@@ -21,40 +21,44 @@ export default function ScanPage() {
 
   const [streaming, setStreaming] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState("LOADING 293 AI...");
+  const [status, setStatus] = useState("LOADING AI...");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [debugLabel, setDebugLabel] = useState("");
 
   useEffect(() => {
     const loadModel = async () => {
-      try {
-        await tf.ready();
-        modelRef.current = await tf.loadLayersModel("/model/model.json");
-        setStatus("🔥 293 AI READY");
-      } catch (error) {
-        console.error(error);
-        setStatus("MODEL LOAD ERROR");
-      }
+      await tf.ready();
+
+      // 🔥 กัน browser cache โหลด weights 5 ใบเก่า
+      tf.io.removeModel("indexeddb://nexora-scan").catch(() => {});
+
+      const model = await tf.loadLayersModel(
+        `/model/model.json?v=${Date.now()}`
+      );
+
+      modelRef.current = model;
+
+      const outputShape = model.outputs[0].shape;
+      const classes = outputShape?.[1] || 0;
+
+      setStatus(`🔥 AI READY ${classes} CLASSES`);
+      console.log("MODEL OUTPUT:", outputShape);
     };
 
     loadModel();
   }, []);
 
   const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-        },
-      });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+      },
+    });
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setStreaming(true);
-        setStatus("📷 LIVE SCAN");
-      }
-    } catch (error: any) {
-      alert("เปิดกล้องไม่ได้: " + error.message);
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      setStreaming(true);
+      setStatus("📷 LIVE SCAN");
     }
   };
 
@@ -88,23 +92,20 @@ export default function ScanPage() {
 
       tf.dispose([input, output]);
 
-      let bestIndex = 0;
-      let bestScore = 0;
+      // 🔥 debug ชัดๆ ว่ามีกี่ class
+      console.log("SCORES LENGTH =", scores.length);
 
-      for (let i = 0; i < scores.length; i++) {
-        if (scores[i] > bestScore) {
-          bestScore = scores[i];
-          bestIndex = i;
-        }
-      }
+      const bestIndex = scores.reduce(
+        (best, score, i) => (score > scores[best] ? i : best),
+        0
+      );
 
-      // ✅ ใช้ index ตรงจาก model 293 ใบ
+      const bestScore = scores[bestIndex];
       const cardNo = String(bestIndex + 1).padStart(3, "0");
 
-      setDebugLabel(cardNo);
+      setDebugLabel(`${cardNo} / ${scores.length}`);
       setConfidence(bestScore);
 
-      // 🔥 threshold ใหม่กันมั่ว
       if (bestScore > 0.65) {
         if (lastCardRef.current === cardNo) return;
         lastCardRef.current = cardNo;
@@ -123,9 +124,9 @@ export default function ScanPage() {
           setName: data.setName || "NEXORA Core Set",
         });
 
-        setStatus(`🃏 DETECTED ${cardNo} • ${(bestScore * 100).toFixed(1)}%`);
-      } else {
-        setStatus(`🔍 SCANNING ${cardNo}`);
+        setStatus(
+          `🃏 ${cardNo} • ${(bestScore * 100).toFixed(1)}% • ${scores.length}C`
+        );
       }
     } finally {
       isPredictingRef.current = false;
@@ -135,9 +136,7 @@ export default function ScanPage() {
   useEffect(() => {
     if (!streaming) return;
 
-    timerRef.current = setInterval(() => {
-      predict();
-    }, 350);
+    timerRef.current = setInterval(predict, 350);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -158,7 +157,7 @@ export default function ScanPage() {
             onClick={startCamera}
             className="w-full rounded-2xl bg-yellow-500 py-4 font-black text-black"
           >
-            📷 เปิดกล้อง AI Scan 293 ใบ
+            📷 เปิดกล้อง AI Scan
           </button>
         )}
 
