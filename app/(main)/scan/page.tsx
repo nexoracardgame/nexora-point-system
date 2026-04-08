@@ -15,27 +15,22 @@ export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const modelRef = useRef<tf.LayersModel | null>(null);
-  const labelsRef = useRef<string[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastCardRef = useRef("");
+  const isPredictingRef = useRef(false);
 
   const [streaming, setStreaming] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState("LOADING AI...");
+  const [status, setStatus] = useState("LOADING 293 AI...");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [debugLabel, setDebugLabel] = useState("");
 
   useEffect(() => {
     const loadModel = async () => {
       try {
-        const model = await tf.loadLayersModel("/model/model.json");
-        modelRef.current = model;
-
-        const metaRes = await fetch("/model/metadata.json");
-        const meta = await metaRes.json();
-        labelsRef.current = meta.labels || [];
-
-        setStatus("AI READY");
+        await tf.ready();
+        modelRef.current = await tf.loadLayersModel("/model/model.json");
+        setStatus("🔥 293 AI READY");
       } catch (error) {
         console.error(error);
         setStatus("MODEL LOAD ERROR");
@@ -56,7 +51,7 @@ export default function ScanPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setStreaming(true);
-        setStatus("LIVE");
+        setStatus("📷 LIVE SCAN");
       }
     } catch (error: any) {
       alert("เปิดกล้องไม่ได้: " + error.message);
@@ -64,71 +59,76 @@ export default function ScanPage() {
   };
 
   const predict = async () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const model = modelRef.current;
+    if (isPredictingRef.current) return;
+    isPredictingRef.current = true;
 
-    if (!video || !canvas || !model) return;
-    if (!video.videoWidth) return;
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const model = modelRef.current;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      if (!video || !canvas || !model) return;
+      if (!video.videoWidth) return;
 
-    // 🎯 ใช้ภาพเต็มตรงกับ Teachable Machine
-    canvas.width = 224;
-    canvas.height = 224;
-    ctx.drawImage(video, 0, 0, 224, 224);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    const input = tf.browser
-      .fromPixels(canvas)
-      .toFloat()
-      .div(255)
-      .expandDims(0);
+      canvas.width = 224;
+      canvas.height = 224;
+      ctx.drawImage(video, 0, 0, 224, 224);
 
-    const output = model.predict(input) as tf.Tensor;
-    const scores = Array.from(await output.data());
+      const input = tf.browser
+        .fromPixels(canvas)
+        .toFloat()
+        .div(255)
+        .expandDims(0);
 
-    tf.dispose([input, output]);
+      const output = model.predict(input) as tf.Tensor;
+      const scores = Array.from(await output.data());
 
-    let bestIndex = 0;
-    let bestScore = 0;
+      tf.dispose([input, output]);
 
-    scores.forEach((score, index) => {
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = index;
+      let bestIndex = 0;
+      let bestScore = 0;
+
+      for (let i = 0; i < scores.length; i++) {
+        if (scores[i] > bestScore) {
+          bestScore = scores[i];
+          bestIndex = i;
+        }
       }
-    });
 
-    const cardNo =
-      labelsRef.current[bestIndex] ||
-      String(bestIndex + 1).padStart(3, "0");
+      // ✅ ใช้ index ตรงจาก model 293 ใบ
+      const cardNo = String(bestIndex + 1).padStart(3, "0");
 
-    setDebugLabel(cardNo);
-    setConfidence(bestScore);
+      setDebugLabel(cardNo);
+      setConfidence(bestScore);
 
-    // 🔥 ลด threshold ให้ติดง่ายก่อน
-    if (bestScore > 0.25) {
-      if (lastCardRef.current === cardNo) return;
-      lastCardRef.current = cardNo;
+      // 🔥 threshold ใหม่กันมั่ว
+      if (bestScore > 0.65) {
+        if (lastCardRef.current === cardNo) return;
+        lastCardRef.current = cardNo;
 
-      const res = await fetch(`/api/card?cardNo=${cardNo}`, {
-        cache: "no-store",
-      });
+        const res = await fetch(`/api/card?cardNo=${cardNo}`, {
+          cache: "no-store",
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      setCard({
-        cardNo,
-        cardName: data.card_name || `CARD ${cardNo}`,
-        rarity: data.rarity || "Unknown",
-        marketPriceTHB: data.marketPriceTHB || 1500,
-        setName: data.setName || "NEXORA Core Set",
-      });
+        setCard({
+          cardNo,
+          cardName: data.card_name || `CARD ${cardNo}`,
+          rarity: data.rarity || "Unknown",
+          marketPriceTHB: data.marketPriceTHB || 1500,
+          setName: data.setName || "NEXORA Core Set",
+        });
 
-      setStatus(`DETECTED ${(bestScore * 100).toFixed(1)}%`);
-    } else {
-      setStatus(`SCANNING ${cardNo}`);
+        setStatus(`🃏 DETECTED ${cardNo} • ${(bestScore * 100).toFixed(1)}%`);
+      } else {
+        setStatus(`🔍 SCANNING ${cardNo}`);
+      }
+    } finally {
+      isPredictingRef.current = false;
     }
   };
 
@@ -137,7 +137,7 @@ export default function ScanPage() {
 
     timerRef.current = setInterval(() => {
       predict();
-    }, 300); // ⚡ เร็วขึ้นมาก
+    }, 350);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -158,7 +158,7 @@ export default function ScanPage() {
             onClick={startCamera}
             className="w-full rounded-2xl bg-yellow-500 py-4 font-black text-black"
           >
-            📷 เปิดกล้อง AI Scan
+            📷 เปิดกล้อง AI Scan 293 ใบ
           </button>
         )}
 
