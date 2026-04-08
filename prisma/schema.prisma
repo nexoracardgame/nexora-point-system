@@ -1,0 +1,149 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id       String  @id @default(cuid())
+  lineId   String  @unique
+  name     String?
+  image    String?
+  nexPoint Float   @default(0)
+  coin     Int     @default(0)
+  role     String  @default("user")
+
+  displayName String?
+  bio         String?
+  coverImage  String?
+  facebookUrl String?
+  lineUrl     String?
+
+  createdAt DateTime @default(now())
+
+  coupons        Coupon[]
+  marketListings MarketListing[] @relation("UserListings")
+  sellerReviews  SellerReview[]  @relation("SellerReviews")
+  buyerReviews   SellerReview[]  @relation("BuyerReviews")
+}
+
+model MarketPost {
+  id        String   @id @default(cuid())
+  cardNo    String
+  cardName  String
+  imageUrl  String
+  price     Int
+  likes     Int      @default(0)
+  seller    String?
+  createdAt DateTime @default(now())
+}
+
+model PointLog {
+  id        String   @id @default(cuid())
+  lineId    String
+  type      String
+  amount    Int
+  point     Float
+  createdAt DateTime @default(now())
+}
+
+model Reward {
+  id        String   @id @default(cuid())
+  name      String
+  nexCost   Float?
+  coinCost  Int?
+  stock     Int
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  coupons Coupon[]
+}
+
+model Coupon {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  userId    String
+  rewardId  String
+  used      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  user   User   @relation(fields: [userId], references: [id])
+  reward Reward @relation(fields: [rewardId], references: [id])
+}
+
+model MarketListing {
+  id        String   @id @default(cuid())
+  cardNo    String
+  serialNo  String?
+  price     Float
+  sellerId  String
+  status    String   @default("active")
+  likes     Int      @default(0)
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  cardName String?
+  imageUrl String?
+  rarity   String?
+
+  seller User @relation("UserListings", fields: [sellerId], references: [id])
+
+  history   MarketHistory[]
+  bids      MarketBid[]
+  wishlists Wishlist[]
+}
+
+model MarketHistory {
+  id        String   @id @default(cuid())
+  listingId String
+  action    String
+  detail    String
+  createdAt DateTime @default(now())
+
+  listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model MarketBid {
+  id        String   @id @default(cuid())
+  listingId String
+  bidder    String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model DealRequest {
+  id           String   @id @default(cuid())
+  cardId       String
+  buyerId      String
+  sellerId     String
+  offeredPrice Float
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+}
+
+model SellerReview {
+  id        String   @id @default(cuid())
+  sellerId  String
+  buyerId   String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  seller User @relation("SellerReviews", fields: [sellerId], references: [id])
+  buyer  User @relation("BuyerReviews", fields: [buyerId], references: [id])
+}

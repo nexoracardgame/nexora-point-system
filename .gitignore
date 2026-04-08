@@ -1,0 +1,9 @@
+k3env/
+ai-dataset/
+nexora_saved_model/
+*.keras
+__pycache__/
+.next/
+node_modules/
+.env
+.env.local

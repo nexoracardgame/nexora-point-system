@@ -1,0 +1,606 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Heart,
+  Plus,
+  Handshake,
+  ShieldCheck,
+} from "lucide-react";
+
+type MarketItem = {
+  id: string;
+  cardNo: string;
+  name: string;
+  price: string;
+  likes: number;
+  rarity: string;
+  image: string;
+  createdAt?: string;
+};
+
+function rarityClasses(rarity: string) {
+  switch (rarity) {
+    case "Legendary":
+      return {
+        glow: "from-amber-400/20 via-orange-400/10 to-transparent",
+        ring: "hover:shadow-[0_20px_80px_rgba(251,191,36,0.18)]",
+      };
+    default:
+      return {
+        glow: "from-fuchsia-500/20 via-violet-400/10 to-transparent",
+        ring: "hover:shadow-[0_20px_80px_rgba(217,70,239,0.16)]",
+      };
+  }
+}
+
+function ActionButton({
+  href,
+  icon,
+  title,
+  subtitle,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-[20px] border border-white/10 bg-white/[0.03] p-4 transition hover:border-violet-300/30 hover:bg-white/[0.05] md:rounded-[24px] md:p-5"
+    >
+      <div className="mb-3 inline-flex rounded-2xl bg-violet-300/10 p-3 text-violet-300 md:mb-4">
+        {icon}
+      </div>
+      <div className="text-base font-black md:text-lg">{title}</div>
+      <div className="mt-1 text-xs text-white/50 md:text-sm">{subtitle}</div>
+    </Link>
+  );
+}
+
+export default function MarketDashboardTFT() {
+  const [items, setItems] = useState<MarketItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [likedCards, setLikedCards] = useState<string[]>([]);
+  const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
+  const [mouse, setMouse] = useState({ x: 50, y: 50 });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("nexora_market_likes");
+      const parsed = raw ? JSON.parse(raw) : [];
+
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Object.keys(parsed || {}).filter((k) => parsed[k]);
+
+      setLikedCards(list);
+    } catch {
+      setLikedCards([]);
+    }
+  }, []);
+
+  const toggleLike = (cardId: string) => {
+    let next: string[];
+
+    if (likedCards.includes(cardId)) {
+      next = likedCards.filter((x) => x !== cardId);
+    } else {
+      next = [...likedCards, cardId];
+    }
+
+    setLikedCards(next);
+
+    const mapped = Object.fromEntries(next.map((id) => [id, true]));
+
+    localStorage.setItem("nexora_market_likes", JSON.stringify(mapped));
+  };
+
+  useEffect(() => {
+    fetch("/api/market/listings", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        const mapped = (data || []).map((item: any) => {
+          const cardNo = item.card_no || item.cardNo || item.id;
+
+          return {
+            id: item.id,
+            cardNo: String(cardNo),
+            name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
+            price: `฿${Number(item.price || 0).toLocaleString()}`,
+            likes: item.likes || 0,
+            rarity: item.rarity || "Legendary",
+            image:
+              item.image_url ||
+              item.imageUrl ||
+              `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
+            createdAt: item.createdAt,
+          };
+        });
+
+        setItems(mapped);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (window.innerWidth < 1024) return;
+
+      setMouse({
+        x: (e.clientX / window.innerWidth) * 100,
+        y: (e.clientY / window.innerHeight) * 100,
+      });
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, []);
+
+  const sortedItems = useMemo(() => {
+    return [...(loading ? [] : items)].sort((a, b) => b.likes - a.likes);
+  }, [items, loading]);
+
+  const heroTop3 = useMemo(() => {
+    const list = [...sortedItems];
+
+    if (heroMode === "latest") {
+      return list
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt || 0).getTime() -
+            new Date(a.createdAt || 0).getTime()
+        )
+        .slice(0, 3);
+    }
+
+    return list.sort((a, b) => b.likes - a.likes).slice(0, 3);
+  }, [sortedItems, heroMode]);
+
+  const leftHero = heroTop3[1];
+  const centerHero = heroTop3[0];
+  const rightHero = heroTop3[2];
+
+  return (
+    <div className="space-y-6 lg:space-y-8">
+      {/* MOBILE HERO */}
+      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(120,80,255,0.18),transparent_38%),linear-gradient(180deg,#111218_0%,#0b0c11_100%)] p-4 lg:hidden">
+        <div className="flex flex-col gap-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.42em] text-violet-300/80">
+              NEXORA ELITE MARKET
+            </div>
+            <h1 className="mt-3 text-3xl font-black tracking-[-0.04em]">
+              FEATURED TOP 3
+            </h1>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setHeroMode("popular")}
+              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                heroMode === "popular"
+                  ? "bg-pink-500/20 text-pink-300"
+                  : "bg-white/[0.05] text-white/60"
+              }`}
+            >
+              ❤️ Popular
+            </button>
+
+            <button
+              onClick={() => setHeroMode("latest")}
+              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                heroMode === "latest"
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "bg-white/[0.05] text-white/60"
+              }`}
+            >
+              🆕 Latest
+            </button>
+          </div>
+        </div>
+
+        {centerHero && (
+          <Link
+            href={`/market/card/${centerHero.id}`}
+            className="mt-5 block overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.06] shadow-[0_25px_80px_rgba(168,85,247,0.20)] backdrop-blur-xl"
+          >
+            <div className="relative">
+              <img
+                src={centerHero.image}
+                alt={centerHero.name}
+                className="h-[300px] w-full object-cover"
+              />
+
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleLike(centerHero.id);
+                }}
+                className="absolute right-3 top-3 rounded-full bg-black/50 p-3"
+              >
+                <Heart
+                  className={`h-5 w-5 ${
+                    likedCards.includes(centerHero.id)
+                      ? "fill-pink-500 text-pink-500"
+                      : "text-white"
+                  }`}
+                />
+              </button>
+
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4">
+                <div className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur-md">
+                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/60">
+                    FEATURED CARD
+                  </div>
+
+                  <div className="mt-2 line-clamp-2 text-xl font-black leading-tight">
+                    {centerHero.name}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-base font-bold text-amber-300">
+                      {centerHero.price}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-white/70">
+                      <Heart className="h-4 w-4 fill-pink-500 text-pink-500" />
+                      {centerHero.likes +
+                        (likedCards.includes(centerHero.id) ? 1 : 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Link>
+        )}
+
+        {(leftHero || rightHero) && (
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[leftHero, rightHero].filter(Boolean).map((card) => {
+              if (!card) return null;
+
+              return (
+                <Link
+                  key={card.id}
+                  href={`/market/card/${card.id}`}
+                  className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04]"
+                >
+                  <img
+                    src={card.image}
+                    alt={card.name}
+                    className="h-[180px] w-full object-cover"
+                  />
+
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleLike(card.id);
+                    }}
+                    className="absolute right-2 top-2 rounded-full bg-black/50 p-2"
+                  >
+                    <Heart
+                      className={`h-4 w-4 ${
+                        likedCards.includes(card.id)
+                          ? "fill-pink-500 text-pink-500"
+                          : "text-white"
+                      }`}
+                    />
+                  </button>
+
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3">
+                    <div className="line-clamp-2 text-sm font-black leading-tight">
+                      {card.name}
+                    </div>
+                    <div className="mt-1 text-xs font-bold text-amber-300">
+                      {card.price}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* DESKTOP HERO - ORIGINAL */}
+      <section className="relative hidden overflow-hidden rounded-[42px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(120,80,255,0.14),transparent_35%),linear-gradient(180deg,#111218_0%,#0b0c11_100%)] px-8 py-12 xl:px-14 xl:py-16 lg:block">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.5em] text-violet-300/80">
+              NEXORA ELITE MARKET
+            </div>
+
+            <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-6xl">
+              FEATURED TOP 3
+            </h1>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setHeroMode("popular")}
+              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                heroMode === "popular"
+                  ? "bg-pink-500/20 text-pink-300"
+                  : "bg-white/[0.05] text-white/60"
+              }`}
+            >
+              ❤️ Popular
+            </button>
+
+            <button
+              onClick={() => setHeroMode("latest")}
+              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                heroMode === "latest"
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "bg-white/[0.05] text-white/60"
+              }`}
+            >
+              🆕 Latest
+            </button>
+          </div>
+        </div>
+
+        <div className="relative mt-16 flex min-h-[560px] items-end justify-center">
+          {leftHero && (
+            <Link
+              href={`/market/card/${leftHero.id}`}
+              className="absolute left-10 bottom-0 hidden lg:block"
+            >
+              <div className="group relative">
+                <img
+                  src={leftHero.image}
+                  className="h-[380px] w-[260px] rotate-[-10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
+                />
+
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleLike(leftHero.id);
+                  }}
+                  className="absolute right-3 top-3 rounded-full bg-black/50 p-2"
+                >
+                  <Heart
+                    className={`h-4 w-4 ${
+                      likedCards.includes(leftHero.id)
+                        ? "fill-pink-500 text-pink-500"
+                        : "text-white"
+                    }`}
+                  />
+                </button>
+
+                <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
+                  <div className="line-clamp-2 text-sm font-black leading-tight">
+                    {leftHero.name}
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="text-sm font-bold text-amber-300">
+                      {leftHero.price}
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs text-white/70">
+                      <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" />
+                      {leftHero.likes +
+                        (likedCards.includes(leftHero.id) ? 1 : 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {centerHero && (
+            <Link
+              href={`/market/card/${centerHero.id}`}
+              className="relative z-20 w-full max-w-[400px] overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.06] shadow-[0_30px_120px_rgba(168,85,247,0.20)] backdrop-blur-xl transition duration-500 hover:-translate-y-2"
+              style={{
+                transform: `translate(${(mouse.x - 50) * 0.06}px, ${(mouse.y - 50) * 0.04}px)`,
+              }}
+            >
+              <img
+                src={centerHero.image}
+                alt={centerHero.name}
+                className="h-[560px] w-full object-cover"
+              />
+
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleLike(centerHero.id);
+                }}
+                className="absolute right-4 top-4 rounded-full bg-black/50 p-3"
+              >
+                <Heart
+                  className={`h-5 w-5 ${
+                    likedCards.includes(centerHero.id)
+                      ? "fill-pink-500 text-pink-500"
+                      : "text-white"
+                  }`}
+                />
+              </button>
+
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-6">
+                <div className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur-md">
+                  <div className="text-xs uppercase tracking-[0.3em] text-white/60">
+                    FEATURED CARD
+                  </div>
+
+                  <div className="mt-2 text-3xl font-black">
+                    {centerHero.name}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-lg font-bold text-amber-300">
+                      {centerHero.price}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-white/70">
+                      <Heart className="h-4 w-4 fill-pink-500 text-pink-500" />
+                      {centerHero.likes +
+                        (likedCards.includes(centerHero.id) ? 1 : 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {rightHero && (
+            <Link
+              href={`/market/card/${rightHero.id}`}
+              className="absolute right-10 bottom-0 hidden lg:block"
+            >
+              <div className="group relative">
+                <img
+                  src={rightHero.image}
+                  className="h-[380px] w-[260px] rotate-[10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
+                />
+
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleLike(rightHero.id);
+                  }}
+                  className="absolute right-3 top-3 rounded-full bg-black/50 p-2"
+                >
+                  <Heart
+                    className={`h-4 w-4 ${
+                      likedCards.includes(rightHero.id)
+                        ? "fill-pink-500 text-pink-500"
+                        : "text-white"
+                    }`}
+                  />
+                </button>
+
+                <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
+                  <div className="line-clamp-2 text-sm font-black leading-tight">
+                    {rightHero.name}
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="text-sm font-bold text-amber-300">
+                      {rightHero.price}
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs text-white/70">
+                      <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" />
+                      {rightHero.likes +
+                        (likedCards.includes(rightHero.id) ? 1 : 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
+        </div>
+      </section>
+
+      {/* ACTIONS */}
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-4">
+        <ActionButton
+          href="/market/create"
+          icon={<Plus className="h-5 w-5" />}
+          title="Create Listing"
+          subtitle="สร้างรายการขายการ์ดจริง"
+        />
+        <ActionButton
+          href="/market/deals"
+          icon={<Handshake className="h-5 w-5" />}
+          title="Deal Requests"
+          subtitle="ดูคำขอดีล / ตอบรับ"
+        />
+        <ActionButton
+          href="/market/wishlist"
+          icon={<Heart className="h-5 w-5" />}
+          title="Wishlist"
+          subtitle="การ์ดที่กำลังติดตาม"
+        />
+        <ActionButton
+          href="/market/seller-center"
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="Seller Center"
+          subtitle="จัดการโพสต์และรีวิว"
+        />
+      </section>
+
+      {/* MARKET GRID */}
+      <section>
+        <div className="mb-4 text-2xl font-black lg:mb-5 lg:text-3xl">
+          🛒 Marketplace Listings
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-5">
+          {sortedItems.map((card) => {
+            const rarity = rarityClasses(card.rarity);
+            const liked = likedCards.includes(card.id);
+
+            return (
+              <Link
+                key={card.id}
+                href={`/market/card/${card.id}`}
+                className={`group relative overflow-hidden rounded-[22px] border border-white/10 bg-[#101116] transition-all duration-500 hover:-translate-y-1 lg:rounded-[28px] ${rarity.ring}`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-b ${rarity.glow}`} />
+
+                <div className="relative z-10 p-2 lg:p-3">
+                  <div className="relative overflow-hidden rounded-[16px] lg:rounded-[20px]">
+                    <img
+                      src={card.image}
+                      alt={card.name}
+                      className="h-[210px] w-full rounded-[16px] object-cover transition duration-700 group-hover:scale-105 sm:h-[240px] lg:h-[320px] lg:rounded-[20px]"
+                    />
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleLike(card.id);
+                      }}
+                      className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md transition hover:scale-105 lg:right-3 lg:top-3 lg:h-10 lg:w-10"
+                    >
+                      <Heart
+                        className={`h-4 w-4 ${
+                          liked
+                            ? "fill-pink-500 text-pink-500"
+                            : "text-white/70"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="pt-3 text-[13px] font-black leading-snug sm:text-[15px] lg:pt-4 lg:text-[17px]">
+                    {card.name}
+                  </div>
+
+                  <div className="mt-1 text-xs font-semibold text-amber-300 lg:mt-2 lg:text-sm">
+                    {card.price}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-white/60 lg:mt-3 lg:text-xs">
+                    <Heart
+                      className={`h-3.5 w-3.5 ${
+                        liked
+                          ? "fill-pink-500 text-pink-500"
+                          : "text-white/40"
+                      }`}
+                    />
+                    {card.likes + (liked ? 1 : 0)}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
