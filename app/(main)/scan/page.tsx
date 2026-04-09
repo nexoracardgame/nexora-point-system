@@ -170,6 +170,11 @@ export default function ScanPage() {
         }),
       });
 
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`GAS ${res.status}: ${text.slice(0, 80)}`);
+      }
+
       const json = await res.json();
       const raw = String(json.reply || "").trim();
 
@@ -195,9 +200,16 @@ export default function ScanPage() {
         marketPriceTHB: data.marketPriceTHB || 1500,
         setName: data.setName || "NEXORA",
       });
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ Vision Scan ล้มเหลว");
+    } catch (err: any) {
+      console.error("VISION ERROR:", err);
+
+      let msg = "❌ Vision Scan ล้มเหลว";
+
+      if (err?.message) {
+        msg = `❌ ${err.message}`;
+      }
+
+      setStatus(msg);
     } finally {
       setIsProcessing(false);
     }
