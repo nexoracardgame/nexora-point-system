@@ -225,12 +225,13 @@ export default function ScanPage() {
             : ""}
         </div>
 
-        {!streaming && ready && (
+        {!streaming && (
+          
           <button
-            onClick={startCamera}
-            className="w-full rounded-2xl bg-yellow-500 py-4 font-black text-black"
+            onClick={ready ? startCamera : undefined}
+            className={`w-full rounded-2xl py-4 font-black transition-all ${ready ? "bg-yellow-500 text-black hover:scale-[1.02]" : "bg-zinc-800 text-zinc-300 animate-pulse cursor-wait"}`}
           >
-            📷 เปิด WORLD CLASS 293 SCAN
+            {ready ? "📷 เปิด WORLD CLASS 293 SCAN" : `⏳ กำลังโหลดการ์ด ${loadingProgress}%` }
           </button>
         )}
 
