@@ -6,8 +6,9 @@ type CardData = {
   cardNo: string;
   cardName: string;
   rarity: string;
-  marketPriceTHB: number;
-  setName: string;
+  imageUrl?: string;
+  marketPriceTHB?: number;
+  setName?: string;
 };
 
 export default function ScanPage() {
@@ -105,12 +106,7 @@ export default function ScanPage() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    if (!video || !canvas) {
-      setStatus("❌ กล้องยังไม่พร้อม");
-      return;
-    }
-
-    if (!video.videoWidth) {
+    if (!video || !canvas || !video.videoWidth) {
       setStatus("❌ กล้องยังไม่พร้อม");
       return;
     }
@@ -144,16 +140,21 @@ export default function ScanPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             clientId: "nexora-scan",
-            message:
-              "ระบุเลขการ์ด NEXORA 3 หลัก",
+            message: "ระบุเลขการ์ด NEXORA 3 หลัก",
             image,
           }),
         }
       );
 
-      setStatus(`📡 STATUS: ${res.status}`);
+      const text = await res.text();
 
-      const json = await res.json();
+      let json: any;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        setStatus(`❌ GAS ไม่ได้ส่ง JSON`);
+        return;
+      }
 
       const raw =
         typeof json === "string"
@@ -164,8 +165,10 @@ export default function ScanPage() {
           ? json.text.trim()
           : "";
 
-      if (!raw) {
-        setStatus("❌ AI ไม่ส่งผลลัพธ์กลับ");
+      const cardNo = raw.match(/\d{3}/)?.[0];
+
+      if (!cardNo) {
+        setStatus(`❌ AI อ่านเลขไม่ได้: ${raw}`);
         return;
       }
 
@@ -174,10 +177,9 @@ export default function ScanPage() {
 
       setCard({
         cardNo,
-        cardName: data.card_name || `CARD ${cardNo}`,
-        rarity: data.rarity || "Unknown",
-        marketPriceTHB: data.marketPriceTHB || 1500,
-        setName: data.setName || "NEXORA",
+        cardName: data.card_name || "Unknown Card",
+        rarity: data.rarity || "-",
+        imageUrl: data.image_url,
       });
 
       setStatus(`🃏 เจอการ์ด ${cardNo}`);
@@ -220,6 +222,9 @@ export default function ScanPage() {
                 CARD #{card.cardNo}
               </div>
               <h2 className="text-2xl font-black">{card.cardName}</h2>
+              <div className="mt-2 text-sm text-zinc-400">
+                Rarity: {card.rarity}
+              </div>
             </>
           ) : (
             <div className="text-sm text-zinc-400">
