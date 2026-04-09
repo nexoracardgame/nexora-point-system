@@ -78,9 +78,7 @@ export default function ScanPage() {
 
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: "environment" },
-            },
+            video: { facingMode: { ideal: "environment" } },
             audio: false,
           });
         } catch {
@@ -156,7 +154,6 @@ export default function ScanPage() {
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
-      // 🎨 art กลาง
       const artCanvas = document.createElement("canvas");
       artCanvas.width = 520;
       artCanvas.height = 520;
@@ -164,7 +161,6 @@ export default function ScanPage() {
       if (!artCtx) throw new Error("art canvas fail");
       artCtx.drawImage(canvas, 100, 180, 520, 520, 0, 0, 520, 520);
 
-      // ⚡ top-left
       const topCanvas = document.createElement("canvas");
       topCanvas.width = 220;
       topCanvas.height = 220;
@@ -172,7 +168,6 @@ export default function ScanPage() {
       if (!topCtx) throw new Error("top canvas fail");
       topCtx.drawImage(canvas, 40, 40, 220, 220, 0, 0, 220, 220);
 
-      // 🏷️ bottom-name
       const bottomCanvas = document.createElement("canvas");
       bottomCanvas.width = 420;
       bottomCanvas.height = 140;
@@ -184,41 +179,45 @@ export default function ScanPage() {
       const topMatch = matchCardFromCanvas(topCanvas, indexRef.current);
       const bottomMatch = matchCardFromCanvas(bottomCanvas, indexRef.current);
 
-      const sameTop =
-        artMatch && topMatch && artMatch.cardNo === topMatch.cardNo;
-      const sameBottom =
-        artMatch && bottomMatch && artMatch.cardNo === bottomMatch.cardNo;
+      const votes = [
+        artMatch?.cardNo,
+        topMatch?.cardNo,
+        bottomMatch?.cardNo,
+      ].filter(Boolean) as string[];
 
       let match = artMatch;
 
-      if (artMatch && sameTop && sameBottom) {
-        match = {
-          ...artMatch,
-          confidence: Math.min(
-            1,
-            (artMatch.confidence +
-              (topMatch?.confidence || 0) +
-              (bottomMatch?.confidence || 0)) /
-              3 +
-              0.22
-          ),
-        };
-      } else if (artMatch && sameTop) {
-        match = {
-          ...artMatch,
-          confidence: Math.min(
-            1,
-            (artMatch.confidence + (topMatch?.confidence || 0)) / 2 + 0.15
-          ),
-        };
-      } else if (artMatch && sameBottom) {
-        match = {
-          ...artMatch,
-          confidence: Math.min(
-            1,
-            (artMatch.confidence + (bottomMatch?.confidence || 0)) / 2 + 0.12
-          ),
-        };
+      if (votes.length) {
+        const counts: Record<string, number> = {};
+
+        for (const vote of votes) {
+          counts[vote] = (counts[vote] || 0) + 1;
+        }
+
+        const winner = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+
+        if (winner) {
+          const winnerCardNo = winner[0];
+          const voteCount = winner[1];
+
+          const source =
+            artMatch?.cardNo === winnerCardNo
+              ? artMatch
+              : topMatch?.cardNo === winnerCardNo
+              ? topMatch
+              : bottomMatch;
+
+          if (source) {
+            match = {
+              ...source,
+              confidence: Math.min(
+                1,
+                (source.confidence || 0.5) +
+                  (voteCount === 3 ? 0.28 : voteCount === 2 ? 0.18 : 0)
+              ),
+            };
+          }
+        }
       }
 
       if (!match) {
@@ -296,13 +295,9 @@ export default function ScanPage() {
                 CARD #{card.cardNo}
               </div>
               <h2 className="text-2xl font-black">{card.cardName}</h2>
-              <div className="mt-2 text-sm text-zinc-400">
-                Rarity: {card.rarity}
-              </div>
+              <div className="mt-2 text-sm text-zinc-400">Rarity: {card.rarity}</div>
               {card.setName ? (
-                <div className="mt-1 text-sm text-zinc-500">
-                  Set: {card.setName}
-                </div>
+                <div className="mt-1 text-sm text-zinc-500">Set: {card.setName}</div>
               ) : null}
             </>
           ) : (
