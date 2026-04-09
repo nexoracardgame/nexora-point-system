@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Flame } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Play, Sparkles } from "lucide-react";
 
 export default function NexoraLuxuryHome() {
   const [mouse, setMouse] = useState({ x: 50, y: 50 });
@@ -19,116 +19,134 @@ export default function NexoraLuxuryHome() {
     return () => window.removeEventListener("mousemove", move);
   }, []);
 
-  const cards = [
-    { title: "Infernal Flame", price: "8,900 NEX", rarity: "Legendary" },
-    { title: "Tidal Wrath", price: "6,700 NEX", rarity: "Mythic" },
-    { title: "Valecrown Titan", price: "12,500 NEX", rarity: "Genesis" },
-  ];
+  const gameTiles = useMemo(
+    () => [
+      { title: "NEXORA MARKET", image: "/cards/001.jpg", active: true },
+      { title: "CARD BATTLE", image: "/cards/002.jpg" },
+      { title: "COLLECTIONS", image: "/cards/003.jpg" },
+      { title: "REWARDS", image: "/cards/004.jpg" },
+    ],
+    []
+  );
 
   return (
-    <div className="relative min-h-[calc(100vh-140px)] overflow-hidden rounded-[38px] border border-white/10 bg-[#111118] text-white shadow-[0_30px_120px_rgba(0,0,0,0.45)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(255,153,0,0.08),transparent_22%)]" />
+    <div className="relative min-h-[calc(100vh-140px)] overflow-hidden rounded-[32px] border border-white/10 bg-[#090714] text-white shadow-[0_40px_140px_rgba(0,0,0,0.55)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.18),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(168,85,247,0.18),transparent_30%),radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.14),transparent_28%)]" />
+      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] p-6 xl:p-8">
-        {/* LEFT HERO */}
-        <div className="relative min-h-[760px] overflow-hidden rounded-[34px] border border-white/10 bg-[#0f1016]">
-          <div className="relative z-10 p-8">
-            <h1 className="text-[72px] font-black leading-[0.88] tracking-[-0.04em] xl:text-[140px]">
-              YOUR
-              <br />
-              <span className="bg-gradient-to-r from-amber-300 via-orange-400 to-fuchsia-500 bg-clip-text text-transparent">
-                NEXORA
-              </span>
-              <br />
-              STYLE
-            </h1>
+      <section className="relative grid min-h-[calc(100vh-140px)] grid-cols-1 lg:grid-cols-[320px_1fr]">
+        {/* LEFT PANEL */}
+        <div className="relative z-20 border-b border-white/10 bg-black/20 p-4 backdrop-blur-xl lg:border-b-0 lg:border-r lg:p-6">
+          <div className="mb-6">
+            <div className="text-2xl font-black tracking-tight">NEXORA</div>
+            <div className="text-xs uppercase tracking-[0.3em] text-white/40">
+              Ultimate Card Universe
+            </div>
           </div>
 
+          <div className="mb-4 text-xs uppercase tracking-[0.28em] text-white/40">
+            Select your zone
+          </div>
+
+          <div className="space-y-3">
+            {gameTiles.map((tile, i) => (
+              <Link
+                key={tile.title}
+                href="/market"
+                className={`group relative block overflow-hidden rounded-[20px] border transition-all duration-500 ${
+                  tile.active
+                    ? "border-amber-300/60 shadow-[0_0_30px_rgba(251,191,36,0.18)]"
+                    : "border-white/10 hover:border-cyan-400/40"
+                }`}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent z-10" />
+                <img
+                  src={tile.image}
+                  alt={tile.title}
+                  className="h-[92px] w-full object-cover transition duration-700 group-hover:scale-110"
+                />
+                <div className="absolute inset-y-0 left-0 z-20 flex items-center px-4 text-lg font-black tracking-wide">
+                  {tile.title}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* HERO */}
+        <div className="relative min-h-[720px] overflow-hidden">
           <div
-            className="absolute bottom-0 left-0 transition-transform duration-300"
+            className="absolute inset-0 transition-transform duration-300"
             style={{
-              transform: `translate(${(mouse.x - 50) * 0.08}px, ${(mouse.y - 50) * 0.05}px)`,
+              transform: `translate(${(mouse.x - 50) * 0.12}px, ${(mouse.y - 50) * 0.08}px) scale(1.03)`,
             }}
           >
             <img
-              src="https://s.imgz.io/2026/03/20/158-39efa94028226fea.png"
+              src="/cards/001.jpg"
               alt="hero"
-              className="h-[680px] w-auto object-contain drop-shadow-[0_0_90px_rgba(255,153,0,0.18)]"
+              className="h-full w-full object-cover opacity-30"
             />
           </div>
 
-          <div className="absolute bottom-8 left-[42%] z-20 grid w-[48%] gap-4">
-            <div className="rounded-[28px] border border-amber-300/15 bg-gradient-to-br from-orange-500/20 to-fuchsia-500/10 p-6 backdrop-blur-xl">
-              <div className="text-sm uppercase tracking-[0.28em] text-amber-300">
-                #001
-              </div>
-              <div className="mt-3 text-4xl font-black">GENESIS DROP</div>
-              <p className="mt-3 text-sm leading-7 text-white/65">
-                Enter the elite world of premium serial collectibles and unlock
-                legendary elemental prestige.
-              </p>
+          <div className="absolute right-[-5%] top-[8%] hidden h-[78%] w-[58%] lg:block">
+            <img
+              src="/cards/002.jpg"
+              alt="feature"
+              className="h-full w-full object-contain drop-shadow-[0_0_80px_rgba(59,130,246,0.35)] animate-[floatY_6s_ease-in-out_infinite]"
+            />
+          </div>
+
+          <div className="relative z-20 flex h-full flex-col justify-center px-6 py-10 sm:px-10 lg:px-16">
+            <div className="mb-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.4em] text-cyan-300">
+              <Sparkles className="h-4 w-4" />
+              NEXORA CHAMPIONS
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/95 px-6 py-6 text-black shadow-[0_20px_80px_rgba(255,255,255,0.08)]">
-              <div className="text-3xl font-black leading-tight">
-                Discover the world where
-                <br />
-                NEXORA matters
-              </div>
+            <h1 className="max-w-[760px] text-[44px] font-black leading-[0.92] sm:text-[72px] lg:text-[96px] xl:text-[110px]">
+              GET BETTER
+              <br />
+              <span className="text-white">AT NEXORA</span>
+              <br />
+              <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent">
+                CARDGAME
+              </span>
+            </h1>
+
+            <p className="mt-6 max-w-[620px] text-base leading-8 text-white/70 sm:text-xl">
+              Enter the futuristic battleground of 293 unique sigils, luxury
+              serial cards, ranked duels, elite rewards, and cinematic world-class
+              collection experiences.
+            </p>
+
+            <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+              <button className="inline-flex h-[58px] items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-8 text-base font-black text-black shadow-[0_0_30px_rgba(251,191,36,0.35)] transition hover:scale-[1.03]">
+                <Play className="h-5 w-5" />
+                Watch action
+              </button>
+
               <Link
                 href="/market"
-                className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-black px-5 py-3 font-bold text-white"
+                className="inline-flex h-[58px] items-center justify-center gap-3 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-8 text-base font-black text-cyan-200 backdrop-blur-xl transition hover:scale-[1.03]"
               >
-                Mint now
-                <ArrowUpRight className="h-4 w-4" />
+                Explore
+                <ArrowRight className="h-5 w-5" />
               </Link>
             </div>
           </div>
         </div>
-
-        {/* RIGHT */}
-        <div className="grid gap-5">
-          <div className="rounded-[34px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_20px_100px_rgba(0,0,0,0.3)]">
-            <div className="mb-4 flex items-center gap-3">
-              <Flame className="h-5 w-5 text-amber-300" />
-              <div className="text-5xl font-black leading-none">
-                HOT
-                <br />
-                NEXORA
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {cards.map((card) => (
-                <div
-                  key={card.title}
-                  className="group rounded-[28px] border border-white/10 bg-[#111118] p-4 transition duration-500 hover:-translate-y-2 hover:shadow-[0_20px_80px_rgba(255,153,0,0.12)]"
-                >
-                  <div className="text-xs uppercase tracking-[0.28em] text-white/45">
-                    {card.price}
-                  </div>
-                  <img
-                    src="https://s.imgz.io/2026/03/20/158-39efa94028226fea.png"
-                    alt={card.title}
-                    className="mx-auto h-[240px] object-contain transition duration-500 group-hover:scale-105"
-                  />
-                  <div className="text-xl font-black">{card.title}</div>
-                  <div className="text-sm text-amber-300">{card.rarity}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[34px] border border-white/10 bg-gradient-to-r from-amber-400/10 via-orange-400/10 to-fuchsia-500/10 p-6 shadow-[0_20px_80px_rgba(255,153,0,0.08)]">
-            <div className="text-sm uppercase tracking-[0.3em] text-white/50">
-              Luxury ownership
-            </div>
-            <div className="mt-2 text-5xl font-black leading-tight">
-              293 Unique Sigils • 500,000 Printed • 1/1 Serial
-            </div>
-          </div>
-        </div>
       </section>
+
+      <style jsx>{`
+        @keyframes floatY {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-18px);
+          }
+        }
+      `}</style>
     </div>
   );
 }
