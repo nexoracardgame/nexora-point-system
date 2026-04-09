@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  warmupCardIndex,
   matchCardFromCanvas,
   shouldAcceptMatch,
   type CardDescriptor,
@@ -21,14 +20,13 @@ export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const indexRef = useRef<CardDescriptor[]>([]);
 
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("🚀 OPENING CAMERA...");
   const [isProcessing, setIsProcessing] = useState(false);
   const [indexReady, setIndexReady] = useState(false);
   const [indexCount, setIndexCount] = useState(0);
-
-  const indexRef = useRef<CardDescriptor[]>([]);
 
   const drawGuide = () => {
     const canvas = overlayCanvasRef.current;
@@ -63,7 +61,20 @@ export default function ScanPage() {
 
     const boot = async () => {
       try {
-        setStatus("🎥 กำลังเปิดกล้อง...");
+        setStatus("🧠 โหลดระบบสแกน...");
+
+        const indexRes = await fetch(`/cards/card-index.json?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+
+        if (!indexRes.ok) {
+          throw new Error("โหลด card-index ไม่สำเร็จ");
+        }
+
+        const descriptors = (await indexRes.json()) as CardDescriptor[];
+        indexRef.current = descriptors;
+        setIndexCount(descriptors.length);
+        setIndexReady(true);
 
         try {
           stream = await navigator.mediaDevices.getUserMedia({
@@ -93,20 +104,10 @@ export default function ScanPage() {
           drawGuide();
         }, 300);
 
-        setStatus("🧠 กำลังโหลดฐานข้อมูลการ์ด...");
-        const descriptors = await warmupCardIndex((done, total) => {
-          setIndexCount(done);
-          if (done < total) {
-            setStatus(`🧠 กำลังโหลดฐานข้อมูลการ์ด... ${done}/${total}`);
-          }
-        });
-
-        indexRef.current = descriptors;
-        setIndexReady(true);
         setStatus("⚡ CARD VISION READY");
       } catch (err) {
         console.error("SCAN BOOT ERROR:", err);
-        setStatus("❌ เปิดกล้องหรือโหลดฐานข้อมูลไม่สำเร็จ");
+        setStatus("❌ เปิดกล้องหรือโหลด index ไม่สำเร็จ");
       }
     };
 
@@ -131,12 +132,12 @@ export default function ScanPage() {
     }
 
     if (!indexReady || !indexRef.current.length) {
-      setStatus(`⏳ รอฐานข้อมูลการ์ดก่อน... ${indexCount}/293`);
+      setStatus("⏳ ระบบยังโหลดไม่เสร็จ");
       return;
     }
 
     setIsProcessing(true);
-    setStatus("🧠 กำลังเทียบภาพการ์ด...");
+    setStatus("🧠 กำลังเทียบ art กลางการ์ด...");
 
     try {
       const ctx = canvas.getContext("2d");
@@ -155,39 +156,23 @@ export default function ScanPage() {
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
-// 🎯 ใช้เฉพาะโซน art กลาง ลดผลกระทบกรอบ/โต๊ะ/มือ
-const artCanvas = document.createElement("canvas");
-artCanvas.width = 520;
-artCanvas.height = 520;
+      const artCanvas = document.createElement("canvas");
+      artCanvas.width = 520;
+      artCanvas.height = 520;
 
-const artCtx = artCanvas.getContext("2d");
-if (!artCtx) throw new Error("art canvas fail");
+      const artCtx = artCanvas.getContext("2d");
+      if (!artCtx) throw new Error("art canvas fail");
 
-// crop เฉพาะกลางการ์ด
-artCtx.drawImage(
-  canvas,
-  100,   // x
-  180,   // y
-  520,   // width
-  520,   // height
-  0,
-  0,
-  520,
-  520
-);
+      artCtx.drawImage(canvas, 100, 180, 520, 520, 0, 0, 520, 520);
 
-const match = matchCardFromCanvas(artCanvas, indexRef.current);
+      const match = matchCardFromCanvas(artCanvas, indexRef.current);
 
       if (!match) {
         setStatus("❌ ไม่มีผลลัพธ์จากระบบเทียบภาพ");
         return;
       }
 
-      if (!shouldAcceptMatch(match)) {
-        setStatus(
-          `⚠️ เดาว่าเป็น ${match.cardNo} (${(match.confidence * 100).toFixed(0)}%)`
-        );
-      }
+      const accepted = shouldAcceptMatch(match);
 
       const cardRes = await fetch(`/api/card?cardNo=${match.cardNo}`, {
         cache: "no-store",
@@ -210,9 +195,9 @@ const match = matchCardFromCanvas(artCanvas, indexRef.current);
       });
 
       setStatus(
-        `🃏 เจอการ์ด ${match.cardNo} | confidence ${(match.confidence * 100).toFixed(
-          0
-        )}%`
+        accepted
+          ? `🃏 เจอการ์ด ${match.cardNo} | ${(match.confidence * 100).toFixed(0)}%`
+          : `⚠️ คาดว่า ${match.cardNo} | ${(match.confidence * 100).toFixed(0)}%`
       );
     } catch (err: any) {
       console.error(err);
@@ -224,15 +209,15 @@ const match = matchCardFromCanvas(artCanvas, indexRef.current);
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4 pb-32">
-        <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4 pb-44">
+        <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3 backdrop-blur-xl">
           <div className="text-sm font-bold text-yellow-300">{status}</div>
           <div className="mt-1 text-[11px] text-zinc-400">
-            INDEX: {indexReady ? "READY" : `${indexCount}/293`}
+            INDEX: {indexReady ? `${indexCount} ใบพร้อม` : "LOADING"}
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black">
+        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_60px_rgba(234,179,8,0.12)]">
           <div className="relative aspect-[4/5] w-full">
             <video
               ref={videoRef}
@@ -250,7 +235,7 @@ const match = matchCardFromCanvas(artCanvas, indexRef.current);
 
         <canvas ref={canvasRef} className="hidden" />
 
-        <div className="mt-3 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5">
+        <div className="mt-4 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5">
           {card ? (
             <>
               <div className="mb-3 text-xs font-bold text-yellow-300">
@@ -260,11 +245,6 @@ const match = matchCardFromCanvas(artCanvas, indexRef.current);
               <div className="mt-2 text-sm text-zinc-400">Rarity: {card.rarity}</div>
               {card.setName ? (
                 <div className="mt-1 text-sm text-zinc-500">Set: {card.setName}</div>
-              ) : null}
-              {typeof card.marketPriceTHB === "number" ? (
-                <div className="mt-1 text-sm text-zinc-500">
-                  Price: ฿{card.marketPriceTHB}
-                </div>
               ) : null}
             </>
           ) : (
@@ -278,7 +258,7 @@ const match = matchCardFromCanvas(artCanvas, indexRef.current);
       <button
         onClick={captureAndAnalyze}
         disabled={isProcessing || !indexReady}
-        className="fixed bottom-6 left-1/2 z-50 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)] active:scale-95 disabled:opacity-60"
+        className="fixed bottom-24 left-1/2 z-50 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)] transition-all active:scale-95 disabled:opacity-60"
       >
         {isProcessing ? "⏳" : "📸"}
       </button>
