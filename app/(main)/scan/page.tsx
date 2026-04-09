@@ -12,7 +12,6 @@ type CardData = {
   cardName: string;
   rarity: string;
   imageUrl?: string;
-  marketPriceTHB?: number;
   setName?: string;
   reward?: string;
 };
@@ -32,17 +31,14 @@ export default function ScanPage() {
   const drawGuide = () => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const w = canvas.width;
     const h = canvas.height;
-
     ctx.clearRect(0, 0, w, h);
 
     const boxW = w * 0.82;
@@ -57,20 +53,57 @@ export default function ScanPage() {
     ctx.stroke();
   };
 
+  const detectCardShape = (canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+
+    const { width, height } = canvas;
+    const data = ctx.getImageData(0, 0, width, height).data;
+
+    let edgeCount = 0;
+    let borderContrast = 0;
+
+    for (let y = 8; y < height - 8; y += 8) {
+      for (let x = 8; x < width - 8; x += 8) {
+        const i = (y * width + x) * 4;
+        const left = (y * width + (x - 4)) * 4;
+        const top = ((y - 4) * width + x) * 4;
+
+        const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        const lumLeft =
+          data[left] * 0.299 + data[left + 1] * 0.587 + data[left + 2] * 0.114;
+        const lumTop =
+          data[top] * 0.299 + data[top + 1] * 0.587 + data[top + 2] * 0.114;
+
+        const diff = Math.abs(lum - lumLeft) + Math.abs(lum - lumTop);
+        if (diff > 90) edgeCount++;
+
+        if (
+          x < 40 ||
+          x > width - 40 ||
+          y < 40 ||
+          y > height - 40
+        ) {
+          borderContrast += diff;
+        }
+      }
+    }
+
+    return edgeCount > 140 && borderContrast > 4000;
+  };
+
   useEffect(() => {
     let stream: MediaStream | null = null;
 
     const boot = async () => {
       try {
         setStatus("🧠 โหลดระบบสแกน...");
-
-        const indexRes = await fetch(`/cards/card-index.json?ts=${Date.now()}`, {
+        const res = await fetch(`/cards/card-index.json?ts=${Date.now()}`, {
           cache: "no-store",
         });
+        if (!res.ok) throw new Error("โหลด card-index ไม่สำเร็จ");
 
-        if (!indexRes.ok) throw new Error("โหลด card-index ไม่สำเร็จ");
-
-        const descriptors = (await indexRes.json()) as CardDescriptor[];
+        const descriptors = (await res.json()) as CardDescriptor[];
         indexRef.current = descriptors;
         setIndexCount(descriptors.length);
         setIndexReady(true);
@@ -91,26 +124,17 @@ export default function ScanPage() {
         if (!video || !stream) return;
 
         video.srcObject = stream;
-        video.muted = true;
-        video.playsInline = true;
-        video.autoplay = true;
-
         await video.play().catch(() => {});
-        setTimeout(() => {
-          video.play().catch(() => {});
-          drawGuide();
-        }, 300);
-
-        setStatus("⚡ CARD VISION READY");
-      } catch (err) {
-        console.error("SCAN BOOT ERROR:", err);
+        setTimeout(drawGuide, 300);
+        setStatus("⚡ WORLD-CLASS CARD VISION READY");
+      } catch (e) {
+        console.error(e);
         setStatus("❌ เปิดกล้องหรือโหลด index ไม่สำเร็จ");
       }
     };
 
     boot();
     window.addEventListener("resize", drawGuide);
-
     return () => {
       window.removeEventListener("resize", drawGuide);
       stream?.getTracks().forEach((t) => t.stop());
@@ -128,13 +152,13 @@ export default function ScanPage() {
       return;
     }
 
-    if (!indexReady || !indexRef.current.length) {
+    if (!indexReady) {
       setStatus("⏳ ระบบยังโหลดไม่เสร็จ");
       return;
     }
 
     setIsProcessing(true);
-    setStatus("🧠 กำลังสแกนหลายโซน...");
+    setStatus("🧠 ตรวจจับทรงการ์ด + วิเคราะห์หลายโซน...");
 
     try {
       const ctx = canvas.getContext("2d");
@@ -145,13 +169,17 @@ export default function ScanPage() {
 
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-
       const cropW = vw * 0.82;
       const cropH = cropW * 1.42;
       const sx = (vw - cropW) / 2;
       const sy = (vh - cropH) / 2;
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
+
+      if (!detectCardShape(canvas)) {
+        setStatus("🟥 กรุณาวางเฉพาะการ์ดให้อยู่ในกรอบ");
+        return;
+      }
 
       const artCanvas = document.createElement("canvas");
       artCanvas.width = 520;
@@ -178,62 +206,53 @@ export default function ScanPage() {
       const topMatch = matchCardFromCanvas(topCanvas, indexRef.current);
       const bottomMatch = matchCardFromCanvas(bottomCanvas, indexRef.current);
 
-      const votes = [
-        artMatch?.cardNo,
-        topMatch?.cardNo,
-        bottomMatch?.cardNo,
-      ].filter(Boolean) as string[];
+      const weightedVotes = new Map<string, number>();
+      const addVote = (cardNo: string | undefined, weight: number) => {
+        if (!cardNo) return;
+        weightedVotes.set(cardNo, (weightedVotes.get(cardNo) || 0) + weight);
+      };
 
-      let match = artMatch;
+      addVote(artMatch?.cardNo, 0.5);
+      addVote(topMatch?.cardNo, 0.3);
+      addVote(bottomMatch?.cardNo, 0.2);
 
-      if (votes.length) {
-        const counts: Record<string, number> = {};
-        for (const vote of votes) counts[vote] = (counts[vote] || 0) + 1;
-
-        const winner = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-
-        if (winner) {
-          const [winnerCardNo, voteCount] = winner;
-          const source =
-            artMatch?.cardNo === winnerCardNo
-              ? artMatch
-              : topMatch?.cardNo === winnerCardNo
-              ? topMatch
-              : bottomMatch;
-
-          if (source) {
-            match = {
-              ...source,
-              confidence: Math.min(
-                1,
-                (source.confidence || 0.5) +
-                  (voteCount === 3 ? 0.28 : voteCount === 2 ? 0.18 : 0)
-              ),
-            };
-          }
-        }
-      }
-
-      if (!match) {
-        setStatus("❌ ไม่มีผลลัพธ์จากระบบเทียบภาพ");
+      const winner = [...weightedVotes.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (!winner) {
+        setStatus("❌ ไม่พบการ์ดที่ตรงพอ");
         return;
       }
 
-      const accepted = shouldAcceptMatch(match);
+      const winnerCardNo = winner[0];
+      const source =
+        artMatch?.cardNo === winnerCardNo
+          ? artMatch
+          : topMatch?.cardNo === winnerCardNo
+          ? topMatch
+          : bottomMatch;
 
-      const cardRes = await fetch(`/api/card?cardNo=${match.cardNo}`, {
+      if (!source) {
+        setStatus("❌ ไม่พบ source match");
+        return;
+      }
+
+      const match = {
+        ...source,
+        cardNo: winnerCardNo,
+        confidence: Math.min(1, (source.confidence || 0.5) + winner[1] * 0.35),
+      };
+
+      if (!shouldAcceptMatch(match)) {
+        setStatus(`🟨 ยังไม่ชัดพอ (${winnerCardNo}) กรุณาถ่ายใหม่`);
+        return;
+      }
+
+      const cardRes = await fetch(`/api/card?cardNo=${winnerCardNo}`, {
         cache: "no-store",
       });
-
-      if (!cardRes.ok) {
-        setStatus(`❌ โหลดข้อมูลการ์ด ${match.cardNo} ไม่สำเร็จ`);
-        return;
-      }
-
       const data = await cardRes.json();
 
       setCard({
-        cardNo: match.cardNo,
+        cardNo: winnerCardNo,
         cardName: data.card_name || "Unknown Card",
         rarity: data.rarity || "-",
         imageUrl: data.image_url,
@@ -241,11 +260,7 @@ export default function ScanPage() {
         reward: data.reward,
       });
 
-      setStatus(
-        accepted
-          ? `🃏 เจอการ์ด ${match.cardNo} | ${(match.confidence * 100).toFixed(0)}%`
-          : `⚠️ คาดว่า ${match.cardNo} | ${(match.confidence * 100).toFixed(0)}%`
-      );
+      setStatus(`🃏 เจอการ์ด ${winnerCardNo} | ${(match.confidence * 100).toFixed(0)}%`);
     } catch (err: any) {
       console.error(err);
       setStatus(`❌ ${err?.message || "scan fail"}`);
@@ -266,17 +281,8 @@ export default function ScanPage() {
 
         <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_60px_rgba(234,179,8,0.12)]">
           <div className="relative aspect-[4/5] w-full">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <canvas
-              ref={overlayCanvasRef}
-              className="pointer-events-none absolute inset-0 h-full w-full"
-            />
+            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+            <canvas ref={overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
           </div>
         </div>
 
@@ -285,37 +291,19 @@ export default function ScanPage() {
         <div className="mt-4 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5">
           {card ? (
             <>
-              <div className="mb-3 text-xs font-bold text-yellow-300">
-                CARD #{card.cardNo}
-              </div>
-
+              <div className="mb-3 text-xs font-bold text-yellow-300">CARD #{card.cardNo}</div>
               <h2 className="text-2xl font-black">{card.cardName}</h2>
-
-              <div className="mt-2 text-sm text-zinc-400">
-                ✨ Rarity: {card.rarity}
-              </div>
-
-              {card.setName ? (
-                <div className="mt-1 text-sm text-zinc-500">
-                  📦 Set: {card.setName}
-                </div>
-              ) : null}
-
+              <div className="mt-2 text-sm text-zinc-400">✨ Rarity: {card.rarity}</div>
+              {card.setName ? <div className="mt-1 text-sm text-zinc-500">📦 Set: {card.setName}</div> : null}
               {card.reward ? (
                 <div className="mt-3 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3">
-                  <div className="text-xs font-bold text-yellow-300">
-                    🎁 REWARD / รางวัล
-                  </div>
-                  <div className="mt-1 text-sm whitespace-pre-wrap text-white">
-                    {card.reward}
-                  </div>
+                  <div className="text-xs font-bold text-yellow-300">🎁 REWARD / รางวัล</div>
+                  <div className="mt-1 whitespace-pre-wrap text-sm text-white">{card.reward}</div>
                 </div>
               ) : null}
             </>
           ) : (
-            <div className="text-sm text-zinc-400">
-              วางการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มเหลืองเพื่อสแกน
-            </div>
+            <div className="text-sm text-zinc-400">วางการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มเหลืองเพื่อสแกน</div>
           )}
         </div>
       </div>
