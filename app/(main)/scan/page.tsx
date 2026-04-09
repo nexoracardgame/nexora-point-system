@@ -27,61 +27,44 @@ export default function ScanPage() {
     setStatus("🧠 AI SERVER กำลังวิเคราะห์...");
 
     try {
-      const reader = new FileReader();
+      const imageUrl = URL.createObjectURL(file);
+      setPreview(imageUrl);
 
-      reader.onload = async () => {
-        try {
-          const image = reader.result as string;
-          setPreview(image);
+      const form = new FormData();
+      form.append("file", file);
 
-          const aiRes = await fetch("http://127.0.0.1:8001/predict", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ image }),
-          });
+      const aiRes = await fetch("/api/scan-ai", {
+        method: "POST",
+        body: form,
+      });
 
-          if (!aiRes.ok) {
-            throw new Error("AI server failed");
-          }
+      if (!aiRes.ok) {
+        throw new Error("AI server failed");
+      }
 
-          const ai = await aiRes.json();
+      const ai = await aiRes.json();
 
-          if (!ai.cardNo) {
-            setStatus("❌ AI อ่านไม่ออก");
-            setIsProcessing(false);
-            return;
-          }
+      if (!ai.cardNo) {
+        setStatus("❌ AI อ่านไม่ออก");
+        return;
+      }
 
-          const cardRes = await fetch(`/api/card?cardNo=${ai.cardNo}`);
-          const data = await cardRes.json();
+      const cardRes = await fetch(`/api/card?cardNo=${ai.cardNo}`);
+      const data = await cardRes.json();
 
-          setCard({
-            cardNo: ai.cardNo,
-            cardName: data.card_name || "Unknown Card",
-            rarity: data.rarity || "-",
-            setName: data.set_name,
-            reward: data.reward,
-          });
+      setCard({
+        cardNo: ai.cardNo,
+        cardName: data.card_name || "Unknown Card",
+        rarity: data.rarity || "-",
+        setName: data.set_name,
+        reward: data.reward,
+      });
 
-          setStatus(
-            `🃏 ${ai.cardNo} (${Math.round(
-              (ai.confidence || 0) * 100
-            )}%)`
-          );
-        } catch (error: any) {
-          console.error(error);
-          setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
-        } finally {
-          setIsProcessing(false);
-        }
-      };
-
-      reader.readAsDataURL(file);
-    } catch (err: any) {
-      console.error(err);
-      setStatus(`❌ ${err?.message || "scan fail"}`);
+      setStatus(`🃏 ${ai.cardNo} (${ai.confidence || 0}%)`);
+    } catch (error: any) {
+      console.error(error);
+      setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
+    } finally {
       setIsProcessing(false);
     }
   };
