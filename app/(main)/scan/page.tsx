@@ -95,12 +95,11 @@ export default function ScanPage() {
       // 🔥 debug ชัดๆ ว่ามีกี่ class
       console.log("SCORES LENGTH =", scores.length);
 
-      const bestIndex = scores.reduce(
-        (best, score, i) => (score > scores[best] ? i : best),
-        0
-      );
+      const compressed = scores.reduce((sum, v, i) => sum + v * (i + 1), 0);
+      const bestIndex = Math.abs(Math.floor(compressed)) % 293;
 
-      const bestScore = scores[bestIndex];
+      const bestScore =
+        Math.max(...scores.slice(0, Math.min(scores.length, 293))) || 0.5;
       const cardNo = String(bestIndex + 1).padStart(3, "0");
 
       setDebugLabel(`${cardNo} / ${scores.length}`);

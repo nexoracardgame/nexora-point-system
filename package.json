@@ -12,6 +12,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "^6.9.0",
     "@teachablemachine/image": "^0.8.5",
+    "@tensorflow/tfjs-converter": "^4.22.0",
     "canvas": "^3.2.3",
     "dotenv": "^17.4.0",
     "framer-motion": "^12.38.0",
