@@ -1,6 +1,5 @@
 "use client";
 
-import * as tf from "@tensorflow/tfjs";
 import { useEffect, useRef, useState } from "react";
 
 type CardData = {
@@ -15,11 +14,9 @@ export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const modelRef = useRef<tf.LayersModel | null>(null);
 
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("🚀 OPENING CAMERA...");
-  const [confidence, setConfidence] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const drawGuide = () => {
@@ -34,36 +31,29 @@ export default function ScanPage() {
 
     ctx.clearRect(0, 0, w, h);
 
-    const boxW = w * 0.78;
+    const boxW = w * 0.82;
     const boxH = boxW * 1.42;
     const x = (w - boxW) / 2;
     const y = (h - boxH) / 2;
 
     ctx.strokeStyle = "rgba(250,204,21,0.98)";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.roundRect(x, y, boxW, boxH, 20);
+    ctx.roundRect(x, y, boxW, boxH, 22);
     ctx.stroke();
   };
 
   useEffect(() => {
     const boot = async () => {
       try {
-        setStatus("🚀 OPENING CAMERA...");
-
-        const [stream, model] = await Promise.all([
-          navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-            audio: false,
-          }),
-          tf.loadLayersModel("/model/model.json"),
-        ]);
-
-        modelRef.current = model;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
 
         const video = videoRef.current;
         if (!video) return;
@@ -89,10 +79,10 @@ export default function ScanPage() {
           drawGuide();
         });
 
-        setStatus("⚡ AI READY");
+        setStatus("⚡ VISION READY");
       } catch (err) {
         console.error(err);
-        setStatus("❌ เปิดกล้องหรือโมเดลไม่สำเร็จ");
+        setStatus("❌ เปิดกล้องไม่สำเร็จ");
       }
     };
 
@@ -104,20 +94,19 @@ export default function ScanPage() {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const model = modelRef.current;
 
-    if (!video || !canvas || !model) {
-      setStatus("⏳ AI กำลังโหลด");
+    if (!video || !canvas) {
+      setStatus("❌ กล้องยังไม่พร้อม");
       return;
     }
 
     if (!video.videoWidth || !video.videoHeight) {
-      setStatus("⏳ กล้องยังไม่พร้อม");
+      setStatus("❌ กล้องยังโหลดไม่เสร็จ");
       return;
     }
 
     setIsProcessing(true);
-    setStatus("🧠 AI กำลังคิด...");
+    setStatus("🧠 AI Vision กำลังดูการ์ด...");
 
     try {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -126,52 +115,51 @@ export default function ScanPage() {
         return;
       }
 
-      canvas.width = 224;
-      canvas.height = 224;
+      canvas.width = 720;
+      canvas.height = 1024;
 
       const vw = video.videoWidth;
       const vh = video.videoHeight;
 
-      // crop กลางตามกรอบ
-      const cropW = vw * 0.78;
+      const cropW = vw * 0.82;
       const cropH = cropW * 1.42;
       const sx = (vw - cropW) / 2;
       const sy = (vh - cropH) / 2;
 
-      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 224, 224);
+      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
-      const input = tf.browser
-        .fromPixels(canvas)
-        .toFloat()
-        .div(255)
-        .expandDims(0);
+      const image = canvas.toDataURL("image/jpeg", 0.95);
 
-      const pred = model.predict(input) as tf.Tensor;
-      const probs = Array.from(await pred.data());
+      const res = await fetch(process.env.NEXT_PUBLIC_GAS_SCAN_URL!, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientId: "nexora-scan",
+          message:
+            "ดูภาพนี้ว่าเป็นการ์ด NEXORA หมายเลขอะไร ให้ตอบเป็นเลข 3 หลักเท่านั้น เช่น 029",
+          image,
+        }),
+      });
 
-      input.dispose();
-      pred.dispose();
+      const json = await res.json();
+      const raw = String(json.reply || "").trim();
 
-      if (!probs.length) {
-        setStatus("❌ AI ไม่คืนผลลัพธ์");
+      const match = raw.match(/\d{1,3}/);
+      const cardNo = match ? match[0].padStart(3, "0") : "";
+
+      if (!cardNo) {
+        setStatus("❌ AI อ่านเลขไม่ออก");
         return;
       }
 
-      let bestIndex = 0;
-      for (let i = 1; i < probs.length; i++) {
-        if (probs[i] > probs[bestIndex]) bestIndex = i;
-      }
+      setStatus(`🃏 เจอการ์ด ${cardNo}`);
 
-      const bestProb = probs[bestIndex];
-      const cardNo = String(bestIndex + 1).padStart(3, "0");
-
-      setConfidence(bestProb);
-      setStatus(`🃏 เจอการ์ด ${cardNo} • ${(bestProb * 100).toFixed(1)}%`);
-
-      const res = await fetch(`/api/card?cardNo=${cardNo}`, {
+      const cardRes = await fetch(`/api/card?cardNo=${cardNo}`, {
         cache: "no-store",
       });
-      const data = await res.json();
+      const data = await cardRes.json();
 
       setCard({
         cardNo,
@@ -182,7 +170,7 @@ export default function ScanPage() {
       });
     } catch (err) {
       console.error(err);
-      setStatus("❌ วิเคราะห์ไม่สำเร็จ");
+      setStatus("❌ Vision Scan ล้มเหลว");
     } finally {
       setIsProcessing(false);
     }
@@ -193,9 +181,6 @@ export default function ScanPage() {
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4">
         <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3">
           <div className="text-sm font-bold text-yellow-300">{status}</div>
-          <div className="mt-1 text-xs text-zinc-300">
-            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}
-          </div>
         </div>
 
         <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_80px_rgba(234,179,8,0.15)]">
@@ -231,7 +216,7 @@ export default function ScanPage() {
             </>
           ) : (
             <div className="text-sm text-zinc-400">
-              วางการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มเหลืองเพื่อถ่าย
+              วางการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มเหลืองเพื่อสแกน
             </div>
           )}
         </div>
