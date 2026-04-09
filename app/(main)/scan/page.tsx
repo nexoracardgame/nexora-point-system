@@ -14,6 +14,7 @@ type CardData = {
   imageUrl?: string;
   marketPriceTHB?: number;
   setName?: string;
+  reward?: string;
 };
 
 export default function ScanPage() {
@@ -67,9 +68,7 @@ export default function ScanPage() {
           cache: "no-store",
         });
 
-        if (!indexRes.ok) {
-          throw new Error("โหลด card-index ไม่สำเร็จ");
-        }
+        if (!indexRes.ok) throw new Error("โหลด card-index ไม่สำเร็จ");
 
         const descriptors = (await indexRes.json()) as CardDescriptor[];
         indexRef.current = descriptors;
@@ -189,17 +188,12 @@ export default function ScanPage() {
 
       if (votes.length) {
         const counts: Record<string, number> = {};
-
-        for (const vote of votes) {
-          counts[vote] = (counts[vote] || 0) + 1;
-        }
+        for (const vote of votes) counts[vote] = (counts[vote] || 0) + 1;
 
         const winner = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
 
         if (winner) {
-          const winnerCardNo = winner[0];
-          const voteCount = winner[1];
-
+          const [winnerCardNo, voteCount] = winner;
           const source =
             artMatch?.cardNo === winnerCardNo
               ? artMatch
@@ -243,8 +237,8 @@ export default function ScanPage() {
         cardName: data.card_name || "Unknown Card",
         rarity: data.rarity || "-",
         imageUrl: data.image_url,
-        marketPriceTHB: data.market_price_thb,
         setName: data.set_name,
+        reward: data.reward,
       });
 
       setStatus(
@@ -294,10 +288,28 @@ export default function ScanPage() {
               <div className="mb-3 text-xs font-bold text-yellow-300">
                 CARD #{card.cardNo}
               </div>
+
               <h2 className="text-2xl font-black">{card.cardName}</h2>
-              <div className="mt-2 text-sm text-zinc-400">Rarity: {card.rarity}</div>
+
+              <div className="mt-2 text-sm text-zinc-400">
+                ✨ Rarity: {card.rarity}
+              </div>
+
               {card.setName ? (
-                <div className="mt-1 text-sm text-zinc-500">Set: {card.setName}</div>
+                <div className="mt-1 text-sm text-zinc-500">
+                  📦 Set: {card.setName}
+                </div>
+              ) : null}
+
+              {card.reward ? (
+                <div className="mt-3 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3">
+                  <div className="text-xs font-bold text-yellow-300">
+                    🎁 REWARD / รางวัล
+                  </div>
+                  <div className="mt-1 text-sm whitespace-pre-wrap text-white">
+                    {card.reward}
+                  </div>
+                </div>
               ) : null}
             </>
           ) : (
