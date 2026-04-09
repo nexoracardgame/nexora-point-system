@@ -42,8 +42,11 @@ export default function ScanPage() {
   );
 
   const cosineSimilarity = (a: ArrayLike<number>, b: ArrayLike<number>) => {
-    let dot = 0, magA = 0, magB = 0;
+    let dot = 0,
+      magA = 0,
+      magB = 0;
     const len = Math.min(a.length, b.length);
+
     for (let i = 0; i < len; i++) {
       const av = Number(a[i]) || 0;
       const bv = Number(b[i]) || 0;
@@ -51,6 +54,7 @@ export default function ScanPage() {
       magA += av * av;
       magB += bv * bv;
     }
+
     return dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
   };
 
@@ -58,34 +62,43 @@ export default function ScanPage() {
     const c = document.createElement("canvas");
     c.width = w;
     c.height = h;
+
     const ctx = c.getContext("2d", { willReadFrequently: true });
     if (!ctx) return new Uint8ClampedArray(w * h * 4);
+
     ctx.drawImage(source, 0, 0, w, h);
     return ctx.getImageData(0, 0, w, h).data;
   };
 
   const makeRgbVector = (data: Uint8ClampedArray, w: number, h: number) => {
     const out = new Float32Array(w * h * 3);
+
     for (let i = 0; i < w * h; i++) {
       out[i * 3] = data[i * 4] / 255;
       out[i * 3 + 1] = data[i * 4 + 1] / 255;
       out[i * 3 + 2] = data[i * 4 + 2] / 255;
     }
+
     return out;
   };
 
   const makeGray = (data: Uint8ClampedArray, w: number, h: number) => {
     const out = new Float32Array(w * h);
+
     for (let i = 0; i < w * h; i++) {
-      const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+      const r = data[i * 4];
+      const g = data[i * 4 + 1];
+      const b = data[i * 4 + 2];
       out[i] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
     }
+
     return out;
   };
 
   const makeEdgeVector = (data: Uint8ClampedArray, w: number, h: number) => {
     const gray = makeGray(data, w, h);
     const edge = new Float32Array(w * h);
+
     for (let y = 1; y < h - 1; y++) {
       for (let x = 1; x < w - 1; x++) {
         const i = y * w + x;
@@ -94,23 +107,28 @@ export default function ScanPage() {
         edge[i] = Math.min(1, Math.sqrt(gx * gx + gy * gy));
       }
     }
+
     return edge;
   };
 
   const makeHistogram = (data: Uint8ClampedArray, w: number, h: number) => {
     const bins = new Float32Array(HIST_BINS * HIST_BINS * HIST_BINS);
+
     for (let i = 0; i < w * h; i++) {
       const r = Math.min(HIST_BINS - 1, Math.floor((data[i * 4] / 255) * HIST_BINS));
       const g = Math.min(HIST_BINS - 1, Math.floor((data[i * 4 + 1] / 255) * HIST_BINS));
       const b = Math.min(HIST_BINS - 1, Math.floor((data[i * 4 + 2] / 255) * HIST_BINS));
+
       bins[r * HIST_BINS * HIST_BINS + g * HIST_BINS + b] += 1;
     }
+
     return bins;
   };
 
   const extractFeatures = (source: CanvasImageSource) => {
     const rgbData = getImageData(source, RGB_W, RGB_H);
     const edgeData = getImageData(source, EDGE_W, EDGE_H);
+
     return {
       rgb: Array.from(makeRgbVector(rgbData, RGB_W, RGB_H)),
       edge: Array.from(makeEdgeVector(edgeData, EDGE_W, EDGE_H)),
@@ -122,17 +140,20 @@ export default function ScanPage() {
     const rgb = cosineSimilarity(q.rgb, item.rgb);
     const edge = cosineSimilarity(q.edge, item.edge);
     const hist = cosineSimilarity(q.hist, item.hist);
+
     return rgb * 0.5 + edge * 0.32 + hist * 0.18;
   };
 
   const drawGuide = () => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const w = canvas.width;
     const h = canvas.height;
+
     ctx.clearRect(0, 0, w, h);
 
     const boxW = w * 0.72;
@@ -148,43 +169,49 @@ export default function ScanPage() {
   };
 
   useEffect(() => {
-  const boot = async () => {
-    try {
-      // ✅ เปิดกล้องก่อนทันที
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
 
-      const video = videoRef.current;
-      if (!video) return;
+        const video = videoRef.current;
+        if (!video) return;
 
-      video.srcObject = stream;
+        video.srcObject = stream;
 
-      await new Promise<void>((resolve) => {
-        video.onloadedmetadata = async () => {
-          await video.play();
-          resolve();
-        };
-      });
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = async () => {
+            await video.play();
+            resolve();
+          };
+        });
 
-      setStatus("⚡ CAMERA READY");
+        setStatus("⚡ CAMERA READY");
 
-      requestAnimationFrame(() => {
-        const rect = video.getBoundingClientRect();
-        const overlay = overlayCanvasRef.current;
-        if (!overlay) return;
-        overlay.width = rect.width;
-        overlay.height = rect.height;
-        drawGuide();
-      });
+        requestAnimationFrame(() => {
+          const rect = video.getBoundingClientRect();
+          const overlay = overlayCanvasRef.current;
+          if (!overlay) return;
 
-      // ✅ ค่อยโหลด index ทีหลังแบบ background
+          overlay.width = rect.width;
+          overlay.height = rect.height;
+          drawGuide();
+        });
+      } catch (err) {
+        console.error(err);
+        setStatus("❌ เปิดกล้องไม่สำเร็จ");
+      }
+    };
+
+    const loadIndex = async () => {
       const items: CardIndexItem[] = [];
+
       for (const cardNo of labels) {
         try {
           const img = new Image();
@@ -202,14 +229,11 @@ export default function ScanPage() {
 
       indexRef.current = items;
       setStatus("⚡ SNAP READY");
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ เปิดกล้องไม่สำเร็จ");
-    }
-  };
+    };
 
-  boot();
-}, [labels]);
+    startCamera();
+    loadIndex();
+  }, [labels]);
 
   const analyzeOneFrame = () => {
     const video = videoRef.current!;
@@ -221,6 +245,7 @@ export default function ScanPage() {
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
+
     const cropW = vw * 0.62;
     const cropH = cropW * 1.42;
     const sx = (vw - cropW) / 2;
@@ -228,13 +253,17 @@ export default function ScanPage() {
 
     ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
-    const query: CardIndexItem = { cardNo: "000", ...extractFeatures(canvas) };
+    const query: CardIndexItem = {
+      cardNo: "000",
+      ...extractFeatures(canvas),
+    };
 
     let bestCard = "";
     let bestScore = -1;
 
     for (const item of indexRef.current) {
       const score = scoreCard(query, item);
+
       if (score > bestScore) {
         bestScore = score;
         bestCard = item.cardNo;
@@ -246,6 +275,12 @@ export default function ScanPage() {
 
   const captureAndAnalyze = async () => {
     if (isProcessing) return;
+
+    if (!indexRef.current.length) {
+      setStatus("⏳ กำลังเตรียมระบบ...");
+      return;
+    }
+
     setIsProcessing(true);
     setStatus("📸 ANALYZING...");
 
@@ -257,8 +292,9 @@ export default function ScanPage() {
         votes[s.bestCard] = (votes[s.bestCard] || 0) + s.bestScore;
       }
 
-      const bestCard = Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0];
-      const score = Object.values(votes).sort((a, b) => b - a)[0] / 3;
+      const sorted = Object.entries(votes).sort((a, b) => b[1] - a[1]);
+      const bestCard = sorted[0]?.[0];
+      const score = (sorted[0]?.[1] || 0) / 3;
 
       setConfidence(score);
 
@@ -340,7 +376,7 @@ export default function ScanPage() {
             type="button"
             onClick={captureAndAnalyze}
             disabled={isProcessing}
-            className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)]"
+            className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)] active:scale-95"
           >
             <span className="absolute inset-2 rounded-full border-2 border-black/20" />
             <span className="relative">{isProcessing ? "⏳" : "📸"}</span>
