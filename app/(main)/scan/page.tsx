@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type CardData = {
   cardNo: string;
@@ -17,7 +17,6 @@ type CardIndexItem = {
   hist: number[];
 };
 
-const CARD_COUNT = 293;
 const RGB_W = 56;
 const RGB_H = 80;
 const EDGE_W = 40;
@@ -36,15 +35,11 @@ export default function ScanPage() {
   const [confidence, setConfidence] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const labels = useMemo(
-    () => Array.from({ length: CARD_COUNT }, (_, i) => String(i + 1).padStart(3, "0")),
-    []
-  );
-
   const cosineSimilarity = (a: ArrayLike<number>, b: ArrayLike<number>) => {
-    let dot = 0,
-      magA = 0,
-      magB = 0;
+    let dot = 0;
+    let magA = 0;
+    let magB = 0;
+
     const len = Math.min(a.length, b.length);
 
     for (let i = 0; i < len; i++) {
@@ -169,7 +164,7 @@ export default function ScanPage() {
   };
 
   useEffect(() => {
-    const startCamera = async () => {
+    const boot = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -192,8 +187,6 @@ export default function ScanPage() {
           };
         });
 
-        setStatus("⚡ CAMERA READY");
-
         requestAnimationFrame(() => {
           const rect = video.getBoundingClientRect();
           const overlay = overlayCanvasRef.current;
@@ -203,37 +196,23 @@ export default function ScanPage() {
           overlay.height = rect.height;
           drawGuide();
         });
+
+        const res = await fetch("/card-index.json", {
+          cache: "force-cache",
+        });
+
+        const json = await res.json();
+        indexRef.current = json.items || [];
+
+        setStatus("⚡ SNAP READY");
       } catch (err) {
         console.error(err);
         setStatus("❌ เปิดกล้องไม่สำเร็จ");
       }
     };
 
-    const loadIndex = async () => {
-      const items: CardIndexItem[] = [];
-
-      for (const cardNo of labels) {
-        try {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.src = `/cards/${cardNo}.jpg`;
-
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject();
-          });
-
-          items.push({ cardNo, ...extractFeatures(img) });
-        } catch {}
-      }
-
-      indexRef.current = items;
-      setStatus("⚡ SNAP READY");
-    };
-
-    startCamera();
-    loadIndex();
-  }, [labels]);
+    boot();
+  }, []);
 
   const analyzeOneFrame = () => {
     const video = videoRef.current!;
@@ -263,7 +242,6 @@ export default function ScanPage() {
 
     for (const item of indexRef.current) {
       const score = scoreCard(query, item);
-
       if (score > bestScore) {
         bestScore = score;
         bestCard = item.cardNo;
@@ -277,7 +255,7 @@ export default function ScanPage() {
     if (isProcessing) return;
 
     if (!indexRef.current.length) {
-      setStatus("⏳ กำลังเตรียมระบบ...");
+      setStatus("⏳ กำลังโหลดระบบ...");
       return;
     }
 
