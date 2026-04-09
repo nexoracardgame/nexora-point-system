@@ -34,7 +34,6 @@ export default function ScanPage() {
   const warmingRef = useRef(false);
 
   const [streaming, setStreaming] = useState(false);
-  const [indexReady, setIndexReady] = useState(false);
   const [warmingProgress, setWarmingProgress] = useState(0);
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("📷 READY TO SNAP");
@@ -152,9 +151,7 @@ export default function ScanPage() {
     const edge = cosineSimilarity(q.edge, item.edge);
     const hist = cosineSimilarity(q.hist, item.hist);
     const zones = cosineSimilarity(q.zones, item.zones);
-
-  // 🔥 ลดน้ำหนัก zones ลง
-    return rgb * 0.48 + edge * 0.30 + hist * 0.17 + zones * 0.05;
+    return rgb * 0.48 + edge * 0.3 + hist * 0.17 + zones * 0.05;
   };
 
   const fetchCardData = async (cardNo: string) => {
@@ -176,34 +173,29 @@ export default function ScanPage() {
     if (!ctx) return;
     const w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    const boxW = w * 0.54;
+    const boxW = w * 0.52;
     const boxH = boxW * 1.42;
     const x = (w - boxW) / 2;
     const y = (h - boxH) / 2;
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
     ctx.fillRect(0, 0, w, h);
     ctx.clearRect(x, y, boxW, boxH);
     ctx.strokeStyle = "rgba(250,204,21,0.98)";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.roundRect(x, y, boxW, boxH, 18);
+    ctx.roundRect(x, y, boxW, boxH, 20);
     ctx.stroke();
   };
 
   useEffect(() => {
-    const loadIndex = async () => {
+    (async () => {
       try {
         const res = await fetch(`/card-index.json?v=${Date.now()}`, { cache: "no-store" });
         const json = await res.json();
         indexRef.current = json.items || [];
-        setIndexReady(indexRef.current.length > 0);
-        setWarmingProgress(100);
         setStatus("⚡ SNAP READY");
-      } catch {
-        setStatus("📷 READY TO SNAP");
-      }
-    };
-    loadIndex();
+      } catch {}
+    })();
   }, []);
 
   const warmIndexInBackground = async () => {
@@ -214,18 +206,13 @@ export default function ScanPage() {
       const cardNo = labels[i - 1];
       try {
         const img = new Image();
-        img.crossOrigin = "anonymous";
         img.src = `/cards/${cardNo}.jpg?v=1`;
         await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(); });
         built.push({ cardNo, ...extractFeatures(img) });
       } catch {}
-      if (i % 5 === 0 || i === CARD_COUNT) {
-        indexRef.current = [...built];
-        setWarmingProgress(Math.round((i / CARD_COUNT) * 100));
-      }
+      if (i % 10 === 0 || i === CARD_COUNT) setWarmingProgress(Math.round((i / CARD_COUNT) * 100));
     }
     indexRef.current = built;
-    setIndexReady(true);
     setStatus("⚡ SNAP READY");
   };
 
@@ -254,10 +241,6 @@ export default function ScanPage() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return;
-    if (!indexRef.current.length) {
-      setStatus(`🚀 PREPARING... ${warmingProgress}%`);
-      return;
-    }
     setIsProcessing(true);
     setStatus("📸 ANALYZING...");
     try {
@@ -295,43 +278,55 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.08),transparent_28%),linear-gradient(180deg,#050505_0%,#0a0a0a_100%)] text-white">
-      <div className="mx-auto flex h-full max-w-md flex-col px-4 py-3">
-        <div className="mb-2 rounded-2xl border border-yellow-500/20 bg-white/5 px-4 py-2 text-sm font-bold text-yellow-300 backdrop-blur-xl">
-          <div>{status}</div>
-          <div className="mt-1 text-xs text-zinc-300">{confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}{debugLabel ? ` • ${debugLabel}` : ""}</div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.08),transparent_28%),linear-gradient(180deg,#050505_0%,#0a0a0a_100%)] text-white">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-3 px-4 py-4">
+        <div className="rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3 backdrop-blur-xl">
+          <div className="text-sm font-bold text-yellow-300">{status}</div>
+          <div className="mt-1 text-xs text-zinc-300">
+            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}
+            {debugLabel ? ` • ${debugLabel}` : ""}
+            {warmingProgress > 0 && warmingProgress < 100 ? ` • ${warmingProgress}%` : ""}
+          </div>
         </div>
 
-        <div className="mb-2 rounded-2xl border border-yellow-500/10 bg-white/[0.03] px-4 py-2 text-[11px] leading-5 text-zinc-300">
-          💡 แสงต้องพอ • วางการ์ดให้ตรงกรอบ • อย่าให้มือบัง • กดแชะครั้งเดียว
+        <div className="rounded-3xl border border-yellow-500/10 bg-white/[0.03] px-4 py-3 text-xs leading-6 text-zinc-300">
+          💡 ใช้ในที่สว่าง • วางการ์ดเต็มกรอบ • อย่าเอียงมาก • กดแชะครั้งเดียว
         </div>
 
-        <div className="relative overflow-hidden rounded-[24px] border border-yellow-500/30 bg-black shadow-[0_0_60px_rgba(234,179,8,0.12)]" style={{height:'42vh'}}>
-          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-          <canvas ref={overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_70px_rgba(234,179,8,0.12)]">
+          <div className="aspect-[4/5] w-full">
+            <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+            <canvas ref={overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+          </div>
         </div>
 
         <canvas ref={canvasRef} className="hidden" />
 
-        <div className="mt-3 flex-1 overflow-hidden rounded-[24px] border border-yellow-500/15 bg-white/[0.03] p-4 backdrop-blur-xl">
+        <div className="rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5 backdrop-blur-xl shadow-[0_0_40px_rgba(250,204,21,0.05)]">
           {card ? (
-            <div>
-              <div className="mb-2 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">CARD #{card.cardNo}</div>
+            <>
+              <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
+                CARD #{card.cardNo}
+              </div>
               <h2 className="text-2xl font-black leading-tight">{card.cardName}</h2>
-              <p className="mt-1 text-sm text-zinc-300">{card.rarity}</p>
-              <div className="mt-3 text-3xl font-black text-yellow-400">฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}</div>
+              <p className="mt-2 text-sm text-zinc-300">{card.rarity}</p>
+              <div className="mt-4 text-3xl font-black text-yellow-400">฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}</div>
               <p className="mt-2 text-xs text-zinc-400">{card.setName}</p>
-            </div>
+            </>
           ) : (
-            <div className="text-sm text-zinc-400">ผลลัพธ์จะแสดงตรงนี้ทันที ไม่ต้องเลื่อนจอ ใช้งานมือเดียวได้สบาย</div>
+            <div className="text-sm leading-7 text-zinc-400">ผลลัพธ์จะโชว์เต็มๆตรงนี้แบบไม่อึดอัด อ่านง่าย ไม่เบียด ใช้งานมือเดียวลื่นๆ</div>
           )}
         </div>
 
-        <div className="pt-3">
+        <div className="sticky bottom-0 mt-auto pb-2 pt-1">
           {!streaming ? (
-            <button onClick={startCamera} className="w-full rounded-2xl bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 py-4 font-black text-black shadow-[0_15px_50px_rgba(234,179,8,0.28)]">📷 เปิดกล้อง SNAP SCAN</button>
+            <button onClick={startCamera} className="w-full rounded-3xl bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 py-4 text-base font-black text-black shadow-[0_18px_60px_rgba(234,179,8,0.30)]">
+              📷 เปิดกล้อง SNAP SCAN
+            </button>
           ) : (
-            <button onClick={captureAndAnalyze} disabled={isProcessing} className="w-full rounded-2xl bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 py-4 text-lg font-black text-black shadow-[0_15px_50px_rgba(234,179,8,0.28)] disabled:opacity-60">{isProcessing ? "⏳ กำลังคิด..." : "📸 แชะเลย"}</button>
+            <button onClick={captureAndAnalyze} disabled={isProcessing} className="w-full rounded-3xl bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 py-4 text-lg font-black text-black shadow-[0_18px_60px_rgba(234,179,8,0.30)] disabled:opacity-60">
+              {isProcessing ? "⏳ กำลังคิด..." : "📸 แชะเลย"}
+            </button>
           )}
         </div>
       </div>
