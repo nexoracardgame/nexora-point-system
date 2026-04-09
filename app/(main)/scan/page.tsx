@@ -145,7 +145,7 @@ export default function ScanPage() {
           body: JSON.stringify({
             clientId: "nexora-scan",
             message:
-              "ระบุเลขการ์ด NEXORA 3 หลัก"
+              "ระบุเลขการ์ด NEXORA 3 หลัก",
             image,
           }),
         }
