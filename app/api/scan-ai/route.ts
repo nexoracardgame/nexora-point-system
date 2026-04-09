@@ -12,11 +12,16 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (error) {
+    const text = await res.text();
+    console.log("AI RAW:", text);
+
+    return NextResponse.json(JSON.parse(text));
+  } catch (error: any) {
+    console.error("AI SCAN ERROR:", error);
     return NextResponse.json(
-      { error: "AI scan failed" },
+      {
+        error: error?.message || "AI scan failed",
+      },
       { status: 500 }
     );
   }
