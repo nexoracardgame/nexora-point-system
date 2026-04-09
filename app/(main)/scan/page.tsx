@@ -12,23 +12,26 @@ type CardData = {
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("🚀 OPENING CAMERA...");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const drawGuide = (w: number, h: number) => {
+  const drawGuide = () => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
 
-    canvas.width = w;
-    canvas.height = h;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -46,35 +49,6 @@ export default function ScanPage() {
 
   useEffect(() => {
     let stream: MediaStream | null = null;
-    let raf = 0;
-
-    const renderLoop = () => {
-      const video = videoRef.current;
-      const canvas = previewCanvasRef.current;
-      if (!video || !canvas) {
-        raf = requestAnimationFrame(renderLoop);
-        return;
-      }
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        raf = requestAnimationFrame(renderLoop);
-        return;
-      }
-
-      const rect = canvas.getBoundingClientRect();
-      if (canvas.width !== rect.width) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-        drawGuide(rect.width, rect.height);
-      }
-
-      if (video.readyState >= 2) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      }
-
-      raf = requestAnimationFrame(renderLoop);
-    };
 
     const boot = async () => {
       try {
@@ -103,9 +77,12 @@ export default function ScanPage() {
         video.autoplay = true;
 
         await video.play().catch(() => {});
-        setStatus("⚡ VISION READY");
+        setTimeout(() => {
+          video.play().catch(() => {});
+          drawGuide();
+        }, 300);
 
-        raf = requestAnimationFrame(renderLoop);
+        setStatus("⚡ VISION READY");
       } catch (err) {
         console.error("CAMERA ERROR:", err);
         setStatus("❌ เปิดกล้องไม่สำเร็จ");
@@ -114,8 +91,10 @@ export default function ScanPage() {
 
     boot();
 
+    window.addEventListener("resize", drawGuide);
+
     return () => {
-      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", drawGuide);
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -123,10 +102,15 @@ export default function ScanPage() {
   const captureAndAnalyze = async () => {
     if (isProcessing) return;
 
-    const preview = previewCanvasRef.current;
-    const canvas = captureCanvasRef.current;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
 
-    if (!preview || !canvas) {
+    if (!video || !canvas) {
+      setStatus("❌ กล้องยังไม่พร้อม");
+      return;
+    }
+
+    if (!video.videoWidth) {
       setStatus("❌ กล้องยังไม่พร้อม");
       return;
     }
@@ -141,15 +125,15 @@ export default function ScanPage() {
       canvas.width = 720;
       canvas.height = 1024;
 
-      const pw = preview.width;
-      const ph = preview.height;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
 
-      const cropW = pw * 0.82;
+      const cropW = vw * 0.82;
       const cropH = cropW * 1.42;
-      const sx = (pw - cropW) / 2;
-      const sy = (ph - cropH) / 2;
+      const sx = (vw - cropW) / 2;
+      const sy = (vh - cropH) / 2;
 
-      ctx.drawImage(preview, sx, sy, cropW, cropH, 0, 0, 720, 1024);
+      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
       const image = canvas.toDataURL("image/jpeg", 0.95);
 
@@ -199,26 +183,28 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4 pb-32">
         <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3">
           <div className="text-sm font-bold text-yellow-300">{status}</div>
         </div>
 
         <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black">
           <div className="relative aspect-[4/5] w-full">
-            <canvas
-              ref={previewCanvasRef}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
               className="absolute inset-0 h-full w-full object-cover"
             />
             <canvas
               ref={overlayCanvasRef}
               className="pointer-events-none absolute inset-0 h-full w-full"
             />
-            <video ref={videoRef} className="hidden" />
           </div>
         </div>
 
-        <canvas ref={captureCanvasRef} className="hidden" />
+        <canvas ref={canvasRef} className="hidden" />
 
         <div className="mt-3 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5">
           {card ? (
@@ -234,17 +220,15 @@ export default function ScanPage() {
             </div>
           )}
         </div>
-
-        <div className="sticky bottom-0 mt-auto flex justify-center pb-3 pt-3">
-          <button
-            onClick={captureAndAnalyze}
-            disabled={isProcessing}
-            className="h-24 w-24 rounded-full bg-yellow-400 text-4xl text-black"
-          >
-            {isProcessing ? "⏳" : "📸"}
-          </button>
-        </div>
       </div>
+
+      <button
+        onClick={captureAndAnalyze}
+        disabled={isProcessing}
+        className="fixed bottom-6 left-1/2 z-50 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)] active:scale-95 disabled:opacity-60"
+      >
+        {isProcessing ? "⏳" : "📸"}
+      </button>
     </div>
   );
 }
