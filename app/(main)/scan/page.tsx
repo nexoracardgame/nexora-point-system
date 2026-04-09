@@ -1,320 +1,124 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  matchCardFromCanvas,
-  shouldAcceptMatch,
-  type CardDescriptor,
-} from "@/lib/card-vision";
+import { useState } from "react";
 
 type CardData = {
   cardNo: string;
   cardName: string;
   rarity: string;
-  imageUrl?: string;
   setName?: string;
   reward?: string;
 };
 
 export default function ScanPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const indexRef = useRef<CardDescriptor[]>([]);
-
+  const [preview, setPreview] = useState("");
   const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState("🚀 OPENING CAMERA...");
+  const [status, setStatus] = useState("📸 แตะปุ่มเพื่อถ่ายการ์ด");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [indexReady, setIndexReady] = useState(false);
-  const [indexCount, setIndexCount] = useState(0);
 
-  const drawGuide = () => {
-    const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    const boxW = w * 0.82;
-    const boxH = boxW * 1.42;
-    const x = (w - boxW) / 2;
-    const y = (h - boxH) / 2;
-
-    ctx.strokeStyle = "rgba(250,204,21,0.98)";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.roundRect(x, y, boxW, boxH, 22);
-    ctx.stroke();
-  };
-
-  const detectCardShape = (canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return false;
-
-    const { width, height } = canvas;
-    const data = ctx.getImageData(0, 0, width, height).data;
-
-    let edgeCount = 0;
-    let borderContrast = 0;
-
-    for (let y = 8; y < height - 8; y += 8) {
-      for (let x = 8; x < width - 8; x += 8) {
-        const i = (y * width + x) * 4;
-        const left = (y * width + (x - 4)) * 4;
-        const top = ((y - 4) * width + x) * 4;
-
-        const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-        const lumLeft =
-          data[left] * 0.299 + data[left + 1] * 0.587 + data[left + 2] * 0.114;
-        const lumTop =
-          data[top] * 0.299 + data[top + 1] * 0.587 + data[top + 2] * 0.114;
-
-        const diff = Math.abs(lum - lumLeft) + Math.abs(lum - lumTop);
-        if (diff > 90) edgeCount++;
-
-        if (
-          x < 40 ||
-          x > width - 40 ||
-          y < 40 ||
-          y > height - 40
-        ) {
-          borderContrast += diff;
-        }
-      }
-    }
-
-    return edgeCount > 140 && borderContrast > 4000;
-  };
-
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    const boot = async () => {
-      try {
-        setStatus("🧠 โหลดระบบสแกน...");
-        const res = await fetch(`/cards/card-index.json?ts=${Date.now()}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("โหลด card-index ไม่สำเร็จ");
-
-        const descriptors = (await res.json()) as CardDescriptor[];
-        indexRef.current = descriptors;
-        setIndexCount(descriptors.length);
-        setIndexReady(true);
-
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" } },
-            audio: false,
-          });
-        } catch {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
-        }
-
-        const video = videoRef.current;
-        if (!video || !stream) return;
-
-        video.srcObject = stream;
-        await video.play().catch(() => {});
-        setTimeout(drawGuide, 300);
-        setStatus("⚡ WORLD-CLASS CARD VISION READY");
-      } catch (e) {
-        console.error(e);
-        setStatus("❌ เปิดกล้องหรือโหลด index ไม่สำเร็จ");
-      }
-    };
-
-    boot();
-    window.addEventListener("resize", drawGuide);
-    return () => {
-      window.removeEventListener("resize", drawGuide);
-      stream?.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
-
-  const captureAndAnalyze = async () => {
-    if (isProcessing) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (!video || !canvas || !video.videoWidth) {
-      setStatus("❌ กล้องยังไม่พร้อม");
-      return;
-    }
-
-    if (!indexReady) {
-      setStatus("⏳ ระบบยังโหลดไม่เสร็จ");
-      return;
-    }
+  const handleCapture = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     setIsProcessing(true);
-    setStatus("🧠 ตรวจจับทรงการ์ด + วิเคราะห์หลายโซน...");
+    setStatus("🧠 AI SERVER กำลังวิเคราะห์...");
 
     try {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("canvas fail");
+      const reader = new FileReader();
 
-      canvas.width = 720;
-      canvas.height = 1024;
+      reader.onload = async () => {
+        const image = reader.result as string;
+        setPreview(image);
 
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const cropW = vw * 0.82;
-      const cropH = cropW * 1.42;
-      const sx = (vw - cropW) / 2;
-      const sy = (vh - cropH) / 2;
+        const aiRes = await fetch("http://192.168.1.117:8001/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image }),
+        });
 
-      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
+        const ai = await aiRes.json();
 
-      if (!detectCardShape(canvas)) {
-        setStatus("🟥 กรุณาวางเฉพาะการ์ดให้อยู่ในกรอบ");
-        return;
-      }
+        if (!ai.cardNo) {
+          setStatus("❌ AI อ่านไม่ออก");
+          setIsProcessing(false);
+          return;
+        }
 
-      const artCanvas = document.createElement("canvas");
-      artCanvas.width = 520;
-      artCanvas.height = 520;
-      const artCtx = artCanvas.getContext("2d");
-      if (!artCtx) throw new Error("art canvas fail");
-      artCtx.drawImage(canvas, 100, 180, 520, 520, 0, 0, 520, 520);
+        const cardRes = await fetch(`/api/card?cardNo=${ai.cardNo}`);
+        const data = await cardRes.json();
 
-      const topCanvas = document.createElement("canvas");
-      topCanvas.width = 220;
-      topCanvas.height = 220;
-      const topCtx = topCanvas.getContext("2d");
-      if (!topCtx) throw new Error("top canvas fail");
-      topCtx.drawImage(canvas, 40, 40, 220, 220, 0, 0, 220, 220);
+        setCard({
+          cardNo: ai.cardNo,
+          cardName: data.card_name || "Unknown Card",
+          rarity: data.rarity || "-",
+          setName: data.set_name,
+          reward: data.reward,
+        });
 
-      const bottomCanvas = document.createElement("canvas");
-      bottomCanvas.width = 420;
-      bottomCanvas.height = 140;
-      const bottomCtx = bottomCanvas.getContext("2d");
-      if (!bottomCtx) throw new Error("bottom canvas fail");
-      bottomCtx.drawImage(canvas, 150, 850, 420, 140, 0, 0, 420, 140);
+        setStatus(
+          `🃏 ${ai.cardNo} (${Math.round(
+            (ai.confidence || 0) * 100
+          )}%)`
+        );
 
-      const artMatch = matchCardFromCanvas(artCanvas, indexRef.current);
-      const topMatch = matchCardFromCanvas(topCanvas, indexRef.current);
-      const bottomMatch = matchCardFromCanvas(bottomCanvas, indexRef.current);
-
-      const weightedVotes = new Map<string, number>();
-      const addVote = (cardNo: string | undefined, weight: number) => {
-        if (!cardNo) return;
-        weightedVotes.set(cardNo, (weightedVotes.get(cardNo) || 0) + weight);
+        setIsProcessing(false);
       };
 
-      addVote(artMatch?.cardNo, 0.5);
-      addVote(topMatch?.cardNo, 0.3);
-      addVote(bottomMatch?.cardNo, 0.2);
-
-      const winner = [...weightedVotes.entries()].sort((a, b) => b[1] - a[1])[0];
-      if (!winner) {
-        setStatus("❌ ไม่พบการ์ดที่ตรงพอ");
-        return;
-      }
-
-      const winnerCardNo = winner[0];
-      const source =
-        artMatch?.cardNo === winnerCardNo
-          ? artMatch
-          : topMatch?.cardNo === winnerCardNo
-          ? topMatch
-          : bottomMatch;
-
-      if (!source) {
-        setStatus("❌ ไม่พบ source match");
-        return;
-      }
-
-      const match = {
-        ...source,
-        cardNo: winnerCardNo,
-        confidence: Math.min(1, (source.confidence || 0.5) + winner[1] * 0.35),
-      };
-
-      if (!shouldAcceptMatch(match)) {
-        setStatus(`🟨 ยังไม่ชัดพอ (${winnerCardNo}) กรุณาถ่ายใหม่`);
-        return;
-      }
-
-      const cardRes = await fetch(`/api/card?cardNo=${winnerCardNo}`, {
-        cache: "no-store",
-      });
-      const data = await cardRes.json();
-
-      setCard({
-        cardNo: winnerCardNo,
-        cardName: data.card_name || "Unknown Card",
-        rarity: data.rarity || "-",
-        imageUrl: data.image_url,
-        setName: data.set_name,
-        reward: data.reward,
-      });
-
-      setStatus(`🃏 เจอการ์ด ${winnerCardNo} | ${(match.confidence * 100).toFixed(0)}%`);
+      reader.readAsDataURL(file);
     } catch (err: any) {
       console.error(err);
       setStatus(`❌ ${err?.message || "scan fail"}`);
-    } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4 pb-44">
-        <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3 backdrop-blur-xl">
-          <div className="text-sm font-bold text-yellow-300">{status}</div>
-          <div className="mt-1 text-[11px] text-zinc-400">
-            INDEX: {indexReady ? `${indexCount} ใบพร้อม` : "LOADING"}
+    <div className="min-h-screen bg-black px-4 py-6 text-white">
+      <div className="mx-auto max-w-md">
+        <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-white/5 p-4">
+          {status}
+        </div>
+
+        {preview && (
+          <div className="mb-4 overflow-hidden rounded-3xl border border-yellow-500/20">
+            <img
+              src={preview}
+              alt="preview"
+              className="aspect-[4/5] w-full object-cover"
+            />
           </div>
-        </div>
+        )}
 
-        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_60px_rgba(234,179,8,0.12)]">
-          <div className="relative aspect-[4/5] w-full">
-            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
-            <canvas ref={overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <label className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)]">
+          {isProcessing ? "⏳" : "📸"}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleCapture}
+            className="hidden"
+          />
+        </label>
+
+        {card && (
+          <div className="mt-6 rounded-3xl border border-yellow-500/20 bg-white/5 p-5">
+            <div className="text-yellow-300">CARD #{card.cardNo}</div>
+            <div className="text-2xl font-black">{card.cardName}</div>
+            <div className="mt-2 text-sm text-zinc-400">
+              ✨ {card.rarity}
+            </div>
+            {card.reward && (
+              <div className="mt-4 rounded-2xl bg-yellow-500/10 p-3 text-sm">
+                🎁 {card.reward}
+              </div>
+            )}
           </div>
-        </div>
-
-        <canvas ref={canvasRef} className="hidden" />
-
-        <div className="mt-4 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5">
-          {card ? (
-            <>
-              <div className="mb-3 text-xs font-bold text-yellow-300">CARD #{card.cardNo}</div>
-              <h2 className="text-2xl font-black">{card.cardName}</h2>
-              <div className="mt-2 text-sm text-zinc-400">✨ Rarity: {card.rarity}</div>
-              {card.setName ? <div className="mt-1 text-sm text-zinc-500">📦 Set: {card.setName}</div> : null}
-              {card.reward ? (
-                <div className="mt-3 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3">
-                  <div className="text-xs font-bold text-yellow-300">🎁 REWARD / รางวัล</div>
-                  <div className="mt-1 whitespace-pre-wrap text-sm text-white">{card.reward}</div>
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <div className="text-sm text-zinc-400">วางการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มเหลืองเพื่อสแกน</div>
-          )}
-        </div>
+        )}
       </div>
-
-      <button
-        onClick={captureAndAnalyze}
-        disabled={isProcessing || !indexReady}
-        className="fixed bottom-24 left-1/2 z-50 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)] transition-all active:scale-95 disabled:opacity-60"
-      >
-        {isProcessing ? "⏳" : "📸"}
-      </button>
     </div>
   );
 }
