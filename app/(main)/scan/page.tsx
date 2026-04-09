@@ -12,23 +12,32 @@ type CardData = {
 
 type CardIndexItem = {
   cardNo: string;
-  vector: number[];
+  rgb: number[];
+  edge: number[];
+  hist: number[];
 };
 
 const CARD_COUNT = 293;
-const VECTOR_SIZE = 64;
-const MATCH_THRESHOLD = 0.62;
-const SCAN_INTERVAL_MS = 180;
+const RGB_W = 36;
+const RGB_H = 52;
+const EDGE_W = 24;
+const EDGE_H = 34;
+const HIST_BINS = 8;
+const SCAN_INTERVAL_MS = 160;
+const MATCH_THRESHOLD = 0.78;
+const STABLE_HITS_REQUIRED = 3;
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastCardRef = useRef("");
-  const isPredictingRef = useRef(false);
   const indexRef = useRef<CardIndexItem[]>([]);
   const warmingRef = useRef(false);
+  const stableCardRef = useRef("");
+  const stableHitsRef = useRef(0);
+  const lastFetchedRef = useRef("");
+  const isPredictingRef = useRef(false);
 
   const [streaming, setStreaming] = useState(false);
   const [indexReady, setIndexReady] = useState(false);
@@ -39,21 +48,19 @@ export default function ScanPage() {
   const [debugLabel, setDebugLabel] = useState("");
 
   const labels = useMemo(
-    () =>
-      Array.from({ length: CARD_COUNT }, (_, i) =>
-        String(i + 1).padStart(3, "0")
-      ),
+    () => Array.from({ length: CARD_COUNT }, (_, i) => String(i + 1).padStart(3, "0")),
     []
   );
 
-  const cosineSimilarity = (a: Float32Array, b: number[]) => {
+  const cosineSimilarity = (a: ArrayLike<number>, b: ArrayLike<number>) => {
     let dot = 0;
     let magA = 0;
     let magB = 0;
 
-    for (let i = 0; i < a.length; i++) {
-      const av = a[i] || 0;
-      const bv = b[i] || 0;
+    const len = Math.min(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      const av = Number(a[i]) || 0;
+      const bv = Number(b[i]) || 0;
       dot += av * bv;
       magA += av * av;
       magB += bv * bv;
@@ -62,38 +69,137 @@ export default function ScanPage() {
     return dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
   };
 
-  const makeVectorFromImageData = (
-    data: Uint8ClampedArray,
-    size: number
-  ) => {
-    const vec = new Float32Array(size * size * 3);
+  const createCanvas = (w: number, h: number) => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return c;
+  };
 
-    for (let i = 0; i < size * size; i++) {
+  const getImageDataFromSource = (source: CanvasImageSource, w: number, h: number) => {
+    const c = createCanvas(w, h);
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return new Uint8ClampedArray(w * h * 4);
+    ctx.drawImage(source, 0, 0, w, h);
+    return ctx.getImageData(0, 0, w, h).data;
+  };
+
+  const makeRgbVector = (data: Uint8ClampedArray, w: number, h: number) => {
+    const vec = new Float32Array(w * h * 3);
+    for (let i = 0; i < w * h; i++) {
       vec[i * 3] = data[i * 4] / 255;
       vec[i * 3 + 1] = data[i * 4 + 1] / 255;
       vec[i * 3 + 2] = data[i * 4 + 2] / 255;
     }
-
     return vec;
   };
 
-  const extractVector = (source: CanvasImageSource, size = VECTOR_SIZE) => {
-    const c = document.createElement("canvas");
-    c.width = size;
-    c.height = size;
-    const ctx = c.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return new Float32Array(size * size * 3);
+  const makeGray = (data: Uint8ClampedArray, w: number, h: number) => {
+    const gray = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+      const r = data[i * 4];
+      const g = data[i * 4 + 1];
+      const b = data[i * 4 + 2];
+      gray[i] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+    }
+    return gray;
+  };
 
-    ctx.drawImage(source, 0, 0, size, size);
-    const imageData = ctx.getImageData(0, 0, size, size);
-    return makeVectorFromImageData(imageData.data, size);
+  const makeEdgeVector = (data: Uint8ClampedArray, w: number, h: number) => {
+    const gray = makeGray(data, w, h);
+    const edge = new Float32Array(w * h);
+
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        const gx =
+          -gray[(y - 1) * w + (x - 1)] + gray[(y - 1) * w + (x + 1)] +
+          -2 * gray[y * w + (x - 1)] + 2 * gray[y * w + (x + 1)] +
+          -gray[(y + 1) * w + (x - 1)] + gray[(y + 1) * w + (x + 1)];
+
+        const gy =
+          -gray[(y - 1) * w + (x - 1)] - 2 * gray[(y - 1) * w + x] - gray[(y - 1) * w + (x + 1)] +
+          gray[(y + 1) * w + (x - 1)] + 2 * gray[(y + 1) * w + x] + gray[(y + 1) * w + (x + 1)];
+
+        edge[i] = Math.min(1, Math.sqrt(gx * gx + gy * gy));
+      }
+    }
+
+    return edge;
+  };
+
+  const rgbToHsv = (r: number, g: number, b: number) => {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    const s = max === 0 ? 0 : d / max;
+    const v = max;
+
+    if (d !== 0) {
+      switch (max) {
+        case r:
+          h = ((g - b) / d) % 6;
+          break;
+        case g:
+          h = (b - r) / d + 2;
+          break;
+        default:
+          h = (r - g) / d + 4;
+          break;
+      }
+      h /= 6;
+      if (h < 0) h += 1;
+    }
+
+    return [h, s, v];
+  };
+
+  const makeHistogram = (data: Uint8ClampedArray, w: number, h: number) => {
+    const bins = new Float32Array(HIST_BINS * HIST_BINS * HIST_BINS);
+
+    for (let i = 0; i < w * h; i++) {
+      const r = data[i * 4] / 255;
+      const g = data[i * 4 + 1] / 255;
+      const b = data[i * 4 + 2] / 255;
+      const [hh, ss, vv] = rgbToHsv(r, g, b);
+
+      const hb = Math.min(HIST_BINS - 1, Math.floor(hh * HIST_BINS));
+      const sb = Math.min(HIST_BINS - 1, Math.floor(ss * HIST_BINS));
+      const vb = Math.min(HIST_BINS - 1, Math.floor(vv * HIST_BINS));
+      const idx = hb * HIST_BINS * HIST_BINS + sb * HIST_BINS + vb;
+      bins[idx] += 1;
+    }
+
+    let mag = 0;
+    for (let i = 0; i < bins.length; i++) mag += bins[i] * bins[i];
+    mag = Math.sqrt(mag) || 1;
+    for (let i = 0; i < bins.length; i++) bins[i] /= mag;
+
+    return bins;
+  };
+
+  const extractCardFeatures = (source: CanvasImageSource) => {
+    const rgbData = getImageDataFromSource(source, RGB_W, RGB_H);
+    const edgeData = getImageDataFromSource(source, EDGE_W, EDGE_H);
+
+    return {
+      rgb: Array.from(makeRgbVector(rgbData, RGB_W, RGB_H)),
+      edge: Array.from(makeEdgeVector(edgeData, EDGE_W, EDGE_H)),
+      hist: Array.from(makeHistogram(rgbData, RGB_W, RGB_H)),
+    };
+  };
+
+  const scoreCard = (query: CardIndexItem, item: CardIndexItem) => {
+    const rgbScore = cosineSimilarity(query.rgb, item.rgb);
+    const edgeScore = cosineSimilarity(query.edge, item.edge);
+    const histScore = cosineSimilarity(query.hist, item.hist);
+
+    return rgbScore * 0.45 + edgeScore * 0.35 + histScore * 0.2;
   };
 
   const fetchCardData = async (cardNo: string) => {
-    const res = await fetch(`/api/card?cardNo=${cardNo}`, {
-      cache: "no-store",
-    });
-
+    const res = await fetch(`/api/card?cardNo=${cardNo}`, { cache: "no-store" });
     const data = await res.json();
 
     setCard({
@@ -124,7 +230,7 @@ export default function ScanPage() {
     ctx.fillRect(0, 0, w, h);
     ctx.clearRect(x, y, boxW, boxH);
 
-    ctx.strokeStyle = "rgba(250,204,21,0.95)";
+    ctx.strokeStyle = "rgba(250,204,21,0.96)";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.roundRect(x, y, boxW, boxH, 18);
@@ -134,11 +240,8 @@ export default function ScanPage() {
   useEffect(() => {
     const loadIndex = async () => {
       try {
-        const res = await fetch(`/card-index.json?v=${Date.now()}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`/card-index.json?v=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) throw new Error("card-index not found");
-
         const json = await res.json();
         indexRef.current = json.items || [];
         setIndexReady(indexRef.current.length > 0);
@@ -157,7 +260,6 @@ export default function ScanPage() {
       const video = videoRef.current;
       const overlay = overlayCanvasRef.current;
       if (!video || !overlay) return;
-
       const rect = video.getBoundingClientRect();
       overlay.width = rect.width;
       overlay.height = rect.height;
@@ -166,7 +268,6 @@ export default function ScanPage() {
 
     window.addEventListener("resize", onResize);
     const t = setTimeout(onResize, 300);
-
     return () => {
       window.removeEventListener("resize", onResize);
       clearTimeout(t);
@@ -192,8 +293,7 @@ export default function ScanPage() {
           img.onerror = () => reject();
         });
 
-        const vector = Array.from(extractVector(img));
-        built.push({ cardNo, vector });
+        built.push({ cardNo, ...extractCardFeatures(img) });
       } catch {}
 
       if (i % 4 === 0 || i === CARD_COUNT) {
@@ -225,11 +325,7 @@ export default function ScanPage() {
       }
 
       setStreaming(true);
-      setStatus(
-        indexRef.current.length
-          ? "⚡ INSTANT SCAN READY"
-          : "🚀 WARMING SMART SCAN..."
-      );
+      setStatus(indexRef.current.length ? "⚡ INSTANT SCAN READY" : "🚀 WARMING SMART SCAN...");
       warmIndexInBackground();
 
       setTimeout(() => {
@@ -253,8 +349,8 @@ export default function ScanPage() {
     try {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-
       if (!video || !canvas || !video.videoWidth) return;
+
       if (!indexRef.current.length) {
         setStatus(`🚀 WARMING SMART SCAN... ${warmingProgress}%`);
         return;
@@ -273,26 +369,17 @@ export default function ScanPage() {
       const sx = (vw - cropW) / 2;
       const sy = (vh - cropH) / 2;
 
-      ctx.drawImage(
-        video,
-        sx,
-        sy,
-        cropW,
-        cropH,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
-      const query = extractVector(canvas);
+      const queryFeatures = extractCardFeatures(canvas);
+      const query: CardIndexItem = { cardNo: "000", ...queryFeatures };
 
       let bestCard = "";
       let bestScore = -1;
       let secondScore = -1;
 
       for (const item of indexRef.current) {
-        const score = cosineSimilarity(query, item.vector);
+        const score = scoreCard(query, item);
         if (score > bestScore) {
           secondScore = bestScore;
           bestScore = score;
@@ -302,32 +389,42 @@ export default function ScanPage() {
         }
       }
 
-      const stability = Math.max(0, bestScore - Math.max(0, secondScore));
-      const displayScore = Math.min(
-        0.999,
-        bestScore * 0.82 + stability * 1.8
-      );
+      const margin = Math.max(0, bestScore - Math.max(0, secondScore));
+      const displayScore = Math.min(0.999, bestScore * 0.88 + margin * 2.2);
 
       setConfidence(displayScore);
       setDebugLabel(bestCard);
 
       if (!bestCard) {
-        setStatus(`🔍 SCANNING...`);
+        setStatus("🔍 SCANNING...");
+        stableCardRef.current = "";
+        stableHitsRef.current = 0;
         return;
       }
 
-      if (displayScore < MATCH_THRESHOLD) {
-        setStatus(
-          `🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`
-        );
+      if (stableCardRef.current === bestCard) {
+        stableHitsRef.current += 1;
+      } else {
+        stableCardRef.current = bestCard;
+        stableHitsRef.current = 1;
       }
 
-      if (lastCardRef.current === bestCard) {
+      if (displayScore < MATCH_THRESHOLD) {
+        setStatus(`🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`);
+        return;
+      }
+
+      if (stableHitsRef.current < STABLE_HITS_REQUIRED) {
+        setStatus(`🎯 VERIFYING ${bestCard} ${stableHitsRef.current}/${STABLE_HITS_REQUIRED}`);
+        return;
+      }
+
+      if (lastFetchedRef.current === bestCard) {
         setStatus(`🃏 ${bestCard} • ${(displayScore * 100).toFixed(1)}%`);
         return;
       }
 
-      lastCardRef.current = bestCard;
+      lastFetchedRef.current = bestCard;
       await fetchCardData(bestCard);
       setStatus(`🃏 ${bestCard} • ${(displayScore * 100).toFixed(1)}%`);
     } finally {
@@ -337,9 +434,7 @@ export default function ScanPage() {
 
   useEffect(() => {
     if (!streaming) return;
-
     timerRef.current = setInterval(predict, SCAN_INTERVAL_MS);
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -351,13 +446,9 @@ export default function ScanPage() {
         <div className="mb-3 rounded-2xl border border-yellow-500/20 bg-white/5 px-4 py-3 text-sm font-bold text-yellow-300 backdrop-blur-xl">
           <div>{status}</div>
           <div className="mt-1 text-xs text-zinc-300">
-            {confidence !== null
-              ? `${(confidence * 100).toFixed(1)}%`
-              : "READY"}
+            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}
             {debugLabel ? ` • ${debugLabel}` : ""}
-            {!indexReady && warmingProgress > 0
-              ? ` • INDEX ${warmingProgress}%`
-              : ""}
+            {!indexReady && warmingProgress > 0 ? ` • INDEX ${warmingProgress}%` : ""}
           </div>
         </div>
 
@@ -392,9 +483,7 @@ export default function ScanPage() {
               <div className="mb-2 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
                 CARD #{card.cardNo}
               </div>
-              <h2 className="text-3xl font-black leading-tight">
-                {card.cardName}
-              </h2>
+              <h2 className="text-3xl font-black leading-tight">{card.cardName}</h2>
               <p className="mt-2 text-sm text-zinc-300">{card.rarity}</p>
               <div className="mt-4 text-4xl font-black text-yellow-400">
                 ฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}
@@ -403,7 +492,7 @@ export default function ScanPage() {
             </div>
           ) : (
             <div className="rounded-[28px] border border-yellow-500/15 bg-white/[0.03] p-5 text-sm text-zinc-400 backdrop-blur-xl">
-              วางการ์ดให้อยู่ในกรอบสีทอง ระบบจะจับเลขการ์ดและดึงชื่อจริงจากฐานข้อมูลให้อัตโนมัติ
+              วางการ์ดให้อยู่ในกรอบสีทอง ระบบจะตรวจเลขการ์ดและดึงข้อมูลจริงให้อัตโนมัติ
             </div>
           )}
         </div>
