@@ -2,17 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { image } = await req.json();
+    const body = await req.json();
 
-    // 🔥 ตอนนี้ mock ก่อน
-    // เดี๋ยวรอบต่อไปต่อ python microservice model จริง
-    return NextResponse.json({
-      cardNo: "029",
-      confidence: 0.98,
+    const res = await fetch(process.env.AI_SCAN_URL!, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     });
-  } catch {
+
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (error) {
     return NextResponse.json(
-      { error: "scan fail" },
+      { error: "AI scan failed" },
       { status: 500 }
     );
   }

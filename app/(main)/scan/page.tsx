@@ -23,49 +23,59 @@ export default function ScanPage() {
     if (!file) return;
 
     setIsProcessing(true);
+    setCard(null);
     setStatus("🧠 AI SERVER กำลังวิเคราะห์...");
 
     try {
       const reader = new FileReader();
 
       reader.onload = async () => {
-        const image = reader.result as string;
-        setPreview(image);
+        try {
+          const image = reader.result as string;
+          setPreview(image);
 
-        const aiRes = await fetch("http://192.168.1.117:8001/predict", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ image }),
-        });
+          const aiRes = await fetch("/api/scan-ai", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ image }),
+          });
 
-        const ai = await aiRes.json();
+          if (!aiRes.ok) {
+            throw new Error("AI server failed");
+          }
 
-        if (!ai.cardNo) {
-          setStatus("❌ AI อ่านไม่ออก");
+          const ai = await aiRes.json();
+
+          if (!ai.cardNo) {
+            setStatus("❌ AI อ่านไม่ออก");
+            setIsProcessing(false);
+            return;
+          }
+
+          const cardRes = await fetch(`/api/card?cardNo=${ai.cardNo}`);
+          const data = await cardRes.json();
+
+          setCard({
+            cardNo: ai.cardNo,
+            cardName: data.card_name || "Unknown Card",
+            rarity: data.rarity || "-",
+            setName: data.set_name,
+            reward: data.reward,
+          });
+
+          setStatus(
+            `🃏 ${ai.cardNo} (${Math.round(
+              (ai.confidence || 0) * 100
+            )}%)`
+          );
+        } catch (error: any) {
+          console.error(error);
+          setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
+        } finally {
           setIsProcessing(false);
-          return;
         }
-
-        const cardRes = await fetch(`/api/card?cardNo=${ai.cardNo}`);
-        const data = await cardRes.json();
-
-        setCard({
-          cardNo: ai.cardNo,
-          cardName: data.card_name || "Unknown Card",
-          rarity: data.rarity || "-",
-          setName: data.set_name,
-          reward: data.reward,
-        });
-
-        setStatus(
-          `🃏 ${ai.cardNo} (${Math.round(
-            (ai.confidence || 0) * 100
-          )}%)`
-        );
-
-        setIsProcessing(false);
       };
 
       reader.readAsDataURL(file);
