@@ -177,7 +177,7 @@ export default function ScanPage() {
     const boxH = boxW * 1.42;
     const x = (w - boxW) / 2;
     const y = (h - boxH) / 2;
-    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.fillStyle = "rgba(0,0,0,0.10)";
     ctx.fillRect(0, 0, w, h);
     ctx.clearRect(x, y, boxW, boxH);
     ctx.strokeStyle = "rgba(250,204,21,0.98)";
@@ -206,6 +206,7 @@ export default function ScanPage() {
       const cardNo = labels[i - 1];
       try {
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.src = `/cards/${cardNo}.jpg?v=1`;
         await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(); });
         built.push({ cardNo, ...extractFeatures(img) });
@@ -221,16 +222,20 @@ export default function ScanPage() {
       video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     });
+
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
-      const rect = videoRef.current.getBoundingClientRect();
-      if (overlayCanvasRef.current) {
-        overlayCanvasRef.current.width = rect.width;
-        overlayCanvasRef.current.height = rect.height;
-        drawGuide();
-      }
+      requestAnimationFrame(() => {
+        const rect = videoRef.current?.getBoundingClientRect();
+        if (rect && overlayCanvasRef.current) {
+          overlayCanvasRef.current.width = rect.width;
+          overlayCanvasRef.current.height = rect.height;
+          drawGuide();
+        }
+      });
     }
+
     setStreaming(true);
     setStatus(indexRef.current.length ? "⚡ SNAP READY" : "🚀 PREPARING...");
     warmIndexInBackground();
@@ -241,8 +246,10 @@ export default function ScanPage() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return;
+
     setIsProcessing(true);
     setStatus("📸 ANALYZING...");
+
     try {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) return;
@@ -257,19 +264,28 @@ export default function ScanPage() {
 
       const query: CardIndexItem = { cardNo: "000", ...extractFeatures(canvas) };
       let bestCard = "", bestScore = -1, second = -1;
+
       for (const item of indexRef.current) {
         const score = scoreCard(query, item);
-        if (score > bestScore) { second = bestScore; bestScore = score; bestCard = item.cardNo; }
-        else if (score > second) second = score;
+        if (score > bestScore) {
+          second = bestScore;
+          bestScore = score;
+          bestCard = item.cardNo;
+        } else if (score > second) {
+          second = score;
+        }
       }
+
       const margin = Math.max(0, bestScore - Math.max(0, second));
       const finalScore = Math.min(0.999, bestScore * 0.92 + margin * 2.8);
       setConfidence(finalScore);
       setDebugLabel(bestCard);
+
       if (!bestCard || finalScore < MATCH_THRESHOLD) {
         setStatus(`❌ ลองจัดแสงใหม่ ${(finalScore * 100).toFixed(1)}%`);
         return;
       }
+
       await fetchCardData(bestCard);
       setStatus(`🃏 ${bestCard} • ${(finalScore * 100).toFixed(1)}%`);
     } finally {
@@ -290,11 +306,11 @@ export default function ScanPage() {
         </div>
 
         <div className="rounded-3xl border border-yellow-500/10 bg-white/[0.03] px-4 py-3 text-xs leading-6 text-zinc-300">
-          💡 ใช้ในที่สว่าง • วางการ์ดเต็มกรอบ • อย่าเอียงมาก • กดแชะครั้งเดียว
+          💡 ใช้ในที่สว่าง • วางการ์ดเต็มกรอบ • อย่าเอียงมาก • แตะปุ่มกลมล่างจอ
         </div>
 
         <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_70px_rgba(234,179,8,0.12)]">
-          <div className="aspect-[4/5] w-full">
+          <div className="aspect-[4/5] w-full relative">
             <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
             <canvas ref={overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
           </div>
@@ -305,27 +321,37 @@ export default function ScanPage() {
         <div className="rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5 backdrop-blur-xl shadow-[0_0_40px_rgba(250,204,21,0.05)]">
           {card ? (
             <>
-              <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
-                CARD #{card.cardNo}
-              </div>
+              <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">CARD #{card.cardNo}</div>
               <h2 className="text-2xl font-black leading-tight">{card.cardName}</h2>
               <p className="mt-2 text-sm text-zinc-300">{card.rarity}</p>
               <div className="mt-4 text-3xl font-black text-yellow-400">฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}</div>
               <p className="mt-2 text-xs text-zinc-400">{card.setName}</p>
             </>
           ) : (
-            <div className="text-sm leading-7 text-zinc-400">ผลลัพธ์จะโชว์เต็มๆตรงนี้แบบไม่อึดอัด อ่านง่าย ไม่เบียด ใช้งานมือเดียวลื่นๆ</div>
+            <div className="text-sm leading-7 text-zinc-400">ผลลัพธ์จะโชว์เต็มๆตรงนี้แบบลื่นไหลและอ่านง่าย</div>
           )}
         </div>
 
-        <div className="sticky bottom-0 mt-auto pb-2 pt-1">
+        <div className="sticky bottom-0 mt-auto flex justify-center pb-3 pt-2">
           {!streaming ? (
-            <button onClick={startCamera} className="w-full rounded-3xl bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 py-4 text-base font-black text-black shadow-[0_18px_60px_rgba(234,179,8,0.30)]">
-              📷 เปิดกล้อง SNAP SCAN
+            <button
+              type="button"
+              onClick={startCamera}
+              className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-yellow-300/80 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-3xl text-black shadow-[0_18px_60px_rgba(234,179,8,0.35)] transition-all active:scale-95"
+              aria-label="Open camera"
+            >
+              📷
             </button>
           ) : (
-            <button onClick={captureAndAnalyze} disabled={isProcessing} className="w-full rounded-3xl bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 py-4 text-lg font-black text-black shadow-[0_18px_60px_rgba(234,179,8,0.30)] disabled:opacity-60">
-              {isProcessing ? "⏳ กำลังคิด..." : "📸 แชะเลย"}
+            <button
+              type="button"
+              onClick={captureAndAnalyze}
+              disabled={isProcessing}
+              className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/90 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_70px_rgba(234,179,8,0.40)] transition-all active:scale-95 disabled:opacity-60"
+              aria-label="Snap card"
+            >
+              <span className="absolute inset-2 rounded-full border-2 border-black/20" />
+              <span className="relative">{isProcessing ? "⏳" : "📸"}</span>
             </button>
           )}
         </div>
