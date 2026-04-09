@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  warmupCardIndex,
+  matchCardFromCanvas,
+  shouldAcceptMatch,
+  type CardDescriptor,
+} from "@/lib/card-vision";
 
 type CardData = {
   cardNo: string;
@@ -19,6 +25,10 @@ export default function ScanPage() {
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("🚀 OPENING CAMERA...");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [indexReady, setIndexReady] = useState(false);
+  const [indexCount, setIndexCount] = useState(0);
+
+  const indexRef = useRef<CardDescriptor[]>([]);
 
   const drawGuide = () => {
     const canvas = overlayCanvasRef.current;
@@ -83,15 +93,24 @@ export default function ScanPage() {
           drawGuide();
         }, 300);
 
-        setStatus("⚡ VISION READY");
+        setStatus("🧠 กำลังโหลดฐานข้อมูลการ์ด...");
+        const descriptors = await warmupCardIndex((done, total) => {
+          setIndexCount(done);
+          if (done < total) {
+            setStatus(`🧠 กำลังโหลดฐานข้อมูลการ์ด... ${done}/${total}`);
+          }
+        });
+
+        indexRef.current = descriptors;
+        setIndexReady(true);
+        setStatus("⚡ CARD VISION READY");
       } catch (err) {
-        console.error("CAMERA ERROR:", err);
-        setStatus("❌ เปิดกล้องไม่สำเร็จ");
+        console.error("SCAN BOOT ERROR:", err);
+        setStatus("❌ เปิดกล้องหรือโหลดฐานข้อมูลไม่สำเร็จ");
       }
     };
 
     boot();
-
     window.addEventListener("resize", drawGuide);
 
     return () => {
@@ -111,8 +130,13 @@ export default function ScanPage() {
       return;
     }
 
+    if (!indexReady || !indexRef.current.length) {
+      setStatus(`⏳ รอฐานข้อมูลการ์ดก่อน... ${indexCount}/293`);
+      return;
+    }
+
     setIsProcessing(true);
-    setStatus("🧠 AI Vision กำลังดูการ์ด...");
+    setStatus("🧠 กำลังเทียบภาพการ์ด...");
 
     try {
       const ctx = canvas.getContext("2d");
@@ -131,64 +155,48 @@ export default function ScanPage() {
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
-      const image = canvas.toDataURL("image/jpeg", 0.8);
+      const match = matchCardFromCanvas(canvas, indexRef.current);
 
-      const res = await fetch(
-        "https://script.google.com/macros/s/AKfycbydI7TpOGs5mxgbQRTkcSpOeXBZor_2gwdqC3kKfAQCa4MWmV0XEEjJsYpfoSGzCKpI/exec",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientId: "nexora-scan",
-            message: "ระบุเลขการ์ด NEXORA 3 หลัก",
-            image,
-          }),
-        }
-      );
+      if (!match) {
+        setStatus("❌ ไม่มีผลลัพธ์จากระบบเทียบภาพ");
+        return;
+      }
 
-      const text = await res.text();
+      if (!shouldAcceptMatch(match)) {
+        setStatus(
+          `❌ ยังไม่มั่นใจพอ (${match.cardNo}) score=${match.score.toFixed(3)}`
+        );
+        return;
+      }
 
-let json: any;
+      const cardRes = await fetch(`/api/card?cardNo=${match.cardNo}`, {
+        cache: "no-store",
+      });
 
-try {
-  json = JSON.parse(text);
-} catch {
-  console.log("GAS RAW RESPONSE:", text);
-  setStatus(`❌ GAS RAW: ${text.slice(0, 120)}`);
-  return;
-}
+      if (!cardRes.ok) {
+        setStatus(`❌ โหลดข้อมูลการ์ด ${match.cardNo} ไม่สำเร็จ`);
+        return;
+      }
 
-const raw =
-  typeof json === "string"
-    ? json.trim()
-    : typeof json?.reply === "string"
-    ? json.reply.trim()
-    : typeof json?.text === "string"
-    ? json.text.trim()
-    : typeof json?.result === "string"
-    ? json.result.trim()
-    : JSON.stringify(json);
-
-const cardNo = raw.match(/\d{3}/)?.[0];
-
-if (!cardNo) {
-  setStatus(`❌ AI อ่านเลขไม่ได้: ${raw}`);
-  return;
-}
-
-      const cardRes = await fetch(`/api/card?cardNo=${cardNo}`);
       const data = await cardRes.json();
 
       setCard({
-        cardNo,
+        cardNo: match.cardNo,
         cardName: data.card_name || "Unknown Card",
         rarity: data.rarity || "-",
         imageUrl: data.image_url,
+        marketPriceTHB: data.market_price_thb,
+        setName: data.set_name,
       });
 
-      setStatus(`🃏 เจอการ์ด ${cardNo}`);
+      setStatus(
+        `🃏 เจอการ์ด ${match.cardNo} | confidence ${(match.confidence * 100).toFixed(
+          0
+        )}%`
+      );
     } catch (err: any) {
-      setStatus(`❌ ${err?.message || "Vision fail"}`);
+      console.error(err);
+      setStatus(`❌ ${err?.message || "scan fail"}`);
     } finally {
       setIsProcessing(false);
     }
@@ -199,6 +207,9 @@ if (!cardNo) {
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4 pb-32">
         <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3">
           <div className="text-sm font-bold text-yellow-300">{status}</div>
+          <div className="mt-1 text-[11px] text-zinc-400">
+            INDEX: {indexReady ? "READY" : `${indexCount}/293`}
+          </div>
         </div>
 
         <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black">
@@ -226,9 +237,15 @@ if (!cardNo) {
                 CARD #{card.cardNo}
               </div>
               <h2 className="text-2xl font-black">{card.cardName}</h2>
-              <div className="mt-2 text-sm text-zinc-400">
-                Rarity: {card.rarity}
-              </div>
+              <div className="mt-2 text-sm text-zinc-400">Rarity: {card.rarity}</div>
+              {card.setName ? (
+                <div className="mt-1 text-sm text-zinc-500">Set: {card.setName}</div>
+              ) : null}
+              {typeof card.marketPriceTHB === "number" ? (
+                <div className="mt-1 text-sm text-zinc-500">
+                  Price: ฿{card.marketPriceTHB}
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="text-sm text-zinc-400">
@@ -240,7 +257,7 @@ if (!cardNo) {
 
       <button
         onClick={captureAndAnalyze}
-        disabled={isProcessing}
+        disabled={isProcessing || !indexReady}
         className="fixed bottom-6 left-1/2 z-50 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)] active:scale-95 disabled:opacity-60"
       >
         {isProcessing ? "⏳" : "📸"}
