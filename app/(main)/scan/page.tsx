@@ -34,7 +34,7 @@ export default function ScanPage() {
           const image = reader.result as string;
           setPreview(image);
 
-          const aiRes = await fetch("/api/scan-ai", {
+          const aiRes = await fetch("http://127.0.0.1:8001/predict", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
