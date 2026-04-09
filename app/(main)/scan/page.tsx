@@ -51,21 +51,31 @@ export default function ScanPage() {
       setStatus("🎥 กำลังเปิดกล้อง...");
 
       try {
-        // ใช้กล้องอะไรก็ได้ก่อน เสถียรสุด
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      } catch {
-        // fallback มือถือ
+        // มือถือ: เอากล้องหลังเป็นหลัก
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { ideal: "environment" },
+            facingMode: { exact: "environment" },
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
           audio: false,
         });
+      } catch {
+        try {
+          // fallback มือถือบางรุ่น
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: "environment" },
+            },
+            audio: false,
+          });
+        } catch {
+          // desktop/webcam fallback
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
       }
 
       const video = videoRef.current;
