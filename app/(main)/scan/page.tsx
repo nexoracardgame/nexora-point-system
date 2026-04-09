@@ -148,43 +148,68 @@ export default function ScanPage() {
   };
 
   useEffect(() => {
-    const boot = async () => {
-      const items: CardIndexItem[] = [];
-      for (const cardNo of labels) {
-        try {
-          const img = new Image();
-          img.src = `/cards/${cardNo}.jpg`;
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject();
-          });
-          items.push({ cardNo, ...extractFeatures(img) });
-        } catch {}
-      }
-      indexRef.current = items;
-
+  const boot = async () => {
+    try {
+      // ✅ เปิดกล้องก่อนทันที
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
 
-      const video = videoRef.current!;
-      video.srcObject = stream;
-      await video.play();
+      const video = videoRef.current;
+      if (!video) return;
 
-      setStatus("⚡ SNAP READY");
+      video.srcObject = stream;
+
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = async () => {
+          await video.play();
+          resolve();
+        };
+      });
+
+      setStatus("⚡ CAMERA READY");
 
       requestAnimationFrame(() => {
         const rect = video.getBoundingClientRect();
-        const overlay = overlayCanvasRef.current!;
+        const overlay = overlayCanvasRef.current;
+        if (!overlay) return;
         overlay.width = rect.width;
         overlay.height = rect.height;
         drawGuide();
       });
-    };
 
-    boot();
-  }, [labels]);
+      // ✅ ค่อยโหลด index ทีหลังแบบ background
+      const items: CardIndexItem[] = [];
+      for (const cardNo of labels) {
+        try {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = `/cards/${cardNo}.jpg`;
+
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject();
+          });
+
+          items.push({ cardNo, ...extractFeatures(img) });
+        } catch {}
+      }
+
+      indexRef.current = items;
+      setStatus("⚡ SNAP READY");
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ เปิดกล้องไม่สำเร็จ");
+    }
+  };
+
+  boot();
+}, [labels]);
 
   const analyzeOneFrame = () => {
     const video = videoRef.current!;
