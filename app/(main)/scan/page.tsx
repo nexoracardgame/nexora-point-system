@@ -17,8 +17,8 @@ type CardIndexItem = {
 
 const CARD_COUNT = 293;
 const VECTOR_SIZE = 24;
-const MATCH_THRESHOLD = 0.9;
-const SCAN_INTERVAL_MS = 180;
+const MATCH_THRESHOLD = 0.62;
+const SCAN_INTERVAL_MS = 120;
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -327,14 +327,19 @@ export default function ScanPage() {
       setConfidence(displayScore);
       setDebugLabel(bestCard);
 
-      if (!bestCard || displayScore < MATCH_THRESHOLD) {
-        setStatus(`🔍 SCANNING... ${(displayScore * 100).toFixed(1)}%`);
-        return;
+      if (!bestCard) {
+       setStatus(`🔍 SCANNING...`);
+       return;
       }
 
-      if (lastCardRef.current === bestCard) {
-        setStatus(`🃏 ${bestCard} • ${(displayScore * 100).toFixed(1)}%`);
-        return;
+// 🔥 ยอมโชว์ผลแม้ score ยังไม่สูงมาก
+      if (displayScore < MATCH_THRESHOLD) {
+        setStatus(`🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`);
+      }
+
+// 🔥 ยอมโชว์ผลแม้ score ยังไม่สูงมาก
+      if (displayScore < MATCH_THRESHOLD) {
+        setStatus(`🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`);
       }
 
       lastCardRef.current = bestCard;
