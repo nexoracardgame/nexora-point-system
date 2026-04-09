@@ -208,37 +208,59 @@ export default function ScanPage() {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = `/cards/${cardNo}.jpg?v=1`;
-        await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(); });
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject();
+        });
         built.push({ cardNo, ...extractFeatures(img) });
       } catch {}
-      if (i % 10 === 0 || i === CARD_COUNT) setWarmingProgress(Math.round((i / CARD_COUNT) * 100));
+      if (i % 10 === 0 || i === CARD_COUNT) {
+        setWarmingProgress(Math.round((i / CARD_COUNT) * 100));
+      }
     }
     indexRef.current = built;
     setStatus("⚡ SNAP READY");
   };
 
   const startCamera = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
-    });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-      requestAnimationFrame(() => {
-        const rect = videoRef.current?.getBoundingClientRect();
-        if (rect && overlayCanvasRef.current) {
+      if (!videoRef.current) return;
+
+      const video = videoRef.current;
+      video.srcObject = stream;
+
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = async () => {
+          await video.play();
+          resolve();
+        };
+      });
+
+      setStreaming(true);
+      setStatus(indexRef.current.length ? "⚡ SNAP READY" : "🚀 PREPARING...");
+      warmIndexInBackground();
+
+      setTimeout(() => {
+        const rect = video.getBoundingClientRect();
+        if (overlayCanvasRef.current) {
           overlayCanvasRef.current.width = rect.width;
           overlayCanvasRef.current.height = rect.height;
           drawGuide();
         }
-      });
+      }, 300);
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ เปิดกล้องไม่สำเร็จ");
     }
-
-    setStreaming(true);
-    setStatus(indexRef.current.length ? "⚡ SNAP READY" : "🚀 PREPARING...");
-    warmIndexInBackground();
   };
 
   const captureAndAnalyze = async () => {
@@ -253,17 +275,24 @@ export default function ScanPage() {
     try {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) return;
+
       canvas.width = 280;
       canvas.height = 398;
-      const vw = video.videoWidth, vh = video.videoHeight;
+
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
       const cropW = vw * 0.42;
       const cropH = cropW * 1.42;
       const sx = (vw - cropW) / 2;
       const sy = (vh - cropH) / 2;
+
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
       const query: CardIndexItem = { cardNo: "000", ...extractFeatures(canvas) };
-      let bestCard = "", bestScore = -1, second = -1;
+
+      let bestCard = "";
+      let bestScore = -1;
+      let second = -1;
 
       for (const item of indexRef.current) {
         const score = scoreCard(query, item);
@@ -278,6 +307,7 @@ export default function ScanPage() {
 
       const margin = Math.max(0, bestScore - Math.max(0, second));
       const finalScore = Math.min(0.999, bestScore * 0.92 + margin * 2.8);
+
       setConfidence(finalScore);
       setDebugLabel(bestCard);
 
@@ -310,9 +340,18 @@ export default function ScanPage() {
         </div>
 
         <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_70px_rgba(234,179,8,0.12)]">
-          <div className="aspect-[4/5] w-full relative">
-            <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-            <canvas ref={overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+          <div className="relative aspect-[4/5] w-full bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <canvas
+              ref={overlayCanvasRef}
+              className="pointer-events-none absolute inset-0 h-full w-full"
+            />
           </div>
         </div>
 
@@ -321,14 +360,20 @@ export default function ScanPage() {
         <div className="rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5 backdrop-blur-xl shadow-[0_0_40px_rgba(250,204,21,0.05)]">
           {card ? (
             <>
-              <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">CARD #{card.cardNo}</div>
+              <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
+                CARD #{card.cardNo}
+              </div>
               <h2 className="text-2xl font-black leading-tight">{card.cardName}</h2>
               <p className="mt-2 text-sm text-zinc-300">{card.rarity}</p>
-              <div className="mt-4 text-3xl font-black text-yellow-400">฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}</div>
+              <div className="mt-4 text-3xl font-black text-yellow-400">
+                ฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}
+              </div>
               <p className="mt-2 text-xs text-zinc-400">{card.setName}</p>
             </>
           ) : (
-            <div className="text-sm leading-7 text-zinc-400">ผลลัพธ์จะโชว์เต็มๆตรงนี้แบบลื่นไหลและอ่านง่าย</div>
+            <div className="text-sm leading-7 text-zinc-400">
+              ผลลัพธ์จะโชว์เต็มๆตรงนี้แบบลื่นไหลและอ่านง่าย
+            </div>
           )}
         </div>
 
@@ -338,7 +383,6 @@ export default function ScanPage() {
               type="button"
               onClick={startCamera}
               className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-yellow-300/80 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-3xl text-black shadow-[0_18px_60px_rgba(234,179,8,0.35)] transition-all active:scale-95"
-              aria-label="Open camera"
             >
               📷
             </button>
@@ -348,7 +392,6 @@ export default function ScanPage() {
               onClick={captureAndAnalyze}
               disabled={isProcessing}
               className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/90 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_70px_rgba(234,179,8,0.40)] transition-all active:scale-95 disabled:opacity-60"
-              aria-label="Snap card"
             >
               <span className="absolute inset-2 rounded-full border-2 border-black/20" />
               <span className="relative">{isProcessing ? "⏳" : "📸"}</span>
