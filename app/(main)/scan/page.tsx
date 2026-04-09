@@ -44,9 +44,21 @@ export default function ScanPage() {
   };
 
   useEffect(() => {
-    const boot = async () => {
+  let stream: MediaStream | null = null;
+
+  const boot = async () => {
+    try {
+      setStatus("🎥 กำลังเปิดกล้อง...");
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        // ใช้กล้องอะไรก็ได้ก่อน เสถียรสุด
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      } catch {
+        // fallback มือถือ
+        stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
             width: { ideal: 1280 },
@@ -54,40 +66,45 @@ export default function ScanPage() {
           },
           audio: false,
         });
-
-        const video = videoRef.current;
-        if (!video) return;
-
-        video.srcObject = stream;
-
-        await new Promise<void>((resolve) => {
-          video.onloadedmetadata = async () => {
-            try {
-              await video.play();
-            } catch {}
-            resolve();
-          };
-        });
-
-        requestAnimationFrame(() => {
-          const rect = video.getBoundingClientRect();
-          const overlay = overlayCanvasRef.current;
-          if (!overlay) return;
-
-          overlay.width = rect.width;
-          overlay.height = rect.height;
-          drawGuide();
-        });
-
-        setStatus("⚡ VISION READY");
-      } catch (err) {
-        console.error(err);
-        setStatus("❌ เปิดกล้องไม่สำเร็จ");
       }
-    };
 
-    boot();
-  }, []);
+      const video = videoRef.current;
+      if (!video || !stream) return;
+
+      video.srcObject = stream;
+
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = async () => {
+          try {
+            await video.play();
+          } catch {}
+          resolve();
+        };
+      });
+
+      requestAnimationFrame(() => {
+        const rect = video.getBoundingClientRect();
+        const overlay = overlayCanvasRef.current;
+        if (!overlay) return;
+
+        overlay.width = rect.width;
+        overlay.height = rect.height;
+        drawGuide();
+      });
+
+      setStatus("⚡ VISION READY");
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ เปิดกล้องไม่สำเร็จ");
+    }
+  };
+
+  boot();
+
+  return () => {
+    stream?.getTracks().forEach((track) => track.stop());
+  };
+}, []);
 
   const captureAndAnalyze = async () => {
     if (isProcessing) return;
