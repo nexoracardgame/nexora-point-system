@@ -148,32 +148,33 @@ export default function ScanPage() {
 
       const text = await res.text();
 
-      let json: any;
-      try {
-        json = JSON.parse(text);
-      catch {
-        console.log("GAS RAW RESPONSE:", text);
-        setStatus(`❌ GAS RAW: ${text.slice(0, 120)}`);
-        return;
-      }
+let json: any;
 
-      const raw =
-        typeof json === "string"
-          ? json.trim()
-          : typeof json?.reply === "string"
-          ? json.reply.trim()
-          : typeof json?.text === "string"
-          ? json.text.trim()
-          : typeof json?.result === "string"
-          ? json.result.trim()
-          : JSON.stringify(json);
+try {
+  json = JSON.parse(text);
+} catch {
+  console.log("GAS RAW RESPONSE:", text);
+  setStatus(`❌ GAS RAW: ${text.slice(0, 120)}`);
+  return;
+}
 
-      const cardNo = raw.match(/\d{3}/)?.[0];
+const raw =
+  typeof json === "string"
+    ? json.trim()
+    : typeof json?.reply === "string"
+    ? json.reply.trim()
+    : typeof json?.text === "string"
+    ? json.text.trim()
+    : typeof json?.result === "string"
+    ? json.result.trim()
+    : JSON.stringify(json);
 
-      if (!cardNo) {
-        setStatus(`❌ AI อ่านเลขไม่ได้: ${raw}`);
-        return;
-      }
+const cardNo = raw.match(/\d{3}/)?.[0];
+
+if (!cardNo) {
+  setStatus(`❌ AI อ่านเลขไม่ได้: ${raw}`);
+  return;
+}
 
       const cardRes = await fetch(`/api/card?cardNo=${cardNo}`);
       const data = await cardRes.json();
