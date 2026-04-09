@@ -137,7 +137,7 @@ export default function ScanPage() {
     }
 
     setIsProcessing(true);
-    setStatus("🧠 กำลังเทียบ art กลางการ์ด...");
+    setStatus("🧠 กำลังสแกนหลายโซน...");
 
     try {
       const ctx = canvas.getContext("2d");
@@ -156,16 +156,70 @@ export default function ScanPage() {
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
+      // 🎨 art กลาง
       const artCanvas = document.createElement("canvas");
       artCanvas.width = 520;
       artCanvas.height = 520;
-
       const artCtx = artCanvas.getContext("2d");
       if (!artCtx) throw new Error("art canvas fail");
-
       artCtx.drawImage(canvas, 100, 180, 520, 520, 0, 0, 520, 520);
 
-      const match = matchCardFromCanvas(artCanvas, indexRef.current);
+      // ⚡ top-left
+      const topCanvas = document.createElement("canvas");
+      topCanvas.width = 220;
+      topCanvas.height = 220;
+      const topCtx = topCanvas.getContext("2d");
+      if (!topCtx) throw new Error("top canvas fail");
+      topCtx.drawImage(canvas, 40, 40, 220, 220, 0, 0, 220, 220);
+
+      // 🏷️ bottom-name
+      const bottomCanvas = document.createElement("canvas");
+      bottomCanvas.width = 420;
+      bottomCanvas.height = 140;
+      const bottomCtx = bottomCanvas.getContext("2d");
+      if (!bottomCtx) throw new Error("bottom canvas fail");
+      bottomCtx.drawImage(canvas, 150, 850, 420, 140, 0, 0, 420, 140);
+
+      const artMatch = matchCardFromCanvas(artCanvas, indexRef.current);
+      const topMatch = matchCardFromCanvas(topCanvas, indexRef.current);
+      const bottomMatch = matchCardFromCanvas(bottomCanvas, indexRef.current);
+
+      const sameTop =
+        artMatch && topMatch && artMatch.cardNo === topMatch.cardNo;
+      const sameBottom =
+        artMatch && bottomMatch && artMatch.cardNo === bottomMatch.cardNo;
+
+      let match = artMatch;
+
+      if (artMatch && sameTop && sameBottom) {
+        match = {
+          ...artMatch,
+          confidence: Math.min(
+            1,
+            (artMatch.confidence +
+              (topMatch?.confidence || 0) +
+              (bottomMatch?.confidence || 0)) /
+              3 +
+              0.22
+          ),
+        };
+      } else if (artMatch && sameTop) {
+        match = {
+          ...artMatch,
+          confidence: Math.min(
+            1,
+            (artMatch.confidence + (topMatch?.confidence || 0)) / 2 + 0.15
+          ),
+        };
+      } else if (artMatch && sameBottom) {
+        match = {
+          ...artMatch,
+          confidence: Math.min(
+            1,
+            (artMatch.confidence + (bottomMatch?.confidence || 0)) / 2 + 0.12
+          ),
+        };
+      }
 
       if (!match) {
         setStatus("❌ ไม่มีผลลัพธ์จากระบบเทียบภาพ");
@@ -242,9 +296,13 @@ export default function ScanPage() {
                 CARD #{card.cardNo}
               </div>
               <h2 className="text-2xl font-black">{card.cardName}</h2>
-              <div className="mt-2 text-sm text-zinc-400">Rarity: {card.rarity}</div>
+              <div className="mt-2 text-sm text-zinc-400">
+                Rarity: {card.rarity}
+              </div>
               {card.setName ? (
-                <div className="mt-1 text-sm text-zinc-500">Set: {card.setName}</div>
+                <div className="mt-1 text-sm text-zinc-500">
+                  Set: {card.setName}
+                </div>
               ) : null}
             </>
           ) : (
