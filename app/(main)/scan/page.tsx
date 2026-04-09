@@ -151,8 +151,9 @@ export default function ScanPage() {
       let json: any;
       try {
         json = JSON.parse(text);
-      } catch {
-        setStatus(`❌ GAS ไม่ได้ส่ง JSON`);
+      catch {
+        console.log("GAS RAW RESPONSE:", text);
+        setStatus(`❌ GAS RAW: ${text.slice(0, 120)}`);
         return;
       }
 
@@ -163,7 +164,9 @@ export default function ScanPage() {
           ? json.reply.trim()
           : typeof json?.text === "string"
           ? json.text.trim()
-          : "";
+          : typeof json?.result === "string"
+          ? json.result.trim()
+          : JSON.stringify(json);
 
       const cardNo = raw.match(/\d{3}/)?.[0];
 
