@@ -1,5 +1,3 @@
-"use client";
-
 export type CardDescriptor = {
   cardNo: string;
   aHash: string;
@@ -10,32 +8,15 @@ export type CardDescriptor = {
 export type MatchResult = {
   cardNo: string;
   score: number;
-  confidence: number;
   secondScore: number;
+  confidence: number;
 };
-
-const INDEX_VERSION = "nexora-card-index-v1";
-const CARD_COUNT = 293;
-
-function pad3(n: number) {
-  return String(n).padStart(3, "0");
-}
 
 function makeCanvas(w: number, h: number) {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   return canvas;
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`โหลดรูปไม่ได้: ${src}`));
-    img.src = src;
-  });
 }
 
 function drawCoverToCanvas(
@@ -90,8 +71,8 @@ function drawCoverToCanvas(
 function getGrayPixels(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas context fail");
-  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
+  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const gray = new Uint8Array(width * height);
 
   for (let i = 0; i < data.length; i += 4) {
@@ -129,6 +110,7 @@ function computeDHashFromCanvas(canvas: HTMLCanvasElement, width = 17, height = 
       bits += left > right ? "1" : "0";
     }
   }
+
   return bits;
 }
 
@@ -182,6 +164,10 @@ function hamming(a: string, b: string) {
   return diff + Math.abs(a.length - b.length);
 }
 
+function normalizeHamming(diff: number, length: number) {
+  return length === 0 ? 1 : diff / length;
+}
+
 function blockDistance(a: number[], b: number[]) {
   const len = Math.min(a.length, b.length);
   let diff = 0;
@@ -191,56 +177,12 @@ function blockDistance(a: number[], b: number[]) {
   return diff / (len * 255);
 }
 
-function normalizeHamming(diff: number, length: number) {
-  return length === 0 ? 1 : diff / length;
-}
-
 function scoreDescriptor(query: CardDescriptor, ref: CardDescriptor) {
   const a = normalizeHamming(hamming(query.aHash, ref.aHash), ref.aHash.length);
   const d = normalizeHamming(hamming(query.dHash, ref.dHash), ref.dHash.length);
   const b = blockDistance(query.blocks, ref.blocks);
 
   return a * 0.4 + d * 0.45 + b * 0.15;
-}
-
-async function buildDescriptorForCard(cardNo: string): Promise<CardDescriptor> {
-  const src = `/cards/${cardNo}.jpg`;
-  const img = await loadImage(src);
-  const canvas = drawCoverToCanvas(img, 240, 340);
-  const desc = descriptorFromCanvas(canvas);
-  desc.cardNo = cardNo;
-  return desc;
-}
-
-export async function warmupCardIndex(
-  onProgress?: (done: number, total: number) => void
-): Promise<CardDescriptor[]> {
-  const cached = localStorage.getItem(INDEX_VERSION);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached) as CardDescriptor[];
-      if (Array.isArray(parsed) && parsed.length >= CARD_COUNT) {
-        onProgress?.(CARD_COUNT, CARD_COUNT);
-        return parsed;
-      }
-    } catch {}
-  }
-
-  const all: CardDescriptor[] = [];
-
-  for (let i = 1; i <= CARD_COUNT; i++) {
-    const cardNo = pad3(i);
-    try {
-      const desc = await buildDescriptorForCard(cardNo);
-      all.push(desc);
-    } catch (err) {
-      console.warn("index build skip", cardNo, err);
-    }
-    onProgress?.(i, CARD_COUNT);
-  }
-
-  localStorage.setItem(INDEX_VERSION, JSON.stringify(all));
-  return all;
 }
 
 export function matchCardFromCanvas(
@@ -269,8 +211,8 @@ export function matchCardFromCanvas(
   return {
     cardNo: best.cardNo,
     score: best.score,
-    confidence,
     secondScore: second.score,
+    confidence,
   };
 }
 
