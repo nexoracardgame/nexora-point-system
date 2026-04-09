@@ -16,9 +16,9 @@ type CardIndexItem = {
 };
 
 const CARD_COUNT = 293;
-const VECTOR_SIZE = 24;
+const VECTOR_SIZE = 64;
 const MATCH_THRESHOLD = 0.62;
-const SCAN_INTERVAL_MS = 120;
+const SCAN_INTERVAL_MS = 180;
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,7 +39,10 @@ export default function ScanPage() {
   const [debugLabel, setDebugLabel] = useState("");
 
   const labels = useMemo(
-    () => Array.from({ length: CARD_COUNT }, (_, i) => String(i + 1).padStart(3, "0")),
+    () =>
+      Array.from({ length: CARD_COUNT }, (_, i) =>
+        String(i + 1).padStart(3, "0")
+      ),
     []
   );
 
@@ -59,29 +62,19 @@ export default function ScanPage() {
     return dot / (Math.sqrt(magA) * Math.sqrt(magB) + 1e-8);
   };
 
-  const makeVectorFromImageData = (data: Uint8ClampedArray, size: number) => {
-    const gray = new Float32Array(size * size);
+  const makeVectorFromImageData = (
+    data: Uint8ClampedArray,
+    size: number
+  ) => {
+    const vec = new Float32Array(size * size * 3);
 
     for (let i = 0; i < size * size; i++) {
-      const r = data[i * 4];
-      const g = data[i * 4 + 1];
-      const b = data[i * 4 + 2];
-      gray[i] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      vec[i * 3] = data[i * 4] / 255;
+      vec[i * 3 + 1] = data[i * 4 + 1] / 255;
+      vec[i * 3 + 2] = data[i * 4 + 2] / 255;
     }
 
-    let sum = 0;
-    for (let i = 0; i < gray.length; i++) sum += gray[i];
-    const mean = sum / gray.length;
-
-    let variance = 0;
-    for (let i = 0; i < gray.length; i++) variance += (gray[i] - mean) ** 2;
-    const std = Math.sqrt(variance / gray.length) || 1;
-
-    for (let i = 0; i < gray.length; i++) {
-      gray[i] = (gray[i] - mean) / std;
-    }
-
-    return gray;
+    return vec;
   };
 
   const extractVector = (source: CanvasImageSource, size = VECTOR_SIZE) => {
@@ -89,7 +82,7 @@ export default function ScanPage() {
     c.width = size;
     c.height = size;
     const ctx = c.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return new Float32Array(size * size);
+    if (!ctx) return new Float32Array(size * size * 3);
 
     ctx.drawImage(source, 0, 0, size, size);
     const imageData = ctx.getImageData(0, 0, size, size);
@@ -115,7 +108,6 @@ export default function ScanPage() {
   const drawGuide = () => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -137,33 +129,16 @@ export default function ScanPage() {
     ctx.beginPath();
     ctx.roundRect(x, y, boxW, boxH, 18);
     ctx.stroke();
-
-    const corner = 24;
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(255,215,64,1)";
-
-    const corners = [
-      [x, y, x + corner, y, x, y + corner],
-      [x + boxW, y, x + boxW - corner, y, x + boxW, y + corner],
-      [x, y + boxH, x + corner, y + boxH, x, y + boxH - corner],
-      [x + boxW, y + boxH, x + boxW - corner, y + boxH, x + boxW, y + boxH - corner],
-    ];
-
-    corners.forEach(([sx, sy, hx, hy, vx, vy]) => {
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(hx, hy);
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(vx, vy);
-      ctx.stroke();
-    });
   };
 
   useEffect(() => {
     const loadIndex = async () => {
       try {
-        const res = await fetch(`/card-index.json?v=${Date.now()}`, { cache: "no-store" });
+        const res = await fetch(`/card-index.json?v=${Date.now()}`, {
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error("card-index not found");
+
         const json = await res.json();
         indexRef.current = json.items || [];
         setIndexReady(indexRef.current.length > 0);
@@ -231,14 +206,6 @@ export default function ScanPage() {
     setIndexReady(built.length > 0);
     setWarmingProgress(100);
     setStatus("⚡ INSTANT SCAN READY");
-
-    try {
-      await fetch("/card-index-cache", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: built }),
-      }).catch(() => {});
-    } catch {}
   };
 
   const startCamera = async () => {
@@ -258,7 +225,11 @@ export default function ScanPage() {
       }
 
       setStreaming(true);
-      setStatus(indexRef.current.length ? "⚡ INSTANT SCAN READY" : "🚀 WARMING SMART SCAN...");
+      setStatus(
+        indexRef.current.length
+          ? "⚡ INSTANT SCAN READY"
+          : "🚀 WARMING SMART SCAN..."
+      );
       warmIndexInBackground();
 
       setTimeout(() => {
@@ -297,12 +268,22 @@ export default function ScanPage() {
 
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      const cropW = vw * 0.44;
+      const cropW = vw * 0.46;
       const cropH = cropW * 1.42;
       const sx = (vw - cropW) / 2;
       const sy = (vh - cropH) / 2;
 
-      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(
+        video,
+        sx,
+        sy,
+        cropW,
+        cropH,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
 
       const query = extractVector(canvas);
 
@@ -322,24 +303,28 @@ export default function ScanPage() {
       }
 
       const stability = Math.max(0, bestScore - Math.max(0, secondScore));
-      const displayScore = Math.min(0.999, bestScore * 0.82 + stability * 1.8);
+      const displayScore = Math.min(
+        0.999,
+        bestScore * 0.82 + stability * 1.8
+      );
 
       setConfidence(displayScore);
       setDebugLabel(bestCard);
 
       if (!bestCard) {
-       setStatus(`🔍 SCANNING...`);
-       return;
+        setStatus(`🔍 SCANNING...`);
+        return;
       }
 
-// 🔥 ยอมโชว์ผลแม้ score ยังไม่สูงมาก
       if (displayScore < MATCH_THRESHOLD) {
-        setStatus(`🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`);
+        setStatus(
+          `🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`
+        );
       }
 
-// 🔥 ยอมโชว์ผลแม้ score ยังไม่สูงมาก
-      if (displayScore < MATCH_THRESHOLD) {
-        setStatus(`🟡 LOCKING ${bestCard} ${(displayScore * 100).toFixed(1)}%`);
+      if (lastCardRef.current === bestCard) {
+        setStatus(`🃏 ${bestCard} • ${(displayScore * 100).toFixed(1)}%`);
+        return;
       }
 
       lastCardRef.current = bestCard;
@@ -366,9 +351,13 @@ export default function ScanPage() {
         <div className="mb-3 rounded-2xl border border-yellow-500/20 bg-white/5 px-4 py-3 text-sm font-bold text-yellow-300 backdrop-blur-xl">
           <div>{status}</div>
           <div className="mt-1 text-xs text-zinc-300">
-            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}
+            {confidence !== null
+              ? `${(confidence * 100).toFixed(1)}%`
+              : "READY"}
             {debugLabel ? ` • ${debugLabel}` : ""}
-            {!indexReady && warmingProgress > 0 ? ` • INDEX ${warmingProgress}%` : ""}
+            {!indexReady && warmingProgress > 0
+              ? ` • INDEX ${warmingProgress}%`
+              : ""}
           </div>
         </div>
 
@@ -403,7 +392,9 @@ export default function ScanPage() {
               <div className="mb-2 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
                 CARD #{card.cardNo}
               </div>
-              <h2 className="text-3xl font-black leading-tight">{card.cardName}</h2>
+              <h2 className="text-3xl font-black leading-tight">
+                {card.cardName}
+              </h2>
               <p className="mt-2 text-sm text-zinc-300">{card.rarity}</p>
               <div className="mt-4 text-4xl font-black text-yellow-400">
                 ฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}
