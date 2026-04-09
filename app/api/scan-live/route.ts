@@ -6,15 +6,28 @@ import sharp from "sharp";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VECTOR_PATH = path.join(process.cwd(), "public", "card-vectors.json");
+const VECTOR_PATH = path.join(
+  process.cwd(),
+  "public",
+  "card-vectors.json"
+);
 
-function sad(a: number[], b: number[]) {
-  let s = 0;
+function weightedSad(a: number[], b: number[]) {
+  let score = 0;
   const len = Math.min(a.length, b.length);
+
   for (let i = 0; i < len; i++) {
-    s += Math.abs(a[i] - b[i]);
+    const row = Math.floor(i / 32);
+
+    // ให้น้ำหนักหัวการ์ด + ขวาที่มี Card No.
+    let weight = 1;
+    if (row < 8) weight = 2.2; // title ด้านบน
+    if (i % 32 > 24) weight = 2.5; // เลข card no ขวา
+
+    score += Math.abs(a[i] - b[i]) * weight;
   }
-  return s;
+
+  return score;
 }
 
 async function makeVectorFromBuffer(buffer: Buffer) {
@@ -26,20 +39,10 @@ async function makeVectorFromBuffer(buffer: Buffer) {
     throw new Error("Invalid image");
   }
 
-  const cropWidth = Math.floor(width * 0.6);
-  const cropHeight = Math.floor(height * 0.75);
-  const left = Math.floor((width - cropWidth) / 2);
-  const top = Math.floor((height - cropHeight) / 2);
-
   const raw = await sharp(buffer)
-    .extract({
-      left,
-      top,
-      width: cropWidth,
-      height: cropHeight,
-    })
     .resize(32, 48, { fit: "fill" })
     .grayscale()
+    .normalize()
     .raw()
     .toBuffer();
 
@@ -68,18 +71,32 @@ export async function POST(req: NextRequest) {
 
     let bestCardNo = "";
     let bestScore = Infinity;
+    let secondBest = Infinity;
 
     for (const [cardNo, ref] of Object.entries(db)) {
-      const score = sad(vec, ref);
+      const score = weightedSad(vec, ref);
+
       if (score < bestScore) {
+        secondBest = bestScore;
         bestScore = score;
         bestCardNo = cardNo;
+      } else if (score < secondBest) {
+        secondBest = score;
       }
     }
+
+    const confidence = Math.max(
+      0,
+      Math.min(
+        99,
+        Math.round((1 - bestScore / (secondBest || bestScore + 1)) * 100)
+      )
+    );
 
     return NextResponse.json({
       success: true,
       cardNo: bestCardNo,
+      confidence,
       score: bestScore,
     });
   } catch (error: any) {
