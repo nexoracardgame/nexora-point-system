@@ -15,28 +15,25 @@ type CardIndexItem = {
   rgb: number[];
   edge: number[];
   hist: number[];
-  zones: number[];
 };
 
 const CARD_COUNT = 293;
-const RGB_W = 48;
-const RGB_H = 68;
-const EDGE_W = 32;
-const EDGE_H = 44;
+const RGB_W = 56;
+const RGB_H = 80;
+const EDGE_W = 40;
+const EDGE_H = 56;
 const HIST_BINS = 8;
-const MATCH_THRESHOLD = 0.68;
+const MATCH_THRESHOLD = 0.62;
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const indexRef = useRef<CardIndexItem[]>([]);
-  const startedRef = useRef(false);
 
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("🚀 OPENING CAMERA...");
   const [confidence, setConfidence] = useState<number | null>(null);
-  const [debugLabel, setDebugLabel] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
   const labels = useMemo(
@@ -111,28 +108,6 @@ export default function ScanPage() {
     return bins;
   };
 
-  const makeZoneSignature = (data: Uint8ClampedArray, w: number, h: number) => {
-    const zones = new Float32Array(12);
-    const zoneW = Math.floor(w / 2);
-    const zoneH = Math.floor(h / 2);
-    let zi = 0;
-    for (let zy = 0; zy < 2; zy++) {
-      for (let zx = 0; zx < 2; zx++) {
-        let sr = 0, sg = 0, sb = 0, count = 0;
-        for (let y = zy * zoneH; y < (zy + 1) * zoneH; y++) {
-          for (let x = zx * zoneW; x < (zx + 1) * zoneW; x++) {
-            const i = (y * w + x) * 4;
-            sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; count++;
-          }
-        }
-        zones[zi++] = sr / count / 255;
-        zones[zi++] = sg / count / 255;
-        zones[zi++] = sb / count / 255;
-      }
-    }
-    return zones;
-  };
-
   const extractFeatures = (source: CanvasImageSource) => {
     const rgbData = getImageData(source, RGB_W, RGB_H);
     const edgeData = getImageData(source, EDGE_W, EDGE_H);
@@ -140,7 +115,6 @@ export default function ScanPage() {
       rgb: Array.from(makeRgbVector(rgbData, RGB_W, RGB_H)),
       edge: Array.from(makeEdgeVector(edgeData, EDGE_W, EDGE_H)),
       hist: Array.from(makeHistogram(rgbData, RGB_W, RGB_H)),
-      zones: Array.from(makeZoneSignature(rgbData, RGB_W, RGB_H)),
     };
   };
 
@@ -148,20 +122,7 @@ export default function ScanPage() {
     const rgb = cosineSimilarity(q.rgb, item.rgb);
     const edge = cosineSimilarity(q.edge, item.edge);
     const hist = cosineSimilarity(q.hist, item.hist);
-    const zones = cosineSimilarity(q.zones, item.zones);
-    return rgb * 0.48 + edge * 0.3 + hist * 0.17 + zones * 0.05;
-  };
-
-  const fetchCardData = async (cardNo: string) => {
-    const res = await fetch(`/api/card?cardNo=${cardNo}`, { cache: "no-store" });
-    const data = await res.json();
-    setCard({
-      cardNo,
-      cardName: data.card_name || `CARD ${cardNo}`,
-      rarity: data.rarity || "Unknown",
-      marketPriceTHB: data.marketPriceTHB || 1500,
-      setName: data.setName || "NEXORA Core Set",
-    });
+    return rgb * 0.5 + edge * 0.32 + hist * 0.18;
   };
 
   const drawGuide = () => {
@@ -169,15 +130,16 @@ export default function ScanPage() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const w = canvas.width, h = canvas.height;
+
+    const w = canvas.width;
+    const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    const boxW = w * 0.52;
+
+    const boxW = w * 0.72;
     const boxH = boxW * 1.42;
     const x = (w - boxW) / 2;
     const y = (h - boxH) / 2;
-    ctx.fillStyle = "rgba(0,0,0,0.08)";
-    ctx.fillRect(0, 0, w, h);
-    ctx.clearRect(x, y, boxW, boxH);
+
     ctx.strokeStyle = "rgba(250,204,21,0.98)";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -187,110 +149,120 @@ export default function ScanPage() {
 
   useEffect(() => {
     const boot = async () => {
-      try {
-        const res = await fetch(`/card-index.json?v=${Date.now()}`, { cache: "no-store" });
-        const json = await res.json();
-        indexRef.current = json.items || [];
-      } catch {}
-
-      if (startedRef.current) return;
-      startedRef.current = true;
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
-
-        const video = videoRef.current;
-        if (!video) return;
-
-        video.srcObject = stream;
-
-        await new Promise<void>((resolve) => {
-          video.onloadedmetadata = async () => {
-            await video.play();
-            resolve();
-          };
-        });
-
-        setStatus("⚡ SNAP READY");
-
-        requestAnimationFrame(() => {
-          const rect = video.getBoundingClientRect();
-          if (overlayCanvasRef.current) {
-            overlayCanvasRef.current.width = rect.width;
-            overlayCanvasRef.current.height = rect.height;
-            drawGuide();
-          }
-        });
-      } catch {
-        setStatus("❌ เปิดกล้องไม่สำเร็จ");
+      const items: CardIndexItem[] = [];
+      for (const cardNo of labels) {
+        try {
+          const img = new Image();
+          img.src = `/cards/${cardNo}.jpg`;
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject();
+          });
+          items.push({ cardNo, ...extractFeatures(img) });
+        } catch {}
       }
+      indexRef.current = items;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+
+      const video = videoRef.current!;
+      video.srcObject = stream;
+      await video.play();
+
+      setStatus("⚡ SNAP READY");
+
+      requestAnimationFrame(() => {
+        const rect = video.getBoundingClientRect();
+        const overlay = overlayCanvasRef.current!;
+        overlay.width = rect.width;
+        overlay.height = rect.height;
+        drawGuide();
+      });
     };
 
     boot();
-  }, []);
+  }, [labels]);
+
+  const analyzeOneFrame = () => {
+    const video = videoRef.current!;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+
+    canvas.width = 320;
+    canvas.height = 455;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const cropW = vw * 0.62;
+    const cropH = cropW * 1.42;
+    const sx = (vw - cropW) / 2;
+    const sy = (vh - cropH) / 2;
+
+    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+
+    const query: CardIndexItem = { cardNo: "000", ...extractFeatures(canvas) };
+
+    let bestCard = "";
+    let bestScore = -1;
+
+    for (const item of indexRef.current) {
+      const score = scoreCard(query, item);
+      if (score > bestScore) {
+        bestScore = score;
+        bestCard = item.cardNo;
+      }
+    }
+
+    return { bestCard, bestScore };
+  };
 
   const captureAndAnalyze = async () => {
     if (isProcessing) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !video.videoWidth) return;
-
     setIsProcessing(true);
     setStatus("📸 ANALYZING...");
 
     try {
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return;
+      const samples = [analyzeOneFrame(), analyzeOneFrame(), analyzeOneFrame()];
+      const votes: Record<string, number> = {};
 
-      canvas.width = 280;
-      canvas.height = 398;
-
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const cropW = vw * 0.42;
-      const cropH = cropW * 1.42;
-      const sx = (vw - cropW) / 2;
-      const sy = (vh - cropH) / 2;
-
-      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
-
-      const query: CardIndexItem = { cardNo: "000", ...extractFeatures(canvas) };
-
-      let bestCard = "";
-      let bestScore = -1;
-      let second = -1;
-
-      for (const item of indexRef.current) {
-        const score = scoreCard(query, item);
-        if (score > bestScore) {
-          second = bestScore;
-          bestScore = score;
-          bestCard = item.cardNo;
-        } else if (score > second) {
-          second = score;
-        }
+      for (const s of samples) {
+        votes[s.bestCard] = (votes[s.bestCard] || 0) + s.bestScore;
       }
 
-      const margin = Math.max(0, bestScore - Math.max(0, second));
-      const finalScore = Math.min(0.999, bestScore * 0.92 + margin * 2.8);
+      const bestCard = Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const score = Object.values(votes).sort((a, b) => b - a)[0] / 3;
 
-      setConfidence(finalScore);
-      setDebugLabel(bestCard);
+      setConfidence(score);
 
-      if (!bestCard || finalScore < MATCH_THRESHOLD) {
-        setStatus(`❌ ลองจัดแสงใหม่ ${(finalScore * 100).toFixed(1)}%`);
+      if (!bestCard || score < MATCH_THRESHOLD) {
+        setStatus("❌ ไม่มั่นใจ ลองใหม่");
         return;
       }
 
-      await fetchCardData(bestCard);
-      setStatus(`🃏 ${bestCard} • ${(finalScore * 100).toFixed(1)}%`);
+      setCard({
+        cardNo: bestCard,
+        cardName: `CARD ${bestCard}`,
+        rarity: "Analyzing...",
+        marketPriceTHB: 0,
+        setName: "NEXORA",
+      });
+
+      setStatus(`🃏 ${bestCard} • ${(score * 100).toFixed(1)}%`);
+
+      fetch(`/api/card?cardNo=${bestCard}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setCard({
+            cardNo: bestCard,
+            cardName: data.card_name || `CARD ${bestCard}`,
+            rarity: data.rarity || "Unknown",
+            marketPriceTHB: data.marketPriceTHB || 1500,
+            setName: data.setName || "NEXORA",
+          });
+        });
     } finally {
       setIsProcessing(false);
     }
@@ -299,15 +271,14 @@ export default function ScanPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4">
-        <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3 backdrop-blur-xl">
+        <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3">
           <div className="text-sm font-bold text-yellow-300">{status}</div>
           <div className="mt-1 text-xs text-zinc-300">
-            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}
-            {debugLabel ? ` • ${debugLabel}` : ""}
+            {confidence ? `${(confidence * 100).toFixed(1)}%` : "READY"}
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_80px_rgba(234,179,8,0.15)]">
+        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black">
           <div className="relative aspect-[4/5] w-full bg-black">
             <video
               ref={videoRef}
@@ -325,23 +296,17 @@ export default function ScanPage() {
 
         <canvas ref={canvasRef} className="hidden" />
 
-        <div className="mt-3 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5 backdrop-blur-xl">
+        <div className="mt-3 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5">
           {card ? (
             <>
               <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
                 CARD #{card.cardNo}
               </div>
-              <h2 className="text-2xl font-black leading-tight">{card.cardName}</h2>
+              <h2 className="text-2xl font-black">{card.cardName}</h2>
               <p className="mt-2 text-sm text-zinc-300">{card.rarity}</p>
-              <div className="mt-4 text-3xl font-black text-yellow-400">
-                ฿{Number(card.marketPriceTHB).toLocaleString("th-TH")}
-              </div>
-              <p className="mt-2 text-xs text-zinc-400">{card.setName}</p>
             </>
           ) : (
-            <div className="text-sm leading-7 text-zinc-400">
-              เปิดเข้าหน้านี้ = กล้องพร้อมทันที • แตะปุ่มเหลืองด้านล่างเพื่อถ่าย
-            </div>
+            <div className="text-sm text-zinc-400">พร้อมสแกนทันที</div>
           )}
         </div>
 
@@ -350,7 +315,7 @@ export default function ScanPage() {
             type="button"
             onClick={captureAndAnalyze}
             disabled={isProcessing}
-            className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)] transition-all active:scale-95 disabled:opacity-60"
+            className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)]"
           >
             <span className="absolute inset-2 rounded-full border-2 border-black/20" />
             <span className="relative">{isProcessing ? "⏳" : "📸"}</span>
