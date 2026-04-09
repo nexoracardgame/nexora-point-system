@@ -106,7 +106,7 @@ export default function ScanPage() {
       setDebugLabel(`${cardNo} / ${scores.length}`);
       setConfidence(bestScore);
 
-      if (bestScore > 0.65) {
+      if (bestScore > 0.15) {
         if (lastCardRef.current === cardNo) return;
         lastCardRef.current = cardNo;
 
