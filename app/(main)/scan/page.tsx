@@ -153,6 +153,7 @@ export default function ScanPage() {
 
       const json = await res.json();
       const raw = String(json.reply || "").trim();
+      setStatus(`🧠 AI ตอบ: ${raw}`);
 
       const match = raw.match(/\d{1,3}/);
       const cardNo = match ? match[0].padStart(3, "0") : "";
