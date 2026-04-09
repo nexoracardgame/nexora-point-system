@@ -31,12 +31,10 @@ export default function ScanPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const indexRef = useRef<CardIndexItem[]>([]);
-  const warmingRef = useRef(false);
+  const startedRef = useRef(false);
 
-  const [streaming, setStreaming] = useState(false);
-  const [warmingProgress, setWarmingProgress] = useState(0);
   const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState("📷 READY TO SNAP");
+  const [status, setStatus] = useState("🚀 OPENING CAMERA...");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [debugLabel, setDebugLabel] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -177,7 +175,7 @@ export default function ScanPage() {
     const boxH = boxW * 1.42;
     const x = (w - boxW) / 2;
     const y = (h - boxH) / 2;
-    ctx.fillStyle = "rgba(0,0,0,0.10)";
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
     ctx.fillRect(0, 0, w, h);
     ctx.clearRect(x, y, boxW, boxH);
     ctx.strokeStyle = "rgba(250,204,21,0.98)";
@@ -188,80 +186,55 @@ export default function ScanPage() {
   };
 
   useEffect(() => {
-    (async () => {
+    const boot = async () => {
       try {
         const res = await fetch(`/card-index.json?v=${Date.now()}`, { cache: "no-store" });
         const json = await res.json();
         indexRef.current = json.items || [];
-        setStatus("⚡ SNAP READY");
       } catch {}
-    })();
-  }, []);
 
-  const warmIndexInBackground = async () => {
-    if (warmingRef.current || indexRef.current.length) return;
-    warmingRef.current = true;
-    const built: CardIndexItem[] = [];
-    for (let i = 1; i <= CARD_COUNT; i++) {
-      const cardNo = labels[i - 1];
+      if (startedRef.current) return;
+      startedRef.current = true;
+
       try {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = `/cards/${cardNo}.jpg?v=1`;
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = () => reject();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
         });
-        built.push({ cardNo, ...extractFeatures(img) });
-      } catch {}
-      if (i % 10 === 0 || i === CARD_COUNT) {
-        setWarmingProgress(Math.round((i / CARD_COUNT) * 100));
+
+        const video = videoRef.current;
+        if (!video) return;
+
+        video.srcObject = stream;
+
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = async () => {
+            await video.play();
+            resolve();
+          };
+        });
+
+        setStatus("⚡ SNAP READY");
+
+        requestAnimationFrame(() => {
+          const rect = video.getBoundingClientRect();
+          if (overlayCanvasRef.current) {
+            overlayCanvasRef.current.width = rect.width;
+            overlayCanvasRef.current.height = rect.height;
+            drawGuide();
+          }
+        });
+      } catch {
+        setStatus("❌ เปิดกล้องไม่สำเร็จ");
       }
-    }
-    indexRef.current = built;
-    setStatus("⚡ SNAP READY");
-  };
+    };
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-
-      if (!videoRef.current) return;
-
-      const video = videoRef.current;
-      video.srcObject = stream;
-
-      await new Promise<void>((resolve) => {
-        video.onloadedmetadata = async () => {
-          await video.play();
-          resolve();
-        };
-      });
-
-      setStreaming(true);
-      setStatus(indexRef.current.length ? "⚡ SNAP READY" : "🚀 PREPARING...");
-      warmIndexInBackground();
-
-      setTimeout(() => {
-        const rect = video.getBoundingClientRect();
-        if (overlayCanvasRef.current) {
-          overlayCanvasRef.current.width = rect.width;
-          overlayCanvasRef.current.height = rect.height;
-          drawGuide();
-        }
-      }, 300);
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ เปิดกล้องไม่สำเร็จ");
-    }
-  };
+    boot();
+  }, []);
 
   const captureAndAnalyze = async () => {
     if (isProcessing) return;
@@ -324,22 +297,17 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.08),transparent_28%),linear-gradient(180deg,#050505_0%,#0a0a0a_100%)] text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-3 px-4 py-4">
-        <div className="rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3 backdrop-blur-xl">
+    <div className="min-h-screen bg-black text-white">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4">
+        <div className="mb-3 rounded-3xl border border-yellow-500/20 bg-white/5 px-4 py-3 backdrop-blur-xl">
           <div className="text-sm font-bold text-yellow-300">{status}</div>
           <div className="mt-1 text-xs text-zinc-300">
             {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "READY"}
             {debugLabel ? ` • ${debugLabel}` : ""}
-            {warmingProgress > 0 && warmingProgress < 100 ? ` • ${warmingProgress}%` : ""}
           </div>
         </div>
 
-        <div className="rounded-3xl border border-yellow-500/10 bg-white/[0.03] px-4 py-3 text-xs leading-6 text-zinc-300">
-          💡 ใช้ในที่สว่าง • วางการ์ดเต็มกรอบ • อย่าเอียงมาก • แตะปุ่มกลมล่างจอ
-        </div>
-
-        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_70px_rgba(234,179,8,0.12)]">
+        <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/30 bg-black shadow-[0_0_80px_rgba(234,179,8,0.15)]">
           <div className="relative aspect-[4/5] w-full bg-black">
             <video
               ref={videoRef}
@@ -357,7 +325,7 @@ export default function ScanPage() {
 
         <canvas ref={canvasRef} className="hidden" />
 
-        <div className="rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5 backdrop-blur-xl shadow-[0_0_40px_rgba(250,204,21,0.05)]">
+        <div className="mt-3 rounded-[28px] border border-yellow-500/15 bg-white/[0.04] p-5 backdrop-blur-xl">
           {card ? (
             <>
               <div className="mb-3 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
@@ -372,31 +340,21 @@ export default function ScanPage() {
             </>
           ) : (
             <div className="text-sm leading-7 text-zinc-400">
-              ผลลัพธ์จะโชว์เต็มๆตรงนี้แบบลื่นไหลและอ่านง่าย
+              เปิดเข้าหน้านี้ = กล้องพร้อมทันที • แตะปุ่มเหลืองด้านล่างเพื่อถ่าย
             </div>
           )}
         </div>
 
-        <div className="sticky bottom-0 mt-auto flex justify-center pb-3 pt-2">
-          {!streaming ? (
-            <button
-              type="button"
-              onClick={startCamera}
-              className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-yellow-300/80 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-3xl text-black shadow-[0_18px_60px_rgba(234,179,8,0.35)] transition-all active:scale-95"
-            >
-              📷
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={captureAndAnalyze}
-              disabled={isProcessing}
-              className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/90 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_70px_rgba(234,179,8,0.40)] transition-all active:scale-95 disabled:opacity-60"
-            >
-              <span className="absolute inset-2 rounded-full border-2 border-black/20" />
-              <span className="relative">{isProcessing ? "⏳" : "📸"}</span>
-            </button>
-          )}
+        <div className="sticky bottom-0 mt-auto flex justify-center pb-3 pt-3">
+          <button
+            type="button"
+            onClick={captureAndAnalyze}
+            disabled={isProcessing}
+            className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-yellow-200 bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-4xl text-black shadow-[0_20px_80px_rgba(234,179,8,0.45)] transition-all active:scale-95 disabled:opacity-60"
+          >
+            <span className="absolute inset-2 rounded-full border-2 border-black/20" />
+            <span className="relative">{isProcessing ? "⏳" : "📸"}</span>
+          </button>
         </div>
       </div>
     </div>
