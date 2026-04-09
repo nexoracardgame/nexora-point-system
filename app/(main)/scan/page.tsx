@@ -34,7 +34,7 @@ export default function ScanPage() {
           const image = reader.result as string;
           setPreview(image);
 
-          const aiRes = await fetch("http://127.0.0.1:8001/predict", {
+          const aiRes = await fetch("http://192.168.1.117:8001/predict", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -103,15 +103,18 @@ export default function ScanPage() {
           </div>
         )}
 
-        <label className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)]">
+        <label className="relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)]">
           {isProcessing ? "⏳" : "📸"}
           <input
             type="file"
             accept="image/*"
             capture="environment"
-            onChange={handleCapture}
-            className="hidden"
-          />
+            onChange={(e) => {
+              handleCapture(e);
+              e.currentTarget.value = "";
+           }}
+           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+         />
         </label>
 
         {card && (
