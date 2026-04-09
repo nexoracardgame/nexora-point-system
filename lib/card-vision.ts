@@ -221,11 +221,11 @@ export function shouldAcceptMatch(result: MatchResult | null) {
 
   const gap = result.secondScore - result.score;
 
-  // ปล่อยผ่านง่ายขึ้นสำหรับภาพจากกล้องจริง
-  if (result.score <= 0.28 && gap >= 0.005) return true;
+  // 🎯 ปล่อยผ่านง่ายขึ้นมากสำหรับ art-zone scan
+  if (result.score <= 0.35 && gap >= 0.002) return true;
 
-  // ถ้าคะแนนดีที่สุดดีพอ ปล่อยเลย
-  if (result.score <= 0.24) return true;
+  // 🎯 ถ้าคะแนนดีที่สุดดีพอ ปล่อยเลย
+  if (result.score <= 0.30) return true;
 
   return false;
 }

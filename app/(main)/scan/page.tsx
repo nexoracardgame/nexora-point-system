@@ -155,7 +155,28 @@ export default function ScanPage() {
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
-      const match = matchCardFromCanvas(canvas, indexRef.current);
+// 🎯 ใช้เฉพาะโซน art กลาง ลดผลกระทบกรอบ/โต๊ะ/มือ
+const artCanvas = document.createElement("canvas");
+artCanvas.width = 520;
+artCanvas.height = 520;
+
+const artCtx = artCanvas.getContext("2d");
+if (!artCtx) throw new Error("art canvas fail");
+
+// crop เฉพาะกลางการ์ด
+artCtx.drawImage(
+  canvas,
+  100,   // x
+  180,   // y
+  520,   // width
+  520,   // height
+  0,
+  0,
+  520,
+  520
+);
+
+const match = matchCardFromCanvas(artCanvas, indexRef.current);
 
       if (!match) {
         setStatus("❌ ไม่มีผลลัพธ์จากระบบเทียบภาพ");
