@@ -164,9 +164,8 @@ export default function ScanPage() {
 
       if (!shouldAcceptMatch(match)) {
         setStatus(
-          `❌ ยังไม่มั่นใจพอ (${match.cardNo}) score=${match.score.toFixed(3)}`
+          `⚠️ เดาว่าเป็น ${match.cardNo} (${(match.confidence * 100).toFixed(0)}%)`
         );
-        return;
       }
 
       const cardRes = await fetch(`/api/card?cardNo=${match.cardNo}`, {
