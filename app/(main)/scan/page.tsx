@@ -151,6 +151,8 @@ export default function ScanPage() {
         }
       );
 
+      setStatus(`📡 STATUS: ${res.status}`);
+
       const json = await res.json();
       const raw = String(json.reply || "").trim();
       setStatus(`🧠 AI ตอบ: ${raw}`);
