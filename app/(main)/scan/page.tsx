@@ -152,7 +152,9 @@ export default function ScanPage() {
     const edge = cosineSimilarity(q.edge, item.edge);
     const hist = cosineSimilarity(q.hist, item.hist);
     const zones = cosineSimilarity(q.zones, item.zones);
-    return rgb * 0.35 + edge * 0.25 + hist * 0.15 + zones * 0.25;
+
+  // 🔥 ลดน้ำหนัก zones ลง
+    return rgb * 0.48 + edge * 0.30 + hist * 0.17 + zones * 0.05;
   };
 
   const fetchCardData = async (cardNo: string) => {
