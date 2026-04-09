@@ -34,7 +34,7 @@ export default function ScanPage() {
           const image = reader.result as string;
           setPreview(image);
 
-          const aiRes = await fetch("http://192.168.1.117:8001/predict", {
+          const aiRes = await fetch("/api/scan-ai", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -50,7 +50,6 @@ export default function ScanPage() {
 
           if (!ai.cardNo) {
             setStatus("❌ AI อ่านไม่ออก");
-            setIsProcessing(false);
             return;
           }
 
@@ -109,12 +108,13 @@ export default function ScanPage() {
             type="file"
             accept="image/*"
             capture="environment"
+            multiple={false}
             onChange={(e) => {
               handleCapture(e);
               e.currentTarget.value = "";
-           }}
-           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-         />
+            }}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
         </label>
 
         {card && (
