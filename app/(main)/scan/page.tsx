@@ -135,7 +135,7 @@ export default function ScanPage() {
 
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, 720, 1024);
 
-      const image = canvas.toDataURL("image/jpeg", 0.95);
+      const image = canvas.toDataURL("image/jpeg", 0.8);
 
       const res = await fetch(
         "https://script.google.com/macros/s/AKfycbydI7TpOGs5mxgbQRTkcSpOeXBZor_2gwdqC3kKfAQCa4MWmV0XEEjJsYpfoSGzCKpI/exec",
@@ -145,7 +145,7 @@ export default function ScanPage() {
           body: JSON.stringify({
             clientId: "nexora-scan",
             message:
-              "ดูภาพนี้ว่าเป็นการ์ด NEXORA หมายเลขอะไร ให้ตอบเป็นเลข 3 หลักเท่านั้น เช่น 029",
+              "ระบุเลขการ์ด NEXORA 3 หลัก"
             image,
           }),
         }
@@ -154,14 +154,18 @@ export default function ScanPage() {
       setStatus(`📡 STATUS: ${res.status}`);
 
       const json = await res.json();
-      const raw = String(json.reply || "").trim();
-      setStatus(`🧠 AI ตอบ: ${raw}`);
 
-      const match = raw.match(/\d{1,3}/);
-      const cardNo = match ? match[0].padStart(3, "0") : "";
+      const raw =
+        typeof json === "string"
+          ? json.trim()
+          : typeof json?.reply === "string"
+          ? json.reply.trim()
+          : typeof json?.text === "string"
+          ? json.text.trim()
+          : "";
 
-      if (!cardNo) {
-        setStatus("❌ AI อ่านเลขไม่ออก");
+      if (!raw) {
+        setStatus("❌ AI ไม่ส่งผลลัพธ์กลับ");
         return;
       }
 
