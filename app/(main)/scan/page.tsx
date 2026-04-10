@@ -30,37 +30,40 @@ export default function ScanPage() {
   }, []);
 
   const startCamera = async () => {
+  try {
+    let stream: MediaStream | null = null;
+
     try {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
-        });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      }
-
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
-
-      setCameraReady(true);
-      setStatus("📸 พร้อมสแกน แตะปุ่มครั้งเดียวแล้วรอข้อมูลเด้งขึ้น");
-    } catch (error) {
-      console.error(error);
-      setStatus("❌ เปิดกล้องไม่ได้ กรุณาอนุญาตสิทธิ์กล้อง");
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+    } catch {
+      // 💻 fallback desktop / browser แปลกๆ
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
     }
-  };
+
+    streamRef.current = stream;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => {});
+    }
+
+    setCameraReady(true);
+    setStatus("📸 พร้อมสแกน แตะปุ่มครั้งเดียวแล้วรอข้อมูลเด้งขึ้น");
+  } catch (error) {
+    console.error(error);
+    setStatus("❌ เปิดกล้องไม่ได้ กรุณาอนุญาตสิทธิ์กล้อง");
+  }
+};
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
