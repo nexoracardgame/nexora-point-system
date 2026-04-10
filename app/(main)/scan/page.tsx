@@ -9,24 +9,14 @@ type CardData = {
   reward?: string;
 };
 
-const LENS_PRESETS = [
-  { label: "0.5", zoom: 0.5 },
-  { label: "1", zoom: 1 },
-  { label: "2", zoom: 2 },
-  { label: "3", zoom: 3 },
-];
-
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState(
-    "📸 จัดการ์ดให้อยู่ในกรอบ"
-  );
+  const [status, setStatus] = useState("📸 จัดการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มแชะ");
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
 
   useEffect(() => {
     fetch("/api/scan-ai", {
@@ -38,7 +28,10 @@ export default function ScanPage() {
     }).catch(() => {});
 
     startCamera();
-    return () => stopCamera();
+
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const startCamera = async () => {
@@ -49,8 +42,8 @@ export default function ScanPage() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 3840 },
-            height: { ideal: 2160 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
           audio: false,
         });
@@ -69,7 +62,7 @@ export default function ScanPage() {
       }
 
       setCameraReady(true);
-      setStatus("📸 พร้อมแล้ว ภาพคมระดับสูง");
+      setStatus("📸 พร้อมแล้ว แตะปุ่มครั้งเดียวให้ AI วิเคราะห์");
     } catch (error) {
       console.error(error);
       setStatus("❌ เปิดกล้องไม่ได้");
@@ -77,9 +70,7 @@ export default function ScanPage() {
   };
 
   const stopCamera = () => {
-    streamRef.current?.getTracks().forEach((t) =>
-      t.stop()
-    );
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   };
 
@@ -87,27 +78,32 @@ export default function ScanPage() {
     const video = videoRef.current;
     if (!video || !cameraReady || isProcessing) return;
 
+    if (!video.videoWidth || !video.videoHeight) {
+      setStatus("❌ กล้องยังไม่พร้อม");
+      return;
+    }
+
     setIsProcessing(true);
     setCard(null);
-    setStatus("🧠 AI กำลังวิเคราะห์ภาพคมสูง...");
+    setStatus("🧠 AI กำลังวิเคราะห์...");
 
     try {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("canvas error");
+      if (!ctx) {
+        throw new Error("canvas error");
+      }
 
-      const baseCropWidth = video.videoWidth * 0.52;
-      const cropWidth = baseCropWidth / zoomLevel;
+      // ✅ mobile-first crop: การ์ดต้องใหญ่ในเฟรม
+      const cropWidth = video.videoWidth * 0.56;
       const cropHeight = cropWidth * 1.25;
 
-      const sx =
-        (video.videoWidth - cropWidth) / 2;
-      const sy =
-        (video.videoHeight - cropHeight) / 2;
+      const sx = Math.max(0, (video.videoWidth - cropWidth) / 2);
+      const sy = Math.max(0, (video.videoHeight - cropHeight) / 2);
 
-      // 🚀 ส่งภาพใหญ่ขึ้นให้ AI
-      canvas.width = 1280;
-      canvas.height = 1730;
+      // ✅ สมดุลระหว่างความคมกับความเร็ว
+      canvas.width = 960;
+      canvas.height = 1200;
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
@@ -124,10 +120,10 @@ export default function ScanPage() {
         canvas.height
       );
 
-      const image = canvas.toDataURL(
-        "image/jpeg",
-        0.94
-      );
+      const image = canvas.toDataURL("image/jpeg", 0.9);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
 
       const aiRes = await fetch("/api/scan-ai", {
         method: "POST",
@@ -135,7 +131,10 @@ export default function ScanPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ image }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       const raw = await aiRes.text();
 
@@ -146,30 +145,28 @@ export default function ScanPage() {
       const ai = JSON.parse(raw);
 
       if (!ai.cardNo) {
-        setStatus(
-          "❌ AI อ่านไม่ออก ลองใช้ 1x หรือขยับให้ตรงกรอบ"
-        );
+        setStatus("❌ AI อ่านไม่ออก ขยับการ์ดให้เต็มกรอบและนิ่งอีกนิด");
         return;
       }
 
       setCard({
         cardNo: ai.cardNo,
-        cardName:
-          ai.card_name ||
-          ai.cardName ||
-          "Unknown Card",
+        cardName: ai.card_name || ai.cardName || "Unknown Card",
         rarity: ai.rarity || "-",
         reward: ai.reward,
       });
 
       setStatus(
-        `🃏 ${ai.cardNo} • ${Math.round(
-          (ai.confidence || 0) * 100
-        )}%`
+        `🃏 พบการ์ด ${ai.cardNo} • ${Math.round((ai.confidence || 0) * 100)}%`
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
+
+      if (error?.name === "AbortError") {
+        setStatus("❌ AI ตอบช้าเกินไป ลองแชะใหม่อีกครั้ง");
+      } else {
+        setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -185,36 +182,14 @@ export default function ScanPage() {
         className="absolute inset-0 h-full w-full object-cover"
       />
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/75" />
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="h-[52vh] w-[72vw] max-w-sm rounded-[2.5rem] border-4 border-yellow-300/90 shadow-[0_0_60px_rgba(234,179,8,0.35)]" />
+        <div className="h-[54vh] w-[74vw] max-w-sm rounded-[2.4rem] border-4 border-yellow-300/90 shadow-[0_0_60px_rgba(234,179,8,0.35)]" />
       </div>
 
-      <div className="absolute top-4 left-1/2 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-2xl bg-black/35 px-4 py-3 text-center text-sm backdrop-blur-md">
+      <div className="absolute left-1/2 top-4 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-2xl bg-black/35 px-4 py-3 text-center text-sm backdrop-blur-md">
         {status}
-      </div>
-
-      <div className="absolute bottom-24 right-4 z-30">
-        <div className="flex gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
-          {LENS_PRESETS.map((lens) => {
-            const active = zoomLevel === lens.zoom;
-
-            return (
-              <button
-                key={lens.label}
-                onClick={() => setZoomLevel(lens.zoom)}
-                className={`h-10 min-w-10 rounded-full px-3 text-xs font-bold transition ${
-                  active
-                    ? "bg-white text-black shadow-lg"
-                    : "bg-white/10 text-white"
-                }`}
-              >
-                {lens.label}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {card && (
@@ -225,9 +200,7 @@ export default function ScanPage() {
           <div className="mt-1 text-2xl font-black leading-tight">
             {card.cardName}
           </div>
-          <div className="mt-2 text-sm text-zinc-300">
-            ✨ {card.rarity}
-          </div>
+          <div className="mt-2 text-sm text-zinc-300">✨ {card.rarity}</div>
           {card.reward && (
             <div className="mt-4 rounded-2xl bg-yellow-500/10 p-3 text-sm text-yellow-50">
               🎁 {card.reward}
