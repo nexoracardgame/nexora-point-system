@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type CardData = {
   cardNo: string;
   cardName: string;
   rarity: string;
-  setName?: string;
   reward?: string;
 };
 
@@ -15,6 +14,17 @@ export default function ScanPage() {
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("📸 แตะปุ่มเพื่อถ่ายการ์ด");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    // warm AI cloud
+    fetch("/api/scan-ai", {
+      method: "POST",
+      body: JSON.stringify({ image: "warmup" }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }).catch(() => {});
+  }, []);
 
   const handleCapture = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -27,12 +37,40 @@ export default function ScanPage() {
     setStatus("🧠 AI SERVER กำลังวิเคราะห์...");
 
     try {
-      const reader = new FileReader();
+      const img = document.createElement("img");
+      const previewUrl = URL.createObjectURL(file);
 
-      reader.onload = async () => {
+      // 🚀 preview ขึ้นทันที
+      setPreview(previewUrl);
+
+      img.onload = async () => {
         try {
-          const image = reader.result as string;
-          setPreview(image);
+          const canvas = document.createElement("canvas");
+
+          const maxWidth = 900;
+          const scale = Math.min(1, maxWidth / img.width);
+
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            setStatus("❌ canvas error");
+            return;
+          }
+
+          ctx.drawImage(
+            img,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          const image = canvas.toDataURL(
+            "image/jpeg",
+            0.82
+          );
 
           const aiRes = await fetch("/api/scan-ai", {
             method: "POST",
@@ -42,26 +80,27 @@ export default function ScanPage() {
             body: JSON.stringify({ image }),
           });
 
+          const raw = await aiRes.text();
+
           if (!aiRes.ok) {
-            throw new Error("AI server failed");
+            throw new Error(raw || "AI server failed");
           }
 
-          const ai = await aiRes.json();
+          const ai = JSON.parse(raw);
 
           if (!ai.cardNo) {
             setStatus("❌ AI อ่านไม่ออก");
             return;
           }
 
-          const cardRes = await fetch(`/api/card?cardNo=${ai.cardNo}`);
-          const data = await cardRes.json();
-
           setCard({
             cardNo: ai.cardNo,
-            cardName: data.card_name || "Unknown Card",
-            rarity: data.rarity || "-",
-            setName: data.set_name,
-            reward: data.reward,
+            cardName:
+              ai.card_name ||
+              ai.cardName ||
+              "Unknown Card",
+            rarity: ai.rarity || "-",
+            reward: ai.reward,
           });
 
           setStatus(
@@ -69,18 +108,19 @@ export default function ScanPage() {
               (ai.confidence || 0) * 100
             )}%)`
           );
-        } catch (error: any) {
+        } catch (error) {
           console.error(error);
           setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
         } finally {
           setIsProcessing(false);
+          URL.revokeObjectURL(previewUrl);
         }
       };
 
-      reader.readAsDataURL(file);
-    } catch (err: any) {
+      img.src = previewUrl;
+    } catch (err) {
       console.error(err);
-      setStatus(`❌ ${err?.message || "scan fail"}`);
+      setStatus("❌ scan fail");
       setIsProcessing(false);
     }
   };
@@ -108,7 +148,6 @@ export default function ScanPage() {
             type="file"
             accept="image/*"
             capture="environment"
-            multiple={false}
             onChange={(e) => {
               handleCapture(e);
               e.currentTarget.value = "";
@@ -119,8 +158,12 @@ export default function ScanPage() {
 
         {card && (
           <div className="mt-6 rounded-3xl border border-yellow-500/20 bg-white/5 p-5">
-            <div className="text-yellow-300">CARD #{card.cardNo}</div>
-            <div className="text-2xl font-black">{card.cardName}</div>
+            <div className="text-yellow-300">
+              CARD #{card.cardNo}
+            </div>
+            <div className="text-2xl font-black">
+              {card.cardName}
+            </div>
             <div className="mt-2 text-sm text-zinc-400">
               ✨ {card.rarity}
             </div>
