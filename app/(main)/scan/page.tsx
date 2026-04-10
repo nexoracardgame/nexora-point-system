@@ -11,12 +11,15 @@ type CardData = {
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const currentDeviceIdRef = useRef<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState("📸 เล็งการ์ดให้เต็มกรอบ แล้วแตะปุ่มแชะ");
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/scan-ai", {
@@ -25,45 +28,64 @@ export default function ScanPage() {
       body: JSON.stringify({ image: "warmup" }),
     }).catch(() => {});
 
-    startCamera();
+    loadDevices().then(() => startCamera());
     return () => stopCamera();
   }, []);
 
-  const startCamera = async () => {
-  try {
-    let stream: MediaStream | null = null;
-
+  const loadDevices = async () => {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
-    } catch {
-      // 💻 fallback desktop / browser แปลกๆ
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false,
-      });
+      const temp = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      temp.getTracks().forEach((t) => t.stop());
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videos = devices.filter((d) => d.kind === "videoinput");
+      setCameraDevices(videos);
+      if (videos[0] && !selectedDeviceId) {
+        setSelectedDeviceId(videos[0].deviceId);
+      }
+    } catch {}
+  };
+
+  const startCamera = async (forcedDeviceId?: string) => {
+    try {
+      let stream: MediaStream;
+      const deviceId = forcedDeviceId || selectedDeviceId || currentDeviceIdRef.current;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: deviceId
+            ? {
+                deviceId: { exact: deviceId },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+              }
+            : {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+              },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
+      currentDeviceIdRef.current = deviceId || null;
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+
+      setCameraReady(true);
+      setStatus("📸 พร้อมสแกน แตะปุ่มครั้งเดียวแล้วรอข้อมูลเด้งขึ้น");
+    } catch (error) {
+      console.error(error);
+      setStatus("❌ เปิดกล้องไม่ได้ กรุณาอนุญาตสิทธิ์กล้อง");
     }
-
-    streamRef.current = stream;
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play().catch(() => {});
-    }
-
-    setCameraReady(true);
-    setStatus("📸 พร้อมสแกน แตะปุ่มครั้งเดียวแล้วรอข้อมูลเด้งขึ้น");
-  } catch (error) {
-    console.error(error);
-    setStatus("❌ เปิดกล้องไม่ได้ กรุณาอนุญาตสิทธิ์กล้อง");
-  }
-};
+  };
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -170,6 +192,27 @@ export default function ScanPage() {
           )}
         </div>
       )}
+
+      <div className="absolute bottom-24 right-4 z-30 flex flex-col gap-2">
+        {cameraDevices.length > 1 && (
+          <select
+            value={selectedDeviceId}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSelectedDeviceId(next);
+              stopCamera();
+              startCamera(next);
+            }}
+            className="rounded-2xl border border-white/20 bg-black/60 px-3 py-2 text-xs text-white backdrop-blur"
+          >
+            {cameraDevices.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || `Lens ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <div className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
         <button
