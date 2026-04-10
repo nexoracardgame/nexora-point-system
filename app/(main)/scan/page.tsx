@@ -22,7 +22,7 @@ export default function ScanPage() {
 
   const [card, setCard] = useState<CardData | null>(null);
   const [status, setStatus] = useState(
-    "📸 เล็งการ์ดให้อยู่ในกรอบ แล้วแตะปุ่มแชะ"
+    "📸 จัดการ์ดให้อยู่ในกรอบ"
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -38,7 +38,6 @@ export default function ScanPage() {
     }).catch(() => {});
 
     startCamera();
-
     return () => stopCamera();
   }, []);
 
@@ -50,8 +49,8 @@ export default function ScanPage() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
           },
           audio: false,
         });
@@ -70,9 +69,7 @@ export default function ScanPage() {
       }
 
       setCameraReady(true);
-      setStatus(
-        "📸 พร้อมแล้ว เลือกเลนส์แล้วแตะปุ่มครั้งเดียว"
-      );
+      setStatus("📸 พร้อมแล้ว ภาพคมระดับสูง");
     } catch (error) {
       console.error(error);
       setStatus("❌ เปิดกล้องไม่ได้");
@@ -92,14 +89,14 @@ export default function ScanPage() {
 
     setIsProcessing(true);
     setCard(null);
-    setStatus("🧠 AI กำลังวิเคราะห์...");
+    setStatus("🧠 AI กำลังวิเคราะห์ภาพคมสูง...");
 
     try {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("canvas error");
 
-      const baseCropWidth = video.videoWidth * 0.62;
+      const baseCropWidth = video.videoWidth * 0.72;
       const cropWidth = baseCropWidth / zoomLevel;
       const cropHeight = cropWidth * 1.35;
 
@@ -108,8 +105,12 @@ export default function ScanPage() {
       const sy =
         (video.videoHeight - cropHeight) / 2;
 
-      canvas.width = 720;
-      canvas.height = 972;
+      // 🚀 ส่งภาพใหญ่ขึ้นให้ AI
+      canvas.width = 1280;
+      canvas.height = 1730;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
       ctx.drawImage(
         video,
@@ -125,7 +126,7 @@ export default function ScanPage() {
 
       const image = canvas.toDataURL(
         "image/jpeg",
-        0.88
+        0.94
       );
 
       const aiRes = await fetch("/api/scan-ai", {
@@ -146,7 +147,7 @@ export default function ScanPage() {
 
       if (!ai.cardNo) {
         setStatus(
-          "❌ AI อ่านไม่ออก ลองเปลี่ยนเลนส์หรือขยับเข้าใกล้"
+          "❌ AI อ่านไม่ออก ลองใช้ 1x หรือขยับให้ตรงกรอบ"
         );
         return;
       }
@@ -162,7 +163,7 @@ export default function ScanPage() {
       });
 
       setStatus(
-        `🃏 พบการ์ด ${ai.cardNo} • ${Math.round(
+        `🃏 ${ai.cardNo} • ${Math.round(
           (ai.confidence || 0) * 100
         )}%`
       );
