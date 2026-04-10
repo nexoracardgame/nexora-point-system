@@ -1,250 +1,193 @@
-"use client";
+# ai_server.py
+# 🚀 NEXORA AI Scanner v2
+# High Accuracy Mobile + Edge Number Boost 001-293
 
-import { useEffect, useRef, useState } from "react";
+from fastapi import FastAPI
+from pydantic import BaseModel
+import base64
+import cv2
+import numpy as np
+import json
 
-type CardData = {
-  cardNo: string;
-  cardName: string;
-  rarity: string;
-  reward?: string;
-};
+app = FastAPI()
 
-const LENS_PRESETS = [
-  { label: "0.5", zoom: 0.5 },
-  { label: "1", zoom: 1 },
-  { label: "2", zoom: 2 },
-  { label: "3", zoom: 3 },
-];
 
-export default function ScanPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+# =========================
+# LOAD CARD VECTORS
+# =========================
+with open("card-vectors.json", "r", encoding="utf-8") as f:
+    CARD_VECTORS = json.load(f)
 
-  const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState(
-    "📸 จัดการ์ดให้อยู่ในกรอบ"
-  );
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
 
-  useEffect(() => {
-    fetch("/api/scan-ai", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ image: "warmup" }),
-    }).catch(() => {});
+class ScanRequest(BaseModel):
+    image: str
 
-    startCamera();
-    return () => stopCamera();
-  }, []);
 
-  const startCamera = async () => {
-    try {
-      let stream: MediaStream;
+# =========================
+# HELPERS
+# =========================
+def decode_base64_image(data_url: str):
+    if "," in data_url:
+        data_url = data_url.split(",", 1)[1]
 
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 3840 },
-            height: { ideal: 2160 },
-          },
-          audio: false,
-        });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      }
+    img_bytes = base64.b64decode(data_url)
+    arr = np.frombuffer(img_bytes, np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    return img
 
-      streamRef.current = stream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
+def cosine_similarity(a, b):
+    denom = (np.linalg.norm(a) * np.linalg.norm(b)) + 1e-8
+    return float(np.dot(a, b) / denom)
 
-      setCameraReady(true);
-      setStatus("📸 พร้อมแล้ว ภาพคมระดับสูง");
-    } catch (error) {
-      console.error(error);
-      setStatus("❌ เปิดกล้องไม่ได้");
-    }
-  };
 
-  const stopCamera = () => {
-    streamRef.current?.getTracks().forEach((t) =>
-      t.stop()
-    );
-    streamRef.current = null;
-  };
+# =========================
+# EDGE NUMBER EXTRACTION
+# =========================
+def extract_number_rois(img: np.ndarray):
+    h, w = img.shape[:2]
 
-  const captureAndScan = async () => {
-    const video = videoRef.current;
-    if (!video || !cameraReady || isProcessing) return;
+    top_left = img[
+        0 : int(h * 0.18),
+        0 : int(w * 0.35),
+    ]
 
-    setIsProcessing(true);
-    setCard(null);
-    setStatus("🧠 AI กำลังวิเคราะห์ภาพคมสูง...");
+    bottom_right = img[
+        int(h * 0.82) : h,
+        int(w * 0.65) : w,
+    ]
 
-    try {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("canvas error");
+    return top_left, bottom_right
 
-      const baseCropWidth = video.videoWidth * 0.72;
-      const cropWidth = baseCropWidth / zoomLevel;
-      const cropHeight = cropWidth * 1.35;
 
-      const sx =
-        (video.videoWidth - cropWidth) / 2;
-      const sy =
-        (video.videoHeight - cropHeight) / 2;
+def preprocess_number_roi(roi: np.ndarray):
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
-      // 🚀 ส่งภาพใหญ่ขึ้นให้ AI
-      canvas.width = 1280;
-      canvas.height = 1730;
+    # 🚀 เพิ่ม contrast ให้เลขคม
+    gray = cv2.convertScaleAbs(
+        gray,
+        alpha=1.9,
+        beta=10,
+    )
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
-      ctx.drawImage(
-        video,
-        sx,
-        sy,
-        cropWidth,
-        cropHeight,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+    th = cv2.adaptiveThreshold(
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        21,
+        6,
+    )
 
-      const image = canvas.toDataURL(
-        "image/jpeg",
-        0.94
-      );
+    return th
 
-      const aiRes = await fetch("/api/scan-ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image }),
-      });
 
-      const raw = await aiRes.text();
+def signature_from_binary(binary: np.ndarray):
+    small = cv2.resize(binary, (32, 16))
+    return (
+        small.astype(np.float32).flatten() / 255.0
+    )
 
-      if (!aiRes.ok) {
-        throw new Error(raw || "AI server failed");
-      }
 
-      const ai = JSON.parse(raw);
+# =========================
+# MAIN SIGNATURE
+# =========================
+def build_signature(img: np.ndarray):
+    # 🎨 artwork ทั้งใบ
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.resize(gray, (96, 128))
 
-      if (!ai.cardNo) {
-        setStatus(
-          "❌ AI อ่านไม่ออก ลองใช้ 1x หรือขยับให้ตรงกรอบ"
-        );
-        return;
-      }
+    main_sig = (
+        gray.astype(np.float32).flatten() / 255.0
+    )
 
-      setCard({
-        cardNo: ai.cardNo,
-        cardName:
-          ai.card_name ||
-          ai.cardName ||
-          "Unknown Card",
-        rarity: ai.rarity || "-",
-        reward: ai.reward,
-      });
+    # 🔢 เลขขอบ
+    tl, br = extract_number_rois(img)
 
-      setStatus(
-        `🃏 ${ai.cardNo} • ${Math.round(
-          (ai.confidence || 0) * 100
-        )}%`
-      );
-    } catch (error) {
-      console.error(error);
-      setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    tl_sig = signature_from_binary(
+        preprocess_number_roi(tl)
+    )
 
-  return (
-    <div className="relative h-screen overflow-hidden bg-black text-white">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+    br_sig = signature_from_binary(
+        preprocess_number_roi(br)
+    )
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+    # 🚀 รวมเป็น signature เดียว
+    return np.concatenate(
+        [
+            main_sig,
+            tl_sig,
+            br_sig,
+        ]
+    )
 
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="h-[52vh] w-[72vw] max-w-sm rounded-[2.5rem] border-4 border-yellow-300/90 shadow-[0_0_60px_rgba(234,179,8,0.35)]" />
-      </div>
 
-      <div className="absolute top-4 left-1/2 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-2xl bg-black/35 px-4 py-3 text-center text-sm backdrop-blur-md">
-        {status}
-      </div>
+# =========================
+# API
+# =========================
+@app.post("/predict")
+def predict(req: ScanRequest):
+    try:
+        # warmup route
+        if req.image == "warmup":
+            return {"ok": True}
 
-      <div className="absolute bottom-24 right-4 z-30">
-        <div className="flex gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
-          {LENS_PRESETS.map((lens) => {
-            const active = zoomLevel === lens.zoom;
+        img = decode_base64_image(req.image)
 
-            return (
-              <button
-                key={lens.label}
-                onClick={() => setZoomLevel(lens.zoom)}
-                className={`h-10 min-w-10 rounded-full px-3 text-xs font-bold transition ${
-                  active
-                    ? "bg-white text-black shadow-lg"
-                    : "bg-white/10 text-white"
-                }`}
-              >
-                {lens.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        if img is None:
+            return {
+                "cardNo": None,
+                "confidence": 0,
+            }
 
-      {card && (
-        <div className="absolute bottom-28 left-1/2 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-[2rem] border border-yellow-400/30 bg-black/75 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-          <div className="text-xs tracking-[0.2em] text-yellow-300">
-            CARD #{card.cardNo}
-          </div>
-          <div className="mt-1 text-2xl font-black leading-tight">
-            {card.cardName}
-          </div>
-          <div className="mt-2 text-sm text-zinc-300">
-            ✨ {card.rarity}
-          </div>
-          {card.reward && (
-            <div className="mt-4 rounded-2xl bg-yellow-500/10 p-3 text-sm text-yellow-50">
-              🎁 {card.reward}
-            </div>
-          )}
-        </div>
-      )}
+        query_sig = build_signature(img)
 
-      <div className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
-        <button
-          onClick={captureAndScan}
-          disabled={isProcessing || !cameraReady}
-          className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/90 bg-white text-4xl text-black shadow-[0_20px_80px_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-60"
-        >
-          {isProcessing ? "⏳" : "📸"}
-        </button>
-      </div>
-    </div>
-  );
-}
+        best_card = None
+        best_score = -1
+
+        for item in CARD_VECTORS:
+            vec = np.array(
+                item["vector"],
+                dtype=np.float32,
+            )
+
+            score = cosine_similarity(
+                query_sig,
+                vec,
+            )
+
+            # 🚀 boost เฉพาะเลขจริง 001-293
+            card_no = str(
+                item.get("cardNo", "")
+            ).zfill(3)
+
+            if card_no.isdigit():
+                n = int(card_no)
+
+                if 1 <= n <= 293:
+                    score += 0.025
+
+            if score > best_score:
+                best_score = score
+                best_card = item
+
+        return {
+            "cardNo": (
+                best_card.get("cardNo")
+                if best_card
+                else None
+            ),
+            "confidence": round(
+                float(best_score),
+                4,
+            ),
+        }
+
+    except Exception as e:
+        return {
+            "cardNo": None,
+            "confidence": 0,
+            "error": str(e),
+        }
