@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       cardNo: result.cardNo || result.card_no || null,
-      confidence: result.confidence ?? 0.99,
+      confidence: result.confidence ?? 0,
       score: result.score || 0,
     });
   } catch (error: any) {

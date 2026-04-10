@@ -96,9 +96,9 @@ export default function ScanPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("canvas error");
 
-      const baseCropWidth = video.videoWidth * 0.72;
+      const baseCropWidth = video.videoWidth * 0.52;
       const cropWidth = baseCropWidth / zoomLevel;
-      const cropHeight = cropWidth * 1.35;
+      const cropHeight = cropWidth * 1.25;
 
       const sx =
         (video.videoWidth - cropWidth) / 2;
