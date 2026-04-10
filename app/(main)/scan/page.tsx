@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type CardData = {
   cardNo: string;
@@ -10,13 +10,15 @@ type CardData = {
 };
 
 export default function ScanPage() {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [preview, setPreview] = useState("");
   const [card, setCard] = useState<CardData | null>(null);
-  const [status, setStatus] = useState("📸 แตะปุ่มเพื่อถ่ายการ์ด");
+  const [status, setStatus] = useState("📸 แตะปุ่มเพื่อสแกนการ์ด");
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // warm AI cloud
+    // 🚀 warm AI cloud
     fetch("/api/scan-ai", {
       method: "POST",
       body: JSON.stringify({ image: "warmup" }),
@@ -40,7 +42,7 @@ export default function ScanPage() {
       const img = document.createElement("img");
       const previewUrl = URL.createObjectURL(file);
 
-      // 🚀 preview ขึ้นทันที
+      // 🚀 preview ทันที
       setPreview(previewUrl);
 
       img.onload = async () => {
@@ -142,19 +144,25 @@ export default function ScanPage() {
           </div>
         )}
 
-        <label className="relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)]">
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={isProcessing}
+          className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-yellow-200 bg-yellow-400 text-4xl text-black shadow-[0_20px_100px_rgba(234,179,8,0.55)]"
+        >
           {isProcessing ? "⏳" : "📸"}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => {
-              handleCapture(e);
-              e.currentTarget.value = "";
-            }}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-        </label>
+        </button>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => {
+            handleCapture(e);
+            e.currentTarget.value = "";
+          }}
+          className="hidden"
+        />
 
         {card && (
           <div className="mt-6 rounded-3xl border border-yellow-500/20 bg-white/5 p-5">
