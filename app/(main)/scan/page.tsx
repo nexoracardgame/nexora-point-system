@@ -9,6 +9,13 @@ type CardData = {
   reward?: string;
 };
 
+const LENS_PRESETS = [
+  { label: "0.5", zoom: 0.5 },
+  { label: "1", zoom: 1 },
+  { label: "2", zoom: 2 },
+  { label: "3", zoom: 3 },
+];
+
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -19,11 +26,7 @@ export default function ScanPage() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [cameraDevices, setCameraDevices] = useState<
-    MediaDeviceInfo[]
-  >([]);
-  const [selectedDeviceId, setSelectedDeviceId] =
-    useState("");
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   useEffect(() => {
     fetch("/api/scan-ai", {
@@ -34,66 +37,29 @@ export default function ScanPage() {
       body: JSON.stringify({ image: "warmup" }),
     }).catch(() => {});
 
-    initCamera();
+    startCamera();
 
     return () => stopCamera();
   }, []);
 
-  const initCamera = async () => {
-    try {
-      const temp =
-        await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-
-      temp.getTracks().forEach((t) => t.stop());
-
-      const devices =
-        await navigator.mediaDevices.enumerateDevices();
-
-      const videos = devices.filter(
-        (d) => d.kind === "videoinput"
-      );
-
-      setCameraDevices(videos);
-
-      const firstId = videos[0]?.deviceId || "";
-      setSelectedDeviceId(firstId);
-
-      startCamera(firstId);
-    } catch (error) {
-      console.error(error);
-      setStatus("❌ เปิดกล้องไม่สำเร็จ");
-    }
-  };
-
-  const startCamera = async (deviceId?: string) => {
+  const startCamera = async () => {
     try {
       let stream: MediaStream;
 
       try {
-        stream =
-          await navigator.mediaDevices.getUserMedia({
-            video: deviceId
-              ? {
-                  deviceId: { exact: deviceId },
-                  width: { ideal: 1920 },
-                  height: { ideal: 1080 },
-                }
-              : {
-                  facingMode: {
-                    ideal: "environment",
-                  },
-                },
-            audio: false,
-          });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
       } catch {
-        stream =
-          await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
       }
 
       streamRef.current = stream;
@@ -105,7 +71,7 @@ export default function ScanPage() {
 
       setCameraReady(true);
       setStatus(
-        "📸 พร้อมแล้ว แตะปุ่มครั้งเดียวให้ AI วิเคราะห์"
+        "📸 พร้อมแล้ว เลือกเลนส์แล้วแตะปุ่มครั้งเดียว"
       );
     } catch (error) {
       console.error(error);
@@ -133,7 +99,8 @@ export default function ScanPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("canvas error");
 
-      const cropWidth = video.videoWidth * 0.62;
+      const baseCropWidth = video.videoWidth * 0.62;
+      const cropWidth = baseCropWidth / zoomLevel;
       const cropHeight = cropWidth * 1.35;
 
       const sx =
@@ -158,7 +125,7 @@ export default function ScanPage() {
 
       const image = canvas.toDataURL(
         "image/jpeg",
-        0.86
+        0.88
       );
 
       const aiRes = await fetch("/api/scan-ai", {
@@ -179,7 +146,7 @@ export default function ScanPage() {
 
       if (!ai.cardNo) {
         setStatus(
-          "❌ AI อ่านไม่ออก ขยับการ์ดให้เต็มกรอบ"
+          "❌ AI อ่านไม่ออก ลองเปลี่ยนเลนส์หรือขยับเข้าใกล้"
         );
         return;
       }
@@ -228,34 +195,25 @@ export default function ScanPage() {
       </div>
 
       <div className="absolute bottom-24 right-4 z-30">
-        {cameraDevices.length > 1 && (
-          <div className="flex gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
-            {cameraDevices.map((device, index) => {
-              const active =
-                selectedDeviceId === device.deviceId;
+        <div className="flex gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
+          {LENS_PRESETS.map((lens) => {
+            const active = zoomLevel === lens.zoom;
 
-              return (
-                <button
-                  key={device.deviceId}
-                  onClick={() => {
-                    setSelectedDeviceId(
-                      device.deviceId
-                    );
-                    stopCamera();
-                    startCamera(device.deviceId);
-                  }}
-                  className={`h-10 min-w-10 rounded-full px-3 text-xs font-bold transition ${
-                    active
-                      ? "bg-white text-black shadow-lg"
-                      : "bg-white/10 text-white"
-                  }`}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
-          </div>
-        )}
+            return (
+              <button
+                key={lens.label}
+                onClick={() => setZoomLevel(lens.zoom)}
+                className={`h-10 min-w-10 rounded-full px-3 text-xs font-bold transition ${
+                  active
+                    ? "bg-white text-black shadow-lg"
+                    : "bg-white/10 text-white"
+                }`}
+              >
+                {lens.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {card && (
