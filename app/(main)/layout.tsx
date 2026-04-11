@@ -16,9 +16,9 @@ import {
   House,
   Cat,
   Trophy,
-  Menu,
   X,
   ChevronRight,
+  User,
 } from "lucide-react";
 
 function safeProfileSrc(image?: string | null) {
@@ -209,6 +209,12 @@ export default function MainLayout({
       active: pathname.startsWith("/wallet"),
     },
     {
+      href: "/profile/me",
+      label: "My Profile",
+      icon: User,
+      active: pathname.startsWith("/profile"),
+    },
+    {
       href: "/settings/profile",
       label: "Profile Settings",
       icon: Settings,
@@ -218,7 +224,7 @@ export default function MainLayout({
 
   return (
     <div className="min-h-screen bg-[#050608] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.06),transparent_24%)] pointer-events-none" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.06),transparent_24%)]" />
 
       <div className="relative flex min-h-screen">
         {/* DESKTOP LEFT DOCK */}
@@ -259,15 +265,6 @@ export default function MainLayout({
           <header className="sticky top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl">
             <div className="flex h-[74px] items-center justify-between px-4 sm:px-5 xl:px-6">
               <div className="flex min-w-0 items-center gap-3">
-                {/* MOBILE MENU BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => setMobileNavOpen(true)}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.08)] transition hover:bg-white/[0.05] xl:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-
                 {/* MOBILE LOGO */}
                 <Link
                   href="/"
@@ -363,6 +360,15 @@ export default function MainLayout({
                       >
                         <Wallet className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
                         Wallet
+                      </Link>
+
+                      <Link
+                        href="/profile/me"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
+                      >
+                        <User className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
+                        My Profile
                       </Link>
 
                       <Link
@@ -519,7 +525,7 @@ export default function MainLayout({
 
       {/* MOBILE BOTTOM NAV */}
       <nav className="fixed bottom-0 left-0 right-0 z-[1100] border-t border-white/10 bg-[#0b0c10]/92 px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur-2xl xl:hidden">
-        <div className="mx-auto grid max-w-[640px] grid-cols-5 gap-2">
+        <div className="mx-auto grid max-w-[640px] grid-cols-4 gap-2">
           {mobileBottomItems.map((item) => {
             const Icon = item.icon;
 
@@ -538,15 +544,6 @@ export default function MainLayout({
               </Link>
             );
           })}
-
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="flex min-h-[64px] flex-col items-center justify-center rounded-2xl border border-transparent bg-white/[0.02] text-white/45 transition"
-          >
-            <Menu className="h-5 w-5" />
-            <span className="mt-1 text-[11px] font-bold">Menu</span>
-          </button>
         </div>
       </nav>
     </div>

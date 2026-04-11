@@ -2,10 +2,37 @@
 
 import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
+import liff from "@line/liff";
 
 export default function LoginPage() {
   const BG_IMAGE =
     "https://s.imgz.io/2026/04/03/NEXORA496971ca3675ceb2ca.png";
+
+  useEffect(() => {
+    async function autoLogin() {
+      try {
+        await liff.init({
+          liffId: process.env.NEXT_PUBLIC_LIFF_ID!,
+        });
+
+        // ถ้าเปิดใน LINE app และ login LINE อยู่แล้ว
+        if (liff.isInClient()) {
+          if (!liff.isLoggedIn()) {
+            liff.login();
+            return;
+          }
+
+          // เข้าเว็บตรงได้เลย
+          window.location.href = "/";
+        }
+      } catch (error) {
+        console.error("LIFF auto login failed:", error);
+      }
+    }
+
+    autoLogin();
+  }, []);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-white">
@@ -37,7 +64,7 @@ export default function LoginPage() {
           repeat: Infinity,
           ease: "easeInOut",
         }}
-        className="absolute left-1/2 top-[30%] -translate-x-1/2 w-[240px] h-[240px] md:w-[420px] md:h-[420px] rounded-full bg-cyan-400/10 blur-3xl"
+        className="absolute left-1/2 top-[30%] h-[240px] w-[240px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl md:h-[420px] md:w-[420px]"
       />
 
       <motion.div
@@ -50,11 +77,11 @@ export default function LoginPage() {
           repeat: Infinity,
           ease: "easeInOut",
         }}
-        className="absolute left-[12%] bottom-[18%] w-[160px] h-[160px] md:w-[280px] md:h-[280px] rounded-full bg-orange-500/10 blur-3xl"
+        className="absolute bottom-[18%] left-[12%] h-[160px] w-[160px] rounded-full bg-orange-500/10 blur-3xl md:h-[280px] md:w-[280px]"
       />
 
       {/* ===== particles ===== */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="pointer-events-none absolute inset-0">
         {[...Array(16)].map((_, i) => (
           <motion.div
             key={i}
@@ -77,7 +104,7 @@ export default function LoginPage() {
         ))}
       </div>
 
-      {/* ===== TOP NAV (เหมือนเดิม desktop) ===== */}
+      {/* ===== TOP NAV ===== */}
       <div className="relative z-10 flex items-center justify-between px-4 py-5 md:px-10">
         <div className="text-lg font-black tracking-[0.25em] md:text-2xl">
           NEXORA
@@ -88,9 +115,8 @@ export default function LoginPage() {
         </button>
       </div>
 
-      {/* ===== MOBILE + DESKTOP CENTER ===== */}
+      {/* ===== CENTER ===== */}
       <div className="relative z-10 flex min-h-[calc(100vh-72px)] flex-col items-center justify-center px-5 text-center md:px-10">
-        
         {/* LOGO */}
         <motion.img
           initial={{ opacity: 0, y: 30 }}
@@ -106,7 +132,7 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.2 }}
-          className="mt-6 text-[32px] leading-[1] font-black md:mt-8 md:text-7xl lg:text-8xl"
+          className="mt-6 text-[32px] font-black leading-[1] md:mt-8 md:text-7xl lg:text-8xl"
         >
           YOUR OWN STORY
           <br />
@@ -123,7 +149,7 @@ export default function LoginPage() {
           Wallet • Marketplace • Rewards • Competitive Card Ecosystem
         </motion.p>
 
-        {/* LOGIN BUTTON (mobile optimized) */}
+        {/* LOGIN BUTTON */}
         <motion.button
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.97 }}
@@ -141,12 +167,11 @@ export default function LoginPage() {
           LOGIN WITH LINE
         </motion.button>
 
-        {/* FOOTER TEXT */}
+        {/* FOOTER */}
         <div className="mt-4 text-[10px] text-zinc-400 md:mt-5 md:text-sm">
           Protected by NEXORA Secure Authentication
         </div>
 
-        {/* SCROLL */}
         <motion.div
           animate={{ y: [0, 8, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
