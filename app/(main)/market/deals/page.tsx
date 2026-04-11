@@ -160,11 +160,8 @@ export default async function DealsPage() {
               const englishName =
                 listing?.cardName || "Unknown Card";
 
-              const thaiName =
-                listing?.cardNameThai ||
-                listing?.cardNameTH ||
-                "";
-
+              const thaiName = "";
+              
               return (
                 <div
                   key={deal.id}
