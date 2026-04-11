@@ -21,17 +21,18 @@ export default function ScanPage() {
   const [cameraReady, setCameraReady] = useState(false);
 
   useEffect(() => {
-    fetch("/api/scan-ai", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ image: "warmup" }),
-    }).catch(() => {});
+    const warm = setInterval(() => {
+  fetch("/api/scan-ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: "warmup" }),
+  }).catch(() => {});
+}, 45000);
 
     startCamera();
 
     return () => {
+      clearInterval(warm)
       stopCamera();
     };
   }, []);
@@ -44,8 +45,8 @@ export default function ScanPage() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
           audio: false,
         });
@@ -148,7 +149,7 @@ setCameraReady(true);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    const cropWidth = video.videoWidth * 0.44;
+    const cropWidth = video.videoWidth * 0.40;
     const cropHeight = cropWidth * 1.25;
 
     const sx = (video.videoWidth - cropWidth) / 2;
