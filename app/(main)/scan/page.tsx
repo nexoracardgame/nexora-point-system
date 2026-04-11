@@ -179,7 +179,7 @@ export default function ScanPage() {
     setStatus("🧠 AI กำลังวิเคราะห์...");
 
     const controller = new AbortController();
-    timeout = setTimeout(() => controller.abort(), 30000);
+    timeout = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch("/api/scan-ai", {
       method: "POST",
@@ -189,30 +189,40 @@ export default function ScanPage() {
       body: JSON.stringify({ image: imageData }),
       signal: controller.signal,
       cache: "no-store",
-   });
+    });
 
-   const raw = await res.text();
+    const raw = await res.text();
 
-   let ai: any = null;
+    let ai: any = null;
 
-   try {
-     ai = JSON.parse(raw);
-   } catch {
-     setStatus("❌ AI ตอบผิดรูปแบบ ลองใหม่");
-     return;
-   }
+    try {
+      ai = JSON.parse(raw);
+    } catch {
+      setStatus("❌ AI ตอบผิดรูปแบบ ลองใหม่");
+      return;
+    }
 
-    setStatus(`✅ พบการ์ด ${ai.cardNo} กำลังโหลดข้อมูล...`);
+    if (!res.ok || !ai?.cardNo) {
+      setStatus("❌ AI อ่านไม่เจอ");
+      return;
+    }
 
-    const sheetCard = await getCardFromSheet(ai.cardNo);
+    // ⚡ FAST MODE: ไม่ดึงชีท
+    setCard({
+      cardNo: ai.cardNo,
+      cardName: `NEXORA CARD ${ai.cardNo}`,
+      rarity: "⚡ FAST AI MODE",
+      reward: "",
+      collection: "",
+      collectionReward: "",
+    });
 
-    setCard(sheetCard);
-    setStatus(`🎉 พบ ${sheetCard.cardName}`);
+    setStatus(`⚡ พบการ์ด ${ai.cardNo} แบบเร็ว`);
   } catch (e: any) {
     console.error(e);
     setStatus(
       e?.name === "AbortError"
-        ? "⏳ AI ใช้เวลานานเกินไป ลองขยับการ์ดให้นิ่งและแสงสว่างขึ้น"
+        ? "⏳ AI ใช้เวลานานเกินไป ลองใหม่"
         : `❌ ${e?.message || "สแกนไม่สำเร็จ"}`
     );
   } finally {
