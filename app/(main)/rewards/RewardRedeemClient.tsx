@@ -16,7 +16,13 @@ export default function RewardRedeemClient({
   user,
   rewards,
 }: {
-  user: { lineId: string; nexPoint: number; coin: number; name: string };
+  user: {
+  lineId: string;
+  nexPoint: number;
+  coin: number;
+  name: string;
+  image?: string;
+};
   rewards: Reward[];
 }) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
