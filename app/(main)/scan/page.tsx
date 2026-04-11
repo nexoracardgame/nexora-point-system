@@ -131,6 +131,8 @@ export default function ScanPage() {
   const captureAndScan = async () => {
   if (isProcessing) return;
 
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
   try {
     if (!videoRef.current) {
       setStatus("❌ ไม่พบกล้อง");
@@ -177,8 +179,7 @@ export default function ScanPage() {
     setStatus("🧠 AI กำลังวิเคราะห์...");
 
     const controller = new AbortController();
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    timeout = setTimeout(() => controller.abort(), 20000);
+    timeout = setTimeout(() => controller.abort(), 30000);
 
     const res = await fetch("/api/scan-ai", {
       method: "POST",
@@ -189,7 +190,6 @@ export default function ScanPage() {
       signal: controller.signal,
     });
 
-  
     const ai = await res.json();
     console.log("AI RESULT =", ai);
 
@@ -206,10 +206,14 @@ export default function ScanPage() {
     setStatus(`🎉 พบ ${sheetCard.cardName}`);
   } catch (e: any) {
     console.error(e);
-    setStatus(`❌ ${e?.message || "สแกนไม่สำเร็จ"}`);
+    setStatus(
+      e?.name === "AbortError"
+        ? "⏳ AI ใช้เวลานานเกินไป ลองขยับการ์ดให้นิ่งและแสงสว่างขึ้น"
+        : `❌ ${e?.message || "สแกนไม่สำเร็จ"}`
+    );
   } finally {
-  if (timeout) clearTimeout(timeout);
-  setIsProcessing(false);
+    if (timeout) clearTimeout(timeout);
+    setIsProcessing(false);
   }
 };
 
