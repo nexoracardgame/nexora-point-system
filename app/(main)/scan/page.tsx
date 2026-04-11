@@ -29,7 +29,7 @@ export default function ScanPage() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image: "warmup" }),
   }).catch(() => {});
-}, 60000);
+}, 30000);
 
     startCamera();
 
@@ -179,7 +179,7 @@ export default function ScanPage() {
     setStatus("🧠 AI กำลังวิเคราะห์...");
 
     const controller = new AbortController();
-    timeout = setTimeout(() => controller.abort(), 15000);
+    timeout = setTimeout(() => controller.abort(), 30000);
 
     const res = await fetch("/api/scan-ai", {
       method: "POST",
