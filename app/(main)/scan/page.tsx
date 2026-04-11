@@ -173,39 +173,8 @@ setCameraReady(true);
 
       const image = canvas.toDataURL("image/jpeg", 0.95);
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 18000);
+              throw new Error(raw || "AI server failed");
 
-      const aiRes = await fetch("/api/scan-ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      const raw = await aiRes.text();
-
-      if (!aiRes.ok) {
-        throw new Error(raw || "AI server failed");
-      }
-
-      const ai = JSON.parse(raw);
-
-      const cardNo =
-        ai.cardNo ||
-        ai.card_no ||
-        ai.number ||
-        ai.card_number ||
-        "";
-
-      if (!cardNo) {
-        setStatus("❌ AI อ่านไม่ออก ขยับการ์ดให้เต็มกรอบและนิ่งอีกนิด");
-        return;
-      }
 
       setStatus(`🔎 พบเลขการ์ด ${cardNo} กำลังดึงข้อมูลจากชีท...`);
 
