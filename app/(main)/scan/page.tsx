@@ -60,8 +60,17 @@ export default function ScanPage() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
+
+        await new Promise<void>((resolve) => {
+          const video = videoRef.current!;
+          video.onloadedmetadata = async () => {
+           await video.play().catch(() => {});
+           resolve();
+    };
+  });
+}
+
+setCameraReady(true);
 
       setCameraReady(true);
       setStatus("📸 พร้อมแล้ว แตะปุ่มครั้งเดียวให้ AI วิเคราะห์");
