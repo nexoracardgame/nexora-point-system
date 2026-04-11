@@ -45,9 +45,12 @@ export default async function DealsPage() {
   const currentUserId = String((session?.user as any)?.id || "");
 
   const deals = await prisma.dealRequest.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
+  where: {
+    status: "pending",
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
   });
 
   const buyerIds = [...new Set(deals.map((deal) => deal.buyerId))];
@@ -160,7 +163,7 @@ export default async function DealsPage() {
               const thaiName =
                 listing?.cardNameThai ||
                 listing?.cardNameTH ||
-                "การ์ดเน็กซอร่า";
+                "";
 
               return (
                 <div
@@ -249,7 +252,7 @@ export default async function DealsPage() {
                         </div>
 
                         <Link
-                          href={`/market/seller/${buyer?.id}`}
+                          href={`/profile/${buyer?.id}`}
                           className="mt-3 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]"
                         >
                           <img
