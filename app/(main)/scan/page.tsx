@@ -147,7 +147,7 @@ setCameraReady(true);
         throw new Error("canvas error");
       }
 
-      const cropWidth = video.videoWidth * 0.56;
+      const cropWidth = video.videoWidth * 0.52;
       const cropHeight = cropWidth * 1.25;
 
       const sx = Math.max(0, (video.videoWidth - cropWidth) / 2);
@@ -171,7 +171,7 @@ setCameraReady(true);
         canvas.height
       );
 
-      const image = canvas.toDataURL("image/jpeg", 0.9);
+      const image = canvas.toDataURL("image/jpeg", 0.95);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12000);
