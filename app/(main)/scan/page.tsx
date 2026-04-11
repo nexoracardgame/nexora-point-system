@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from "react";
 type CardData = {
   cardNo: string;
   cardName: string;
-  rarity: string;
+  rarity?: string;
   reward?: string;
+  collection?: string;
+  collectionReward?: string;
 };
 
 export default function ScanPage() {
@@ -74,6 +76,48 @@ export default function ScanPage() {
     streamRef.current = null;
   };
 
+  const getCardFromSheet = async (cardNo: string): Promise<CardData> => {
+    const res = await fetch(`/api/card?cardNo=${encodeURIComponent(cardNo)}`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return {
+        cardNo,
+        cardName: "Unknown Card",
+        rarity: "-",
+      };
+    }
+
+    const data = await res.json();
+
+    return {
+      cardNo: data.cardNo || data.card_no || cardNo,
+      cardName:
+        data.cardName ||
+        data.card_name ||
+        data.name ||
+        `Card ${cardNo}`,
+      rarity: data.rarity || data.card_rarity || "-",
+      reward:
+        data.reward ||
+        data.rewardText ||
+        data.reward_name ||
+        "",
+      collection:
+        data.collection ||
+        data.collectionName ||
+        data.set_name ||
+        data.reward_set ||
+        "",
+      collectionReward:
+        data.collectionReward ||
+        data.collection_reward ||
+        data.set_reward ||
+        "",
+    };
+  };
+
   const captureAndScan = async () => {
     const video = videoRef.current;
     if (!video || !cameraReady || isProcessing) return;
@@ -94,14 +138,12 @@ export default function ScanPage() {
         throw new Error("canvas error");
       }
 
-      // ✅ mobile-first crop: การ์ดต้องใหญ่ในเฟรม
       const cropWidth = video.videoWidth * 0.56;
       const cropHeight = cropWidth * 1.25;
 
       const sx = Math.max(0, (video.videoWidth - cropWidth) / 2);
       const sy = Math.max(0, (video.videoHeight - cropHeight) / 2);
 
-      // ✅ สมดุลระหว่างความคมกับความเร็ว
       canvas.width = 960;
       canvas.height = 1200;
 
@@ -123,7 +165,7 @@ export default function ScanPage() {
       const image = canvas.toDataURL("image/jpeg", 0.9);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 12000);
 
       const aiRes = await fetch("/api/scan-ai", {
         method: "POST",
@@ -144,20 +186,28 @@ export default function ScanPage() {
 
       const ai = JSON.parse(raw);
 
-      if (!ai.cardNo) {
+      const cardNo =
+        ai.cardNo ||
+        ai.card_no ||
+        ai.number ||
+        ai.card_number ||
+        "";
+
+      if (!cardNo) {
         setStatus("❌ AI อ่านไม่ออก ขยับการ์ดให้เต็มกรอบและนิ่งอีกนิด");
         return;
       }
 
-      setCard({
-        cardNo: ai.cardNo,
-        cardName: ai.card_name || ai.cardName || "Unknown Card",
-        rarity: ai.rarity || "-",
-        reward: ai.reward,
-      });
+      setStatus(`🔎 พบเลขการ์ด ${cardNo} กำลังดึงข้อมูลจากชีท...`);
+
+      const sheetCard = await getCardFromSheet(cardNo);
+
+      setCard(sheetCard);
 
       setStatus(
-        `🃏 พบการ์ด ${ai.cardNo} • ${Math.round((ai.confidence || 0) * 100)}%`
+        `🃏 พบการ์ด ${sheetCard.cardNo} • ${Math.round(
+          (ai.confidence || 0) * 100
+        )}%`
       );
     } catch (error: any) {
       console.error(error);
@@ -182,28 +232,75 @@ export default function ScanPage() {
         className="absolute inset-0 h-full w-full object-cover"
       />
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/75" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/80" />
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className="h-[54vh] w-[74vw] max-w-sm rounded-[2.4rem] border-4 border-yellow-300/90 shadow-[0_0_60px_rgba(234,179,8,0.35)]" />
       </div>
 
-      <div className="absolute left-1/2 top-4 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-2xl bg-black/35 px-4 py-3 text-center text-sm backdrop-blur-md">
+      <div className="absolute left-1/2 top-4 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-2xl border border-white/10 bg-black/45 px-4 py-3 text-center text-sm font-medium backdrop-blur-md">
         {status}
       </div>
 
       {card && (
-        <div className="absolute bottom-28 left-1/2 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-[2rem] border border-yellow-400/30 bg-black/75 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-          <div className="text-xs tracking-[0.2em] text-yellow-300">
-            CARD #{card.cardNo}
+        <div className="absolute bottom-28 left-1/2 z-20 w-[92vw] max-w-md -translate-x-1/2 rounded-[1.6rem] border border-yellow-400/25 bg-black/78 p-4 shadow-[0_20px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-bold tracking-[0.22em] text-yellow-300">
+                CARD #{card.cardNo}
+              </div>
+              <div className="mt-1 text-xl font-black leading-tight">
+                {card.cardName}
+              </div>
+              <div className="mt-1 text-sm text-zinc-300">
+                ✨ {card.rarity || "-"}
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-yellow-500/12 px-3 py-2 text-right">
+              <div className="text-[10px] tracking-[0.16em] text-yellow-200/80">
+                SCAN
+              </div>
+              <div className="text-lg font-black text-yellow-300">
+                SUCCESS
+              </div>
+            </div>
           </div>
-          <div className="mt-1 text-2xl font-black leading-tight">
-            {card.cardName}
-          </div>
-          <div className="mt-2 text-sm text-zinc-300">✨ {card.rarity}</div>
-          {card.reward && (
-            <div className="mt-4 rounded-2xl bg-yellow-500/10 p-3 text-sm text-yellow-50">
-              🎁 {card.reward}
+
+          {(card.collection || card.collectionReward || card.reward) && (
+            <div className="mt-4 space-y-3">
+              {card.collection && (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-[11px] font-bold tracking-[0.18em] text-zinc-400">
+                    ชุดสะสม
+                  </div>
+                  <div className="mt-1 text-base font-bold text-white">
+                    {card.collection}
+                  </div>
+                </div>
+              )}
+
+              {card.collectionReward && (
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-3">
+                  <div className="text-[11px] font-bold tracking-[0.18em] text-emerald-200/80">
+                    รางวัลของชุดนี้
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-emerald-50">
+                    🎁 {card.collectionReward}
+                  </div>
+                </div>
+              )}
+
+              {card.reward && (
+                <div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 p-3">
+                  <div className="text-[11px] font-bold tracking-[0.18em] text-yellow-200/80">
+                    รางวัลที่เกี่ยวข้อง
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-yellow-50">
+                    🏆 {card.reward}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
