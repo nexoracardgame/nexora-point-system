@@ -22,12 +22,14 @@ export default function ScanPage() {
 
   useEffect(() => {
     const warm = setInterval(() => {
+  if (isProcessing) return;
+
   fetch("/api/scan-ai", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image: "warmup" }),
   }).catch(() => {});
-}, 45000);
+}, 60000);
 
     startCamera();
 
@@ -70,8 +72,6 @@ export default function ScanPage() {
     };
   });
 }
-
-setCameraReady(true);
 
       setCameraReady(true);
       setStatus("📸 พร้อมแล้ว แตะปุ่มครั้งเดียวให้ AI วิเคราะห์");
@@ -129,6 +129,8 @@ setCameraReady(true);
   };
 
   const captureAndScan = async () => {
+  if (isProcessing) return;
+
   try {
     if (!videoRef.current) {
       setStatus("❌ ไม่พบกล้อง");
@@ -175,7 +177,8 @@ setCameraReady(true);
     setStatus("🧠 AI กำลังวิเคราะห์...");
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 18000);
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    timeout = setTimeout(() => controller.abort(), 20000);
 
     const res = await fetch("/api/scan-ai", {
       method: "POST",
@@ -186,8 +189,7 @@ setCameraReady(true);
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
-
+  
     const ai = await res.json();
     console.log("AI RESULT =", ai);
 
@@ -206,7 +208,8 @@ setCameraReady(true);
     console.error(e);
     setStatus(`❌ ${e?.message || "สแกนไม่สำเร็จ"}`);
   } finally {
-    setIsProcessing(false);
+  if (timeout) clearTimeout(timeout);
+  setIsProcessing(false);
   }
 };
 
