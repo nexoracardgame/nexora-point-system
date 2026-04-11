@@ -18,6 +18,10 @@ type MarketItem = {
   rarity: string;
   image: string;
   createdAt?: string;
+
+  sellerId?: string;
+  sellerName?: string;
+  sellerImage?: string;
 };
 
 function rarityClasses(rarity: string) {
@@ -106,18 +110,27 @@ export default function MarketDashboardTFT() {
           const cardNo = item.card_no || item.cardNo || item.id;
 
           return {
-            id: item.id,
-            cardNo: String(cardNo),
-            name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-            price: `฿${Number(item.price || 0).toLocaleString()}`,
-            likes: item.likes || 0,
-            rarity: item.rarity || "Legendary",
-            image:
-              item.image_url ||
-              item.imageUrl ||
-              `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
-            createdAt: item.createdAt,
-          };
+  id: item.id,
+  cardNo: String(cardNo),
+  name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
+  price: `฿${Number(item.price || 0).toLocaleString()}`,
+  likes: item.likes || 0,
+  rarity: item.rarity || "Legendary",
+  image:
+    item.image_url ||
+    item.imageUrl ||
+    `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
+  createdAt: item.createdAt,
+
+  sellerId: item.sellerId || item.seller?.id,
+  sellerName:
+    item.seller?.displayName ||
+    item.seller?.name ||
+    "Unknown Seller",
+  sellerImage:
+    item.seller?.image ||
+    "/default-avatar.png",
+};
         });
 
         setItems(mapped);
@@ -582,6 +595,7 @@ export default function MarketDashboardTFT() {
                   </div>
 
                   <div className="mt-1 text-xs font-semibold text-amber-300 lg:mt-2 lg:text-sm">
+                    
                     {card.price}
                   </div>
 
