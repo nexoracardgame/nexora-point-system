@@ -1,29 +1,43 @@
 "use client";
 
+import { XCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+
 export default function CancelDealButton({
   dealId,
 }: {
   dealId: string;
 }) {
+  const router = useRouter();
+
+  const handleCancel = async () => {
+    const ok = confirm("ยกเลิกคำขอดีลนี้?");
+    if (!ok) return;
+
+    const res = await fetch("/api/market/deal-cancel", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ dealId }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      router.refresh();
+    } else {
+      alert(data.error || "ยกเลิกไม่สำเร็จ");
+    }
+  };
+
   return (
     <button
-      onClick={async () => {
-        const ok = confirm("ยกเลิกดีลนี้?");
-        if (!ok) return;
-
-        const res = await fetch(`/api/market/deal-request/${dealId}`, {
-          method: "DELETE",
-        });
-
-        if (res.ok) {
-          window.location.reload();
-        } else {
-          alert("ยกเลิกไม่สำเร็จ");
-        }
-      }}
-      className="w-full rounded-2xl bg-red-500 px-6 py-3 font-bold text-white"
+      onClick={handleCancel}
+      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 px-5 py-3 font-bold text-white shadow-lg shadow-red-500/20 transition hover:scale-[1.02]"
     >
-      Cancel Deal
+      <XCircle className="h-4 w-4" />
+      Cancel My Request
     </button>
   );
 }

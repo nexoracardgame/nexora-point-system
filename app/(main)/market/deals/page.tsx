@@ -13,6 +13,7 @@ import {
   Clock3,
   BadgeCheck,
   XCircle,
+  Shield,
 } from "lucide-react";
 
 function getStatusUI(status: string) {
@@ -45,12 +46,16 @@ export default async function DealsPage() {
   const currentUserId = String((session?.user as any)?.id || "");
 
   const deals = await prisma.dealRequest.findMany({
-  where: {
-    status: "pending",
-  },
-  orderBy: {
-    createdAt: "desc",
-  },
+    where: {
+      status: "pending",
+      OR: [
+        { sellerId: currentUserId },
+        { buyerId: currentUserId },
+      ],
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
   });
 
   const buyerIds = [...new Set(deals.map((deal) => deal.buyerId))];
@@ -101,15 +106,14 @@ export default async function DealsPage() {
     listings.map((listing) => [listing.id, listing])
   );
 
-  const pendingCount = deals.filter((d) => d.status === "pending").length;
-  const acceptedCount = deals.filter((d) => d.status === "accepted").length;
+  const pendingCount = deals.length;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#22114a_0%,#090b12_40%,#05070d_100%)] text-white">
       <div className="relative mx-auto max-w-7xl space-y-5 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6">
         {/* HERO */}
         <section className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-[40px] sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-violet-300 sm:text-xs">
                 NEXORA DEAL CENTER
@@ -117,28 +121,14 @@ export default async function DealsPage() {
               <h1 className="mt-2 text-2xl font-black sm:text-5xl">
                 🤝 คำขอดีล
               </h1>
-              <p className="mt-2 text-xs text-zinc-400 sm:text-base">
-                จัดการคำขอซื้อขายการ์ดทั้งหมดแบบเรียลไทม์
-              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-3xl border border-amber-300/15 bg-amber-300/10 p-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  Pending
-                </div>
-                <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
-                  {pendingCount}
-                </div>
+            <div className="rounded-3xl border border-amber-300/15 bg-amber-300/10 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                Active
               </div>
-
-              <div className="rounded-3xl border border-emerald-300/15 bg-emerald-300/10 p-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  Accepted
-                </div>
-                <div className="mt-2 text-2xl font-black text-emerald-300 sm:text-3xl">
-                  {acceptedCount}
-                </div>
+              <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
+                {pendingCount}
               </div>
             </div>
           </div>
@@ -160,8 +150,6 @@ export default async function DealsPage() {
               const englishName =
                 listing?.cardName || "Unknown Card";
 
-              const thaiName = "";
-              
               return (
                 <div
                   key={deal.id}
@@ -170,13 +158,25 @@ export default async function DealsPage() {
                   {/* HEADER */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300 sm:h-12 sm:w-12">
-                        <Handshake className="h-5 w-5" />
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+                          isSeller
+                            ? "bg-violet-500/10 text-violet-300"
+                            : "bg-red-500/10 text-red-300"
+                        }`}
+                      >
+                        {isSeller ? (
+                          <Shield className="h-5 w-5" />
+                        ) : (
+                          <Handshake className="h-5 w-5" />
+                        )}
                       </div>
 
                       <div>
                         <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">
-                          Deal Request
+                          {isSeller
+                            ? "OWNER ACTION"
+                            : "YOUR REQUEST"}
                         </div>
                         <div className="text-sm font-bold text-white/85">
                           #{String(index + 1).padStart(3, "0")}
@@ -192,87 +192,99 @@ export default async function DealsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-4">
-                    {/* PRICE */}
-                    <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                      <div className="flex items-center gap-2 text-xs text-zinc-400">
-                        <Wallet className="h-4 w-4" />
-                        Offer Price
+                  {/* PRICE */}
+                  <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-4">
+                    <div className="flex items-center gap-2 text-xs text-zinc-400">
+                      <Wallet className="h-4 w-4" />
+                      Offer Price
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
+                      ฿{Number(deal.offeredPrice).toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* CARD + BUYER */}
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl bg-white/[0.03] p-4">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+                        Card
                       </div>
-                      <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
-                        ฿{Number(deal.offeredPrice).toLocaleString()}
+
+                      <div className="mt-3 flex items-center gap-4">
+                        <img
+                          src={
+                            listing?.imageUrl ||
+                            `/cards/${String(
+                              listing?.cardNo || "001"
+                            ).padStart(3, "0")}.jpg`
+                          }
+                          alt={englishName}
+                          className="aspect-[2/3] w-20 rounded-2xl border border-white/10 object-cover shadow-xl sm:w-24"
+                        />
+
+                        <div className="min-w-0">
+                          <div className="truncate text-base font-black text-white/90 sm:text-lg">
+                            {englishName}
+                          </div>
+
+                          <div className="mt-2 text-sm text-amber-300">
+                            #{String(
+                              listing?.cardNo || "001"
+                            ).padStart(3, "0")}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      {/* BIG CARD */}
-                      <div className="rounded-2xl bg-white/[0.03] p-4">
-                        <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-                          Card
-                        </div>
-
-                        <div className="mt-3 flex items-center gap-4">
-                          <img
-                            src={
-                              listing?.imageUrl ||
-                              `/cards/${String(
-                                listing?.cardNo || "001"
-                              ).padStart(3, "0")}.jpg`
-                            }
-                            alt={englishName}
-                            className="aspect-[2/3] w-20 rounded-2xl border border-white/10 object-cover shadow-xl sm:w-24"
-                          />
-
-                          <div className="min-w-0">
-                            <div className="truncate text-base font-black text-white/90 sm:text-lg">
-                              {englishName}
-                            </div>
-
-                            <div className="mt-1 truncate text-xs text-zinc-400 sm:text-sm">
-                              {thaiName}
-                            </div>
-
-                            <div className="mt-2 text-sm text-amber-300">
-                              #{String(
-                                listing?.cardNo || "001"
-                              ).padStart(3, "0")}
-                            </div>
-                          </div>
-                        </div>
+                    <div className="rounded-2xl bg-white/[0.03] p-4">
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+                        <User className="h-3.5 w-3.5" />
+                        Deal Member
                       </div>
 
-                      {/* BUYER */}
-                      <div className="rounded-2xl bg-white/[0.03] p-4">
-                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-                          <User className="h-3.5 w-3.5" />
-                          Deal Member
+                      <Link
+                        href={`/profile/${buyer?.id}`}
+                        className="mt-3 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]"
+                      >
+                        <img
+                          src={buyer?.image || "/avatar.png"}
+                          alt={buyer?.name}
+                          className="h-12 w-12 rounded-full border border-white/10 object-cover"
+                        />
+
+                        <div className="truncate text-sm font-bold text-white/85">
+                          {buyer?.name || "Unknown Buyer"}
                         </div>
-
-                        <Link
-                          href={`/profile/${buyer?.id}`}
-                          className="mt-3 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]"
-                        >
-                          <img
-                            src={buyer?.image || "/avatar.png"}
-                            alt={buyer?.name}
-                            className="h-12 w-12 rounded-full border border-white/10 object-cover"
-                          />
-
-                          <div className="truncate text-sm font-bold text-white/85">
-                            {buyer?.name || "Unknown Buyer"}
-                          </div>
-                        </Link>
-                      </div>
+                      </Link>
                     </div>
                   </div>
 
                   {/* ACTION */}
-                  {deal.status === "pending" && (
-                    <div className="mt-4 rounded-2xl border border-violet-400/15 bg-violet-500/5 p-3">
-                      {isSeller && <DealActionButtons dealId={deal.id} />}
-                      {isBuyer && <CancelDealButton dealId={deal.id} />}
-                    </div>
-                  )}
+                  <div
+                    className={`mt-4 rounded-2xl border p-3 ${
+                      isSeller
+                        ? "border-violet-400/15 bg-violet-500/5"
+                        : "border-red-400/15 bg-red-500/5"
+                    }`}
+                  >
+                    {isSeller && (
+                      <>
+                        <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-violet-300">
+                          OWNER ACTION REQUIRED
+                        </div>
+                        <DealActionButtons dealId={deal.id} />
+                      </>
+                    )}
+
+                    {isBuyer && (
+                      <>
+                        <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-red-300">
+                          YOUR ACTIVE REQUEST
+                        </div>
+                        <CancelDealButton dealId={deal.id} />
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })
