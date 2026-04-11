@@ -179,7 +179,7 @@ export default function ScanPage() {
     setStatus("🧠 AI กำลังวิเคราะห์...");
 
     const controller = new AbortController();
-    timeout = setTimeout(() => controller.abort(), 30000);
+    timeout = setTimeout(() => controller.abort(), 15000);
 
     const res = await fetch("/api/scan-ai", {
       method: "POST",
@@ -188,15 +188,19 @@ export default function ScanPage() {
       },
       body: JSON.stringify({ image: imageData }),
       signal: controller.signal,
-    });
+      cache: "no-store",
+   });
 
-    const ai = await res.json();
-    console.log("AI RESULT =", ai);
+   const raw = await res.text();
 
-    if (!res.ok || !ai?.cardNo) {
-      setStatus("❌ AI อ่านไม่เจอ");
-      return;
-    }
+   let ai: any = null;
+
+   try {
+     ai = JSON.parse(raw);
+   } catch {
+     setStatus("❌ AI ตอบผิดรูปแบบ ลองใหม่");
+     return;
+   }
 
     setStatus(`✅ พบการ์ด ${ai.cardNo} กำลังโหลดข้อมูล...`);
 
