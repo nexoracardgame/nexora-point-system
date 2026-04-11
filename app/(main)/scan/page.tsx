@@ -147,7 +147,7 @@ setCameraReady(true);
         throw new Error("canvas error");
       }
 
-      const cropWidth = video.videoWidth * 0.50;
+      const cropWidth = video.videoWidth * 0.47;
       const cropHeight = cropWidth * 1.25;
 
       const sx = Math.max(0, (video.videoWidth - cropWidth) / 2);
