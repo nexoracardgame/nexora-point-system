@@ -12,9 +12,14 @@ export default function LoginPage() {
   useEffect(() => {
     async function autoLogin() {
       try {
-        await liff.init({
-          liffId: process.env.NEXT_PUBLIC_LIFF_ID!,
-        });
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+
+        if (!liffId) {
+          console.error("LIFF ID missing");
+         return;
+        }
+
+        await liff.init({ liffId });
 
         // ถ้าเปิดใน LINE app และ login LINE อยู่แล้ว
         if (liff.isInClient()) {
