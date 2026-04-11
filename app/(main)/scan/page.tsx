@@ -153,7 +153,7 @@ export default function ScanPage() {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    const cropWidth = video.videoWidth * 0.40;
+    const cropWidth = video.videoWidth * 0.44;
     const cropHeight = cropWidth * 1.25;
 
     const sx = (video.videoWidth - cropWidth) / 2;
