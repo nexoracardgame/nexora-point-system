@@ -174,7 +174,7 @@ setCameraReady(true);
       const image = canvas.toDataURL("image/jpeg", 0.95);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12000);
+      const timeout = setTimeout(() => controller.abort(), 18000);
 
       const aiRes = await fetch("/api/scan-ai", {
         method: "POST",
