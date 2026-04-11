@@ -12,7 +12,7 @@ export default function RequestDealButton({
   const [loading, setLoading] = useState(false);
 
   const handleRequest = async () => {
-    const offeredPrice = prompt("เสนอราคาดีล (NEX)");
+    const offeredPrice = prompt("เสนอราคาดีล ([บาท])");
     if (!offeredPrice) return;
 
     const price = Number(offeredPrice);
