@@ -47,61 +47,61 @@ export default function CreateListingConsole() {
   };
 
   const createListing = async () => {
-  if (!card) {
-    alert("ค้นหาการ์ดก่อน");
-    return;
-  }
-
-  if (!serialNo.trim()) {
-    alert("กรอกซีเรียลหลังการ์ด");
-    return;
-  }
-
-  const numericPrice = Number(price);
-
-  if (isNaN(numericPrice) || numericPrice <= 0) {
-    alert("กรอกราคาขายให้ถูกต้อง");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const res = await fetch("/api/market/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        cardNo: card.cardNo,
-        serialNo,
-        price: numericPrice,
-        cardName: card.cardName,
-        imageUrl: card.imageUrl,
-        rarity: card.rarity,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      alert("🚀 วางขายสำเร็จ");
-      window.location.href = "/market";
-    } else {
-      alert(data.error || "วางขายไม่สำเร็จ");
+    if (!card) {
+      alert("ค้นหาการ์ดก่อน");
+      return;
     }
-  } catch (error) {
-    console.error("CREATE LISTING ERROR:", error);
-    alert("เกิดข้อผิดพลาด");
-  } finally {
-    setLoading(false);
-  }
-};
+
+    if (!serialNo.trim()) {
+      alert("กรอกซีเรียลหลังการ์ด");
+      return;
+    }
+
+    const numericPrice = Number(price);
+
+    if (isNaN(numericPrice) || numericPrice <= 0) {
+      alert("กรอกราคาขายให้ถูกต้อง");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await fetch("/api/market/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cardNo: card.cardNo,
+          serialNo,
+          price: numericPrice,
+          cardName: card.cardName,
+          imageUrl: card.imageUrl,
+          rarity: card.rarity,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("🚀 วางขายสำเร็จ");
+        window.location.href = "/market";
+      } else {
+        alert(data.error || "วางขายไม่สำเร็จ");
+      }
+    } catch (error) {
+      console.error("CREATE LISTING ERROR:", error);
+      alert("เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1a102d_0%,#090b12_45%,#05070d_100%)] text-white">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10">
-        <section className="rounded-[28px] border border-amber-400/10 bg-white/[0.03] p-5 shadow-[0_20px_120px_rgba(0,0,0,0.45)] backdrop-blur-2xl md:rounded-[36px] md:p-8">
+        <section className="rounded-[28px] border border-amber-400/10 bg-white/[0.03] p-5 text-center shadow-[0_20px_120px_rgba(0,0,0,0.45)] backdrop-blur-2xl md:rounded-[36px] md:p-8 md:text-left">
           <p className="text-[10px] uppercase tracking-[0.35em] text-amber-300">
             NEXORA MARKET / CREATE LISTING
           </p>
@@ -117,16 +117,16 @@ export default function CreateListingConsole() {
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           {/* LEFT PREVIEW */}
-          <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5 backdrop-blur-2xl">
+          <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5 text-center backdrop-blur-2xl">
             {card ? (
               <>
                 <img
                   src={card.imageUrl}
                   alt={card.cardName}
-                  className="mx-auto aspect-[3/4] w-full max-w-sm rounded-3xl object-cover shadow-[0_0_40px_rgba(251,191,36,0.18)]"
+                  className="mx-auto aspect-[3/4] w-full max-w-[280px] sm:max-w-sm rounded-3xl object-cover shadow-[0_0_40px_rgba(251,191,36,0.18)]"
                 />
 
-                <div className="mt-5 space-y-2">
+                <div className="mt-5 space-y-2 text-center">
                   <div className="text-2xl font-black">
                     {card.cardName}
                   </div>
@@ -136,7 +136,7 @@ export default function CreateListingConsole() {
                 </div>
               </>
             ) : (
-              <div className="flex min-h-[420px] items-center justify-center rounded-3xl border border-dashed border-white/10 text-zinc-500">
+              <div className="flex min-h-[320px] sm:min-h-[420px] items-center justify-center rounded-3xl border border-dashed border-white/10 px-4 text-center text-zinc-500">
                 ค้นหาการ์ดเพื่อแสดงตัวอย่าง
               </div>
             )}
@@ -145,10 +145,10 @@ export default function CreateListingConsole() {
           {/* RIGHT FORM */}
           <div className="space-y-5 rounded-[28px] border border-white/8 bg-white/[0.03] p-5 backdrop-blur-2xl">
             <div>
-              <label className="mb-2 block text-sm font-bold text-white/80">
+              <label className="mb-2 block text-center text-sm font-bold text-white/80 md:text-left">
                 เลขการ์ด
               </label>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <input
                   value={cardNo}
                   onChange={(e) => setCardNo(e.target.value)}
@@ -158,12 +158,12 @@ export default function CreateListingConsole() {
                     }
                   }}
                   placeholder="เช่น 6, 06, 006"
-                  className="flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 outline-none"
+                  className="flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center sm:text-left outline-none"
                 />
                 <button
                   onClick={fetchCard}
                   disabled={loading}
-                  className="rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 px-6 font-bold text-black"
+                  className="rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 px-6 py-4 font-bold text-black"
                 >
                   {loading ? "..." : "ค้นหาการ์ด"}
                 </button>
@@ -171,19 +171,19 @@ export default function CreateListingConsole() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-bold text-white/80">
+              <label className="mb-2 block text-center text-sm font-bold text-white/80 md:text-left">
                 ซีเรียลหลังการ์ด (บังคับ)
               </label>
               <input
                 value={serialNo}
                 onChange={(e) => setSerialNo(e.target.value)}
                 placeholder="เช่น 369789"
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center sm:text-left outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-bold text-white/80">
+              <label className="mb-2 block text-center text-sm font-bold text-white/80 md:text-left">
                 ราคาวางขาย (THB)
               </label>
               <input
@@ -193,10 +193,10 @@ export default function CreateListingConsole() {
                   if (e.key === "Enter") {
                     createListing();
                   }
-                 }}
-                 placeholder="เช่น 1500"
-                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 outline-none"
-               />
+                }}
+                placeholder="เช่น 1500"
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center sm:text-left outline-none"
+              />
             </div>
 
             <button
