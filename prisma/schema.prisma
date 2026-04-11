@@ -28,6 +28,9 @@ model User {
   marketListings MarketListing[] @relation("UserListings")
   sellerReviews  SellerReview[]  @relation("SellerReviews")
   buyerReviews   SellerReview[]  @relation("BuyerReviews")
+  
+  dealRequestsSent     DealRequest[] @relation("DealBuyer")
+  dealRequestsReceived DealRequest[] @relation("DealSeller")
 }
 
 model MarketPost {
@@ -134,6 +137,9 @@ model DealRequest {
   offeredPrice Float
   status       String   @default("pending")
   createdAt    DateTime @default(now())
+
+  buyer  User @relation("DealBuyer", fields: [buyerId], references: [id])
+  seller User @relation("DealSeller", fields: [sellerId], references: [id])
 }
 
 model SellerReview {

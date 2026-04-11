@@ -239,7 +239,10 @@ export default async function MarketCardDetailPage({
           </div>
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row md:mt-6">
-            <RequestDealButton cardId={listing.id} />
+            <RequestDealButton
+              cardId={listing.id}
+              sellerId={listing.sellerId}
+/>
 
             <WishlistButton
               listingId={listing.id}
