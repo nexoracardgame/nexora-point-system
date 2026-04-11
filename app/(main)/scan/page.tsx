@@ -128,8 +128,13 @@ setCameraReady(true);
   };
 
   const captureAndScan = async () => {
+  try {
+    if (!videoRef.current) {
+      setStatus("❌ ไม่พบกล้อง");
+      return;
+    }
+
     const video = videoRef.current;
-    if (!video || !cameraReady || isProcessing) return;
 
     if (!video.videoWidth || !video.videoHeight) {
       setStatus("❌ กล้องยังไม่พร้อม");
@@ -138,67 +143,71 @@ setCameraReady(true);
 
     setIsProcessing(true);
     setCard(null);
+    setStatus("📸 กำลังจับภาพ...");
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const cropWidth = video.videoWidth * 0.44;
+    const cropHeight = cropWidth * 1.25;
+
+    const sx = (video.videoWidth - cropWidth) / 2;
+    const sy = (video.videoHeight - cropHeight) / 2;
+
+    canvas.width = 960;
+    canvas.height = 1200;
+
+    ctx?.drawImage(
+      video,
+      sx,
+      sy,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const imageData = canvas.toDataURL("image/jpeg", 0.95);
+
     setStatus("🧠 AI กำลังวิเคราะห์...");
 
-    try {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        throw new Error("canvas error");
-      }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 18000);
 
-      const cropWidth = video.videoWidth * 0.44;
-      const cropHeight = cropWidth * 1.25;
+    const res = await fetch("/api/scan-ai", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ image: imageData }),
+      signal: controller.signal,
+    });
 
-      const sx = Math.max(0, (video.videoWidth - cropWidth) / 2);
-      const sy = Math.max(0, (video.videoHeight - cropHeight) / 2);
+    clearTimeout(timeout);
 
-      canvas.width = 960;
-      canvas.height = 1200;
+    const ai = await res.json();
+    console.log("AI RESULT =", ai);
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-
-      ctx.drawImage(
-        video,
-        sx,
-        sy,
-        cropWidth,
-        cropHeight,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      const image = canvas.toDataURL("image/jpeg", 0.95);
-
-              throw new Error(raw || "AI server failed");
-
-
-      setStatus(`🔎 พบเลขการ์ด ${cardNo} กำลังดึงข้อมูลจากชีท...`);
-
-      const sheetCard = await getCardFromSheet(cardNo);
-
-      setCard(sheetCard);
-
-      setStatus(
-        `🃏 พบการ์ด ${sheetCard.cardNo} • ${Math.round(
-          (ai.confidence || 0) * 100
-        )}%`
-      );
-    } catch (error: any) {
-      console.error(error);
-
-      if (error?.name === "AbortError") {
-        setStatus("❌ AI ตอบช้าเกินไป ลองแชะใหม่อีกครั้ง");
-      } else {
-        setStatus("❌ AI วิเคราะห์ไม่สำเร็จ");
-      }
-    } finally {
-      setIsProcessing(false);
+    if (!res.ok || !ai?.cardNo) {
+      setStatus("❌ AI อ่านไม่เจอ");
+      return;
     }
-  };
+
+    setStatus(`✅ พบการ์ด ${ai.cardNo} กำลังโหลดข้อมูล...`);
+
+    const sheetCard = await getCardFromSheet(ai.cardNo);
+
+    setCard(sheetCard);
+    setStatus(`🎉 พบ ${sheetCard.cardName}`);
+  } catch (e: any) {
+    console.error(e);
+    setStatus(`❌ ${e?.message || "สแกนไม่สำเร็จ"}`);
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   return (
     <div className="relative h-screen overflow-hidden bg-black text-white">
