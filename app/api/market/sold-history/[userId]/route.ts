@@ -1,33 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
-  req: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  context: { params: Promise<{ userId: string }> }
 ) {
+  const { userId } = await context.params; // 🔥 ต้อง await
+
   try {
-    const userId = params.userId;
-
-    if (!userId) {
-      return NextResponse.json([]);
-    }
-
     const history = await prisma.marketHistory.findMany({
       where: {
-        action: "sold",
-        sellerId: userId,
+        OR: [
+          { sellerId: userId },
+          { buyerId: userId },
+        ],
       },
       orderBy: {
         createdAt: "desc",
       },
-      take: 20,
     });
 
     return NextResponse.json(history);
   } catch (error) {
     console.error("SOLD HISTORY ERROR:", error);
-    return NextResponse.json([]);
+
+    return NextResponse.json(
+      { error: "โหลดข้อมูลไม่สำเร็จ" },
+      { status: 500 }
+    );
   }
 }
