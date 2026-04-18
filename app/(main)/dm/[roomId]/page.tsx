@@ -26,11 +26,21 @@ function formatTime(dateString?: string) {
 }
 
 export default function DMPage() {
-  const params = useParams();
-  const roomId = params?.roomId as string;
 
-  if (!roomId) return null;
+  // ✅ ย้าย hook เข้ามาใน component (ตัวแก้ crash)
+  const params = useParams();
+  const roomId = params?.roomId as string | undefined;
   const router = useRouter();
+
+  // ✅ กันมือถือ crash
+  if (!roomId) {
+    return (
+      <div className="h-[100dvh] flex items-center justify-center text-white">
+        กำลังโหลดห้องแชท...
+      </div>
+    );
+  }
+
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [me, setMe] = useState<any>(null);
@@ -175,13 +185,14 @@ export default function DMPage() {
   };
 
   const openOtherProfile = () => {
-  if (!other?.id) return;
-  router.push(`/profile/${other.id}`);
-};
+    if (!other?.id) return;
+    router.push(`/profile/${other.id}`);
+  };
 
   return (
     <div className="h-[100dvh] bg-gradient-to-b from-black via-[#0b0b0b] to-black text-white flex justify-center">
       <div className="w-full max-w-[920px] h-full flex flex-col">
+
         {/* HEADER */}
         <div className="sticky top-0 z-10 border-b border-white/10 bg-black/50 backdrop-blur-xl">
           <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
@@ -306,6 +317,7 @@ export default function DMPage() {
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
