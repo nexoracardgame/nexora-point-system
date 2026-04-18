@@ -27,12 +27,10 @@ function formatTime(dateString?: string) {
 
 export default function DMPage() {
 
-  // ✅ ย้าย hook เข้ามาใน component (ตัวแก้ crash)
   const params = useParams();
   const roomId = params?.roomId as string | undefined;
   const router = useRouter();
 
-  // ✅ กันมือถือ crash
   if (!roomId) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center text-white pb-[env(safe-area-inset-bottom)]">
@@ -61,21 +59,19 @@ export default function DMPage() {
   };
 
   useEffect(() => {
-  if (!roomId) return;
+    if (!roomId) return;
 
-  let mounted = true; // ✅ เพิ่ม
+    loadSession();
+    loadRoom();
+    loadMessages();
 
-  loadSession();
-  loadRoom();
-  loadMessages();
+    const channel = supabase.channel(`dm-${roomId}`, {
+      config: {
+        broadcast: { self: false },
+      },
+    });
 
-  const channel = supabase.channel(`dm-${roomId}`, {
-    config: {
-      broadcast: { self: false },
-    },
-  });
-
-  channelRef.current = channel;
+    channelRef.current = channel;
 
     channel.on(
       "postgres_changes",
@@ -113,17 +109,15 @@ export default function DMPage() {
     channel.subscribe();
 
     return () => {
-  mounted = false; // ✅ เพิ่ม
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+      }
 
-  if (typingTimeout.current) {
-    clearTimeout(typingTimeout.current);
-  }
-
-  if (channelRef.current) {
-    supabase.removeChannel(channelRef.current);
-    channelRef.current = null;
-  }
-};
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [roomId, me?.id]);
 
   useEffect(() => {
@@ -137,7 +131,10 @@ export default function DMPage() {
   };
 
   const loadRoom = async () => {
-    const res = await fetch(`/api/dm/room-info?roomId=${roomId}`);
+    const res = await fetch(`/api/dm/room-info?roomId=${roomId}`, {
+      cache: "no-store",
+    });
+
     const data = await res.json();
     setOther(data.otherUser);
   };
@@ -196,7 +193,7 @@ export default function DMPage() {
   };
 
   return (
-    <div className="h-[100dvh] bg-gradient-to-b from-black via-[#0b0b0b] to-black text-white flex justify-center">
+    <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
       <div className="w-full max-w-[920px] h-full flex flex-col">
 
         {/* HEADER */}
@@ -224,7 +221,7 @@ export default function DMPage() {
 
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-bold sm:text-base">
-                  {other?.name || "Loading..."}
+                  {other?.name}
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-white/45">
@@ -327,6 +324,7 @@ export default function DMPage() {
     </div>
   </div>
 </div>
+
       </div>
     </div>
   );
