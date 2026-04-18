@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import DealActionButtons from "./DealActionButtons";
 import CancelDealButton from "./CancelDealButton";
 import VerifySaleButton from "./VerifySaleButton";
@@ -15,28 +16,6 @@ import {
   Shield,
 } from "lucide-react";
 
-const handleChat = async (targetUserId: string) => {
-  try {
-    const res = await fetch("/api/dm/create-room", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ user2: targetUserId }),
-    });
-
-    const data = await res.json();
-
-    if (data?.roomId) {
-      window.location.href = `/dm/${data.roomId}`;
-    } else {
-      alert("เปิดแชทไม่สำเร็จ");
-    }
-  } catch (err) {
-    console.error("CHAT ERROR:", err);
-    alert("เกิดข้อผิดพลาด");
-  }
-};
 type DealMember = {
   id: string;
   name: string;
@@ -45,7 +24,7 @@ type DealMember = {
 
 type DealCard = {
   id: string;
-  status: "pending" | "accepted";
+  status: "pending" | "accepted" | "rejected";
   offeredPrice: number;
   isSeller: boolean;
   buyer: DealMember;
@@ -57,13 +36,17 @@ type DealCard = {
   listingStatus: string;
 };
 
+function safeImage(src?: string | null, fallback = "/avatar.png") {
+  const raw = String(src || "").trim();
+  return raw || fallback;
+}
+
 function getStatusUI(status: string) {
   switch (status) {
     case "accepted":
       return {
         label: "READY TO CLOSE",
-        className:
-          "border-cyan-300/20 bg-cyan-400/10 text-cyan-300",
+        className: "border-cyan-300/20 bg-cyan-400/10 text-cyan-300",
         icon: BadgeCheck,
       };
     case "rejected":
@@ -75,48 +58,115 @@ function getStatusUI(status: string) {
     default:
       return {
         label: "PENDING",
-        className:
-          "border-amber-300/20 bg-amber-300/10 text-amber-300",
+        className: "border-amber-300/20 bg-amber-300/10 text-amber-300",
         icon: Clock3,
       };
   }
 }
 
 export default function DealsPage() {
+  const router = useRouter();
+
   const [deals, setDeals] = useState<DealCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creatingChatId, setCreatingChatId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchDeals = async (firstLoad = false) => {
-    try {
-      const res = await fetch("/api/market/deals", {
-        method: "GET",
-        cache: "no-store",
-      });
+  const fetchDeals = useCallback(
+    async (firstLoad = false) => {
+      try {
+        if (firstLoad) {
+          setLoading(true);
+        } else {
+          setRefreshing(true);
+        }
 
-      const data = await res.json();
+        const res = await fetch("/api/market/deals", {
+          method: "GET",
+          cache: "no-store",
+        });
 
-      if (Array.isArray(data)) {
-        setDeals(data);
-      } else {
-        setDeals([]);
+        if (!res.ok) {
+          throw new Error("โหลดดีลไม่สำเร็จ");
+        }
+
+        const data = await res.json();
+
+        if (Array.isArray(data)) {
+          setDeals(data);
+        } else {
+          setDeals([]);
+        }
+      } catch (error) {
+        console.error("FETCH DEALS ERROR:", error);
+        if (firstLoad) setDeals([]);
+      } finally {
+        if (firstLoad) setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error("FETCH DEALS ERROR:", error);
-      if (firstLoad) setDeals([]);
-    } finally {
-      if (firstLoad) setLoading(false);
-    }
-  };
+    },
+    []
+  );
 
   useEffect(() => {
     fetchDeals(true);
 
-    const interval = setInterval(() => {
-      fetchDeals(false);
-    }, 2000);
+    const onFocus = () => fetchDeals(false);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchDeals(false);
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, []);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
+    // รีเฟรชเบาๆ พอ ไม่ถี่ยิบจนเว็บอืด
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchDeals(false);
+      }
+    }, 15000);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+    };
+  }, [fetchDeals]);
+
+  const handleChat = async (targetUserId: string) => {
+    if (!targetUserId || creatingChatId) return;
+
+    try {
+      setCreatingChatId(targetUserId);
+
+      const res = await fetch("/api/dm/create-room", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ user2: targetUserId }),
+      });
+
+      if (!res.ok) {
+        throw new Error("CREATE ROOM FAILED");
+      }
+
+      const data = await res.json();
+
+      if (data?.roomId) {
+        router.push(`/dm/${data.roomId}`);
+      } else {
+        alert("เปิดแชทไม่สำเร็จ");
+      }
+    } catch (err) {
+      console.error("CHAT ERROR:", err);
+      alert("เกิดข้อผิดพลาด");
+    } finally {
+      setCreatingChatId(null);
+    }
+  };
 
   const pendingDeals = useMemo(
     () => deals.filter((d) => d.status === "pending"),
@@ -144,6 +194,7 @@ export default function DealsPage() {
     const statusUI = getStatusUI(deal.status);
     const StatusIcon = statusUI.icon;
     const member = deal.isSeller ? deal.buyer : deal.seller;
+    const isOpeningChat = creatingChatId === member.id;
 
     return (
       <div
@@ -202,9 +253,10 @@ export default function DealsPage() {
 
         <button
           onClick={() => handleChat(member.id)}
-          className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110"
+          disabled={isOpeningChat}
+          className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          💬 แชทนัดสถานที่
+          {isOpeningChat ? "⏳ กำลังเปิดแชท..." : "💬 แชทนัดสถานที่"}
         </button>
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -215,7 +267,7 @@ export default function DealsPage() {
 
             <div className="mt-3 flex items-center gap-4">
               <img
-                src={deal.cardImage}
+                src={safeImage(deal.cardImage, "/cards/001.jpg")}
                 alt={deal.cardName}
                 className="aspect-[2/3] w-20 rounded-2xl border border-white/10 object-cover shadow-xl sm:w-24"
                 onError={(e) => {
@@ -252,7 +304,7 @@ export default function DealsPage() {
               className="mt-3 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]"
             >
               <img
-                src={member.image || "/avatar.png"}
+                src={safeImage(member.image, "/avatar.png")}
                 alt={member.name}
                 className="h-12 w-12 rounded-full border border-white/10 object-cover"
                 onError={(e) => {
@@ -322,7 +374,7 @@ export default function DealsPage() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#22114a_0%,#090b12_40%,#05070d_100%)] text-white">
       <div className="relative mx-auto max-w-7xl space-y-5 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6">
         <section className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-[40px] sm:p-7">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-violet-300 sm:text-xs">
                 NEXORA DEAL CENTER
@@ -351,6 +403,10 @@ export default function DealsPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="mt-4 text-xs text-white/35">
+            {refreshing ? "กำลังอัปเดตข้อมูล..." : "ข้อมูลอัปเดตอัตโนมัติเมื่อกลับมาเปิดหน้า หรือทุก 15 วินาที"}
           </div>
         </section>
 
