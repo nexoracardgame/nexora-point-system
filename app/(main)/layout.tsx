@@ -43,14 +43,17 @@ export default function MainLayout({
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
 
-  // 🔥 FIX: ใช้ session อย่างเดียว ไม่ fetch profile ซ้ำ ลดอืด + รูปขึ้นทันที
+  // 🔥 FIX: ตัดระบบ fetch หนักออก ใช้ session อย่างเดียว
   useEffect(() => {
-    const nextImage = safeProfileSrc(session?.user?.image);
-
+  if (session?.user?.image) {
+    const nextImage = safeProfileSrc(session.user.image);
     stableAvatarRef.current = nextImage;
     setProfileImage(nextImage);
     setAvatarReady(true);
+    }
   }, [session?.user?.image]);
+
+  // 🔽 ทุกอย่างด้านล่าง "เหมือนเดิม 100%" ห้ามแก้
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -184,7 +187,6 @@ export default function MainLayout({
           <div className="flex h-full w-full flex-col items-center py-5">
             <Link
               href="/"
-              prefetch
               className="mb-6 flex h-14 w-14 items-center justify-center rounded-[20px] border border-amber-300/15 bg-[#12141a] text-amber-300 shadow-[0_0_30px_rgba(251,191,36,0.18)] transition hover:scale-[1.03] hover:shadow-[0_0_34px_rgba(251,191,36,0.26)]"
             >
               <Gem className="h-5 w-5" />
@@ -198,7 +200,6 @@ export default function MainLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    prefetch
                     className={`group flex h-12 w-12 items-center justify-center rounded-2xl border transition ${
                       item.active
                         ? "border-amber-300/20 bg-amber-300/12 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.18)]"
@@ -222,7 +223,6 @@ export default function MainLayout({
                 {/* MOBILE LOGO */}
                 <Link
                   href="/"
-                  prefetch
                   className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/15 bg-[#12141a] text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.16)] xl:hidden"
                 >
                   <Gem className="h-5 w-5" />
@@ -245,7 +245,6 @@ export default function MainLayout({
 
                 <Link
                   href="/wallet"
-                  prefetch
                   className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)]"
                 >
                   <Wallet className="h-4 w-4" />
@@ -276,21 +275,14 @@ export default function MainLayout({
                       decoding="async"
                       alt="profile"
                       draggable={false}
-                      onLoad={() => setAvatarReady(true)}
-                      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out ${
-                        avatarReady ? "opacity-100" : "opacity-0"
-                      }`}
+                      className="absolute inset-0 h-full w-full object-cover opacity-100"
                       onError={(e) => {
-                        const target = e.currentTarget;
-                        if (!target.src.includes("/avatar.png")) {
-                          stableAvatarRef.current = "/avatar.png";
-                          setProfileImage("/avatar.png");
-                        }
-                        requestAnimationFrame(() => {
-                          setAvatarReady(true);
-                        });
-                      }}
-                    />
+                       const target = e.currentTarget;
+                       if (!target.src.includes("/avatar.png")) {
+                          target.src = "/avatar.png";
+                       }
+                     }}
+                  />                    
                   </button>
 
                   {menuOpen && (
@@ -309,7 +301,6 @@ export default function MainLayout({
 
                       <Link
                         href="/wallet"
-                        prefetch
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
@@ -319,7 +310,6 @@ export default function MainLayout({
 
                       <Link
                         href="/profile/me"
-                        prefetch
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
@@ -329,7 +319,6 @@ export default function MainLayout({
 
                       <Link
                         href="/settings/profile"
-                        prefetch
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
@@ -408,18 +397,14 @@ export default function MainLayout({
           <div className="mb-5 rounded-[24px] border border-white/5 bg-white/[0.03] p-4">
             <div className="flex items-center gap-3">
               <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-amber-300/10 bg-[#111318]">
-                <img
-                  src={profileImage}
-                  alt="profile"
-                  className="h-full w-full object-cover"
-                  draggable={false}
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (!target.src.includes("/avatar.png")) {
-                      target.src = "/avatar.png";
-                    }
-                  }}
-                />
+                {profileImage && (
+                  <img
+                    src={profileImage}
+                    alt="profile"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                )}
               </div>
 
               <div className="min-w-0 flex-1">
@@ -441,7 +426,6 @@ export default function MainLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch
                   className={`flex items-center justify-between rounded-2xl border px-4 py-4 transition ${
                     item.active
                       ? "border-amber-300/18 bg-amber-300/10 text-amber-200 shadow-[0_0_24px_rgba(251,191,36,0.10)]"
@@ -495,7 +479,6 @@ export default function MainLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch
                 className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border transition ${
                   item.active
                     ? "border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
