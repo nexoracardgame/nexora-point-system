@@ -35,7 +35,7 @@ export default function DMPage() {
   // ✅ กันมือถือ crash
   if (!roomId) {
     return (
-      <div className="h-[100dvh] flex items-center justify-center text-white">
+      <div className="min-h-[100dvh] flex items-center justify-center text-white pb-[env(safe-area-inset-bottom)]">
         กำลังโหลดห้องแชท...
       </div>
     );
@@ -170,6 +170,8 @@ export default function DMPage() {
       content: msg,
     });
 
+    scrollBottom(true);
+
     if (error) {
       console.error("INSERT ERROR:", error);
     }
@@ -241,7 +243,7 @@ export default function DMPage() {
         {/* CHAT */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 space-y-4"
+          className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 space-y-4 pb-[140px] sm:pb-[160px] xl:pb-4"
         >
           {messages.map((m) => {
             const mine = m.senderId === me?.id;
@@ -295,7 +297,7 @@ export default function DMPage() {
         </div>
 
         {/* INPUT */}
-<div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] left-0 right-0 z-[1200] px-3 sm:px-4 xl:static xl:bottom-auto xl:px-0">
+<div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] left-0 right-0 z-[1200] px-3 sm:px-4 xl:static xl:bottom-auto xl:px-0 transition-all duration-300">
   <div className="mx-auto max-w-[920px]">
     <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/70 backdrop-blur-2xl px-3 py-2 shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
 
