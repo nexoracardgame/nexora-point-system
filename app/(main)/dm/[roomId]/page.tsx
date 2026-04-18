@@ -26,9 +26,11 @@ function formatTime(dateString?: string) {
 }
 
 export default function DMPage() {
-  const { roomId } = useParams();
-  const router = useRouter();
+  const params = useParams();
+  const roomId = params?.roomId as string;
 
+  if (!roomId) return null;
+  const router = useRouter();
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [me, setMe] = useState<any>(null);
@@ -49,6 +51,8 @@ export default function DMPage() {
   };
 
   useEffect(() => {
+    if (!roomId) return;
+
     loadSession();
     loadRoom();
     loadMessages();
@@ -171,9 +175,9 @@ export default function DMPage() {
   };
 
   const openOtherProfile = () => {
-    if (!other?.id) return;
-    router.push(`/profile/${other.id}`);
-  };
+  if (!other?.id) return;
+  router.push(`/profile/${other.id}`);
+};
 
   return (
     <div className="h-[100dvh] bg-gradient-to-b from-black via-[#0b0b0b] to-black text-white flex justify-center">
