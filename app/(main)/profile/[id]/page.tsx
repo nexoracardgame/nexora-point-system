@@ -138,6 +138,34 @@ export default async function SellerProfilePage({
                     {seller?.bio ||
                       "Genesis-tier NEXORA trader with elite collectible market presence."}
                   </p>
+                  {/* 🔥 SOCIAL LINKS */}
+{(seller?.lineUrl || seller?.facebookUrl) && (
+  <div className="mt-3 flex flex-wrap items-center gap-3">
+    
+    {seller?.lineUrl && (
+      <a
+        href={seller.lineUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 rounded-full border border-green-400/20 bg-green-500/10 px-4 py-2 text-sm font-bold text-green-300 transition hover:bg-green-500/20 hover:scale-[1.03]"
+      >
+        💬 LINE
+      </a>
+    )}
+
+    {seller?.facebookUrl && (
+      <a
+        href={seller.facebookUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-bold text-blue-300 transition hover:bg-blue-500/20 hover:scale-[1.03]"
+      >
+        📘 Facebook
+      </a>
+    )}
+
+  </div>
+)}
                 </div>
               </div>
 
