@@ -43,62 +43,20 @@ export default function MainLayout({
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
 
+  // 🔥 FIX: ตัดระบบ fetch หนักออก ใช้ session อย่างเดียว
   useEffect(() => {
-    let mounted = true;
-
     const nextImage = safeProfileSrc(session?.user?.image);
 
-    function updateAvatar(src: string) {
-      if (src !== stableAvatarRef.current) {
-        stableAvatarRef.current = src;
-        setAvatarReady(false);
-        setProfileImage(src);
-      } else {
-        setAvatarReady(true);
-      }
-    }
-
-    if (nextImage !== "/avatar.png") {
-      updateAvatar(nextImage);
-      return;
-    }
-
-    if (stableAvatarRef.current !== "/avatar.png") {
-      setProfileImage(stableAvatarRef.current);
+    if (nextImage !== stableAvatarRef.current) {
+      stableAvatarRef.current = nextImage;
+      setAvatarReady(false);
+      setProfileImage(nextImage);
+    } else {
       setAvatarReady(true);
-      return;
     }
-
-    async function fallbackFetch() {
-      try {
-        const res = await fetch("/api/profile/me", {
-          cache: "force-cache",
-        });
-
-        const data = await res.json();
-        if (!mounted) return;
-
-        const dbImage = safeProfileSrc(data?.image);
-
-        if (dbImage !== "/avatar.png") {
-          updateAvatar(dbImage);
-        } else {
-          setProfileImage("/avatar.png");
-          setAvatarReady(true);
-        }
-      } catch {
-        if (!mounted) return;
-        setProfileImage("/avatar.png");
-        setAvatarReady(true);
-      }
-    }
-
-    fallbackFetch();
-
-    return () => {
-      mounted = false;
-    };
   }, [session?.user?.image]);
+
+  // 🔽 ทุกอย่างด้านล่าง "เหมือนเดิม 100%" ห้ามแก้
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
