@@ -36,24 +36,69 @@ export default function MainLayout({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [profileImage, setProfileImage] = useState("/avatar.png");
-  const [avatarReady, setAvatarReady] = useState(true);
+  const [profileImage, setProfileImage] = useState("");
+  const [avatarReady, setAvatarReady] = useState(false);
 
   const stableAvatarRef = useRef("/avatar.png");
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
 
-  // 🔥 FIX: ตัดระบบ fetch หนักออก ใช้ session อย่างเดียว
   useEffect(() => {
-  if (session?.user?.image) {
-    const nextImage = safeProfileSrc(session.user.image);
-    stableAvatarRef.current = nextImage;
-    setProfileImage(nextImage);
-    setAvatarReady(true);
-    }
-  }, [session?.user?.image]);
+    let mounted = true;
 
-  // 🔽 ทุกอย่างด้านล่าง "เหมือนเดิม 100%" ห้ามแก้
+    const nextImage = safeProfileSrc(session?.user?.image);
+
+    function updateAvatar(src: string) {
+      if (src !== stableAvatarRef.current) {
+        stableAvatarRef.current = src;
+        setAvatarReady(false);
+        setProfileImage(src);
+      } else {
+        setAvatarReady(true);
+      }
+    }
+
+    if (nextImage !== "/avatar.png") {
+      updateAvatar(nextImage);
+      return;
+    }
+
+    if (stableAvatarRef.current !== "/avatar.png") {
+      setProfileImage(stableAvatarRef.current);
+      setAvatarReady(true);
+      return;
+    }
+
+    async function fallbackFetch() {
+      try {
+        const res = await fetch("/api/profile/me", {
+          cache: "force-cache",
+        });
+
+        const data = await res.json();
+        if (!mounted) return;
+
+        const dbImage = safeProfileSrc(data?.image);
+
+        if (dbImage !== "/avatar.png") {
+          updateAvatar(dbImage);
+        } else {
+          setProfileImage("/avatar.png");
+          setAvatarReady(true);
+        }
+      } catch {
+        if (!mounted) return;
+        setProfileImage("/avatar.png");
+        setAvatarReady(true);
+      }
+    }
+
+    fallbackFetch();
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.user?.image]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -269,20 +314,29 @@ export default function MainLayout({
                       menuOpen ? "ring-2 ring-amber-300/40" : ""
                     }`}
                   >
-                    <img
-                      src={profileImage}
-                      loading="eager"
-                      decoding="async"
-                      alt="profile"
-                      draggable={false}
-                      className="absolute inset-0 h-full w-full object-cover opacity-100"
-                      onError={(e) => {
-                       const target = e.currentTarget;
-                       if (!target.src.includes("/avatar.png")) {
-                          target.src = "/avatar.png";
-                       }
-                     }}
-                  />                    
+                    {profileImage && (
+                      <img
+                        src={profileImage}
+                        loading="eager"
+                        decoding="async"
+                        alt="profile"
+                        draggable={false}
+                        onLoad={() => setAvatarReady(true)}
+                        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out ${
+                          avatarReady ? "opacity-100" : "opacity-0"
+                        }`}
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (!target.src.includes("/avatar.png")) {
+                            stableAvatarRef.current = "/avatar.png";
+                            setProfileImage("/avatar.png");
+                            requestAnimationFrame(() => {
+                              setAvatarReady(true);
+                            });
+                          }
+                        }}
+                      />
+                    )}
                   </button>
 
                   {menuOpen && (

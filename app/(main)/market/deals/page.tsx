@@ -15,6 +15,28 @@ import {
   Shield,
 } from "lucide-react";
 
+const handleChat = async (targetUserId: string) => {
+  try {
+    const res = await fetch("/api/dm/create-room", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ user2: targetUserId }),
+    });
+
+    const data = await res.json();
+
+    if (data?.roomId) {
+      window.location.href = `/dm/${data.roomId}`;
+    } else {
+      alert("เปิดแชทไม่สำเร็จ");
+    }
+  } catch (err) {
+    console.error("CHAT ERROR:", err);
+    alert("เกิดข้อผิดพลาด");
+  }
+};
 type DealMember = {
   id: string;
   name: string;
@@ -177,6 +199,13 @@ export default function DealsPage() {
             ฿{Number(deal.offeredPrice).toLocaleString()}
           </div>
         </div>
+
+        <button
+          onClick={() => handleChat(member.id)}
+          className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110"
+        >
+          💬 แชทนัดสถานที่
+        </button>
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-2xl bg-white/[0.03] p-4">

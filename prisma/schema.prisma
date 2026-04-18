@@ -162,3 +162,18 @@ model SellerReview {
   seller User @relation("SellerReviews", fields: [sellerId], references: [id])
   buyer  User @relation("BuyerReviews", fields: [buyerId], references: [id])
 }
+
+model dmRoom {
+  id        String   @id @default(cuid())
+  user1     String
+  user2     String
+  createdAt DateTime @default(now())
+}
+
+model dmMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+}
