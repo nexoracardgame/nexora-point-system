@@ -66,7 +66,7 @@ export default async function SellerCenterPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-8">
-            {myListings.map((item, index) => (
+            {myListings.map((item: any, index: number) => (
               <div
                 key={item.id}
                 className="group relative"
