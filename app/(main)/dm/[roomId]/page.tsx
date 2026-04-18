@@ -194,7 +194,7 @@ export default function DMPage() {
 
   return (
     <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
-      <div className="w-full max-w-[920px] h-full flex flex-col">
+      <div className="w-full max-w-[920px] h-full flex flex-col mx-auto px-2 sm:px-4 xl:px-0">
 
         {/* HEADER */}
         <div className="sticky top-0 z-10 border-b border-white/10 bg-black/50 backdrop-blur-xl">
