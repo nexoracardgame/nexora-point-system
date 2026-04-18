@@ -295,33 +295,36 @@ export default function DMPage() {
         </div>
 
         {/* INPUT */}
-        <div className="sticky bottom-0 border-t border-white/10 bg-black/50 backdrop-blur-xl">
-          <div className="flex items-center gap-2 p-3 sm:p-4">
-            <input
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                sendTyping();
-              }}
-              className="h-12 flex-1 rounded-full border border-white/10 bg-white/10 px-4 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-yellow-400/40 focus:ring-2 focus:ring-yellow-400/20 sm:text-[15px]"
-              placeholder="พิมพ์ข้อความ..."
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-            />
+<div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] left-0 right-0 z-[1200] px-3 sm:px-4 xl:static xl:bottom-auto xl:px-0">
+  <div className="mx-auto max-w-[920px]">
+    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/70 backdrop-blur-2xl px-3 py-2 shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
 
-            <button
-              onClick={send}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98]"
-            >
-              <Send size={18} />
-            </button>
-          </div>
-        </div>
+      <input
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          sendTyping();
+        }}
+        className="h-12 flex-1 rounded-full border border-white/10 bg-white/10 px-4 text-sm text-white outline-none transition-all duration-200 placeholder:text-white/35 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 focus:shadow-[0_0_20px_rgba(250,204,21,0.2)] sm:text-[15px]"
+        placeholder="พิมพ์ข้อความ..."
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            send();
+          }
+        }}
+      />
 
+      <button
+        onClick={send}
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98]"
+      >
+        <Send size={18} />
+      </button>
+
+    </div>
+  </div>
+</div>
       </div>
     </div>
   );
