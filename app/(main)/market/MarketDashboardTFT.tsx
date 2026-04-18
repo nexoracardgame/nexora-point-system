@@ -98,7 +98,6 @@ export default function MarketDashboardTFT() {
     setLikedCards(next);
 
     const mapped = Object.fromEntries(next.map((id) => [id, true]));
-
     localStorage.setItem("nexora_market_likes", JSON.stringify(mapped));
   };
 
@@ -110,27 +109,27 @@ export default function MarketDashboardTFT() {
           const cardNo = item.card_no || item.cardNo || item.id;
 
           return {
-  id: item.id,
-  cardNo: String(cardNo),
-  name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-  price: `฿${Number(item.price || 0).toLocaleString()}`,
-  likes: item.likes || 0,
-  rarity: item.rarity || "Legendary",
-  image:
-    item.image_url ||
-    item.imageUrl ||
-    `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
-  createdAt: item.createdAt,
+            id: item.id,
+            cardNo: String(cardNo),
+            name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
+            price: `฿${Number(item.price || 0).toLocaleString()}`,
+            likes: item.likes || 0,
+            rarity: item.rarity || "Legendary",
+            image:
+              item.image_url ||
+              item.imageUrl ||
+              `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
+            createdAt: item.createdAt,
 
-  sellerId: item.sellerId || item.seller?.id,
-  sellerName:
-    item.seller?.displayName ||
-    item.seller?.name ||
-    "Unknown Seller",
-  sellerImage:
-    item.seller?.image ||
-    "/default-avatar.png",
-};
+            sellerId: item.sellerId || item.seller?.id,
+            sellerName:
+              item.seller?.displayName ||
+              item.seller?.name ||
+              "Unknown Seller",
+            sellerImage:
+              item.seller?.image ||
+              "/default-avatar.png",
+          };
         });
 
         setItems(mapped);
@@ -255,6 +254,17 @@ export default function MarketDashboardTFT() {
                     {centerHero.name}
                   </div>
 
+                  <div className="mt-3 flex items-center gap-2">
+                    <img
+                      src={centerHero.sellerImage || "/default-avatar.png"}
+                      alt={centerHero.sellerName || "Seller"}
+                      className="h-7 w-7 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <span className="truncate text-xs text-white/70">
+                      {centerHero.sellerName}
+                    </span>
+                  </div>
+
                   <div className="mt-3 flex items-center justify-between">
                     <div className="text-base font-bold text-amber-300">
                       {centerHero.price}
@@ -310,8 +320,25 @@ export default function MarketDashboardTFT() {
                     <div className="line-clamp-2 text-sm font-black leading-tight">
                       {card.name}
                     </div>
+
                     <div className="mt-1 text-xs font-bold text-amber-300">
                       {card.price}
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <img
+                        src={card.sellerImage || "/default-avatar.png"}
+                        alt={card.sellerName || "Seller"}
+                        className="h-5 w-5 rounded-full object-cover ring-1 ring-white/10"
+                      />
+                      <span className="truncate text-[10px] text-white/60">
+                        {card.sellerName}
+                      </span>
+                    </div>
+
+                    <div className="mt-1 flex items-center gap-1 text-[10px] text-white/50">
+                      <Heart className="h-3 w-3 fill-pink-500 text-pink-500" />
+                      {card.likes + (likedCards.includes(card.id) ? 1 : 0)}
                     </div>
                   </div>
                 </Link>
@@ -368,6 +395,7 @@ export default function MarketDashboardTFT() {
               <div className="group relative">
                 <img
                   src={leftHero.image}
+                  alt={leftHero.name}
                   className="h-[380px] w-[260px] rotate-[-10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
                 />
 
@@ -391,6 +419,17 @@ export default function MarketDashboardTFT() {
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
                   <div className="line-clamp-2 text-sm font-black leading-tight">
                     {leftHero.name}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <img
+                      src={leftHero.sellerImage || "/default-avatar.png"}
+                      alt={leftHero.sellerName || "Seller"}
+                      className="h-6 w-6 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <span className="truncate text-[10px] text-white/60">
+                      {leftHero.sellerName}
+                    </span>
                   </div>
 
                   <div className="mt-2 flex items-center justify-between">
@@ -450,6 +489,17 @@ export default function MarketDashboardTFT() {
                     {centerHero.name}
                   </div>
 
+                  <div className="mt-3 flex items-center gap-2">
+                    <img
+                      src={centerHero.sellerImage || "/default-avatar.png"}
+                      alt={centerHero.sellerName || "Seller"}
+                      className="h-7 w-7 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <span className="truncate text-sm text-white/70">
+                      {centerHero.sellerName}
+                    </span>
+                  </div>
+
                   <div className="mt-3 flex items-center justify-between">
                     <div className="text-lg font-bold text-amber-300">
                       {centerHero.price}
@@ -474,6 +524,7 @@ export default function MarketDashboardTFT() {
               <div className="group relative">
                 <img
                   src={rightHero.image}
+                  alt={rightHero.name}
                   className="h-[380px] w-[260px] rotate-[10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
                 />
 
@@ -497,6 +548,17 @@ export default function MarketDashboardTFT() {
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
                   <div className="line-clamp-2 text-sm font-black leading-tight">
                     {rightHero.name}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <img
+                      src={rightHero.sellerImage || "/default-avatar.png"}
+                      alt={rightHero.sellerName || "Seller"}
+                      className="h-6 w-6 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <span className="truncate text-[10px] text-white/60">
+                      {rightHero.sellerName}
+                    </span>
                   </div>
 
                   <div className="mt-2 flex items-center justify-between">
@@ -547,7 +609,7 @@ export default function MarketDashboardTFT() {
 
       {/* MARKET GRID */}
       <section>
-        <div className="mb-4 text-2xl font-black lg:mb-5 lg:text-3xl">
+        <div className="mb-4 text-2xl font-black lg:mb-6 lg:text-3xl">
           🛒 Marketplace Listings
         </div>
 
@@ -560,16 +622,16 @@ export default function MarketDashboardTFT() {
               <Link
                 key={card.id}
                 href={`/market/card/${card.id}`}
-                className={`group relative overflow-hidden rounded-[22px] border border-white/10 bg-[#101116] transition-all duration-500 hover:-translate-y-1 lg:rounded-[28px] ${rarity.ring}`}
+                className={`group relative transition-all duration-500 hover:-translate-y-2 ${rarity.ring}`}
               >
-                <div className={`absolute inset-0 bg-gradient-to-b ${rarity.glow}`} />
+                <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-[#0d0f16] shadow-[0_20px_60px_rgba(0,0,0,0.4)] lg:rounded-[28px]">
+                  <div className={`absolute inset-0 bg-gradient-to-b ${rarity.glow}`} />
 
-                <div className="relative z-10 p-2 lg:p-3">
-                  <div className="relative overflow-hidden rounded-[16px] lg:rounded-[20px]">
+                  <div className="relative aspect-[2/3] w-full overflow-hidden">
                     <img
                       src={card.image}
                       alt={card.name}
-                      className="h-[210px] w-full rounded-[16px] object-cover transition duration-700 group-hover:scale-105 sm:h-[240px] lg:h-[320px] lg:rounded-[20px]"
+                      className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                     />
 
                     <button
@@ -578,7 +640,7 @@ export default function MarketDashboardTFT() {
                         e.stopPropagation();
                         toggleLike(card.id);
                       }}
-                      className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md transition hover:scale-105 lg:right-3 lg:top-3 lg:h-10 lg:w-10"
+                      className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md transition hover:scale-105"
                     >
                       <Heart
                         className={`h-4 w-4 ${
@@ -588,26 +650,34 @@ export default function MarketDashboardTFT() {
                         }`}
                       />
                     </button>
-                  </div>
 
-                  <div className="pt-3 text-[13px] font-black leading-snug sm:text-[15px] lg:pt-4 lg:text-[17px]">
-                    {card.name}
-                  </div>
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 lg:p-4">
+                      <div className="line-clamp-2 text-sm font-black leading-tight text-white lg:text-base">
+                        {card.name}
+                      </div>
 
-                  <div className="mt-1 text-xs font-semibold text-amber-300 lg:mt-2 lg:text-sm">
-                    
-                    {card.price}
-                  </div>
+                      <div className="mt-1 text-xs font-bold text-amber-300 lg:text-sm">
+                        {card.price}
+                      </div>
 
-                  <div className="mt-2 flex items-center gap-2 text-[11px] text-white/60 lg:mt-3 lg:text-xs">
-                    <Heart
-                      className={`h-3.5 w-3.5 ${
-                        liked
-                          ? "fill-pink-500 text-pink-500"
-                          : "text-white/40"
-                      }`}
-                    />
-                    {card.likes + (liked ? 1 : 0)}
+                      {card.sellerId && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <img
+                            src={card.sellerImage || "/default-avatar.png"}
+                            alt={card.sellerName || "Seller"}
+                            className="h-6 w-6 rounded-full object-cover ring-1 ring-white/10"
+                          />
+                          <span className="truncate text-[10px] text-white/60 lg:text-xs">
+                            {card.sellerName}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-white/50">
+                        <Heart className="h-3 w-3 fill-pink-500 text-pink-500" />
+                        {card.likes + (liked ? 1 : 0)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </Link>

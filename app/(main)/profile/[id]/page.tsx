@@ -22,27 +22,60 @@ export default async function SellerProfilePage({
   const isOwner = currentUserId === id;
 
   const seller = await prisma.user.findUnique({
-    where: { id },
-  });
+  where: { id },
+  select: {
+    id: true,
+    name: true,
+    displayName: true,
+    image: true,
+    coverImage: true,
+    coverPosition: true, // ต้องมีจริงแล้ว
+    bio: true,
+    facebookUrl: true,
+    lineUrl: true,
+  },
+});
 
   const listings = await prisma.marketListing.findMany({
     where: {
       sellerId: id,
+      status: {
+        in: ["active", "ACTIVE"],
+      },
     },
     orderBy: {
       createdAt: "desc",
     },
   });
 
-  const completedDeals = await prisma.dealRequest.count({
+  const soldHistory = await prisma.marketHistory.findMany({
     where: {
-      sellerId: id,
-      status: "accepted",
+      action: "sold",
+      listing: {
+        sellerId: id,
+      },
     },
+    include: {
+      listing: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 24,
   });
 
-  const totalVolume = listings.reduce(
-    (sum, item) => sum + Number(item.price),
+  // ใช้จาก soldHistory ก่อน เพื่อไม่ให้พังกับ schema ปัจจุบัน
+  const completedDeals =
+  soldHistory.length +
+  (await prisma.dealRequest.count({
+    where: {
+      buyerId: id,
+      status: "completed", // 👈 ต้องตรงกับข้อ 1
+    },
+  }));
+
+  const totalVolume = soldHistory.reduce(
+    (sum, item) => sum + Number(item.listing?.price || 0),
     0
   );
 
@@ -61,7 +94,10 @@ export default async function SellerProfilePage({
             <img
               src={seller?.coverImage || "/seller-cover.jpg"}
               alt="Seller Cover"
-              className="h-full w-full object-cover scale-[1.02]"
+              className="h-full w-full object-cover"
+              style={{
+                objectPosition: `center ${seller?.coverPosition ?? 50}%`,
+              }}
             />
 
             <div className="absolute inset-0 bg-gradient-to-t from-[#090b12] via-black/25 to-transparent" />
@@ -146,7 +182,9 @@ export default async function SellerProfilePage({
                   <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-400 sm:text-xs">
                     {stat.label}
                   </div>
-                  <div className={`mt-2 text-2xl font-black sm:text-3xl ${stat.color}`}>
+                  <div
+                    className={`mt-2 text-2xl font-black sm:text-3xl ${stat.color}`}
+                  >
                     {stat.value}
                   </div>
                 </div>
@@ -246,6 +284,75 @@ export default async function SellerProfilePage({
             ) : (
               <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-8 text-sm text-zinc-400 sm:rounded-3xl">
                 ยังไม่มีการ์ดที่กำลังขาย
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* SOLD HISTORY */}
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 shadow-[0_20px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:rounded-[40px] sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-amber-300 sm:text-4xl">
+                📦 Sold Cards
+              </h2>
+              <p className="mt-1 text-xs text-white/45 sm:text-sm">
+                Successfully completed marketplace sales
+              </p>
+            </div>
+
+            <div className="w-fit rounded-full bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-300 sm:text-sm">
+              {soldHistory.length} SOLD
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:mt-6 sm:grid-cols-2 xl:grid-cols-4">
+            {soldHistory.length > 0 ? (
+              soldHistory.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="group overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] transition duration-500 hover:-translate-y-1 hover:border-amber-400/30 hover:shadow-[0_0_70px_rgba(251,191,36,0.12)]"
+                >
+                  <div className="relative overflow-hidden">
+                    <img
+                      src={
+                        item.listing?.imageUrl ||
+                        `/cards/${String(
+                          item.listing?.cardNo || "001"
+                        ).padStart(3, "0")}.jpg`
+                      }
+                      alt={item.listing?.cardName || "Sold Card"}
+                      className="aspect-[2.5/3.5] w-full object-cover transition duration-700 group-hover:scale-105"
+                    />
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
+
+                    <div className="absolute left-4 top-4 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300 backdrop-blur-md">
+                      SOLD
+                    </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 p-5">
+                      <div className="text-xl font-black leading-tight">
+                        {item.listing?.cardName || "Unknown Card"}
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2 text-lg font-black text-amber-300">
+                        <Gem className="h-4 w-4" />
+                        ฿{Number(item.listing?.price || 0).toLocaleString(
+                          "th-TH"
+                        )}
+                      </div>
+
+                      <div className="mt-2 text-xs text-white/55">
+                        {new Date(item.createdAt).toLocaleDateString("th-TH")}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-8 text-sm text-zinc-400 sm:rounded-3xl">
+                ยังไม่มีประวัติการขาย
               </div>
             )}
           </div>

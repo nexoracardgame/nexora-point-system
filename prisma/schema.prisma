@@ -16,6 +16,8 @@ model User {
   coin     Int     @default(0)
   role     String  @default("user")
 
+  coverPosition Float? @default(50)
+
   displayName String?
   bio         String?
   coverImage  String?
@@ -28,7 +30,7 @@ model User {
   marketListings MarketListing[] @relation("UserListings")
   sellerReviews  SellerReview[]  @relation("SellerReviews")
   buyerReviews   SellerReview[]  @relation("BuyerReviews")
-  
+
   dealRequestsSent     DealRequest[] @relation("DealBuyer")
   dealRequestsReceived DealRequest[] @relation("DealSeller")
 }
@@ -104,8 +106,15 @@ model MarketHistory {
   id        String   @id @default(cuid())
   listingId String
   action    String
-  detail    String
+  detail    String?
   createdAt DateTime @default(now())
+
+  // 🔥 เพิ่มใหม่สำหรับระบบขายจริง / history / profile / leaderboard
+  sellerId String?
+  buyerId  String?
+  price    Float?
+  cardName String?
+  imageUrl String?
 
   listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }

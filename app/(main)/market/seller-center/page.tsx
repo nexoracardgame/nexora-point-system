@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -17,13 +19,17 @@ export default async function SellerCenterPage() {
   }
 
   const myListings = await prisma.marketListing.findMany({
-    where: {
-      sellerId: session.user.id,
+  where: {
+    sellerId: session.user.id,
+    NOT: {
+      status: "sold",
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+  // 🔥 ตัวนี้แหละจบ
+}).then(res => JSON.parse(JSON.stringify(res)));
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1830_0%,#090a10_55%,#05060a_100%)] px-3 py-4 text-white sm:px-6 sm:py-10">

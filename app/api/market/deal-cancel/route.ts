@@ -3,12 +3,29 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = String((session?.user as any)?.id || "");
 
+    if (!currentUserId) {
+      return NextResponse.json(
+        { error: "กรุณาเข้าสู่ระบบ" },
+        { status: 401 }
+      );
+    }
+
     const { dealId } = await req.json();
+
+    if (!dealId) {
+      return NextResponse.json(
+        { error: "ไม่มี dealId" },
+        { status: 400 }
+      );
+    }
 
     const deal = await prisma.dealRequest.findUnique({
       where: { id: dealId },
@@ -32,7 +49,14 @@ export async function POST(req: NextRequest) {
       where: { id: dealId },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     console.error("DEAL CANCEL ERROR:", error);
 

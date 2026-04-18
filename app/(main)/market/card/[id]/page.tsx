@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import Card3DPreview from "./Card3DPreview";
 import RequestDealButton from "./RequestDealButton";
 import WishlistButton from "./WishlistButton";
-import SerialVerifyBox from "./SerialVerifyBox";
 import CardStatsClient from "./CardStatsClient";
 
 async function getListing(id: string) {
@@ -204,18 +203,7 @@ export default async function MarketCardDetailPage({
             >
               {card.owner}
             </Link>
-          </div>
-
-          <div className="mt-4 md:mt-5">
-            <SerialVerifyBox
-              listingSerial={
-                liveCard?.listingSerial ||
-                liveCard?.serialNo ||
-                card.cardNo ||
-                ""
-              }
-            />
-          </div>
+          </div>         
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 md:mt-5 md:gap-4">
             <StatCard

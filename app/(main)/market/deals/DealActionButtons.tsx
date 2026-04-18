@@ -1,30 +1,38 @@
 "use client";
 
+import { useState } from "react";
+
 export default function DealActionButtons({
   dealId,
 }: {
   dealId: string;
 }) {
+  const [loading, setLoading] = useState(false);
+
   const handleAction = async (action: "accept" | "reject") => {
-    const res = await fetch("/api/market/deal-action", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ dealId, action }),
-    });
+    if (loading) return;
 
-    const data = await res.json();
+    try {
+      setLoading(true);
 
-    if (data.success) {
-      alert(
-        action === "accept"
-          ? "ตอบรับดีลสำเร็จ ✅"
-          : "ปฏิเสธดีลแล้ว ❌"
-      );
-      location.reload();
-    } else {
-      alert(data.error || "อัปเดตไม่สำเร็จ");
+      const res = await fetch("/api/market/deal-action", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ dealId, action }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.error || "อัปเดตไม่สำเร็จ");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -32,14 +40,16 @@ export default function DealActionButtons({
     <div className="flex gap-3">
       <button
         onClick={() => handleAction("accept")}
-        className="rounded-xl bg-emerald-500 px-4 py-2 font-bold text-black"
+        disabled={loading}
+        className="rounded-xl bg-emerald-500 px-4 py-2 font-bold text-black transition hover:scale-105 disabled:opacity-60"
       >
         ✅ Accept
       </button>
 
       <button
         onClick={() => handleAction("reject")}
-        className="rounded-xl bg-red-500 px-4 py-2 font-bold text-white"
+        disabled={loading}
+        className="rounded-xl bg-red-500 px-4 py-2 font-bold text-white transition hover:scale-105 disabled:opacity-60"
       >
         ❌ Reject
       </button>

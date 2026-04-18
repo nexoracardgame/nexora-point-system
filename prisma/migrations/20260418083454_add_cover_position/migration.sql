@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "coverPosition" DOUBLE PRECISION DEFAULT 50;
