@@ -48,7 +48,7 @@ export default function DMPage() {
   const [typing, setTyping] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const scrollBottom = (smooth = true) => {
@@ -61,19 +61,21 @@ export default function DMPage() {
   };
 
   useEffect(() => {
-    if (!roomId) return;
+  if (!roomId) return;
 
-    loadSession();
-    loadRoom();
-    loadMessages();
+  let mounted = true; // ✅ เพิ่ม
 
-    const channel = supabase.channel(`dm-${roomId}`, {
-      config: {
-        broadcast: { self: false },
-      },
-    });
+  loadSession();
+  loadRoom();
+  loadMessages();
 
-    channelRef.current = channel;
+  const channel = supabase.channel(`dm-${roomId}`, {
+    config: {
+      broadcast: { self: false },
+    },
+  });
+
+  channelRef.current = channel;
 
     channel.on(
       "postgres_changes",
@@ -111,15 +113,17 @@ export default function DMPage() {
     channel.subscribe();
 
     return () => {
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
+  mounted = false; // ✅ เพิ่ม
 
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
+  if (typingTimeout.current) {
+    clearTimeout(typingTimeout.current);
+  }
+
+  if (channelRef.current) {
+    supabase.removeChannel(channelRef.current);
+    channelRef.current = null;
+  }
+};
   }, [roomId, me?.id]);
 
   useEffect(() => {
