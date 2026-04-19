@@ -25,15 +25,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 
-  /* 🔥 ทำให้ scroll ลื่น */
   scroll-behavior: smooth;
 
-  /* 🔥 กันกระพริบตอนโหลด */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ================== SCROLLBAR (โคตรโปร) ================== */
+/* ================== SCROLLBAR ================== */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -61,7 +59,7 @@ body {
   }
 }
 
-/* 🔥 ข้อความ slide ขึ้น */
+/* 🔥 ข้อความ slide */
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -73,29 +71,49 @@ body {
   }
 }
 
-/* 🔥 shimmer (ไว้ทำ skeleton เทพๆ) */
+/* 🔥 bubble แชท (เนียนกว่า slideUp) */
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 🔥 shimmer skeleton */
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* 🔥 typing dots */
+@keyframes typingDots {
+  0% { opacity: 0.2; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 0.2; transform: translateY(0); }
 }
 
 /* ================== UTILS ================== */
 
-/* ใช้กับรูป */
+/* รูป */
 .fade-in {
   animation: fadeIn 0.25s ease forwards;
 }
 
-/* ใช้กับ message */
+/* ข้อความ */
 .slide-up {
   animation: slideUp 0.25s ease forwards;
 }
 
-/* skeleton เทพ */
+/* bubble แชท */
+.bubble-in {
+  animation: bubbleIn 0.25s ease forwards;
+}
+
+/* skeleton */
 .skeleton {
   background: linear-gradient(
     90deg,
@@ -106,3 +124,22 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }
+
+/* ปุ่มกด */
+.press {
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.press:active {
+  transform: scale(0.96);
+}
+
+/* typing dots */
+.typing-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #facc15;
+  animation: typingDots 1s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
