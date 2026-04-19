@@ -172,6 +172,12 @@ export default function MainLayout({
         icon: Cat,
         active: pathname.startsWith("/community"),
       },
+      {
+       href: "/dm",
+       label: "Chat",
+       icon: MessageCircle,
+       active: pathname.startsWith("/dm"),
+      },
     ],
     [pathname]
   );
