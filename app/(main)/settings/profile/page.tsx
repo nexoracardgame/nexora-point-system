@@ -6,11 +6,16 @@ import { useEffect, useRef, useState } from "react";
 import { UploadCloud, User2 } from "lucide-react";
 import { emitProfileSync } from "@/lib/profile-sync";
 
+const MAX_SOURCE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+
+type ImageKind = "profile" | "cover";
+
 export default function ProfileSettingsPage() {
   const router = useRouter();
   const { update } = useSession();
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [processingImage, setProcessingImage] = useState<ImageKind | null>(null);
 
   const [coverUrl, setCoverUrl] = useState("/seller-cover.jpg");
   const [coverPosition, setCoverPosition] = useState(50);
@@ -60,49 +65,90 @@ export default function ProfileSettingsPage() {
     };
   }, []);
 
-  function uploadImage(file: File, type: "profile" | "cover") {
-    const img = new Image();
-    const reader = new FileReader();
+  function readFileAsDataUrl(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
 
-    reader.onload = () => {
-      img.src = reader.result as string;
-    };
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const isCover = type === "cover";
-      const maxSize = isCover ? 2200 : 1080;
-      const exportType =
-        isCover && file.type === "image/png" ? "image/png" : "image/jpeg";
-      const exportQuality = isCover ? 0.94 : 0.88;
-
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > maxSize) {
-          height *= maxSize / width;
-          width = maxSize;
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
         }
-      } else if (height > maxSize) {
-        width *= maxSize / height;
-        height = maxSize;
+
+        reject(new Error("Unable to read image"));
+      };
+
+      reader.onerror = () => reject(new Error("Unable to read image"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImageElement(src: string) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Unable to load image"));
+      img.src = src;
+    });
+  }
+
+  async function processImageFile(file: File, type: ImageKind) {
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Please choose an image file");
+    }
+
+    if (file.size > MAX_SOURCE_FILE_SIZE_BYTES) {
+      throw new Error("Image is too large. Please use a file under 25MB");
+    }
+
+    const sourceUrl = await readFileAsDataUrl(file);
+    const img = await loadImageElement(sourceUrl);
+    const canvas = document.createElement("canvas");
+    const isCover = type === "cover";
+    const maxSize = isCover ? 2200 : 1080;
+    const exportType =
+      isCover && file.type === "image/png" ? "image/png" : "image/jpeg";
+    const exportQuality = isCover ? 0.94 : 0.88;
+
+    let width = img.naturalWidth || img.width;
+    let height = img.naturalHeight || img.height;
+
+    if (!width || !height) {
+      throw new Error("Invalid image dimensions");
+    }
+
+    if (width > height) {
+      if (width > maxSize) {
+        height *= maxSize / width;
+        width = maxSize;
       }
+    } else if (height > maxSize) {
+      width *= maxSize / height;
+      height = maxSize;
+    }
 
-      canvas.width = width;
-      canvas.height = height;
+    canvas.width = Math.max(1, Math.round(width));
+    canvas.height = Math.max(1, Math.round(height));
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Unable to process image");
+    }
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, width, height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      const compressed =
-        exportType === "image/png"
-          ? canvas.toDataURL(exportType)
-          : canvas.toDataURL(exportType, exportQuality);
+    return exportType === "image/png"
+      ? canvas.toDataURL(exportType)
+      : canvas.toDataURL(exportType, exportQuality);
+  }
+
+  async function uploadImage(file: File, type: ImageKind) {
+    try {
+      setProcessingImage(type);
+      const compressed = await processImageFile(file, type);
 
       if (type === "profile") {
         setProfileImage(compressed);
@@ -110,9 +156,16 @@ export default function ProfileSettingsPage() {
         setCoverUrl(compressed);
         setCoverPosition(50);
       }
-    };
-
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("PROCESS IMAGE ERROR:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to process this image"
+      );
+    } finally {
+      setProcessingImage((current) => (current === type ? null : current));
+    }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -126,6 +179,11 @@ export default function ProfileSettingsPage() {
   }
 
   async function saveProfile() {
+    if (processingImage) {
+      alert("Please wait for the image to finish processing first");
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -184,7 +242,22 @@ export default function ProfileSettingsPage() {
     }
   }
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1140_0%,#090b12_45%,#05070d_100%)] p-4 text-white sm:p-6">
+        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
+          <div className="rounded-[36px] border border-white/10 bg-white/[0.03] p-6 shadow-2xl">
+            <div className="h-8 w-40 animate-pulse rounded-xl bg-white/10" />
+            <div className="mt-6 h-28 w-28 animate-pulse rounded-full bg-white/10" />
+            <div className="mt-6 h-16 animate-pulse rounded-3xl bg-white/10" />
+          </div>
+          <div className="overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.03] shadow-2xl">
+            <div className="h-[260px] animate-pulse bg-white/10" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1140_0%,#090b12_45%,#05070d_100%)] p-4 text-white sm:p-6">
@@ -220,10 +293,15 @@ export default function ProfileSettingsPage() {
                 const file = e.target.files?.[0];
                 if (!file) return;
 
-                uploadImage(file, "profile");
+                void uploadImage(file, "profile");
                 e.currentTarget.value = "";
               }}
             />
+            {processingImage === "profile" && (
+              <div className="mt-3 text-xs text-violet-200/80">
+                Processing profile image...
+              </div>
+            )}
           </div>
 
           <div className="mt-6">
@@ -242,7 +320,7 @@ export default function ProfileSettingsPage() {
                   Choose Cover Image
                 </div>
                 <div className="text-xs text-zinc-400">
-                  Works on mobile, gallery, and LINE browser.
+                  Works on mobile, gallery, and LINE browser. Up to 25MB.
                 </div>
               </div>
               <div className="text-xs text-violet-300">Browse</div>
@@ -257,7 +335,7 @@ export default function ProfileSettingsPage() {
                 const file = e.target.files?.[0];
                 if (!file) return;
 
-                uploadImage(file, "cover");
+                void uploadImage(file, "cover");
                 e.currentTarget.value = "";
               }}
             />
@@ -287,6 +365,11 @@ export default function ProfileSettingsPage() {
                 }}
               />
             </div>
+            {processingImage === "cover" && (
+              <div className="mt-3 text-xs text-violet-200/80">
+                Processing cover image...
+              </div>
+            )}
           </div>
 
           <div className="mt-4">
@@ -327,10 +410,14 @@ export default function ProfileSettingsPage() {
 
           <button
             onClick={saveProfile}
-            disabled={saving}
-            className="mt-6 w-full rounded-2xl bg-violet-500 py-4 font-bold"
+            disabled={saving || processingImage !== null}
+            className="mt-6 w-full rounded-2xl bg-violet-500 py-4 font-bold disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save Profile"}
+            {saving
+              ? "Saving..."
+              : processingImage
+                ? "Processing Image..."
+                : "Save Profile"}
           </button>
         </section>
 
