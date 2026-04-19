@@ -60,7 +60,6 @@ export async function GET() {
           cardNo: true,
           cardName: true,
           imageUrl: true,
-          serialNo: true,
           status: true,
         },
       }),
@@ -119,7 +118,6 @@ export async function GET() {
         cardImage:
           listing?.imageUrl ||
           `/cards/${String(listing?.cardNo || "001").padStart(3, "0")}.jpg`,
-        serialNo: listing?.serialNo || "",
         listingStatus: listing?.status || "active",
       };
     });

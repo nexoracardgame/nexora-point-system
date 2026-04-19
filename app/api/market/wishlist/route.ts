@@ -1,29 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const { cardNo, userId } = await req.json();
+    const session = await getServerSession(authOptions);
+    const body = await req.json();
+    const cardNo = String(body?.cardNo || "").trim();
+    const listingId = String(body?.listingId || "").trim();
+    const userId =
+      String(session?.user?.id || "").trim() ||
+      String(body?.userId || "").trim();
 
-    if (!cardNo || !userId) {
+    if ((!cardNo && !listingId) || !userId) {
       return NextResponse.json(
-        { error: "ข้อมูลไม่ครบ" },
+        { error: "Missing wishlist payload" },
         { status: 400 }
       );
     }
 
-    const listing = await prisma.marketListing.findFirst({
-      where: {
-        cardNo,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const listing = listingId
+      ? await prisma.marketListing.findUnique({
+          where: { id: listingId },
+        })
+      : await prisma.marketListing.findFirst({
+          where: {
+            cardNo,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
 
     if (!listing) {
       return NextResponse.json(
-        { error: "ไม่พบ listing" },
+        { error: "Listing not found" },
         { status: 404 }
       );
     }
@@ -38,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (existing) {
       return NextResponse.json({
         success: true,
-        message: "มีอยู่ใน Wishlist แล้ว",
+        message: "Already wishlisted",
       });
     }
 
@@ -49,15 +61,26 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await prisma.marketListing.update({
+      where: {
+        id: listing.id,
+      },
+      data: {
+        likes: {
+          increment: 1,
+        },
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      message: "เพิ่ม Wishlist สำเร็จ ❤️",
+      message: "Wishlist added",
     });
   } catch (error) {
     console.error("WISHLIST ERROR:", error);
 
     return NextResponse.json(
-      { error: "เพิ่ม Wishlist ไม่สำเร็จ" },
+      { error: "Wishlist failed" },
       { status: 500 }
     );
   }

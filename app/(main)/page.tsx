@@ -1,20 +1,37 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
+import PrefetchLink from "@/components/PrefetchLink";
 
 export default function NexoraLuxuryHome() {
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
+    let frameId = 0;
+
     const move = (e: MouseEvent) => {
-      setMouse({
-        x: (e.clientX / window.innerWidth - 0.5) * 30,
-        y: (e.clientY / window.innerHeight - 0.5) * 20,
+      if (frameId) return;
+
+      frameId = window.requestAnimationFrame(() => {
+        setMouse({
+          x: (e.clientX / window.innerWidth - 0.5) * 30,
+          y: (e.clientY / window.innerHeight - 0.5) * 20,
+        });
+        frameId = 0;
       });
     };
+
     window.addEventListener("mousemove", move);
-    return () => window.removeEventListener("mousemove", move);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
   }, []);
 
   return (
@@ -46,9 +63,13 @@ export default function NexoraLuxuryHome() {
         className="absolute inset-x-0 bottom-0 z-20 flex justify-center transition-transform duration-300"
         style={{ transform: `translate(${mouse.x}px, ${mouse.y}px)` }}
       >
-        <img
+        <Image
           src="https://s.imgz.io/2026/03/24/033-97ca7d23f8ddf07a.png"
           alt="nexora hero"
+          width={1200}
+          height={1600}
+          priority
+          sizes="(max-width: 640px) 80vw, (max-width: 1024px) 62vw, 52vw"
           className="h-[70vh] w-auto object-contain sm:h-[82vh] lg:h-[88vh] drop-shadow-[0_0_80px_rgba(255,255,255,0.08)]"
         />
       </div>
@@ -64,18 +85,18 @@ export default function NexoraLuxuryHome() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
+          <PrefetchLink
             href="/market"
             className="rounded-2xl bg-white px-6 py-3 text-sm font-black text-black transition hover:scale-[1.03]"
           >
             ENTER MARKET
-          </Link>
-          <Link
+          </PrefetchLink>
+          <PrefetchLink
             href="/collections"
             className="rounded-2xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-black text-white backdrop-blur-xl transition hover:scale-[1.03]"
           >
             VIEW SETS
-          </Link>
+          </PrefetchLink>
         </div>
       </div>
 

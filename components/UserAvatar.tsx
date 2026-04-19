@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { listenProfileSync } from "@/lib/profile-sync";
 
 export default function UserAvatar({
   className = "",
@@ -12,7 +13,9 @@ export default function UserAvatar({
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/profile/me");
+        const res = await fetch("/api/profile/me", {
+          cache: "no-store",
+        });
         const data = await res.json();
 
         if (res.ok && data.image) {
@@ -22,6 +25,12 @@ export default function UserAvatar({
     }
 
     load();
+
+    return listenProfileSync((detail) => {
+      if (detail.image) {
+        setImage(detail.image);
+      }
+    });
   }, []);
 
   return (

@@ -1,13 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { MessageCircle } from "lucide-react";
+import PrefetchLink from "@/components/PrefetchLink";
+import NotificationBell from "@/components/NotificationBell";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useLanguage } from "@/lib/i18n";
+import { listenProfileSync } from "@/lib/profile-sync";
 import {
   Gem,
-  Bell,
   Wallet,
   ShoppingBag,
   Gift,
@@ -33,7 +37,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
+  const { t } = useLanguage();
   const isDmRoomPage = pathname.startsWith("/dm/");
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,20 +51,23 @@ export default function MainLayout({
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
 
+  function updateAvatar(src?: string | null) {
+    const nextSrc = safeProfileSrc(src);
+
+    if (nextSrc !== stableAvatarRef.current) {
+      stableAvatarRef.current = nextSrc;
+      setAvatarReady(false);
+      setProfileImage(nextSrc);
+      return;
+    }
+
+    setAvatarReady(true);
+  }
+
   useEffect(() => {
     let mounted = true;
 
     const nextImage = safeProfileSrc(session?.user?.image);
-
-    function updateAvatar(src: string) {
-      if (src !== stableAvatarRef.current) {
-        stableAvatarRef.current = src;
-        setAvatarReady(false);
-        setProfileImage(src);
-      } else {
-        setAvatarReady(true);
-      }
-    }
 
     if (nextImage !== "/avatar.png") {
       updateAvatar(nextImage);
@@ -74,7 +83,7 @@ export default function MainLayout({
     async function fallbackFetch() {
       try {
         const res = await fetch("/api/profile/me", {
-          cache: "force-cache",
+          cache: "no-store",
         });
 
         const data = await res.json();
@@ -103,6 +112,12 @@ export default function MainLayout({
   }, [session?.user?.image]);
 
   useEffect(() => {
+    return listenProfileSync((detail) => {
+      updateAvatar(detail.image);
+    });
+  }, []);
+
+  useEffect(() => {
     const close = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node)) {
         setMenuOpen(false);
@@ -114,116 +129,141 @@ export default function MainLayout({
   }, []);
 
   useEffect(() => {
-    setMenuOpen(false);
-    setMobileNavOpen(false);
-  }, [pathname]);
+    const importantRoutes = [
+      "/",
+      "/market",
+      "/rewards",
+      "/redeem",
+      "/wallet",
+      "/dm",
+      "/profile/me",
+    ];
+
+    const warmRoutes = () => {
+      importantRoutes.forEach((route) => router.prefetch(route));
+    };
+
+    if (typeof window === "undefined") return;
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(() => warmRoutes(), {
+        timeout: 1200,
+      });
+
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = window.setTimeout(warmRoutes, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [router]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
 
     const prev = document.body.style.overflow;
-    
+    document.body.style.overflow = "hidden";
+
     return () => {
       document.body.style.overflow = prev;
     };
   }, [mobileNavOpen]);
 
   const pageContext = useMemo(() => {
-    if (pathname.startsWith("/market")) return "MARKET";
-    if (pathname.startsWith("/collections")) return "COLLECTIONS";
-    if (pathname.startsWith("/community")) return "COMMUNITY";
-    if (pathname.startsWith("/redeem")) return "REDEEM";
-    if (pathname.startsWith("/rewards")) return "REWARDS";
-    if (pathname.startsWith("/wallet")) return "WALLET";
-    if (pathname.startsWith("/dashboard")) return "DASHBOARD";
-    return "NEXORA HOME";
-  }, [pathname]);
+    if (pathname.startsWith("/market")) return t("layout.page.market");
+    if (pathname.startsWith("/collections")) return t("layout.page.collections");
+    if (pathname.startsWith("/community")) return t("layout.page.community");
+    if (pathname.startsWith("/redeem")) return t("layout.page.redeem");
+    if (pathname.startsWith("/rewards")) return t("layout.page.rewards");
+    if (pathname.startsWith("/wallet")) return t("layout.page.wallet");
+    if (pathname.startsWith("/dashboard")) return t("layout.page.dashboard");
+    return t("layout.page.home");
+  }, [pathname, t]);
 
   const sideItems = useMemo(
     () => [
-      { href: "/", label: "Home", icon: House, active: pathname === "/" },
+      { href: "/", label: t("layout.nav.home"), icon: House, active: pathname === "/" },
       {
         href: "/market",
-        label: "Market",
+        label: t("layout.nav.market"),
         icon: ShoppingBag,
         active: pathname.startsWith("/market"),
       },
       {
         href: "/rewards",
-        label: "Rewards",
+        label: t("layout.nav.rewards"),
         icon: Trophy,
         active: pathname.startsWith("/rewards"),
       },
       {
         href: "/redeem",
-        label: "Redeem",
+        label: t("layout.nav.redeem"),
         icon: Gift,
         active: pathname.startsWith("/redeem"),
       },
       {
         href: "/collections",
-        label: "Collections",
+        label: t("layout.nav.collections"),
         icon: FolderKanban,
         active: pathname.startsWith("/collections"),
       },
       {
         href: "/community",
-        label: "Community",
+        label: t("layout.nav.community"),
         icon: Cat,
         active: pathname.startsWith("/community"),
       },
       {
        href: "/dm",
-       label: "Chat",
+       label: t("layout.nav.chat"),
        icon: MessageCircle,
        active: pathname.startsWith("/dm"),
       },
     ],
-    [pathname]
+    [pathname, t]
   );
 
   const mobileBottomItems = useMemo(
     () => [
-      { href: "/", label: "Home", icon: House, active: pathname === "/" },
+      { href: "/", label: t("layout.nav.home"), icon: House, active: pathname === "/" },
       {
         href: "/market",
-        label: "Market",
+        label: t("layout.nav.market"),
         icon: ShoppingBag,
         active: pathname.startsWith("/market"),
       },
       {
         href: "/rewards",
-        label: "Rewards",
+        label: t("layout.nav.rewards"),
         icon: Trophy,
         active: pathname.startsWith("/rewards"),
       },
       {
         href: "/dm",
-        label: "Chat",
+        label: t("layout.nav.chat"),
         icon: MessageCircle,
         active: pathname.startsWith("/dm"),
       },
     ],
-    [pathname]
+    [pathname, t]
   );
 
   const drawerLinks = [
     ...sideItems,
     {
       href: "/wallet",
-      label: "Wallet",
+      label: t("layout.nav.wallet"),
       icon: Wallet,
       active: pathname.startsWith("/wallet"),
     },
     {
       href: "/profile/me",
-      label: "My Profile",
+      label: t("layout.nav.profile"),
       icon: User,
       active: pathname.startsWith("/profile"),
     },
     {
       href: "/settings/profile",
-      label: "Profile Settings",
+      label: t("layout.nav.profileSettings"),
       icon: Settings,
       active: pathname.startsWith("/settings/profile"),
     },
@@ -237,19 +277,19 @@ export default function MainLayout({
         {/* DESKTOP LEFT DOCK */}
         <aside className="hidden xl:flex fixed left-0 top-0 h-screen w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex-col xl:items-center z-[600]">
           <div className="flex h-full w-full flex-col items-center py-5">
-            <Link
+            <PrefetchLink
               href="/"
               className="mb-6 flex h-14 w-14 items-center justify-center rounded-[20px] border border-amber-300/15 bg-[#12141a] text-amber-300 shadow-[0_0_30px_rgba(251,191,36,0.18)] transition hover:scale-[1.03] hover:shadow-[0_0_34px_rgba(251,191,36,0.26)]"
             >
               <Gem className="h-5 w-5" />
-            </Link>
+            </PrefetchLink>
 
             <div className="flex flex-col gap-3">
               {sideItems.map((item) => {
                 const Icon = item.icon;
 
                 return (
-                  <Link
+                  <PrefetchLink
                     key={item.href}
                     href={item.href}
                     className={`group flex h-12 w-12 items-center justify-center rounded-2xl border transition ${
@@ -259,7 +299,7 @@ export default function MainLayout({
                     }`}
                   >
                     <Icon className="h-[18px] w-[18px]" />
-                  </Link>
+                  </PrefetchLink>
                 );
               })}
             </div>
@@ -273,16 +313,16 @@ export default function MainLayout({
             <div className="flex h-[74px] items-center justify-between px-4 sm:px-5 xl:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 {/* MOBILE LOGO */}
-                <Link
+                <PrefetchLink
                   href="/"
                   className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/15 bg-[#12141a] text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.16)] xl:hidden"
                 >
                   <Gem className="h-5 w-5" />
-                </Link>
+                </PrefetchLink>
 
                 <div className="min-w-0">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35 sm:text-[11px]">
-                    NEXORA COMMAND
+                    {t("layout.command")}
                   </div>
                   <div className="truncate text-[20px] font-black leading-none sm:text-2xl">
                     {pageContext}
@@ -291,16 +331,16 @@ export default function MainLayout({
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                <button className="hidden h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)] sm:flex">
-                  <Bell className="h-4 w-4" />
-                </button>
+                <LanguageSwitcher />
 
-                <Link
+                <NotificationBell />
+
+                <PrefetchLink
                   href="/wallet"
                   className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)]"
                 >
                   <Wallet className="h-4 w-4" />
-                </Link>
+                </PrefetchLink>
 
                 <div className="rounded-xl border border-amber-300/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.16),rgba(245,158,11,0.08))] px-3 py-2 text-xs font-black text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] sm:px-4 sm:text-sm">
                   <span className="drop-shadow-[0_0_12px_rgba(251,191,36,0.55)]">
@@ -353,39 +393,39 @@ export default function MainLayout({
                     >
                       <div className="mb-2 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
                         <div className="text-xs uppercase tracking-[0.24em] text-white/35">
-                          Commander
+                          {t("layout.profile.commander")}
                         </div>
                         <div className="mt-1 truncate text-base font-black text-white">
                           {session?.user?.name || "NEXORA USER"}
                         </div>
                       </div>
 
-                      <Link
+                      <PrefetchLink
                         href="/wallet"
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
                         <Wallet className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
-                        Wallet
-                      </Link>
+                        {t("layout.nav.wallet")}
+                      </PrefetchLink>
 
-                      <Link
+                      <PrefetchLink
                         href="/profile/me"
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
                         <User className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
-                        My Profile
-                      </Link>
+                        {t("layout.nav.profile")}
+                      </PrefetchLink>
 
-                      <Link
+                      <PrefetchLink
                         href="/settings/profile"
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
                         <Settings className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
-                        Profile Settings
-                      </Link>
+                        {t("layout.nav.profileSettings")}
+                      </PrefetchLink>
 
                       <button
                         type="button"
@@ -396,7 +436,7 @@ export default function MainLayout({
                         className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-300 transition hover:bg-red-500/10"
                       >
                         <LogOut className="h-4 w-4" />
-                        Logout
+                        {t("layout.logout")}
                       </button>
                     </div>
                   )}
@@ -454,7 +494,7 @@ export default function MainLayout({
                 <div className="text-[10px] uppercase tracking-[0.26em] text-white/35">
                   NEXORA
                 </div>
-                <div className="text-lg font-black">COMMAND MENU</div>
+                <div className="text-lg font-black">{t("layout.mobile.menu")}</div>
               </div>
             </div>
 
@@ -496,9 +536,10 @@ export default function MainLayout({
               const Icon = item.icon;
 
               return (
-                <Link
+                <PrefetchLink
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileNavOpen(false)}
                   className={`flex items-center justify-between rounded-2xl border px-4 py-4 transition ${
                     item.active
                       ? "border-amber-300/18 bg-amber-300/10 text-amber-200 shadow-[0_0_24px_rgba(251,191,36,0.10)]"
@@ -519,7 +560,7 @@ export default function MainLayout({
                   </div>
 
                   <ChevronRight className="h-4 w-4 opacity-50" />
-                </Link>
+                </PrefetchLink>
               );
             })}
           </div>
@@ -534,7 +575,7 @@ export default function MainLayout({
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
                   <LogOut className="h-5 w-5" />
                 </div>
-                <span className="text-sm font-bold">Logout</span>
+                <span className="text-sm font-bold">{t("layout.logout")}</span>
               </div>
               <ChevronRight className="h-4 w-4 opacity-50" />
             </button>
@@ -550,9 +591,10 @@ export default function MainLayout({
               const Icon = item.icon;
 
               return (
-                <Link
+                <PrefetchLink
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileNavOpen(false)}
                   className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border transition ${
                     item.active
                       ? "border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
@@ -561,7 +603,7 @@ export default function MainLayout({
                 >
                   <Icon className="h-5 w-5" />
                   <span className="mt-1 text-[11px] font-bold">{item.label}</span>
-                </Link>
+                </PrefetchLink>
               );
             })}
           </div>

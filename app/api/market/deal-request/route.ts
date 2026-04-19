@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    const buyerId = String((session?.user as any)?.id || "");
+    const buyerId = String(session?.user?.id || "").trim();
 
     if (!buyerId) {
       return NextResponse.json(
@@ -17,20 +19,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { cardId, sellerId, offeredPrice } = body;
+    const cardId = String(body?.cardId || "").trim();
+    const sellerId = String(body?.sellerId || "").trim();
+    const offeredPrice = Number(body?.offeredPrice);
 
-    console.log("DEAL INPUT:", {
-      buyerId,
-      sellerId,
-      cardId,
-      offeredPrice,
-    });
-
-    if (!cardId || !sellerId || !offeredPrice) {
-      return NextResponse.json(
-        { error: "ข้อมูลไม่ครบ" },
-        { status: 400 }
-      );
+    if (!cardId || !sellerId || !Number.isFinite(offeredPrice)) {
+      return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
     }
 
     if (buyerId === sellerId) {
@@ -40,41 +34,79 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const price = Number(offeredPrice);
-
-    if (isNaN(price) || price <= 0) {
+    if (offeredPrice <= 0) {
       return NextResponse.json(
         { error: "ราคาที่เสนอไม่ถูกต้อง" },
         { status: 400 }
       );
     }
 
-    // ✅ เช็คว่าคนขายมีอยู่จริง
-    const sellerUser = await prisma.user.findUnique({
-      where: {
-        id: sellerId,
-      },
-      select: {
-        id: true,
-        displayName: true,
-        name: true,
-      },
-    });
+    const [sellerUser, listing, existingOpenDeal] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: sellerId },
+        select: {
+          id: true,
+          displayName: true,
+          name: true,
+        },
+      }),
+      prisma.marketListing.findUnique({
+        where: { id: cardId },
+        select: {
+          id: true,
+          sellerId: true,
+          status: true,
+        },
+      }),
+      prisma.dealRequest.findFirst({
+        where: {
+          cardId,
+          buyerId,
+          status: {
+            in: ["pending", "accepted"],
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+      }),
+    ]);
 
     if (!sellerUser) {
+      return NextResponse.json({ error: "ไม่พบผู้ขาย" }, { status: 400 });
+    }
+
+    if (!listing || listing.sellerId !== sellerId) {
+      return NextResponse.json(
+        { error: "ไม่พบการ์ดใบนี้ในตลาด" },
+        { status: 404 }
+      );
+    }
+
+    if (listing.status === "sold") {
+      return NextResponse.json(
+        { error: "การ์ดใบนี้ขายไปแล้ว" },
+        { status: 400 }
+      );
+    }
+
+    if (existingOpenDeal) {
       return NextResponse.json(
         {
           error:
-            "ไม่พบ sellerId ในระบบ (client น่าจะส่ง id ผิด ต้องใช้ listing.sellerId)",
+            existingOpenDeal.status === "accepted"
+              ? "คุณมีดีลที่ถูกตอบรับแล้วกับการ์ดใบนี้อยู่ ต้องยกเลิกก่อนถึงจะส่งใหม่ได้"
+              : "คุณส่งคำขอดีลค้างอยู่กับการ์ดใบนี้แล้ว ต้องยกเลิกดีลเดิมก่อน",
         },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
     const deal = await prisma.dealRequest.create({
       data: {
         cardId,
-        offeredPrice: price,
+        offeredPrice,
         status: "pending",
         buyerId,
         sellerId,
@@ -97,18 +129,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "ส่งคำขอดีลสำเร็จ 🎉",
+      message: "ส่งคำขอดีลสำเร็จ",
       deal,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("DEAL REQUEST ERROR:", error);
-    console.error("DEAL REQUEST ERROR FULL:", error?.message);
 
-    return NextResponse.json(
-      {
-        error: error?.message || "สร้างคำขอดีลไม่สำเร็จ",
-      },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "สร้างคำขอดีลไม่สำเร็จ";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

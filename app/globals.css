@@ -143,3 +143,82 @@ body {
 }
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes homeFloat {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -12px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes homeFloatSlow {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -16px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes homeFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes homeMarquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.home-hero-float {
+  animation: homeFloatSlow 7s ease-in-out infinite;
+}
+
+.home-float-card {
+  animation: homeFloat 5s ease-in-out infinite;
+}
+
+.home-float-card-delay {
+  animation: homeFloatSlow 6.5s ease-in-out infinite;
+}
+
+.home-fade-up,
+.home-fade-up-delay,
+.home-fade-up-delay-2,
+.home-fade-up-delay-3 {
+  opacity: 0;
+  animation: homeFadeUp 0.8s ease-out forwards;
+}
+
+.home-fade-up-delay {
+  animation-delay: 120ms;
+}
+
+.home-fade-up-delay-2 {
+  animation-delay: 220ms;
+}
+
+.home-fade-up-delay-3 {
+  animation-delay: 320ms;
+}
+
+.home-marquee {
+  animation: homeMarquee 24s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-float,
+  .home-float-card,
+  .home-float-card-delay,
+  .home-fade-up,
+  .home-fade-up-delay,
+  .home-fade-up-delay-2,
+  .home-fade-up-delay-3,
+  .home-marquee {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

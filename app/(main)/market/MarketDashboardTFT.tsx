@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Heart,
@@ -24,6 +25,28 @@ type MarketItem = {
   sellerImage?: string;
 };
 
+type ListingApiItem = {
+  id: string;
+  card_no?: string;
+  cardNo?: string;
+  cardName?: string;
+  card_name?: string;
+  name?: string;
+  price?: number;
+  likes?: number;
+  rarity?: string;
+  image_url?: string;
+  imageUrl?: string;
+  createdAt?: string;
+  sellerId?: string;
+  seller?: {
+    id?: string;
+    displayName?: string;
+    name?: string;
+    image?: string;
+  };
+};
+
 function rarityClasses(rarity: string) {
   switch (rarity) {
     case "Legendary":
@@ -37,6 +60,37 @@ function rarityClasses(rarity: string) {
         ring: "hover:shadow-[0_20px_80px_rgba(217,70,239,0.16)]",
       };
   }
+}
+
+function getCreatedAtValue(dateString?: string) {
+  const value = new Date(dateString || 0).getTime();
+  return Number.isNaN(value) ? 0 : value;
+}
+
+function comparePopularCards(a: MarketItem, b: MarketItem) {
+  if (b.likes !== a.likes) {
+    return b.likes - a.likes;
+  }
+
+  const createdAtDiff = getCreatedAtValue(a.createdAt) - getCreatedAtValue(b.createdAt);
+  if (createdAtDiff !== 0) {
+    return createdAtDiff;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
+function compareLatestCards(a: MarketItem, b: MarketItem) {
+  const createdAtDiff = getCreatedAtValue(b.createdAt) - getCreatedAtValue(a.createdAt);
+  if (createdAtDiff !== 0) {
+    return createdAtDiff;
+  }
+
+  if (b.likes !== a.likes) {
+    return b.likes - a.likes;
+  }
+
+  return a.id.localeCompare(b.id);
 }
 
 function ActionButton({
@@ -64,32 +118,38 @@ function ActionButton({
   );
 }
 
-export default function MarketDashboardTFT() {
-  const [items, setItems] = useState<MarketItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [likedCards, setLikedCards] = useState<string[]>([]);
-  const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
-  const [mouse, setMouse] = useState({ x: 50, y: 50 });
+export default function MarketDashboardTFT({
+  initialItems = [],
+  initialItemsLoaded = false,
+}: {
+  initialItems?: MarketItem[];
+  initialItemsLoaded?: boolean;
+}) {
+  const { data: session } = useSession();
+  const [items, setItems] = useState<MarketItem[]>(initialItems);
+  const [loading, setLoading] = useState(!initialItemsLoaded);
+  const [likedCards, setLikedCards] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
 
-  useEffect(() => {
     try {
       const raw = localStorage.getItem("nexora_market_likes");
       const parsed = raw ? JSON.parse(raw) : [];
 
-      const list = Array.isArray(parsed)
+      return Array.isArray(parsed)
         ? parsed
-        : Object.keys(parsed || {}).filter((k) => parsed[k]);
-
-      setLikedCards(list);
+        : Object.keys(parsed || {}).filter((key) => parsed[key]);
     } catch {
-      setLikedCards([]);
+      return [];
     }
-  }, []);
+  });
+  const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
+  const [mouse, setMouse] = useState({ x: 50, y: 50 });
 
-  const toggleLike = (cardId: string) => {
+  const toggleLike = (cardId: string, cardNo: string) => {
+    const alreadyLiked = likedCards.includes(cardId);
     let next: string[];
 
-    if (likedCards.includes(cardId)) {
+    if (alreadyLiked) {
       next = likedCards.filter((x) => x !== cardId);
     } else {
       next = [...likedCards, cardId];
@@ -99,13 +159,28 @@ export default function MarketDashboardTFT() {
 
     const mapped = Object.fromEntries(next.map((id) => [id, true]));
     localStorage.setItem("nexora_market_likes", JSON.stringify(mapped));
+
+    if (!alreadyLiked && session?.user?.id) {
+      void fetch("/api/market/wishlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: cardId,
+          cardNo,
+        }),
+      });
+    }
   };
 
   useEffect(() => {
+    let active = true;
+
     fetch("/api/market/listings", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        const mapped = (data || []).map((item: any) => {
+        const mapped = ((data || []) as ListingApiItem[]).map((item) => {
           const cardNo = item.card_no || item.cardNo || item.id;
 
           return {
@@ -132,10 +207,18 @@ export default function MarketDashboardTFT() {
           };
         });
 
+        if (!active) return;
         setItems(mapped);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -153,23 +236,17 @@ export default function MarketDashboardTFT() {
   }, []);
 
   const sortedItems = useMemo(() => {
-    return [...(loading ? [] : items)].sort((a, b) => b.likes - a.likes);
+    return [...(loading ? [] : items)].sort(comparePopularCards);
   }, [items, loading]);
 
   const heroTop3 = useMemo(() => {
     const list = [...sortedItems];
 
     if (heroMode === "latest") {
-      return list
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt || 0).getTime() -
-            new Date(a.createdAt || 0).getTime()
-        )
-        .slice(0, 3);
+      return list.sort(compareLatestCards).slice(0, 3);
     }
 
-    return list.sort((a, b) => b.likes - a.likes).slice(0, 3);
+    return list.sort(comparePopularCards).slice(0, 3);
   }, [sortedItems, heroMode]);
 
   const leftHero = heroTop3[1];
@@ -231,7 +308,7 @@ export default function MarketDashboardTFT() {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  toggleLike(centerHero.id);
+                  toggleLike(centerHero.id, centerHero.cardNo);
                 }}
                 className="absolute right-3 top-3 rounded-full bg-black/50 p-3"
               >
@@ -303,7 +380,7 @@ export default function MarketDashboardTFT() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      toggleLike(card.id);
+                      toggleLike(card.id, card.cardNo);
                     }}
                     className="absolute right-2 top-2 rounded-full bg-black/50 p-2"
                   >
@@ -403,7 +480,7 @@ export default function MarketDashboardTFT() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    toggleLike(leftHero.id);
+                    toggleLike(leftHero.id, leftHero.cardNo);
                   }}
                   className="absolute right-3 top-3 rounded-full bg-black/50 p-2"
                 >
@@ -466,7 +543,7 @@ export default function MarketDashboardTFT() {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  toggleLike(centerHero.id);
+                  toggleLike(centerHero.id, centerHero.cardNo);
                 }}
                 className="absolute right-4 top-4 rounded-full bg-black/50 p-3"
               >
@@ -532,7 +609,7 @@ export default function MarketDashboardTFT() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    toggleLike(rightHero.id);
+                    toggleLike(rightHero.id, rightHero.cardNo);
                   }}
                   className="absolute right-3 top-3 rounded-full bg-black/50 p-2"
                 >
@@ -638,7 +715,7 @@ export default function MarketDashboardTFT() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        toggleLike(card.id);
+                        toggleLike(card.id, card.cardNo);
                       }}
                       className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md transition hover:scale-105"
                     >

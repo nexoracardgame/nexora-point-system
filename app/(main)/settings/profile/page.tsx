@@ -1,9 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { UploadCloud, User2 } from "lucide-react";
+import { emitProfileSync } from "@/lib/profile-sync";
 
 export default function ProfileSettingsPage() {
+  const router = useRouter();
+  const { update } = useSession();
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -18,7 +23,6 @@ export default function ProfileSettingsPage() {
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const profileInputRef = useRef<HTMLInputElement>(null);
-
   const coverRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
@@ -57,53 +61,59 @@ export default function ProfileSettingsPage() {
   }, []);
 
   function uploadImage(file: File, type: "profile" | "cover") {
-  const img = new Image();
-  const reader = new FileReader();
+    const img = new Image();
+    const reader = new FileReader();
 
-  reader.onload = () => {
-    img.src = reader.result as string;
-  };
+    reader.onload = () => {
+      img.src = reader.result as string;
+    };
 
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    const maxSize = 800; // 🔥 จำกัดขนาด
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const isCover = type === "cover";
+      const maxSize = isCover ? 2200 : 1080;
+      const exportType =
+        isCover && file.type === "image/png" ? "image/png" : "image/jpeg";
+      const exportQuality = isCover ? 0.94 : 0.88;
 
-    let width = img.width;
-    let height = img.height;
+      let width = img.width;
+      let height = img.height;
 
-    if (width > height) {
-      if (width > maxSize) {
-        height *= maxSize / width;
-        width = maxSize;
-      }
-    } else {
-      if (height > maxSize) {
+      if (width > height) {
+        if (width > maxSize) {
+          height *= maxSize / width;
+          width = maxSize;
+        }
+      } else if (height > maxSize) {
         width *= maxSize / height;
         height = maxSize;
       }
-    }
 
-    canvas.width = width;
-    canvas.height = height;
+      canvas.width = width;
+      canvas.height = height;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    ctx.drawImage(img, 0, 0, width, height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, width, height);
 
-    // 🔥 บีบคุณภาพ
-    const compressed = canvas.toDataURL("image/jpeg", 0.7);
+      const compressed =
+        exportType === "image/png"
+          ? canvas.toDataURL(exportType)
+          : canvas.toDataURL(exportType, exportQuality);
 
-    if (type === "profile") {
-      setProfileImage(compressed);
-    } else {
-      setCoverUrl(compressed);
-      setCoverPosition(50);
-    }
-  };
+      if (type === "profile") {
+        setProfileImage(compressed);
+      } else {
+        setCoverUrl(compressed);
+        setCoverPosition(50);
+      }
+    };
 
-  reader.readAsDataURL(file);
-}
+    reader.readAsDataURL(file);
+  }
 
   function handlePointerMove(e: React.PointerEvent) {
     if (!isDragging.current || !coverRef.current) return;
@@ -120,7 +130,6 @@ export default function ProfileSettingsPage() {
       setSaving(true);
 
       const payload = {
-        // รูปแบบเดิม
         coverUrl,
         coverPosition,
         displayName,
@@ -128,8 +137,6 @@ export default function ProfileSettingsPage() {
         lineLink,
         facebookLink,
         profileImage,
-
-        // รูปแบบสำรองให้ backend ที่ใช้ชื่ออีกแบบ
         coverImage: coverUrl,
         image: profileImage,
         lineUrl: lineLink,
@@ -151,10 +158,24 @@ export default function ProfileSettingsPage() {
         return;
       }
 
-      // โหลดค่าจริงกลับมาหลังเซฟ เพื่อให้มือถือ/คอมตรงกันทันที
+      const syncedName =
+        data?.user?.displayName || data?.user?.name || displayName || "";
+      const syncedImage = data?.user?.image || profileImage || "/avatar.png";
+
+      await update({
+        name: syncedName,
+        image: syncedImage,
+      });
+
+      emitProfileSync({
+        name: syncedName,
+        image: syncedImage,
+      });
+
+      router.refresh();
       await loadProfile();
 
-      alert("บันทึกโปรไฟล์สำเร็จ 🎉");
+      alert("Saved successfully");
     } catch (error) {
       console.error("SAVE PROFILE ERROR:", error);
       alert("Save failed");
@@ -168,9 +189,7 @@ export default function ProfileSettingsPage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1140_0%,#090b12_45%,#05070d_100%)] p-4 text-white sm:p-6">
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
-        {/* LEFT PANEL */}
         <section className="rounded-[36px] border border-white/10 bg-white/[0.03] p-6 shadow-2xl">
-          {/* PROFILE IMAGE */}
           <div className="mt-6">
             <div className="flex items-center gap-2 text-sm font-semibold text-white/70">
               <User2 className="h-4 w-4" />
@@ -207,7 +226,6 @@ export default function ProfileSettingsPage() {
             />
           </div>
 
-          {/* COVER */}
           <div className="mt-6">
             <div className="flex items-center gap-2 text-sm font-semibold text-white/70">
               <UploadCloud className="h-4 w-4" />
@@ -221,10 +239,10 @@ export default function ProfileSettingsPage() {
             >
               <div>
                 <div className="text-sm font-bold text-white">
-                  🖼 Choose Cover Image
+                  Choose Cover Image
                 </div>
                 <div className="text-xs text-zinc-400">
-                  รองรับมือถือ / แกลเลอรี่ / LINE browser
+                  Works on mobile, gallery, and LINE browser.
                 </div>
               </div>
               <div className="text-xs text-violet-300">Browse</div>
@@ -244,7 +262,6 @@ export default function ProfileSettingsPage() {
               }}
             />
 
-            {/* DRAG AREA */}
             <div
               ref={coverRef}
               onPointerDown={(e) => {
@@ -262,6 +279,7 @@ export default function ProfileSettingsPage() {
             >
               <img
                 src={coverUrl}
+                alt="Cover preview"
                 draggable={false}
                 className="pointer-events-none h-full w-full object-cover"
                 style={{
@@ -271,7 +289,6 @@ export default function ProfileSettingsPage() {
             </div>
           </div>
 
-          {/* TEXT FIELDS */}
           <div className="mt-4">
             <label className="text-sm text-white/70">Display Name</label>
             <input
@@ -308,21 +325,20 @@ export default function ProfileSettingsPage() {
             />
           </div>
 
-          {/* SAVE */}
           <button
             onClick={saveProfile}
             disabled={saving}
             className="mt-6 w-full rounded-2xl bg-violet-500 py-4 font-bold"
           >
-            {saving ? "Saving..." : "💾 Save Profile"}
+            {saving ? "Saving..." : "Save Profile"}
           </button>
         </section>
 
-        {/* RIGHT PREVIEW */}
         <section className="overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.03] shadow-2xl">
           <div className="relative h-[260px] overflow-hidden">
             <img
               src={coverUrl}
+              alt="Cover banner"
               className="h-full w-full object-cover"
               style={{
                 objectPosition: `center ${coverPosition}%`,
@@ -335,7 +351,7 @@ export default function ProfileSettingsPage() {
             <h1 className="text-xl font-bold">{displayName}</h1>
 
             <p className="mt-2 text-sm text-white/60">
-              {bio || "Top-tier NEXORA trader ⚡"}
+              {bio || "Top-tier NEXORA trader"}
             </p>
 
             <div className="mt-3 flex gap-4">

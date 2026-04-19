@@ -1,7 +1,8 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useState } from "react";
 
 type WishlistItem = {
   id: string;
@@ -9,6 +10,34 @@ type WishlistItem = {
   cardName?: string;
   sellerName?: string;
 };
+
+function normalizeWishlist(raw: string | null): WishlistItem[] {
+  try {
+    const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
+
+    return parsed.map((item) => {
+      if (typeof item === "string") {
+        return {
+          id: item,
+          cardNo: item,
+          cardName: `Card #${item}`,
+          sellerName: "Vault Prime",
+        };
+      }
+
+      const value = (item || {}) as Partial<WishlistItem>;
+
+      return {
+        id: String(value.id || ""),
+        cardNo: String(value.cardNo || value.id || ""),
+        cardName: value.cardName || undefined,
+        sellerName: value.sellerName || undefined,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
 
 export default function WishlistButton({
   listingId,
@@ -21,59 +50,46 @@ export default function WishlistButton({
   cardName?: string;
   sellerName?: string;
 }) {
-  const [saved, setSaved] = useState(false);
+  const { data: session } = useSession();
+  const [saved, setSaved] = useState(() => {
+    if (typeof window === "undefined") return false;
 
-  useEffect(() => {
-    const raw = localStorage.getItem("nexora_wishlist");
-    const parsed = raw ? JSON.parse(raw) : [];
-
-    const normalized: WishlistItem[] = parsed.map((item: any) =>
-      typeof item === "string"
-        ? {
-            id: item,
-            cardNo: item,
-            cardName: `Card #${item}`,
-            sellerName: "Vault Prime",
-          }
-        : item
-    );
-
-    setSaved(normalized.some((x) => x.id === listingId));
-  }, [listingId]);
+    const wishlist = normalizeWishlist(localStorage.getItem("nexora_wishlist"));
+    return wishlist.some((item) => item.id === listingId);
+  });
 
   const handleWishlist = () => {
-    const raw = localStorage.getItem("nexora_wishlist");
-    const parsed = raw ? JSON.parse(raw) : [];
+    const list = normalizeWishlist(localStorage.getItem("nexora_wishlist"));
+    const exists = list.some((item) => item.id === listingId);
 
-    let list: WishlistItem[] = parsed.map((item: any) =>
-      typeof item === "string"
-        ? {
-            id: item,
-            cardNo: item,
-            cardName: `Card #${item}`,
-            sellerName: "Vault Prime",
-          }
-        : item
-    );
+    const nextList = exists
+      ? list.filter((item) => item.id !== listingId)
+      : [
+          ...list,
+          {
+            id: listingId,
+            cardNo,
+            cardName:
+              cardName || `Card #${String(cardNo).padStart(3, "0")}`,
+            sellerName: sellerName || "Vault Prime",
+          },
+        ];
 
-    const exists = list.some((x) => x.id === listingId);
+    localStorage.setItem("nexora_wishlist", JSON.stringify(nextList));
+    setSaved(!exists);
 
-    if (exists) {
-      list = list.filter((x) => x.id !== listingId);
-      setSaved(false);
-    } else {
-      list.push({
-        id: listingId,
-        cardNo,
-        cardName:
-          cardName || `Card #${String(cardNo).padStart(3, "0")}`,
-        sellerName: sellerName || "Vault Prime",
+    if (!exists && session?.user?.id) {
+      void fetch("/api/market/wishlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId,
+          cardNo,
+        }),
       });
-
-      setSaved(true);
     }
-
-    localStorage.setItem("nexora_wishlist", JSON.stringify(list));
   };
 
   return (

@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const listings = await prisma.marketListing.findMany({
     where: {
-      status: {
-        in: ["active", "ACTIVE"],
+      NOT: {
+        status: "sold",
       },
     },
     orderBy: { createdAt: "desc" },

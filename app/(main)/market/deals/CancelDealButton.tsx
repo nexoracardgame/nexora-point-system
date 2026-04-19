@@ -2,12 +2,16 @@
 
 import { XCircle } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function CancelDealButton({
   dealId,
+  label = "Cancel My Request",
 }: {
   dealId: string;
+  label?: string;
 }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
 
   const handleCancel = async () => {
@@ -51,7 +55,7 @@ export default function CancelDealButton({
       }`}
     >
       <XCircle className="h-4 w-4" />
-      {loading ? "Cancelling..." : "Cancel My Request"}
+      {loading ? t("deals.cancelLoading") : label}
     </button>
   );
 }

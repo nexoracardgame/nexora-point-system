@@ -1,20 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import DealActionButtons from "./DealActionButtons";
-import CancelDealButton from "./CancelDealButton";
-import VerifySaleButton from "./VerifySaleButton";
 import {
-  Handshake,
-  Wallet,
-  User,
-  Clock3,
   BadgeCheck,
-  XCircle,
+  Clock3,
+  Handshake,
   Shield,
+  User,
+  Wallet,
+  XCircle,
 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import CancelDealButton from "./CancelDealButton";
+import DealActionButtons from "./DealActionButtons";
+import VerifySaleButton from "./VerifySaleButton";
 
 type DealMember = {
   id: string;
@@ -24,7 +25,7 @@ type DealMember = {
 
 type DealCard = {
   id: string;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "completed";
   offeredPrice: number;
   isSeller: boolean;
   buyer: DealMember;
@@ -32,7 +33,6 @@ type DealCard = {
   cardName: string;
   cardNo: string;
   cardImage: string;
-  serialNo: string;
   listingStatus: string;
 };
 
@@ -41,23 +41,26 @@ function safeImage(src?: string | null, fallback = "/avatar.png") {
   return raw || fallback;
 }
 
-function getStatusUI(status: string) {
+function getStatusUI(
+  status: string,
+  t: (key: string, vars?: Record<string, string | number>) => string
+) {
   switch (status) {
     case "accepted":
       return {
-        label: "READY TO CLOSE",
+        label: t("deals.status.ready"),
         className: "border-cyan-300/20 bg-cyan-400/10 text-cyan-300",
         icon: BadgeCheck,
       };
     case "rejected":
       return {
-        label: "REJECTED",
+        label: t("deals.status.rejected"),
         className: "border-red-300/20 bg-red-400/10 text-red-300",
         icon: XCircle,
       };
     default:
       return {
-        label: "PENDING",
+        label: t("deals.status.pending"),
         className: "border-amber-300/20 bg-amber-300/10 text-amber-300",
         icon: Clock3,
       };
@@ -66,72 +69,74 @@ function getStatusUI(status: string) {
 
 export default function DealsPage() {
   const router = useRouter();
-
+  const { t } = useLanguage();
   const [deals, setDeals] = useState<DealCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingChatId, setCreatingChatId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchDeals = useCallback(
-    async (firstLoad = false) => {
-      try {
-        if (firstLoad) {
-          setLoading(true);
-        } else {
-          setRefreshing(true);
-        }
+  const fetchDeals = useCallback(async (firstLoad = false) => {
+    try {
+      if (firstLoad) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
 
-        const res = await fetch("/api/market/deals", {
-          method: "GET",
-          cache: "no-store",
-        });
+      const res = await fetch("/api/market/deals", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-        if (!res.ok) {
-          throw new Error("โหลดดีลไม่สำเร็จ");
-        }
+      if (!res.ok) {
+        throw new Error(t("deals.loading"));
+      }
 
-        const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setDeals(data);
-        } else {
-          setDeals([]);
-        }
-      } catch (error) {
-        console.error("FETCH DEALS ERROR:", error);
-        if (firstLoad) setDeals([]);
-      } finally {
-        if (firstLoad) setLoading(false);
+      const data = await res.json();
+      setDeals(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("FETCH DEALS ERROR:", error);
+      if (firstLoad) {
+        setDeals([]);
+      }
+    } finally {
+      if (firstLoad) {
+        setLoading(false);
+      } else {
         setRefreshing(false);
       }
-    },
-    []
-  );
+    }
+  }, [t]);
 
   useEffect(() => {
-    fetchDeals(true);
+    const start = window.setTimeout(() => {
+      void fetchDeals(true);
+    }, 0);
 
-    const onFocus = () => fetchDeals(false);
+    const onFocus = () => {
+      void fetchDeals(false);
+    };
+
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        fetchDeals(false);
+        void fetchDeals(false);
       }
     };
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
 
-    // รีเฟรชเบาๆ พอ ไม่ถี่ยิบจนเว็บอืด
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        fetchDeals(false);
+        void fetchDeals(false);
       }
     }, 15000);
 
     return () => {
+      window.clearTimeout(start);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(interval);
+      window.clearInterval(interval);
     };
   }, [fetchDeals]);
 
@@ -157,24 +162,25 @@ export default function DealsPage() {
 
       if (data?.roomId) {
         router.push(`/dm/${data.roomId}`);
-      } else {
-        alert("เปิดแชทไม่สำเร็จ");
+        return;
       }
-    } catch (err) {
-      console.error("CHAT ERROR:", err);
-      alert("เกิดข้อผิดพลาด");
+
+      alert(t("deals.chat"));
+    } catch (error) {
+      console.error("CHAT ERROR:", error);
+      alert(t("deals.chat"));
     } finally {
       setCreatingChatId(null);
     }
   };
 
   const pendingDeals = useMemo(
-    () => deals.filter((d) => d.status === "pending"),
+    () => deals.filter((deal) => deal.status === "pending"),
     [deals]
   );
 
   const acceptedDeals = useMemo(
-    () => deals.filter((d) => d.status === "accepted"),
+    () => deals.filter((deal) => deal.status === "accepted"),
     [deals]
   );
 
@@ -183,7 +189,7 @@ export default function DealsPage() {
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,#22114a_0%,#090b12_40%,#05070d_100%)] text-white">
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 text-zinc-300 shadow-[0_25px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
-            กำลังโหลดคำขอดีล...
+            {t("deals.loading")}
           </div>
         </div>
       </div>
@@ -191,10 +197,11 @@ export default function DealsPage() {
   }
 
   const renderDealCard = (deal: DealCard, index: number) => {
-    const statusUI = getStatusUI(deal.status);
+    const statusUI = getStatusUI(deal.status, t);
     const StatusIcon = statusUI.icon;
     const member = deal.isSeller ? deal.buyer : deal.seller;
     const isOpeningChat = creatingChatId === member.id;
+    const canOpenChat = deal.status === "accepted";
 
     return (
       <div
@@ -221,11 +228,11 @@ export default function DealsPage() {
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">
                 {deal.status === "accepted"
                   ? deal.isSeller
-                    ? "WAITING BUYER VERIFY"
-                    : "VERIFY TO CLOSE"
+                    ? t("deals.role.waitBuyer")
+                    : t("deals.role.verify")
                   : deal.isSeller
-                    ? "OWNER ACTION"
-                    : "YOUR REQUEST"}
+                    ? t("deals.role.ownerAction")
+                    : t("deals.role.yourRequest")}
               </div>
               <div className="text-sm font-bold text-white/85">
                 #{String(index + 1).padStart(3, "0")}
@@ -244,25 +251,27 @@ export default function DealsPage() {
         <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-4">
           <div className="flex items-center gap-2 text-xs text-zinc-400">
             <Wallet className="h-4 w-4" />
-            Offer Price
+            {t("deals.offerPrice")}
           </div>
           <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
-            ฿{Number(deal.offeredPrice).toLocaleString()}
+            ฿{Number(deal.offeredPrice).toLocaleString("th-TH")}
           </div>
         </div>
 
-        <button
-          onClick={() => handleChat(member.id)}
-          disabled={isOpeningChat}
-          className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {isOpeningChat ? "⏳ กำลังเปิดแชท..." : "💬 แชทนัดสถานที่"}
-        </button>
+        {canOpenChat && (
+          <button
+            onClick={() => handleChat(member.id)}
+            disabled={isOpeningChat}
+            className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isOpeningChat ? t("deals.chatOpening") : t("deals.chat")}
+          </button>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-2xl bg-white/[0.03] p-4">
             <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-              Card
+              {t("deals.card")}
             </div>
 
             <div className="mt-3 flex items-center gap-4">
@@ -283,12 +292,6 @@ export default function DealsPage() {
                 <div className="mt-2 text-sm text-amber-300">
                   #{String(deal.cardNo).padStart(3, "0")}
                 </div>
-
-                {deal.status === "accepted" && (
-                  <div className="mt-2 text-[11px] text-cyan-300">
-                    Reference Serial: {deal.serialNo || "-"}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -296,7 +299,7 @@ export default function DealsPage() {
           <div className="rounded-2xl bg-white/[0.03] p-4">
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
               <User className="h-3.5 w-3.5" />
-              {deal.isSeller ? "Buyer" : "Seller"}
+              {deal.isSeller ? t("deals.buyer") : t("deals.seller")}
             </div>
 
             <Link
@@ -331,7 +334,7 @@ export default function DealsPage() {
           {deal.status === "pending" && deal.isSeller && (
             <>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-violet-300">
-                OWNER ACTION REQUIRED
+                {t("deals.ownerAction")}
               </div>
               <DealActionButtons dealId={deal.id} />
             </>
@@ -340,19 +343,25 @@ export default function DealsPage() {
           {deal.status === "pending" && !deal.isSeller && (
             <>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-red-300">
-                YOUR ACTIVE REQUEST
+                {t("deals.activeRequest")}
               </div>
-              <CancelDealButton dealId={deal.id} />
+              <CancelDealButton dealId={deal.id} label={t("deals.cancelRequest")} />
             </>
           )}
 
           {deal.status === "accepted" && deal.isSeller && (
             <>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">
-                DEAL ACCEPTED — WAITING BUYER VERIFY
+                {t("deals.acceptedWait")}
               </div>
               <div className="rounded-xl border border-cyan-300/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
-                นัดเจอ ตรวจสภาพการ์ด แล้วให้ฝั่งผู้ซื้อกด Verify Serial เพื่อปิดการขายจริง
+                {t("deals.acceptedDesc")}
+              </div>
+              <div className="mt-3">
+                <CancelDealButton
+                  dealId={deal.id}
+                  label={t("deals.cancelAccepted")}
+                />
               </div>
             </>
           )}
@@ -360,9 +369,15 @@ export default function DealsPage() {
           {deal.status === "accepted" && !deal.isSeller && (
             <>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">
-                READY TO CLOSE SALE
+                {t("deals.closeReady")}
               </div>
-              <VerifySaleButton dealId={deal.id} />
+              <div className="space-y-3">
+                <VerifySaleButton dealId={deal.id} />
+                <CancelDealButton
+                  dealId={deal.id}
+                  label={t("deals.cancelAccepted")}
+                />
+              </div>
             </>
           )}
         </div>
@@ -380,14 +395,14 @@ export default function DealsPage() {
                 NEXORA DEAL CENTER
               </div>
               <h1 className="mt-2 text-2xl font-black sm:text-5xl">
-                🤝 คำขอดีล
+                {t("deals.title")}
               </h1>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-3xl border border-amber-300/15 bg-amber-300/10 p-4">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  Pending
+                  {t("deals.pending")}
                 </div>
                 <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
                   {pendingDeals.length}
@@ -396,7 +411,7 @@ export default function DealsPage() {
 
               <div className="rounded-3xl border border-cyan-300/15 bg-cyan-300/10 p-4">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  Ready
+                  {t("deals.ready")}
                 </div>
                 <div className="mt-2 text-2xl font-black text-cyan-300 sm:text-3xl">
                   {acceptedDeals.length}
@@ -406,14 +421,14 @@ export default function DealsPage() {
           </div>
 
           <div className="mt-4 text-xs text-white/35">
-            {refreshing ? "กำลังอัปเดตข้อมูล..." : "ข้อมูลอัปเดตอัตโนมัติเมื่อกลับมาเปิดหน้า หรือทุก 15 วินาที"}
+            {refreshing ? t("deals.refreshing") : t("deals.autoRefresh")}
           </div>
         </section>
 
         {acceptedDeals.length > 0 && (
           <section>
             <div className="mb-4 text-2xl font-black text-cyan-300">
-              🔐 Ready to Close
+              {t("deals.section.ready")}
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -424,7 +439,7 @@ export default function DealsPage() {
 
         <section>
           <div className="mb-4 text-2xl font-black text-amber-300">
-            ⏳ Pending Requests
+            {t("deals.section.pending")}
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -432,7 +447,7 @@ export default function DealsPage() {
               pendingDeals.map((deal, index) => renderDealCard(deal, index))
             ) : (
               <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center text-zinc-400 lg:col-span-2">
-                ยังไม่มีคำขอดีลตอนนี้
+                {t("deals.empty")}
               </div>
             )}
           </div>

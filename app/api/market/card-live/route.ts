@@ -1,63 +1,105 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function getDisplayName(user?: {
+  displayName?: string | null;
+  name?: string | null;
+}) {
+  return user?.displayName || user?.name || "Unknown User";
+}
+
 export async function GET(req: NextRequest) {
-  const cardNo = req.nextUrl.searchParams.get("cardNo");
+  const cardNo = String(req.nextUrl.searchParams.get("cardNo") || "").trim();
 
   if (!cardNo) {
-    return NextResponse.json(
-      { error: "missing cardNo" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "missing cardNo" }, { status: 400 });
   }
 
-  const listing = await prisma.marketListing.findFirst({
+  const relatedListings = await prisma.marketListing.findMany({
     where: {
       cardNo,
     },
     orderBy: {
       createdAt: "desc",
     },
-  });
-
-  const seller = listing
-    ? await prisma.user.findUnique({
-        where: {
-          id: listing.sellerId,
+    select: {
+      id: true,
+      sellerId: true,
+      price: true,
+      status: true,
+      createdAt: true,
+      seller: {
+        select: {
+          id: true,
+          displayName: true,
+          name: true,
+          image: true,
         },
-      })
-    : null;
-
-  const history = await prisma.marketHistory.findMany({
-    where: {
-      listingId: cardNo,
+      },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 5,
   });
 
-  const bidders = await prisma.dealRequest.findMany({
-    where: {
-      cardId: cardNo,
-      status: "pending",
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 5,
-  });
+  const latestListing = relatedListings[0] || null;
+  const relatedListingIds = relatedListings.map((item) => item.id);
+
+  const [history, bidders] = await Promise.all([
+    relatedListingIds.length
+      ? prisma.marketHistory.findMany({
+          where: {
+            listingId: {
+              in: relatedListingIds,
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 5,
+        })
+      : Promise.resolve([]),
+    latestListing
+      ? prisma.dealRequest.findMany({
+          where: {
+            cardId: latestListing.id,
+            status: {
+              in: ["pending", "accepted", "completed"],
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 5,
+          include: {
+            buyer: {
+              select: {
+                id: true,
+                displayName: true,
+                name: true,
+                image: true,
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
 
   return NextResponse.json({
-    owner: listing?.sellerId || "Vault Prime",
-    ownerName:
-      seller?.name ||
-      seller?.lineId ||
-      listing?.sellerId ||
-      "Vault Prime",
-    ownerId: listing?.sellerId || "me",
+    owner: latestListing?.sellerId || null,
+    ownerId: latestListing?.sellerId || null,
+    ownerName: latestListing?.seller
+      ? getDisplayName(latestListing.seller)
+      : null,
     history,
-    bidders,
+    bidders: bidders.map((item) => ({
+      id: item.id,
+      offeredPrice: item.offeredPrice,
+      status: item.status,
+      createdAt: item.createdAt,
+      buyerId: item.buyerId,
+      buyerName: getDisplayName(item.buyer),
+      buyerImage: item.buyer.image || "/avatar.png",
+    })),
   });
 }

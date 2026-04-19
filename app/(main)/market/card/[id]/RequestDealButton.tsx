@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function RequestDealButton({
   cardId,
@@ -9,16 +10,17 @@ export default function RequestDealButton({
   cardId: string;
   sellerId: string;
 }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
 
   const handleRequest = async () => {
-    const offeredPrice = prompt("เสนอราคาดีล ([บาท])");
+    const offeredPrice = prompt(t("deals.requestPricePrompt"));
     if (!offeredPrice) return;
 
     const price = Number(offeredPrice);
 
-    if (isNaN(price) || price <= 0) {
-      alert("กรุณาใส่ราคาให้ถูกต้อง");
+    if (Number.isNaN(price) || price <= 0) {
+      alert(t("deals.requestInvalidPrice"));
       return;
     }
 
@@ -40,13 +42,13 @@ export default function RequestDealButton({
       const data = await res.json();
 
       if (data.success) {
-        alert("ส่งคำขอดีลสำเร็จ 🤝");
+        alert(t("deals.request"));
       } else {
-        alert(data.error || "ส่งไม่สำเร็จ");
+        alert(data.error || t("deals.request"));
       }
     } catch (error) {
       console.error("REQUEST DEAL ERROR:", error);
-      alert("เกิดข้อผิดพลาดในการส่งดีล");
+      alert(t("deals.request"));
     } finally {
       setLoading(false);
     }
@@ -58,7 +60,7 @@ export default function RequestDealButton({
       disabled={loading}
       className="rounded-2xl bg-gradient-to-r from-orange-400 to-amber-500 px-6 py-3 font-bold text-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {loading ? "⏳ Sending..." : "🤝 Request Deal"}
+      {loading ? t("deals.requestLoading") : t("deals.request")}
     </button>
   );
 }

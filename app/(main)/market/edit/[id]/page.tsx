@@ -73,7 +73,7 @@ export default async function EditListingPage({
                 </div>
 
                 <div className="mt-2 text-sm text-white/60">
-                  Serial: {listing.serialNo || "-"}
+                  Serial protected in Seller Center
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 text-lg font-black text-amber-300">

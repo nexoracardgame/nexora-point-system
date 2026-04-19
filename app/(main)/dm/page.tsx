@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -18,178 +18,305 @@ type Room = {
   unread: number;
 };
 
+type SessionUser = {
+  id: string;
+  lineId?: string | null;
+  name?: string | null;
+  image?: string | null;
+};
+
+type MessageRow = {
+  roomId?: string;
+  senderId?: string;
+  senderName?: string | null;
+  senderImage?: string | null;
+  content?: string | null;
+  imageUrl?: string | null;
+  createdAt?: string | null;
+  seenAt?: string | null;
+};
+
+function buildPreview(content?: string | null, imageUrl?: string | null) {
+  const text = String(content || "").trim();
+  if (text) return text;
+  if (imageUrl) return "Photo";
+  return "Start chatting";
+}
+
+function formatRoomTime(dateString?: string) {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+  const now = new Date();
+  const isSameDay =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isSameDay) {
+    return date.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
 export default function DMListPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [me, setMe] = useState<any>(null);
 
   const hasInit = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const meRef = useRef<SessionUser | null>(null);
+
+  const hydrateUnknownRooms = async (baseRooms: Room[]) => {
+    const unknownRooms = baseRooms.filter(
+      (room) => room.otherName === "User" || room.otherImage === "/avatar.png"
+    );
+
+    if (unknownRooms.length === 0) return;
+
+    await Promise.all(
+      unknownRooms.map(async (room) => {
+        try {
+          const res = await fetch(`/api/dm/room-info?roomId=${room.roomId}`, {
+            cache: "no-store",
+          });
+
+          if (!res.ok) return;
+
+          const data = await res.json();
+          const otherUser = data?.otherUser as
+            | { name?: string | null; image?: string | null }
+            | undefined;
+
+          if (!otherUser?.name && !otherUser?.image) return;
+
+          setRooms((prev) =>
+            prev.map((item) =>
+              item.roomId === room.roomId
+                ? {
+                    ...item,
+                    otherName:
+                      otherUser.name && otherUser.name !== "User"
+                        ? otherUser.name
+                        : item.otherName,
+                    otherImage:
+                      otherUser.image && otherUser.image !== "/avatar.png"
+                        ? otherUser.image
+                        : item.otherImage,
+                  }
+                : item
+            )
+          );
+        } catch {
+          return;
+        }
+      })
+    );
+  };
+
+  const loadRooms = async () => {
+    const res = await fetch("/api/dm/list", {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error("LOAD DM LIST ERROR:", res.status, res.statusText);
+      return;
+    }
+
+    const data = await res.json();
+    const nextRooms: Room[] = Array.isArray(data?.rooms)
+      ? data.rooms.map((room: Partial<Room>) => ({
+          roomId: String(room.roomId || ""),
+          otherName: String(room.otherName || "User"),
+          otherImage: String(room.otherImage || "/avatar.png"),
+          lastMessage: String(room.lastMessage || ""),
+          createdAt: String(room.createdAt || ""),
+          unread: Number(room.unread || 0),
+        }))
+      : [];
+
+    setRooms(nextRooms);
+    void hydrateUnknownRooms(nextRooms);
+  };
+
+  const applyRealtimeMessage = (row: MessageRow, eventType: string) => {
+    if (!row.roomId) return;
+
+    const me = meRef.current;
+    const isMine =
+      row.senderId === me?.id ||
+      (me?.lineId ? row.senderId === me.lineId : false);
+
+    if (eventType === "INSERT") {
+      setRooms((prev) => {
+        const targetIndex = prev.findIndex((room) => room.roomId === row.roomId);
+
+        if (targetIndex < 0) {
+          void loadRooms();
+          return prev;
+        }
+
+        const next = [...prev];
+        const target = next[targetIndex];
+
+        next[targetIndex] = {
+          ...target,
+          lastMessage: buildPreview(row.content, row.imageUrl),
+          createdAt: String(row.createdAt || target.createdAt || ""),
+          unread: isMine ? target.unread : target.unread + 1,
+          otherName:
+            !isMine && row.senderName && row.senderName !== "User"
+              ? row.senderName
+              : target.otherName,
+          otherImage:
+            !isMine && row.senderImage && row.senderImage !== "/avatar.png"
+              ? row.senderImage
+              : target.otherImage,
+        };
+
+        next.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+        return next;
+      });
+      return;
+    }
+
+    if (eventType === "UPDATE") {
+      setRooms((prev) =>
+        prev.map((room) =>
+          room.roomId === row.roomId
+            ? {
+                ...room,
+                lastMessage: buildPreview(row.content, row.imageUrl) || room.lastMessage,
+                createdAt: String(row.createdAt || room.createdAt || ""),
+                unread: row.seenAt ? 0 : room.unread,
+              }
+            : room
+        )
+      );
+      return;
+    }
+
+    void loadRooms();
+  };
 
   useEffect(() => {
     if (hasInit.current) return;
     hasInit.current = true;
 
+    let active = true;
+
     const init = async () => {
-      const res = await fetch("/api/auth/session");
-      const session = await res.json();
-      const meUser = session.user;
+      const sessionRes = await fetch("/api/auth/session", {
+        cache: "no-store",
+      });
+      const sessionData = await sessionRes.json();
+      meRef.current = (sessionData?.user || null) as SessionUser | null;
 
-      setMe(meUser);
+      await loadRooms();
 
-      await loadRooms(meUser);
+      if (!active) return;
 
-      // 🔥 kill channel เก่า
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
 
-      // 🔥 realtime
-      channelRef.current = supabase
-  .channel("dm-list")
+      const channel = supabase.channel(`dm-list-${Date.now()}`);
 
-  // 🔥 ใส่ on ก่อน
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "dmMessage" },
-    () => {
-      loadRooms(meUser);
-    }
-  )
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dmMessage" },
+        (payload) => {
+          const row = (payload.new || payload.old || {}) as MessageRow;
+          applyRealtimeMessage(row, payload.eventType);
+        }
+      );
 
-  // 🔥 แล้วค่อย subscribe
-  .subscribe();
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => {
+          void loadRooms();
+        }
+      );
+
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dm_room" },
+        () => {
+          void loadRooms();
+        }
+      );
+
+      channelRef.current = channel;
+      channel.subscribe();
     };
 
-    init();
+    void init();
 
     return () => {
+      active = false;
+
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
   }, []);
 
-  const loadRooms = async (meUser: any) => {
-    // 🔥 ดึงห้อง
-    const { data: roomsData, error: roomErr } = await supabase
-      .from("dm_room")
-      .select("*")
-      .order("updatedat", { ascending: false });
-
-    if (roomErr) {
-      console.error("ROOM ERROR:", roomErr);
-      return;
-    }
-
-    // 🔥 ดึงข้อความ
-    const { data: messages, error: msgErr } = await supabase
-      .from("dmMessage")
-      .select("*");
-
-    if (msgErr) {
-      console.error("MSG ERROR:", msgErr);
-      return;
-    }
-
-    const result: Room[] = [];
-
-    // ✅ เอาเฉพาะห้องของเรา
-    const myRooms = (roomsData || []).filter(
-      (r: any) => r.usera === meUser.id || r.userb === meUser.id
-    );
-
-    myRooms.forEach((r: any) => {
-      const roomMsgs = (messages || []).filter(
-        (m: any) => m.roomId === r.roomid
-      );
-
-      if (roomMsgs.length === 0) return; // ❗ ไม่มีข้อความ ไม่ต้องโชว์
-
-      // 🔥 ข้อความล่าสุด
-      const lastMsg = [...roomMsgs].sort((a: any, b: any) =>
-        (b.createdAt || "").localeCompare(a.createdAt || "")
-      )[0];
-
-      // 🔥 หา "อีกฝั่ง" จาก message จริง (สำคัญสุด)
-      const isMeLast = lastMsg?.senderId === meUser.id;
-
-// 🔥 ถ้าข้อความล่าสุดเราพิม → เอาอีกฝั่ง
-// 🔥 ถ้าอีกฝั่งพิม → ใช้เลย
-
-      const otherName = isMeLast
-        ? roomMsgs.find((m: any) => m.senderId !== meUser.id)?.senderName || "User"
-        : lastMsg?.senderName || "User";
-
-      const otherImage = isMeLast
-        ? roomMsgs.find((m: any) => m.senderId !== meUser.id)?.senderImage || "/avatar.png"
-        : lastMsg?.senderImage || "/avatar.png";
-
-      // 🔴 unread
-      const unread = roomMsgs.filter(
-        (m: any) =>
-          m.senderId !== meUser.id && !m.seenAt
-      ).length;
-
-      result.push({
-        roomId: r.roomid,
-        otherName,
-        otherImage,
-        lastMessage: lastMsg?.content || "📷 รูปภาพ",
-        createdAt: lastMsg?.createdAt || r.updatedat,
-        unread,
-      });
-    });
-
-    // 🔥 เรียงแบบ LINE
-    result.sort((a, b) =>
-      (b.createdAt || "").localeCompare(a.createdAt || "")
-    );
-
-    setRooms(result);
-  };
-
   return (
-    <div className="max-w-[720px] mx-auto px-3 py-4 text-white">
-      <h1 className="text-xl font-bold mb-4">แชท</h1>
+    <div className="mx-auto max-w-[720px] px-3 py-4 text-white">
+      <h1 className="mb-4 text-xl font-bold">Chat</h1>
 
       <div className="space-y-2">
-        {rooms.map((r) => (
+        {rooms.map((room) => (
           <Link
-            key={r.roomId}
-            href={`/dm/${r.roomId}`}
-            className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition"
+            key={room.roomId}
+            href={`/dm/${room.roomId}`}
+            className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3 transition hover:border-yellow-300/10 hover:bg-white/[0.04]"
           >
             <div className="relative">
               <img
-                src={r.otherImage}
-                className="w-12 h-12 rounded-full object-cover"
+                src={room.otherImage}
+                alt={room.otherName}
+                className="h-12 w-12 rounded-full border border-white/10 object-cover"
               />
 
-              {r.unread > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                  {r.unread}
+              {room.unread > 0 && (
+                <div className="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+                  {room.unread > 99 ? "99+" : room.unread}
                 </div>
               )}
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="font-bold truncate">
-                {r.otherName}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="truncate font-bold">{room.otherName}</div>
+                <div className="shrink-0 text-[11px] text-white/35">
+                  {formatRoomTime(room.createdAt)}
+                </div>
               </div>
 
-              <div className="text-sm text-white/50 truncate">
-                {r.lastMessage}
+              <div
+                className={`truncate text-sm ${
+                  room.unread > 0 ? "font-semibold text-white/90" : "text-white/50"
+                }`}
+              >
+                {room.lastMessage}
               </div>
             </div>
           </Link>
         ))}
 
         {rooms.length === 0 && (
-          <div className="text-center text-white/40 mt-10">
-            ยังไม่มีแชท
-          </div>
+          <div className="mt-10 text-center text-white/40">No chats yet</div>
         )}
       </div>
     </div>

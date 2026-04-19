@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function DealActionButtons({
   dealId,
 }: {
   dealId: string;
 }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
 
   const handleAction = async (action: "accept" | "reject") => {
@@ -26,11 +28,11 @@ export default function DealActionButtons({
       const data = await res.json();
 
       if (!data.success) {
-        alert(data.error || "อัปเดตไม่สำเร็จ");
+        alert(data.error || "Request failed");
       }
-    } catch (err) {
-      console.error(err);
-      alert("เกิดข้อผิดพลาด");
+    } catch (error) {
+      console.error(error);
+      alert("Request failed");
     } finally {
       setLoading(false);
     }
@@ -43,7 +45,7 @@ export default function DealActionButtons({
         disabled={loading}
         className="rounded-xl bg-emerald-500 px-4 py-2 font-bold text-black transition hover:scale-105 disabled:opacity-60"
       >
-        ✅ Accept
+        {t("deals.accept")}
       </button>
 
       <button
@@ -51,7 +53,7 @@ export default function DealActionButtons({
         disabled={loading}
         className="rounded-xl bg-red-500 px-4 py-2 font-bold text-white transition hover:scale-105 disabled:opacity-60"
       >
-        ❌ Reject
+        {t("deals.reject")}
       </button>
     </div>
   );

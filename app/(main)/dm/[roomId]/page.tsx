@@ -29,11 +29,6 @@ type DMMessage = {
   optimistic?: boolean;
 };
 
-type UserMapValue = {
-  name?: string | null;
-  image?: string | null;
-};
-
 type ChatUser = {
   id: string;
   name?: string | null;
@@ -123,8 +118,7 @@ export default function DMPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
-
-  const [userMap, setUserMap] = useState<Record<string, UserMapValue>>({});
+  const [newMessageCount, setNewMessageCount] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +128,8 @@ export default function DMPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasInitialScrolledRef = useRef(false);
   const hasMarkedSeenRef = useRef(false);
+  const isNearBottomRef = useRef(true);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const hasValidRoom = Boolean(roomId);
 
@@ -142,6 +138,36 @@ export default function DMPage() {
       block: "end",
       behavior,
     });
+  };
+
+  const getDistanceFromBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return 0;
+
+    return el.scrollHeight - el.scrollTop - el.clientHeight;
+  };
+
+  const checkIsNearBottom = () => {
+    return getDistanceFromBottom() < 120;
+  };
+
+  const shouldAutoScrollOnIncoming = () => {
+    const el = scrollRef.current;
+    if (!el) return true;
+
+    const distanceFromBottom = getDistanceFromBottom();
+    const autoScrollThreshold = Math.max(el.clientHeight, 220);
+
+    return distanceFromBottom <= autoScrollThreshold;
+  };
+
+  const handleScroll = () => {
+    const nearBottom = checkIsNearBottom();
+    isNearBottomRef.current = nearBottom;
+
+    if (nearBottom) {
+      setNewMessageCount(0);
+    }
   };
 
   const loadSession = async () => {
@@ -166,33 +192,24 @@ export default function DMPage() {
     return data.otherUser;
   };
 
-  const loadUsersMap = async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("id,name,image");
+  const syncRoomMetadata = async (meData?: ChatUser, otherData?: ChatUser) => {
+    if (!roomId || !meData?.id || !otherData?.id) return;
 
-    if (error) {
-      console.error("LOAD USERS MAP ERROR:", error);
-      return {};
-    }
-
-    const map: Record<string, UserMapValue> = {};
-
-    (data || []).forEach((u: any) => {
-      map[u.id] = {
-        name: u.name || null,
-        image: u.image || null,
-      };
+    await supabase.from("dm_room").upsert({
+      roomid: roomId,
+      usera: meData.id,
+      userb: otherData.id,
+      useraname: meData.name || "You",
+      useraimage: meData.image || "/avatar.png",
+      userbname: otherData.name || "User",
+      userbimage: otherData.image || "/avatar.png",
+      updatedat: new Date().toISOString(),
     });
-
-    setUserMap(map);
-    return map;
   };
 
   const loadMessages = async (
     meData?: any,
-    otherData?: any,
-    _mapData?: Record<string, UserMapValue>
+    otherData?: any
   ) => {
     if (!roomId) return;
 
@@ -248,6 +265,14 @@ export default function DMPage() {
       .eq("roomId", roomId)
       .neq("senderId", me.id)
       .is("seenAt", null);
+
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.senderId !== me.id && !message.seenAt
+          ? { ...message, seenAt: new Date().toISOString() }
+          : message
+      )
+    );
   };
 
   useEffect(() => {
@@ -255,12 +280,17 @@ export default function DMPage() {
 
     hasInitialScrolledRef.current = false;
     hasMarkedSeenRef.current = false;
+    isNearBottomRef.current = true;
+    lastMessageIdRef.current = null;
+    requestAnimationFrame(() => {
+      setNewMessageCount(0);
+    });
 
     const init = async () => {
       const meData = await loadSession();
       const otherData = await loadRoom();
-      const mapData = await loadUsersMap();
-      await loadMessages(meData, otherData, mapData);
+      await syncRoomMetadata(meData, otherData);
+      await loadMessages(meData, otherData);
     };
 
     init();
@@ -372,9 +402,45 @@ export default function DMPage() {
 
     requestAnimationFrame(() => {
       scrollToBottom("auto");
+      isNearBottomRef.current = true;
+      lastMessageIdRef.current = messages[messages.length - 1]?.id || null;
       hasInitialScrolledRef.current = true;
     });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!messages.length || !hasInitialScrolledRef.current) return;
+
+    const latestMessage = messages[messages.length - 1];
+    if (!latestMessage) return;
+
+    if (!lastMessageIdRef.current) {
+      lastMessageIdRef.current = latestMessage.id;
+      return;
+    }
+
+    if (lastMessageIdRef.current === latestMessage.id) return;
+
+    lastMessageIdRef.current = latestMessage.id;
+
+    const isMine = latestMessage.senderId === me?.id || latestMessage.optimistic;
+    const nearBottom = checkIsNearBottom();
+    const shouldAutoScroll = isMine || shouldAutoScrollOnIncoming();
+    isNearBottomRef.current = nearBottom;
+
+    if (shouldAutoScroll) {
+      requestAnimationFrame(() => {
+        scrollToBottom(isMine ? "smooth" : "auto");
+        setNewMessageCount(0);
+        isNearBottomRef.current = true;
+      });
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      setNewMessageCount((prev) => prev + 1);
+    });
+  }, [messages, me?.id]);
 
   const send = async () => {
     if ((!text.trim() && !file) || !me?.id || !roomId) return;
@@ -385,13 +451,14 @@ export default function DMPage() {
     }
 
     await supabase.from("dm_room").upsert({
-      roomId,
-      userA: me.id,
-      userB: other.id,
-      userAName: me.name,
-      userAImage: me.image,
-      userBName: other.name,
-      userBImage: other.image,
+      roomid: roomId,
+      usera: me.id,
+      userb: other.id,
+      useraname: me.name || "You",
+      useraimage: me.image || "/avatar.png",
+      userbname: other.name || "User",
+      userbimage: other.image || "/avatar.png",
+      updatedat: new Date().toISOString(),
     });
 
     let imageUrl: string | null = null;
@@ -471,8 +538,14 @@ export default function DMPage() {
 
     await supabase
       .from("dm_room")
-      .update({ updatedAt: new Date().toISOString() })
-      .eq("roomId", roomId);
+      .update({
+        updatedat: new Date().toISOString(),
+        useraname: me.name || "You",
+        useraimage: me.image || "/avatar.png",
+        userbname: other.name || "User",
+        userbimage: other.image || "/avatar.png",
+      })
+      .eq("roomid", roomId);
 
     if (error) {
       console.error("INSERT ERROR:", error);
@@ -565,6 +638,7 @@ export default function DMPage() {
 
         <div
           ref={scrollRef}
+          onScroll={handleScroll}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         >
           <div className="mx-auto flex min-h-full w-full max-w-[980px] flex-col justify-end px-3 pb-4 pt-4 sm:px-4 sm:pb-5">
@@ -645,6 +719,22 @@ export default function DMPage() {
 
         <div className="sticky bottom-0 z-20 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.18),rgba(5,6,8,0.92)_18%,rgba(5,6,8,0.98)_100%)] px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-2xl sm:px-4">
           <div className="mx-auto relative w-full max-w-[980px]">
+            {newMessageCount > 0 && (
+              <div className="pointer-events-none absolute -top-14 left-1/2 z-20 -translate-x-1/2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    scrollToBottom("smooth");
+                    setNewMessageCount(0);
+                    isNearBottomRef.current = true;
+                  }}
+                  className="pointer-events-auto rounded-full border border-yellow-300/25 bg-[#16181d]/95 px-4 py-2 text-sm font-bold text-yellow-300 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:scale-[1.02] hover:bg-[#1b1e24]"
+                >
+                  มีข้อความใหม่ {newMessageCount > 1 ? `(${newMessageCount}) ` : ""}↓
+                </button>
+              </div>
+            )}
+
             {showEmoji && (
               <div
                 ref={emojiRef}
