@@ -57,21 +57,53 @@ export default function ProfileSettingsPage() {
   }, []);
 
   function uploadImage(file: File, type: "profile" | "cover") {
-    const reader = new FileReader();
+  const img = new Image();
+  const reader = new FileReader();
 
-    reader.onload = () => {
-      const base64 = reader.result as string;
+  reader.onload = () => {
+    img.src = reader.result as string;
+  };
 
-      if (type === "profile") {
-        setProfileImage(base64);
-      } else {
-        setCoverUrl(base64);
-        setCoverPosition(50);
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    const maxSize = 800; // 🔥 จำกัดขนาด
+
+    let width = img.width;
+    let height = img.height;
+
+    if (width > height) {
+      if (width > maxSize) {
+        height *= maxSize / width;
+        width = maxSize;
       }
-    };
+    } else {
+      if (height > maxSize) {
+        width *= maxSize / height;
+        height = maxSize;
+      }
+    }
 
-    reader.readAsDataURL(file);
-  }
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // 🔥 บีบคุณภาพ
+    const compressed = canvas.toDataURL("image/jpeg", 0.7);
+
+    if (type === "profile") {
+      setProfileImage(compressed);
+    } else {
+      setCoverUrl(compressed);
+      setCoverPosition(50);
+    }
+  };
+
+  reader.readAsDataURL(file);
+}
 
   function handlePointerMove(e: React.PointerEvent) {
     if (!isDragging.current || !coverRef.current) return;
