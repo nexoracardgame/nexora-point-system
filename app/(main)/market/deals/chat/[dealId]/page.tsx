@@ -145,6 +145,7 @@ export default function DealChatPage() {
   const hasMarkedSeenRef = useRef(false);
   const isNearBottomRef = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
+  const hasValidDealRoom = Boolean(dealId);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     bottomRef.current?.scrollIntoView({
@@ -206,6 +207,12 @@ export default function DealChatPage() {
     setLoadingRoom(false);
 
     return data;
+  };
+
+  const refreshChatState = async (showClosedState = false) => {
+    const info = await loadRoomInfo(showClosedState);
+    if (!info?.roomId) return;
+    await loadMessages(info.roomId, info.me, info.other);
   };
 
   const loadMessages = async (
@@ -288,34 +295,67 @@ export default function DealChatPage() {
       setNewMessageCount(0);
     });
 
-    const init = async () => {
-      const info = await loadRoomInfo();
-      if (!info?.roomId) return;
-
-      await loadMessages(info.roomId, info.me, info.other);
-    };
-
-    void init();
+    queueMicrotask(() => {
+      void refreshChatState(true);
+    });
   }, [dealId]);
 
   useEffect(() => {
     if (!roomId || !me?.id) return;
 
     const interval = setInterval(() => {
-      void loadMessages(roomId, me, other);
-    }, 1500);
+      if (document.visibilityState === "visible") {
+        void loadMessages(roomId, me, other);
+      }
+    }, 4000);
 
-    return () => clearInterval(interval);
+    const onFocus = () => {
+      void loadMessages(roomId, me, other);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadMessages(roomId, me, other);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [roomId, me, other]);
 
   useEffect(() => {
     if (!dealId || !roomId) return;
 
     const interval = setInterval(() => {
-      void loadRoomInfo(true);
-    }, 5000);
+      if (document.visibilityState === "visible") {
+        void loadRoomInfo(true);
+      }
+    }, 8000);
 
-    return () => clearInterval(interval);
+    const onFocus = () => {
+      void loadRoomInfo(true);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadRoomInfo(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [dealId, roomId]);
 
   const lastSeenMineId = useMemo(() => {
@@ -459,6 +499,11 @@ export default function DealChatPage() {
     });
   };
 
+  const openOtherProfile = () => {
+    if (!other?.id) return;
+    router.push(`/profile/${other.id}`);
+  };
+
   const send = async () => {
     if ((!text.trim() && !file) || !me?.id || !other?.id || !roomId) return;
 
@@ -548,9 +593,9 @@ export default function DealChatPage() {
     }
   };
 
-  if (loadingRoom) {
+  if (!hasValidDealRoom || loadingRoom) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center text-white">
+      <div className="flex min-h-[100dvh] items-center justify-center pb-[env(safe-area-inset-bottom)] text-white">
         กำลังโหลดห้องแชทดีล...
       </div>
     );
@@ -582,12 +627,15 @@ export default function DealChatPage() {
           <div className="mx-auto flex w-full max-w-[980px] items-center gap-3 px-3 py-3 sm:px-4">
             <button
               onClick={() => router.push("/market/deals")}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
             >
               <ArrowLeft size={20} />
             </button>
 
-            <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-1">
+            <button
+              onClick={openOtherProfile}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-1 text-left transition hover:bg-white/5 active:scale-[0.98]"
+            >
               <img
                 src={other.image || "/avatar.png"}
                 alt={other.name}
@@ -606,7 +654,7 @@ export default function DealChatPage() {
                   ดีลการ์ด {card.name} #{card.no}
                 </div>
 
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-1.5 flex flex-wrap gap-2">
                   <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-bold text-amber-200 sm:px-3 sm:text-[11px]">
                     ราคาตั้งขาย {formatPrice(card.listedPrice)}
                   </div>
@@ -624,7 +672,7 @@ export default function DealChatPage() {
                   <span>{typing ? "กำลังพิมพ์..." : "ห้องนัดสถานที่ของดีลนี้"}</span>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -755,7 +803,7 @@ export default function DealChatPage() {
                     setNewMessageCount(0);
                     isNearBottomRef.current = true;
                   }}
-                  className="pointer-events-auto rounded-full border border-yellow-300/25 bg-[#16181d]/95 px-4 py-2 text-sm font-bold text-yellow-300 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+                  className="pointer-events-auto rounded-full border border-yellow-300/25 bg-[#16181d]/95 px-4 py-2 text-sm font-bold text-yellow-300 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:scale-[1.02] hover:bg-[#1b1e24]"
                 >
                   มีข้อความใหม่ {newMessageCount > 1 ? `(${newMessageCount}) ` : ""}ดู
                 </button>
@@ -806,7 +854,7 @@ export default function DealChatPage() {
                 }}
               />
 
-              <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20">
+              <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-95">
                 <ImageIcon size={18} />
                 <input
                   ref={fileInputRef}
@@ -819,14 +867,14 @@ export default function DealChatPage() {
 
               <button
                 onClick={() => setShowEmoji((prev) => !prev)}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-95"
               >
                 <Smile size={18} />
               </button>
 
               <button
                 onClick={() => void send()}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98]"
               >
                 <Send size={18} />
               </button>

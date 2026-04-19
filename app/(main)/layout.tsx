@@ -40,7 +40,8 @@ export default function MainLayout({
   const router = useRouter();
   const { data: session } = useSession();
   const { t } = useLanguage();
-  const isDmRoomPage = pathname.startsWith("/dm/");
+  const isChatRoomPage =
+    pathname.startsWith("/dm/") || pathname.startsWith("/market/deals/chat/");
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -448,14 +449,14 @@ export default function MainLayout({
           {/* CONTENT */}
           <main
             className={`relative z-0 min-w-0 flex-1 bg-[#07080b] ${
-              isDmRoomPage
+              isChatRoomPage
                 ? "overflow-hidden p-0 pb-0"
                 : "p-3 pb-[90px] sm:p-4 sm:pb-[100px] xl:p-6 xl:pb-6"
             }`}
           >
             <div
               className={`${
-                isDmRoomPage
+                isChatRoomPage
                   ? "h-[calc(100dvh-74px)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(100dvh-74px)]"
                   : "min-h-[calc(100vh-74px-92px)] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(100vh-74px-96px)] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(100vh-122px)] xl:p-6"
               }`}
@@ -584,7 +585,7 @@ export default function MainLayout({
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      {!isDmRoomPage && (
+      {!isChatRoomPage && (
         <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[640px] rounded-2xl border border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
           <div className="mx-auto grid max-w-[640px] grid-cols-4 gap-2">
             {mobileBottomItems.map((item) => {
