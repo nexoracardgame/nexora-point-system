@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import CouponQRClient from "./CouponQRClient";
 
 type PageProps = {
@@ -29,12 +29,15 @@ export default async function CouponPage({ params }: PageProps) {
         code: coupon.code,
         used: coupon.used,
         createdAt: coupon.createdAt.toISOString(),
+        usedAt: coupon.usedAt ? coupon.usedAt.toISOString() : null,
         rewardName: coupon.reward.name,
         rewardType:
           coupon.reward.nexCost != null
-            ? "NEX Reward"
-            : "COIN Reward",
-        userName: coupon.user.name || coupon.user.lineId,
+            ? "แลกด้วย NEX"
+            : coupon.reward.coinCost != null
+              ? "แลกด้วย COIN"
+              : "คูปองรางวัล",
+        userName: coupon.user.displayName || coupon.user.name || coupon.user.lineId,
       }}
     />
   );

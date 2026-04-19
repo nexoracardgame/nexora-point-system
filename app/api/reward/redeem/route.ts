@@ -1,20 +1,16 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const rawLineId = body.lineId;
-    const rawRewardId = body.rewardId;
-    const rawCurrency = body.currency;
-
-    const lineId = String(rawLineId || "").trim();
-    const rewardId = String(rawRewardId || "").trim();
-    const currency = String(rawCurrency || "NEX").trim();
+    const lineId = String(body?.lineId || "").trim();
+    const rewardId = String(body?.rewardId || "").trim();
+    const currency = String(body?.currency || "NEX").trim();
 
     if (!lineId || !rewardId) {
       return NextResponse.json(
-        { success: false, message: "ข้อมูลไม่ครบ" },
+        { success: false, error: "ข้อมูลไม่ครบ" },
         { status: 400 }
       );
     }
@@ -25,7 +21,7 @@ export async function POST(req: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "ไม่พบผู้ใช้" },
+        { success: false, error: "ไม่พบผู้ใช้งาน" },
         { status: 404 }
       );
     }
@@ -36,45 +32,38 @@ export async function POST(req: Request) {
 
     if (!reward) {
       return NextResponse.json(
-        { success: false, message: "ไม่พบของรางวัล" },
+        { success: false, error: "ไม่พบรางวัล" },
         { status: 404 }
       );
     }
 
     if (reward.stock <= 0) {
       return NextResponse.json(
-        { success: false, message: "ของรางวัลหมด" },
+        { success: false, error: "รางวัลหมดแล้ว" },
         { status: 400 }
       );
     }
 
-    // เช็คแต้มตาม currency
     if (currency === "NEX") {
-      if (
-        reward.nexCost == null ||
-        user.nexPoint < reward.nexCost
-      ) {
+      if (reward.nexCost == null || user.nexPoint < reward.nexCost) {
         return NextResponse.json(
-          { success: false, message: "แต้ม NEX ไม่พอ" },
+          { success: false, error: "แต้ม NEX ไม่เพียงพอ" },
           { status: 400 }
         );
       }
     }
 
     if (currency === "COIN") {
-      if (
-        reward.coinCost == null ||
-        user.coin < reward.coinCost
-      ) {
+      if (reward.coinCost == null || user.coin < reward.coinCost) {
         return NextResponse.json(
-          { success: false, message: "เหรียญไม่พอ" },
+          { success: false, error: "เหรียญ COIN ไม่เพียงพอ" },
           { status: 400 }
         );
       }
     }
 
-    const result = await prisma.$transaction(async (tx: any) => {
-      if (currency === "NEX") {
+    const coupon = await prisma.$transaction(async (tx) => {
+      if (currency === "NEX" && reward.nexCost != null) {
         await tx.user.update({
           where: { lineId },
           data: {
@@ -85,7 +74,7 @@ export async function POST(req: Request) {
         });
       }
 
-      if (currency === "COIN") {
+      if (currency === "COIN" && reward.coinCost != null) {
         await tx.user.update({
           where: { lineId },
           data: {
@@ -105,21 +94,20 @@ export async function POST(req: Request) {
         },
       });
 
-      const coupon = await tx.coupon.create({
+      return tx.coupon.create({
         data: {
           code: `NXR-${Date.now()}`,
           userId: user.id,
           rewardId: reward.id,
         },
       });
-
-      return coupon;
     });
 
     return NextResponse.json({
       success: true,
       message: "แลกรางวัลสำเร็จ",
-      couponId: result.id,
+      couponId: coupon.id,
+      couponUrl: `/coupon/${coupon.code}`,
     });
   } catch (error) {
     console.error("REDEEM ERROR:", error);
@@ -127,7 +115,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "เกิดข้อผิดพลาด",
+        error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในระบบ",
       },
       { status: 500 }
     );
