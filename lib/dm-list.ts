@@ -22,8 +22,8 @@ function safeImage(image?: string | null) {
 function buildPreview(content?: string | null, imageUrl?: string | null) {
   const text = String(content || "").trim();
   if (text) return text;
-  if (imageUrl) return "Photo";
-  return "Start chatting";
+  if (imageUrl) return "รูปภาพ";
+  return "เริ่มแชท";
 }
 
 export async function getDmRoomsForUser(
@@ -138,32 +138,32 @@ export async function getDmRoomsForUser(
   return dedupedRooms
     .map((room) => {
       const latestMessage = latestMessageByRoom.get(String(room.roomid));
-      if (!latestMessage) return null;
-
       const roomUserAIsMe =
         room.usera === myId || (myLineId ? room.usera === myLineId : false);
       const otherUserId = roomUserAIsMe ? room.userb : room.usera;
       const otherUser = userMap.get(otherUserId);
+      const createdAt =
+        String(latestMessage?.createdAt || "").trim() ||
+        String(room.updatedat || "").trim();
 
       return {
         roomId: String(room.roomid),
-        createdAt:
-          String(latestMessage.createdAt || "").trim() ||
-          String(room.updatedat || "").trim(),
-        lastMessage: buildPreview(latestMessage.content, latestMessage.imageUrl),
+        createdAt,
+        lastMessage: latestMessage
+          ? buildPreview(latestMessage.content, latestMessage.imageUrl)
+          : "เริ่มแชท",
         otherName:
           otherUser?.name ||
           (roomUserAIsMe ? room.userbname : room.useraname) ||
-          latestMessage.senderName ||
+          latestMessage?.senderName ||
           "User",
         otherImage:
           otherUser?.image ||
           safeImage(roomUserAIsMe ? room.userbimage : room.useraimage) ||
-          safeImage(latestMessage.senderImage),
+          safeImage(latestMessage?.senderImage),
         unread: unreadCountByRoom.get(String(room.roomid)) || 0,
       } satisfies DMRoomListItem;
     })
-    .filter((room): room is DMRoomListItem => room !== null)
     .sort((a, b) => {
       const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;

@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import DeleteListingButton from "@/components/DeleteListingButton";
+import ProfileChatButton from "@/components/ProfileChatButton";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -313,14 +314,14 @@ export default async function SellerProfilePage({
                       "Genesis-tier NEXORA trader with elite collectible market presence."}
                   </p>
 
-                  {(seller.lineUrl || seller.facebookUrl) && (
+                  {(seller.lineUrl || seller.facebookUrl || !isOwner) && (
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       {seller.lineUrl && (
                         <a
                           href={seller.lineUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 rounded-full border border-green-400/20 bg-green-500/10 px-4 py-2 text-sm font-bold text-green-300 transition hover:bg-green-500/20 hover:scale-[1.03]"
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-green-400/20 bg-green-500/10 px-5 py-2.5 text-sm font-bold text-green-300 transition hover:scale-[1.03] hover:bg-green-500/20"
                         >
                           LINE
                         </a>
@@ -331,10 +332,21 @@ export default async function SellerProfilePage({
                           href={seller.facebookUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-bold text-blue-300 transition hover:bg-blue-500/20 hover:scale-[1.03]"
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-5 py-2.5 text-sm font-bold text-blue-300 transition hover:scale-[1.03] hover:bg-blue-500/20"
                         >
                           Facebook
                         </a>
+                      )}
+
+                      {!isOwner && (
+                        <ProfileChatButton
+                          targetUserId={seller.id}
+                          targetUserName={
+                            seller.displayName || seller.name || "User"
+                          }
+                          targetUserImage={seller.image || "/avatar.png"}
+                          className="min-w-[132px]"
+                        />
                       )}
                     </div>
                   )}

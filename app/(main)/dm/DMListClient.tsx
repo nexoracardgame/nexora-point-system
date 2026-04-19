@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import type { DMRoomListItem } from "@/lib/dm-list";
+import { saveDmRoomSeed } from "@/lib/dm-room-seed";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,8 +32,8 @@ type MessageRow = {
 function buildPreview(content?: string | null, imageUrl?: string | null) {
   const text = String(content || "").trim();
   if (text) return text;
-  if (imageUrl) return "Photo";
-  return "Start chatting";
+  if (imageUrl) return "รูปภาพ";
+  return "เริ่มแชท";
 }
 
 function formatRoomTime(dateString?: string) {
@@ -291,7 +292,7 @@ export default function DMListClient({
 
   return (
     <div className="mx-auto max-w-[720px] px-3 py-4 text-white">
-      <h1 className="mb-4 text-xl font-bold">Chat</h1>
+      <h1 className="mb-4 text-xl font-bold">แชท</h1>
 
       <div className="space-y-2">
         {loading && rooms.length === 0 && (
@@ -314,7 +315,13 @@ export default function DMListClient({
         {rooms.map((room) => (
           <Link
             key={room.roomId}
-            href={`/dm/${room.roomId}`}
+            href={`/dm/${room.roomId}?back=${encodeURIComponent("/dm")}`}
+            onClick={() => {
+              saveDmRoomSeed(room.roomId, {
+                name: room.otherName,
+                image: room.otherImage,
+              });
+            }}
             className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3 transition hover:border-yellow-300/10 hover:bg-white/[0.04]"
           >
             <div className="relative">
@@ -351,7 +358,7 @@ export default function DMListClient({
         ))}
 
         {!loading && rooms.length === 0 && (
-          <div className="mt-10 text-center text-white/40">No chats yet</div>
+          <div className="mt-10 text-center text-white/40">ยังไม่มีแชท</div>
         )}
       </div>
     </div>

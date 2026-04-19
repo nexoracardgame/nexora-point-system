@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import { Send, ArrowLeft, Image as ImageIcon, Smile } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import { readDmRoomSeed } from "@/lib/dm-room-seed";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -107,13 +108,28 @@ export default function DMPage() {
   const params = useParams();
   const roomId = typeof params?.roomId === "string" ? params.roomId : "";
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const seededFromStorage = useMemo(() => readDmRoomSeed(roomId), [roomId]);
+  const initialOtherName = String(seededFromStorage?.name || "").trim();
+  const initialOtherImage = String(seededFromStorage?.image || "").trim();
+  const seededOther = useMemo<ChatUser>(
+    () =>
+      initialOtherName || initialOtherImage
+        ? {
+            id: "",
+            name: initialOtherName || "User",
+            image: initialOtherImage || "/avatar.png",
+          }
+        : null,
+    [initialOtherImage, initialOtherName]
+  );
 
   const [messages, setMessages] = useState<DMMessage[]>([]);
   const [text, setText] = useState("");
-  const [me, setMe] = useState<any>(null);
-  const [other, setOther] = useState<any>(null);
+  const [me, setMe] = useState<ChatUser>(null);
+  const [other, setOther] = useState<ChatUser>(seededOther);
   const [typing, setTyping] = useState(false);
-  const [loadingRoom, setLoadingRoom] = useState(true);
+  const [loadingRoom, setLoadingRoom] = useState(!seededOther);
 
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -132,6 +148,7 @@ export default function DMPage() {
   const lastMessageIdRef = useRef<string | null>(null);
 
   const hasValidRoom = Boolean(roomId);
+  const backHref = String(searchParams?.get("back") || "").trim();
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     bottomRef.current?.scrollIntoView({
@@ -171,7 +188,9 @@ export default function DMPage() {
   };
 
   const loadSession = async () => {
-    const res = await fetch("/api/auth/session");
+    const res = await fetch("/api/auth/session", {
+      cache: "no-store",
+    });
     const data = await res.json();
 
     setMe(data.user);
@@ -208,8 +227,8 @@ export default function DMPage() {
   };
 
   const loadMessages = async (
-    meData?: any,
-    otherData?: any
+    meData?: ChatUser,
+    otherData?: ChatUser
   ) => {
     if (!roomId) return;
 
@@ -224,7 +243,7 @@ export default function DMPage() {
       return;
     }
 
-    const withSender = (data || []).map((m: any) => ({
+    const withSender: DMMessage[] = ((data || []) as DMMessage[]).map((m) => ({
       ...m,
       sender: buildSender(
         m.senderId,
@@ -239,7 +258,7 @@ export default function DMPage() {
 
     setMessages((prev) => {
       const optimisticMessages = prev.filter((message) => message.optimistic);
-      let next = withSender;
+      let next: DMMessage[] = withSender;
 
       optimisticMessages.forEach((message) => {
         next = mergeMessage(next, message, meData, otherData);
@@ -283,18 +302,20 @@ export default function DMPage() {
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
     requestAnimationFrame(() => {
+      setLoadingRoom(!seededOther);
       setNewMessageCount(0);
     });
 
     const init = async () => {
-      const meData = await loadSession();
-      const otherData = await loadRoom();
-      await syncRoomMetadata(meData, otherData);
-      await loadMessages(meData, otherData);
+      const [meData, otherData] = await Promise.all([loadSession(), loadRoom()]);
+      await Promise.all([
+        loadMessages(meData, otherData),
+        syncRoomMetadata(meData, otherData),
+      ]);
     };
 
-    init();
-  }, [roomId]);
+    void init();
+  }, [roomId, seededOther]);
 
   useEffect(() => {
     if (!roomId || !me?.id) return;
@@ -581,6 +602,15 @@ export default function DMPage() {
     router.push(`/profile/${other.id}`);
   };
 
+  const handleBack = () => {
+    if (backHref) {
+      router.push(backHref);
+      return;
+    }
+
+    router.back();
+  };
+
   if (!hasValidRoom) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center text-white pb-[env(safe-area-inset-bottom)]">
@@ -595,7 +625,7 @@ export default function DMPage() {
         <div className="sticky top-0 z-20 border-b border-white/10 bg-black/75 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex w-full max-w-[980px] items-center gap-3 px-3 py-3 sm:px-4">
             <button
-              onClick={() => router.back()}
+              onClick={handleBack}
               className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
             >
               <ArrowLeft size={20} />
