@@ -231,29 +231,28 @@ export default function DMPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (!roomId || !me?.id || messages.length === 0) return;
+  if (!roomId || !me?.id) return;
 
-    const markSeen = async () => {
-      const unread = messages.filter(
-        (m) => m.senderId !== me.id && !m.seenAt
-      );
+  const markSeen = async () => {
+    await supabase
+      .from("dmMessage")
+      .update({ seenAt: new Date().toISOString() })
+      .eq("roomId", roomId)
+      .neq("senderId", me.id)
+      .is("seenAt", null);
+  };
 
-      if (unread.length === 0) return;
+  // ยิงตอนเข้าแชท
+  markSeen();
 
-      const unreadIds = unread.map((m) => m.id);
+  // ยิงตอนกลับมาโฟกัสหน้าจอ
+  const onFocus = () => markSeen();
+  window.addEventListener("focus", onFocus);
 
-      const { error } = await supabase
-        .from("dmMessage")
-        .update({ seenAt: new Date().toISOString() })
-        .in("id", unreadIds);
-
-      if (error) {
-        console.error("SEEN ERROR:", error);
-      }
-    };
-
-    markSeen();
-  }, [messages, me?.id, roomId]);
+  return () => {
+    window.removeEventListener("focus", onFocus);
+  };
+}, [roomId, me?.id]);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -430,7 +429,7 @@ export default function DMPage() {
 
   return (
     <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
-      <div className="w-full max-w-[920px] h-full flex flex-col mx-auto px-2 sm:px-4 xl:px-0">
+      <div className="w-full max-w-[920px] h-full flex flex-col mx-auto px-0 sm:px-0">
 
         {/* HEADER */}
         <div className="fixed top-[72px] left-1/2 -translate-x-1/2 w-full max-w-[3200px] z-[3000] border-b border-white/10 bg-black/60 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
@@ -478,88 +477,86 @@ export default function DMPage() {
         </div>
 
         {/* CHAT */}
+        <div          
+  ref={scrollRef}
+  className="flex-1 overflow-y-auto pt-[80px] py-4 pb-[calc(220px+env(safe-area-inset-bottom))]"
+>
+  <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4">
+    {messages.map((m) => {
+      const mine = m.senderId === me?.id;
+      const sender = m.sender;
+
+      return (
         <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-3 pt-[80px] py-4 sm:px-4 space-y-4 pb-[calc(220px+env(safe-area-inset-bottom))]"
+          key={m.id}
+          className={`flex ${mine ? "justify-end pr-3 sm:pr-20" : "justify-start pl-3 sm:pl-0"}`}
         >
-          {messages.map((m) => {
-            const mine = m.senderId === me?.id;
-            const sender = m.sender;
+          <div className="flex max-w-[92%] items-end gap-2 sm:max-w-[84%]">
+            {!mine &&
+              (loadingRoom ? (
+                <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+              ) : (
+                <img
+                  src={sender?.image || "/avatar.png"}
+                  className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10 opacity-0 animate-[fadeIn_.25s_ease_forwards]"
+                  onError={(e) => {
+                    e.currentTarget.src = "/avatar.png";
+                  }}
+                />
+              ))}
 
-            return (
+            <div className={`${mine ? "items-end" : "items-start"} flex flex-col`}>
+              {!mine && (
+                <button
+                  onClick={openOtherProfile}
+                  className="mb-1 text-left text-[11px] text-white/40 transition hover:text-white/70"
+                >
+                  {sender?.name || "User"}
+                </button>
+              )}
+
               <div
-                key={m.id}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                className={`bubble-in break-words rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
+                  mine
+                    ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
+                    : "bg-white/10 text-white backdrop-blur"
+                }`}
               >
-                <div className="flex max-w-[88%] items-end gap-2 sm:max-w-[78%]">
-                  {!mine &&
-                    (loadingRoom ? (
-                      <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
-                    ) : (
-                      <img
-                        src={sender?.image || "/avatar.png"}
-                        className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10 opacity-0 animate-[fadeIn_.25s_ease_forwards]"
-                        onError={(e) => {
-                          e.currentTarget.src = "/avatar.png";
-                        }}
-                      />
-                    ))}
+                {m.imageUrl && (
+                  <img
+                    src={m.imageUrl}
+                    onClick={() => setPreview(m.imageUrl || null)}
+                    className="mb-2 rounded-xl max-h-[220px] cursor-pointer"
+                  />
+                )}
 
-                  <div
-                    className={`${
-                      mine ? "items-end" : "items-start"
-                    } flex flex-col`}
-                  >
-                    {!mine && (
-                      <button
-                        onClick={openOtherProfile}
-                        className="mb-1 text-left text-[11px] text-white/40 transition hover:text-white/70"
-                      >
-                        {sender?.name || "User"}
-                      </button>
-                    )}
-
-                    <div
-                      className={`bubble-in break-words rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
-                        mine
-                          ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
-                          : "bg-white/10 text-white backdrop-blur"
-                      }`}
-                    >
-                      {m.imageUrl && (
-                        <img
-                          src={m.imageUrl}
-                          onClick={() => setPreview(m.imageUrl || null)}
-                          className="mb-2 rounded-xl max-h-[220px] cursor-pointer"
-                        />
-                      )}
-
-                      {m.content}
-                    </div>
-
-                    <div
-                      className={`mt-1 px-1 text-[10px] text-white/30 ${
-                        mine ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {formatTime(m.createdAt)}
-                    </div>
-
-                    {mine && lastSeenMineId === m.id && m.seenAt && (
-                      <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
-                        อ่านแล้ว
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {m.content}
               </div>
-            );
-          })}
+
+              <div
+                className={`mt-1 px-1 text-[10px] text-white/30 ${
+                  mine ? "text-right" : "text-left"
+                }`}
+              >
+                {formatTime(m.createdAt)}
+              </div>
+
+              {mine && lastSeenMineId === m.id && m.seenAt && (
+                <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
+                  อ่านแล้ว
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+      );
+    })}
+  </div>
+</div>
 
         {/* INPUT */}
-        <div className="fixed bottom-[calc(100px+env(safe-area-inset-bottom)+16px)] left-0 right-0 z-[1200] px-3 sm:px-4">
-          <div className="mx-auto max-w-[920px] relative">
+        <div className="fixed bottom-[calc(100px+env(safe-area-inset-bottom)+16px)] left-0 right-0 z-[1200]">
+          <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4 relative">
             {showEmoji && (
               <div
                 ref={emojiRef}
