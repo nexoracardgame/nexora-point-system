@@ -7,7 +7,6 @@ import { signOut, useSession } from "next-auth/react";
 import { MessageCircle } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
 import {
@@ -332,8 +331,6 @@ export default function MainLayout({
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                <LanguageSwitcher />
-
                 <NotificationBell />
 
                 <PrefetchLink

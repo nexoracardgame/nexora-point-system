@@ -6,13 +6,10 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
 import {
   DEFAULT_LOCALE,
-  LOCALE_COOKIE_KEY,
-  resolveLocale,
   translate,
   type Locale,
 } from "@/lib/i18n-core";
@@ -37,19 +34,10 @@ export {
 
 export function LanguageProvider({
   children,
-  initialLocale,
 }: {
   children: ReactNode;
-  initialLocale?: Locale;
 }) {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window === "undefined") {
-      return resolveLocale(initialLocale);
-    }
-
-    const storedLocale = window.localStorage.getItem(LOCALE_COOKIE_KEY);
-    return resolveLocale(storedLocale || initialLocale || DEFAULT_LOCALE);
-  });
+  const locale = DEFAULT_LOCALE;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -57,18 +45,15 @@ export function LanguageProvider({
   }, [locale]);
 
   const setLocale = useCallback((nextLocale: Locale) => {
-    setLocaleState(nextLocale);
-
+    void nextLocale;
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(LOCALE_COOKIE_KEY, nextLocale);
-      document.cookie = `${LOCALE_COOKIE_KEY}=${nextLocale}; path=/; max-age=31536000; SameSite=Lax`;
-      document.documentElement.lang = nextLocale;
+      document.documentElement.lang = DEFAULT_LOCALE;
     }
   }, []);
 
   const toggleLocale = useCallback(() => {
-    setLocale(locale === "th" ? "en" : "th");
-  }, [locale, setLocale]);
+    setLocale(DEFAULT_LOCALE);
+  }, [setLocale]);
 
   const value = useMemo<LanguageContextValue>(
     () => ({

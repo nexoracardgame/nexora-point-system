@@ -148,6 +148,15 @@ export default function DealChatPage() {
   const hasValidDealRoom = Boolean(dealId);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    const el = scrollRef.current;
+
+    if (el) {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior,
+      });
+    }
+
     bottomRef.current?.scrollIntoView({
       block: "end",
       behavior,
@@ -256,6 +265,13 @@ export default function DealChatPage() {
 
       return next;
     });
+
+    if (!hasInitialScrolledRef.current || isNearBottomRef.current) {
+      requestAnimationFrame(() => {
+        scrollToBottom("auto");
+        isNearBottomRef.current = true;
+      });
+    }
   };
 
   const markSeenNow = async () => {
@@ -654,7 +670,7 @@ export default function DealChatPage() {
                   ดีลการ์ด {card.name} #{card.no}
                 </div>
 
-                <div className="mt-1.5 flex flex-wrap gap-2">
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-bold text-amber-200 sm:px-3 sm:text-[11px]">
                     ราคาตั้งขาย {formatPrice(card.listedPrice)}
                   </div>
@@ -670,6 +686,19 @@ export default function DealChatPage() {
                     }`}
                   />
                   <span>{typing ? "กำลังพิมพ์..." : "ห้องนัดสถานที่ของดีลนี้"}</span>
+                </div>
+              </div>
+
+              <div className="ml-1 shrink-0">
+                <div className="overflow-hidden rounded-2xl border border-cyan-300/18 bg-white/[0.04] p-1 shadow-[0_0_18px_rgba(34,211,238,0.10)]">
+                  <img
+                    src={card.image}
+                    alt={card.name}
+                    className="aspect-[2/3] h-[44px] w-auto rounded-xl object-cover sm:h-[52px]"
+                    onError={(e) => {
+                      e.currentTarget.src = "/cards/001.jpg";
+                    }}
+                  />
                 </div>
               </div>
             </button>
