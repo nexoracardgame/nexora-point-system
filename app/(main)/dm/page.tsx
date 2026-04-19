@@ -109,19 +109,18 @@ export default function DMListPage() {
       )[0];
 
       // 🔥 หา "อีกฝั่ง" จาก message จริง (สำคัญสุด)
-      const otherMsg = roomMsgs.find(
-        (m: any) => m.senderId !== meUser.id
-      );
+      const isMeLast = lastMsg?.senderId === meUser.id;
 
-      const otherName =
-        otherMsg?.senderName ||
-        lastMsg?.senderName ||
-        "User";
+// 🔥 ถ้าข้อความล่าสุดเราพิม → เอาอีกฝั่ง
+// 🔥 ถ้าอีกฝั่งพิม → ใช้เลย
 
-      const otherImage =
-        otherMsg?.senderImage ||
-        lastMsg?.senderImage ||
-        "/avatar.png";
+      const otherName = isMeLast
+        ? roomMsgs.find((m: any) => m.senderId !== meUser.id)?.senderName || "User"
+        : lastMsg?.senderName || "User";
+
+      const otherImage = isMeLast
+        ? roomMsgs.find((m: any) => m.senderId !== meUser.id)?.senderImage || "/avatar.png"
+        : lastMsg?.senderImage || "/avatar.png";
 
       // 🔴 unread
       const unread = roomMsgs.filter(
