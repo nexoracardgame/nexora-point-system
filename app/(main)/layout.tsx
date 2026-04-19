@@ -34,6 +34,7 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const isDmRoomPage = pathname.startsWith("/dm/");
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -405,8 +406,20 @@ export default function MainLayout({
           </header>
 
           {/* CONTENT */}
-          <main className="relative z-0 min-w-0 flex-1 bg-[#07080b] p-3 sm:p-4 xl:p-6 pb-[90px] sm:pb-[100px] xl:pb-6">
-            <div className="min-h-[calc(100vh-74px-92px)] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(100vh-74px-96px)] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(100vh-122px)] xl:p-6">
+          <main
+            className={`relative z-0 min-w-0 flex-1 bg-[#07080b] ${
+              isDmRoomPage
+                ? "overflow-hidden p-0 pb-0"
+                : "p-3 pb-[90px] sm:p-4 sm:pb-[100px] xl:p-6 xl:pb-6"
+            }`}
+          >
+            <div
+              className={`${
+                isDmRoomPage
+                  ? "h-[calc(100dvh-74px)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(100dvh-74px)]"
+                  : "min-h-[calc(100vh-74px-92px)] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(100vh-74px-96px)] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(100vh-122px)] xl:p-6"
+              }`}
+            >
               {children}
             </div>
           </main>
@@ -530,28 +543,30 @@ export default function MainLayout({
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] border border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 backdrop-blur-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] xl:hidden mx-auto max-w-[640px] rounded-2xl">
-        <div className="mx-auto grid max-w-[640px] grid-cols-4 gap-2">
-          {mobileBottomItems.map((item) => {
-            const Icon = item.icon;
+      {!isDmRoomPage && (
+        <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[640px] rounded-2xl border border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
+          <div className="mx-auto grid max-w-[640px] grid-cols-4 gap-2">
+            {mobileBottomItems.map((item) => {
+              const Icon = item.icon;
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border transition ${
-                  item.active
-                    ? "border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
-                    : "border-transparent bg-white/[0.02] text-white/45"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="mt-1 text-[11px] font-bold">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border transition ${
+                    item.active
+                      ? "border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
+                      : "border-transparent bg-white/[0.02] text-white/45"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="mt-1 text-[11px] font-bold">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

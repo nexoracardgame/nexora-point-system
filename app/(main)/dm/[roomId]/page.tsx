@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import { Send, ArrowLeft, Image as ImageIcon, Smile } from "lucide-react";
@@ -26,12 +26,19 @@ type DMMessage = {
     name: string;
     image: string;
   };
+  optimistic?: boolean;
 };
 
 type UserMapValue = {
   name?: string | null;
   image?: string | null;
 };
+
+type ChatUser = {
+  id: string;
+  name?: string | null;
+  image?: string | null;
+} | null;
 
 function formatTime(dateString?: string | null) {
   if (!dateString) return "";
@@ -41,6 +48,64 @@ function formatTime(dateString?: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function buildSender(
+  senderId: string,
+  msg?: { senderName?: string | null; senderImage?: string | null },
+  meData?: ChatUser,
+  otherData?: ChatUser
+) {
+  const isMine = senderId === meData?.id;
+
+  if (isMine) {
+    return {
+      id: senderId,
+      name: meData?.name || msg?.senderName || "You",
+      image: meData?.image || msg?.senderImage || "/avatar.png",
+    };
+  }
+
+  return {
+    id: senderId,
+    name: otherData?.name || msg?.senderName || "User",
+    image: otherData?.image || msg?.senderImage || "/avatar.png",
+  };
+}
+
+function mergeMessage(
+  prev: DMMessage[],
+  incoming: DMMessage,
+  meData?: ChatUser,
+  otherData?: ChatUser
+) {
+  const nextMessage = {
+    ...incoming,
+    sender:
+      incoming.sender ||
+      buildSender(
+        incoming.senderId,
+        {
+          senderName: incoming.senderName,
+          senderImage: incoming.senderImage,
+        },
+        meData,
+        otherData
+      ),
+  };
+
+  const existingIndex = prev.findIndex((item) => item.id === incoming.id);
+
+  if (existingIndex >= 0) {
+    const next = [...prev];
+    next[existingIndex] = {
+      ...next[existingIndex],
+      ...nextMessage,
+    };
+    return next;
+  }
+
+  return [...prev, nextMessage];
 }
 
 export default function DMPage() {
@@ -66,32 +131,17 @@ export default function DMPage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const hasInitialScrolledRef = useRef(false);
   const hasMarkedSeenRef = useRef(false);
 
   const hasValidRoom = Boolean(roomId);
 
-  const buildSender = (
-    senderId: string,
-    msg?: { senderName?: string | null; senderImage?: string | null },
-    meData?: any,
-    otherData?: any
-  ) => {
-    const isMine = senderId === meData?.id;
-
-    if (isMine) {
-      return {
-        id: senderId,
-        name: meData?.name || msg?.senderName || "You",
-        image: meData?.image || msg?.senderImage || "/avatar.png",
-      };
-    }
-
-    return {
-      id: senderId,
-      name: otherData?.name || msg?.senderName || "User",
-      image: otherData?.image || msg?.senderImage || "/avatar.png",
-    };
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    bottomRef.current?.scrollIntoView({
+      block: "end",
+      behavior,
+    });
   };
 
   const loadSession = async () => {
@@ -170,15 +220,17 @@ export default function DMPage() {
       ),
     }));
 
-    setMessages(withSender);
+    setMessages((prev) => {
+      const optimisticMessages = prev.filter((message) => message.optimistic);
+      let next = withSender;
 
-// 💥 บังคับลงล่างทันทีหลังโหลดเสร็จ
-requestAnimationFrame(() => {
-  if (scrollRef.current) {
-    scrollRef.current.scrollTop =
-      scrollRef.current.scrollHeight;
-  }
-});
+      optimisticMessages.forEach((message) => {
+        next = mergeMessage(next, message, meData, otherData);
+      });
+
+      return next;
+    });
+
   };
 
   const markSeenNow = async () => {
@@ -214,6 +266,16 @@ requestAnimationFrame(() => {
     init();
   }, [roomId]);
 
+  useEffect(() => {
+    if (!roomId || !me?.id) return;
+
+    const interval = setInterval(() => {
+      void loadMessages(me, other);
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [roomId, me, other]);
+
   const lastSeenMineId = useMemo(() => {
     const mineSeen = messages.filter((m) => m.senderId === me?.id && !!m.seenAt);
     if (mineSeen.length === 0) return null;
@@ -238,31 +300,12 @@ requestAnimationFrame(() => {
           event: "INSERT",
           schema: "public",
           table: "dmMessage",
+          filter: `roomId=eq.${roomId}`,
         },
         (payload) => {
-          const msg = payload.new as any;
+          const msg = payload.new as DMMessage;
 
-          if (msg.roomId !== roomId) return;
-
-          setMessages((prev) => {
-            if (prev.find((x) => x.id === msg.id)) return prev;
-
-            return [
-              ...prev,
-              {
-                ...msg,
-                sender: buildSender(
-                  msg.senderId,
-                  {
-                    senderName: msg.senderName,
-                    senderImage: msg.senderImage,
-                  },
-                  me,
-                  other
-                ),
-              },
-            ];
-          });
+          setMessages((prev) => mergeMessage(prev, msg, me, other));
         }
       )
       .on(
@@ -271,31 +314,12 @@ requestAnimationFrame(() => {
           event: "UPDATE",
           schema: "public",
           table: "dmMessage",
+          filter: `roomId=eq.${roomId}`,
         },
         (payload) => {
-          const updated = payload.new as any;
+          const updated = payload.new as DMMessage;
 
-          if (updated.roomId !== roomId) return;
-
-          setMessages((prev) =>
-            prev.map((x) =>
-              x.id === updated.id
-                ? {
-                    ...x,
-                    ...updated,
-                    sender: buildSender(
-                      updated.senderId,
-                      {
-                        senderName: updated.senderName,
-                        senderImage: updated.senderImage,
-                      },
-                      me,
-                      other
-                    ),
-                  }
-                : x
-            )
-          );
+          setMessages((prev) => mergeMessage(prev, updated, me, other));
         }
       )
       .on("broadcast", { event: "typing" }, ({ payload }) => {
@@ -312,8 +336,13 @@ requestAnimationFrame(() => {
           setTyping(false);
         }, 1500);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("REALTIME STATUS:", status);
 
+        if (status === "SUBSCRIBED") {
+          console.log("✅ REALTIME CONNECTED");
+        }
+      });
     return () => {
       if (typingTimeout.current) {
         clearTimeout(typingTimeout.current);
@@ -338,29 +367,14 @@ requestAnimationFrame(() => {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  useEffect(() => {
-  if (!messages.length) return;
+  useLayoutEffect(() => {
+    if (!messages.length || hasInitialScrolledRef.current) return;
 
-  const el = scrollRef.current;
-  if (!el) return;
-
-  let tries = 0;
-
-  const forceScroll = () => {
-    if (!scrollRef.current) return;
-
-    scrollRef.current.scrollTop =
-      scrollRef.current.scrollHeight;
-
-    tries++;
-
-    if (tries < 10) {
-      requestAnimationFrame(forceScroll);
-    }
-  };
-
-  forceScroll();
-}, [messages.length]);
+    requestAnimationFrame(() => {
+      scrollToBottom("auto");
+      hasInitialScrolledRef.current = true;
+    });
+  }, [messages.length]);
 
   const send = async () => {
     if ((!text.trim() && !file) || !me?.id || !roomId) return;
@@ -410,20 +424,50 @@ requestAnimationFrame(() => {
     setText("");
     setShowEmoji(false);
 
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticMessage: DMMessage = {
+      id: optimisticId,
+      roomId,
+      senderId: me.id,
+      content: msg || null,
+      imageUrl,
+      seenAt: null,
+      createdAt: new Date().toISOString(),
+      senderName: me.name || "You",
+      senderImage: me.image || "/avatar.png",
+      sender: buildSender(
+        me.id,
+        {
+          senderName: me.name || "You",
+          senderImage: me.image || "/avatar.png",
+        },
+        me,
+        other
+      ),
+      optimistic: true,
+    };
+
+    setMessages((prev) => mergeMessage(prev, optimisticMessage, me, other));
+    scrollToBottom("smooth");
+
     if (!me?.id) {
       alert("ยังไม่ได้ login");
       return;
     }
 
-    const { error } = await supabase.from("dmMessage").insert({
-      roomId,
-      senderId: me.id,
-      content: msg,
-      imageUrl,
-      seenAt: null,
-      senderName: me.name || "You",
-      senderImage: me.image || "/avatar.png",
-    });
+    const { data: insertedMessage, error } = await supabase
+      .from("dmMessage")
+      .insert({
+        roomId,
+        senderId: me.id,
+        content: msg,
+        imageUrl,
+        seenAt: null,
+        senderName: me.name || "You",
+        senderImage: me.image || "/avatar.png",
+      })
+      .select("*")
+      .single();
 
     await supabase
       .from("dm_room")
@@ -432,8 +476,18 @@ requestAnimationFrame(() => {
 
     if (error) {
       console.error("INSERT ERROR:", error);
+      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setText(msg);
       return;
-    }   
+    }
+
+    if (insertedMessage) {
+      setMessages((prev) => {
+        const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
+        return mergeMessage(withoutOptimistic, insertedMessage as DMMessage, me, other);
+      });
+      scrollToBottom("smooth");
+    }
   };
 
   const sendTyping = async () => {
@@ -463,10 +517,10 @@ requestAnimationFrame(() => {
   }
 
   return (
-    <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
-      <div className="w-full h-full flex flex-col">
-        <div className="fixed top-[72px] left-1/2 -translate-x-1/2 w-full max-w-[3200px] z-[3000] border-b border-white/10 bg-black/60 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
-          <div className="mx-auto w-full max-w-[920px] flex items-center gap-3 px-3 py-3 sm:px-4">
+    <div className="h-full min-h-0 overflow-hidden">
+      <div className="flex h-full min-h-0 w-full flex-col bg-[#050608]">
+        <div className="sticky top-0 z-20 border-b border-white/10 bg-black/75 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <div className="mx-auto flex w-full max-w-[980px] items-center gap-3 px-3 py-3 sm:px-4">
             <button
               onClick={() => router.back()}
               className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
@@ -511,9 +565,9 @@ requestAnimationFrame(() => {
 
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto pt-[80px] pb-[140px]"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         >
-          <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4">
+          <div className="mx-auto flex min-h-full w-full max-w-[980px] flex-col justify-end px-3 pb-4 pt-4 sm:px-4 sm:pb-5">
             {messages.map((m) => {
               const mine = m.senderId === me?.id;
               const sender = m.sender;
@@ -522,10 +576,10 @@ requestAnimationFrame(() => {
                 <div
                   key={m.id}
                   className={`flex ${
-                    mine ? "justify-end pr-3 sm:pr-20" : "justify-start pl-3 sm:pl-0"
+                    mine ? "mb-3 justify-end pr-0 sm:pr-10" : "mb-3 justify-start pl-0"
                   }`}
                 >
-                  <div className="flex max-w-[92%] items-end gap-2 sm:max-w-[84%]">
+                  <div className="flex max-w-[94%] items-end gap-2 sm:max-w-[78%]">
                     {!mine &&
                       (loadingRoom ? (
                         <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
@@ -550,7 +604,7 @@ requestAnimationFrame(() => {
                       )}
 
                       <div
-                        className={`bubble-in break-words rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
+                        className={`bubble-in break-words rounded-[22px] px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
                           mine
                             ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
                             : "bg-white/10 text-white backdrop-blur"
@@ -585,15 +639,16 @@ requestAnimationFrame(() => {
                 </div>
               );
             })}
+            <div ref={bottomRef} className="h-1 w-full" />
           </div>
         </div>
 
-        <div className="fixed bottom-[calc(100px+env(safe-area-inset-bottom)+16px)] left-0 right-0 z-[1200]">
-          <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4 relative">
+        <div className="sticky bottom-0 z-20 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.18),rgba(5,6,8,0.92)_18%,rgba(5,6,8,0.98)_100%)] px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-2xl sm:px-4">
+          <div className="mx-auto relative w-full max-w-[980px]">
             {showEmoji && (
               <div
                 ref={emojiRef}
-                className="absolute bottom-[90px] right-0 z-[9999] rounded-2xl border border-white/10 bg-[#111318] shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden"
+                className="absolute bottom-[calc(100%+12px)] right-0 z-[9999] overflow-hidden rounded-2xl border border-white/10 bg-[#111318] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
               >
                 <div className="mb-2 text-xs font-bold text-white/50">
                   เลือกอีโมจิ
@@ -611,7 +666,7 @@ requestAnimationFrame(() => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/70 backdrop-blur-2xl px-3 py-2 shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
+            <div className="flex items-center gap-2 rounded-[28px] border border-white/10 bg-black/70 px-3 py-2 shadow-[0_10px_40px_rgba(0,0,0,0.4)]">
               <input
                 value={text}
                 onChange={(e) => {
@@ -628,7 +683,7 @@ requestAnimationFrame(() => {
                 }}
                 inputMode="text"
                 autoComplete="off"
-                className="h-12 flex-1 rounded-full border border-white/10 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 sm:text-[15px]"
+                className="h-12 min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 sm:text-[15px]"
                 placeholder="พิมพ์ข้อความ... 😊"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -665,7 +720,7 @@ requestAnimationFrame(() => {
             </div>
 
             {file && (
-              <div className="mt-2 text-xs text-white/60">
+              <div className="mt-2 px-2 text-xs text-white/60">
                 เลือกไฟล์แล้ว: {file.name}
               </div>
             )}
