@@ -132,6 +132,7 @@ export default function MainLayout({
     const importantRoutes = [
       "/",
       "/market",
+      "/market/deals",
       "/rewards",
       "/redeem",
       "/wallet",

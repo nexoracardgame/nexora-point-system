@@ -80,8 +80,12 @@ export default async function RedeemPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#16243f_0%,#0b0d13_42%,#05070d_100%)] text-white">
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
-        <section className="relative overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.03))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[34px] sm:p-6 xl:p-8">
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-5%,rgba(34,211,238,0.18),transparent_22%),radial-gradient(circle_at_0%_100%,rgba(168,85,247,0.12),transparent_25%),radial-gradient(circle_at_100%_100%,rgba(251,191,36,0.1),transparent_24%)]" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
+        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,19,29,0.98),rgba(13,15,24,0.92))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[34px] sm:p-6 xl:p-8">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(34,211,238,0.12),transparent_28%),radial-gradient(circle_at_10%_10%,rgba(251,191,36,0.12),transparent_25%)]" />
 
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -102,7 +106,7 @@ export default async function RedeemPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[560px]">
-              <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
+              <div className="rounded-[26px] border border-white/8 bg-black/20 p-4">
                 <div className="flex items-center gap-3">
                   <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                     <Image
@@ -125,7 +129,7 @@ export default async function RedeemPage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-emerald-300/12 bg-emerald-300/10 p-4">
+              <div className="rounded-[26px] border border-emerald-300/12 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(16,185,129,0.08))] p-4">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-emerald-200/70">
                   <QrCode className="h-3.5 w-3.5" />
                   พร้อมใช้งาน
@@ -135,7 +139,7 @@ export default async function RedeemPage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-white/8 bg-white/[0.05] p-4">
+              <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.03))] p-4">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-white/55">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   ใช้แล้ว
@@ -149,7 +153,7 @@ export default async function RedeemPage() {
         </section>
 
         <section className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 backdrop-blur-2xl">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <Gift className="h-4 w-4 text-amber-300" />
               เปิดคูปองได้ทันที
@@ -159,7 +163,7 @@ export default async function RedeemPage() {
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 backdrop-blur-2xl">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <Clock3 className="h-4 w-4 text-cyan-300" />
               สถานะชัดเจน
@@ -169,7 +173,7 @@ export default async function RedeemPage() {
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 backdrop-blur-2xl">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <ShieldCheck className="h-4 w-4 text-emerald-300" />
               เหมาะกับการใช้งานหน้าร้าน
@@ -213,10 +217,10 @@ export default async function RedeemPage() {
                 return (
                   <article
                     key={coupon.id}
-                    className="overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 shadow-[0_14px_60px_rgba(0,0,0,0.3)] backdrop-blur-2xl"
+                    className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,19,29,0.98),rgba(13,15,24,0.92))] p-4 shadow-[0_14px_60px_rgba(0,0,0,0.3)] backdrop-blur-2xl"
                   >
                     <div className="flex flex-col gap-4 sm:flex-row">
-                      <div className="relative h-[120px] overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.04] sm:w-[152px] sm:min-w-[152px]">
+                      <div className="relative h-[120px] overflow-hidden rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.04))] sm:w-[152px] sm:min-w-[152px]">
                         <Image
                           src={
                             coupon.reward.imageUrl ||
@@ -288,7 +292,7 @@ export default async function RedeemPage() {
                             className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
                               coupon.used
                                 ? "border border-white/10 bg-white/[0.06] text-white/75 hover:bg-white/[0.09]"
-                                : "bg-gradient-to-r from-cyan-400 to-emerald-300 text-black hover:scale-[1.01]"
+                                : "bg-gradient-to-r from-cyan-400 to-emerald-300 text-black shadow-[0_10px_30px_rgba(34,211,238,0.18)] hover:scale-[1.01]"
                             }`}
                           >
                             <QrCode className="h-4 w-4" />

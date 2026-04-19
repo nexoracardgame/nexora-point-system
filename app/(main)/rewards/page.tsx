@@ -68,13 +68,18 @@ export default async function RewardsPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1138_0%,#0a0b12_42%,#05070d_100%)] text-white">
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
-        <section className="relative overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[34px] sm:p-6 xl:p-8">
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-5%,rgba(168,85,247,0.24),transparent_26%),radial-gradient(circle_at_0%_100%,rgba(34,211,238,0.12),transparent_24%),radial-gradient(circle_at_100%_100%,rgba(251,191,36,0.12),transparent_22%)]" />
+        <div className="absolute bottom-[-10%] left-[-10%] h-[260px] w-[260px] rounded-full bg-violet-500/12 blur-3xl sm:h-[360px] sm:w-[360px]" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
+        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(21,17,35,0.96),rgba(15,14,24,0.9))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[34px] sm:p-6 xl:p-8">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_16%,rgba(251,191,36,0.14),transparent_30%),radial-gradient(circle_at_8%_18%,rgba(34,211,238,0.12),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(168,85,247,0.1),transparent_35%)]" />
 
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/15 bg-amber-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-amber-200 sm:text-xs">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-300/12 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-violet-100 sm:text-xs">
                 <Gift className="h-3.5 w-3.5" />
                 NEXORA REWARDS
               </div>
@@ -111,7 +116,7 @@ export default async function RewardsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[540px]">
-              <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
+              <div className="rounded-[26px] border border-white/10 bg-black/25 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="flex items-center gap-3">
                   <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                     <Image
@@ -134,7 +139,7 @@ export default async function RewardsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-amber-300/12 bg-amber-300/10 p-4">
+              <div className="rounded-[26px] border border-amber-300/12 bg-[linear-gradient(180deg,rgba(251,191,36,0.16),rgba(251,191,36,0.08))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-amber-200/70">
                   <Gem className="h-3.5 w-3.5" />
                   NEX คงเหลือ
@@ -144,7 +149,7 @@ export default async function RewardsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-cyan-300/12 bg-cyan-300/10 p-4">
+              <div className="rounded-[26px] border border-cyan-300/12 bg-[linear-gradient(180deg,rgba(34,211,238,0.16),rgba(34,211,238,0.08))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-cyan-200/70">
                   <Coins className="h-3.5 w-3.5" />
                   COIN คงเหลือ
@@ -158,7 +163,7 @@ export default async function RewardsPage() {
         </section>
 
         <section className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 backdrop-blur-2xl">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <ShieldCheck className="h-4 w-4 text-emerald-300" />
               แลกแล้วรับคูปองทันที
@@ -168,7 +173,7 @@ export default async function RewardsPage() {
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 backdrop-blur-2xl">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <Sparkles className="h-4 w-4 text-violet-300" />
               ใช้ได้ทั้ง NEX และ COIN
@@ -178,7 +183,7 @@ export default async function RewardsPage() {
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 backdrop-blur-2xl">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <Ticket className="h-4 w-4 text-amber-300" />
               สต็อกอัปเดตตามจริง
@@ -209,9 +214,9 @@ export default async function RewardsPage() {
             {rewards.map((reward) => (
               <article
                 key={reward.id}
-                className="group overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-3 shadow-[0_14px_60px_rgba(0,0,0,0.3)] transition duration-500 hover:-translate-y-1 hover:border-amber-300/18 hover:shadow-[0_20px_80px_rgba(0,0,0,0.4)] sm:p-4"
+                className="group overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,16,30,0.98),rgba(15,13,24,0.94))] p-3 shadow-[0_14px_60px_rgba(0,0,0,0.3)] transition duration-500 hover:-translate-y-1 hover:border-amber-300/18 hover:shadow-[0_20px_80px_rgba(0,0,0,0.4)] sm:p-4"
               >
-                <div className="relative overflow-hidden rounded-[22px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.03))]">
+                <div className="relative overflow-hidden rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.14),transparent_52%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.03))]">
                   <div className="absolute left-3 top-3 z-10 rounded-full border border-white/8 bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/70 backdrop-blur-xl">
                     คงเหลือ {formatNumber(reward.stock)}
                   </div>
@@ -243,7 +248,7 @@ export default async function RewardsPage() {
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {reward.nexCost != null ? (
-                    <div className="rounded-[22px] border border-amber-300/10 bg-amber-300/10 p-4">
+                    <div className="rounded-[24px] border border-amber-300/10 bg-[linear-gradient(180deg,rgba(251,191,36,0.14),rgba(251,191,36,0.07))] p-4">
                       <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-amber-200/70">
                         <Gem className="h-3.5 w-3.5" />
                         NEX
@@ -255,7 +260,7 @@ export default async function RewardsPage() {
                   ) : null}
 
                   {reward.coinCost != null ? (
-                    <div className="rounded-[22px] border border-cyan-300/10 bg-cyan-300/10 p-4">
+                    <div className="rounded-[24px] border border-cyan-300/10 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(34,211,238,0.07))] p-4">
                       <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
                         <Coins className="h-3.5 w-3.5" />
                         COIN
