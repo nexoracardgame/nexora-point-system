@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import { getLocaleTag, useLanguage } from "@/lib/i18n";
 import {
@@ -30,8 +29,6 @@ type NotificationItem = {
 
 type NotificationResponse = {
   items: NotificationItem[];
-  chatUnreadCount: number;
-  activityCount: number;
 };
 
 function formatNotificationTime(
@@ -69,19 +66,49 @@ function getNotificationIcon(type: NotificationItem["type"]) {
 }
 
 export default function NotificationBell() {
-  const { data: session } = useSession();
   const { locale, t } = useLanguage();
-  const userId = session?.user?.id || "";
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [chatUnreadCount, setChatUnreadCount] = useState(0);
-  const [seenAt, setSeenAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const storageKey = "nexora_notification_seen_items";
+  const [seenMap, setSeenMap] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
 
-  const storageKey = userId ? `nexora_notification_seen_at:${userId}` : "";
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object"
+        ? (parsed as Record<string, boolean>)
+        : {};
+    } catch {
+      return {};
+    }
+  });
+
   const localeTag = getLocaleTag(locale);
+
+  const persistSeenMap = (nextMap: Record<string, boolean>) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(storageKey, JSON.stringify(nextMap));
+  };
+
+  const markSeen = (notificationId: string) => {
+    if (!notificationId) return;
+
+    setSeenMap((prev) => {
+      if (prev[notificationId]) return prev;
+      const next = {
+        ...prev,
+        [notificationId]: true,
+      };
+      persistSeenMap(next);
+      return next;
+    });
+  };
 
   const loadNotifications = async () => {
     try {
@@ -91,25 +118,12 @@ export default function NotificationBell() {
 
       const data = (await res.json()) as NotificationResponse;
       setItems(Array.isArray(data?.items) ? data.items : []);
-      setChatUnreadCount(Number(data?.chatUnreadCount || 0));
     } catch {
       return;
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!storageKey || typeof window === "undefined") return;
-
-    const raw = window.localStorage.getItem(storageKey);
-    const nextSeenAt = raw ? Number(raw) || 0 : 0;
-    const frameId = window.requestAnimationFrame(() => {
-      setSeenAt(nextSeenAt);
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [storageKey]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -168,8 +182,24 @@ export default function NotificationBell() {
       }
     );
 
-    channelRef.current = channel;
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dealRequest" },
+      () => {
+        void loadNotifications();
+      }
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "marketHistory" },
+      () => {
+        void loadNotifications();
+      }
+    );
+
     channel.subscribe();
+    channelRef.current = channel;
 
     return () => {
       if (channelRef.current) {
@@ -190,31 +220,12 @@ export default function NotificationBell() {
     return () => window.removeEventListener("click", onClickOutside);
   }, []);
 
-  const activityUnreadCount = useMemo(
-    () =>
-      items.filter(
-        (item) =>
-          item.type !== "chat" &&
-          new Date(item.createdAt).getTime() > seenAt
-      ).length,
-    [items, seenAt]
+  const unreadItems = useMemo(
+    () => items.filter((item) => !seenMap[item.id]),
+    [items, seenMap]
   );
 
-  const totalUnreadCount = chatUnreadCount + activityUnreadCount;
-
-  const openPanel = () => {
-    setOpen((prev) => {
-      const nextOpen = !prev;
-
-      if (nextOpen && storageKey && typeof window !== "undefined") {
-        const now = Date.now();
-        window.localStorage.setItem(storageKey, String(now));
-        setSeenAt(now);
-      }
-
-      return nextOpen;
-    });
-  };
+  const totalUnreadCount = unreadItems.length;
 
   return (
     <div className="relative z-[700]" ref={wrapRef}>
@@ -222,7 +233,7 @@ export default function NotificationBell() {
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          openPanel();
+          setOpen((prev) => !prev);
         }}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)]"
       >
@@ -266,24 +277,23 @@ export default function NotificationBell() {
                 </div>
               )}
 
-              {!loading && items.length === 0 && (
+              {!loading && unreadItems.length === 0 && (
                 <div className="px-3 py-10 text-center text-sm text-white/45">
                   {t("notifications.empty")}
                 </div>
               )}
 
-              {items.map((item) => {
+              {unreadItems.map((item) => {
                 const Icon = getNotificationIcon(item.type);
-                const isUnread =
-                  item.type === "chat"
-                    ? true
-                    : new Date(item.createdAt).getTime() > seenAt;
 
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
-                    onClick={() => setOpen(false)}
+                    onClick={() => {
+                      markSeen(item.id);
+                      setOpen(false);
+                    }}
                     className="group flex items-start gap-3 rounded-[22px] border border-transparent px-3 py-3 transition hover:border-amber-300/10 hover:bg-white/[0.03]"
                   >
                     <div className="relative shrink-0">
@@ -313,9 +323,7 @@ export default function NotificationBell() {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
-                      {isUnread && (
-                        <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
-                      )}
+                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
                       <ChevronRight className="mt-1 h-4 w-4 text-white/24 transition group-hover:text-white/45" />
                     </div>
                   </Link>

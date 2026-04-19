@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       select: {
         id: true,
         cardId: true,
+        buyerId: true,
         sellerId: true,
         offeredPrice: true,
         status: true,
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
         select: {
           id: true,
           cardId: true,
+          buyerId: true,
           offeredPrice: true,
           status: true,
         },
@@ -94,6 +96,9 @@ export async function POST(req: NextRequest) {
         select: {
           id: true,
           status: true,
+          sellerId: true,
+          cardName: true,
+          imageUrl: true,
         },
       });
 
@@ -140,6 +145,11 @@ export async function POST(req: NextRequest) {
             listingId: freshDeal.cardId,
             action: "deal_accepted",
             detail: `Deal accepted for ${Number(freshDeal.offeredPrice).toLocaleString("th-TH")} THB`,
+            sellerId: listing.sellerId,
+            buyerId: deal.buyerId,
+            price: Number(freshDeal.offeredPrice),
+            cardName: listing.cardName,
+            imageUrl: listing.imageUrl,
           },
         });
       }

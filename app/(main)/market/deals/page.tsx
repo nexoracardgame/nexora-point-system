@@ -140,38 +140,11 @@ export default function DealsPage() {
     };
   }, [fetchDeals]);
 
-  const handleChat = async (targetUserId: string) => {
-    if (!targetUserId || creatingChatId) return;
+  const handleChat = async (dealId: string) => {
+    if (!dealId || creatingChatId) return;
 
-    try {
-      setCreatingChatId(targetUserId);
-
-      const res = await fetch("/api/dm/create-room", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ user2: targetUserId }),
-      });
-
-      if (!res.ok) {
-        throw new Error("CREATE ROOM FAILED");
-      }
-
-      const data = await res.json();
-
-      if (data?.roomId) {
-        router.push(`/dm/${data.roomId}`);
-        return;
-      }
-
-      alert(t("deals.chat"));
-    } catch (error) {
-      console.error("CHAT ERROR:", error);
-      alert(t("deals.chat"));
-    } finally {
-      setCreatingChatId(null);
-    }
+    setCreatingChatId(dealId);
+    router.push(`/market/deals/chat/${dealId}`);
   };
 
   const pendingDeals = useMemo(
@@ -200,7 +173,7 @@ export default function DealsPage() {
     const statusUI = getStatusUI(deal.status, t);
     const StatusIcon = statusUI.icon;
     const member = deal.isSeller ? deal.buyer : deal.seller;
-    const isOpeningChat = creatingChatId === member.id;
+    const isOpeningChat = creatingChatId === deal.id;
     const canOpenChat = deal.status === "accepted";
 
     return (
@@ -260,7 +233,7 @@ export default function DealsPage() {
 
         {canOpenChat && (
           <button
-            onClick={() => handleChat(member.id)}
+            onClick={() => handleChat(deal.id)}
             disabled={isOpeningChat}
             className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
           >

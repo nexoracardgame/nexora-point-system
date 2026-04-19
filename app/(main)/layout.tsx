@@ -153,8 +153,8 @@ export default function MainLayout({
       return () => window.cancelIdleCallback(idleId);
     }
 
-    const timeoutId = window.setTimeout(warmRoutes, 250);
-    return () => window.clearTimeout(timeoutId);
+    const timeoutId = globalThis.setTimeout(warmRoutes, 250);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [router]);
 
   useEffect(() => {

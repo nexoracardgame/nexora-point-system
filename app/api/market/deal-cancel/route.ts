@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -75,6 +76,29 @@ export async function POST(req: NextRequest) {
       }
 
       if (deal.status === "accepted") {
+        const listingForHistory = await tx.marketListing.findUnique({
+          where: { id: deal.cardId },
+          select: {
+            id: true,
+            sellerId: true,
+            cardName: true,
+            imageUrl: true,
+          },
+        });
+
+        await tx.marketHistory.create({
+          data: {
+            listingId: deal.cardId,
+            action: "deal_cancelled",
+            detail: "Accepted deal was cancelled",
+            sellerId: deal.sellerId,
+            buyerId: deal.buyerId,
+            price: null,
+            cardName: listingForHistory?.cardName,
+            imageUrl: listingForHistory?.imageUrl,
+          },
+        });
+
         const latestAcceptedHistory = await tx.marketHistory.findFirst({
           where: {
             listingId: deal.cardId,
@@ -95,6 +119,10 @@ export async function POST(req: NextRequest) {
         }
       }
     });
+
+    if (deal.status === "accepted") {
+      await cleanupDealChat(deal.id);
+    }
 
     return NextResponse.json(
       { success: true },

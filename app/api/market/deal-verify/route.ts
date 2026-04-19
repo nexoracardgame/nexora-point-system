@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,8 @@ export async function POST(req: NextRequest) {
         where: { cardId: listing.id },
       });
     });
+
+    await cleanupDealChat(deal.id);
 
     revalidatePath("/market/seller-center");
     revalidatePath("/market/deals");
