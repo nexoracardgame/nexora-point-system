@@ -481,7 +481,7 @@ export default function DMPage() {
         {/* CHAT */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-3 pt-[80px] py-4 sm:px-4 space-y-4 pb-[calc(200px+env(safe-area-inset-bottom))]"
+          className="flex-1 overflow-y-auto px-3 pt-[80px] py-4 sm:px-4 space-y-4 pb-[calc(220px+env(safe-area-inset-bottom))]"
         >
           {messages.map((m) => {
             const mine = m.senderId === me?.id;
@@ -559,7 +559,7 @@ export default function DMPage() {
         </div>
 
         {/* INPUT */}
-        <div className="fixed bottom-[calc(80px+env(safe-area-inset-bottom)+12px)] left-0 right-0 z-[1200] px-3 sm:px-4">
+        <div className="fixed bottom-[calc(100px+env(safe-area-inset-bottom)+16px)] left-0 right-0 z-[1200] px-3 sm:px-4">
           <div className="mx-auto max-w-[920px] relative">
             {showEmoji && (
               <div
