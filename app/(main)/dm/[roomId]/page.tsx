@@ -224,7 +224,7 @@ export default function DMPage() {
         channelRef.current = null;
       }
     };
-  }, [hasValidRoom, me?.id, roomId, other, userMap]);
+  }, [hasValidRoom, me?.id, roomId, other]);
 
   useEffect(() => {
     scrollBottom(messages.length > 0);
@@ -347,8 +347,23 @@ export default function DMPage() {
 
   const send = async () => {
     if ((!text.trim() && !file) || !me?.id || !roomId) return;
+    
+    if (!other?.id) {
+      console.log("ยังไม่มี other");
+      return;
+    }
 
-    let imageUrl: string | null = null;
+    await supabase.from("dm_room").upsert({
+        roomId,
+        userA: me.id,
+        userB: other.id,
+        userAName: me.name,
+        userAImage: me.image,
+        userBName: other.name,
+        userBImage: other.image,
+      });
+
+        let imageUrl: string | null = null;
 
     if (file) {
       const fileName = `${Date.now()}-${file.name}`;
@@ -392,6 +407,11 @@ export default function DMPage() {
       senderName: me.name || "You",
       senderImage: me.image || "/avatar.png",
     });
+
+    await supabase
+      .from("dm_room")
+      .update({ updatedAt: new Date().toISOString() })
+      .eq("roomId", roomId);
 
     if (error) {
       console.error("INSERT ERROR:", error);

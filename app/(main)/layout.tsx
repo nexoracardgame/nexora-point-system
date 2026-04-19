@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { MessageCircle } from "lucide-react";
 import {
   Gem,
   Bell,
@@ -191,10 +192,10 @@ export default function MainLayout({
         active: pathname.startsWith("/rewards"),
       },
       {
-        href: "/wallet",
-        label: "Wallet",
-        icon: Wallet,
-        active: pathname.startsWith("/wallet"),
+        href: "/dm",
+        label: "Chat",
+        icon: MessageCircle,
+        active: pathname.startsWith("/dm"),
       },
     ],
     [pathname]
