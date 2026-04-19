@@ -137,6 +137,7 @@ export default function MainLayout({
       "/wallet",
       "/dm",
       "/profile/me",
+      "/settings/profile",
     ];
 
     const warmRoutes = () => {
