@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import { Send, ArrowLeft, Image as ImageIcon, Smile } from "lucide-react";
-import EmojiPicker from "emoji-picker-react";
+import EmojiPicker, { Theme } from "emoji-picker-react";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -571,10 +571,10 @@ export default function DMPage() {
 
                 <EmojiPicker
                   onEmojiClick={(emojiData) => {
-                    setText((prev) => prev + emojiData.emoji);
-                    setShowEmoji(false);
+                   setText((prev) => prev + emojiData.emoji);
+                   setShowEmoji(false);
                   }}
-                  theme="dark"
+                  theme={Theme.DARK}
                   width={300}
                   height={400}
                 />
