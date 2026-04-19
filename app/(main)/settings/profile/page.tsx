@@ -4,12 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { UploadCloud, User2 } from "lucide-react";
 
 export default function ProfileSettingsPage() {
-  const [ready, setReady] = useState(false); //
-
-  const [saving, setSaving] = useState(false); //
+  const [ready, setReady] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [coverUrl, setCoverUrl] = useState("/seller-cover.jpg");
-  const [coverPosition, setCoverPosition] = useState(50); // 🔥 เพิ่ม
+  const [coverPosition, setCoverPosition] = useState(50);
 
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -23,31 +22,39 @@ export default function ProfileSettingsPage() {
   const coverRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  useEffect(() => {
-  let mounted = true;
-
   async function loadProfile() {
     const res = await fetch("/api/profile/me", { cache: "no-store" });
     const data = await res.json();
-    if (!res.ok || !mounted) return;
 
-    setCoverUrl(data.coverImage || "/seller-cover.jpg");
+    if (!res.ok) return false;
+
+    setCoverUrl(data.coverImage || data.coverUrl || "/seller-cover.jpg");
     setCoverPosition(data.coverPosition ?? 50);
     setDisplayName(data.displayName || data.name || "");
     setBio(data.bio || "");
-    setLineLink(data.lineUrl || "");
-    setFacebookLink(data.facebookUrl || "");
-    setProfileImage(data.image || "/avatar.png");
+    setLineLink(data.lineUrl || data.lineLink || "");
+    setFacebookLink(data.facebookUrl || data.facebookLink || "");
+    setProfileImage(data.image || data.profileImage || "/avatar.png");
 
-    setReady(true); // 🔥 ย้ายมาไว้ตรงนี้
+    return true;
   }
 
-  loadProfile();
+  useEffect(() => {
+    let mounted = true;
 
-  return () => {
-    mounted = false;
-  };
-}, []);
+    async function init() {
+      const ok = await loadProfile();
+      if (mounted && ok) {
+        setReady(true);
+      }
+    }
+
+    init();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function uploadImage(file: File, type: "profile" | "cover") {
     const reader = new FileReader();
@@ -66,14 +73,13 @@ export default function ProfileSettingsPage() {
     reader.readAsDataURL(file);
   }
 
-  // 🔥 ระบบลาก (ใช้ของเดิมที่ผ่านแล้ว)
   function handlePointerMove(e: React.PointerEvent) {
     if (!isDragging.current || !coverRef.current) return;
 
     const rect = coverRef.current.getBoundingClientRect();
     const percent = ((e.clientY - rect.top) / rect.height) * 100;
-
     const clamped = Math.max(0, Math.min(100, percent));
+
     setCoverPosition(clamped);
   }
 
@@ -81,53 +87,68 @@ export default function ProfileSettingsPage() {
     try {
       setSaving(true);
 
+      const payload = {
+        // รูปแบบเดิม
+        coverUrl,
+        coverPosition,
+        displayName,
+        bio,
+        lineLink,
+        facebookLink,
+        profileImage,
+
+        // รูปแบบสำรองให้ backend ที่ใช้ชื่ออีกแบบ
+        coverImage: coverUrl,
+        image: profileImage,
+        lineUrl: lineLink,
+        facebookUrl: facebookLink,
+      };
+
       const res = await fetch("/api/profile/update", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          image: profileImage,        // 🔥 เปลี่ยนชื่อ
-          coverImage: coverUrl,       // 🔥 เปลี่ยนชื่อ
-          coverPosition,
-          displayName,
-          bio,
-          lineUrl: lineLink,          // 🔥 เปลี่ยนชื่อ
-          facebookUrl: facebookLink,  // 🔥 เปลี่ยนชื่อ
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(data.error || "Save failed");
+        alert(data?.error || "Save failed");
         return;
       }
 
+      // โหลดค่าจริงกลับมาหลังเซฟ เพื่อให้มือถือ/คอมตรงกันทันที
+      await loadProfile();
+
       alert("บันทึกโปรไฟล์สำเร็จ 🎉");
+    } catch (error) {
+      console.error("SAVE PROFILE ERROR:", error);
+      alert("Save failed");
     } finally {
       setSaving(false);
     }
   }
 
   if (!ready) return null;
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1140_0%,#090b12_45%,#05070d_100%)] p-4 text-white sm:p-6">
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
-
         {/* LEFT PANEL */}
         <section className="rounded-[36px] border border-white/10 bg-white/[0.03] p-6 shadow-2xl">
-
           {/* PROFILE IMAGE */}
           <div className="mt-6">
-            <div className="text-sm font-semibold text-white/70 flex items-center gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/70">
               <User2 className="h-4 w-4" />
               Profile Image
             </div>
 
             <button
+              type="button"
               onClick={() => profileInputRef.current?.click()}
-              className="mt-3 relative block"
+              className="relative mt-3 block"
             >
               <img
                 src={profileImage}
@@ -142,24 +163,27 @@ export default function ProfileSettingsPage() {
             <input
               ref={profileInputRef}
               type="file"
-              accept="image/*"              
+              accept="image/*"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+
                 uploadImage(file, "profile");
+                e.currentTarget.value = "";
               }}
             />
           </div>
 
           {/* COVER */}
           <div className="mt-6">
-            <div className="text-sm font-semibold text-white/70 flex items-center gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/70">
               <UploadCloud className="h-4 w-4" />
               Upload Cover Banner
             </div>
 
             <button
+              type="button"
               onClick={() => coverInputRef.current?.click()}
               className="mt-3 flex w-full items-center justify-between rounded-3xl border border-violet-400/20 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/10 to-pink-500/10 px-5 py-4"
             >
@@ -177,31 +201,37 @@ export default function ProfileSettingsPage() {
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/*"              
+              accept="image/*"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+
                 uploadImage(file, "cover");
+                e.currentTarget.value = "";
               }}
             />
 
-            {/* 🔥 DRAG AREA */}
+            {/* DRAG AREA */}
             <div
               ref={coverRef}
               onPointerDown={(e) => {
                 isDragging.current = true;
                 e.currentTarget.setPointerCapture(e.pointerId);
               }}
-              onPointerUp={() => (isDragging.current = false)}
-              onPointerLeave={() => (isDragging.current = false)}
+              onPointerUp={() => {
+                isDragging.current = false;
+              }}
+              onPointerLeave={() => {
+                isDragging.current = false;
+              }}
               onPointerMove={handlePointerMove}
-              className="mt-4 h-40 overflow-hidden rounded-3xl border border-white/10 cursor-grab active:cursor-grabbing select-none"
+              className="mt-4 h-40 cursor-grab select-none overflow-hidden rounded-3xl border border-white/10 active:cursor-grabbing"
             >
               <img
                 src={coverUrl}
                 draggable={false}
-                className="h-full w-full object-cover pointer-events-none"
+                className="pointer-events-none h-full w-full object-cover"
                 style={{
                   objectPosition: `center ${coverPosition}%`,
                 }}
@@ -215,7 +245,7 @@ export default function ProfileSettingsPage() {
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="mt-1 w-full p-3 bg-black/40 rounded-xl"
+              className="mt-1 w-full rounded-xl bg-black/40 p-3"
             />
           </div>
 
@@ -224,7 +254,7 @@ export default function ProfileSettingsPage() {
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="mt-1 w-full p-3 bg-black/40 rounded-xl"
+              className="mt-1 w-full rounded-xl bg-black/40 p-3"
             />
           </div>
 
@@ -233,7 +263,7 @@ export default function ProfileSettingsPage() {
             <input
               value={lineLink}
               onChange={(e) => setLineLink(e.target.value)}
-              className="mt-1 w-full p-3 bg-black/40 rounded-xl"
+              className="mt-1 w-full rounded-xl bg-black/40 p-3"
             />
           </div>
 
@@ -242,7 +272,7 @@ export default function ProfileSettingsPage() {
             <input
               value={facebookLink}
               onChange={(e) => setFacebookLink(e.target.value)}
-              className="mt-1 w-full p-3 bg-black/40 rounded-xl"
+              className="mt-1 w-full rounded-xl bg-black/40 p-3"
             />
           </div>
 
@@ -250,7 +280,7 @@ export default function ProfileSettingsPage() {
           <button
             onClick={saveProfile}
             disabled={saving}
-            className="mt-6 w-full py-4 bg-violet-500 rounded-2xl font-bold"
+            className="mt-6 w-full rounded-2xl bg-violet-500 py-4 font-bold"
           >
             {saving ? "Saving..." : "💾 Save Profile"}
           </button>
@@ -276,7 +306,6 @@ export default function ProfileSettingsPage() {
               {bio || "Top-tier NEXORA trader ⚡"}
             </p>
 
-            {/* 🔥 LINKS */}
             <div className="mt-3 flex gap-4">
               {lineLink && (
                 <a
