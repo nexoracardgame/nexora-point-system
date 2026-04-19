@@ -46,15 +46,19 @@ export default function DMListPage() {
 
       // 🔥 realtime
       channelRef.current = supabase
-        .channel("dm-list")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "dmMessage" },
-          () => {
-            loadRooms(meUser);
-          }
-        )
-        .subscribe();
+  .channel("dm-list")
+
+  // 🔥 ใส่ on ก่อน
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "dmMessage" },
+    () => {
+      loadRooms(meUser);
+    }
+  )
+
+  // 🔥 แล้วค่อย subscribe
+  .subscribe();
     };
 
     init();

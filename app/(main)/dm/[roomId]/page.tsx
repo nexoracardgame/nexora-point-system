@@ -66,34 +66,154 @@ export default function DMPage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrolledRef = useRef(false);
+  const hasMarkedSeenRef = useRef(false);
 
   const hasValidRoom = Boolean(roomId);
 
   const buildSender = (
-  senderId: string,
-  msg?: { senderName?: string | null; senderImage?: string | null },
-  meData?: any,
-  otherData?: any
-) => {
-  const isMine = senderId === meData?.id;
+    senderId: string,
+    msg?: { senderName?: string | null; senderImage?: string | null },
+    meData?: any,
+    otherData?: any
+  ) => {
+    const isMine = senderId === meData?.id;
 
-  if (isMine) {
+    if (isMine) {
+      return {
+        id: senderId,
+        name: meData?.name || msg?.senderName || "You",
+        image: meData?.image || msg?.senderImage || "/avatar.png",
+      };
+    }
+
     return {
       id: senderId,
-      name: meData?.name || "You",
-      image: meData?.image || "/avatar.png",
+      name: otherData?.name || msg?.senderName || "User",
+      image: otherData?.image || msg?.senderImage || "/avatar.png",
     };
-  }
-
-  return {
-    id: senderId,
-    name: otherData?.name || "User",
-    image: otherData?.image || "/avatar.png",
   };
-};
+
+  const scrollBottom = (smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const run = () => {
+      if (!scrollRef.current) return;
+
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    };
+
+    // ยิงหลายจังหวะให้แน่ใจว่า DOM สูงครบจริง
+    setTimeout(run, 0);
+    setTimeout(run, 80);
+    setTimeout(run, 180);
+  };
+
+  const loadSession = async () => {
+    const res = await fetch("/api/auth/session");
+    const data = await res.json();
+
+    setMe(data.user);
+    return data.user;
+  };
+
+  const loadRoom = async () => {
+    if (!roomId) return null;
+
+    const res = await fetch(`/api/dm/room-info?roomId=${roomId}`, {
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    setOther(data.otherUser);
+    setLoadingRoom(false);
+    return data.otherUser;
+  };
+
+  const loadUsersMap = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id,name,image");
+
+    if (error) {
+      console.error("LOAD USERS MAP ERROR:", error);
+      return {};
+    }
+
+    const map: Record<string, UserMapValue> = {};
+
+    (data || []).forEach((u: any) => {
+      map[u.id] = {
+        name: u.name || null,
+        image: u.image || null,
+      };
+    });
+
+    setUserMap(map);
+    return map;
+  };
+
+  const loadMessages = async (
+    meData?: any,
+    otherData?: any,
+    _mapData?: Record<string, UserMapValue>
+  ) => {
+    if (!roomId) return;
+
+    const { data, error } = await supabase
+      .from("dmMessage")
+      .select("*")
+      .eq("roomId", roomId)
+      .order("createdAt", { ascending: true });
+
+    if (error) {
+      console.error("LOAD MESSAGES ERROR:", error);
+      return;
+    }
+
+    const withSender = (data || []).map((m: any) => ({
+      ...m,
+      sender: buildSender(
+        m.senderId,
+        {
+          senderName: m.senderName,
+          senderImage: m.senderImage,
+        },
+        meData,
+        otherData
+      ),
+    }));
+
+    setMessages(withSender);
+  };
+
+  const markSeenNow = async () => {
+    if (!roomId || !me?.id) return;
+
+    const hasUnread = messages.some(
+      (m) => m.senderId !== me.id && !m.seenAt
+    );
+
+    if (!hasUnread) return;
+
+    await supabase
+      .from("dmMessage")
+      .update({ seenAt: new Date().toISOString() })
+      .eq("roomId", roomId)
+      .neq("senderId", me.id)
+      .is("seenAt", null);
+  };
 
   useEffect(() => {
     if (!roomId) return;
+
+    hasInitialScrolledRef.current = false;
+    hasMarkedSeenRef.current = false;
 
     const init = async () => {
       const meData = await loadSession();
@@ -110,15 +230,6 @@ export default function DMPage() {
     if (mineSeen.length === 0) return null;
     return mineSeen[mineSeen.length - 1].id;
   }, [messages, me?.id]);
-
-  const scrollBottom = (smooth = true) => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: smooth ? "smooth" : "auto",
-      });
-    });
-  };
 
   useEffect(() => {
     if (!hasValidRoom || !me?.id) return;
@@ -227,32 +338,15 @@ export default function DMPage() {
   }, [hasValidRoom, me?.id, roomId, other]);
 
   useEffect(() => {
-    scrollBottom(messages.length > 0);
-  }, [messages]);
+    if (!messages.length) return;
 
-  useEffect(() => {
-  if (!roomId || !me?.id) return;
-
-  const markSeen = async () => {
-    await supabase
-      .from("dmMessage")
-      .update({ seenAt: new Date().toISOString() })
-      .eq("roomId", roomId)
-      .neq("senderId", me.id)
-      .is("seenAt", null);
-  };
-
-  // ยิงตอนเข้าแชท
-  markSeen();
-
-  // ยิงตอนกลับมาโฟกัสหน้าจอ
-  const onFocus = () => markSeen();
-  window.addEventListener("focus", onFocus);
-
-  return () => {
-    window.removeEventListener("focus", onFocus);
-  };
-}, [roomId, me?.id]);
+    if (!hasInitialScrolledRef.current) {
+      scrollBottom(false);
+      hasInitialScrolledRef.current = true;
+    } else {
+      scrollBottom(true);
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -266,104 +360,25 @@ export default function DMPage() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const loadSession = async () => {
-    const res = await fetch("/api/auth/session");
-    const data = await res.json();
-
-    setMe(data.user);
-    return data.user;
-  };
-
-  const loadRoom = async () => {
-    if (!roomId) return null;
-
-    const res = await fetch(`/api/dm/room-info?roomId=${roomId}`, {
-      cache: "no-store",
-    });
-
-    const data = await res.json();
-
-    setOther(data.otherUser);
-    setLoadingRoom(false);
-    return data.otherUser;
-  };
-
-  const loadUsersMap = async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("id,name,image");
-
-    if (error) {
-      console.error("LOAD USERS MAP ERROR:", error);
-      return {};
-    }
-
-    const map: Record<string, UserMapValue> = {};
-
-    (data || []).forEach((u: any) => {
-      map[u.id] = {
-        name: u.name || null,
-        image: u.image || null,
-      };
-    });
-
-    setUserMap(map);
-    return map;
-  };
-
-  const loadMessages = async (
-    meData?: any,
-    otherData?: any,
-    mapData?: Record<string, UserMapValue>
-  ) => {
-    if (!roomId) return;
-
-    const { data, error } = await supabase
-      .from("dmMessage")
-      .select("*")
-      .eq("roomId", roomId)
-      .order("createdAt", { ascending: true });
-
-    if (error) {
-      console.error("LOAD MESSAGES ERROR:", error);
-      return;
-    }
-
-    const withSender = (data || []).map((m: any) => ({
-      ...m,
-      sender: buildSender(
-        m.senderId,
-        {
-          senderName: m.senderName,
-          senderImage: m.senderImage,
-        },
-        meData,
-        otherData,        
-      ),
-    }));
-
-    setMessages(withSender);
-  };
-
   const send = async () => {
     if ((!text.trim() && !file) || !me?.id || !roomId) return;
-    
+
     if (!other?.id) {
       console.log("ยังไม่มี other");
       return;
     }
 
     await supabase.from("dm_room").upsert({
-        roomId,
-        userA: me.id,
-        userB: other.id,
-        userAName: me.name,
-        userAImage: me.image,
-        userBName: other.name,
-        userBImage: other.image,
-      });
+      roomId,
+      userA: me.id,
+      userB: other.id,
+      userAName: me.name,
+      userAImage: me.image,
+      userBName: other.name,
+      userBImage: other.image,
+    });
 
-        let imageUrl: string | null = null;
+    let imageUrl: string | null = null;
 
     if (file) {
       const fileName = `${Date.now()}-${file.name}`;
@@ -393,7 +408,7 @@ export default function DMPage() {
     setText("");
     setShowEmoji(false);
 
-    if (!me || !me.id) {
+    if (!me?.id) {
       alert("ยังไม่ได้ login");
       return;
     }
@@ -449,9 +464,7 @@ export default function DMPage() {
 
   return (
     <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
-      <div className="w-full max-w-[920px] h-full flex flex-col mx-auto px-0 sm:px-0">
-
-        {/* HEADER */}
+      <div className="w-full h-full flex flex-col">
         <div className="fixed top-[72px] left-1/2 -translate-x-1/2 w-full max-w-[3200px] z-[3000] border-b border-white/10 bg-black/60 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
           <div className="mx-auto w-full max-w-[920px] flex items-center gap-3 px-3 py-3 sm:px-4">
             <button
@@ -496,85 +509,85 @@ export default function DMPage() {
           </div>
         </div>
 
-        {/* CHAT */}
-        <div          
-  ref={scrollRef}
-  className="flex-1 overflow-y-auto pt-[80px] py-4 pb-[calc(220px+env(safe-area-inset-bottom))]"
->
-  <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4">
-    {messages.map((m) => {
-      const mine = m.senderId === me?.id;
-      const sender = m.sender;
-
-      return (
         <div
-          key={m.id}
-          className={`flex ${mine ? "justify-end pr-3 sm:pr-20" : "justify-start pl-3 sm:pl-0"}`}
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto pt-[80px] pb-[140px]"
         >
-          <div className="flex max-w-[92%] items-end gap-2 sm:max-w-[84%]">
-            {!mine &&
-              (loadingRoom ? (
-                <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
-              ) : (
-                <img
-                  src={sender?.image || "/avatar.png"}
-                  className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10 opacity-0 animate-[fadeIn_.25s_ease_forwards]"
-                  onError={(e) => {
-                    e.currentTarget.src = "/avatar.png";
-                  }}
-                />
-              ))}
+          <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4">
+            {messages.map((m) => {
+              const mine = m.senderId === me?.id;
+              const sender = m.sender;
 
-            <div className={`${mine ? "items-end" : "items-start"} flex flex-col`}>
-              {!mine && (
-                <button
-                  onClick={openOtherProfile}
-                  className="mb-1 text-left text-[11px] text-white/40 transition hover:text-white/70"
+              return (
+                <div
+                  key={m.id}
+                  className={`flex ${
+                    mine ? "justify-end pr-3 sm:pr-20" : "justify-start pl-3 sm:pl-0"
+                  }`}
                 >
-                  {sender?.name || "User"}
-                </button>
-              )}
+                  <div className="flex max-w-[92%] items-end gap-2 sm:max-w-[84%]">
+                    {!mine &&
+                      (loadingRoom ? (
+                        <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+                      ) : (
+                        <img
+                          src={sender?.image || "/avatar.png"}
+                          className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10 opacity-0 animate-[fadeIn_.25s_ease_forwards]"
+                          onError={(e) => {
+                            e.currentTarget.src = "/avatar.png";
+                          }}
+                        />
+                      ))}
 
-              <div
-                className={`bubble-in break-words rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
-                  mine
-                    ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
-                    : "bg-white/10 text-white backdrop-blur"
-                }`}
-              >
-                {m.imageUrl && (
-                  <img
-                    src={m.imageUrl}
-                    onClick={() => setPreview(m.imageUrl || null)}
-                    className="mb-2 rounded-xl max-h-[220px] cursor-pointer"
-                  />
-                )}
+                    <div className={`${mine ? "items-end" : "items-start"} flex flex-col`}>
+                      {!mine && (
+                        <button
+                          onClick={openOtherProfile}
+                          className="mb-1 text-left text-[11px] text-white/40 transition hover:text-white/70"
+                        >
+                          {sender?.name || "User"}
+                        </button>
+                      )}
 
-                {m.content}
-              </div>
+                      <div
+                        className={`bubble-in break-words rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
+                          mine
+                            ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
+                            : "bg-white/10 text-white backdrop-blur"
+                        }`}
+                      >
+                        {m.imageUrl && (
+                          <img
+                            src={m.imageUrl}
+                            onClick={() => setPreview(m.imageUrl || null)}
+                            className="mb-2 rounded-xl max-h-[220px] cursor-pointer"
+                          />
+                        )}
 
-              <div
-                className={`mt-1 px-1 text-[10px] text-white/30 ${
-                  mine ? "text-right" : "text-left"
-                }`}
-              >
-                {formatTime(m.createdAt)}
-              </div>
+                        {m.content}
+                      </div>
 
-              {mine && lastSeenMineId === m.id && m.seenAt && (
-                <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
-                  อ่านแล้ว
+                      <div
+                        className={`mt-1 px-1 text-[10px] text-white/30 ${
+                          mine ? "text-right" : "text-left"
+                        }`}
+                      >
+                        {formatTime(m.createdAt)}
+                      </div>
+
+                      {mine && lastSeenMineId === m.id && m.seenAt && (
+                        <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
+                          อ่านแล้ว
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
+              );
+            })}
           </div>
         </div>
-      );
-    })}
-  </div>
-</div>
 
-        {/* INPUT */}
         <div className="fixed bottom-[calc(100px+env(safe-area-inset-bottom)+16px)] left-0 right-0 z-[1200]">
           <div className="mx-auto w-full max-w-[920px] px-3 sm:px-4 relative">
             {showEmoji && (
@@ -588,8 +601,8 @@ export default function DMPage() {
 
                 <EmojiPicker
                   onEmojiClick={(emojiData) => {
-                   setText((prev) => prev + emojiData.emoji);
-                   setShowEmoji(false);
+                    setText((prev) => prev + emojiData.emoji);
+                    setShowEmoji(false);
                   }}
                   theme={Theme.DARK}
                   width={300}
@@ -604,6 +617,14 @@ export default function DMPage() {
                 onChange={(e) => {
                   setText(e.target.value);
                   sendTyping();
+                }}
+                onFocus={async () => {
+                  if (hasMarkedSeenRef.current) return;
+                  hasMarkedSeenRef.current = true;
+                  await markSeenNow();
+                  setTimeout(() => {
+                    hasMarkedSeenRef.current = false;
+                  }, 300);
                 }}
                 inputMode="text"
                 autoComplete="off"
