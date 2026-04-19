@@ -339,8 +339,7 @@ export default function DMPage() {
           senderImage: m.senderImage,
         },
         meData,
-        otherData,
-        mapData
+        otherData,        
       ),
     }));
 
