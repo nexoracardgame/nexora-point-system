@@ -240,10 +240,22 @@ export default function MainLayout({
         active: pathname.startsWith("/rewards"),
       },
       {
+        href: "/collections",
+        label: t("layout.nav.collections"),
+        icon: FolderKanban,
+        active: pathname.startsWith("/collections"),
+      },
+      {
         href: "/dm",
         label: t("layout.nav.chat"),
         icon: MessageCircle,
         active: pathname.startsWith("/dm"),
+      },
+      {
+        href: "/profile/me",
+        label: "ฉัน",
+        icon: User,
+        active: pathname.startsWith("/profile"),
       },
     ],
     [pathname, t]
@@ -586,7 +598,7 @@ export default function MainLayout({
       {/* MOBILE BOTTOM NAV */}
       {!isChatRoomPage && (
         <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[640px] rounded-2xl border border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
-          <div className="mx-auto grid max-w-[640px] grid-cols-4 gap-2">
+          <div className="mx-auto grid max-w-[640px] grid-cols-6 gap-1.5 sm:gap-2">
             {mobileBottomItems.map((item) => {
               const Icon = item.icon;
 
@@ -595,14 +607,16 @@ export default function MainLayout({
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileNavOpen(false)}
-                  className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border transition ${
+                  className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border px-1 transition ${
                     item.active
                       ? "border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
                       : "border-transparent bg-white/[0.02] text-white/45"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
-                  <span className="mt-1 text-[11px] font-bold">{item.label}</span>
+                  <span className="mt-1 text-[10px] font-bold leading-none sm:text-[11px]">
+                    {item.label}
+                  </span>
                 </PrefetchLink>
               );
             })}
