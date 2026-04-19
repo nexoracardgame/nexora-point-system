@@ -44,6 +44,7 @@ export default function DMPage() {
   const [me, setMe] = useState<any>(null);
   const [other, setOther] = useState<any>(null);
   const [typing, setTyping] = useState(false);
+  const [loadingRoom, setLoadingRoom] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,9 +129,8 @@ export default function DMPage() {
 
   const data = await res.json();
 
-  console.log("ROOM:", data); // ✅ ย้ายมาหลังประกาศ
-
   setOther(data.otherUser);
+  setLoadingRoom(false); // ⭐ เพิ่มบรรทัดนี้
   };
 
   const loadMessages = async () => {
@@ -212,19 +212,23 @@ export default function DMPage() {
     >
 
       {/* รูป */}
-      <img
-        src={other?.image || "/avatar.png"}
-        alt={other?.name || "profile"}
-        className="h-11 w-11 rounded-full object-cover border border-white/15 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
-        onError={(e) => {
-          e.currentTarget.src = "/avatar.png";
-        }}
-      />
+      {loadingRoom ? (
+  <div className="h-11 w-11 rounded-full bg-white/10 animate-pulse" />
+) : (
+  <img
+    src={other?.image || "/avatar.png"}
+    alt={other?.name || "profile"}
+    className="h-11 w-11 rounded-full object-cover border border-white/15 opacity-0 animate-[fadeIn_.25s_ease_forwards]"
+    onError={(e) => {
+      e.currentTarget.src = "/avatar.png";
+    }}
+  />
+)}
 
       {/* ชื่อ + สถานะ */}
       <div className="min-w-0">
         <div className="truncate text-[15px] font-bold sm:text-base">
-          {other?.name || "User"}
+          {loadingRoom ? "" : other?.name}
         </div>
 
         <div className="flex items-center gap-2 text-xs text-white/45">
@@ -256,14 +260,18 @@ export default function DMPage() {
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className="flex max-w-[88%] items-end gap-2 sm:max-w-[78%]">
                   {!mine && (
-                    <img
-                      src={other?.image || "/avatar.png"}
-                      alt={other?.name || "profile"}
-                      className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10"
-                      onError={(e) => {
-                        e.currentTarget.src = "/avatar.png";
-                      }}
-                    />
+                    loadingRoom ? (
+                      <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+                    ) : (
+                      <img
+                        src={other?.image || "/avatar.png"}
+                        alt={other?.name || "profile"}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10 opacity-0 animate-[fadeIn_.25s_ease_forwards]"
+                        onError={(e) => {
+                          e.currentTarget.src = "/avatar.png";
+                       }}
+                     />
+                    )
                   )}
 
                   <div className={`${mine ? "items-end" : "items-start"} flex flex-col`}>

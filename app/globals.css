@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
+/* ================== ROOT ================== */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
 
-@theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -19,6 +19,37 @@
   }
 }
 
+/* ================== BASE ================== */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+
+  /* 🔥 ทำให้ scroll ลื่น */
+  scroll-behavior: smooth;
+
+  /* 🔥 กันกระพริบตอนโหลด */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ================== SCROLLBAR (โคตรโปร) ================== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ================== ANIMATIONS ================== */
+
+/* 🔥 รูป fade-in */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -30,8 +61,48 @@
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+/* 🔥 ข้อความ slide ขึ้น */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 🔥 shimmer (ไว้ทำ skeleton เทพๆ) */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ================== UTILS ================== */
+
+/* ใช้กับรูป */
+.fade-in {
+  animation: fadeIn 0.25s ease forwards;
+}
+
+/* ใช้กับ message */
+.slide-up {
+  animation: slideUp 0.25s ease forwards;
+}
+
+/* skeleton เทพ */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.05) 25%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(255,255,255,0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
 }
