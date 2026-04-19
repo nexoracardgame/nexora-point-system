@@ -87,13 +87,13 @@ export default function ProfileSettingsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          coverUrl,
+          image: profileImage,        // 🔥 เปลี่ยนชื่อ
+          coverImage: coverUrl,       // 🔥 เปลี่ยนชื่อ
           coverPosition,
           displayName,
           bio,
-          lineLink,
-          facebookLink,
-          profileImage,
+          lineUrl: lineLink,          // 🔥 เปลี่ยนชื่อ
+          facebookUrl: facebookLink,  // 🔥 เปลี่ยนชื่อ
         }),
       });
 
