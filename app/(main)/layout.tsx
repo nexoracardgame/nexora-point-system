@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -135,6 +136,7 @@ export default function MainLayout({
       "/market/deals",
       "/rewards",
       "/redeem",
+      "/collections",
       "/wallet",
       "/dm",
       "/profile/me",
@@ -374,19 +376,19 @@ export default function MainLayout({
                     }`}
                   >
                     {profileImage && (
-                      <img
+                      <Image
                         src={profileImage}
-                        loading="eager"
-                        decoding="async"
                         alt="profile"
+                        fill
+                        sizes="40px"
+                        priority
                         draggable={false}
                         onLoad={() => setAvatarReady(true)}
-                        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out ${
+                        className={`absolute inset-0 object-cover transition-opacity duration-300 ease-out ${
                           avatarReady ? "opacity-100" : "opacity-0"
                         }`}
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          if (!target.src.includes("/avatar.png")) {
+                        onError={() => {
+                          if (profileImage !== "/avatar.png") {
                             stableAvatarRef.current = "/avatar.png";
                             setProfileImage("/avatar.png");
                             requestAnimationFrame(() => {
@@ -523,11 +525,13 @@ export default function MainLayout({
             <div className="flex items-center gap-3">
               <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-amber-300/10 bg-[#111318]">
                 {profileImage && (
-                  <img
+                  <Image
                     src={profileImage}
                     alt="profile"
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="56px"
                     draggable={false}
+                    className="object-cover"
                   />
                 )}
               </div>
@@ -597,7 +601,8 @@ export default function MainLayout({
 
       {/* MOBILE BOTTOM NAV */}
       {!isChatRoomPage && (
-        <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[640px] rounded-2xl border border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
+        <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[640px] overflow-hidden rounded-[26px] border border-white/10 bg-[#0b0c10]/82 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))]" />
           <div className="mx-auto grid max-w-[640px] grid-cols-6 gap-1.5 sm:gap-2">
             {mobileBottomItems.map((item) => {
               const Icon = item.icon;
@@ -607,12 +612,15 @@ export default function MainLayout({
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileNavOpen(false)}
-                  className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl border px-1 transition ${
+                  className={`relative flex min-h-[64px] flex-col items-center justify-center overflow-hidden rounded-[20px] border px-1 transition-all duration-200 ${
                     item.active
-                      ? "border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
-                      : "border-transparent bg-white/[0.02] text-white/45"
+                      ? "border-amber-300/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.14),rgba(251,191,36,0.06))] text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
+                      : "border-transparent bg-white/[0.02] text-white/45 hover:bg-white/[0.04]"
                   }`}
                 >
+                  {item.active && (
+                    <span className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
+                  )}
                   <Icon className="h-5 w-5" />
                   <span className="mt-1 text-[10px] font-bold leading-none sm:text-[11px]">
                     {item.label}
