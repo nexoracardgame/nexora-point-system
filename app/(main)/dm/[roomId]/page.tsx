@@ -94,25 +94,6 @@ export default function DMPage() {
     };
   };
 
-  const scrollBottom = (smooth = false) => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const run = () => {
-      if (!scrollRef.current) return;
-
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: smooth ? "smooth" : "auto",
-      });
-    };
-
-    // ยิงหลายจังหวะให้แน่ใจว่า DOM สูงครบจริง
-    setTimeout(run, 0);
-    setTimeout(run, 80);
-    setTimeout(run, 180);
-  };
-
   const loadSession = async () => {
     const res = await fetch("/api/auth/session");
     const data = await res.json();
@@ -190,6 +171,14 @@ export default function DMPage() {
     }));
 
     setMessages(withSender);
+
+// 💥 บังคับลงล่างทันทีหลังโหลดเสร็จ
+requestAnimationFrame(() => {
+  if (scrollRef.current) {
+    scrollRef.current.scrollTop =
+      scrollRef.current.scrollHeight;
+  }
+});
   };
 
   const markSeenNow = async () => {
@@ -336,19 +325,8 @@ export default function DMPage() {
       }
     };
   }, [hasValidRoom, me?.id, roomId, other]);
-
-  useEffect(() => {
-    if (!messages.length) return;
-
-    if (!hasInitialScrolledRef.current) {
-      scrollBottom(false);
-      hasInitialScrolledRef.current = true;
-    } else {
-      scrollBottom(true);
-    }
-  }, [messages.length]);
-
-  useEffect(() => {
+  
+   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
       if (!emojiRef.current) return;
       if (!emojiRef.current.contains(e.target as Node)) {
@@ -359,6 +337,30 @@ export default function DMPage() {
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  useEffect(() => {
+  if (!messages.length) return;
+
+  const el = scrollRef.current;
+  if (!el) return;
+
+  let tries = 0;
+
+  const forceScroll = () => {
+    if (!scrollRef.current) return;
+
+    scrollRef.current.scrollTop =
+      scrollRef.current.scrollHeight;
+
+    tries++;
+
+    if (tries < 10) {
+      requestAnimationFrame(forceScroll);
+    }
+  };
+
+  forceScroll();
+}, [messages.length]);
 
   const send = async () => {
     if ((!text.trim() && !file) || !me?.id || !roomId) return;
@@ -431,9 +433,7 @@ export default function DMPage() {
     if (error) {
       console.error("INSERT ERROR:", error);
       return;
-    }
-
-    scrollBottom(true);
+    }   
   };
 
   const sendTyping = async () => {
