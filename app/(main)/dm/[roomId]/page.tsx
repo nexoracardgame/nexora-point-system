@@ -59,21 +59,28 @@ export default function DMPage() {
   };
 
   useEffect(() => {
-    if (!roomId) return;
+  if (!roomId) return;
 
-    loadSession();
-    loadRoom();
-    loadMessages();
+  const init = async () => {
+    await loadSession();   // 🔥 รอให้ได้ user ก่อน
+    await loadRoom();      // 🔥 แล้วค่อยโหลดอีกฝ่าย
+    await loadMessages();
+  };
 
-    const channel = supabase.channel(`dm-${roomId}`, {
-      config: {
-        broadcast: { self: false },
-      },
-    });
+  init();
 
-    channelRef.current = channel;
+  if (channelRef.current) return;
 
-    channel.on(
+  const channel = supabase.channel(`dm-${roomId}`, {
+    config: {
+      broadcast: { self: false },
+    },
+  });
+
+  channelRef.current = channel;
+
+  channel
+    .on(
       "postgres_changes",
       {
         event: "INSERT",
@@ -81,7 +88,9 @@ export default function DMPage() {
         table: "dmMessage",
       },
       (payload) => {
-        const msg = payload.new as any;
+        console.log("🔥 REALTIME:", payload);
+
+        const msg = payload.new;
         if (msg.roomId !== roomId) return;
 
         setMessages((prev) => {
@@ -89,36 +98,18 @@ export default function DMPage() {
           return [...prev, msg];
         });
       }
-    );
-
-    channel.on("broadcast", { event: "typing" }, ({ payload }) => {
-      if (payload.senderId === me?.id) return;
-      if (payload.roomId !== roomId) return;
-
-      setTyping(true);
-
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
-
-      typingTimeout.current = setTimeout(() => {
-        setTyping(false);
-      }, 1500);
+    )
+    .subscribe((status) => {
+      console.log("📡 STATUS:", status);
     });
 
-    channel.subscribe();
-
-    return () => {
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [roomId, me?.id]);
+  return () => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  };
+}, [roomId]);
 
   useEffect(() => {
     scrollBottom(messages.length > 0);
@@ -131,12 +122,15 @@ export default function DMPage() {
   };
 
   const loadRoom = async () => {
-    const res = await fetch(`/api/dm/room-info?roomId=${roomId}`, {
-      cache: "no-store",
-    });
+  const res = await fetch(`/api/dm/room-info?roomId=${roomId}`, {
+    cache: "no-store",
+  });
 
-    const data = await res.json();
-    setOther(data.otherUser);
+  const data = await res.json();
+
+  console.log("ROOM:", data); // ✅ ย้ายมาหลังประกาศ
+
+  setOther(data.otherUser);
   };
 
   const loadMessages = async () => {
@@ -197,50 +191,63 @@ export default function DMPage() {
       <div className="w-full max-w-[920px] h-full flex flex-col mx-auto px-2 sm:px-4 xl:px-0">
 
         {/* HEADER */}
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-black/50 backdrop-blur-xl">
-          <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
-            <button
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white"
-            >
-              <ArrowLeft size={20} />
-            </button>
+<div className="fixed top-[72px] left-1/2 -translate-x-1/2 w-full max-w-[9200px] z-[3000] border-b border-white/10 bg-black/60 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.6)]">
+  <div className="mx-auto w-full max-w-[920px] flex items-center gap-3 px-3 py-3 sm:px-4">
 
-            <button
-              onClick={openOtherProfile}
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-white/5"
-            >
-              <img
-                src={safeProfileSrc(other?.image)}
-                alt={other?.name || "profile"}
-                className="h-11 w-11 rounded-full object-cover border border-white/15 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
-                onError={(e) => {
-                  e.currentTarget.src = "/avatar.png";
-                }}
-              />
+    {/* ปุ่มย้อนกลับ */}
+    <button
+      onClick={() => router.back()}
+      className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
+    >
+      <ArrowLeft size={20} />
+    </button>
 
-              <div className="min-w-0">
-                <div className="truncate text-[15px] font-bold sm:text-base">
-                  {other?.name}
-                </div>
+    {/* โปรไฟล์อีกฝ่าย */}
+    <button
+      onClick={() => {
+        if (!other?.id) return;
+        router.push(`/profile/${other.id}`);
+      }}
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-1 text-left transition hover:bg-white/5 active:scale-[0.98]"
+    >
 
-                <div className="flex items-center gap-2 text-xs text-white/45">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      typing ? "bg-yellow-400" : "bg-green-400"
-                    }`}
-                  />
-                  <span>{typing ? "กำลังพิมพ์..." : "Online"}</span>
-                </div>
-              </div>
-            </button>
-          </div>
+      {/* รูป */}
+      <img
+        src={other?.image || "/avatar.png"}
+        alt={other?.name || "profile"}
+        className="h-11 w-11 rounded-full object-cover border border-white/15 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
+        onError={(e) => {
+          e.currentTarget.src = "/avatar.png";
+        }}
+      />
+
+      {/* ชื่อ + สถานะ */}
+      <div className="min-w-0">
+        <div className="truncate text-[15px] font-bold sm:text-base">
+          {other?.name || "User"}
         </div>
 
+        <div className="flex items-center gap-2 text-xs text-white/45">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              typing ? "bg-yellow-400 animate-pulse" : "bg-green-400"
+            }`}
+          />
+          <span>
+            {typing ? "กำลังพิมพ์..." : "Online"}
+          </span>
+        </div>
+      </div>
+
+    </button>
+
+  </div>
+</div>
+            
         {/* CHAT */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 space-y-4 pb-[140px] sm:pb-[160px] xl:pb-4"
+          className="flex-1 overflow-y-auto px-3 pt-[80px] py-4 sm:px-4 space-y-4 pb-[140px] sm:pb-[160px] xl:pb-4"
         >
           {messages.map((m) => {
             const mine = m.senderId === me?.id;
@@ -250,7 +257,7 @@ export default function DMPage() {
                 <div className="flex max-w-[88%] items-end gap-2 sm:max-w-[78%]">
                   {!mine && (
                     <img
-                      src={safeProfileSrc(other?.image)}
+                      src={other?.image || "/avatar.png"}
                       alt={other?.name || "profile"}
                       className="h-8 w-8 shrink-0 rounded-full object-cover border border-white/10"
                       onError={(e) => {

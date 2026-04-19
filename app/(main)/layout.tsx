@@ -228,7 +228,7 @@ export default function MainLayout({
 
       <div className="relative flex min-h-screen">
         {/* DESKTOP LEFT DOCK */}
-        <aside className="hidden w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex xl:flex-col xl:items-center">
+        <aside className="hidden xl:flex fixed left-0 top-0 h-screen w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex-col xl:items-center z-[600]">
           <div className="flex h-full w-full flex-col items-center py-5">
             <Link
               href="/"
@@ -260,7 +260,7 @@ export default function MainLayout({
         </aside>
 
         {/* MAIN */}
-        <div className="relative z-0 flex min-w-0 flex-1 flex-col">
+        <div className="relative z-0 flex min-w-0 flex-1 flex-col xl:ml-[92px]">
           {/* TOPBAR */}
           <header className="sticky top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl">
             <div className="flex h-[74px] items-center justify-between px-4 sm:px-5 xl:px-6">
@@ -524,7 +524,7 @@ export default function MainLayout({
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className="fixed bottom-0 left-0 right-0 z-[1100] border-t border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 backdrop-blur-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] xl:hidden">
+      <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] border border-white/10 bg-[#0b0c10]/80 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 backdrop-blur-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] xl:hidden mx-auto max-w-[640px] rounded-2xl">
         <div className="mx-auto grid max-w-[640px] grid-cols-4 gap-2">
           {mobileBottomItems.map((item) => {
             const Icon = item.icon;
