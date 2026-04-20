@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await context.params; // 🔥 ต้อง await
+    const id = params.id;
 
     await prisma.marketListing.delete({
       where: { id },

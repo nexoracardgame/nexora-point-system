@@ -1,1 +1,34 @@
-[]
+[
+  {
+    "id": "local-1776680675995",
+    "createdAt": "2026-04-20T10:24:35.995Z",
+    "likes": 0,
+    "views": 0,
+    "status": "ACTIVE",
+    "cardNo": "002",
+    "serialNo": "2",
+    "price": 1000,
+    "sellerId": "Ufbf4468d734289f32c1dc80ae8903faf",
+    "cardName": "Flame Crystal (เฟลม คริสตัล)",
+    "imageUrl": "https://s.imgz.io/2026/01/15/002-copy0a95ea409208a656.jpg",
+    "rarity": "Gold (ทอง)",
+    "sellerName": "S1R BAZ",
+    "sellerImage": "https://oitmcvkiseinypuaaxpn.supabase.co/storage/v1/object/public/chat-images/profile-assets/profile-1776676330613-9659797e-3d2a-4ca2-b09d-9a9de0919c40.jpg"
+  },
+  {
+    "id": "local-1776680364777",
+    "createdAt": "2026-04-20T10:19:24.777Z",
+    "likes": 0,
+    "views": 0,
+    "status": "ACTIVE",
+    "cardNo": "001",
+    "serialNo": "1",
+    "price": 1000,
+    "sellerId": "Ufbf4468d734289f32c1dc80ae8903faf",
+    "cardName": "Earth Crystal (เอิร์ธ คริสตัล)",
+    "imageUrl": "https://s.imgz.io/2026/01/15/001-copy0bec958886c95293.jpg",
+    "rarity": "Gold (ทอง)",
+    "sellerName": "S1R BAZ",
+    "sellerImage": "https://oitmcvkiseinypuaaxpn.supabase.co/storage/v1/object/public/chat-images/profile-assets/profile-1776676330613-9659797e-3d2a-4ca2-b09d-9a9de0919c40.jpg"
+  }
+]
