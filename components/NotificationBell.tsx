@@ -72,32 +72,41 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const hiddenIdsRef = useRef<Set<string>>(new Set());
+  const requestIdRef = useRef(0);
   const localeTag = getLocaleTag(locale);
 
   const loadNotifications = async () => {
+    const requestId = ++requestIdRef.current;
+
     try {
       const res = await fetch("/api/notifications", {
         cache: "no-store",
       });
 
       const data = (await res.json()) as NotificationResponse;
-      setItems(Array.isArray(data?.items) ? data.items : []);
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const nextItems = Array.isArray(data?.items) ? data.items : [];
+      const hiddenIds = hiddenIdsRef.current;
+      setItems(nextItems.filter((item) => !hiddenIds.has(item.id)));
     } catch {
       return;
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const markNotificationRead = (notificationId: string) => {
-    if (
-      !notificationId ||
-      notificationId.startsWith("chat-") ||
-      notificationId.startsWith("deal-chat-")
-    ) {
+    if (!notificationId) {
       return;
     }
 
+    hiddenIdsRef.current.add(notificationId);
     setItems((prev) => prev.filter((item) => item.id !== notificationId));
 
     void fetch("/api/notifications/read", {
@@ -109,9 +118,16 @@ export default function NotificationBell() {
         ids: [notificationId],
       }),
       keepalive: true,
-    }).catch(() => {
-      void loadNotifications();
-    });
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error("read failed");
+        }
+      })
+      .catch(() => {
+        hiddenIdsRef.current.delete(notificationId);
+        void loadNotifications();
+      });
   };
 
   useEffect(() => {
