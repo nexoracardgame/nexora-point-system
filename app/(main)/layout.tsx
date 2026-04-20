@@ -50,6 +50,7 @@ export default function MainLayout({
   const [avatarReady, setAvatarReady] = useState(false);
 
   const stableAvatarRef = useRef("/avatar.png");
+  const profileVersionRef = useRef("");
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
 
@@ -80,8 +81,10 @@ export default function MainLayout({
 
         const dbImage = safeProfileSrc(data?.image);
         const dbName = String(data?.displayName || data?.name || "").trim();
+        const dbUpdatedAt = String(data?.updatedAt || "").trim();
         const sessionImage = safeProfileSrc(session?.user?.image);
         const sessionName = String(session?.user?.name || "").trim();
+        const nextVersion = [dbUpdatedAt, dbImage, dbName].join("|");
 
         if (dbImage !== "/avatar.png") {
           updateAvatar(dbImage);
@@ -97,6 +100,9 @@ export default function MainLayout({
         } else if (sessionName) {
           setProfileName(sessionName);
         }
+
+        profileVersionRef.current =
+          nextVersion || [sessionImage, sessionName].join("|");
       } catch {
         if (!mounted) return;
         const sessionImage = safeProfileSrc(session?.user?.image);
@@ -106,6 +112,8 @@ export default function MainLayout({
         if (sessionName) {
           setProfileName(sessionName);
         }
+
+        profileVersionRef.current = [sessionImage, sessionName].join("|");
       }
     }
 
@@ -122,8 +130,91 @@ export default function MainLayout({
       if (typeof detail.name === "string" && detail.name.trim()) {
         setProfileName(detail.name.trim());
       }
+      profileVersionRef.current = [
+        String(detail.timestamp || ""),
+        safeProfileSrc(detail.image),
+        String(detail.name || "").trim(),
+      ].join("|");
       router.refresh();
     });
+  }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const syncLatestProfile = async () => {
+      if (cancelled || document.visibilityState !== "visible") {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/profile/me?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+
+        if (!res.ok || cancelled) {
+          return;
+        }
+
+        const data = await res.json();
+        if (cancelled) {
+          return;
+        }
+
+        const nextName = String(data?.displayName || data?.name || "").trim();
+        const nextImage = safeProfileSrc(data?.image);
+        const nextUpdatedAt = String(data?.updatedAt || "").trim();
+        const nextVersion = [nextUpdatedAt, nextImage, nextName].join("|");
+
+        if (!nextVersion || nextVersion === profileVersionRef.current) {
+          return;
+        }
+
+        profileVersionRef.current = nextVersion;
+        updateAvatar(nextImage);
+
+        if (nextName) {
+          setProfileName(nextName);
+        }
+
+        router.refresh();
+      } catch {
+        return;
+      }
+    };
+
+    const startPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+
+      intervalId = setInterval(syncLatestProfile, 2500);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncLatestProfile();
+      }
+    };
+
+    const handleFocus = () => {
+      void syncLatestProfile();
+    };
+
+    startPolling();
+    void syncLatestProfile();
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [router]);
 
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";

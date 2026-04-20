@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
         bio: updatedUser.bio,
         lineUrl: updatedUser.lineUrl,
         facebookUrl: updatedUser.facebookUrl,
+        updatedAt: updatedUser.updatedAt,
       },
     });
   } catch (error) {

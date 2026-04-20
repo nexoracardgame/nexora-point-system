@@ -31,6 +31,7 @@ export async function GET() {
       bio: profile?.bio || "",
       lineUrl: profile?.lineUrl || "",
       facebookUrl: profile?.facebookUrl || "",
+      updatedAt: profile?.updatedAt || null,
     },
     {
       headers: {
