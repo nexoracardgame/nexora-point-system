@@ -10,9 +10,9 @@ import {
 import DeleteListingButton from "@/components/DeleteListingButton";
 import ProfileChatButton from "@/components/ProfileChatButton";
 import { authOptions } from "@/lib/auth";
-import { getAllLocalDeals } from "@/lib/local-deal-store";
-import { getLocalMarketListings } from "@/lib/local-market-store";
+import { getMarketListings } from "@/lib/market-listings";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { prisma } from "@/lib/prisma";
 import {
   buildRankLabel,
   buildSellerScore,
@@ -63,6 +63,38 @@ type SellerProfileFallback = {
   createdAt: Date;
 };
 
+function getSnapshotSellerName(
+  snapshot:
+    | {
+        seller?: {
+          displayName?: string | null;
+          name?: string | null;
+        } | null;
+        sellerName?: string | null;
+      }
+    | null
+) {
+  return (
+    snapshot?.seller?.displayName ||
+    snapshot?.seller?.name ||
+    snapshot?.sellerName ||
+    "NEXORA User"
+  );
+}
+
+function getSnapshotSellerImage(
+  snapshot:
+    | {
+        seller?: {
+          image?: string | null;
+        } | null;
+        sellerImage?: string | null;
+      }
+    | null
+) {
+  return snapshot?.seller?.image || snapshot?.sellerImage || "/avatar.png";
+}
+
 export default async function SellerProfilePage({
   params,
 }: {
@@ -79,8 +111,30 @@ export default async function SellerProfilePage({
   };
 
   const [allListings, allDeals] = await Promise.all([
-    getLocalMarketListings(),
-    getAllLocalDeals(),
+    getMarketListings(),
+    prisma.dealRequest.findMany({
+      include: {
+        buyer: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
   ]);
   const localProfile = await getLocalProfileByUserId(id);
 
@@ -96,9 +150,7 @@ export default async function SellerProfilePage({
 
   const completedSales = allDeals
     .filter((item) => item.sellerId === id && item.status === "completed")
-    .sort((a, b) =>
-      String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
-    );
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   const sellerSnapshot =
     sellerListings[0] ||
@@ -142,16 +194,10 @@ export default async function SellerProfilePage({
   if (!seller && sellerSnapshot) {
     seller = {
       id,
-      name:
-        localProfile?.displayName ||
-        sellerSnapshot.sellerName ||
-        "NEXORA User",
+      name: localProfile?.displayName || getSnapshotSellerName(sellerSnapshot),
       displayName:
-        localProfile?.displayName ||
-        sellerSnapshot.sellerName ||
-        "NEXORA User",
-      image:
-        localProfile?.image || sellerSnapshot.sellerImage || "/avatar.png",
+        localProfile?.displayName || getSnapshotSellerName(sellerSnapshot),
+      image: localProfile?.image || getSnapshotSellerImage(sellerSnapshot),
       coverImage: localProfile?.coverImage || null,
       coverPosition: localProfile?.coverPosition ?? 50,
       bio: localProfile?.bio || null,
@@ -178,16 +224,18 @@ export default async function SellerProfilePage({
     price: Number(item.price || 0),
   }));
 
+  const listingById = new Map(allListings.map((item) => [item.id, item]));
+
   const soldHistory: SoldHistoryItem[] = completedSales.slice(0, 24).map(
     (item) => ({
       id: item.id,
       createdAt: item.createdAt,
-      price: Number(item.offeredPrice || item.listedPrice || 0),
+      price: Number(item.offeredPrice || 0),
       listing: {
-        cardNo: item.cardNo,
-        cardName: item.cardName,
-        imageUrl: item.cardImage,
-        price: Number(item.listedPrice || item.offeredPrice || 0),
+        cardNo: listingById.get(item.cardId)?.cardNo || null,
+        cardName: listingById.get(item.cardId)?.cardName || null,
+        imageUrl: listingById.get(item.cardId)?.imageUrl || null,
+        price: Number(item.offeredPrice || 0),
       },
     })
   );
@@ -226,8 +274,7 @@ export default async function SellerProfilePage({
 
       soldStatMap.set(item.sellerId, {
         soldCount: current.soldCount + 1,
-        totalVolume:
-          current.totalVolume + Number(item.offeredPrice || item.listedPrice || 0),
+        totalVolume: current.totalVolume + Number(item.offeredPrice || 0),
       });
     });
 

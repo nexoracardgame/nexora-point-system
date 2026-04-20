@@ -5,10 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
 import { publishDealEvent } from "@/lib/deal-events";
 import { deleteLocalDeal, getAllLocalDeals } from "@/lib/local-deal-store";
-import {
-  deleteLocalMarketListing,
-  getLocalMarketListingById,
-} from "@/lib/local-market-store";
+import { deleteMarketListing, getMarketListingById } from "@/lib/market-listings";
 import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
@@ -35,7 +32,7 @@ export async function DELETE(
           sellerId: true,
         },
       }),
-      getLocalMarketListingById(id),
+      getMarketListingById(id),
       getAllLocalDeals(),
     ]);
 
@@ -50,17 +47,12 @@ export async function DELETE(
     const relatedLocalDeals = localDeals.filter((deal) => deal.cardId === id);
 
     await Promise.all([
-      deleteLocalMarketListing(id),
+      deleteMarketListing(id),
       ...(dbListing
         ? [
             prisma.dealRequest.deleteMany({
               where: {
                 cardId: id,
-              },
-            }),
-            prisma.marketListing.delete({
-              where: {
-                id,
               },
             }),
           ]

@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import {
-  getLocalMarketListingById,
-  getLocalMarketListings,
-  incrementLocalMarketListingLikes,
-} from "@/lib/local-market-store";
+  getMarketListingById,
+  getMarketListings,
+  incrementMarketListingLikes,
+} from "@/lib/market-listings";
 import { createLocalNotification } from "@/lib/local-notification-store";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
     }
 
     const listing = listingId
-      ? await getLocalMarketListingById(listingId)
-      : (await getLocalMarketListings())
+      ? await getMarketListingById(listingId)
+      : (await getMarketListings())
           .filter((item) => String(item.cardNo || "") === cardNo)
           .sort((a, b) =>
             String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    await incrementLocalMarketListingLikes(listing.id);
+    await incrementMarketListingLikes(listing.id);
 
     if (listing.sellerId && listing.sellerId !== userId) {
       const likerName =

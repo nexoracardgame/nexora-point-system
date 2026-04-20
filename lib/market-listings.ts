@@ -289,6 +289,46 @@ export async function incrementMarketListingViews(id: string) {
   }
 }
 
+export async function incrementMarketListingLikes(id: string) {
+  if (!hasDatabaseConfig()) {
+    const { incrementLocalMarketListingLikes } = await import(
+      "@/lib/local-market-store"
+    );
+    return incrementLocalMarketListingLikes(id);
+  }
+
+  try {
+    const updated = await prisma.marketListing.update({
+      where: { id },
+      data: {
+        likes: {
+          increment: 1,
+        },
+      },
+      include: {
+        seller: {
+          select: {
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    return toMarketListingRecord(updated);
+  } catch {
+    if (process.env.NODE_ENV === "production") {
+      return null;
+    }
+
+    const { incrementLocalMarketListingLikes } = await import(
+      "@/lib/local-market-store"
+    );
+    return incrementLocalMarketListingLikes(id);
+  }
+}
+
 export async function deleteMarketListing(id: string) {
   if (!hasDatabaseConfig()) {
     return deleteLocalMarketListing(id);
