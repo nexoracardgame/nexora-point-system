@@ -70,7 +70,7 @@ function comparePopularCards(a: MarketItem, b: MarketItem) {
   }
 
   const createdAtDiff =
-    getCreatedAtValue(b.createdAt) - getCreatedAtValue(a.createdAt);
+    getCreatedAtValue(a.createdAt) - getCreatedAtValue(b.createdAt);
   if (createdAtDiff !== 0) {
     return createdAtDiff;
   }
