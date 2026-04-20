@@ -199,7 +199,7 @@ export default function MarketDashboardTFT({
             id: item.id,
             cardNo: String(cardNo),
             name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-            price: `฿${Number(item.price || 0).toLocaleString()}`,
+            price: `฿${Number(item.price || 0).toLocaleString()}`
             likes: item.likes || 0,
             rarity: item.rarity || "Legendary",
             image:
@@ -222,7 +222,12 @@ export default function MarketDashboardTFT({
         });
 
         if (!active) return;
-        setItems(mapped);
+        setItems((prev) => {
+  if (JSON.stringify(prev) === JSON.stringify(mapped)) {
+    return prev; // 🔥 ไม่ re-render ถ้าเหมือนเดิม
+  }
+  return mapped;
+});
         setLoading(false);
       })
       .catch(() => {
@@ -260,53 +265,6 @@ export default function MarketDashboardTFT({
       );
     });
   }, [session?.user?.id]);
-
-  useEffect(() => {
-    const onFocus = () => {
-      void fetch("/api/market/listings", { cache: "no-store" })
-        .then((res) => res.json())
-        .then((data) => {
-          const mapped = ((data || []) as ListingApiItem[]).map((item) => {
-            const cardNo = item.card_no || item.cardNo || item.id;
-
-            return {
-              id: item.id,
-              cardNo: String(cardNo),
-              name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-              price: `เธฟ${Number(item.price || 0).toLocaleString()}`,
-              likes: item.likes || 0,
-              rarity: item.rarity || "Legendary",
-              image:
-                item.image_url ||
-                item.imageUrl ||
-                `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
-              createdAt: item.createdAt,
-              sellerId: item.sellerId || item.seller?.id,
-              sellerName:
-                item.sellerName ||
-                item.seller?.displayName ||
-                item.seller?.name ||
-                "Unknown Seller",
-              sellerImage:
-                item.sellerImage ||
-                item.seller?.image ||
-                "/default-avatar.png",
-            };
-          });
-
-          setItems(mapped);
-        })
-        .catch(() => undefined);
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
-  }, []);
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
