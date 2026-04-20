@@ -15,6 +15,7 @@ import {
   normalizeMarketListingView,
   type MarketViewItem,
 } from "@/lib/market-listing-view";
+import { listenMarketSync } from "@/lib/market-sync";
 import { listenProfileSync } from "@/lib/profile-sync";
 
 type MarketItem = MarketViewItem;
@@ -102,6 +103,18 @@ function ActionButton({
   title: string;
   subtitle: string;
 }) {
+  const subtitleMap: Record<string, string> = {
+    "Create Listing": "สร้างโพสต์ขายการ์ดของคุณ",
+    "Deal Requests": "ดูคำขอดีลและตอบรับได้ทันที",
+    Wishlist: "รายการการ์ดที่คุณติดตามไว้",
+    "Seller Center": "จัดการโพสต์ขายและลบรายการ",
+  };
+
+  const safeSubtitle =
+    subtitle.includes("เธ") || subtitle.includes("เน€")
+      ? subtitleMap[title] || ""
+      : subtitle;
+
   return (
     <Link
       href={href}
@@ -111,7 +124,7 @@ function ActionButton({
         {icon}
       </div>
       <div className="text-base font-black md:text-lg">{title}</div>
-      <div className="mt-1 text-xs text-white/50 md:text-sm">{subtitle}</div>
+      <div className="mt-1 text-xs text-white/50 md:text-sm">{safeSubtitle}</div>
     </Link>
   );
 }
@@ -269,6 +282,12 @@ export default function MarketDashboardTFT({
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
+  }, []);
+
+  useEffect(() => {
+    return listenMarketSync(() => {
+      void refreshListings({ preserveOnEmpty: false });
+    });
   }, []);
 
   useEffect(() => {
