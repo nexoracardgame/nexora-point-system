@@ -199,7 +199,7 @@ export default function MarketDashboardTFT({
             id: item.id,
             cardNo: String(cardNo),
             name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-            price: `฿${Number(item.price || 0).toLocaleString()}`
+            price: `฿${Number(item.price || 0).toLocaleString()}`, // ✅ ใส่ comma
             likes: item.likes || 0,
             rarity: item.rarity || "Legendary",
             image:
