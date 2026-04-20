@@ -492,26 +492,26 @@ export default async function MarketCardDetailPage({
 
   return (
     <div className="space-y-4 text-white md:space-y-6">
-      <section className="relative overflow-hidden rounded-[28px] border border-amber-200/10 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.05),transparent_18%),linear-gradient(180deg,rgba(10,10,12,0.95)_0%,rgba(6,7,9,0.72)_100%)] px-4 py-5 shadow-[0_30px_120px_rgba(0,0,0,0.48)] md:rounded-[38px] md:px-7 md:py-8">
+      <section className="relative overflow-hidden rounded-[28px] border border-amber-200/10 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.16),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.12),transparent_26%),linear-gradient(180deg,rgba(9,9,11,0.98)_0%,rgba(6,7,9,0.78)_100%)] px-4 py-4 shadow-[0_30px_120px_rgba(0,0,0,0.48)] md:rounded-[38px] md:px-7 md:py-6">
         <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent,rgba(255,215,0,0.04),transparent)]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/30 to-transparent" />
         <div className="absolute right-[-10%] top-[-15%] h-40 w-40 rounded-full bg-amber-300/10 blur-3xl md:h-72 md:w-72" />
         <div className="absolute bottom-[-15%] left-[-5%] h-32 w-32 rounded-full bg-violet-400/10 blur-3xl md:h-56 md:w-56" />
         <div className="relative space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-amber-200/15 bg-white/[0.03] px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.32em] text-amber-100/88 md:px-4 md:text-[11px]">
+            <span className="rounded-full border border-amber-200/15 bg-white/[0.03] px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.32em] text-amber-100/88 md:px-4 md:text-[10px]">
               {translate(locale, "market.card.header")}
             </span>
             <span
-              className={`rounded-full border px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.24em] md:px-4 md:text-[11px] ${statusTone}`}
+              className={`rounded-full border px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.24em] md:px-4 md:text-[10px] ${statusTone}`}
             >
               {String(listing.status || "active")}
             </span>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px] xl:items-end">
-            <div className="space-y-4">
-              <h1 className="max-w-5xl text-[2.2rem] font-black leading-[0.88] tracking-[-0.07em] sm:text-5xl lg:text-6xl xl:text-7xl">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_360px] xl:items-end">
+            <div className="space-y-3">
+              <h1 className="max-w-4xl text-[2rem] font-black leading-[0.9] tracking-[-0.07em] sm:text-[3.3rem] lg:text-[4rem] xl:text-[4.6rem]">
                 {card.name}
               </h1>
 
@@ -533,13 +533,21 @@ export default async function MarketCardDetailPage({
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-amber-200/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-4 backdrop-blur md:rounded-[28px] md:p-5">
-              <div className="text-[10px] uppercase tracking-[0.3em] text-white/38">
-                Live Price
+            <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.008))] p-4 backdrop-blur md:rounded-[28px] md:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/38">
+                    Live Price
+                  </div>
+                  <div className="mt-2 text-[1.9rem] font-black tracking-[-0.06em] text-amber-300 drop-shadow-[0_0_24px_rgba(251,191,36,0.2)] md:text-[2.8rem]">
+                    {card.price}
+                  </div>
+                </div>
+                <div className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[10px] uppercase tracking-[0.22em] text-white/55">
+                  #{card.cardNo}
+                </div>
               </div>
-              <div className="mt-3 text-3xl font-black tracking-[-0.06em] text-amber-300 drop-shadow-[0_0_24px_rgba(251,191,36,0.2)] md:text-5xl">
-                {card.price}
-              </div>
+
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <HeroMetric
                   label="Median"
@@ -557,13 +565,13 @@ export default async function MarketCardDetailPage({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)] md:gap-6">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] md:gap-6">
         <div className="rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(250,204,21,0.06),transparent_32%),linear-gradient(180deg,rgba(18,18,24,0.76)_0%,rgba(8,9,11,0.42)_100%)] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.34)] md:rounded-[36px] md:p-5">
           <CardStaticPreview image={card.image} name={card.name} />
         </div>
 
         <div className="space-y-4 md:space-y-6">
-          <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,24,0.72)_0%,rgba(9,10,12,0.36)_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur md:rounded-[36px] md:p-6">
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,24,0.62)_0%,rgba(9,10,12,0.22)_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur md:rounded-[34px] md:p-6">
             <div className="flex items-start gap-4">
               <Image
                 src={listing.seller?.image || "/avatar.png"}
