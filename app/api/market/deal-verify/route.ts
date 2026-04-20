@@ -4,9 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { publishDealEvent } from "@/lib/deal-events";
 import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
-import { getLocalDealById, updateLocalDealStatus } from "@/lib/local-deal-store";
 import { createLocalNotification } from "@/lib/local-notification-store";
-import { updateLocalMarketListingStatus } from "@/lib/local-market-store";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -26,37 +25,86 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
   }
 
-  const localDeal = await getLocalDealById(dealId);
+  const deal = await prisma.dealRequest.findUnique({
+    where: {
+      id: dealId,
+    },
+    include: {
+      buyer: {
+        select: {
+          id: true,
+          displayName: true,
+          name: true,
+          image: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          displayName: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+  });
 
-  if (!localDeal) {
+  if (!deal) {
     return NextResponse.json({ error: "ไม่พบดีล" }, { status: 404 });
   }
 
-  if (localDeal.buyerId !== currentUserId) {
+  if (deal.buyer.id !== currentUserId) {
     return NextResponse.json({ error: "เฉพาะผู้ซื้อเท่านั้น" }, { status: 403 });
   }
 
-  if (localDeal.status !== "accepted") {
+  if (deal.status !== "accepted") {
     return NextResponse.json({ error: "ดีลนี้ยังไม่พร้อมปิด" }, { status: 400 });
   }
 
-  const localSerial = String(localDeal.serialNo || "").trim().toLowerCase();
+  const listing = await prisma.marketListing.findUnique({
+    where: {
+      id: deal.cardId,
+    },
+    select: {
+      id: true,
+      serialNo: true,
+    },
+  });
+
+  const localSerial = String(listing?.serialNo || "").trim().toLowerCase();
 
   if (!localSerial || localSerial !== serialInput) {
     return NextResponse.json({ error: "Serial ไม่ตรง" }, { status: 400 });
   }
 
-  await updateLocalDealStatus(localDeal.id, "completed");
-  await updateLocalMarketListingStatus(localDeal.cardId, "sold");
-  await cleanupDealChat(localDeal.id);
+  await prisma.$transaction([
+    prisma.dealRequest.update({
+      where: {
+        id: deal.id,
+      },
+      data: {
+        status: "completed",
+      },
+    }),
+    prisma.marketListing.update({
+      where: {
+        id: deal.cardId,
+      },
+      data: {
+        status: "sold",
+      },
+    }),
+  ]);
+
+  await cleanupDealChat(deal.id);
 
   await createLocalNotification({
-    userId: localDeal.sellerId,
+    userId: deal.seller.id,
     type: "deal",
-    title: `${localDeal.buyerName} ยืนยันรับการ์ดแล้ว`,
-    body: `${localDeal.cardName} ปิดดีลสำเร็จที่ ฿${Number(localDeal.offeredPrice).toLocaleString("th-TH")}`,
+    title: `${deal.buyer.displayName || deal.buyer.name || "Buyer"} ยืนยันรับการ์ดแล้ว`,
+    body: `ปิดดีลสำเร็จที่ ฿${Number(deal.offeredPrice).toLocaleString("th-TH")}`,
     href: "/market/deals",
-    image: localDeal.buyerImage,
+    image: deal.buyer.image || "/avatar.png",
   });
 
   revalidatePath("/market/seller-center");
@@ -64,7 +112,7 @@ export async function POST(req: NextRequest) {
   revalidatePath("/market");
 
   publishDealEvent({
-    dealId: localDeal.id,
+    dealId: deal.id,
     action: "completed",
     changedAt: new Date().toISOString(),
   });

@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { publishDealEvent } from "@/lib/deal-events";
-import {
-  deleteLocalDeal,
-  getLocalDealById,
-  updateLocalDealStatus,
-} from "@/lib/local-deal-store";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -19,10 +15,7 @@ export async function POST(req: NextRequest) {
     const currentUserId = String(session?.user?.id || "").trim();
 
     if (!currentUserId) {
-      return NextResponse.json(
-        { error: "กรุณาเข้าสู่ระบบ" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const dealId = String(body?.dealId || "").trim();
@@ -32,16 +25,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
     }
 
-    const localDeal = await getLocalDealById(dealId);
+    const deal = await prisma.dealRequest.findUnique({
+      where: {
+        id: dealId,
+      },
+      include: {
+        buyer: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
 
-    if (!localDeal) {
+    if (!deal) {
       return NextResponse.json(
         { success: true, alreadyRemoved: true },
         { headers: { "Cache-Control": "no-store" } }
       );
     }
 
-    if (localDeal.sellerId !== currentUserId) {
+    if (deal.sellerId !== currentUserId) {
       return NextResponse.json(
         { error: "เฉพาะเจ้าของการ์ดเท่านั้น" },
         { status: 403 }
@@ -50,19 +65,23 @@ export async function POST(req: NextRequest) {
 
     if (action === "reject") {
       await createLocalNotification({
-        userId: localDeal.buyerId,
+        userId: deal.buyer.id,
         type: "deal",
-        title: `${localDeal.sellerName} ปฏิเสธคำขอดีล`,
-        body: `${localDeal.cardName} ไม่ได้รับการตอบรับ`,
+        title: `${deal.seller.displayName || deal.seller.name || "Seller"} ปฏิเสธคำขอดีล`,
+        body: `ดีลของคุณไม่ได้รับการตอบรับ`,
         href: "/market/deals",
-        image: localDeal.sellerImage,
+        image: deal.seller.image || "/avatar.png",
       });
 
-      await deleteLocalDeal(localDeal.id);
+      await prisma.dealRequest.delete({
+        where: {
+          id: deal.id,
+        },
+      });
 
       const changedAt = new Date().toISOString();
       publishDealEvent({
-        dealId: localDeal.id,
+        dealId: deal.id,
         action: "rejected",
         changedAt,
       });
@@ -71,7 +90,7 @@ export async function POST(req: NextRequest) {
         {
           success: true,
           action: "reject",
-          removedDealId: localDeal.id,
+          removedDealId: deal.id,
           changedAt,
         },
         {
@@ -83,20 +102,27 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "accept") {
-      const updatedDeal = await updateLocalDealStatus(localDeal.id, "accepted");
+      const updatedDeal = await prisma.dealRequest.update({
+        where: {
+          id: deal.id,
+        },
+        data: {
+          status: "accepted",
+        },
+      });
 
       await createLocalNotification({
-        userId: localDeal.buyerId,
+        userId: deal.buyer.id,
         type: "deal",
-        title: `${localDeal.sellerName} ตอบรับดีลของคุณ`,
-        body: `${localDeal.cardName} พร้อมคุยต่อในห้องดีลแล้ว`,
-        href: `/market/deals/chat/${localDeal.id}`,
-        image: localDeal.sellerImage,
+        title: `${deal.seller.displayName || deal.seller.name || "Seller"} ตอบรับดีลของคุณ`,
+        body: `พร้อมคุยต่อในห้องดีลแล้ว`,
+        href: `/market/deals/chat/${deal.id}`,
+        image: deal.seller.image || "/avatar.png",
       });
 
       const changedAt = new Date().toISOString();
       publishDealEvent({
-        dealId: localDeal.id,
+        dealId: deal.id,
         action: "accepted",
         changedAt,
       });
@@ -116,13 +142,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      { error: "action ไม่ถูกต้อง" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "action ไม่ถูกต้อง" }, { status: 400 });
   } catch (error) {
     console.error("DEAL ACTION ERROR:", error);
-
     return NextResponse.json({ error: "Request failed" }, { status: 500 });
   }
 }

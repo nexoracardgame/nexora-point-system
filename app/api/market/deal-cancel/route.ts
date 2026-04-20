@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { publishDealEvent } from "@/lib/deal-events";
 import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
-import { deleteLocalDeal, getLocalDealById } from "@/lib/local-deal-store";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -16,10 +16,7 @@ export async function POST(req: NextRequest) {
     const currentUserId = String(session?.user?.id || "").trim();
 
     if (!currentUserId) {
-      return NextResponse.json(
-        { error: "กรุณาเข้าสู่ระบบ" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const dealId = String(body?.dealId || "").trim();
@@ -28,9 +25,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ไม่พบ dealId" }, { status: 400 });
     }
 
-    const localDeal = await getLocalDealById(dealId);
+    const deal = await prisma.dealRequest.findUnique({
+      where: {
+        id: dealId,
+      },
+      include: {
+        buyer: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
 
-    if (!localDeal) {
+    if (!deal) {
       return NextResponse.json(
         { success: true, alreadyRemoved: true },
         { headers: { "Cache-Control": "no-store" } }
@@ -38,8 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     const isParticipant =
-      localDeal.buyerId === currentUserId ||
-      localDeal.sellerId === currentUserId;
+      deal.buyer.id === currentUserId || deal.seller.id === currentUserId;
 
     if (!isParticipant) {
       return NextResponse.json(
@@ -48,7 +66,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!["pending", "accepted"].includes(localDeal.status)) {
+    if (!["pending", "accepted"].includes(deal.status)) {
       return NextResponse.json(
         { success: true, alreadyRemoved: true },
         { headers: { "Cache-Control": "no-store" } }
@@ -56,40 +74,42 @@ export async function POST(req: NextRequest) {
     }
 
     const otherUserId =
-      localDeal.buyerId === currentUserId
-        ? localDeal.sellerId
-        : localDeal.buyerId;
+      deal.buyer.id === currentUserId ? deal.seller.id : deal.buyer.id;
     const actorName =
-      localDeal.buyerId === currentUserId
-        ? localDeal.buyerName
-        : localDeal.sellerName;
+      deal.buyer.id === currentUserId
+        ? deal.buyer.displayName || deal.buyer.name || "User"
+        : deal.seller.displayName || deal.seller.name || "User";
     const actorImage =
-      localDeal.buyerId === currentUserId
-        ? localDeal.buyerImage
-        : localDeal.sellerImage;
+      deal.buyer.id === currentUserId
+        ? deal.buyer.image || "/avatar.png"
+        : deal.seller.image || "/avatar.png";
 
-    await deleteLocalDeal(localDeal.id);
+    await prisma.dealRequest.delete({
+      where: {
+        id: deal.id,
+      },
+    });
 
     const sideEffects: Array<PromiseLike<unknown> | unknown> = [
       createLocalNotification({
         userId: otherUserId,
         type: "deal",
         title: `${actorName} ยกเลิกดีล`,
-        body: `ดีลของ ${localDeal.cardName} ถูกยกเลิกแล้ว`,
+        body: `ดีลถูกยกเลิกแล้ว`,
         href: "/market/deals",
         image: actorImage,
       }),
     ];
 
-    if (localDeal.status === "accepted") {
-      sideEffects.push(cleanupDealChat(localDeal.id));
+    if (deal.status === "accepted") {
+      sideEffects.push(cleanupDealChat(deal.id));
     }
 
     await Promise.allSettled(sideEffects);
 
     const changedAt = new Date().toISOString();
     publishDealEvent({
-      dealId: localDeal.id,
+      dealId: deal.id,
       action: "cancelled",
       changedAt,
     });
@@ -97,7 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        removedDealId: localDeal.id,
+        removedDealId: deal.id,
         changedAt,
       },
       { headers: { "Cache-Control": "no-store" } }

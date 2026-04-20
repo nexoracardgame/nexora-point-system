@@ -178,9 +178,16 @@ export default function DealsClient({
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
 
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchDeals(true);
+      }
+    }, 15000);
+
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(interval);
     };
   }, [fetchDeals]);
 

@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { publishDealEvent } from "@/lib/deal-events";
-import {
-  createLocalDeal,
-  findExistingLocalOpenDeal,
-} from "@/lib/local-deal-store";
-import { getLocalMarketListingById } from "@/lib/local-market-store";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { prisma } from "@/lib/prisma";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +24,35 @@ export async function POST(req: NextRequest) {
     }
 
     const cardId = String(body?.cardId || "").trim();
-    const sellerId = String(body?.sellerId || "").trim();
     const offeredPrice = Number(body?.offeredPrice);
 
-    if (!cardId || !sellerId || !Number.isFinite(offeredPrice)) {
+    if (!cardId || !Number.isFinite(offeredPrice)) {
       return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
+    }
+
+    const listing = await prisma.marketListing.findUnique({
+      where: {
+        id: cardId,
+      },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    const sellerId = String(listing?.sellerId || "").trim();
+
+    if (!listing || !sellerId) {
+      return NextResponse.json(
+        { error: "ไม่พบการ์ดใบนี้ในตลาด" },
+        { status: 404 }
+      );
     }
 
     if (buyerId === sellerId) {
@@ -49,15 +69,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const listing = await getLocalMarketListingById(cardId);
-
-    if (!listing || listing.sellerId !== sellerId) {
-      return NextResponse.json(
-        { error: "ไม่พบการ์ดใบนี้ในตลาด" },
-        { status: 404 }
-      );
-    }
-
     if (String(listing.status || "").toLowerCase() === "sold") {
       return NextResponse.json(
         { error: "การ์ดใบนี้ขายไปแล้ว" },
@@ -65,7 +76,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existingOpenDeal = await findExistingLocalOpenDeal(cardId, buyerId);
+    const existingOpenDeal = await prisma.dealRequest.findFirst({
+      where: {
+        cardId,
+        buyerId,
+        status: {
+          in: ["pending", "accepted"],
+        },
+      },
+    });
 
     if (existingOpenDeal) {
       return NextResponse.json(
@@ -79,54 +98,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const buyerName = identity.name;
-    const buyerImage = identity.image;
-
-    const localDeal = await createLocalDeal({
-      cardId,
-      buyerId,
-      buyerName,
-      buyerImage,
-      sellerId,
-      sellerName: listing.sellerName || "ผู้ขาย",
-      sellerImage: listing.sellerImage || "/avatar.png",
-      offeredPrice,
-      cardName:
-        String(body?.cardName || "").trim() ||
-        listing.cardName ||
-        `Card #${String(listing.cardNo || "001").padStart(3, "0")}`,
-      cardNo:
-        String(body?.cardNo || "").trim() ||
-        String(listing.cardNo || "001"),
-      cardImage:
-        String(body?.cardImage || "").trim() ||
-        listing.imageUrl ||
-        `/cards/${String(listing.cardNo || "001").padStart(3, "0")}.jpg`,
-      listedPrice: Number.isFinite(Number(body?.listedPrice))
-        ? Number(body?.listedPrice)
-        : Number(listing.price || 0),
-      serialNo:
-        String(body?.serialNo || "").trim() ||
-        String(listing.serialNo || "").trim() ||
-        null,
-      listingStatus: String(listing.status || "active"),
+    const createdDeal = await prisma.dealRequest.create({
+      data: {
+        cardId,
+        buyerId,
+        sellerId,
+        offeredPrice,
+      },
     });
 
     try {
       await createLocalNotification({
         userId: sellerId,
         type: "deal",
-        title: `${buyerName} ส่งคำขอดีลใหม่`,
-        body: `เสนอราคา ฿${Number(offeredPrice).toLocaleString("th-TH")} สำหรับ ${localDeal.cardName}`,
+        title: `${identity.name} ส่งคำขอดีลใหม่`,
+        body: `เสนอราคา ฿${Number(offeredPrice).toLocaleString("th-TH")} สำหรับ ${
+          String(body?.cardName || "").trim() ||
+          listing.cardName ||
+          `Card #${String(listing.cardNo || "001").padStart(3, "0")}`
+        }`,
         href: "/market/deals",
-        image: buyerImage,
+        image: identity.image,
       });
     } catch (error) {
       console.error("DEAL NOTIFICATION ERROR:", error);
     }
 
     publishDealEvent({
-      dealId: localDeal.id,
+      dealId: createdDeal.id,
       action: "created",
       changedAt: new Date().toISOString(),
     });
@@ -134,7 +133,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "ส่งคำขอดีลสำเร็จ",
-      deal: localDeal,
+      deal: createdDeal,
     });
   } catch (error) {
     console.error("DEAL REQUEST ERROR:", error);

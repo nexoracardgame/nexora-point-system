@@ -1,4 +1,4 @@
-import { getLocalDealsForUser } from "@/lib/local-deal-store";
+import { prisma } from "@/lib/prisma";
 
 export type DealMember = {
   id: string;
@@ -41,29 +41,91 @@ export async function getMarketDealsForUser(
     return [];
   }
 
-  const deals = await getLocalDealsForUser(normalizedUserId);
+  const deals = await prisma.dealRequest.findMany({
+    where: {
+      OR: [{ buyerId: normalizedUserId }, { sellerId: normalizedUserId }],
+      status: {
+        in: ["pending", "accepted"],
+      },
+    },
+    include: {
+      buyer: {
+        select: {
+          id: true,
+          displayName: true,
+          name: true,
+          image: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          displayName: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-  return deals.map((deal) => ({
-    id: deal.id,
-    status: deal.status as DealStatus,
-    createdAt: String(deal.createdAt || ""),
-    offeredPrice: Number(deal.offeredPrice || 0),
-    isSeller: normalizedUserId === deal.sellerId,
-    buyer: {
-      id: deal.buyerId,
-      name: safeMemberName(deal.buyerName, "ผู้ซื้อ"),
-      image: safeMemberImage(deal.buyerImage),
-    },
-    seller: {
-      id: deal.sellerId,
-      name: safeMemberName(deal.sellerName, "ผู้ขาย"),
-      image: safeMemberImage(deal.sellerImage),
-    },
-    cardName: safeMemberName(deal.cardName, "การ์ดไม่พบข้อมูล"),
-    cardNo: String(deal.cardNo || "001"),
-    cardImage:
-      String(deal.cardImage || "").trim() ||
-      `/cards/${String(deal.cardNo || "001").padStart(3, "0")}.jpg`,
-    listingStatus: String(deal.listingStatus || "active"),
-  }));
+  const listingIds = Array.from(
+    new Set(deals.map((deal) => String(deal.cardId || "").trim()).filter(Boolean))
+  );
+
+  const listings = listingIds.length
+    ? await prisma.marketListing.findMany({
+        where: {
+          id: {
+            in: listingIds,
+          },
+        },
+        select: {
+          id: true,
+          cardNo: true,
+          cardName: true,
+          imageUrl: true,
+          status: true,
+        },
+      })
+    : [];
+
+  const listingMap = new Map(listings.map((listing) => [listing.id, listing]));
+
+  return deals.map((deal) => {
+    const listing = listingMap.get(deal.cardId);
+    const cardNo = String(listing?.cardNo || "001");
+
+    return {
+      id: deal.id,
+      status: deal.status as DealStatus,
+      createdAt: deal.createdAt.toISOString(),
+      offeredPrice: Number(deal.offeredPrice || 0),
+      isSeller: normalizedUserId === deal.sellerId,
+      buyer: {
+        id: deal.buyer.id,
+        name: safeMemberName(
+          deal.buyer.displayName || deal.buyer.name,
+          "ผู้ซื้อ"
+        ),
+        image: safeMemberImage(deal.buyer.image),
+      },
+      seller: {
+        id: deal.seller.id,
+        name: safeMemberName(
+          deal.seller.displayName || deal.seller.name,
+          "ผู้ขาย"
+        ),
+        image: safeMemberImage(deal.seller.image),
+      },
+      cardName: safeMemberName(listing?.cardName, "การ์ดไม่พบข้อมูล"),
+      cardNo,
+      cardImage:
+        String(listing?.imageUrl || "").trim() ||
+        `/cards/${cardNo.padStart(3, "0")}.jpg`,
+      listingStatus: String(listing?.status || "active"),
+    };
+  });
 }
