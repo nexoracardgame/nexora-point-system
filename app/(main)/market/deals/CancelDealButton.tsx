@@ -7,9 +7,11 @@ import { useLanguage } from "@/lib/i18n";
 export default function CancelDealButton({
   dealId,
   label = "Cancel My Request",
+  onOptimisticCancel,
 }: {
   dealId: string;
   label?: string;
+  onOptimisticCancel?: () => void | (() => void);
 }) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
@@ -17,8 +19,10 @@ export default function CancelDealButton({
   const handleCancel = async () => {
     if (loading) return;
 
-    const ok = confirm("ยกเลิกคำขอดีลนี้?");
+    const ok = confirm("ยกเลิกดีลนี้?");
     if (!ok) return;
+
+    const rollback = onOptimisticCancel?.();
 
     try {
       setLoading(true);
@@ -31,12 +35,14 @@ export default function CancelDealButton({
         body: JSON.stringify({ dealId }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!data.success) {
-        alert(data.error || "ยกเลิกไม่สำเร็จ");
+      if (!res.ok || !data?.success) {
+        rollback?.();
+        alert(data?.error || "ยกเลิกไม่สำเร็จ");
       }
     } catch (err) {
+      rollback?.();
       console.error(err);
       alert("เกิดข้อผิดพลาด");
     } finally {

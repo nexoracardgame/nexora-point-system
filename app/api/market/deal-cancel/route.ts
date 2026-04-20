@@ -9,64 +9,80 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const session = await getServerSession(authOptions);
-  const currentUserId = String(session?.user?.id || "").trim();
+  try {
+    const body = await req.json();
+    const session = await getServerSession(authOptions);
+    const currentUserId = String(session?.user?.id || "").trim();
 
-  if (!currentUserId) {
-    return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
-  }
+    if (!currentUserId) {
+      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+    }
 
-  const dealId = String(body?.dealId || "").trim();
+    const dealId = String(body?.dealId || "").trim();
 
-  if (!dealId) {
-    return NextResponse.json({ error: "ไม่พบ dealId" }, { status: 400 });
-  }
+    if (!dealId) {
+      return NextResponse.json({ error: "ไม่พบ dealId" }, { status: 400 });
+    }
 
-  const localDeal = await getLocalDealById(dealId);
+    const localDeal = await getLocalDealById(dealId);
 
-  if (!localDeal) {
-    return NextResponse.json({ error: "ไม่พบดีล" }, { status: 404 });
-  }
+    if (!localDeal) {
+      return NextResponse.json({ error: "ไม่พบดีล" }, { status: 404 });
+    }
 
-  const isParticipant =
-    localDeal.buyerId === currentUserId || localDeal.sellerId === currentUserId;
+    const isParticipant =
+      localDeal.buyerId === currentUserId || localDeal.sellerId === currentUserId;
 
-  if (!isParticipant) {
-    return NextResponse.json({ error: "เฉพาะคนในดีลเท่านั้น" }, { status: 403 });
-  }
+    if (!isParticipant) {
+      return NextResponse.json(
+        { error: "เฉพาะคนในดีลเท่านั้น" },
+        { status: 403 }
+      );
+    }
 
-  if (!["pending", "accepted"].includes(localDeal.status)) {
+    if (!["pending", "accepted"].includes(localDeal.status)) {
+      return NextResponse.json(
+        { error: "ดีลนี้ยกเลิกไม่ได้แล้ว" },
+        { status: 400 }
+      );
+    }
+
+    const otherUserId =
+      localDeal.buyerId === currentUserId ? localDeal.sellerId : localDeal.buyerId;
+    const actorName =
+      localDeal.buyerId === currentUserId ? localDeal.buyerName : localDeal.sellerName;
+    const actorImage =
+      localDeal.buyerId === currentUserId ? localDeal.buyerImage : localDeal.sellerImage;
+
+    await deleteLocalDeal(localDeal.id);
+
+    const sideEffects: Promise<unknown>[] = [
+      createLocalNotification({
+        userId: otherUserId,
+        type: "deal",
+        title: `${actorName} ยกเลิกดีล`,
+        body: `ดีลของ ${localDeal.cardName} ถูกยกเลิกแล้ว`,
+        href: "/market/deals",
+        image: actorImage,
+      }),
+    ];
+
+    if (localDeal.status === "accepted") {
+      sideEffects.push(cleanupDealChat(localDeal.id));
+    }
+
+    await Promise.allSettled(sideEffects);
+
     return NextResponse.json(
-      { error: "ดีลนี้ยกเลิกไม่ได้แล้ว" },
-      { status: 400 }
+      { success: true },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    console.error("DEAL CANCEL ERROR:", error);
+
+    return NextResponse.json(
+      { error: "ยกเลิกดีลไม่สำเร็จ" },
+      { status: 500 }
     );
   }
-
-  const otherUserId =
-    localDeal.buyerId === currentUserId ? localDeal.sellerId : localDeal.buyerId;
-  const actorName =
-    localDeal.buyerId === currentUserId ? localDeal.buyerName : localDeal.sellerName;
-  const actorImage =
-    localDeal.buyerId === currentUserId ? localDeal.buyerImage : localDeal.sellerImage;
-
-  await createLocalNotification({
-    userId: otherUserId,
-    type: "deal",
-    title: `${actorName} ยกเลิกดีล`,
-    body: `ดีลของ ${localDeal.cardName} ถูกยกเลิกแล้ว`,
-    href: "/market/deals",
-    image: actorImage,
-  });
-
-  await deleteLocalDeal(localDeal.id);
-
-  if (localDeal.status === "accepted") {
-    await cleanupDealChat(localDeal.id);
-  }
-
-  return NextResponse.json(
-    { success: true },
-    { headers: { "Cache-Control": "no-store" } }
-  );
 }

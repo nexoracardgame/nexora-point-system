@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
@@ -60,6 +60,7 @@ export default function DealsClient({
   const [deals, setDeals] = useState<DealCard[]>(initialDeals);
   const [creatingChatId, setCreatingChatId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const lastOptimisticMutationAt = useRef(0);
 
   const fetchDeals = useCallback(async () => {
     try {
@@ -75,6 +76,9 @@ export default function DealsClient({
       }
 
       const data = await res.json();
+      if (Date.now() - lastOptimisticMutationAt.current < 1800) {
+        return;
+      }
       setDeals(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("FETCH DEALS ERROR:", error);
@@ -116,6 +120,32 @@ export default function DealsClient({
     setCreatingChatId(dealId);
     router.push(`/market/deals/chat/${dealId}`);
   };
+
+  const optimisticallyRemoveDeal = useCallback((dealId: string) => {
+    let removedDeal: DealCard | null = null;
+
+    setDeals((prev) => {
+      removedDeal = prev.find((deal) => deal.id === dealId) || null;
+      if (!removedDeal) {
+        return prev;
+      }
+
+      lastOptimisticMutationAt.current = Date.now();
+      return prev.filter((deal) => deal.id !== dealId);
+    });
+
+    return () => {
+      if (!removedDeal) return;
+
+      setDeals((prev) => {
+        if (prev.some((deal) => deal.id === removedDeal?.id)) {
+          return prev;
+        }
+
+        return [removedDeal as DealCard, ...prev];
+      });
+    };
+  }, []);
 
   const pendingDeals = useMemo(
     () => deals.filter((deal) => deal.status === "pending"),
@@ -278,7 +308,11 @@ export default function DealsClient({
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-red-300">
                 {t("deals.activeRequest")}
               </div>
-              <CancelDealButton dealId={deal.id} label={t("deals.cancelRequest")} />
+              <CancelDealButton
+                dealId={deal.id}
+                label={t("deals.cancelRequest")}
+                onOptimisticCancel={() => optimisticallyRemoveDeal(deal.id)}
+              />
             </>
           )}
 
@@ -294,6 +328,7 @@ export default function DealsClient({
                 <CancelDealButton
                   dealId={deal.id}
                   label={t("deals.cancelAccepted")}
+                  onOptimisticCancel={() => optimisticallyRemoveDeal(deal.id)}
                 />
               </div>
             </>
@@ -309,6 +344,7 @@ export default function DealsClient({
                 <CancelDealButton
                   dealId={deal.id}
                   label={t("deals.cancelAccepted")}
+                  onOptimisticCancel={() => optimisticallyRemoveDeal(deal.id)}
                 />
               </div>
             </>
