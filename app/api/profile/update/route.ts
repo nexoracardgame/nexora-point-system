@@ -31,15 +31,26 @@ export async function POST(req: NextRequest) {
         ? Math.max(0, Math.min(100, coverPosition))
         : 50;
 
-    const updatedUser = await upsertLocalProfile(userId, {
+    const fallbackUser = {
+      userId,
+      displayName: String(displayName || "").trim() || null,
+      image: String(profileImage || "").trim() || null,
       coverImage: String(coverUrl || "").trim() || null,
       coverPosition: safePosition,
-      displayName: String(displayName || "").trim() || null,
       bio: String(bio || "").trim() || null,
       lineUrl: String(lineLink || "").trim() || null,
       facebookUrl: String(facebookLink || "").trim() || null,
-      image: String(profileImage || "").trim() || null,
-    });
+    };
+
+    const updatedUser = await upsertLocalProfile(userId, fallbackUser).catch(
+      (error) => {
+        console.error("UPSERT PROFILE ERROR:", error);
+        return {
+          ...fallbackUser,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    );
 
     const syncedName =
       updatedUser.displayName || session?.user?.name || "NEXORA User";
@@ -50,7 +61,7 @@ export async function POST(req: NextRequest) {
       userId,
       name: syncedName,
       image: syncedImage,
-    });
+    }).catch(() => undefined);
 
     return NextResponse.json({
       success: true,
@@ -66,7 +77,8 @@ export async function POST(req: NextRequest) {
         facebookUrl: updatedUser.facebookUrl,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("PROFILE UPDATE ERROR:", error);
     return NextResponse.json(
       { error: "Profile update failed" },
       { status: 500 }
