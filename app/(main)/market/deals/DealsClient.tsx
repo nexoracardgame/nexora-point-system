@@ -14,7 +14,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { emitDealSync, listenDealSync } from "@/lib/deal-sync";
+import {
+  emitDealSync,
+  listenDealServerSync,
+  listenDealSync,
+} from "@/lib/deal-sync";
 import type { DealCard } from "@/lib/market-deals";
 import CancelDealButton from "./CancelDealButton";
 import DealActionButtons from "./DealActionButtons";
@@ -136,6 +140,12 @@ export default function DealsClient({
 
   useEffect(() => {
     return listenDealSync(() => {
+      void fetchDeals();
+    });
+  }, [fetchDeals]);
+
+  useEffect(() => {
+    return listenDealServerSync(() => {
       void fetchDeals();
     });
   }, [fetchDeals]);

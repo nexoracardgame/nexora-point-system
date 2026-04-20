@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { publishDealEvent } from "@/lib/deal-events";
 import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
 import { deleteLocalDeal, getLocalDealById } from "@/lib/local-deal-store";
 import { createLocalNotification } from "@/lib/local-notification-store";
@@ -24,15 +25,11 @@ export async function POST(req: NextRequest) {
     const dealId = String(body?.dealId || "").trim();
 
     if (!dealId) {
-      return NextResponse.json(
-        { error: "ไม่พบ dealId" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ไม่พบ dealId" }, { status: 400 });
     }
 
     const localDeal = await getLocalDealById(dealId);
 
-    // Treat missing deals as already removed so repeated clicks or stale tabs stay quiet.
     if (!localDeal) {
       return NextResponse.json(
         { success: true, alreadyRemoved: true },
@@ -90,11 +87,18 @@ export async function POST(req: NextRequest) {
 
     await Promise.allSettled(sideEffects);
 
+    const changedAt = new Date().toISOString();
+    publishDealEvent({
+      dealId: localDeal.id,
+      action: "cancelled",
+      changedAt,
+    });
+
     return NextResponse.json(
       {
         success: true,
         removedDealId: localDeal.id,
-        changedAt: new Date().toISOString(),
+        changedAt,
       },
       { headers: { "Cache-Control": "no-store" } }
     );

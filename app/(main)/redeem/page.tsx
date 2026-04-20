@@ -10,73 +10,39 @@ import {
   CheckCircle2,
   Gift,
 } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 
-export const revalidate = 30;
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function safeImage(image?: string | null) {
   const value = String(image || "").trim();
   return value || "/avatar.png";
 }
 
-function formatDateTime(value?: Date | null) {
-  if (!value) return "-";
-
-  return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
-}
-
 export default async function RedeemPage() {
   const session = await getServerSession(authOptions);
-  const userId = String((session?.user as { id?: string } | undefined)?.id || "").trim();
+  const userId = String(
+    (session?.user as { id?: string } | undefined)?.id || ""
+  ).trim();
 
   if (!userId) {
     redirect("/login");
   }
 
-  const [user, coupons] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        displayName: true,
-        image: true,
-        nexPoint: true,
-        coin: true,
-      },
-    }),
-    prisma.coupon.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        reward: {
-          select: {
-            name: true,
-            imageUrl: true,
-            nexCost: true,
-            coinCost: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    }),
-  ]);
+  const profile = await getLocalProfileByUserId(userId).catch(() => null);
+  const displayName =
+    profile?.displayName ||
+    String(session?.user?.name || "").trim() ||
+    "NEXORA User";
+  const profileImage = safeImage(profile?.image || session?.user?.image);
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const displayName = user.displayName || user.name || "ผู้ใช้งาน";
-  const activeCoupons = coupons.filter((coupon) => !coupon.used).length;
-  const usedCoupons = coupons.filter((coupon) => coupon.used).length;
+  const coupons: Array<{
+    id: string;
+    code: string;
+    used: boolean;
+  }> = [];
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#16243f_0%,#0b0d13_42%,#05070d_100%)] text-white">
@@ -100,8 +66,8 @@ export default async function RedeemPage() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base sm:leading-7">
-                ใช้หน้านี้เปิดคูปองหรือ QR ให้พนักงานสแกนที่หน้าร้านหรือบริษัท
-                พร้อมเช็กสถานะว่าใบไหนใช้แล้ว ใบไหนยังพร้อมใช้งาน
+                ตอนนี้หน้า Redeem ถูกย้ายออกจาก DB เก่าแล้ว เพื่อไม่ให้ระบบล่มจาก quota เดิม
+                รายการคูปองจะกลับมาแสดงทันทีเมื่อเชื่อมเข้าระบบคูปองชุดใหม่เรียบร้อย
               </p>
             </div>
 
@@ -110,7 +76,7 @@ export default async function RedeemPage() {
                 <div className="flex items-center gap-3">
                   <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                     <Image
-                      src={safeImage(user.image)}
+                      src={profileImage}
                       alt={displayName}
                       fill
                       sizes="48px"
@@ -132,10 +98,10 @@ export default async function RedeemPage() {
               <div className="rounded-[26px] border border-emerald-300/12 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(16,185,129,0.08))] p-4">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-emerald-200/70">
                   <QrCode className="h-3.5 w-3.5" />
-                  พร้อมใช้งาน
+                  พร้อมใช้
                 </div>
                 <div className="mt-2 text-2xl font-black text-emerald-300 sm:text-3xl">
-                  {activeCoupons.toLocaleString("th-TH")}
+                  0
                 </div>
               </div>
 
@@ -145,7 +111,7 @@ export default async function RedeemPage() {
                   ใช้แล้ว
                 </div>
                 <div className="mt-2 text-2xl font-black text-white sm:text-3xl">
-                  {usedCoupons.toLocaleString("th-TH")}
+                  0
                 </div>
               </div>
             </div>
@@ -156,10 +122,10 @@ export default async function RedeemPage() {
           <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <Gift className="h-4 w-4 text-amber-300" />
-              เปิดคูปองได้ทันที
+              พร้อมย้ายสู่ระบบใหม่
             </div>
             <p className="mt-2 text-sm leading-6 text-white/50">
-              แตะรายการที่ต้องการ ระบบจะเปิดหน้า QR ของคูปองใบจริงให้ทันที
+              หน้านี้ถูกกันไม่ให้ใช้ DB เก่าแล้ว เพื่อให้เว็บหลักไม่พังอีกจากปริมาณใช้งานเดิม
             </p>
           </div>
 
@@ -169,17 +135,17 @@ export default async function RedeemPage() {
               สถานะชัดเจน
             </div>
             <p className="mt-2 text-sm leading-6 text-white/50">
-              แยกชัดว่าใบไหนยังพร้อมใช้ และใบไหนถูกใช้ไปแล้วเมื่อเวลาใด
+              ระหว่างที่ระบบคูปองใหม่ยังไม่ต่อครบ หน้า Redeem จะไม่แสดงข้อมูลค้างหรือหลอนจากฐานเก่าอีก
             </p>
           </div>
 
           <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl">
             <div className="flex items-center gap-2 text-sm font-bold text-white/88">
               <ShieldCheck className="h-4 w-4 text-emerald-300" />
-              เหมาะกับการใช้งานหน้าร้าน
+              ปลอดภัยบนเว็บจริง
             </div>
             <p className="mt-2 text-sm leading-6 text-white/50">
-              พนักงานสามารถสแกนจากหน้า QR และตรวจสถานะการใช้สิทธิ์ได้ตรงจากระบบ
+              หน้าใช้งานจะไม่ล้มจาก Prisma quota เดิมอีก แม้ระบบคูปองใหม่ยังอยู่ระหว่างเชื่อมต่อ
             </p>
           </div>
         </section>
@@ -200,112 +166,17 @@ export default async function RedeemPage() {
             </div>
           </div>
 
-          {coupons.length === 0 ? (
-            <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-8 text-center text-white/45">
-              ยังไม่มีคูปองที่แลกไว้ตอนนี้
+          <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-8 text-center text-white/45">
+            ยังไม่มีรายการคูปองจากระบบใหม่ในตอนนี้
+            <div className="mt-4">
+              <Link
+                href="/rewards"
+                className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-black transition hover:scale-[1.01]"
+              >
+                กลับไปหน้ารางวัล
+              </Link>
             </div>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {coupons.map((coupon) => {
-                const rewardType =
-                  coupon.reward.nexCost != null
-                    ? "แลกด้วย NEX"
-                    : coupon.reward.coinCost != null
-                      ? "แลกด้วย COIN"
-                      : "คูปอง";
-
-                return (
-                  <article
-                    key={coupon.id}
-                    className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,19,29,0.98),rgba(13,15,24,0.92))] p-4 shadow-[0_14px_60px_rgba(0,0,0,0.3)] backdrop-blur-2xl"
-                  >
-                    <div className="flex flex-col gap-4 sm:flex-row">
-                      <div className="relative h-[120px] overflow-hidden rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.04))] sm:w-[152px] sm:min-w-[152px]">
-                        <Image
-                          src={
-                            coupon.reward.imageUrl ||
-                            "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"
-                          }
-                          alt={coupon.reward.name}
-                          fill
-                          sizes="(max-width: 640px) 100vw, 152px"
-                          className="object-contain p-3"
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div
-                            className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${
-                              coupon.used
-                                ? "border border-white/8 bg-white/10 text-white/60"
-                                : "border border-emerald-300/15 bg-emerald-300/10 text-emerald-300"
-                            }`}
-                          >
-                            {coupon.used ? "ใช้แล้ว" : "พร้อมใช้งาน"}
-                          </div>
-
-                          <div className="rounded-full border border-cyan-300/12 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200/80">
-                            {rewardType}
-                          </div>
-                        </div>
-
-                        <h3 className="mt-3 text-xl font-black sm:text-2xl">
-                          {coupon.reward.name}
-                        </h3>
-
-                        <div className="mt-3 grid gap-2 text-sm text-white/58 sm:grid-cols-2">
-                          <div>
-                            <span className="text-white/32">รหัสคูปอง</span>
-                            <div className="mt-1 break-all font-semibold text-white/88">
-                              {coupon.code}
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-white/32">แลกเมื่อ</span>
-                            <div className="mt-1 font-semibold text-white/88">
-                              {formatDateTime(coupon.createdAt)}
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-white/32">หมดอายุ</span>
-                            <div className="mt-1 font-semibold text-white/88">
-                              ใช้ได้จนกว่าจะใช้งาน
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-white/32">ใช้สิทธิ์เมื่อ</span>
-                            <div className="mt-1 font-semibold text-white/88">
-                              {coupon.usedAt
-                                ? formatDateTime(coupon.usedAt)
-                                : "ยังไม่ถูกใช้งาน"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <Link
-                            href={`/coupon/${coupon.code}`}
-                            className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
-                              coupon.used
-                                ? "border border-white/10 bg-white/[0.06] text-white/75 hover:bg-white/[0.09]"
-                                : "bg-gradient-to-r from-cyan-400 to-emerald-300 text-black shadow-[0_10px_30px_rgba(34,211,238,0.18)] hover:scale-[1.01]"
-                            }`}
-                          >
-                            <QrCode className="h-4 w-4" />
-                            {coupon.used ? "ดูรายละเอียดคูปอง" : "เปิด QR เพื่อใช้งาน"}
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+          </div>
         </section>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { publishDealEvent } from "@/lib/deal-events";
 import {
   createLocalDeal,
   findExistingLocalOpenDeal,
@@ -123,6 +124,12 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error("DEAL NOTIFICATION ERROR:", error);
     }
+
+    publishDealEvent({
+      dealId: localDeal.id,
+      action: "created",
+      changedAt: new Date().toISOString(),
+    });
 
     return NextResponse.json({
       success: true,

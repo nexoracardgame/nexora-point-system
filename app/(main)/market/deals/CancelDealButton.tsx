@@ -20,7 +20,7 @@ export default function CancelDealButton({
   const handleCancel = async () => {
     if (loading) return;
 
-    const ok = confirm("เธขเธเน€เธฅเธดเธเธ”เธตเธฅเธเธตเน?");
+    const ok = confirm("ยืนยันยกเลิกดีลนี้?");
     if (!ok) return;
 
     const rollback = onOptimisticCancel?.();
@@ -40,7 +40,7 @@ export default function CancelDealButton({
 
       if (!res.ok || !data?.success) {
         rollback?.();
-        alert(data?.error || "เธขเธเน€เธฅเธดเธเนเธกเนเธชเธณเน€เธฃเนเธ");
+        alert(data?.error || "ยกเลิกดีลไม่สำเร็จ");
         return;
       }
 
@@ -51,7 +51,7 @@ export default function CancelDealButton({
     } catch (err) {
       rollback?.();
       console.error(err);
-      alert("เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”");
+      alert("เกิดข้อผิดพลาด");
     } finally {
       setLoading(false);
     }

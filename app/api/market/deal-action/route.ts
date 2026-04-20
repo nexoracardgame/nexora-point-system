@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { publishDealEvent } from "@/lib/deal-events";
 import {
   deleteLocalDeal,
   getLocalDealById,
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     if (!currentUserId) {
       return NextResponse.json(
-        { error: "เธเธฃเธธเธ“เธฒเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ" },
+        { error: "กรุณาเข้าสู่ระบบ" },
         { status: 401 }
       );
     }
@@ -28,10 +29,7 @@ export async function POST(req: NextRequest) {
     const action = String(body?.action || "").trim().toLowerCase();
 
     if (!dealId || !action) {
-      return NextResponse.json(
-        { error: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
     }
 
     const localDeal = await getLocalDealById(dealId);
@@ -45,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     if (localDeal.sellerId !== currentUserId) {
       return NextResponse.json(
-        { error: "เน€เธเธเธฒเธฐเน€เธเนเธฒเธเธญเธเธเธฒเธฃเนเธ”เน€เธ—เนเธฒเธเธฑเนเธ" },
+        { error: "เฉพาะเจ้าของการ์ดเท่านั้น" },
         { status: 403 }
       );
     }
@@ -54,20 +52,27 @@ export async function POST(req: NextRequest) {
       await createLocalNotification({
         userId: localDeal.buyerId,
         type: "deal",
-        title: `${localDeal.sellerName} เธเธเธดเน€เธชเธเธเธณเธเธญเธ”เธตเธฅ`,
-        body: `${localDeal.cardName} เนเธกเนเนเธ”เนเธฃเธฑเธเธเธฒเธฃเธ•เธญเธเธฃเธฑเธ`,
+        title: `${localDeal.sellerName} ปฏิเสธคำขอดีล`,
+        body: `${localDeal.cardName} ไม่ได้รับการตอบรับ`,
         href: "/market/deals",
         image: localDeal.sellerImage,
       });
 
       await deleteLocalDeal(localDeal.id);
 
+      const changedAt = new Date().toISOString();
+      publishDealEvent({
+        dealId: localDeal.id,
+        action: "rejected",
+        changedAt,
+      });
+
       return NextResponse.json(
         {
           success: true,
           action: "reject",
           removedDealId: localDeal.id,
-          changedAt: new Date().toISOString(),
+          changedAt,
         },
         {
           headers: {
@@ -83,10 +88,17 @@ export async function POST(req: NextRequest) {
       await createLocalNotification({
         userId: localDeal.buyerId,
         type: "deal",
-        title: `${localDeal.sellerName} เธ•เธญเธเธฃเธฑเธเธ”เธตเธฅเธเธญเธเธเธธเธ“`,
-        body: `${localDeal.cardName} เธเธฃเนเธญเธกเธเธธเธขเธ•เนเธญเนเธเธซเนเธญเธเธ”เธตเธฅเนเธฅเนเธง`,
+        title: `${localDeal.sellerName} ตอบรับดีลของคุณ`,
+        body: `${localDeal.cardName} พร้อมคุยต่อในห้องดีลแล้ว`,
         href: `/market/deals/chat/${localDeal.id}`,
         image: localDeal.sellerImage,
+      });
+
+      const changedAt = new Date().toISOString();
+      publishDealEvent({
+        dealId: localDeal.id,
+        action: "accepted",
+        changedAt,
       });
 
       return NextResponse.json(
@@ -94,7 +106,7 @@ export async function POST(req: NextRequest) {
           success: true,
           action: "accept",
           deal: updatedDeal,
-          changedAt: new Date().toISOString(),
+          changedAt,
         },
         {
           headers: {
@@ -105,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "action เนเธกเนเธ–เธนเธเธ•เนเธญเธ" },
+      { error: "action ไม่ถูกต้อง" },
       { status: 400 }
     );
   } catch (error) {

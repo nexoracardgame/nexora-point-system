@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { publishDealEvent } from "@/lib/deal-events";
 import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
 import { getLocalDealById, updateLocalDealStatus } from "@/lib/local-deal-store";
 import { createLocalNotification } from "@/lib/local-notification-store";
@@ -61,6 +62,12 @@ export async function POST(req: NextRequest) {
   revalidatePath("/market/seller-center");
   revalidatePath("/market/deals");
   revalidatePath("/market");
+
+  publishDealEvent({
+    dealId: localDeal.id,
+    action: "completed",
+    changedAt: new Date().toISOString(),
+  });
 
   return NextResponse.json({
     success: true,

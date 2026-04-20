@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { createClient } from "@supabase/supabase-js";
 import { authOptions } from "@/lib/auth";
 import { isDealChatRoomId } from "@/lib/deal-chat";
 import { getAllLocalDeals } from "@/lib/local-deal-store";
 import { getLocalNotificationsForUser } from "@/lib/local-notification-store";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 type NotificationItem = {
   id: string;
@@ -42,6 +37,7 @@ export const fetchCache = "force-no-store";
 
 export async function GET() {
   try {
+    const supabase = getServerSupabaseClient();
     const session = await getServerSession(authOptions);
     const currentUserId = String(session?.user?.id || "").trim();
     const currentLineId = String(session?.user?.lineId || "").trim();
@@ -50,6 +46,13 @@ export async function GET() {
       return NextResponse.json(
         { items: [] },
         { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    if (!supabase) {
+      return NextResponse.json(
+        { items: [] },
+        { headers: { "Cache-Control": "no-store" }, status: 500 }
       );
     }
 

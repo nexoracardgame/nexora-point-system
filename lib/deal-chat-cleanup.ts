@@ -1,13 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
 import { getDealChatRoomId } from "@/lib/deal-chat";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function cleanupDealChat(dealId: string) {
   const roomId = getDealChatRoomId(dealId);
+  const supabase = getServerSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
 
   const { error } = await supabase.from("dmMessage").delete().eq("roomId", roomId);
 

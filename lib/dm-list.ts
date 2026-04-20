@@ -1,10 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export type DMRoomListItem = {
   roomId: string;
@@ -31,6 +26,12 @@ export async function getDmRoomsForUser(
   myLineId?: string | null
 ): Promise<DMRoomListItem[]> {
   if (!myId) return [];
+
+  const supabase = getServerSupabaseClient();
+
+  if (!supabase) {
+    return [];
+  }
 
   const roomOrFilters = [`usera.eq.${myId}`, `userb.eq.${myId}`];
   if (myLineId) {

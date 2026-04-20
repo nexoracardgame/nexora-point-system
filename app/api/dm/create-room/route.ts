@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { createClient } from "@supabase/supabase-js";
 import { authOptions } from "@/lib/auth";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 import { resolveUserIdentity } from "@/lib/user-identity";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function safeName(name?: string | null, fallback = "User") {
   const value = String(name || "").trim();
@@ -26,6 +21,7 @@ function buildRoomId(userA: string, userB: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getServerSupabaseClient();
     const session = await getServerSession(authOptions);
     const identity = await resolveUserIdentity(session?.user);
     const user1 = identity.userId;
@@ -63,6 +59,10 @@ export async function POST(req: NextRequest) {
 
     const roomId = buildRoomId(user1, user2);
     const nowIso = new Date().toISOString();
+
+    if (!supabase) {
+      return NextResponse.json({ error: "system unavailable" }, { status: 500 });
+    }
 
     const { error: upsertError } = await supabase.from("dm_room").upsert({
       roomid: roomId,

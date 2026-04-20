@@ -56,3 +56,23 @@ export function listenDealSync(listener: (detail: DealSyncDetail) => void) {
     window.removeEventListener("storage", onStorage);
   };
 }
+
+export function listenDealServerSync(listener: (detail: DealSyncDetail) => void) {
+  if (typeof window === "undefined" || typeof EventSource === "undefined") {
+    return () => {};
+  }
+
+  const source = new EventSource("/api/market/deals/stream");
+
+  source.onmessage = (event) => {
+    if (!event.data) return;
+
+    try {
+      listener(JSON.parse(event.data) as DealSyncDetail);
+    } catch {}
+  };
+
+  return () => {
+    source.close();
+  };
+}

@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { createClient } from "@supabase/supabase-js";
 import { authOptions } from "@/lib/auth";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -15,6 +10,12 @@ export async function GET() {
 
   if (!userId) {
     return NextResponse.json({ count: 0 });
+  }
+
+  const supabase = getServerSupabaseClient();
+
+  if (!supabase) {
+    return NextResponse.json({ count: 0 }, { status: 500 });
   }
 
   const { data: rooms, error: roomErr } = await supabase
