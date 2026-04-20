@@ -16,6 +16,8 @@ import {
 import { emitProfileSync } from "@/lib/profile-sync";
 
 const MAX_SOURCE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+const DEFAULT_COVER_URL = "/seller-cover.jpg";
+const DEFAULT_PROFILE_URL = "/avatar.png";
 
 type ImageKind = "profile" | "cover";
 
@@ -44,9 +46,8 @@ export default function ProfileSettingsClient({
   const [processingImage, setProcessingImage] = useState<ImageKind | null>(
     null
   );
-
   const [coverUrl, setCoverUrl] = useState(
-    initialProfile.coverImage || initialProfile.coverUrl || "/seller-cover.jpg"
+    initialProfile.coverImage || initialProfile.coverUrl || DEFAULT_COVER_URL
   );
   const [coverPosition, setCoverPosition] = useState(
     initialProfile.coverPosition ?? 50
@@ -62,7 +63,7 @@ export default function ProfileSettingsClient({
     initialProfile.facebookUrl || initialProfile.facebookLink || ""
   );
   const [profileImage, setProfileImage] = useState(
-    initialProfile.image || initialProfile.profileImage || "/avatar.png"
+    initialProfile.image || initialProfile.profileImage || DEFAULT_PROFILE_URL
   );
 
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -72,17 +73,17 @@ export default function ProfileSettingsClient({
 
   async function loadProfile() {
     const res = await fetch("/api/profile/me", { cache: "no-store" });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) return false;
 
-    setCoverUrl(data.coverImage || data.coverUrl || "/seller-cover.jpg");
+    setCoverUrl(data.coverImage || data.coverUrl || DEFAULT_COVER_URL);
     setCoverPosition(data.coverPosition ?? 50);
     setDisplayName(data.displayName || data.name || "");
     setBio(data.bio || "");
     setLineLink(data.lineUrl || data.lineLink || "");
     setFacebookLink(data.facebookUrl || data.facebookLink || "");
-    setProfileImage(data.image || data.profileImage || "/avatar.png");
+    setProfileImage(data.image || data.profileImage || DEFAULT_PROFILE_URL);
 
     return true;
   }
@@ -130,27 +131,24 @@ export default function ProfileSettingsClient({
 
   async function processImageFile(file: File, type: ImageKind) {
     if (!file.type.startsWith("image/")) {
-      throw new Error("Please choose an image file");
+      throw new Error("กรุณาเลือกไฟล์รูปภาพ");
     }
 
     if (file.size > MAX_SOURCE_FILE_SIZE_BYTES) {
-      throw new Error("Image is too large. Please use a file under 25MB");
+      throw new Error("รูปใหญ่เกินไป กรุณาใช้ไฟล์ไม่เกิน 25MB");
     }
 
     const sourceUrl = await readFileAsDataUrl(file);
     const img = await loadImageElement(sourceUrl);
     const canvas = document.createElement("canvas");
     const isCover = type === "cover";
-    const maxSize = isCover ? 2200 : 1080;
-    const exportType =
-      isCover && file.type === "image/png" ? "image/png" : "image/jpeg";
-    const exportQuality = isCover ? 0.94 : 0.88;
+    const maxSize = isCover ? 1800 : 720;
 
     let width = img.naturalWidth || img.width;
     let height = img.naturalHeight || img.height;
 
     if (!width || !height) {
-      throw new Error("Invalid image dimensions");
+      throw new Error("ขนาดรูปไม่ถูกต้อง");
     }
 
     if (width > height) {
@@ -168,35 +166,55 @@ export default function ProfileSettingsClient({
 
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      throw new Error("Unable to process image");
+      throw new Error("ไม่สามารถประมวลผลรูปได้");
     }
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    return exportType === "image/png"
-      ? canvas.toDataURL(exportType)
-      : canvas.toDataURL(exportType, exportQuality);
+    return canvas.toDataURL("image/jpeg", isCover ? 0.82 : 0.78);
+  }
+
+  async function uploadProcessedImage(dataUrl: string, type: ImageKind) {
+    const blob = await (await fetch(dataUrl)).blob();
+    const formData = new FormData();
+    const file = new File([blob], `${type}-${Date.now()}.jpg`, {
+      type: "image/jpeg",
+    });
+
+    formData.append("file", file);
+    formData.append("kind", type);
+
+    const res = await fetch("/api/upload/cover", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data?.url) {
+      throw new Error(data?.error || "อัปโหลดรูปไม่สำเร็จ");
+    }
+
+    return String(data.url);
   }
 
   async function uploadImage(file: File, type: ImageKind) {
     try {
       setProcessingImage(type);
       const compressed = await processImageFile(file, type);
+      const uploadedUrl = await uploadProcessedImage(compressed, type);
 
       if (type === "profile") {
-        setProfileImage(compressed);
+        setProfileImage(uploadedUrl);
       } else {
-        setCoverUrl(compressed);
+        setCoverUrl(uploadedUrl);
         setCoverPosition(50);
       }
     } catch (error) {
       console.error("PROCESS IMAGE ERROR:", error);
       alert(
-        error instanceof Error
-          ? error.message
-          : "Unable to process this image"
+        error instanceof Error ? error.message : "ไม่สามารถประมวลผลรูปนี้ได้"
       );
     } finally {
       setProcessingImage((current) => (current === type ? null : current));
@@ -217,7 +235,7 @@ export default function ProfileSettingsClient({
 
   async function saveProfile() {
     if (processingImage) {
-      alert("Please wait for the image to finish processing first");
+      alert("กรุณารอให้รูปประมวลผลเสร็จก่อน");
       return;
     }
 
@@ -232,10 +250,6 @@ export default function ProfileSettingsClient({
         lineLink,
         facebookLink,
         profileImage,
-        coverImage: coverUrl,
-        image: profileImage,
-        lineUrl: lineLink,
-        facebookUrl: facebookLink,
       };
 
       const res = await fetch("/api/profile/update", {
@@ -249,13 +263,13 @@ export default function ProfileSettingsClient({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(data?.error || "Save failed");
+        alert(data?.error || "บันทึกไม่สำเร็จ");
         return;
       }
 
       const syncedName =
         data?.user?.displayName || data?.user?.name || displayName || "";
-      const syncedImage = data?.user?.image || profileImage || "/avatar.png";
+      const syncedImage = data?.user?.image || profileImage || DEFAULT_PROFILE_URL;
 
       emitProfileSync({
         name: syncedName,
@@ -265,23 +279,25 @@ export default function ProfileSettingsClient({
       router.refresh();
       await loadProfile();
 
-      alert("Saved successfully");
+      alert("บันทึกสำเร็จ");
     } catch (error) {
       console.error("SAVE PROFILE ERROR:", error);
-      alert("Save failed");
+      alert("บันทึกไม่สำเร็จ");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#281255_0%,#0b0d14_42%,#05070d_100%)] p-4 text-white sm:p-6">
-      <div className="mx-auto max-w-[1280px] space-y-6">
-        <section className="overflow-hidden rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_30px_110px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#281255_0%,#0b0d14_42%,#05070d_100%)] p-3 text-white sm:p-6">
+      <div className="mx-auto max-w-[1280px] space-y-5 sm:space-y-6">
+        <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_30px_110px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[34px]">
           <div
             ref={coverRef}
             onPointerDown={(e) => {
-              if ((e.target as HTMLElement).closest("[data-cover-action='true']")) {
+              if (
+                (e.target as HTMLElement).closest("[data-cover-action='true']")
+              ) {
                 return;
               }
 
@@ -296,14 +312,10 @@ export default function ProfileSettingsClient({
                 e.currentTarget.releasePointerCapture(e.pointerId);
               }
             }}
-            onPointerCancel={() => {
-              stopCoverDragging();
-            }}
-            onPointerLeave={() => {
-              stopCoverDragging();
-            }}
+            onPointerCancel={stopCoverDragging}
+            onPointerLeave={stopCoverDragging}
             onPointerMove={handlePointerMove}
-            className="group relative h-[250px] touch-none select-none overflow-hidden sm:h-[330px] xl:h-[410px]"
+            className="group relative h-[332px] touch-none select-none overflow-hidden sm:h-[340px] xl:h-[410px]"
             style={{
               userSelect: "none",
               WebkitUserSelect: "none",
@@ -323,7 +335,7 @@ export default function ProfileSettingsClient({
             />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,217,102,0.22),transparent_26%),linear-gradient(180deg,rgba(8,8,12,0.04)_0%,rgba(8,8,12,0.26)_42%,rgba(10,10,18,0.92)_100%)]" />
 
-            <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/30 px-4 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-white/82 shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:left-6 sm:top-6">
+            <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/30 px-3 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/82 shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:left-6 sm:top-6 sm:px-4 sm:text-[11px]">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
               Profile Studio
             </div>
@@ -338,7 +350,7 @@ export default function ProfileSettingsClient({
                 e.stopPropagation();
                 openCoverPicker();
               }}
-              className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/34 px-4 py-2 text-sm font-bold text-white/90 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-black/48 sm:right-6 sm:top-6"
+              className="absolute right-3 top-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/34 px-3 py-2 text-xs font-bold text-white/90 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-black/48 sm:right-6 sm:top-6 sm:px-4 sm:text-sm"
             >
               <ImagePlus className="h-4 w-4" />
               เปลี่ยนปก
@@ -346,59 +358,61 @@ export default function ProfileSettingsClient({
 
             <div
               data-cover-action="true"
-              className="absolute right-4 top-16 rounded-full border border-white/12 bg-black/28 px-3 py-1.5 text-[11px] font-bold text-white/72 shadow-[0_10px_24px_rgba(0,0,0,0.18)] sm:right-6 sm:top-20"
+              className="absolute right-3 top-14 rounded-full border border-white/12 bg-black/28 px-3 py-1.5 text-[10px] font-bold text-white/72 shadow-[0_10px_24px_rgba(0,0,0,0.18)] sm:right-6 sm:top-20 sm:text-[11px]"
             >
               ลากขึ้นลงเพื่อจัดตำแหน่ง
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 xl:p-8">
+            <div className="absolute inset-x-0 bottom-0 p-3 sm:p-6 xl:p-8">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <button
-                  type="button"
-                  data-cover-action="true"
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openProfilePicker();
-                  }}
-                  className="group/avatar relative h-28 w-28 cursor-pointer overflow-hidden rounded-full border-[5px] border-white/16 shadow-[0_22px_54px_rgba(0,0,0,0.44)] transition hover:scale-[1.02] sm:h-32 sm:w-32"
-                >
-                  <div className="absolute inset-[-6px] rounded-full border border-dashed border-violet-300/45 transition group-hover/avatar:border-violet-200/80" />
-                  <div className="absolute inset-[-12px] rounded-full bg-[radial-gradient(circle,rgba(167,139,250,0.18)_0%,transparent_68%)]" />
-                  <Image
-                    src={profileImage}
-                    alt="Profile image"
-                    fill
-                    unoptimized
-                    sizes="128px"
-                    className="object-cover"
-                    draggable={false}
-                  />
-                  <div className="absolute inset-0 rounded-full ring-1 ring-white/10" />
-                  <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/72 via-black/8 to-transparent pb-5">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/36 px-3 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-white/92">
-                      <Camera className="h-3.5 w-3.5" />
-                      แตะเปลี่ยนรูป
+                <div className="flex items-end gap-3 sm:gap-5">
+                  <button
+                    type="button"
+                    data-cover-action="true"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openProfilePicker();
+                    }}
+                    className="group/avatar relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-full border-[4px] border-white/18 shadow-[0_22px_54px_rgba(0,0,0,0.44)] transition hover:scale-[1.02] sm:h-32 sm:w-32 sm:border-[5px]"
+                  >
+                    <div className="absolute inset-[-5px] rounded-full border border-dashed border-violet-300/50 transition group-hover/avatar:border-violet-200/85" />
+                    <div className="absolute inset-[-14px] rounded-full bg-[radial-gradient(circle,rgba(167,139,250,0.18)_0%,transparent_68%)]" />
+                    <Image
+                      src={profileImage}
+                      alt="Profile image"
+                      fill
+                      unoptimized
+                      sizes="128px"
+                      className="object-cover"
+                      draggable={false}
+                    />
+                    <div className="absolute inset-0 rounded-full ring-1 ring-white/10" />
+                    <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/72 via-black/8 to-transparent pb-4 sm:pb-5">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/36 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-white/92 sm:px-3 sm:py-2 sm:text-[11px] sm:tracking-[0.24em]">
+                        <Camera className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        แตะเปลี่ยนรูป
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
 
-                <div className="min-w-0 flex-1 sm:px-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/45">
-                    ตั้งค่าโปรไฟล์
+                  <div className="min-w-0 flex-1 pb-1 sm:px-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/45 sm:text-[11px] sm:tracking-[0.34em]">
+                      ตั้งค่าโปรไฟล์
+                    </div>
+                    <h1 className="mt-2 break-words text-[28px] font-black tracking-tight text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)] sm:text-4xl xl:text-5xl">
+                      {displayName || "NEXORA USER"}
+                    </h1>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-white/68 sm:mt-3 sm:text-base">
+                      {bio ||
+                        "ตั้งชื่อ Bio และลิงก์ของคุณให้พร้อม แล้วดูพรีวิวเปลี่ยนแบบสดๆ ได้ทันที"}
+                    </p>
                   </div>
-                  <h1 className="mt-2 truncate text-3xl font-black tracking-tight text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)] sm:text-4xl xl:text-5xl">
-                    {displayName || "NEXORA USER"}
-                  </h1>
-                  <p className="mt-3 max-w-3xl text-sm leading-6 text-white/68 sm:text-base">
-                    {bio ||
-                      "ตั้งชื่อ Bio และลิงก์ของคุณให้พร้อม แล้วดูพรีวิวเปลี่ยนแบบสดๆ ได้ทันที"}
-                  </p>
                 </div>
 
-                <div className="rounded-[24px] border border-white/10 bg-black/26 px-4 py-3 shadow-[0_16px_34px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:min-w-[200px]">
+                <div className="w-full rounded-[24px] border border-white/10 bg-black/26 px-4 py-3 shadow-[0_16px_34px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:w-auto sm:min-w-[200px]">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/44">
                     <MoveVertical className="h-3.5 w-3.5 text-violet-200" />
                     Cover Focus
@@ -412,8 +426,8 @@ export default function ProfileSettingsClient({
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,10,16,0.92)_0%,rgba(10,10,16,0.8)_100%)] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:p-6">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-6">
+          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,10,16,0.92)_0%,rgba(10,10,16,0.8)_100%)] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:rounded-[32px] sm:p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/18 bg-violet-400/10 text-violet-200 shadow-[0_14px_28px_rgba(124,58,237,0.16)]">
                 <Type className="h-5 w-5" />
@@ -479,7 +493,7 @@ export default function ProfileSettingsClient({
               </div>
             </div>
 
-            {(processingImage === "profile" || processingImage === "cover") && (
+            {processingImage && (
               <div className="mt-5 rounded-[22px] border border-violet-400/15 bg-violet-400/10 px-4 py-3 text-sm text-violet-100/92">
                 {processingImage === "profile"
                   ? "กำลังประมวลผลรูปโปรไฟล์..."
@@ -491,7 +505,7 @@ export default function ProfileSettingsClient({
               <button
                 onClick={saveProfile}
                 disabled={saving || processingImage !== null}
-                className="inline-flex min-h-[60px] w-full items-center justify-center gap-3 rounded-[24px] bg-[linear-gradient(90deg,#7c3aed_0%,#8b5cf6_38%,#d946ef_100%)] px-6 text-sm font-black tracking-[0.12em] text-white shadow-[0_22px_54px_rgba(124,58,237,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-[58px] w-full items-center justify-center gap-3 rounded-[24px] bg-[linear-gradient(90deg,#7c3aed_0%,#8b5cf6_38%,#d946ef_100%)] px-6 text-sm font-black tracking-[0.12em] text-white shadow-[0_22px_54px_rgba(124,58,237,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
                 {saving
@@ -503,8 +517,8 @@ export default function ProfileSettingsClient({
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
+          <div className="order-first space-y-4 xl:order-none">
+            <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.18)] sm:rounded-[30px]">
               <div className="relative h-32">
                 <Image
                   src={coverUrl}
@@ -540,8 +554,7 @@ export default function ProfileSettingsClient({
                   {displayName || "NEXORA USER"}
                 </div>
                 <div className="mt-2 line-clamp-3 text-sm leading-6 text-white/62">
-                  {bio ||
-                    "พรีวิวนี้จะเปลี่ยนตามข้อมูลที่คุณกำลังแก้ด้านซ้ายแบบสดๆ"}
+                  {bio || "พรีวิวนี้จะเปลี่ยนตามข้อมูลที่คุณกำลังแก้แบบสดๆ"}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">

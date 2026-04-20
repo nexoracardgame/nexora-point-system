@@ -1,10 +1,11 @@
-import { writeFile } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
+    const kind = String(formData.get("kind") || "cover").trim();
 
     if (!file) {
       return Response.json(
@@ -16,17 +17,22 @@ export async function POST(req: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const fileName = `${Date.now()}-${file.name}`;
-    const filePath = path.join(
-      process.cwd(),
-      "public/uploads",
-      fileName
-    );
+    const extFromType =
+      file.type === "image/png"
+        ? ".png"
+        : file.type === "image/webp"
+          ? ".webp"
+          : ".jpg";
+    const safeKind = kind === "profile" ? "profile" : "cover";
+    const fileName = `${safeKind}-${Date.now()}${extFromType}`;
+    const uploadDir = path.join(process.cwd(), "public", "uploads", safeKind);
+    const filePath = path.join(uploadDir, fileName);
 
+    await mkdir(uploadDir, { recursive: true });
     await writeFile(filePath, buffer);
 
     return Response.json({
-      url: `/uploads/${fileName}`,
+      url: `/uploads/${safeKind}/${fileName}`,
     });
   } catch (error) {
     console.error(error);
