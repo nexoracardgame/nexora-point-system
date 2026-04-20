@@ -102,7 +102,15 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       const appToken = token as AppToken;
       const userId = String(appToken.id || "").trim();
-      const localProfile = userId ? await getLocalProfileByUserId(userId) : null;
+      let localProfile = null;
+
+      if (userId) {
+        try {
+          localProfile = await getLocalProfileByUserId(userId);
+        } catch {
+          localProfile = null;
+        }
+      }
       const resolvedName =
         localProfile?.displayName || appToken.name || "NEXORA User";
       const resolvedImage = getSafeSessionImage(

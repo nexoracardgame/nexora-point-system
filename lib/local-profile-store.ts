@@ -72,35 +72,65 @@ function normalizeProfileRecord(
 }
 
 async function ensureStoreFile() {
-  return ensureLocalStoreFile("local-profiles.json");
+  try {
+    return await ensureLocalStoreFile("local-profiles.json");
+  } catch {
+    return null;
+  }
 }
 
 async function readStore() {
-  await ensureStoreFile();
-  return readLocalStoreJson<LocalProfileRecord>("local-profiles.json");
+  const storePath = await ensureStoreFile();
+
+  if (!storePath) {
+    return [];
+  }
+
+  try {
+    return await readLocalStoreJson<LocalProfileRecord>("local-profiles.json");
+  } catch {
+    return [];
+  }
 }
 
 async function writeStore(items: LocalProfileRecord[]) {
-  await ensureStoreFile();
-  await writeLocalStoreJson(
-    "local-profiles.json",
-    JSON.stringify(items, null, 2)
-  );
+  const storePath = await ensureStoreFile();
+
+  if (!storePath) {
+    return;
+  }
+
+  try {
+    await writeLocalStoreJson(
+      "local-profiles.json",
+      JSON.stringify(items, null, 2)
+    );
+  } catch {
+    return;
+  }
 }
 
 async function readLocalProfile(userId: string) {
-  const items = await readStore();
-  return items.find((item) => item.userId === userId) || null;
+  try {
+    const items = await readStore();
+    return items.find((item) => item.userId === userId) || null;
+  } catch {
+    return null;
+  }
 }
 
 async function writeLocalProfile(record: LocalProfileRecord) {
-  const items = await readStore();
-  const next = items.some((item) => item.userId === record.userId)
-    ? items.map((item) => (item.userId === record.userId ? record : item))
-    : [record, ...items];
+  try {
+    const items = await readStore();
+    const next = items.some((item) => item.userId === record.userId)
+      ? items.map((item) => (item.userId === record.userId ? record : item))
+      : [record, ...items];
 
-  await writeStore(next);
-  return record;
+    await writeStore(next);
+    return record;
+  } catch {
+    return record;
+  }
 }
 
 async function readSupabaseProfile(userId: string) {
