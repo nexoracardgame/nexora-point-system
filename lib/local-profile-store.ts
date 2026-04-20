@@ -1,5 +1,5 @@
 import { promises as fs } from "fs";
-import path from "path";
+import { getLocalStorePath } from "@/lib/local-store-dir";
 
 export type LocalProfileRecord = {
   userId: string;
@@ -13,24 +13,23 @@ export type LocalProfileRecord = {
   updatedAt: string;
 };
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const STORE_PATH = path.join(DATA_DIR, "local-profiles.json");
-
 async function ensureStoreFile() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  const storePath = await getLocalStorePath("local-profiles.json");
 
   try {
-    await fs.access(STORE_PATH);
+    await fs.access(storePath);
   } catch {
-    await fs.writeFile(STORE_PATH, "[]", "utf8");
+    await fs.writeFile(storePath, "[]", "utf8");
   }
+
+  return storePath;
 }
 
 async function readStore() {
-  await ensureStoreFile();
+  const storePath = await ensureStoreFile();
 
   try {
-    const raw = await fs.readFile(STORE_PATH, "utf8");
+    const raw = await fs.readFile(storePath, "utf8");
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as LocalProfileRecord[]) : [];
   } catch {
@@ -39,8 +38,8 @@ async function readStore() {
 }
 
 async function writeStore(items: LocalProfileRecord[]) {
-  await ensureStoreFile();
-  await fs.writeFile(STORE_PATH, JSON.stringify(items, null, 2), "utf8");
+  const storePath = await ensureStoreFile();
+  await fs.writeFile(storePath, JSON.stringify(items, null, 2), "utf8");
 }
 
 export async function getLocalProfileByUserId(userId: string) {
