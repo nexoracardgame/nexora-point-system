@@ -91,7 +91,11 @@ export async function POST(req: NextRequest) {
     await Promise.allSettled(sideEffects);
 
     return NextResponse.json(
-      { success: true },
+      {
+        success: true,
+        removedDealId: localDeal.id,
+        changedAt: new Date().toISOString(),
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {

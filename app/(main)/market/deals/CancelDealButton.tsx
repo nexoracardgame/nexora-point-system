@@ -3,6 +3,7 @@
 import { XCircle } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
+import { emitDealSync } from "@/lib/deal-sync";
 
 export default function CancelDealButton({
   dealId,
@@ -19,7 +20,7 @@ export default function CancelDealButton({
   const handleCancel = async () => {
     if (loading) return;
 
-    const ok = confirm("ยกเลิกดีลนี้?");
+    const ok = confirm("เธขเธเน€เธฅเธดเธเธ”เธตเธฅเธเธตเน?");
     if (!ok) return;
 
     const rollback = onOptimisticCancel?.();
@@ -39,12 +40,18 @@ export default function CancelDealButton({
 
       if (!res.ok || !data?.success) {
         rollback?.();
-        alert(data?.error || "ยกเลิกไม่สำเร็จ");
+        alert(data?.error || "เธขเธเน€เธฅเธดเธเนเธกเนเธชเธณเน€เธฃเนเธ");
+        return;
       }
+
+      emitDealSync({
+        dealId,
+        action: "cancelled",
+      });
     } catch (err) {
       rollback?.();
       console.error(err);
-      alert("เกิดข้อผิดพลาด");
+      alert("เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”");
     } finally {
       setLoading(false);
     }

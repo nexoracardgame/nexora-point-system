@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { emitDealSync, listenDealSync } from "@/lib/deal-sync";
 import type { DealCard } from "@/lib/market-deals";
 import CancelDealButton from "./CancelDealButton";
 import DealActionButtons from "./DealActionButtons";
@@ -62,8 +63,12 @@ export default function DealsClient({
   const [refreshing, setRefreshing] = useState(false);
   const [hiddenDealIds, setHiddenDealIds] = useState<string[]>([]);
   const lastOptimisticMutationAt = useRef(0);
+  const hiddenDealIdsRef = useRef<Set<string>>(new Set());
+  const requestIdRef = useRef(0);
 
   const fetchDeals = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
     try {
       setRefreshing(true);
 
@@ -77,19 +82,30 @@ export default function DealsClient({
       }
 
       const data = await res.json();
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       if (Date.now() - lastOptimisticMutationAt.current < 1800) {
         return;
       }
+
       const nextDeals = Array.isArray(data) ? data : [];
+
       setDeals(
-        nextDeals.filter((deal) => !hiddenDealIds.includes(String(deal.id || "")))
+        nextDeals.filter(
+          (deal) => !hiddenDealIdsRef.current.has(String(deal.id || ""))
+        )
       );
     } catch (error) {
       console.error("FETCH DEALS ERROR:", error);
     } finally {
-      setRefreshing(false);
+      if (requestId === requestIdRef.current) {
+        setRefreshing(false);
+      }
     }
-  }, [hiddenDealIds, t]);
+  }, [t]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -109,13 +125,19 @@ export default function DealsClient({
       if (document.visibilityState === "visible") {
         void fetchDeals();
       }
-    }, 15000);
+    }, 4000);
 
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(interval);
     };
+  }, [fetchDeals]);
+
+  useEffect(() => {
+    return listenDealSync(() => {
+      void fetchDeals();
+    });
   }, [fetchDeals]);
 
   const handleChat = async (dealId: string) => {
@@ -138,11 +160,15 @@ export default function DealsClient({
       return prev.filter((deal) => deal.id !== dealId);
     });
 
-    setHiddenDealIds((prev) => (prev.includes(dealId) ? prev : [...prev, dealId]));
+    hiddenDealIdsRef.current.add(dealId);
+    setHiddenDealIds((prev) =>
+      prev.includes(dealId) ? prev : [...prev, dealId]
+    );
 
     return () => {
       if (!removedDeal) return;
 
+      hiddenDealIdsRef.current.delete(dealId);
       setHiddenDealIds((prev) => prev.filter((id) => id !== dealId));
       setDeals((prev) => {
         if (prev.some((deal) => deal.id === removedDeal?.id)) {
@@ -153,6 +179,32 @@ export default function DealsClient({
       });
     };
   }, []);
+
+  const optimisticallyAcceptDeal = useCallback((dealId: string) => {
+    setDeals((prev) => {
+      lastOptimisticMutationAt.current = Date.now();
+      return prev.map((deal) =>
+        deal.id === dealId
+          ? {
+              ...deal,
+              status: "accepted",
+            }
+          : deal
+      );
+    });
+  }, []);
+
+  const optimisticallyRejectDeal = useCallback(
+    (dealId: string) => {
+      const rollback = optimisticallyRemoveDeal(dealId);
+      emitDealSync({
+        dealId,
+        action: "rejected",
+      });
+      return rollback;
+    },
+    [optimisticallyRemoveDeal]
+  );
 
   const visibleDeals = useMemo(
     () =>
@@ -312,7 +364,15 @@ export default function DealsClient({
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-violet-300">
                 {t("deals.ownerAction")}
               </div>
-              <DealActionButtons dealId={deal.id} />
+              <DealActionButtons
+                dealId={deal.id}
+                onAccepted={() => {
+                  optimisticallyAcceptDeal(deal.id);
+                }}
+                onRejected={() => {
+                  optimisticallyRejectDeal(deal.id);
+                }}
+              />
             </>
           )}
 
@@ -385,8 +445,8 @@ export default function DealsClient({
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60 sm:text-base sm:leading-7">
-                ดูคำขอดีลล่าสุดของคุณแบบพร้อมใช้งานทันที เลือกรับข้อเสนอ คุยต่อในห้องดีล
-                และปิดการขายได้จากหน้าเดียวแบบลื่นทั้งมือถือและคอม
+                ดูคำขอดีลล่าสุดของคุณแบบพร้อมใช้งานทันที เลือกรับข้อเสนอ
+                คุยต่อในห้องดีล และปิดการขายได้จากหน้าเดียวแบบลื่นทั้งมือถือและคอม
               </p>
             </div>
 

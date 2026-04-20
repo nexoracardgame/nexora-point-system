@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
+import { emitDealSync } from "@/lib/deal-sync";
 
 export default function DealActionButtons({
   dealId,
+  onAccepted,
+  onRejected,
 }: {
   dealId: string;
+  onAccepted?: () => void;
+  onRejected?: () => void;
 }) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
@@ -25,10 +30,19 @@ export default function DealActionButtons({
         body: JSON.stringify({ dealId, action }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!data.success) {
+      if (!res.ok || !data.success) {
         alert(data.error || "Request failed");
+        return;
+      }
+
+      if (action === "accept") {
+        onAccepted?.();
+        emitDealSync({ dealId, action: "accepted" });
+      } else {
+        onRejected?.();
+        emitDealSync({ dealId, action: "rejected" });
       }
     } catch (error) {
       console.error(error);

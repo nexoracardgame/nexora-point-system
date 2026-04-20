@@ -12,59 +12,105 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const session = await getServerSession(authOptions);
-  const currentUserId = String(session?.user?.id || "").trim();
+  try {
+    const body = await req.json();
+    const session = await getServerSession(authOptions);
+    const currentUserId = String(session?.user?.id || "").trim();
 
-  if (!currentUserId) {
-    return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
-  }
+    if (!currentUserId) {
+      return NextResponse.json(
+        { error: "เธเธฃเธธเธ“เธฒเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ" },
+        { status: 401 }
+      );
+    }
 
-  const dealId = String(body?.dealId || "").trim();
-  const action = String(body?.action || "").trim().toLowerCase();
+    const dealId = String(body?.dealId || "").trim();
+    const action = String(body?.action || "").trim().toLowerCase();
 
-  if (!dealId || !action) {
-    return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
-  }
+    if (!dealId || !action) {
+      return NextResponse.json(
+        { error: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" },
+        { status: 400 }
+      );
+    }
 
-  const localDeal = await getLocalDealById(dealId);
+    const localDeal = await getLocalDealById(dealId);
 
-  if (!localDeal) {
-    return NextResponse.json({ error: "ไม่พบดีล" }, { status: 404 });
-  }
+    if (!localDeal) {
+      return NextResponse.json(
+        { success: true, alreadyRemoved: true },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
 
-  if (localDeal.sellerId !== currentUserId) {
+    if (localDeal.sellerId !== currentUserId) {
+      return NextResponse.json(
+        { error: "เน€เธเธเธฒเธฐเน€เธเนเธฒเธเธญเธเธเธฒเธฃเนเธ”เน€เธ—เนเธฒเธเธฑเนเธ" },
+        { status: 403 }
+      );
+    }
+
+    if (action === "reject") {
+      await createLocalNotification({
+        userId: localDeal.buyerId,
+        type: "deal",
+        title: `${localDeal.sellerName} เธเธเธดเน€เธชเธเธเธณเธเธญเธ”เธตเธฅ`,
+        body: `${localDeal.cardName} เนเธกเนเนเธ”เนเธฃเธฑเธเธเธฒเธฃเธ•เธญเธเธฃเธฑเธ`,
+        href: "/market/deals",
+        image: localDeal.sellerImage,
+      });
+
+      await deleteLocalDeal(localDeal.id);
+
+      return NextResponse.json(
+        {
+          success: true,
+          action: "reject",
+          removedDealId: localDeal.id,
+          changedAt: new Date().toISOString(),
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
+    if (action === "accept") {
+      const updatedDeal = await updateLocalDealStatus(localDeal.id, "accepted");
+
+      await createLocalNotification({
+        userId: localDeal.buyerId,
+        type: "deal",
+        title: `${localDeal.sellerName} เธ•เธญเธเธฃเธฑเธเธ”เธตเธฅเธเธญเธเธเธธเธ“`,
+        body: `${localDeal.cardName} เธเธฃเนเธญเธกเธเธธเธขเธ•เนเธญเนเธเธซเนเธญเธเธ”เธตเธฅเนเธฅเนเธง`,
+        href: `/market/deals/chat/${localDeal.id}`,
+        image: localDeal.sellerImage,
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          action: "accept",
+          deal: updatedDeal,
+          changedAt: new Date().toISOString(),
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
     return NextResponse.json(
-      { error: "เฉพาะเจ้าของการ์ดเท่านั้น" },
-      { status: 403 }
+      { error: "action เนเธกเนเธ–เธนเธเธ•เนเธญเธ" },
+      { status: 400 }
     );
-  }
+  } catch (error) {
+    console.error("DEAL ACTION ERROR:", error);
 
-  if (action === "reject") {
-    await createLocalNotification({
-      userId: localDeal.buyerId,
-      type: "deal",
-      title: `${localDeal.sellerName} ปฏิเสธคำขอดีล`,
-      body: `${localDeal.cardName} ไม่ได้รับการตอบรับ`,
-      href: "/market/deals",
-      image: localDeal.sellerImage,
-    });
-    await deleteLocalDeal(localDeal.id);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
   }
-
-  if (action === "accept") {
-    await updateLocalDealStatus(localDeal.id, "accepted");
-    await createLocalNotification({
-      userId: localDeal.buyerId,
-      type: "deal",
-      title: `${localDeal.sellerName} ตอบรับดีลของคุณ`,
-      body: `${localDeal.cardName} พร้อมคุยต่อในห้องดีลแล้ว`,
-      href: `/market/deals/chat/${localDeal.id}`,
-      image: localDeal.sellerImage,
-    });
-    return NextResponse.json({ success: true });
-  }
-
-  return NextResponse.json({ error: "action ไม่ถูกต้อง" }, { status: 400 });
 }
