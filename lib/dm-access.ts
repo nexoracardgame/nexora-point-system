@@ -104,6 +104,25 @@ export async function getAccessibleRoomIds(
   return Array.from(new Set([...directRoomIds, ...dealRoomIds]));
 }
 
+async function resolveCanonicalUserId(rawUserId: string) {
+  const value = String(rawUserId || "").trim();
+
+  if (!value) {
+    return "";
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: value }, { lineId: value }],
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return String(user?.id || value).trim();
+}
+
 export async function getDmRoomAccess(input: {
   roomId: string;
   userId: string;
@@ -195,12 +214,14 @@ export async function getDmRoomAccess(input: {
 
   const roomUserAIsMe =
     room.usera === userId || (lineId ? room.usera === lineId : false);
+  const otherUserId = String(roomUserAIsMe ? room.userb : room.usera || "").trim();
+  const canonicalOtherUserId = await resolveCanonicalUserId(otherUserId);
 
   return {
     ok: true,
     kind: "direct",
     roomId,
     room,
-    otherUserId: String(roomUserAIsMe ? room.userb : room.usera || "").trim(),
+    otherUserId: canonicalOtherUserId,
   };
 }
