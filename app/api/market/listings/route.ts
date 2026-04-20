@@ -1,42 +1,34 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getLocalMarketListings } from "@/lib/local-market-store";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export async function GET() {
-  try {
-    const listings = await prisma.marketListing.findMany({
-      where: {
-        status: {
-          not: "sold",
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 24,
-    });
+  const listings = await getLocalMarketListings();
 
-    const fixed = listings.map((item) => ({
+  const fixed = listings
+    .filter((item) => String(item.status || "").toLowerCase() !== "sold")
+    .sort((a, b) =>
+      String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+    )
+    .slice(0, 24)
+    .map((item) => ({
       ...item,
       cardName:
-        item.cardName ||
-        `Card #${String(item.cardNo || item.id).padStart(3, "0")}`,
+        item.cardName || `Card #${String(item.cardNo || item.id).padStart(3, "0")}`,
       imageUrl:
         item.imageUrl ||
         `/cards/${String(item.cardNo || item.id).padStart(3, "0")}.jpg`,
       rarity: item.rarity || "Legendary",
+      sellerId: item.sellerId,
       sellerName: item.sellerName || "Unknown Seller",
       sellerImage: item.sellerImage || "/default-avatar.png",
     }));
 
-    return NextResponse.json(fixed, {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch (error) {
-    console.error("MARKET LIST ERROR:", error);
-    return NextResponse.json([], { status: 500 });
-  }
+  return NextResponse.json(fixed, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
 }
