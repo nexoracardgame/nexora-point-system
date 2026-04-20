@@ -15,23 +15,34 @@ export async function POST(req: NextRequest) {
     const currentUserId = String(session?.user?.id || "").trim();
 
     if (!currentUserId) {
-      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+      return NextResponse.json(
+        { error: "กรุณาเข้าสู่ระบบ" },
+        { status: 401 }
+      );
     }
 
     const dealId = String(body?.dealId || "").trim();
 
     if (!dealId) {
-      return NextResponse.json({ error: "ไม่พบ dealId" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ไม่พบ dealId" },
+        { status: 400 }
+      );
     }
 
     const localDeal = await getLocalDealById(dealId);
 
+    // Treat missing deals as already removed so repeated clicks or stale tabs stay quiet.
     if (!localDeal) {
-      return NextResponse.json({ error: "ไม่พบดีล" }, { status: 404 });
+      return NextResponse.json(
+        { success: true, alreadyRemoved: true },
+        { headers: { "Cache-Control": "no-store" } }
+      );
     }
 
     const isParticipant =
-      localDeal.buyerId === currentUserId || localDeal.sellerId === currentUserId;
+      localDeal.buyerId === currentUserId ||
+      localDeal.sellerId === currentUserId;
 
     if (!isParticipant) {
       return NextResponse.json(
@@ -42,21 +53,27 @@ export async function POST(req: NextRequest) {
 
     if (!["pending", "accepted"].includes(localDeal.status)) {
       return NextResponse.json(
-        { error: "ดีลนี้ยกเลิกไม่ได้แล้ว" },
-        { status: 400 }
+        { success: true, alreadyRemoved: true },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
     const otherUserId =
-      localDeal.buyerId === currentUserId ? localDeal.sellerId : localDeal.buyerId;
+      localDeal.buyerId === currentUserId
+        ? localDeal.sellerId
+        : localDeal.buyerId;
     const actorName =
-      localDeal.buyerId === currentUserId ? localDeal.buyerName : localDeal.sellerName;
+      localDeal.buyerId === currentUserId
+        ? localDeal.buyerName
+        : localDeal.sellerName;
     const actorImage =
-      localDeal.buyerId === currentUserId ? localDeal.buyerImage : localDeal.sellerImage;
+      localDeal.buyerId === currentUserId
+        ? localDeal.buyerImage
+        : localDeal.sellerImage;
 
     await deleteLocalDeal(localDeal.id);
 
-    const sideEffects: Promise<unknown>[] = [
+    const sideEffects: Array<PromiseLike<unknown> | unknown> = [
       createLocalNotification({
         userId: otherUserId,
         type: "deal",

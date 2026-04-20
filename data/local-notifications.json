@@ -1,5 +1,27 @@
 [
   {
+    "id": "local-notification-1776670243601-xnnryu",
+    "createdAt": "2026-04-20T07:30:43.601Z",
+    "readAt": null,
+    "userId": "Ua504882fd0e685a316a2c78510ac4daa",
+    "type": "deal",
+    "title": "S1R BAZ ปฏิเสธคำขอดีล",
+    "body": "Pebble Mage (เพบเบิล เมจ) #No.035 ไม่ได้รับการตอบรับ",
+    "href": "/market/deals",
+    "image": "https://oitmcvkiseinypuaaxpn.supabase.co/storage/v1/object/public/chat-images/profile-assets/profile-1776669666471-4dd7fd16-da67-45a9-a8cf-769e582c3168.jpg"
+  },
+  {
+    "id": "local-notification-1776670240507-6plrez",
+    "createdAt": "2026-04-20T07:30:40.507Z",
+    "readAt": null,
+    "userId": "Ua504882fd0e685a316a2c78510ac4daa",
+    "type": "deal",
+    "title": "S1R BAZ ยกเลิกดีล",
+    "body": "ดีลของ Aqualash (อควาแลช) #No.099 ถูกยกเลิกแล้ว",
+    "href": "/market/deals",
+    "image": "https://oitmcvkiseinypuaaxpn.supabase.co/storage/v1/object/public/chat-images/profile-assets/profile-1776669666471-4dd7fd16-da67-45a9-a8cf-769e582c3168.jpg"
+  },
+  {
     "id": "local-notification-1776662725988-w7rj0u",
     "createdAt": "2026-04-20T05:25:25.988Z",
     "readAt": null,
