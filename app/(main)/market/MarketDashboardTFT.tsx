@@ -343,24 +343,24 @@ export default function MarketDashboardTFT({
           <div className="flex gap-2">
             <button
               onClick={() => setHeroMode("popular")}
-              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+              className={`rounded-2xl px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "popular"
-                  ? "bg-pink-500/20 text-pink-300"
-                  : "bg-white/[0.05] text-white/60"
+                  ? "border border-pink-300/20 bg-[linear-gradient(135deg,rgba(236,72,153,0.26),rgba(168,85,247,0.18))] text-pink-200 shadow-[0_0_28px_rgba(236,72,153,0.18)]"
+                  : "border border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
               }`}
             >
-              โค๏ธ Popular
+              Popular
             </button>
 
             <button
               onClick={() => setHeroMode("latest")}
-              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+              className={`rounded-2xl px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "latest"
-                  ? "bg-violet-500/20 text-violet-300"
-                  : "bg-white/[0.05] text-white/60"
+                  ? "border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.18))] text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.16)]"
+                  : "border border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
               }`}
             >
-              ๐• Latest
+              Latest
             </button>
           </div>
         </div>
@@ -515,24 +515,24 @@ export default function MarketDashboardTFT({
           <div className="flex gap-2">
             <button
               onClick={() => setHeroMode("popular")}
-              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+              className={`rounded-2xl border px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "popular"
-                  ? "bg-pink-500/20 text-pink-300"
-                  : "bg-white/[0.05] text-white/60"
+                  ? "border-pink-300/20 bg-[linear-gradient(135deg,rgba(236,72,153,0.26),rgba(168,85,247,0.18))] text-pink-200 shadow-[0_0_28px_rgba(236,72,153,0.18)]"
+                  : "border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
               }`}
             >
-              โค๏ธ Popular
+              Popular
             </button>
 
             <button
               onClick={() => setHeroMode("latest")}
-              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+              className={`rounded-2xl border px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "latest"
-                  ? "bg-violet-500/20 text-violet-300"
-                  : "bg-white/[0.05] text-white/60"
+                  ? "border-cyan-300/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.18))] text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.16)]"
+                  : "border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
               }`}
             >
-              ๐• Latest
+              Latest
             </button>
           </div>
         </div>
