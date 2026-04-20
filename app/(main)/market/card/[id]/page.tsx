@@ -369,11 +369,7 @@ export default async function MarketCardDetailPage({
 
   const badgeItems = [
     listing.serialNo ? "Serial" : null,
-    `${openOffers} open offer${openOffers === 1 ? "" : "s"}`,
-    `${listing.likes} likes`,
-    `${listing.views} views`,
     formatRelativeDays(toDate(listing.createdAt), locale),
-    String(listing.status || "active").toUpperCase(),
   ].filter(Boolean) as string[];
 
   const marketSnapshots = [...relatedListings]
@@ -534,27 +530,25 @@ export default async function MarketCardDetailPage({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <HeroMetric
-                label="Live Price"
-                value={card.price}
-                tone="text-amber-300"
-              />
-              <HeroMetric
-                label={translate(locale, "market.card.openOffers")}
-                value={String(openOffers)}
-                tone="text-emerald-300"
-              />
-              <HeroMetric
-                label="Median"
-                value={medianPriceDisplay}
-                tone="text-cyan-300"
-              />
-              <HeroMetric
-                label={translate(locale, "market.card.rarityShare")}
-                value={formatPercent(rarityMarketShare)}
-                tone="text-violet-300"
-              />
+            <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 backdrop-blur md:p-5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-white/38">
+                Live Price
+              </div>
+              <div className="mt-3 text-3xl font-black tracking-[-0.05em] text-amber-300 md:text-5xl">
+                {card.price}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <HeroMetric
+                  label="Median"
+                  value={medianPriceDisplay}
+                  tone="text-cyan-300"
+                />
+                <HeroMetric
+                  label="Last Sale"
+                  value={latestCompletedPrice || "-"}
+                  tone="text-emerald-300"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -602,20 +596,18 @@ export default async function MarketCardDetailPage({
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 md:mt-6 md:grid-cols-4">
-              <StatCard label="Price" value={card.price} color="text-amber-300" />
+            <div className="mt-5 grid grid-cols-2 gap-3 md:mt-6 md:grid-cols-3">
+              <StatCard
+                label={translate(locale, "market.card.openOffers")}
+                value={String(openOffers)}
+                color="text-emerald-300"
+              />
 
               <CardStatsClient
                 cardNo={card.cardNo}
                 listingId={listing.id}
                 initialViews={card.views}
                 initialLikes={Number(listing.likes || 0)}
-              />
-
-              <StatCard
-                label={translate(locale, "market.card.openOffers")}
-                value={String(openOffers)}
-                color="text-emerald-300"
               />
             </div>
 
@@ -846,10 +838,6 @@ export default async function MarketCardDetailPage({
             <SnapshotRow label="Rarity" value={card.rarity} />
             <SnapshotRow label="Highest reference" value={topPriceDisplay} />
             <SnapshotRow
-              label="Latest sale"
-              value={latestCompletedPrice || translate(locale, "market.card.noHistory")}
-            />
-            <SnapshotRow
               label="Owner profile"
               value={card.owner}
               href={currentProfileHref}
@@ -880,7 +868,7 @@ function HeroMetric({
       <div className="text-[10px] uppercase tracking-[0.24em] text-white/42 md:text-[11px]">
         {label}
       </div>
-      <div className={`mt-2 text-lg font-black tracking-[-0.03em] md:text-2xl ${tone}`}>
+      <div className={`mt-2 text-base font-black tracking-[-0.03em] md:text-xl ${tone}`}>
         {value}
       </div>
     </div>
