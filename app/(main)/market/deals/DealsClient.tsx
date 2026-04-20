@@ -69,8 +69,51 @@ export default function DealsClient({
   const lastOptimisticMutationAt = useRef(0);
   const hiddenDealIdsRef = useRef<Set<string>>(new Set());
   const requestIdRef = useRef(0);
+  const dealsRef = useRef<DealCard[]>(initialDeals);
 
-  const fetchDeals = useCallback(async () => {
+  const sortDeals = useCallback((items: DealCard[]) => {
+    return [...items].sort((a, b) => {
+      const statusRank = (status: DealCard["status"]) => {
+        switch (status) {
+          case "accepted":
+            return 0;
+          case "pending":
+            return 1;
+          default:
+            return 2;
+        }
+      };
+
+      const rankDiff = statusRank(a.status) - statusRank(b.status);
+      if (rankDiff !== 0) {
+        return rankDiff;
+      }
+
+      const createdAtDiff =
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      if (createdAtDiff !== 0) {
+        return createdAtDiff;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+  }, []);
+
+  useEffect(() => {
+    dealsRef.current = deals;
+  }, [deals]);
+
+  useEffect(() => {
+    setDeals(
+      sortDeals(
+        initialDeals.filter(
+          (deal) => !hiddenDealIdsRef.current.has(String(deal.id || ""))
+        )
+      )
+    );
+  }, [initialDeals, sortDeals]);
+
+  const fetchDeals = useCallback(async (preserveOnEmpty = true) => {
     const requestId = ++requestIdRef.current;
 
     try {
@@ -81,14 +124,14 @@ export default function DealsClient({
         cache: "no-store",
       });
 
-      if (!res.ok) {
-        throw new Error(t("deals.loading"));
-      }
-
       const data = await res.json();
 
       if (requestId !== requestIdRef.current) {
         return;
+      }
+
+      if (!res.ok) {
+        throw new Error(String(data?.error || t("deals.loading")));
       }
 
       if (Date.now() - lastOptimisticMutationAt.current < 1800) {
@@ -97,9 +140,19 @@ export default function DealsClient({
 
       const nextDeals = Array.isArray(data) ? data : [];
 
+      if (
+        preserveOnEmpty &&
+        nextDeals.length === 0 &&
+        dealsRef.current.length > 0
+      ) {
+        return;
+      }
+
       setDeals(
-        nextDeals.filter(
-          (deal) => !hiddenDealIdsRef.current.has(String(deal.id || ""))
+        sortDeals(
+          nextDeals.filter(
+            (deal) => !hiddenDealIdsRef.current.has(String(deal.id || ""))
+          )
         )
       );
     } catch (error) {
@@ -109,44 +162,37 @@ export default function DealsClient({
         setRefreshing(false);
       }
     }
-  }, [t]);
+  }, [sortDeals, t]);
 
   useEffect(() => {
     const onFocus = () => {
-      void fetchDeals();
+      void fetchDeals(true);
     };
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void fetchDeals();
+        void fetchDeals(true);
       }
     };
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
 
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void fetchDeals();
-      }
-    }, 4000);
-
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
-      window.clearInterval(interval);
     };
   }, [fetchDeals]);
 
   useEffect(() => {
     return listenDealSync(() => {
-      void fetchDeals();
+      void fetchDeals(false);
     });
   }, [fetchDeals]);
 
   useEffect(() => {
     return listenDealServerSync(() => {
-      void fetchDeals();
+      void fetchDeals(false);
     });
   }, [fetchDeals]);
 
@@ -185,24 +231,26 @@ export default function DealsClient({
           return prev;
         }
 
-        return [removedDeal as DealCard, ...prev];
+        return sortDeals([removedDeal as DealCard, ...prev]);
       });
     };
-  }, []);
+  }, [sortDeals]);
 
   const optimisticallyAcceptDeal = useCallback((dealId: string) => {
     setDeals((prev) => {
       lastOptimisticMutationAt.current = Date.now();
-      return prev.map((deal) =>
-        deal.id === dealId
-          ? {
-              ...deal,
-              status: "accepted",
-            }
-          : deal
+      return sortDeals(
+        prev.map((deal) =>
+          deal.id === dealId
+            ? {
+                ...deal,
+                status: "accepted",
+              }
+            : deal
+        )
       );
     });
-  }, []);
+  }, [sortDeals]);
 
   const optimisticallyRejectDeal = useCallback(
     (dealId: string) => {
@@ -218,8 +266,10 @@ export default function DealsClient({
 
   const visibleDeals = useMemo(
     () =>
-      deals.filter((deal) => !hiddenDealIds.includes(String(deal.id || ""))),
-    [deals, hiddenDealIds]
+      sortDeals(
+        deals.filter((deal) => !hiddenDealIds.includes(String(deal.id || "")))
+      ),
+    [deals, hiddenDealIds, sortDeals]
   );
 
   const pendingDeals = useMemo(

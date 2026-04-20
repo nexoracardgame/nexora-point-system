@@ -9,6 +9,7 @@ export type DealMember = {
 export type DealCard = {
   id: string;
   status: "pending" | "accepted" | "rejected" | "completed";
+  createdAt: string;
   offeredPrice: number;
   isSeller: boolean;
   buyer: DealMember;
@@ -45,6 +46,7 @@ export async function getMarketDealsForUser(
   return deals.map((deal) => ({
     id: deal.id,
     status: deal.status as DealStatus,
+    createdAt: String(deal.createdAt || ""),
     offeredPrice: Number(deal.offeredPrice || 0),
     isSeller: normalizedUserId === deal.sellerId,
     buyer: {
