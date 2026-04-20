@@ -83,7 +83,7 @@ export default function RequestDealButton({
     <button
       onClick={handleRequest}
       disabled={loading}
-      className="rounded-2xl bg-gradient-to-r from-orange-400 to-amber-500 px-6 py-3 font-bold text-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-[linear-gradient(135deg,#f59e0b_0%,#fbbf24_100%)] px-6 py-3 text-sm font-black text-black shadow-[0_18px_40px_rgba(245,158,11,0.22)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_rgba(245,158,11,0.26)] disabled:cursor-not-allowed disabled:opacity-60 md:min-h-14 md:text-base"
     >
       {loading ? t("deals.requestLoading") : t("deals.request")}
     </button>

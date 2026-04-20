@@ -95,10 +95,10 @@ export default function WishlistButton({
   return (
     <button
       onClick={handleWishlist}
-      className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 font-bold transition-all duration-300 ${
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition-all duration-300 md:min-h-14 md:text-base ${
         saved
-          ? "border border-pink-400/20 bg-pink-500/20 text-pink-300 shadow-[0_0_30px_rgba(236,72,153,0.16)]"
-          : "border border-white/10 bg-white/[0.04] text-white hover:border-pink-400/20 hover:bg-pink-500/10"
+          ? "border border-pink-400/25 bg-[linear-gradient(180deg,rgba(236,72,153,0.22),rgba(236,72,153,0.10))] text-pink-200 shadow-[0_18px_40px_rgba(236,72,153,0.14)]"
+          : "border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] text-white hover:-translate-y-0.5 hover:border-pink-400/20 hover:bg-pink-500/10"
       }`}
     >
       <Heart className={`h-4 w-4 ${saved ? "fill-current" : ""}`} />

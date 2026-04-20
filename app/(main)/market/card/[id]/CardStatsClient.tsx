@@ -65,11 +65,13 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/6 bg-white/[0.03] p-4">
-      <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3 md:rounded-[22px] md:p-4">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 md:text-xs">
         {label}
       </div>
-      <div className="mt-3 text-lg font-black">{value}</div>
+      <div className="mt-2 text-sm font-black tracking-[-0.02em] md:mt-3 md:text-lg">
+        {value}
+      </div>
     </div>
   );
 }
