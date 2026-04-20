@@ -374,28 +374,27 @@ export default async function SellerProfilePage({
               <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
                   <div className="relative">
-                    <div className="absolute inset-[-7px] rounded-full border border-dashed border-violet-300/45" />
-                    <div className="absolute inset-[-16px] rounded-full bg-[radial-gradient(circle,rgba(167,139,250,0.16)_0%,transparent_70%)]" />
+                    <div className="absolute inset-[-12px] rounded-full bg-[radial-gradient(circle,rgba(167,139,250,0.14)_0%,transparent_72%)]" />
                     <img
                       src={seller.image || "/avatar.png"}
                       alt={seller.name || "seller"}
-                      className="relative h-24 w-24 rounded-full border-[5px] border-white/16 object-cover shadow-[0_22px_54px_rgba(0,0,0,0.44)] sm:h-32 sm:w-32"
+                      className="relative h-24 w-24 rounded-full border-[4px] border-white/14 object-cover shadow-[0_22px_54px_rgba(0,0,0,0.44)] sm:h-32 sm:w-32 sm:border-[5px]"
                     />
-                    <div className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-[#090b12] bg-emerald-400" />
+                    <div className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-[#090b12] bg-emerald-400 sm:bottom-2 sm:right-2" />
                   </div>
 
-                  <div className="pb-1 sm:pb-2">
+                  <div className="min-w-0 pb-1 sm:pb-2">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/45">
                       โปรไฟล์นักขาย
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <h1 className="text-3xl font-black leading-tight drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)] sm:text-5xl">
+                      <h1 className="break-words text-[30px] font-black leading-tight drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)] sm:text-5xl">
                         {seller.displayName || seller.name || "Unknown Seller"}
                       </h1>
                       <BadgeCheck className="h-6 w-6 text-emerald-300 sm:h-7 sm:w-7" />
                     </div>
 
-                    <p className="mt-3 max-w-3xl text-sm leading-6 text-white/68 sm:text-base">
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-white/68 sm:mt-3 sm:text-base">
                       {seller.bio ||
                         "Genesis-tier NEXORA trader with elite collectible market presence."}
                     </p>
