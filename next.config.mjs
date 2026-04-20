@@ -14,6 +14,11 @@ const nextConfig = {
         protocol: "https",
         hostname: "s.imgz.io",
       },
+      {
+        protocol: "https",
+        hostname: "oitmcvkiseinypuaaxpn.supabase.co",
+        pathname: "/storage/v1/object/public/chat-images/**",
+      },
     ],
   },
 };

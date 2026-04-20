@@ -1,12 +1,31 @@
 import { mkdir, writeFile } from "fs/promises";
 import crypto from "crypto";
 import path from "path";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let supabaseClient: SupabaseClient | null | undefined;
+
+function getSupabaseClient() {
+  if (supabaseClient !== undefined) {
+    return supabaseClient;
+  }
+
+  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const key = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+
+  if (!url || !key) {
+    supabaseClient = null;
+    return supabaseClient;
+  }
+
+  try {
+    supabaseClient = createClient(url, key);
+  } catch {
+    supabaseClient = null;
+  }
+
+  return supabaseClient;
+}
 
 export async function POST(req: Request) {
   try {
@@ -32,22 +51,29 @@ export async function POST(req: Request) {
     const safeKind = kind === "profile" ? "profile" : "cover";
     const fileName = `profile-assets/${safeKind}-${Date.now()}-${crypto.randomUUID()}${extFromType}`;
 
-    const { error: storageError } = await supabase.storage
-      .from("chat-images")
-      .upload(fileName, buffer, {
-        upsert: false,
-        contentType: file.type || "image/jpeg",
-        cacheControl: "31536000",
-      });
+    const supabase = getSupabaseClient();
+    let storageError: unknown = null;
 
-    if (!storageError) {
-      const { data: url } = supabase.storage
+    if (supabase) {
+      const uploadResult = await supabase.storage
         .from("chat-images")
-        .getPublicUrl(fileName);
+        .upload(fileName, buffer, {
+          upsert: false,
+          contentType: file.type || "image/jpeg",
+          cacheControl: "31536000",
+        });
 
-      return Response.json({
-        url: url.publicUrl,
-      });
+      storageError = uploadResult.error;
+
+      if (!uploadResult.error) {
+        const { data: url } = supabase.storage
+          .from("chat-images")
+          .getPublicUrl(fileName);
+
+        return Response.json({
+          url: url.publicUrl,
+        });
+      }
     }
 
     if (process.env.NODE_ENV === "production") {

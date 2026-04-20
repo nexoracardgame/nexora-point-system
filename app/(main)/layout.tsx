@@ -392,6 +392,8 @@ export default function MainLayout({
                         fill
                         sizes="40px"
                         priority
+                        quality={100}
+                        unoptimized
                         draggable={false}
                         onLoad={() => setAvatarReady(true)}
                         className={`absolute inset-0 object-cover transition-opacity duration-300 ease-out ${

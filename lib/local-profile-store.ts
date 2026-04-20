@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   ensureLocalStoreFile,
   readLocalStoreJson,
@@ -17,10 +17,29 @@ export type LocalProfileRecord = {
   updatedAt: string;
 };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let supabaseClient: SupabaseClient | null | undefined;
+
+function getSupabaseClient() {
+  if (supabaseClient !== undefined) {
+    return supabaseClient;
+  }
+
+  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const key = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+
+  if (!url || !key) {
+    supabaseClient = null;
+    return supabaseClient;
+  }
+
+  try {
+    supabaseClient = createClient(url, key);
+  } catch {
+    supabaseClient = null;
+  }
+
+  return supabaseClient;
+}
 
 function normalizeProfileRecord(
   userId: string,
@@ -85,6 +104,12 @@ async function writeLocalProfile(record: LocalProfileRecord) {
 }
 
 async function readSupabaseProfile(userId: string) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return null;
+  }
+
   try {
     const { data, error } = await supabase
       .from("users")
@@ -106,6 +131,12 @@ async function writeSupabaseProfile(
   userId: string,
   input: Omit<LocalProfileRecord, "userId" | "updatedAt">
 ) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return null;
+  }
+
   const payload = {
     id: userId,
     name: input.displayName,

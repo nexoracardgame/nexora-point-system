@@ -142,7 +142,7 @@ export default function ProfileSettingsClient({
     const img = await loadImageElement(sourceUrl);
     const canvas = document.createElement("canvas");
     const isCover = type === "cover";
-    const maxSize = isCover ? 1800 : 720;
+    const maxSize = isCover ? 1800 : 1440;
 
     let width = img.naturalWidth || img.width;
     let height = img.naturalHeight || img.height;
@@ -173,7 +173,7 @@ export default function ProfileSettingsClient({
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    return canvas.toDataURL("image/jpeg", isCover ? 0.82 : 0.78);
+    return canvas.toDataURL("image/jpeg", isCover ? 0.9 : 0.96);
   }
 
   async function uploadProcessedImage(dataUrl: string, type: ImageKind) {
