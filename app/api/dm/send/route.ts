@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getDmRoomAccess } from "@/lib/dm-access";
 import { resolveUserIdentity } from "@/lib/user-identity";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -8,6 +9,9 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const identity = await resolveUserIdentity(session?.user);
   const senderId = identity.userId;
+  const lineId = String(
+    (((session?.user as { lineId?: string } | undefined) || {}).lineId || "")
+  ).trim();
 
   if (!senderId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -32,10 +36,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "system unavailable" }, { status: 500 });
   }
 
+  const access = await getDmRoomAccess({
+    roomId,
+    userId: senderId,
+    lineId,
+  });
+
+  if (!access.ok) {
+    const status =
+      access.reason === "not-found"
+        ? 404
+        : access.reason === "closed"
+          ? 409
+          : 403;
+
+    return NextResponse.json({ error: access.reason }, { status });
+  }
+
   const { data, error } = await supabase
     .from("dmMessage")
     .insert({
-      roomId,
+      roomId: access.roomId,
       senderId,
       content: content || null,
       imageUrl: imageUrl || null,
@@ -53,7 +74,7 @@ export async function POST(req: NextRequest) {
   await supabase
     .from("dm_room")
     .update({ updatedat: new Date().toISOString() })
-    .eq("roomid", roomId);
+    .eq("roomid", access.roomId);
 
   return NextResponse.json(data);
 }

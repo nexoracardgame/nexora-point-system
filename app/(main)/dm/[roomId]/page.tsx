@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { createClient, RealtimeChannel } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { Send, ArrowLeft, Image as ImageIcon, Smile } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
@@ -128,17 +128,14 @@ export default function DMPage() {
   const [text, setText] = useState("");
   const [me, setMe] = useState<ChatUser>(null);
   const [other, setOther] = useState<ChatUser>(seededOther);
-  const [typing, setTyping] = useState(false);
   const [loadingRoom, setLoadingRoom] = useState(!seededOther);
-
+  const [roomClosed, setRoomClosed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -200,50 +197,39 @@ export default function DMPage() {
   const loadRoom = async () => {
     if (!roomId) return null;
 
-    const res = await fetch(`/api/dm/room-info?roomId=${roomId}`, {
+    const res = await fetch(`/api/dm/room-info?roomId=${encodeURIComponent(roomId)}`, {
       cache: "no-store",
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+      setRoomClosed(true);
+      setLoadingRoom(false);
+      return null;
+    }
 
+    const data = await res.json();
     setOther(data.otherUser);
+    setRoomClosed(false);
     setLoadingRoom(false);
     return data.otherUser;
   };
 
-  const syncRoomMetadata = async (meData?: ChatUser, otherData?: ChatUser) => {
-    if (!roomId || !meData?.id || !otherData?.id) return;
-
-    await supabase.from("dm_room").upsert({
-      roomid: roomId,
-      usera: meData.id,
-      userb: otherData.id,
-      useraname: meData.name || "You",
-      useraimage: meData.image || "/avatar.png",
-      userbname: otherData.name || "User",
-      userbimage: otherData.image || "/avatar.png",
-      updatedat: new Date().toISOString(),
-    });
-  };
-
-  const loadMessages = async (
-    meData?: ChatUser,
-    otherData?: ChatUser
-  ) => {
+  const loadMessages = async (meData?: ChatUser, otherData?: ChatUser) => {
     if (!roomId) return;
 
-    const { data, error } = await supabase
-      .from("dmMessage")
-      .select("*")
-      .eq("roomId", roomId)
-      .order("createdAt", { ascending: true });
+    const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(roomId)}`, {
+      cache: "no-store",
+    });
 
-    if (error) {
-      console.error("LOAD MESSAGES ERROR:", error);
+    if (!res.ok) {
+      if (res.status === 403 || res.status === 404 || res.status === 409) {
+        setRoomClosed(true);
+      }
       return;
     }
 
-    const withSender: DMMessage[] = ((data || []) as DMMessage[]).map((m) => ({
+    const data = (await res.json()) as DMMessage[];
+    const withSender: DMMessage[] = (data || []).map((m) => ({
       ...m,
       sender: buildSender(
         m.senderId,
@@ -266,29 +252,36 @@ export default function DMPage() {
 
       return next;
     });
-
   };
 
   const markSeenNow = async () => {
     if (!roomId || !me?.id) return;
 
-    const hasUnread = messages.some(
-      (m) => m.senderId !== me.id && !m.seenAt
-    );
-
+    const hasUnread = messages.some((m) => m.senderId !== me.id && !m.seenAt);
     if (!hasUnread) return;
 
-    await supabase
-      .from("dmMessage")
-      .update({ seenAt: new Date().toISOString() })
-      .eq("roomId", roomId)
-      .neq("senderId", me.id)
-      .is("seenAt", null);
+    const res = await fetch("/api/dm/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roomId,
+        action: "markSeen",
+      }),
+    });
+
+    if (!res.ok) {
+      return;
+    }
+
+    const payload = await res.json();
+    const seenAt = String(payload?.seenAt || new Date().toISOString());
 
     setMessages((prev) =>
       prev.map((message) =>
         message.senderId !== me.id && !message.seenAt
-          ? { ...message, seenAt: new Date().toISOString() }
+          ? { ...message, seenAt }
           : message
       )
     );
@@ -308,24 +301,40 @@ export default function DMPage() {
 
     const init = async () => {
       const [meData, otherData] = await Promise.all([loadSession(), loadRoom()]);
-      await Promise.all([
-        loadMessages(meData, otherData),
-        syncRoomMetadata(meData, otherData),
-      ]);
+      await loadMessages(meData, otherData);
     };
 
     void init();
   }, [roomId, seededOther]);
 
   useEffect(() => {
-    if (!roomId || !me?.id) return;
+    if (!roomId || !me?.id || roomClosed) return;
 
     const interval = setInterval(() => {
-      void loadMessages(me, other);
-    }, 1500);
+      if (document.visibilityState === "visible") {
+        void loadMessages(me, other);
+      }
+    }, 1800);
 
-    return () => clearInterval(interval);
-  }, [roomId, me, other]);
+    const onFocus = () => {
+      void loadMessages(me, other);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadMessages(me, other);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [roomId, me, other, roomClosed]);
 
   const lastSeenMineId = useMemo(() => {
     const mineSeen = messages.filter((m) => m.senderId === me?.id && !!m.seenAt);
@@ -334,79 +343,6 @@ export default function DMPage() {
   }, [messages, me?.id]);
 
   useEffect(() => {
-    if (!hasValidRoom || !me?.id) return;
-
-    const channel = supabase.channel(`dm-${roomId}`, {
-      config: {
-        broadcast: { self: false },
-      },
-    });
-
-    channelRef.current = channel;
-
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "dmMessage",
-          filter: `roomId=eq.${roomId}`,
-        },
-        (payload) => {
-          const msg = payload.new as DMMessage;
-
-          setMessages((prev) => mergeMessage(prev, msg, me, other));
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "dmMessage",
-          filter: `roomId=eq.${roomId}`,
-        },
-        (payload) => {
-          const updated = payload.new as DMMessage;
-
-          setMessages((prev) => mergeMessage(prev, updated, me, other));
-        }
-      )
-      .on("broadcast", { event: "typing" }, ({ payload }) => {
-        if (payload.senderId === me?.id) return;
-        if (payload.roomId !== roomId) return;
-
-        setTyping(true);
-
-        if (typingTimeout.current) {
-          clearTimeout(typingTimeout.current);
-        }
-
-        typingTimeout.current = setTimeout(() => {
-          setTyping(false);
-        }, 1500);
-      })
-      .subscribe((status) => {
-        console.log("REALTIME STATUS:", status);
-
-        if (status === "SUBSCRIBED") {
-          console.log("✅ REALTIME CONNECTED");
-        }
-      });
-    return () => {
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [hasValidRoom, me?.id, roomId, other]);
-  
-   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
       if (!emojiRef.current) return;
       if (!emojiRef.current.contains(e.target as Node)) {
@@ -464,29 +400,12 @@ export default function DMPage() {
   }, [messages, me?.id]);
 
   const send = async () => {
-    if ((!text.trim() && !file) || !me?.id || !roomId) return;
-
-    if (!other?.id) {
-      console.log("ยังไม่มี other");
-      return;
-    }
-
-    await supabase.from("dm_room").upsert({
-      roomid: roomId,
-      usera: me.id,
-      userb: other.id,
-      useraname: me.name || "You",
-      useraimage: me.image || "/avatar.png",
-      userbname: other.name || "User",
-      userbimage: other.image || "/avatar.png",
-      updatedat: new Date().toISOString(),
-    });
+    if ((!text.trim() && !file) || !me?.id || !roomId || roomClosed) return;
 
     let imageUrl: string | null = null;
 
     if (file) {
       const fileName = `${Date.now()}-${file.name}`;
-
       const { error } = await supabase.storage
         .from("chat-images")
         .upload(fileName, file);
@@ -538,63 +457,33 @@ export default function DMPage() {
     setMessages((prev) => mergeMessage(prev, optimisticMessage, me, other));
     scrollToBottom("smooth");
 
-    if (!me?.id) {
-      alert("ยังไม่ได้ login");
-      return;
-    }
-
-    const { data: insertedMessage, error } = await supabase
-      .from("dmMessage")
-      .insert({
+    const res = await fetch("/api/dm/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         roomId,
-        senderId: me.id,
         content: msg,
         imageUrl,
-        seenAt: null,
-        senderName: me.name || "You",
-        senderImage: me.image || "/avatar.png",
-      })
-      .select("*")
-      .single();
+      }),
+    });
 
-    await supabase
-      .from("dm_room")
-      .update({
-        updatedat: new Date().toISOString(),
-        useraname: me.name || "You",
-        useraimage: me.image || "/avatar.png",
-        userbname: other.name || "User",
-        userbimage: other.image || "/avatar.png",
-      })
-      .eq("roomid", roomId);
-
-    if (error) {
-      console.error("INSERT ERROR:", error);
+    if (!res.ok) {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
       setText(msg);
+      if (res.status === 403 || res.status === 404 || res.status === 409) {
+        setRoomClosed(true);
+      }
       return;
     }
 
-    if (insertedMessage) {
-      setMessages((prev) => {
-        const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
-        return mergeMessage(withoutOptimistic, insertedMessage as DMMessage, me, other);
-      });
-      scrollToBottom("smooth");
-    }
-  };
-
-  const sendTyping = async () => {
-    if (!channelRef.current || !me?.id || !roomId) return;
-
-    await channelRef.current.send({
-      type: "broadcast",
-      event: "typing",
-      payload: {
-        senderId: me.id,
-        roomId,
-      },
+    const insertedMessage = (await res.json()) as DMMessage;
+    setMessages((prev) => {
+      const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
+      return mergeMessage(withoutOptimistic, insertedMessage, me, other);
     });
+    scrollToBottom("smooth");
   };
 
   const openOtherProfile = () => {
@@ -615,6 +504,25 @@ export default function DMPage() {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center text-white pb-[env(safe-area-inset-bottom)]">
         กำลังโหลดห้องแชท...
+      </div>
+    );
+  }
+
+  if (roomClosed) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center px-4 text-white">
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 text-center">
+          <div className="text-lg font-black">ห้องแชทนี้ไม่สามารถใช้งานได้</div>
+          <div className="mt-2 text-sm text-white/60">
+            คุณไม่มีสิทธิ์เข้าถึงห้องนี้ หรือห้องถูกปิดไปแล้ว
+          </div>
+          <button
+            onClick={() => router.push("/dm")}
+            className="mt-4 rounded-xl bg-yellow-400 px-4 py-2 font-bold text-black"
+          >
+            กลับไปหน้าแชท
+          </button>
+        </div>
       </div>
     );
   }
@@ -654,12 +562,8 @@ export default function DMPage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-white/45">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      typing ? "bg-yellow-400 animate-pulse" : "bg-green-400"
-                    }`}
-                  />
-                  <span>{typing ? "กำลังพิมพ์..." : "Online"}</span>
+                  <span className="h-2 w-2 rounded-full bg-green-400" />
+                  <span>Private Chat</span>
                 </div>
               </div>
             </button>
@@ -760,7 +664,7 @@ export default function DMPage() {
                   }}
                   className="pointer-events-auto rounded-full border border-yellow-300/25 bg-[#16181d]/95 px-4 py-2 text-sm font-bold text-yellow-300 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:scale-[1.02] hover:bg-[#1b1e24]"
                 >
-                  มีข้อความใหม่ {newMessageCount > 1 ? `(${newMessageCount}) ` : ""}↓
+                  มีข้อความใหม่ {newMessageCount > 1 ? `(${newMessageCount}) ` : ""}ดู
                 </button>
               </div>
             )}
@@ -770,9 +674,7 @@ export default function DMPage() {
                 ref={emojiRef}
                 className="absolute bottom-[calc(100%+12px)] right-0 z-[9999] overflow-hidden rounded-2xl border border-white/10 bg-[#111318] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
               >
-                <div className="mb-2 text-xs font-bold text-white/50">
-                  เลือกอีโมจิ
-                </div>
+                <div className="mb-2 text-xs font-bold text-white/50">เลือกอีโมจิ</div>
 
                 <EmojiPicker
                   onEmojiClick={(emojiData) => {
@@ -791,7 +693,6 @@ export default function DMPage() {
                 value={text}
                 onChange={(e) => {
                   setText(e.target.value);
-                  sendTyping();
                 }}
                 onFocus={async () => {
                   if (hasMarkedSeenRef.current) return;
@@ -804,11 +705,11 @@ export default function DMPage() {
                 inputMode="text"
                 autoComplete="off"
                 className="h-12 min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 sm:text-[15px]"
-                placeholder="พิมพ์ข้อความ... 😊"
+                placeholder="พิมพ์ข้อความ..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    send();
+                    void send();
                   }
                 }}
               />
@@ -832,7 +733,7 @@ export default function DMPage() {
               </button>
 
               <button
-                onClick={send}
+                onClick={() => void send()}
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98]"
               >
                 <Send size={18} />
@@ -852,10 +753,7 @@ export default function DMPage() {
             onClick={() => setPreview(null)}
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90"
           >
-            <img
-              src={preview}
-              className="max-h-[90%] max-w-[90%] rounded-xl"
-            />
+            <img src={preview} className="max-h-[90%] max-w-[90%] rounded-xl" />
           </div>
         )}
       </div>

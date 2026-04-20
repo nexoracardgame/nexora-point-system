@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getAccessibleRoomIds } from "@/lib/dm-access";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET() {
@@ -18,23 +19,7 @@ export async function GET() {
     return NextResponse.json({ count: 0 }, { status: 500 });
   }
 
-  const { data: rooms, error: roomErr } = await supabase
-    .from("dm_room")
-    .select("roomid,usera,userb");
-
-  if (roomErr) {
-    console.error("UNREAD ROOM ERROR:", roomErr);
-    return NextResponse.json({ count: 0 }, { status: 500 });
-  }
-
-  const myRoomIds = (rooms || [])
-    .filter(
-      (room) =>
-        room.usera === userId ||
-        room.userb === userId ||
-        (lineId ? room.usera === lineId || room.userb === lineId : false)
-    )
-    .map((room) => room.roomid);
+  const myRoomIds = await getAccessibleRoomIds(String(userId), String(lineId || ""));
 
   if (myRoomIds.length === 0) {
     return NextResponse.json({ count: 0 });

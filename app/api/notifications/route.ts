@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { isDealChatRoomId } from "@/lib/deal-chat";
-import { getAllLocalDeals } from "@/lib/local-deal-store";
+import { getAccessibleRoomIds } from "@/lib/dm-access";
 import { getLocalNotificationsForUser } from "@/lib/local-notification-store";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 type NotificationItem = {
@@ -56,27 +56,77 @@ export async function GET() {
       );
     }
 
-    const [
-      roomResult,
-      unreadResult,
-      localDeals,
-      localNotifications,
-    ] = await Promise.all([
+    const [allowedRoomIds, localNotifications] = await Promise.all([
+      getAccessibleRoomIds(currentUserId, currentLineId),
+      getLocalNotificationsForUser(currentUserId, {
+        unreadOnly: true,
+        limit: 60,
+      }),
+    ]);
+
+    if (allowedRoomIds.length === 0) {
+      return NextResponse.json(
+        {
+          items: localNotifications
+            .map((item) => ({
+              id: item.id,
+              type: item.type,
+              title: item.title,
+              body: item.body,
+              href: item.href,
+              image: safeImage(item.image),
+              createdAt: item.createdAt,
+            }))
+            .slice(0, 60),
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
+    const [roomResult, unreadResult, acceptedDeals] = await Promise.all([
       supabase
         .from("dm_room")
-        .select("roomid,usera,userb,useraname,useraimage,userbname,userbimage"),
+        .select("roomid,usera,userb,useraname,useraimage,userbname,userbimage")
+        .in(
+          "roomid",
+          allowedRoomIds.filter((roomId) => !roomId.startsWith("deal:"))
+        ),
       supabase
         .from("dmMessage")
         .select("id,roomId,senderId,senderName,senderImage,content,imageUrl,createdAt")
+        .in("roomId", allowedRoomIds)
         .neq("senderId", currentUserId)
         .neq("senderId", currentLineId || "__never__")
         .is("seenAt", null)
         .order("createdAt", { ascending: false })
         .limit(60),
-      getAllLocalDeals(),
-      getLocalNotificationsForUser(currentUserId, {
-        unreadOnly: true,
-        limit: 60,
+      prisma.dealRequest.findMany({
+        where: {
+          status: "accepted",
+          OR: [{ buyerId: currentUserId }, { sellerId: currentUserId }],
+        },
+        include: {
+          buyer: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
       }),
     ]);
 
@@ -88,25 +138,8 @@ export async function GET() {
       console.error("NOTIFICATION MESSAGE ERROR:", unreadResult.error);
     }
 
-    const rooms = roomResult.data || [];
-    const unreadRows = unreadResult.data || [];
-
-    const myRooms = rooms.filter(
-      (room) =>
-        room.usera === currentUserId ||
-        room.userb === currentUserId ||
-        (currentLineId
-          ? room.usera === currentLineId || room.userb === currentLineId
-          : false)
-    );
-
-    const roomById = new Map(myRooms.map((room) => [room.roomid, room]));
-    const regularRoomIds = new Set(myRooms.map((room) => room.roomid));
-
-    const relevantUnreadRows = unreadRows.filter((row) => {
-      const roomId = String(row.roomId || "");
-      return regularRoomIds.has(roomId) || isDealChatRoomId(roomId);
-    });
+    const roomById = new Map((roomResult.data || []).map((room) => [room.roomid, room]));
+    const relevantUnreadRows = unreadResult.data || [];
 
     const unreadSenderIds = Array.from(
       new Set(
@@ -124,20 +157,24 @@ export async function GET() {
     );
 
     const profileByUserId = new Map(profileEntries);
-    const dealById = new Map(localDeals.map((deal) => [deal.id, deal]));
+    const dealById = new Map(acceptedDeals.map((deal) => [deal.id, deal]));
 
     const chatNotifications: NotificationItem[] = relevantUnreadRows.map((row) => {
       const roomId = String(row.roomId || "");
       const senderId = String(row.senderId || "").trim();
       const senderProfile = profileByUserId.get(senderId);
 
-      if (isDealChatRoomId(roomId)) {
+      if (roomId.startsWith("deal:")) {
         const dealId = roomId.replace(/^deal:/, "");
         const deal = dealById.get(dealId);
         const fallbackName =
-          deal?.buyerId === currentUserId ? deal?.sellerName : deal?.buyerName;
+          deal?.buyerId === currentUserId
+            ? deal?.seller.displayName || deal?.seller.name
+            : deal?.buyer.displayName || deal?.buyer.name;
         const fallbackImage =
-          deal?.buyerId === currentUserId ? deal?.sellerImage : deal?.buyerImage;
+          deal?.buyerId === currentUserId
+            ? deal?.seller.image
+            : deal?.buyer.image;
 
         return {
           id: `deal-chat-${row.id}`,

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getDmRoomAccess } from "@/lib/dm-access";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
-import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -19,24 +19,28 @@ export async function GET(req: Request) {
   }
 
   const myId = String(session.user.id || "").trim();
-  const supabase = getServerSupabaseClient();
+  const lineId = String(
+    ((session.user || {}) as { lineId?: string }).lineId || ""
+  ).trim();
+  const access = await getDmRoomAccess({
+    roomId,
+    userId: myId,
+    lineId,
+  });
 
-  if (!supabase) {
-    return NextResponse.json({ error: "system unavailable" }, { status: 500 });
+  if (!access.ok || access.kind !== "direct") {
+    const status =
+      !access.ok && access.reason === "not-found"
+        ? 404
+        : !access.ok && access.reason === "closed"
+          ? 409
+          : 403;
+
+    return NextResponse.json({ error: "forbidden" }, { status });
   }
 
-  const { data: room, error } = await supabase
-    .from("dm_room")
-    .select("*")
-    .eq("roomid", roomId)
-    .maybeSingle();
-
-  if (error || !room) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
-
-  const roomUserAIsMe = room.usera === myId;
-  const otherUserId = String(roomUserAIsMe ? room.userb : room.usera || "").trim();
+  const roomUserAIsMe = access.room.usera === myId || access.room.usera === lineId;
+  const otherUserId = access.otherUserId;
   const otherProfile = otherUserId ? await getLocalProfileByUserId(otherUserId) : null;
 
   return NextResponse.json({
@@ -44,11 +48,11 @@ export async function GET(req: Request) {
       id: otherUserId,
       name:
         otherProfile?.displayName ||
-        (roomUserAIsMe ? room.userbname : room.useraname) ||
+        (roomUserAIsMe ? access.room.userbname : access.room.useraname) ||
         "User",
       image:
         otherProfile?.image ||
-        (roomUserAIsMe ? room.userbimage : room.useraimage) ||
+        (roomUserAIsMe ? access.room.userbimage : access.room.useraimage) ||
         "/avatar.png",
     },
   });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getAccessibleRoomIds } from "@/lib/dm-access";
 import { markLocalNotificationsRead } from "@/lib/local-notification-store";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const userId = String(session?.user?.id || "").trim();
+    const lineId = String(
+      ((session?.user || {}) as { lineId?: string }).lineId || ""
+    ).trim();
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,11 +44,23 @@ export async function POST(req: NextRequest) {
     const readAt = new Date().toISOString();
 
     if (supabase && chatMessageIds.length > 0) {
+      const allowedRoomIds = await getAccessibleRoomIds(userId, lineId);
+      const { data: allowedMessages } = await supabase
+        .from("dmMessage")
+        .select("id")
+        .in("id", chatMessageIds)
+        .in("roomId", allowedRoomIds);
+
+      const allowedMessageIds = (allowedMessages || [])
+        .map((row) => String(row.id || "").trim())
+        .filter(Boolean);
+
       await supabase
         .from("dmMessage")
         .update({ seenAt: readAt })
-        .in("id", chatMessageIds)
+        .in("id", allowedMessageIds)
         .neq("senderId", userId)
+        .neq("senderId", lineId || "__never__")
         .is("seenAt", null);
     }
 

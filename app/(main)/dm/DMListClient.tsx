@@ -2,14 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 type SessionUser = {
   id: string;
@@ -17,24 +11,6 @@ type SessionUser = {
   name?: string | null;
   image?: string | null;
 };
-
-type MessageRow = {
-  roomId?: string;
-  senderId?: string;
-  senderName?: string | null;
-  senderImage?: string | null;
-  content?: string | null;
-  imageUrl?: string | null;
-  createdAt?: string | null;
-  seenAt?: string | null;
-};
-
-function buildPreview(content?: string | null, imageUrl?: string | null) {
-  const text = String(content || "").trim();
-  if (text) return text;
-  if (imageUrl) return "รูปภาพ";
-  return "เริ่มแชท";
-}
 
 function formatRoomTime(dateString?: string) {
   if (!dateString) return "";
@@ -70,7 +46,6 @@ export default function DMListClient({
   const [loading, setLoading] = useState(initialRooms.length === 0);
 
   const hasInit = useRef(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const meRef = useRef<SessionUser | null>(initialMe);
 
   const hydrateUnknownRooms = async (baseRooms: DMRoomListItem[]) => {
@@ -150,66 +125,6 @@ export default function DMListClient({
     }
   };
 
-  const applyRealtimeMessage = (row: MessageRow, eventType: string) => {
-    if (!row.roomId) return;
-
-    const me = meRef.current;
-    const isMine =
-      row.senderId === me?.id ||
-      (me?.lineId ? row.senderId === me.lineId : false);
-
-    if (eventType === "INSERT") {
-      setRooms((prev) => {
-        const targetIndex = prev.findIndex((room) => room.roomId === row.roomId);
-
-        if (targetIndex < 0) {
-          void loadRooms();
-          return prev;
-        }
-
-        const next = [...prev];
-        const target = next[targetIndex];
-
-        next[targetIndex] = {
-          ...target,
-          lastMessage: buildPreview(row.content, row.imageUrl),
-          createdAt: String(row.createdAt || target.createdAt || ""),
-          unread: isMine ? target.unread : target.unread + 1,
-          otherName:
-            !isMine && row.senderName && row.senderName !== "User"
-              ? row.senderName
-              : target.otherName,
-          otherImage:
-            !isMine && row.senderImage && row.senderImage !== "/avatar.png"
-              ? row.senderImage
-              : target.otherImage,
-        };
-
-        next.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-        return next;
-      });
-      return;
-    }
-
-    if (eventType === "UPDATE") {
-      setRooms((prev) =>
-        prev.map((room) =>
-          room.roomId === row.roomId
-            ? {
-                ...room,
-                lastMessage: buildPreview(row.content, row.imageUrl) || room.lastMessage,
-                createdAt: String(row.createdAt || room.createdAt || ""),
-                unread: row.seenAt ? 0 : room.unread,
-              }
-            : room
-        )
-      );
-      return;
-    }
-
-    void loadRooms();
-  };
-
   useEffect(() => {
     if (initialRooms.length > 0) {
       void hydrateUnknownRooms(initialRooms);
@@ -220,9 +135,7 @@ export default function DMListClient({
     if (hasInit.current) return;
     hasInit.current = true;
 
-    let active = true;
-
-    const init = async () => {
+    void (async () => {
       if (!meRef.current) {
         const sessionRes = await fetch("/api/auth/session", {
           cache: "no-store",
@@ -231,64 +144,41 @@ export default function DMListClient({
         meRef.current = (sessionData?.user || null) as SessionUser | null;
       }
 
-      if (rooms.length === 0) {
+      if (initialRooms.length === 0) {
         await loadRooms();
       } else {
         setLoading(false);
-        globalThis.setTimeout(() => {
-          void loadRooms();
-        }, 0);
+        void loadRooms();
       }
+    })();
+  }, [initialRooms.length]);
 
-      if (!active) return;
-
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadRooms();
       }
+    }, 2500);
 
-      const channel = supabase.channel(`dm-list-${Date.now()}`);
-
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "dmMessage" },
-        (payload) => {
-          const row = (payload.new || payload.old || {}) as MessageRow;
-          applyRealtimeMessage(row, payload.eventType);
-        }
-      );
-
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "users" },
-        () => {
-          void loadRooms();
-        }
-      );
-
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "dm_room" },
-        () => {
-          void loadRooms();
-        }
-      );
-
-      channelRef.current = channel;
-      channel.subscribe();
+    const onFocus = () => {
+      void loadRooms();
     };
 
-    void init();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadRooms();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      active = false;
-
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [initialRooms.length, rooms.length]);
+  }, []);
 
   return (
     <div className="mx-auto max-w-[720px] px-3 py-4 text-white">

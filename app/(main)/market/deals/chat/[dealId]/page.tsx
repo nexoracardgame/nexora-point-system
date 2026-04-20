@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient, RealtimeChannel } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { ArrowLeft, Image as ImageIcon, Send, Smile } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 
@@ -86,10 +86,10 @@ function mergeMessage(
   me?: ChatUser | null,
   other?: ChatUser | null
 ) {
-    const nextMessage: DealMessage = {
-      ...incoming,
-      sender:
-        incoming.sender ||
+  const nextMessage: DealMessage = {
+    ...incoming,
+    sender:
+      incoming.sender ||
       buildSender(
         incoming.senderId,
         {
@@ -127,7 +127,6 @@ export default function DealChatPage() {
   const [other, setOther] = useState<ChatUser | null>(null);
   const [card, setCard] = useState<DealCardInfo | null>(null);
   const [deal, setDeal] = useState<DealInfo | null>(null);
-  const [typing, setTyping] = useState(false);
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [roomClosed, setRoomClosed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -136,8 +135,6 @@ export default function DealChatPage() {
   const [newMessageCount, setNewMessageCount] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -193,12 +190,12 @@ export default function DealChatPage() {
   const loadRoomInfo = async (showClosedState = true) => {
     if (!dealId) return null;
 
-    const res = await fetch(`/api/market/deal-chat/info?dealId=${dealId}`, {
+    const res = await fetch(`/api/market/deal-chat/info?dealId=${encodeURIComponent(dealId)}`, {
       cache: "no-store",
     });
 
     if (!res.ok) {
-      if (showClosedState && (res.status === 404 || res.status === 409)) {
+      if (showClosedState && (res.status === 403 || res.status === 404 || res.status === 409)) {
         setRoomClosed(true);
         setLoadingRoom(false);
       }
@@ -218,12 +215,6 @@ export default function DealChatPage() {
     return data;
   };
 
-  const refreshChatState = async (showClosedState = false) => {
-    const info = await loadRoomInfo(showClosedState);
-    if (!info?.roomId) return;
-    await loadMessages(info.roomId, info.me, info.other);
-  };
-
   const loadMessages = async (
     nextRoomId: string,
     meData?: ChatUser | null,
@@ -231,18 +222,19 @@ export default function DealChatPage() {
   ) => {
     if (!nextRoomId) return;
 
-    const { data, error } = await supabase
-      .from("dmMessage")
-      .select("*")
-      .eq("roomId", nextRoomId)
-      .order("createdAt", { ascending: true });
+    const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(nextRoomId)}`, {
+      cache: "no-store",
+    });
 
-    if (error) {
-      console.error("LOAD DEAL CHAT MESSAGES ERROR:", error);
+    if (!res.ok) {
+      if (res.status === 403 || res.status === 404 || res.status === 409) {
+        setRoomClosed(true);
+      }
       return;
     }
 
-    const withSender: DealMessage[] = ((data || []) as Omit<DealMessage, "sender">[]).map((message) => ({
+    const data = (await res.json()) as Omit<DealMessage, "sender">[];
+    const withSender: DealMessage[] = (data || []).map((message) => ({
       ...message,
       sender: buildSender(
         message.senderId,
@@ -274,6 +266,12 @@ export default function DealChatPage() {
     }
   };
 
+  const refreshChatState = async (showClosedState = false) => {
+    const info = await loadRoomInfo(showClosedState);
+    if (!info?.roomId) return;
+    await loadMessages(info.roomId, info.me, info.other);
+  };
+
   const markSeenNow = async () => {
     if (!roomId || !me?.id) return;
 
@@ -283,14 +281,21 @@ export default function DealChatPage() {
 
     if (!hasUnread) return;
 
-    await supabase
-      .from("dmMessage")
-      .update({ seenAt: new Date().toISOString() })
-      .eq("roomId", roomId)
-      .neq("senderId", me.id)
-      .is("seenAt", null);
+    const res = await fetch("/api/dm/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roomId,
+        action: "markSeen",
+      }),
+    });
 
-    const seenAt = new Date().toISOString();
+    if (!res.ok) return;
+
+    const payload = await res.json();
+    const seenAt = String(payload?.seenAt || new Date().toISOString());
     setMessages((prev) =>
       prev.map((message) =>
         message.senderId !== me.id && !message.seenAt
@@ -317,13 +322,13 @@ export default function DealChatPage() {
   }, [dealId]);
 
   useEffect(() => {
-    if (!roomId || !me?.id) return;
+    if (!roomId || !me?.id || roomClosed) return;
 
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadMessages(roomId, me, other);
       }
-    }, 4000);
+    }, 1800);
 
     const onFocus = () => {
       void loadMessages(roomId, me, other);
@@ -343,16 +348,16 @@ export default function DealChatPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [roomId, me, other]);
+  }, [roomId, me, other, roomClosed]);
 
   useEffect(() => {
-    if (!dealId || !roomId) return;
+    if (!dealId || !roomId || roomClosed) return;
 
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadRoomInfo(true);
       }
-    }, 8000);
+    }, 5000);
 
     const onFocus = () => {
       void loadRoomInfo(true);
@@ -372,79 +377,13 @@ export default function DealChatPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [dealId, roomId]);
+  }, [dealId, roomId, roomClosed]);
 
   const lastSeenMineId = useMemo(() => {
     const mineSeen = messages.filter((message) => message.senderId === me?.id && !!message.seenAt);
     if (mineSeen.length === 0) return null;
     return mineSeen[mineSeen.length - 1]?.id || null;
   }, [messages, me?.id]);
-
-  useEffect(() => {
-    if (!roomId || !me?.id) return;
-
-    const channel = supabase.channel(`deal-chat-${roomId}`, {
-      config: {
-        broadcast: { self: false },
-      },
-    });
-
-    channelRef.current = channel;
-
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "dmMessage",
-          filter: `roomId=eq.${roomId}`,
-        },
-        (payload) => {
-          const msg = payload.new as DealMessage;
-          setMessages((prev) => mergeMessage(prev, msg, me, other));
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "dmMessage",
-          filter: `roomId=eq.${roomId}`,
-        },
-        (payload) => {
-          const updated = payload.new as DealMessage;
-          setMessages((prev) => mergeMessage(prev, updated, me, other));
-        }
-      )
-      .on("broadcast", { event: "typing" }, ({ payload }) => {
-        if (payload.senderId === me.id) return;
-        if (payload.roomId !== roomId) return;
-
-        setTyping(true);
-
-        if (typingTimeout.current) {
-          clearTimeout(typingTimeout.current);
-        }
-
-        typingTimeout.current = setTimeout(() => {
-          setTyping(false);
-        }, 1500);
-      })
-      .subscribe();
-
-    return () => {
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [roomId, me, other]);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -502,26 +441,13 @@ export default function DealChatPage() {
     });
   }, [messages, me?.id]);
 
-  const sendTyping = async () => {
-    if (!channelRef.current || !me?.id || !roomId) return;
-
-    await channelRef.current.send({
-      type: "broadcast",
-      event: "typing",
-      payload: {
-        senderId: me.id,
-        roomId,
-      },
-    });
-  };
-
   const openOtherProfile = () => {
     if (!other?.id) return;
     router.push(`/profile/${other.id}`);
   };
 
   const send = async () => {
-    if ((!text.trim() && !file) || !me?.id || !other?.id || !roomId) return;
+    if ((!text.trim() && !file) || !me?.id || !other?.id || !roomId || roomClosed) return;
 
     let imageUrl: string | null = null;
 
@@ -579,34 +505,33 @@ export default function DealChatPage() {
     setMessages((prev) => mergeMessage(prev, optimisticMessage, me, other));
     scrollToBottom("smooth");
 
-    const { data: insertedMessage, error } = await supabase
-      .from("dmMessage")
-      .insert({
+    const res = await fetch("/api/dm/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         roomId,
-        senderId: me.id,
         content: msg,
         imageUrl,
-        seenAt: null,
-        senderName: me.name,
-        senderImage: me.image,
-      })
-      .select("*")
-      .single();
+      }),
+    });
 
-    if (error) {
-      console.error("DEAL CHAT INSERT ERROR:", error);
+    if (!res.ok) {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
       setText(msg);
+      if (res.status === 403 || res.status === 404 || res.status === 409) {
+        setRoomClosed(true);
+      }
       return;
     }
 
-    if (insertedMessage) {
-      setMessages((prev) => {
-        const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
-        return mergeMessage(withoutOptimistic, insertedMessage as DealMessage, me, other);
-      });
-      scrollToBottom("smooth");
-    }
+    const insertedMessage = (await res.json()) as DealMessage;
+    setMessages((prev) => {
+      const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
+      return mergeMessage(withoutOptimistic, insertedMessage, me, other);
+    });
+    scrollToBottom("smooth");
   };
 
   if (!hasValidDealRoom || loadingRoom) {
@@ -623,7 +548,7 @@ export default function DealChatPage() {
         <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 text-center">
           <div className="text-lg font-black">ห้องแชทดีลนี้ปิดแล้ว</div>
           <div className="mt-2 text-sm text-white/60">
-            ดีลนี้ถูกยกเลิกหรือปิดขายเรียบร้อยแล้ว
+            ดีลนี้ถูกยกเลิก ปิดขาย หรือคุณไม่มีสิทธิ์เข้าถึงแล้ว
           </div>
           <button
             onClick={() => router.push("/market/deals")}
@@ -675,17 +600,13 @@ export default function DealChatPage() {
                     ราคาตั้งขาย {formatPrice(card.listedPrice)}
                   </div>
                   <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-bold text-cyan-200 sm:px-3 sm:text-[11px]">
-                    ราคาขอดีล {formatPrice(deal.offeredPrice)}
+                    ราคาดีล {formatPrice(deal.offeredPrice)}
                   </div>
                 </div>
 
                 <div className="mt-1 flex items-center gap-2 text-xs text-white/45">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      typing ? "animate-pulse bg-yellow-400" : "bg-cyan-400"
-                    }`}
-                  />
-                  <span>{typing ? "กำลังพิมพ์..." : "ห้องนัดสถานที่ของดีลนี้"}</span>
+                  <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                  <span>ห้องนัดสถานที่ของดีลนี้</span>
                 </div>
               </div>
 
@@ -861,7 +782,6 @@ export default function DealChatPage() {
                 value={text}
                 onChange={(e) => {
                   setText(e.target.value);
-                  void sendTyping();
                 }}
                 onFocus={async () => {
                   if (hasMarkedSeenRef.current) return;
