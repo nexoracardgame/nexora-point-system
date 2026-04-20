@@ -492,17 +492,18 @@ export default async function MarketCardDetailPage({
 
   return (
     <div className="space-y-4 text-white md:space-y-6">
-      <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(120,88,255,0.24),transparent_36%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),linear-gradient(135deg,#161624_0%,#0b0d13_62%,#090a0f_100%)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] md:rounded-[40px] md:p-7">
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.03),transparent)]" />
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl md:h-64 md:w-64" />
-        <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl md:h-56 md:w-56" />
+      <section className="relative overflow-hidden rounded-[28px] border border-amber-200/10 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.05),transparent_18%),linear-gradient(180deg,rgba(10,10,12,0.95)_0%,rgba(6,7,9,0.72)_100%)] px-4 py-5 shadow-[0_30px_120px_rgba(0,0,0,0.48)] md:rounded-[38px] md:px-7 md:py-8">
+        <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent,rgba(255,215,0,0.04),transparent)]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/30 to-transparent" />
+        <div className="absolute right-[-10%] top-[-15%] h-40 w-40 rounded-full bg-amber-300/10 blur-3xl md:h-72 md:w-72" />
+        <div className="absolute bottom-[-15%] left-[-5%] h-32 w-32 rounded-full bg-violet-400/10 blur-3xl md:h-56 md:w-56" />
         <div className="relative space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-violet-300/20 bg-violet-400/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.32em] text-violet-200 md:px-4 md:text-[11px]">
+            <span className="rounded-full border border-amber-200/15 bg-white/[0.03] px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.32em] text-amber-100/88 md:px-4 md:text-[11px]">
               {translate(locale, "market.card.header")}
             </span>
             <span
-              className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] md:px-4 md:text-[11px] ${statusTone}`}
+              className={`rounded-full border px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.24em] md:px-4 md:text-[11px] ${statusTone}`}
             >
               {String(listing.status || "active")}
             </span>
@@ -510,25 +511,21 @@ export default async function MarketCardDetailPage({
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px] xl:items-end">
             <div className="space-y-4">
-              <h1 className="max-w-5xl text-3xl font-black leading-[0.9] tracking-[-0.06em] sm:text-5xl lg:text-6xl xl:text-7xl">
+              <h1 className="max-w-5xl text-[2.2rem] font-black leading-[0.88] tracking-[-0.07em] sm:text-5xl lg:text-6xl xl:text-7xl">
                 {card.name}
               </h1>
 
-              <p className="max-w-2xl text-sm leading-6 text-white/56 md:text-base">
-                Competitive market profile for this card with live pricing, offer pressure, and ownership movement in one view.
-              </p>
-
               <div className="flex flex-wrap gap-2">
                 <span
-                  className={`rounded-full border px-4 py-2 text-xs font-semibold md:text-sm ${rarityStyle.badge}`}
+                  className={`rounded-full border px-4 py-2 text-[11px] font-semibold md:text-sm ${rarityStyle.badge}`}
                 >
                   {card.rarity}
                 </span>
 
-                {card.rewardBadges.slice(0, 4).map((badge) => (
+                {card.rewardBadges.slice(0, 2).map((badge) => (
                   <span
                     key={badge}
-                    className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 text-[11px] text-white/72 backdrop-blur"
+                    className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-2 text-[10px] text-white/62 backdrop-blur"
                   >
                     {badge}
                   </span>
@@ -536,11 +533,11 @@ export default async function MarketCardDetailPage({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-4 backdrop-blur md:p-5">
+            <div className="rounded-[24px] border border-amber-200/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-4 backdrop-blur md:rounded-[28px] md:p-5">
               <div className="text-[10px] uppercase tracking-[0.3em] text-white/38">
                 Live Price
               </div>
-              <div className="mt-3 text-3xl font-black tracking-[-0.05em] text-amber-300 md:text-5xl">
+              <div className="mt-3 text-3xl font-black tracking-[-0.06em] text-amber-300 drop-shadow-[0_0_24px_rgba(251,191,36,0.2)] md:text-5xl">
                 {card.price}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
@@ -561,12 +558,12 @@ export default async function MarketCardDetailPage({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)] md:gap-6">
-        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#151624_0%,#0a0d12_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.34)] md:rounded-[36px] md:p-6">
+        <div className="rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(250,204,21,0.06),transparent_32%),linear-gradient(180deg,rgba(18,18,24,0.76)_0%,rgba(8,9,11,0.42)_100%)] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.34)] md:rounded-[36px] md:p-5">
           <CardStaticPreview image={card.image} name={card.name} />
         </div>
 
         <div className="space-y-4 md:space-y-6">
-          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#151624_0%,#0b0d13_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.34)] md:rounded-[36px] md:p-6">
+          <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,24,0.72)_0%,rgba(9,10,12,0.36)_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur md:rounded-[36px] md:p-6">
             <div className="flex items-start gap-4">
               <Image
                 src={listing.seller?.image || "/avatar.png"}
@@ -587,15 +584,15 @@ export default async function MarketCardDetailPage({
                   {card.owner}
                 </Link>
                 <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/65 md:text-xs">
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                  <span className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5">
                     Card #{card.cardNo}
                   </span>
                   {listing.serialNo ? (
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                    <span className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5">
                       Serial {listing.serialNo}
                     </span>
                   ) : null}
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                  <span className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5">
                     {formatRelativeDays(toDate(listing.createdAt), locale)}
                   </span>
                 </div>
@@ -641,7 +638,7 @@ export default async function MarketCardDetailPage({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <InsightCard
               eyebrow={translate(locale, "market.card.low")}
               value={floorPriceDisplay}
@@ -680,7 +677,7 @@ export default async function MarketCardDetailPage({
                 value={medianPriceDisplay}
               />
             </div>
-            <div className="rounded-[20px] border border-white/8 bg-[#090b12] p-3">
+            <div className="rounded-[18px] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-white/38">
                   Price Wave
@@ -981,7 +978,7 @@ function HeroMetric({
   tone?: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-4 backdrop-blur">
+    <div className="rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.008))] p-3 backdrop-blur md:rounded-[20px] md:p-4">
       <div className="text-[10px] uppercase tracking-[0.24em] text-white/42 md:text-[11px]">
         {label}
       </div>
@@ -1002,7 +999,7 @@ function StatCard({
   color?: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3 md:rounded-[22px] md:p-4">
+    <div className="rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.008))] p-3 md:rounded-[20px] md:p-4">
       <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 md:text-xs">
         {label}
       </div>
@@ -1021,7 +1018,7 @@ function MiniMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-3">
+    <div className="rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.008))] px-4 py-3">
       <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
         {label}
       </div>
@@ -1042,7 +1039,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,#151624_0%,#0a0d12_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] md:rounded-[32px] md:p-6">
+    <div className="rounded-[24px] border border-white/7 bg-[linear-gradient(180deg,rgba(18,18,24,0.46)_0%,rgba(9,10,12,0.16)_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur md:rounded-[28px] md:p-6">
       <div className="mb-4 md:mb-5">
         <h3 className="text-lg font-black tracking-[-0.03em] text-white md:text-2xl">
           {title}
@@ -1068,7 +1065,7 @@ function InsightCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,#151624_0%,#0b0d13_100%)] p-4 shadow-[0_16px_50px_rgba(0,0,0,0.26)]">
+    <div className="rounded-[20px] border border-white/7 bg-[linear-gradient(180deg,rgba(18,18,24,0.4)_0%,rgba(8,9,11,0.14)_100%)] p-4 shadow-[0_16px_50px_rgba(0,0,0,0.26)] backdrop-blur">
       <div className="text-[10px] uppercase tracking-[0.24em] text-white/40">
         {eyebrow}
       </div>
@@ -1094,7 +1091,7 @@ function MobileAccordionPanel({
   return (
     <details
       open={defaultOpen}
-      className="group overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,#151624_0%,#0a0d12_100%)] shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
+      className="group overflow-hidden rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(18,18,24,0.44)_0%,rgba(9,10,12,0.16)_100%)] shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur"
     >
       <summary className="cursor-pointer list-none px-4 py-4">
         <div className="flex items-center justify-between gap-3">
@@ -1138,7 +1135,7 @@ function SnapshotRow({
     return (
       <Link
         href={href}
-        className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4 transition hover:border-violet-300/20 hover:bg-white/[0.05]"
+        className="rounded-[18px] border border-white/7 bg-white/[0.02] px-4 py-4 transition hover:border-amber-300/20 hover:bg-white/[0.04]"
       >
         {content}
       </Link>
@@ -1146,7 +1143,7 @@ function SnapshotRow({
   }
 
   return (
-    <div className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4">
+    <div className="rounded-[18px] border border-white/7 bg-white/[0.02] px-4 py-4">
       {content}
     </div>
   );
@@ -1161,7 +1158,7 @@ function CardStaticPreview({
 }) {
   return (
     <div className="group relative mx-auto w-full max-w-[500px] [perspective:1800px]">
-      <div className="absolute inset-0 scale-[1.1] rounded-[52px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.22),transparent_38%),radial-gradient(circle_at_bottom,rgba(34,211,238,0.12),transparent_32%)] blur-3xl" />
+      <div className="absolute inset-0 scale-[1.08] rounded-[52px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.05),transparent_30%)] blur-3xl" />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[52px]">
         <div className="absolute left-10 top-10 h-2 w-2 animate-pulse rounded-full bg-yellow-300/70" />
@@ -1169,8 +1166,8 @@ function CardStaticPreview({
         <div className="absolute bottom-20 left-16 h-2 w-2 animate-pulse rounded-full bg-violet-300/60" />
       </div>
 
-      <div className="relative rounded-[52px] bg-[linear-gradient(145deg,#facc15_0%,#fb923c_30%,#22d3ee_100%)] p-[2px] shadow-[0_0_80px_rgba(245,158,11,0.18)] transition duration-500 ease-out group-hover:-translate-y-1 group-hover:rotate-[0.6deg]">
-        <div className="rounded-[49px] bg-[linear-gradient(180deg,#06080d_0%,#0a0d12_100%)] p-3 md:p-4">
+      <div className="relative rounded-[52px] bg-[linear-gradient(145deg,rgba(250,204,21,0.92)_0%,rgba(251,146,60,0.55)_26%,rgba(255,255,255,0.22)_100%)] p-[1px] shadow-[0_0_80px_rgba(245,158,11,0.16)] transition duration-500 ease-out group-hover:-translate-y-1 group-hover:rotate-[0.6deg]">
+        <div className="rounded-[49px] bg-[linear-gradient(180deg,rgba(6,8,13,0.92)_0%,rgba(10,13,18,0.72)_100%)] p-3 md:p-4">
           <div className="relative aspect-[2.5/3.5] overflow-hidden rounded-[36px] border border-white/10">
             <Image
               src={image}
