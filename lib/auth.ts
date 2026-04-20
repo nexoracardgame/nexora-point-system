@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { prisma } from "@/lib/prisma";
 
 type LineProfile = {
   sub?: string;
@@ -22,6 +23,16 @@ type AppToken = JWT & {
   coin?: number;
 };
 
+type DbUserSnapshot = {
+  id: string;
+  lineId: string;
+  name: string | null;
+  image: string | null;
+  role: string;
+  nexPoint: number;
+  coin: number;
+};
+
 function getSafeSessionImage(image?: string | null) {
   const raw = String(image || "").trim();
 
@@ -32,6 +43,49 @@ function getSafeSessionImage(image?: string | null) {
   }
 
   return raw;
+}
+
+async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
+  const lineId = String(appToken.lineId || lineProfile.sub || "").trim();
+
+  if (!lineId) {
+    return null;
+  }
+
+  const safeName = String(appToken.name || lineProfile.name || "NEXORA User").trim();
+  const safeImage = getSafeSessionImage(
+    typeof appToken.picture === "string" ? appToken.picture : lineProfile.picture
+  );
+
+  try {
+    const dbUser = await prisma.user.upsert({
+      where: { lineId },
+      update: {
+        name: safeName,
+        image: safeImage,
+      },
+      create: {
+        lineId,
+        name: safeName,
+        image: safeImage,
+        role: "USER",
+      },
+      select: {
+        id: true,
+        lineId: true,
+        name: true,
+        image: true,
+        role: true,
+        nexPoint: true,
+        coin: true,
+      },
+    });
+
+    return dbUser satisfies DbUserSnapshot;
+  } catch (error) {
+    console.error("AUTH USER UPSERT ERROR:", error);
+    return null;
+  }
 }
 
 export const authOptions: NextAuthOptions = {
@@ -95,6 +149,20 @@ export const authOptions: NextAuthOptions = {
       appToken.picture = getSafeSessionImage(
         typeof appToken.picture === "string" ? appToken.picture : null
       );
+
+      const dbUser = await ensureDbUser(appToken, lineProfile);
+
+      if (dbUser) {
+        appToken.id = dbUser.id;
+        appToken.lineId = dbUser.lineId;
+        appToken.role = dbUser.role || appToken.role || "USER";
+        appToken.nexPoint = Number(dbUser.nexPoint || 0);
+        appToken.coin = Number(dbUser.coin || 0);
+        appToken.name = dbUser.name || appToken.name || "NEXORA User";
+        appToken.picture = getSafeSessionImage(
+          dbUser.image || (typeof appToken.picture === "string" ? appToken.picture : null)
+        );
+      }
 
       return appToken;
     },
