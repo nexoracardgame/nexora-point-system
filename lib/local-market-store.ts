@@ -21,10 +21,6 @@ export type LocalMarketListing = {
 const DATA_DIR = path.join(process.cwd(), "data");
 const STORE_PATH = path.join(DATA_DIR, "local-market-listings.json");
 
-function isLocalDev() {
-  return process.env.NODE_ENV !== "production";
-}
-
 async function ensureStoreFile() {
   await fs.mkdir(DATA_DIR, { recursive: true });
 
@@ -36,8 +32,6 @@ async function ensureStoreFile() {
 }
 
 async function readStore() {
-  if (!isLocalDev()) return [];
-
   await ensureStoreFile();
 
   try {
@@ -50,8 +44,6 @@ async function readStore() {
 }
 
 async function writeStore(items: LocalMarketListing[]) {
-  if (!isLocalDev()) return;
-
   await ensureStoreFile();
   await fs.writeFile(STORE_PATH, JSON.stringify(items, null, 2), "utf8");
 }
