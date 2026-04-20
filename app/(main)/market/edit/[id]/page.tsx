@@ -1,4 +1,4 @@
-import { getLocalMarketListingById } from "@/lib/local-market-store";
+import { getMarketListingById } from "@/lib/market-listings";
 import { Coins, Sparkles, PencilLine } from "lucide-react";
 import EditListingForm from "@/components/EditListingForm";
 
@@ -9,7 +9,7 @@ export default async function EditListingPage({
 }) {
   const { id } = await params;
 
-  const listing = await getLocalMarketListingById(id);
+  const listing = await getMarketListingById(id);
 
   let sheetCard: { card_name?: string | null } | null = null;
   try {

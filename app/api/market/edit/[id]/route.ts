@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateLocalMarketListingPrice } from "@/lib/local-market-store";
+import { updateMarketListingPrice } from "@/lib/market-listings";
 
 export async function PATCH(
   req: Request,
@@ -9,7 +9,11 @@ export async function PATCH(
     const { id } = await context.params;
     const body = await req.json();
 
-    await updateLocalMarketListingPrice(id, Number(body.price));
+    const updated = await updateMarketListingPrice(id, Number(body.price));
+
+    if (!updated) {
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch {

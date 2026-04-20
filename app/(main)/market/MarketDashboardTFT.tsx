@@ -763,7 +763,7 @@ export default function MarketDashboardTFT({
       {/* MARKET GRID */}
       <section>
         <div className="mb-4 text-2xl font-black lg:mb-6 lg:text-3xl">
-          ๐’ Marketplace Listings
+          Marketplace Listings
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-5">

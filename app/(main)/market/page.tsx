@@ -1,4 +1,4 @@
-import { getLocalMarketListings } from "@/lib/local-market-store";
+import { getMarketListings } from "@/lib/market-listings";
 import { normalizeMarketListingView } from "@/lib/market-listing-view";
 import MarketDashboardTFT from "./MarketDashboardTFT";
 
@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 async function loadListings() {
-  const localItems = await getLocalMarketListings();
-  return localItems
+  const items = await getMarketListings();
+  return items
     .filter((item) => String(item.status || "").toLowerCase() !== "sold")
     .sort((a, b) =>
       String(b.createdAt || "").localeCompare(String(a.createdAt || ""))

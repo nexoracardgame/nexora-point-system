@@ -1,4 +1,4 @@
-import { incrementLocalMarketListingViews } from "@/lib/local-market-store";
+import { incrementMarketListingViews } from "@/lib/market-listings";
 
 export async function POST(
   req: Request,
@@ -6,7 +6,7 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const updated = await incrementLocalMarketListingViews(id);
+  const updated = await incrementMarketListingViews(id);
 
   if (!updated) {
     return Response.json(

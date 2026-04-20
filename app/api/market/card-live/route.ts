@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllLocalDeals } from "@/lib/local-deal-store";
-import { getLocalMarketListings } from "@/lib/local-market-store";
+import { getMarketListings } from "@/lib/market-listings";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,17 +19,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "missing cardNo" }, { status: 400 });
   }
 
-  const [listings, deals] = await Promise.all([
-    getLocalMarketListings(),
-    getAllLocalDeals(),
-  ]);
-
+  const listings = await getMarketListings();
   const relatedListings = listings
     .filter((item) => String(item.cardNo || "").trim() === cardNo)
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
   const latestListing = relatedListings[0] || null;
   const relatedListingIds = relatedListings.map((item) => item.id);
+
+  const deals = relatedListingIds.length
+    ? await prisma.dealRequest.findMany({
+        where: {
+          cardId: {
+            in: relatedListingIds,
+          },
+        },
+        include: {
+          buyer: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      })
+    : [];
 
   const bidders = deals
     .filter(
@@ -38,7 +57,6 @@ export async function GET(req: NextRequest) {
         item.cardId === latestListing.id &&
         ["pending", "accepted", "completed"].includes(item.status)
     )
-    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .slice(0, 5)
     .map((item) => ({
       id: item.id,
@@ -46,20 +64,12 @@ export async function GET(req: NextRequest) {
       status: item.status,
       createdAt: item.createdAt,
       buyerId: item.buyerId,
-      buyerName: getDisplayName({
-        displayName: item.buyerName,
-        name: item.buyerName,
-      }),
-      buyerImage: item.buyerImage || "/avatar.png",
+      buyerName: getDisplayName(item.buyer),
+      buyerImage: item.buyer.image || "/avatar.png",
     }));
 
   const history = deals
-    .filter(
-      (item) =>
-        relatedListingIds.includes(item.cardId) &&
-        ["accepted", "completed"].includes(item.status)
-    )
-    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .filter((item) => ["accepted", "completed"].includes(item.status))
     .slice(0, 5)
     .map((item) => ({
       id: item.id,
@@ -67,14 +77,14 @@ export async function GET(req: NextRequest) {
       action: item.status === "completed" ? "sold" : "deal_accepted",
       detail:
         item.status === "completed"
-          ? `${item.buyerName} bought this card for ฿${Number(item.offeredPrice || 0).toLocaleString("th-TH")}`
-          : `${item.buyerName} offered ฿${Number(item.offeredPrice || 0).toLocaleString("th-TH")}`,
+          ? `${getDisplayName(item.buyer)} bought this card for ฿${Number(item.offeredPrice || 0).toLocaleString("th-TH")}`
+          : `${getDisplayName(item.buyer)} offered ฿${Number(item.offeredPrice || 0).toLocaleString("th-TH")}`,
       price: item.offeredPrice,
       listingId: item.cardId,
-      sellerId: item.sellerId,
+      sellerId: latestListing?.sellerId || null,
       buyerId: item.buyerId,
-      cardName: item.cardName,
-      imageUrl: item.cardImage,
+      cardName: latestListing?.cardName || null,
+      imageUrl: latestListing?.imageUrl || null,
     }));
 
   return NextResponse.json({

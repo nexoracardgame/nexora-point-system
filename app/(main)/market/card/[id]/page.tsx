@@ -8,8 +8,11 @@ import {
   translate,
   type Locale,
 } from "@/lib/i18n-core";
-import { getAllLocalDeals } from "@/lib/local-deal-store";
-import { getLocalMarketListingById, getLocalMarketListings } from "@/lib/local-market-store";
+import {
+  getMarketListingById,
+  getMarketListings,
+} from "@/lib/market-listings";
+import { prisma } from "@/lib/prisma";
 import CardStatsClient from "./CardStatsClient";
 import RequestDealButton from "./RequestDealButton";
 import WishlistButton from "./WishlistButton";
@@ -212,20 +215,19 @@ export default async function MarketCardDetailPage({
   const { id } = await params;
   const cookieStore = await cookies();
   const locale = resolveLocale(cookieStore.get("nexora_locale")?.value);
-  const [localListing, allListings, allDeals] = await Promise.all([
-    getLocalMarketListingById(id),
-    getLocalMarketListings(),
-    getAllLocalDeals(),
+  const [baseListing, allListings] = await Promise.all([
+    getMarketListingById(id),
+    getMarketListings(),
   ]);
 
-  const listing: DetailListing | null = localListing
+  const listing: DetailListing | null = baseListing
     ? {
-        ...localListing,
+        ...baseListing,
         seller: {
-          id: localListing.sellerId,
-          displayName: localListing.sellerName,
-          name: localListing.sellerName,
-          image: localListing.sellerImage,
+          id: baseListing.sellerId,
+          displayName: baseListing.sellerName,
+          name: baseListing.sellerName,
+          image: baseListing.sellerImage,
         },
       }
     : null;
@@ -257,6 +259,37 @@ export default async function MarketCardDetailPage({
     }));
 
   const relatedListingIds = relatedListings.map((item) => item.id);
+  const allDeals = relatedListingIds.length
+    ? await prisma.dealRequest.findMany({
+        where: {
+          cardId: {
+            in: relatedListingIds,
+          },
+        },
+        include: {
+          buyer: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      })
+    : [];
+
   const offerRows: OfferRow[] = allDeals
     .filter(
       (item) =>
@@ -275,9 +308,9 @@ export default async function MarketCardDetailPage({
       offeredPrice: Number(item.offeredPrice || 0),
       buyer: {
         id: item.buyerId,
-        displayName: item.buyerName,
-        name: item.buyerName,
-        image: item.buyerImage,
+        displayName: item.buyer.displayName,
+        name: item.buyer.name,
+        image: item.buyer.image,
       },
     }));
 
@@ -302,9 +335,9 @@ export default async function MarketCardDetailPage({
         offeredPrice: Number(item.offeredPrice || 0),
         buyer: {
           id: item.buyerId,
-          displayName: item.buyerName,
-          name: item.buyerName,
-          image: item.buyerImage,
+          displayName: item.buyer.displayName,
+          name: item.buyer.name,
+          image: item.buyer.image,
         },
       }))[0] || null;
 
@@ -386,8 +419,7 @@ export default async function MarketCardDetailPage({
       )
       .map((item) => {
         const eventTime = toDate(item.createdAt);
-        const sellerName =
-          item.sellerName || getDisplayName(locale, listing.seller);
+        const sellerName = getDisplayName(locale, item.seller);
         const detail =
           item.status === "completed"
             ? describeHistoryAction(

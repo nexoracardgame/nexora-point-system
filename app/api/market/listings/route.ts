@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getLocalMarketListings } from "@/lib/local-market-store";
+import { getMarketListings } from "@/lib/market-listings";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export async function GET() {
-  const listings = await getLocalMarketListings();
+  const listings = await getMarketListings();
 
   const fixed = listings
     .filter((item) => String(item.status || "").toLowerCase() !== "sold")

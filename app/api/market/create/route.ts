@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createLocalMarketListing } from "@/lib/local-market-store";
+import { createMarketListing } from "@/lib/market-listings";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
 type SessionUser = {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const { cardNo, serialNo, price, cardName, imageUrl, rarity } =
       await req.json();
 
-    const listing = await createLocalMarketListing({
+    const listing = await createMarketListing({
       cardNo: String(cardNo),
       serialNo: String(serialNo || "").trim() || null,
       price: Number(price),
@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       listing,
-      localFallback: true,
     });
   } catch (error) {
     const routeError = error as RouteError;

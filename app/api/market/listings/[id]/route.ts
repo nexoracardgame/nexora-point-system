@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLocalMarketListingById } from "@/lib/local-market-store";
+import { getMarketListingById } from "@/lib/market-listings";
 
 export async function GET(
   _: Request,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const listing = await getLocalMarketListingById(id);
+  const listing = await getMarketListingById(id);
 
   if (!listing) {
     return NextResponse.json(null);

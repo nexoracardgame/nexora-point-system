@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getLocalMarketListingsBySeller } from "@/lib/local-market-store";
+import { getMarketListingsBySeller } from "@/lib/market-listings";
 
 type SessionUser = {
   id?: string;
@@ -17,6 +17,6 @@ export async function GET() {
     return NextResponse.json({ items: [] });
   }
 
-  const items = await getLocalMarketListingsBySeller(userId);
+  const items = await getMarketListingsBySeller(userId);
   return NextResponse.json({ items });
 }

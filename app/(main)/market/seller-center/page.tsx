@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { authOptions } from "@/lib/auth";
-import { getLocalMarketListingsBySeller } from "@/lib/local-market-store";
+import { getMarketListingsBySeller } from "@/lib/market-listings";
 import SellerCenterClient from "./SellerCenterClient";
 
 export default async function SellerCenterPage() {
@@ -18,7 +18,7 @@ export default async function SellerCenterPage() {
     );
   }
 
-  const myListings = (await getLocalMarketListingsBySeller(session.user.id)).map(
+  const myListings = (await getMarketListingsBySeller(session.user.id)).map(
     (item) => ({
       id: item.id,
       imageUrl: item.imageUrl,
