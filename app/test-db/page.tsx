@@ -1,7 +1,16 @@
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function TestDbPage() {
-  const count = await prisma.marketPost.count();
+  let count = 0;
+
+  try {
+    count = await prisma.marketPost.count();
+  } catch {
+    count = 0;
+  }
 
   return (
     <div style={{ padding: 40, color: "white" }}>

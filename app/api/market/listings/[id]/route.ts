@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getLocalMarketListingById } from "@/lib/local-market-store";
 
 export async function GET(
   _: Request,
@@ -7,11 +7,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const listing = await prisma.marketListing.findUnique({
-    where: {
-      id,
-    },
-  });
+  const listing = await getLocalMarketListingById(id);
 
   if (!listing) {
     return NextResponse.json(null);

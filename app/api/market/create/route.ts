@@ -1,52 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createLocalMarketListing } from "@/lib/local-market-store";
+import { resolveUserIdentity } from "@/lib/user-identity";
+
+type SessionUser = {
+  id?: string;
+  name?: string | null;
+  image?: string | null;
+};
+
+function getSessionUser(session: Awaited<ReturnType<typeof getServerSession>>) {
+  return ((session || {}) as { user?: SessionUser }).user || ({} as SessionUser);
+}
+
+type RouteError = {
+  message?: string;
+};
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.id;
+    const sessionUser = getSessionUser(session);
+    const identity = await resolveUserIdentity(sessionUser);
+    const sellerId = identity.userId;
 
     if (!sellerId) {
       return NextResponse.json(
-        { error: "กรุณาเข้าสู่ระบบ" },
+        { error: "กรุณาเข้าสู่ระบบก่อน" },
         { status: 401 }
       );
     }
 
-    const {
-      cardNo,
-      serialNo,
-      price,
-      cardName,
-      imageUrl,
-      rarity,
-    } = await req.json();
+    const { cardNo, serialNo, price, cardName, imageUrl, rarity } =
+      await req.json();
 
-    const listing = await prisma.marketListing.create({
-      data: {
-        cardNo,
-        serialNo,
-        price: Number(price),
-        sellerId,
-        cardName,
-        imageUrl,
-        rarity,
-        status: "ACTIVE",
-      },
+    const listing = await createLocalMarketListing({
+      cardNo: String(cardNo),
+      serialNo: String(serialNo || "").trim() || null,
+      price: Number(price),
+      sellerId,
+      cardName: String(cardName || "").trim() || null,
+      imageUrl: String(imageUrl || "").trim() || null,
+      rarity: String(rarity || "").trim() || null,
+      sellerName: identity.name,
+      sellerImage: identity.image,
     });
 
     return NextResponse.json({
       success: true,
       listing,
+      localFallback: true,
     });
-  } catch (error: any) {
-    console.error("MARKET CREATE ERROR =", error);
-
+  } catch (error) {
+    const routeError = error as RouteError;
     return NextResponse.json(
       {
-        error: error?.message || "ลงขายไม่สำเร็จ",
+        error:
+          process.env.NODE_ENV === "production"
+            ? "ลงขายไม่สำเร็จ"
+            : routeError?.message || "ลงขายไม่สำเร็จ",
       },
       { status: 500 }
     );

@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { prisma } from "@/lib/prisma";
+import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,44 +59,24 @@ export async function getDmRoomsForUser(
   }
 
   const roomIds = dedupedRooms.map((room) => String(room.roomid));
-  const otherUserIds = dedupedRooms.map((room) =>
-    room.usera === myId || (myLineId ? room.usera === myLineId : false)
-      ? room.userb
-      : room.usera
-  );
 
-  const [
-    { data: messages, error: msgErr },
-    { data: unreadRows, error: unreadErr },
-    users,
-  ] = await Promise.all([
-    supabase
-      .from("dmMessage")
-      .select(
-        "roomId,senderId,senderName,senderImage,content,imageUrl,createdAt"
-      )
-      .in("roomId", roomIds)
-      .order("createdAt", { ascending: false }),
-    supabase
-      .from("dmMessage")
-      .select("roomId,senderId,seenAt")
-      .in("roomId", roomIds)
-      .neq("senderId", myId)
-      .neq("senderId", myLineId || "__never__")
-      .is("seenAt", null),
-    prisma.user.findMany({
-      where: {
-        OR: [{ id: { in: otherUserIds } }, { lineId: { in: otherUserIds } }],
-      },
-      select: {
-        id: true,
-        lineId: true,
-        name: true,
-        displayName: true,
-        image: true,
-      },
-    }),
-  ]);
+  const [{ data: messages, error: msgErr }, { data: unreadRows, error: unreadErr }] =
+    await Promise.all([
+      supabase
+        .from("dmMessage")
+        .select(
+          "roomId,senderId,senderName,senderImage,content,imageUrl,createdAt"
+        )
+        .in("roomId", roomIds)
+        .order("createdAt", { ascending: false }),
+      supabase
+        .from("dmMessage")
+        .select("roomId,senderId,seenAt")
+        .in("roomId", roomIds)
+        .neq("senderId", myId)
+        .neq("senderId", myLineId || "__never__")
+        .is("seenAt", null),
+    ]);
 
   if (msgErr) {
     console.error("LOAD DM MESSAGE ERROR:", msgErr);
@@ -107,19 +87,6 @@ export async function getDmRoomsForUser(
     console.error("LOAD DM UNREAD ERROR:", unreadErr);
     return [];
   }
-
-  const userMap = new Map(
-    users.flatMap((user) => {
-      const value = {
-        name: user.displayName || user.name || "User",
-        image: safeImage(user.image),
-      };
-
-      return [user.id, user.lineId]
-        .filter(Boolean)
-        .map((key) => [key, value] as const);
-    })
-  );
 
   const latestMessageByRoom = new Map<string, (typeof messages)[number]>();
   for (const message of messages || []) {
@@ -135,13 +102,31 @@ export async function getDmRoomsForUser(
     unreadCountByRoom.set(roomId, (unreadCountByRoom.get(roomId) || 0) + 1);
   }
 
+  const profiles = await Promise.all(
+    dedupedRooms.map(async (room) => {
+      const roomUserAIsMe =
+        room.usera === myId || (myLineId ? room.usera === myLineId : false);
+      const otherUserId = String(roomUserAIsMe ? room.userb : room.usera || "").trim();
+      const profile = otherUserId ? await getLocalProfileByUserId(otherUserId) : null;
+
+      return {
+        roomId: String(room.roomid),
+        otherUserId,
+        profile,
+      };
+    })
+  );
+
+  const profileMap = new Map(
+    profiles.map((item) => [item.roomId, item.profile])
+  );
+
   return dedupedRooms
     .map((room) => {
       const latestMessage = latestMessageByRoom.get(String(room.roomid));
       const roomUserAIsMe =
         room.usera === myId || (myLineId ? room.usera === myLineId : false);
-      const otherUserId = roomUserAIsMe ? room.userb : room.usera;
-      const otherUser = userMap.get(otherUserId);
+      const profile = profileMap.get(String(room.roomid));
       const createdAt =
         String(latestMessage?.createdAt || "").trim() ||
         String(room.updatedat || "").trim();
@@ -153,12 +138,12 @@ export async function getDmRoomsForUser(
           ? buildPreview(latestMessage.content, latestMessage.imageUrl)
           : "เริ่มแชท",
         otherName:
-          otherUser?.name ||
+          profile?.displayName ||
           (roomUserAIsMe ? room.userbname : room.useraname) ||
           latestMessage?.senderName ||
           "User",
         otherImage:
-          otherUser?.image ||
+          profile?.image ||
           safeImage(roomUserAIsMe ? room.userbimage : room.useraimage) ||
           safeImage(latestMessage?.senderImage),
         unread: unreadCountByRoom.get(String(room.roomid)) || 0,

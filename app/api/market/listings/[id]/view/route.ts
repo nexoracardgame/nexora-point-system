@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { incrementLocalMarketListingViews } from "@/lib/local-market-store";
 
 export async function POST(
   req: Request,
@@ -6,19 +6,17 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  const updated = await prisma.marketListing.update({
-    where: {
-      id,
-    },
-    data: {
-      views: {
-        increment: 1,
+  const updated = await incrementLocalMarketListingViews(id);
+
+  if (!updated) {
+    return Response.json(
+      {
+        success: false,
+        error: "Listing not found",
       },
-    },
-    select: {
-      views: true,
-    },
-  });
+      { status: 404 }
+    );
+  }
 
   return Response.json({
     success: true,

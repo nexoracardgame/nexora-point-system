@@ -2,10 +2,19 @@ import { prisma } from "@/lib/prisma";
 import RewardsTable from "./RewardsTable";
 import RewardCreateForm from "./RewardCreateForm";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminRewardsPage() {
-  const rewards = await prisma.reward.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  let rewards: Awaited<ReturnType<typeof prisma.reward.findMany>> = [];
+
+  try {
+    rewards = await prisma.reward.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+  } catch {
+    rewards = [];
+  }
 
   return (
     <div style={{ color: "#fff" }}>

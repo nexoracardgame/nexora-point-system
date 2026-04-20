@@ -46,6 +46,7 @@ export default function MainLayout({
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [profileImage, setProfileImage] = useState("");
+  const [profileName, setProfileName] = useState("");
   const [avatarReady, setAvatarReady] = useState(false);
 
   const stableAvatarRef = useRef("/avatar.png");
@@ -91,12 +92,17 @@ export default function MainLayout({
         if (!mounted) return;
 
         const dbImage = safeProfileSrc(data?.image);
+        const dbName = String(data?.displayName || data?.name || "").trim();
 
         if (dbImage !== "/avatar.png") {
           updateAvatar(dbImage);
         } else {
           setProfileImage("/avatar.png");
           setAvatarReady(true);
+        }
+
+        if (dbName) {
+          setProfileName(dbName);
         }
       } catch {
         if (!mounted) return;
@@ -115,8 +121,14 @@ export default function MainLayout({
   useEffect(() => {
     return listenProfileSync((detail) => {
       updateAvatar(detail.image);
+      if (typeof detail.name === "string" && detail.name.trim()) {
+        setProfileName(detail.name.trim());
+      }
+      router.refresh();
     });
-  }, []);
+  }, [router]);
+
+  const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -410,7 +422,7 @@ export default function MainLayout({
                           {t("layout.profile.commander")}
                         </div>
                         <div className="mt-1 truncate text-base font-black text-white">
-                          {session?.user?.name || "NEXORA USER"}
+                          {displayedProfileName}
                         </div>
                       </div>
 
@@ -538,7 +550,7 @@ export default function MainLayout({
 
               <div className="min-w-0 flex-1">
                 <div className="truncate text-base font-black">
-                  {session?.user?.name || "NEXORA USER"}
+                  {displayedProfileName}
                 </div>
                 <div className="mt-1 inline-flex rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-200">
                   {session?.user?.nexPoint ?? 0} TFT

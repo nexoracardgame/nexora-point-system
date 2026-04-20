@@ -8,16 +8,38 @@ type PageProps = {
   }>;
 };
 
+type CouponDetail = {
+  code: string;
+  used: boolean;
+  createdAt: Date;
+  usedAt: Date | null;
+  reward: {
+    name: string;
+    nexCost: number | null;
+    coinCost: number | null;
+  };
+  user: {
+    displayName: string | null;
+    name: string | null;
+    lineId: string;
+  };
+} | null;
+
 export default async function CouponPage({ params }: PageProps) {
   const { code } = await params;
+  let coupon: CouponDetail = null;
 
-  const coupon = await prisma.coupon.findUnique({
-    where: { code },
-    include: {
-      reward: true,
-      user: true,
-    },
-  });
+  try {
+    coupon = await prisma.coupon.findUnique({
+      where: { code },
+      include: {
+        reward: true,
+        user: true,
+      },
+    });
+  } catch {
+    coupon = null;
+  }
 
   if (!coupon) {
     notFound();

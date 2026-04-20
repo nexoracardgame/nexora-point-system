@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { updateLocalMarketListingPrice } from "@/lib/local-market-store";
 
 export async function PATCH(
   req: Request,
@@ -9,15 +9,10 @@ export async function PATCH(
     const { id } = await context.params;
     const body = await req.json();
 
-    await prisma.marketListing.update({
-      where: { id },
-      data: {
-        price: Number(body.price),
-      },
-    });
+    await updateLocalMarketListingPrice(id, Number(body.price));
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Update failed" },
       { status: 500 }

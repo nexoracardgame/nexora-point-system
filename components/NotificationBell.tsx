@@ -72,43 +72,7 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const storageKey = "nexora_notification_seen_items";
-  const [seenMap, setSeenMap] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return {};
-
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return {};
-
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object"
-        ? (parsed as Record<string, boolean>)
-        : {};
-    } catch {
-      return {};
-    }
-  });
-
   const localeTag = getLocaleTag(locale);
-
-  const persistSeenMap = (nextMap: Record<string, boolean>) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(storageKey, JSON.stringify(nextMap));
-  };
-
-  const markSeen = (notificationId: string) => {
-    if (!notificationId) return;
-
-    setSeenMap((prev) => {
-      if (prev[notificationId]) return prev;
-      const next = {
-        ...prev,
-        [notificationId]: true,
-      };
-      persistSeenMap(next);
-      return next;
-    });
-  };
 
   const loadNotifications = async () => {
     try {
@@ -125,6 +89,31 @@ export default function NotificationBell() {
     }
   };
 
+  const markNotificationRead = (notificationId: string) => {
+    if (
+      !notificationId ||
+      notificationId.startsWith("chat-") ||
+      notificationId.startsWith("deal-chat-")
+    ) {
+      return;
+    }
+
+    setItems((prev) => prev.filter((item) => item.id !== notificationId));
+
+    void fetch("/api/notifications/read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ids: [notificationId],
+      }),
+      keepalive: true,
+    }).catch(() => {
+      void loadNotifications();
+    });
+  };
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadNotifications();
@@ -136,7 +125,7 @@ export default function NotificationBell() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       void loadNotifications();
-    }, 10000);
+    }, 5000);
 
     const onFocus = () => {
       void loadNotifications();
@@ -182,22 +171,6 @@ export default function NotificationBell() {
       }
     );
 
-    channel.on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "dealRequest" },
-      () => {
-        void loadNotifications();
-      }
-    );
-
-    channel.on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "marketHistory" },
-      () => {
-        void loadNotifications();
-      }
-    );
-
     channel.subscribe();
     channelRef.current = channel;
 
@@ -220,11 +193,7 @@ export default function NotificationBell() {
     return () => window.removeEventListener("click", onClickOutside);
   }, []);
 
-  const unreadItems = useMemo(
-    () => items.filter((item) => !seenMap[item.id]),
-    [items, seenMap]
-  );
-
+  const unreadItems = useMemo(() => items, [items]);
   const totalUnreadCount = unreadItems.length;
 
   return (
@@ -291,7 +260,7 @@ export default function NotificationBell() {
                     key={item.id}
                     href={item.href}
                     onClick={() => {
-                      markSeen(item.id);
+                      markNotificationRead(item.id);
                       setOpen(false);
                     }}
                     className="group flex items-start gap-3 rounded-[22px] border border-transparent px-3 py-3 transition hover:border-amber-300/10 hover:bg-white/[0.03]"

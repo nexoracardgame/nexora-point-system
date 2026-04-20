@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { upsertLocalProfile } from "@/lib/local-profile-store";
+import { syncUserIdentityEverywhere } from "@/lib/user-identity-sync";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = String((session?.user as { id?: string } | undefined)?.id || "");
+    const userId = String(
+      (session?.user as { id?: string } | undefined)?.id || ""
+    ).trim();
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
-
     const {
       coverUrl,
       coverPosition,
@@ -29,34 +31,42 @@ export async function POST(req: NextRequest) {
         ? Math.max(0, Math.min(100, coverPosition))
         : 50;
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        coverImage: coverUrl || null,
-        coverPosition: safePosition,
-        displayName: displayName || null,
-        bio: bio || null,
-        lineUrl: lineLink || null,
-        facebookUrl: facebookLink || null,
-        image: profileImage || null,
-      },
-      select: {
-        id: true,
-        name: true,
-        displayName: true,
-        image: true,
-        coverImage: true,
-        coverPosition: true,
-        bio: true,
-        lineUrl: true,
-        facebookUrl: true,
-      },
+    const updatedUser = await upsertLocalProfile(userId, {
+      coverImage: String(coverUrl || "").trim() || null,
+      coverPosition: safePosition,
+      displayName: String(displayName || "").trim() || null,
+      bio: String(bio || "").trim() || null,
+      lineUrl: String(lineLink || "").trim() || null,
+      facebookUrl: String(facebookLink || "").trim() || null,
+      image: String(profileImage || "").trim() || null,
     });
 
-    return NextResponse.json({ success: true, user: updatedUser });
-  } catch (error) {
-    console.error("PROFILE UPDATE ERROR:", error);
+    const syncedName =
+      updatedUser.displayName || session?.user?.name || "NEXORA User";
+    const syncedImage =
+      updatedUser.image || session?.user?.image || "/avatar.png";
 
+    await syncUserIdentityEverywhere({
+      userId,
+      name: syncedName,
+      image: syncedImage,
+    });
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: userId,
+        name: syncedName,
+        displayName: updatedUser.displayName,
+        image: syncedImage,
+        coverImage: updatedUser.coverImage,
+        coverPosition: updatedUser.coverPosition,
+        bio: updatedUser.bio,
+        lineUrl: updatedUser.lineUrl,
+        facebookUrl: updatedUser.facebookUrl,
+      },
+    });
+  } catch {
     return NextResponse.json(
       { error: "Profile update failed" },
       { status: 500 }

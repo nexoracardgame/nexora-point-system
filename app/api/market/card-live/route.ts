@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getAllLocalDeals } from "@/lib/local-deal-store";
+import { getLocalMarketListings } from "@/lib/local-market-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -18,88 +19,69 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "missing cardNo" }, { status: 400 });
   }
 
-  const relatedListings = await prisma.marketListing.findMany({
-    where: {
-      cardNo,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      id: true,
-      sellerId: true,
-      price: true,
-      status: true,
-      createdAt: true,
-      seller: {
-        select: {
-          id: true,
-          displayName: true,
-          name: true,
-          image: true,
-        },
-      },
-    },
-  });
+  const [listings, deals] = await Promise.all([
+    getLocalMarketListings(),
+    getAllLocalDeals(),
+  ]);
+
+  const relatedListings = listings
+    .filter((item) => String(item.cardNo || "").trim() === cardNo)
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
   const latestListing = relatedListings[0] || null;
   const relatedListingIds = relatedListings.map((item) => item.id);
 
-  const [history, bidders] = await Promise.all([
-    relatedListingIds.length
-      ? prisma.marketHistory.findMany({
-          where: {
-            listingId: {
-              in: relatedListingIds,
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 5,
-        })
-      : Promise.resolve([]),
-    latestListing
-      ? prisma.dealRequest.findMany({
-          where: {
-            cardId: latestListing.id,
-            status: {
-              in: ["pending", "accepted", "completed"],
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 5,
-          include: {
-            buyer: {
-              select: {
-                id: true,
-                displayName: true,
-                name: true,
-                image: true,
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  return NextResponse.json({
-    owner: latestListing?.sellerId || null,
-    ownerId: latestListing?.sellerId || null,
-    ownerName: latestListing?.seller
-      ? getDisplayName(latestListing.seller)
-      : null,
-    history,
-    bidders: bidders.map((item) => ({
+  const bidders = deals
+    .filter(
+      (item) =>
+        latestListing &&
+        item.cardId === latestListing.id &&
+        ["pending", "accepted", "completed"].includes(item.status)
+    )
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 5)
+    .map((item) => ({
       id: item.id,
       offeredPrice: item.offeredPrice,
       status: item.status,
       createdAt: item.createdAt,
       buyerId: item.buyerId,
-      buyerName: getDisplayName(item.buyer),
-      buyerImage: item.buyer.image || "/avatar.png",
-    })),
+      buyerName: getDisplayName({
+        displayName: item.buyerName,
+        name: item.buyerName,
+      }),
+      buyerImage: item.buyerImage || "/avatar.png",
+    }));
+
+  const history = deals
+    .filter(
+      (item) =>
+        relatedListingIds.includes(item.cardId) &&
+        ["accepted", "completed"].includes(item.status)
+    )
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 5)
+    .map((item) => ({
+      id: item.id,
+      createdAt: item.createdAt,
+      action: item.status === "completed" ? "sold" : "deal_accepted",
+      detail:
+        item.status === "completed"
+          ? `${item.buyerName} bought this card for ฿${Number(item.offeredPrice || 0).toLocaleString("th-TH")}`
+          : `${item.buyerName} offered ฿${Number(item.offeredPrice || 0).toLocaleString("th-TH")}`,
+      price: item.offeredPrice,
+      listingId: item.cardId,
+      sellerId: item.sellerId,
+      buyerId: item.buyerId,
+      cardName: item.cardName,
+      imageUrl: item.cardImage,
+    }));
+
+  return NextResponse.json({
+    owner: latestListing?.sellerId || null,
+    ownerId: latestListing?.sellerId || null,
+    ownerName: latestListing?.sellerName || null,
+    history,
+    bidders,
   });
 }

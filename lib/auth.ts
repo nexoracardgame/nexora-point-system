@@ -1,7 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
-import { prisma } from "@/lib/prisma";
 
 type LineProfile = {
   sub?: string;
@@ -55,20 +54,6 @@ export const authOptions: NextAuthOptions = {
 
       if (!lineId) return false;
 
-      const existingUser = await prisma.user.findUnique({
-        where: { lineId },
-      });
-
-      if (!existingUser) {
-        await prisma.user.create({
-          data: {
-            lineId,
-            name: lineProfile.name || "LINE User",
-            image: lineProfile.picture || "",
-          },
-        });
-      }
-
       return true;
     },
 
@@ -91,35 +76,24 @@ export const authOptions: NextAuthOptions = {
 
       if (lineProfile.sub) {
         appToken.lineId = lineProfile.sub;
+        appToken.id = appToken.id || lineProfile.sub;
+        appToken.name = appToken.name || lineProfile.name || "NEXORA User";
+        appToken.picture = getSafeSessionImage(
+          typeof appToken.picture === "string"
+            ? appToken.picture
+            : lineProfile.picture
+        );
       }
 
       const lineId = appToken.lineId || lineProfile.sub;
-
-      if (lineId) {
-        const dbUser = await prisma.user.findUnique({
-          where: { lineId },
-          select: {
-            id: true,
-            lineId: true,
-            role: true,
-            nexPoint: true,
-            coin: true,
-            name: true,
-            displayName: true,
-            image: true,
-          },
-        });
-
-        if (dbUser) {
-          appToken.id = dbUser.id;
-          appToken.lineId = dbUser.lineId;
-          appToken.role = dbUser.role;
-          appToken.nexPoint = dbUser.nexPoint;
-          appToken.coin = dbUser.coin;
-          appToken.name = dbUser.displayName || dbUser.name || "NEXORA User";
-          appToken.picture = getSafeSessionImage(dbUser.image);
-        }
-      }
+      appToken.id = appToken.id || lineId || "";
+      appToken.role = appToken.role || "USER";
+      appToken.nexPoint = appToken.nexPoint || 0;
+      appToken.coin = appToken.coin || 0;
+      appToken.name = appToken.name || "NEXORA User";
+      appToken.picture = getSafeSessionImage(
+        typeof appToken.picture === "string" ? appToken.picture : null
+      );
 
       return appToken;
     },

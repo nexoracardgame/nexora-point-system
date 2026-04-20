@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { createClient } from "@supabase/supabase-js";
 import { authOptions } from "@/lib/auth";
+import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,60 +23,33 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "no roomId" }, { status: 400 });
   }
 
-  const myId = session.user.id;
-  const myLineId = (session.user as { lineId?: string }).lineId;
+  const myId = String(session.user.id || "").trim();
 
-  const prismaRoom = await prisma.dmRoom.findUnique({
-    where: { id: roomId },
-  });
+  const { data: room, error } = await supabase
+    .from("dm_room")
+    .select("*")
+    .eq("roomid", roomId)
+    .maybeSingle();
 
-  let otherLookupKey: string | null = null;
-
-  if (prismaRoom) {
-    otherLookupKey = prismaRoom.user1 === myId ? prismaRoom.user2 : prismaRoom.user1;
-  } else {
-    const { data: legacyRoom, error } = await supabase
-      .from("dm_room")
-      .select("*")
-      .eq("roomid", roomId)
-      .maybeSingle();
-
-    if (error || !legacyRoom) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
-    }
-
-    const roomUserAIsMe =
-      legacyRoom.usera === myId ||
-      (myLineId ? legacyRoom.usera === myLineId : false);
-
-    otherLookupKey = roomUserAIsMe ? legacyRoom.userb : legacyRoom.usera;
+  if (error || !room) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const otherUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { id: otherLookupKey || "" },
-        { lineId: otherLookupKey || "" },
-      ],
-    },
-    select: {
-      id: true,
-      lineId: true,
-      name: true,
-      displayName: true,
-      image: true,
-    },
-  });
-
-  if (!otherUser) {
-    return NextResponse.json({ error: "user not found" }, { status: 404 });
-  }
+  const roomUserAIsMe = room.usera === myId;
+  const otherUserId = String(roomUserAIsMe ? room.userb : room.usera || "").trim();
+  const otherProfile = otherUserId ? await getLocalProfileByUserId(otherUserId) : null;
 
   return NextResponse.json({
     otherUser: {
-      id: otherUser.id,
-      name: otherUser.displayName || otherUser.name || "User",
-      image: otherUser.image || "/avatar.png",
+      id: otherUserId,
+      name:
+        otherProfile?.displayName ||
+        (roomUserAIsMe ? room.userbname : room.useraname) ||
+        "User",
+      image:
+        otherProfile?.image ||
+        (roomUserAIsMe ? room.userbimage : room.useraimage) ||
+        "/avatar.png",
     },
   });
 }

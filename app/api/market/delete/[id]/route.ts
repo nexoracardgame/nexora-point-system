@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { deleteLocalMarketListing } from "@/lib/local-market-store";
 
 export async function DELETE(
   req: Request,
@@ -8,9 +8,7 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
-    await prisma.marketListing.delete({
-      where: { id },
-    });
+    await deleteLocalMarketListing(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Pencil, Coins, Sparkles } from "lucide-react";
+import { Coins, Pencil, Sparkles } from "lucide-react";
 import DeleteListingButton from "@/components/DeleteListingButton";
+import { authOptions } from "@/lib/auth";
+import { getLocalMarketListingsBySeller } from "@/lib/local-market-store";
 
 export default async function SellerCenterPage() {
   const session = await getServerSession(authOptions);
@@ -18,23 +18,27 @@ export default async function SellerCenterPage() {
     );
   }
 
-  const myListings = await prisma.marketListing.findMany({
-  where: {
-    sellerId: session.user.id,
-    NOT: {
-      status: "sold",
-    },
-  },
-  orderBy: {
-    createdAt: "desc",
-  },
-  // 🔥 ตัวนี้แหละจบ
-}).then(res => JSON.parse(JSON.stringify(res)));
+  let myListings: Array<{
+    id: string;
+    imageUrl: string | null;
+    cardNo: string;
+    cardName: string | null;
+    serialNo: string | null;
+    price: number;
+  }> = [];
+
+  myListings = (await getLocalMarketListingsBySeller(session.user.id)).map((item) => ({
+    id: item.id,
+    imageUrl: item.imageUrl,
+    cardNo: item.cardNo,
+    cardName: item.cardName,
+    serialNo: item.serialNo,
+    price: Number(item.price || 0),
+  }));
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1830_0%,#090a10_55%,#05060a_100%)] px-3 py-4 text-white sm:px-6 sm:py-10">
       <section className="mx-auto max-w-7xl">
-        {/* HEADER */}
         <div className="mb-6 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-violet-400/10 p-3 text-violet-300">
@@ -55,29 +59,18 @@ export default async function SellerCenterPage() {
             href="/profile/me"
             className="w-fit rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3 text-xs font-bold text-violet-300 transition hover:bg-violet-500/20 sm:px-5 sm:text-sm"
           >
-            👤 ดูโปรไฟล์ฉัน
+            ดูโปรไฟล์ฉัน
           </Link>
         </div>
 
-        {/* EMPTY */}
         {myListings.length === 0 ? (
           <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/50 backdrop-blur-xl sm:rounded-[32px] sm:p-10">
             ยังไม่มีโพสต์ขาย
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-8">
-            {myListings.map((item: any, index: number) => (
-              <div
-                key={item.id}
-                className="group relative"
-                style={{
-                  transform:
-                    typeof window !== "undefined" &&
-                    window.innerWidth >= 640
-                      ? `rotate(${index % 2 === 0 ? "-2deg" : "2deg"})`
-                      : "none",
-                }}
-              >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-8 xl:grid-cols-4">
+            {myListings.map((item) => (
+              <div key={item.id} className="group relative">
                 <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.05] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-[0_0_80px_rgba(139,92,246,0.18)] sm:rounded-[32px] sm:hover:-translate-y-2">
                   <Link
                     href={`/market/card/${item.id}`}
@@ -110,12 +103,11 @@ export default async function SellerCenterPage() {
 
                       <div className="mt-2 flex items-center gap-1 text-sm font-black text-amber-300 sm:mt-3 sm:gap-2 sm:text-lg">
                         <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        ฿{Number(item.price).toLocaleString("th-TH")}
+                        ฿{Number(item.price || 0).toLocaleString("th-TH")}
                       </div>
                     </div>
                   </Link>
 
-                  {/* ACTIONS */}
                   <div className="grid grid-cols-2 gap-2 p-2 sm:gap-3 sm:p-4">
                     <Link
                       href={`/market/edit/${item.id}`}

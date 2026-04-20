@@ -13,18 +13,25 @@ export default function CardStatsClient({
   initialViews: number;
   initialLikes: number;
 }) {
-  const [likes, setLikes] = useState(initialLikes);
   const [views, setViews] = useState(initialViews);
   const hasTrackedView = useRef(false);
+  const [liked] = useState(() => {
+    if (typeof window === "undefined") return false;
 
-  useEffect(() => {
-    const raw = localStorage.getItem("nexora_market_likes");
-    const parsed = raw ? JSON.parse(raw) : {};
+    try {
+      const raw = localStorage.getItem("nexora_market_likes");
+      const parsed = raw ? JSON.parse(raw) : {};
 
-    const liked = !!parsed[cardNo];
-
-    setLikes(initialLikes + (liked ? 1 : 0));
-  }, [cardNo, initialLikes]);
+      return (
+        !!parsed[listingId] ||
+        (Array.isArray(parsed) && parsed.includes(listingId)) ||
+        !!parsed[cardNo]
+      );
+    } catch {
+      return false;
+    }
+  });
+  const likes = initialLikes + (liked ? 1 : 0);
 
   useEffect(() => {
     if (hasTrackedView.current) return;

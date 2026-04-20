@@ -1,27 +1,47 @@
 import { prisma } from "@/lib/prisma";
 import DashboardCharts from "./DashboardCharts";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminDashboardPage() {
-  const totalUsers = await prisma.user.count();
-  const totalRewards = await prisma.reward.count();
-  const totalCoupons = await prisma.coupon.count();
-  const usedCoupons = await prisma.coupon.count({
-    where: { used: true },
-  });
+  let totalUsers = 0;
+  let totalRewards = 0;
+  let totalCoupons = 0;
+  let usedCoupons = 0;
+  let users: Array<{ createdAt: Date; nexPoint: number; coin: number }> = [];
+  let latestLogs: any[] = [];
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "asc" },
-    select: {
-      createdAt: true,
-      nexPoint: true,
-      coin: true,
-    },
-  });
-
-  const latestLogs = await prisma.pointLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
+  try {
+    [totalUsers, totalRewards, totalCoupons, usedCoupons, users, latestLogs] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.reward.count(),
+        prisma.coupon.count(),
+        prisma.coupon.count({
+          where: { used: true },
+        }),
+        prisma.user.findMany({
+          orderBy: { createdAt: "asc" },
+          select: {
+            createdAt: true,
+            nexPoint: true,
+            coin: true,
+          },
+        }),
+        prisma.pointLog.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+      ]);
+  } catch {
+    totalUsers = 0;
+    totalRewards = 0;
+    totalCoupons = 0;
+    usedCoupons = 0;
+    users = [];
+    latestLogs = [];
+  }
 
   const totalNex = users.reduce(
   (sum: number, user: any) => sum + user.nexPoint,

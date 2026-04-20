@@ -8,7 +8,8 @@ import {
   translate,
   type Locale,
 } from "@/lib/i18n-core";
-import { prisma } from "@/lib/prisma";
+import { getAllLocalDeals } from "@/lib/local-deal-store";
+import { getLocalMarketListingById, getLocalMarketListings } from "@/lib/local-market-store";
 import CardStatsClient from "./CardStatsClient";
 import RequestDealButton from "./RequestDealButton";
 import WishlistButton from "./WishlistButton";
@@ -16,8 +17,70 @@ import WishlistButton from "./WishlistButton";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type DetailListing = {
+  id: string;
+  cardNo: string;
+  serialNo: string | null;
+  price: number;
+  sellerId: string;
+  status: string;
+  likes: number;
+  views: number;
+  createdAt: string | Date;
+  cardName: string | null;
+  imageUrl: string | null;
+  rarity: string | null;
+  seller: {
+    id: string;
+    displayName: string | null;
+    name: string | null;
+    image: string | null;
+  } | null;
+};
+
+type RelatedListing = {
+  id: string;
+  cardNo: string;
+  price: number;
+  createdAt: string | Date;
+  status: string;
+  sellerId: string;
+  seller: {
+    id: string;
+    displayName: string | null;
+    name: string | null;
+    image: string | null;
+  } | null;
+};
+
+type OfferRow = {
+  id: string;
+  createdAt: string | Date;
+  sellerId: string;
+  buyerId: string;
+  cardId: string;
+  status: string;
+  offeredPrice: number;
+  buyer: {
+    id: string;
+    displayName: string | null;
+    name: string | null;
+    image: string | null;
+  } | null;
+};
+
+type CompletedDealSnapshot = {
+  offeredPrice: number;
+  createdAt: string | Date;
+};
+
 function getLocalCardImage(cardNo: string) {
   return `/cards/${String(cardNo || "").trim().padStart(3, "0")}.jpg`;
+}
+
+function toDate(value?: string | Date | null) {
+  if (value instanceof Date) return value;
+  return new Date(String(value || "1970-01-01T00:00:00.000Z"));
 }
 
 function formatCurrency(value: number, locale: Locale) {
@@ -57,7 +120,7 @@ function getMedian(values: number[]) {
 
 function getDisplayName(
   locale: Locale,
-  user?: { displayName?: string | null; name?: string | null }
+  user?: { displayName?: string | null; name?: string | null } | null
 ) {
   return (
     user?.displayName ||
@@ -149,185 +212,119 @@ export default async function MarketCardDetailPage({
   const { id } = await params;
   const cookieStore = await cookies();
   const locale = resolveLocale(cookieStore.get("nexora_locale")?.value);
+  const [localListing, allListings, allDeals] = await Promise.all([
+    getLocalMarketListingById(id),
+    getLocalMarketListings(),
+    getAllLocalDeals(),
+  ]);
 
-  const listing = await prisma.marketListing.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      cardNo: true,
-      serialNo: true,
-      price: true,
-      sellerId: true,
-      status: true,
-      likes: true,
-      views: true,
-      createdAt: true,
-      cardName: true,
-      imageUrl: true,
-      rarity: true,
-      seller: {
-        select: {
-          id: true,
-          displayName: true,
-          name: true,
-          image: true,
+  const listing: DetailListing | null = localListing
+    ? {
+        ...localListing,
+        seller: {
+          id: localListing.sellerId,
+          displayName: localListing.sellerName,
+          name: localListing.sellerName,
+          image: localListing.sellerImage,
         },
-      },
-    },
-  });
+      }
+    : null;
 
   if (!listing) {
     return (
       <div className="rounded-[28px] border border-red-400/20 bg-red-500/10 p-6 text-white">
-        Card listing not found
+        {translate(locale, "market.card.unavailable")}
       </div>
     );
   }
 
-  const relatedListings = await prisma.marketListing.findMany({
-    where: {
-      cardNo: listing.cardNo,
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
-    select: {
-      id: true,
-      cardNo: true,
-      price: true,
-      createdAt: true,
-      status: true,
-      sellerId: true,
+  const relatedListings: RelatedListing[] = allListings
+    .filter((item) => item.cardNo === String(listing.cardNo))
+    .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
+    .map((item) => ({
+      id: item.id,
+      cardNo: item.cardNo,
+      price: Number(item.price || 0),
+      createdAt: item.createdAt,
+      status: item.status,
+      sellerId: item.sellerId,
       seller: {
-        select: {
-          id: true,
-          displayName: true,
-          name: true,
-          image: true,
-        },
+        id: item.sellerId,
+        displayName: item.sellerName,
+        name: item.sellerName,
+        image: item.sellerImage,
       },
-    },
-  });
+    }));
 
   const relatedListingIds = relatedListings.map((item) => item.id);
+  const offerRows: OfferRow[] = allDeals
+    .filter(
+      (item) =>
+        item.cardId === listing.id &&
+        ["pending", "accepted", "completed"].includes(item.status)
+    )
+    .sort((a, b) => toDate(b.createdAt).getTime() - toDate(a.createdAt).getTime())
+    .slice(0, 8)
+    .map((item) => ({
+      id: item.id,
+      createdAt: item.createdAt,
+      sellerId: item.sellerId,
+      buyerId: item.buyerId,
+      cardId: item.cardId,
+      status: item.status,
+      offeredPrice: Number(item.offeredPrice || 0),
+      buyer: {
+        id: item.buyerId,
+        displayName: item.buyerName,
+        name: item.buyerName,
+        image: item.buyerImage,
+      },
+    }));
 
-  const [
-    historyRows,
-    offerRows,
-    sameRarityActiveCount,
-    totalActiveListings,
-    latestCompletedDeal,
-    completedDealsForCard,
-  ] = await Promise.all([
-    relatedListingIds.length
-      ? prisma.marketHistory.findMany({
-          where: {
-            listingId: {
-              in: relatedListingIds,
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 18,
-          include: {
-            listing: {
-              select: {
-                id: true,
-                price: true,
-                seller: {
-                  select: {
-                    displayName: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
-    prisma.dealRequest.findMany({
-      where: {
-        cardId: listing.id,
-        status: {
-          in: ["pending", "accepted", "completed"],
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 8,
-      include: {
+  const activeListings = allListings.filter(
+    (item) => String(item.status || "").toLowerCase() !== "sold"
+  );
+  const sameRarityActiveCount = activeListings.filter(
+    (item) => String(item.rarity || "") === String(listing.rarity || "")
+  ).length;
+  const totalActiveListings = activeListings.length;
+  const latestCompletedDeal: OfferRow | null =
+    allDeals
+      .filter((item) => item.cardId === listing.id && item.status === "completed")
+      .sort((a, b) => toDate(b.createdAt).getTime() - toDate(a.createdAt).getTime())
+      .map((item) => ({
+        id: item.id,
+        createdAt: item.createdAt,
+        sellerId: item.sellerId,
+        buyerId: item.buyerId,
+        cardId: item.cardId,
+        status: item.status,
+        offeredPrice: Number(item.offeredPrice || 0),
         buyer: {
-          select: {
-            id: true,
-            displayName: true,
-            name: true,
-            image: true,
-          },
+          id: item.buyerId,
+          displayName: item.buyerName,
+          name: item.buyerName,
+          image: item.buyerImage,
         },
-      },
-    }),
-    prisma.marketListing.count({
-      where: {
-        NOT: {
-          status: "sold",
-        },
-        rarity: listing.rarity || null,
-      },
-    }),
-    prisma.marketListing.count({
-      where: {
-        NOT: {
-          status: "sold",
-        },
-      },
-    }),
-    listing.status === "sold"
-      ? prisma.dealRequest.findFirst({
-          where: {
-            cardId: listing.id,
-            status: "completed",
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          include: {
-            buyer: {
-              select: {
-                id: true,
-                displayName: true,
-                name: true,
-                image: true,
-              },
-            },
-          },
-        })
-      : Promise.resolve(null),
-    relatedListingIds.length
-      ? prisma.dealRequest.findMany({
-          where: {
-            cardId: {
-              in: relatedListingIds,
-            },
-            status: "completed",
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-          select: {
-            offeredPrice: true,
-            createdAt: true,
-          },
-        })
-      : Promise.resolve([]),
-  ]);
+      }))[0] || null;
+
+  const completedDealsForCard: CompletedDealSnapshot[] = allDeals
+    .filter(
+      (item) =>
+        relatedListingIds.includes(item.cardId) && item.status === "completed"
+    )
+    .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
+    .map((item) => ({
+      offeredPrice: Number(item.offeredPrice || 0),
+      createdAt: item.createdAt,
+    }));
 
   const openOffers = offerRows.filter(
     (item) => item.status === "pending" || item.status === "accepted"
   ).length;
 
   const currentProfileUser = latestCompletedDeal?.buyer || listing.seller;
+  const sellerProfileName = getDisplayName(locale, listing.seller);
   const currentProfileName = getDisplayName(locale, currentProfileUser);
   const currentProfileHref = currentProfileUser?.id
     ? `/profile/${currentProfileUser.id}`
@@ -342,15 +339,15 @@ export default async function MarketCardDetailPage({
     `${openOffers} open offer${openOffers === 1 ? "" : "s"}`,
     `${listing.likes} likes`,
     `${listing.views} views`,
-    formatRelativeDays(listing.createdAt, locale),
+    formatRelativeDays(toDate(listing.createdAt), locale),
     String(listing.status || "active").toUpperCase(),
   ].filter(Boolean) as string[];
 
   const marketSnapshots = [...relatedListings]
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
     .map((item) => ({
       price: Number(item.price || 0),
-      createdAt: item.createdAt,
+      createdAt: toDate(item.createdAt),
     }))
     .filter((item) => item.price > 0);
 
@@ -373,31 +370,45 @@ export default async function MarketCardDetailPage({
     ...relatedListings.map((item) => {
       const sellerName = getDisplayName(locale, item.seller);
       return {
-        time: item.createdAt,
-        label: formatDateTime(item.createdAt, locale),
+        time: toDate(item.createdAt),
+        label: formatDateTime(toDate(item.createdAt), locale),
         text: `${sellerName} listed this card for ${formatCurrency(
           Number(item.price || 0),
           locale
         )}`,
       };
     }),
-    ...historyRows.map((item) => {
-      const sellerName = getDisplayName(locale, item.listing?.seller);
-      const detail = String(item.detail || "").trim();
+    ...allDeals
+      .filter(
+        (item) =>
+          relatedListingIds.includes(item.cardId) &&
+          ["accepted", "completed"].includes(item.status)
+      )
+      .map((item) => {
+        const eventTime = toDate(item.createdAt);
+        const sellerName =
+          item.sellerName || getDisplayName(locale, listing.seller);
+        const detail =
+          item.status === "completed"
+            ? describeHistoryAction(
+                "sold",
+                sellerName,
+                locale,
+                Number(item.offeredPrice || 0)
+              )
+            : describeHistoryAction(
+                "deal_accepted",
+                sellerName,
+                locale,
+                Number(item.offeredPrice || 0)
+              );
 
-      return {
-        time: item.createdAt,
-        label: formatDateTime(item.createdAt, locale),
-        text:
-          detail ||
-          describeHistoryAction(
-            String(item.action || ""),
-            sellerName,
-            locale,
-            item.price ?? item.listing?.price ?? null
-          ),
-      };
-    }),
+        return {
+          time: eventTime,
+          label: formatDateTime(eventTime, locale),
+          text: detail,
+        };
+      }),
   ]
     .sort((a, b) => b.time.getTime() - a.time.getTime())
     .slice(0, 8);
@@ -422,8 +433,8 @@ export default async function MarketCardDetailPage({
         Number(deal.offeredPrice || 0),
         locale
       )}`,
-      time: formatDateTime(deal.createdAt, locale),
-      image: deal.buyer.image || "/avatar.png",
+      time: formatDateTime(toDate(deal.createdAt), locale),
+      image: deal.buyer?.image || "/avatar.png",
       statusLabel,
     };
   });
@@ -506,13 +517,25 @@ export default async function MarketCardDetailPage({
           </div>
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row md:mt-6">
-            <RequestDealButton cardId={listing.id} sellerId={listing.sellerId} />
+            {String(listing.status || "").toLowerCase() !== "sold" && (
+              <RequestDealButton
+                cardId={listing.id}
+                sellerId={listing.sellerId}
+                sellerName={sellerProfileName}
+                sellerImage={listing.seller?.image || "/avatar.png"}
+                cardName={card.name}
+                cardNo={card.cardNo}
+                cardImage={card.image}
+                listedPrice={Number(listing.price || 0)}
+                serialNo={listing.serialNo}
+              />
+            )}
 
             <WishlistButton
               listingId={listing.id}
               cardNo={card.cardNo}
               cardName={card.name}
-              sellerName={card.owner}
+              sellerName={sellerProfileName}
             />
           </div>
         </div>

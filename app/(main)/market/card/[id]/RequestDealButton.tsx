@@ -6,9 +6,23 @@ import { useLanguage } from "@/lib/i18n";
 export default function RequestDealButton({
   cardId,
   sellerId,
+  sellerName,
+  sellerImage,
+  cardName,
+  cardNo,
+  cardImage,
+  listedPrice,
+  serialNo,
 }: {
   cardId: string;
   sellerId: string;
+  sellerName: string;
+  sellerImage: string;
+  cardName: string;
+  cardNo: string;
+  cardImage: string;
+  listedPrice: number;
+  serialNo?: string | null;
 }) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
@@ -36,6 +50,13 @@ export default function RequestDealButton({
           cardId,
           sellerId,
           offeredPrice: price,
+          sellerName,
+          sellerImage,
+          cardName,
+          cardNo,
+          cardImage,
+          listedPrice,
+          serialNo,
         }),
       });
 
@@ -44,11 +65,15 @@ export default function RequestDealButton({
       if (data.success) {
         alert(t("deals.request"));
       } else {
-        alert(data.error || t("deals.request"));
+        alert(
+          typeof data?.error === "string" && data.error.trim()
+            ? data.error
+            : "ระบบขอดีลชั่วคราวใช้งานไม่ได้ กรุณาลองใหม่อีกครั้งภายหลัง"
+        );
       }
     } catch (error) {
       console.error("REQUEST DEAL ERROR:", error);
-      alert(t("deals.request"));
+      alert("ระบบขอดีลชั่วคราวใช้งานไม่ได้ กรุณาลองใหม่อีกครั้งภายหลัง");
     } finally {
       setLoading(false);
     }

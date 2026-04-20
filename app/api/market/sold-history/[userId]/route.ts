@@ -1,29 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getAllLocalDeals } from "@/lib/local-deal-store";
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   context: { params: Promise<{ userId: string }> }
 ) {
-  const { userId } = await context.params; // 🔥 ต้อง await
+  const { userId } = await context.params;
 
   try {
-    const history = await prisma.marketHistory.findMany({
-      where: {
-        OR: [
-          { sellerId: userId },
-          { buyerId: userId },
-        ],
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const history = (await getAllLocalDeals())
+      .filter(
+        (item) =>
+          item.status === "completed" &&
+          (item.sellerId === userId || item.buyerId === userId)
+      )
+      .sort((a, b) =>
+        String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+      );
 
     return NextResponse.json(history);
-  } catch (error) {
-    console.error("SOLD HISTORY ERROR:", error);
-
+  } catch {
     return NextResponse.json(
       { error: "โหลดข้อมูลไม่สำเร็จ" },
       { status: 500 }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { createClient } from "@supabase/supabase-js";
-import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { resolveUserIdentity } from "@/lib/user-identity";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,20 +20,33 @@ function safeImage(image?: string | null) {
   return value || "/avatar.png";
 }
 
+function buildRoomId(userA: string, userB: string) {
+  return [userA, userB].sort().join("__");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const user1 = String(session?.user?.id || "").trim();
+    const identity = await resolveUserIdentity(session?.user);
+    const user1 = identity.userId;
 
     if (!user1) {
-      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+      return NextResponse.json(
+        { error: "กรุณาเข้าสู่ระบบ" },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
     const user2 = String(body?.user2 || "").trim();
+    const user2Name = String(body?.user2Name || "").trim();
+    const user2Image = String(body?.user2Image || "").trim();
 
     if (!user2) {
-      return NextResponse.json({ error: "ไม่พบผู้ใช้ปลายทาง" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ไม่พบผู้ใช้ปลายทาง" },
+        { status: 400 }
+      );
     }
 
     if (user1 === user2) {
@@ -42,66 +56,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [currentUser, targetUser] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: user1 },
-        select: {
-          id: true,
-          name: true,
-          displayName: true,
-          image: true,
-        },
-      }),
-      prisma.user.findUnique({
-        where: { id: user2 },
-        select: {
-          id: true,
-          name: true,
-          displayName: true,
-          image: true,
-        },
-      }),
+    const [currentProfile, targetProfile] = await Promise.all([
+      getLocalProfileByUserId(user1),
+      getLocalProfileByUserId(user2),
     ]);
 
-    if (!currentUser || !targetUser) {
-      return NextResponse.json(
-        { error: "ไม่พบข้อมูลผู้ใช้" },
-        { status: 404 }
-      );
-    }
-
-    const existingRoom = await prisma.dmRoom.findFirst({
-      where: {
-        OR: [{ user1, user2 }, { user1: user2, user2: user1 }],
-      },
-      select: { id: true },
-    });
-
-    const roomId =
-      existingRoom?.id ||
-      (
-        await prisma.dmRoom.create({
-          data: { user1, user2 },
-          select: { id: true },
-        })
-      ).id;
-
+    const roomId = buildRoomId(user1, user2);
     const nowIso = new Date().toISOString();
 
     const { error: upsertError } = await supabase.from("dm_room").upsert({
       roomid: roomId,
-      usera: currentUser.id,
-      userb: targetUser.id,
-      useraname: safeName(currentUser.displayName || currentUser.name, "You"),
-      useraimage: safeImage(currentUser.image),
-      userbname: safeName(targetUser.displayName || targetUser.name),
-      userbimage: safeImage(targetUser.image),
+      usera: user1,
+      userb: user2,
+      useraname: safeName(currentProfile?.displayName || identity.name, "You"),
+      useraimage: safeImage(currentProfile?.image || identity.image),
+      userbname: safeName(targetProfile?.displayName || user2Name),
+      userbimage: safeImage(targetProfile?.image || user2Image),
       updatedat: nowIso,
     });
 
     if (upsertError) {
-      console.error("UPSERT DM ROOM ERROR:", upsertError);
-
       return NextResponse.json(
         { error: "ไม่สามารถสร้างห้องแชทได้" },
         { status: 500 }
@@ -112,9 +86,7 @@ export async function POST(req: NextRequest) {
       success: true,
       roomId,
     });
-  } catch (error) {
-    console.error("CREATE ROOM ERROR:", error);
-
+  } catch {
     return NextResponse.json(
       { error: "ระบบเกิดข้อผิดพลาด" },
       { status: 500 }

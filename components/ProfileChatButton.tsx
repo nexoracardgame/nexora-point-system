@@ -46,6 +46,8 @@ export default function ProfileChatButton({
         },
         body: JSON.stringify({
           user2: targetUserId,
+          user2Name: targetUserName,
+          user2Image: targetUserImage,
         }),
       });
 
@@ -75,18 +77,18 @@ export default function ProfileChatButton({
   };
 
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div className={className}>
       <button
         type="button"
         onClick={openChat}
         disabled={isPending || isCreating}
-        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-white/18 bg-white/[0.1] px-5 py-2.5 text-sm font-bold text-white transition hover:scale-[1.02] hover:bg-white/[0.16] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-white/80 bg-white px-5 py-2.5 text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
       >
         <MessageCircle className="h-4 w-4" />
         {isPending || isCreating ? "กำลังเปิดแชท..." : "แชท"}
       </button>
 
-      {error ? <div className="text-xs text-red-300">{error}</div> : null}
+      {error ? <div className="mt-2 text-xs text-red-300">{error}</div> : null}
     </div>
   );
 }

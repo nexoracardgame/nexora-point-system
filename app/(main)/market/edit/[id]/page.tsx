@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getLocalMarketListingById } from "@/lib/local-market-store";
 import { Coins, Sparkles, PencilLine } from "lucide-react";
 import EditListingForm from "@/components/EditListingForm";
 
@@ -9,12 +9,14 @@ export default async function EditListingPage({
 }) {
   const { id } = await params;
 
-  const listing = await prisma.marketListing.findUnique({
-    where: { id },
-  });
+  const listing = await getLocalMarketListingById(id);
 
-  let sheetCard: any = null;
+  let sheetCard: { card_name?: string | null } | null = null;
   try {
+    if (!listing) {
+      throw new Error("missing-listing");
+    }
+
     const res = await fetch(
       `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/card?cardNo=${listing?.cardNo}`,
       { next: { revalidate: 300 } }
