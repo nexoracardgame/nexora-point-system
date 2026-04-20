@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getLocalMarketListings } from "@/lib/local-market-store";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export async function GET() {
   const listings = await getLocalMarketListings();
 
@@ -23,5 +26,9 @@ export async function GET() {
       sellerImage: item.sellerImage || "/default-avatar.png",
     }));
 
-  return NextResponse.json(fixed);
+  return NextResponse.json(fixed, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
 }

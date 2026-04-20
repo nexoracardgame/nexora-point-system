@@ -1,7 +1,8 @@
 import { getLocalMarketListings } from "@/lib/local-market-store";
 import MarketDashboardTFT from "./MarketDashboardTFT";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 type DashboardItem = {
   id: string;

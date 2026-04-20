@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "fs/promises";
+import crypto from "crypto";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
 
@@ -20,6 +21,8 @@ export async function POST(req: Request) {
       );
     }
 
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
     const extFromType =
       file.type === "image/png"
         ? ".png"
@@ -27,13 +30,14 @@ export async function POST(req: Request) {
           ? ".webp"
           : ".jpg";
     const safeKind = kind === "profile" ? "profile" : "cover";
-    const fileName = `profile-assets/${safeKind}-${Date.now()}${extFromType}`;
+    const fileName = `profile-assets/${safeKind}-${Date.now()}-${crypto.randomUUID()}${extFromType}`;
 
     const { error: storageError } = await supabase.storage
       .from("chat-images")
-      .upload(fileName, file, {
-        upsert: true,
+      .upload(fileName, buffer, {
+        upsert: false,
         contentType: file.type || "image/jpeg",
+        cacheControl: "31536000",
       });
 
     if (!storageError) {
@@ -46,8 +50,14 @@ export async function POST(req: Request) {
       });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    if (process.env.NODE_ENV === "production") {
+      console.error("PROFILE STORAGE UPLOAD ERROR:", storageError);
+      return Response.json(
+        { error: "Upload failed" },
+        { status: 500 }
+      );
+    }
+
     const localFileName = `${safeKind}-${Date.now()}${extFromType}`;
     const uploadDir = path.join(process.cwd(), "public", "uploads", safeKind);
     const filePath = path.join(uploadDir, localFileName);

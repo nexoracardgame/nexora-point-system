@@ -9,6 +9,7 @@ import {
   Handshake,
   ShieldCheck,
 } from "lucide-react";
+import { listenProfileSync } from "@/lib/profile-sync";
 
 type MarketItem = {
   id: string;
@@ -231,6 +232,79 @@ export default function MarketDashboardTFT({
 
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return listenProfileSync((detail) => {
+      const currentUserId = String(session?.user?.id || "").trim();
+      const nextName = String(detail.name || "").trim();
+      const nextImage = String(detail.image || "").trim();
+
+      if (!currentUserId || (!nextName && !nextImage)) {
+        return;
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          if (String(item.sellerId || "").trim() !== currentUserId) {
+            return item;
+          }
+
+          return {
+            ...item,
+            sellerName: nextName || item.sellerName,
+            sellerImage: nextImage || item.sellerImage,
+          };
+        })
+      );
+    });
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      void fetch("/api/market/listings", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data) => {
+          const mapped = ((data || []) as ListingApiItem[]).map((item) => {
+            const cardNo = item.card_no || item.cardNo || item.id;
+
+            return {
+              id: item.id,
+              cardNo: String(cardNo),
+              name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
+              price: `เธฟ${Number(item.price || 0).toLocaleString()}`,
+              likes: item.likes || 0,
+              rarity: item.rarity || "Legendary",
+              image:
+                item.image_url ||
+                item.imageUrl ||
+                `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
+              createdAt: item.createdAt,
+              sellerId: item.sellerId || item.seller?.id,
+              sellerName:
+                item.sellerName ||
+                item.seller?.displayName ||
+                item.seller?.name ||
+                "Unknown Seller",
+              sellerImage:
+                item.sellerImage ||
+                item.seller?.image ||
+                "/default-avatar.png",
+            };
+          });
+
+          setItems(mapped);
+        })
+        .catch(() => undefined);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
     };
   }, []);
 

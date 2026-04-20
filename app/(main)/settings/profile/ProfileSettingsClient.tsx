@@ -270,6 +270,20 @@ export default function ProfileSettingsClient({
       const syncedName =
         data?.user?.displayName || data?.user?.name || displayName || "";
       const syncedImage = data?.user?.image || profileImage || DEFAULT_PROFILE_URL;
+      const syncedCover =
+        data?.user?.coverImage || coverUrl || DEFAULT_COVER_URL;
+      const syncedCoverPosition =
+        typeof data?.user?.coverPosition === "number"
+          ? data.user.coverPosition
+          : coverPosition;
+
+      setDisplayName(syncedName);
+      setProfileImage(syncedImage);
+      setCoverUrl(syncedCover);
+      setCoverPosition(syncedCoverPosition);
+      setBio(data?.user?.bio ?? bio);
+      setLineLink(data?.user?.lineUrl ?? lineLink);
+      setFacebookLink(data?.user?.facebookUrl ?? facebookLink);
 
       emitProfileSync({
         name: syncedName,
