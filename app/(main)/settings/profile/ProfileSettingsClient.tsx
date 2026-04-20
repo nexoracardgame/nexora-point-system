@@ -19,6 +19,10 @@ const MAX_SOURCE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const DEFAULT_COVER_URL = "/seller-cover.jpg";
 const DEFAULT_PROFILE_URL = "/avatar.png";
 
+function isInlineDataImage(value?: string | null) {
+  return String(value || "").trim().startsWith("data:image/");
+}
+
 type ImageKind = "profile" | "cover";
 
 type ProfileData = {
@@ -242,14 +246,21 @@ export default function ProfileSettingsClient({
     try {
       setSaving(true);
 
+      const persistedProfileImage = isInlineDataImage(profileImage)
+        ? await uploadProcessedImage(profileImage, "profile")
+        : profileImage;
+      const persistedCoverUrl = isInlineDataImage(coverUrl)
+        ? await uploadProcessedImage(coverUrl, "cover")
+        : coverUrl;
+
       const payload = {
-        coverUrl,
+        coverUrl: persistedCoverUrl,
         coverPosition,
         displayName,
         bio,
         lineLink,
         facebookLink,
-        profileImage,
+        profileImage: persistedProfileImage,
       };
 
       const res = await fetch("/api/profile/update", {
@@ -269,9 +280,10 @@ export default function ProfileSettingsClient({
 
       const syncedName =
         data?.user?.displayName || data?.user?.name || displayName || "";
-      const syncedImage = data?.user?.image || profileImage || DEFAULT_PROFILE_URL;
+      const syncedImage =
+        data?.user?.image || persistedProfileImage || DEFAULT_PROFILE_URL;
       const syncedCover =
-        data?.user?.coverImage || coverUrl || DEFAULT_COVER_URL;
+        data?.user?.coverImage || persistedCoverUrl || DEFAULT_COVER_URL;
       const syncedCoverPosition =
         typeof data?.user?.coverPosition === "number"
           ? data.user.coverPosition
