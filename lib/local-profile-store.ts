@@ -165,9 +165,9 @@ async function readSupabaseProfile(userId: string) {
 
 async function readPrismaProfile(userId: string) {
   try {
-    const data = await prisma.user.findUnique({
+    const data = await prisma.user.findFirst({
       where: {
-        id: userId,
+        OR: [{ id: userId }, { lineId: userId }],
       },
       select: {
         id: true,
@@ -187,7 +187,7 @@ async function readPrismaProfile(userId: string) {
       return null;
     }
 
-    return normalizeProfileRecord(userId, {
+    return normalizeProfileRecord(String(data.id || userId), {
       ...data,
       updatedAt: data.createdAt.toISOString(),
     } as unknown as Record<string, unknown>);
@@ -286,6 +286,10 @@ export async function getLocalProfileByUserId(userId: string) {
       writeLocalProfile(prismaProfile),
     ]).catch(() => undefined);
     return prismaProfile;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return null;
   }
 
   const supabaseProfile = await readSupabaseProfile(userId);

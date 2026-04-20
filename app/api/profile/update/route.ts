@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
 
     await syncUserIdentityEverywhere({
       userId,
+      lineId,
       name: syncedName,
       image: syncedImage,
     }).catch(() => undefined);

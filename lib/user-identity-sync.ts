@@ -35,10 +35,12 @@ function getSupabaseClient() {
 
 export async function syncUserIdentityEverywhere(input: {
   userId: string;
+  lineId?: string | null;
   name?: string | null;
   image?: string | null;
 }) {
   const userId = String(input.userId || "").trim();
+  const lineId = String(input.lineId || "").trim();
 
   if (!userId) {
     return;
@@ -89,6 +91,32 @@ export async function syncUserIdentityEverywhere(input: {
         })
         .eq("senderId", userId)
     );
+
+    if (lineId && lineId !== userId) {
+      tasks.push(
+        supabase
+          .from("dm_room")
+          .update({
+            useraname: name,
+            useraimage: image,
+          })
+          .eq("usera", lineId),
+        supabase
+          .from("dm_room")
+          .update({
+            userbname: name,
+            userbimage: image,
+          })
+          .eq("userb", lineId),
+        supabase
+          .from("dmMessage")
+          .update({
+            senderName: name,
+            senderImage: image,
+          })
+          .eq("senderId", lineId)
+      );
+    }
   }
 
   await Promise.allSettled(tasks);

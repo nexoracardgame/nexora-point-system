@@ -494,6 +494,8 @@ export default async function MarketCardDetailPage({
     <div className="space-y-4 text-white md:space-y-6">
       <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(120,88,255,0.24),transparent_36%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),linear-gradient(135deg,#161624_0%,#0b0d13_62%,#090a0f_100%)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] md:rounded-[40px] md:p-7">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.03),transparent)]" />
+        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl md:h-64 md:w-64" />
+        <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl md:h-56 md:w-56" />
         <div className="relative space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-violet-300/20 bg-violet-400/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.32em] text-violet-200 md:px-4 md:text-[11px]">
@@ -508,9 +510,13 @@ export default async function MarketCardDetailPage({
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px] xl:items-end">
             <div className="space-y-4">
-              <h1 className="max-w-5xl text-3xl font-black leading-[0.92] tracking-[-0.05em] sm:text-5xl lg:text-6xl xl:text-7xl">
+              <h1 className="max-w-5xl text-3xl font-black leading-[0.9] tracking-[-0.06em] sm:text-5xl lg:text-6xl xl:text-7xl">
                 {card.name}
               </h1>
+
+              <p className="max-w-2xl text-sm leading-6 text-white/56 md:text-base">
+                Competitive market profile for this card with live pricing, offer pressure, and ownership movement in one view.
+              </p>
 
               <div className="flex flex-wrap gap-2">
                 <span
@@ -530,7 +536,7 @@ export default async function MarketCardDetailPage({
               </div>
             </div>
 
-            <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 backdrop-blur md:p-5">
+            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-4 backdrop-blur md:p-5">
               <div className="text-[10px] uppercase tracking-[0.3em] text-white/38">
                 Live Price
               </div>
@@ -657,7 +663,118 @@ export default async function MarketCardDetailPage({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] md:gap-6">
+      <section className="space-y-3 md:hidden">
+        <MobileAccordionPanel
+          title={translate(locale, "market.card.marketSignal")}
+          subtitle="Pricing and position"
+          defaultOpen
+        >
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <MiniMetric
+                label={translate(locale, "market.card.low")}
+                value={floorPriceDisplay}
+              />
+              <MiniMetric
+                label={translate(locale, "market.card.fairPrice")}
+                value={medianPriceDisplay}
+              />
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-[#090b12] p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/38">
+                  Price Wave
+                </div>
+                <div className="text-[10px] text-white/42">{pricePoints.length} pts</div>
+              </div>
+              <div className="relative h-28 overflow-hidden rounded-[16px] border border-white/6 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.14),transparent_48%),linear-gradient(180deg,#0a0c13_0%,#07090e_100%)]">
+                {pricePoints.length > 1 ? (
+                  <svg viewBox="0 0 320 120" className="h-full w-full">
+                    <defs>
+                      <linearGradient id="priceWaveMobile" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#22d3ee" />
+                        <stop offset="55%" stopColor="#8b5cf6" />
+                        <stop offset="100%" stopColor="#f59e0b" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d={pricePath}
+                      fill="none"
+                      stroke="url(#priceWaveMobile)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-white/45">
+                    {translate(locale, "market.card.notEnoughHistory")}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </MobileAccordionPanel>
+
+        <MobileAccordionPanel
+          title={translate(locale, "market.card.timeline")}
+          subtitle="Ownership trail"
+        >
+          <div className="space-y-3">
+            {timelineEvents.slice(0, 3).map((item, index) => (
+              <div
+                key={`${item.label}-${item.text}`}
+                className="rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-violet-300/20 bg-violet-400/10 text-[10px] font-black text-violet-200">
+                    {String(index + 1).padStart(2, "0")}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-white/90">{item.label}</div>
+                    <div className="mt-1 text-xs leading-5 text-white/62">{item.text}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </MobileAccordionPanel>
+
+        <MobileAccordionPanel
+          title={translate(locale, "market.card.recentOffers")}
+          subtitle="Buyer pressure"
+        >
+          <div className="space-y-3">
+            {recentOffers.length > 0 ? (
+              recentOffers.slice(0, 3).map((offer) => (
+                <div
+                  key={offer.id}
+                  className="flex items-center gap-3 rounded-[18px] border border-emerald-400/12 bg-[linear-gradient(180deg,rgba(16,185,129,0.10),rgba(255,255,255,0.02))] px-4 py-3"
+                >
+                  <Image
+                    src={offer.image}
+                    alt={offer.buyerName}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-2xl object-cover ring-1 ring-white/10"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold text-white/92">
+                      {offer.text}
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/50">{offer.time}</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-[18px] border border-white/6 bg-white/[0.03] px-4 py-3 text-xs text-white/55">
+                {translate(locale, "market.card.noOffers")}
+              </div>
+            )}
+          </div>
+        </MobileAccordionPanel>
+      </section>
+
+      <section className="hidden gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] md:grid md:gap-6">
         <Panel
           title={translate(locale, "market.card.marketSignal")}
           subtitle="Clean market readout for pricing and positioning"
@@ -789,7 +906,7 @@ export default async function MarketCardDetailPage({
         </Panel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:gap-6">
+      <section className="hidden gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:grid md:gap-6">
         <Panel
           title={translate(locale, "market.card.recentOffers")}
           subtitle="Live buyer pressure around this card"
@@ -960,6 +1077,40 @@ function InsightCard({
       </div>
       <div className="mt-2 text-xs text-white/45">{hint}</div>
     </div>
+  );
+}
+
+function MobileAccordionPanel({
+  title,
+  subtitle,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,#151624_0%,#0a0d12_100%)] shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
+    >
+      <summary className="cursor-pointer list-none px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-base font-black tracking-[-0.03em] text-white">
+              {title}
+            </div>
+            {subtitle ? (
+              <div className="mt-1 text-xs text-white/42">{subtitle}</div>
+            ) : null}
+          </div>
+          <div className="text-lg text-white/36 transition group-open:rotate-45">+</div>
+        </div>
+      </summary>
+      <div className="border-t border-white/6 px-4 pb-4 pt-1">{children}</div>
+    </details>
   );
 }
 

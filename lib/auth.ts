@@ -58,15 +58,66 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
   );
 
   try {
-    const dbUser = await prisma.user.upsert({
+    const existingUser = await prisma.user.findUnique({
       where: { lineId },
-      update: {
-        name: safeName,
-        image: safeImage,
+      select: {
+        id: true,
+        lineId: true,
+        name: true,
+        image: true,
+        displayName: true,
+        role: true,
+        nexPoint: true,
+        coin: true,
       },
-      create: {
+    });
+
+    if (existingUser) {
+      const needsPatch =
+        !String(existingUser.name || "").trim() ||
+        !String(existingUser.image || "").trim() ||
+        !String(existingUser.displayName || "").trim();
+
+      if (needsPatch) {
+        const patchedUser = await prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name: String(existingUser.name || "").trim() ? undefined : safeName,
+            displayName: String(existingUser.displayName || "").trim()
+              ? undefined
+              : safeName,
+            image: String(existingUser.image || "").trim() ? undefined : safeImage,
+          },
+          select: {
+            id: true,
+            lineId: true,
+            name: true,
+            image: true,
+            role: true,
+            nexPoint: true,
+            coin: true,
+          },
+        });
+
+        return patchedUser satisfies DbUserSnapshot;
+      }
+
+      return {
+        id: existingUser.id,
+        lineId: existingUser.lineId,
+        name: existingUser.displayName || existingUser.name,
+        image: existingUser.image,
+        role: existingUser.role,
+        nexPoint: existingUser.nexPoint,
+        coin: existingUser.coin,
+      } satisfies DbUserSnapshot;
+    }
+
+    const createdUser = await prisma.user.create({
+      data: {
         lineId,
         name: safeName,
+        displayName: safeName,
         image: safeImage,
         role: "USER",
       },
@@ -81,7 +132,7 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
       },
     });
 
-    return dbUser satisfies DbUserSnapshot;
+    return createdUser satisfies DbUserSnapshot;
   } catch (error) {
     console.error("AUTH USER UPSERT ERROR:", error);
     return null;
