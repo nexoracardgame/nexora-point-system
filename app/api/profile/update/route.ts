@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { upsertLocalProfile } from "@/lib/local-profile-store";
+import { prisma } from "@/lib/prisma";
 import { syncUserIdentityEverywhere } from "@/lib/user-identity-sync";
 
 export async function POST(req: NextRequest) {
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     const userId = String(
       (session?.user as { id?: string } | undefined)?.id || ""
+    ).trim();
+    const lineId = String(
+      (session?.user as { lineId?: string } | undefined)?.lineId || ""
     ).trim();
 
     if (!userId) {
@@ -41,6 +45,38 @@ export async function POST(req: NextRequest) {
       lineUrl: String(lineLink || "").trim() || null,
       facebookUrl: String(facebookLink || "").trim() || null,
     };
+
+    if (lineId) {
+      await prisma.user
+        .upsert({
+          where: {
+            lineId,
+          },
+          update: {
+            name: fallbackUser.displayName,
+            displayName: fallbackUser.displayName,
+            image: fallbackUser.image,
+            coverImage: fallbackUser.coverImage,
+            coverPosition: fallbackUser.coverPosition,
+            bio: fallbackUser.bio,
+            lineUrl: fallbackUser.lineUrl,
+            facebookUrl: fallbackUser.facebookUrl,
+          },
+          create: {
+            lineId,
+            name: fallbackUser.displayName,
+            displayName: fallbackUser.displayName,
+            image: fallbackUser.image,
+            coverImage: fallbackUser.coverImage,
+            coverPosition: fallbackUser.coverPosition,
+            bio: fallbackUser.bio,
+            lineUrl: fallbackUser.lineUrl,
+            facebookUrl: fallbackUser.facebookUrl,
+            role: "USER",
+          },
+        })
+        .catch(() => undefined);
+    }
 
     const updatedUser = await upsertLocalProfile(userId, fallbackUser).catch(
       (error) => {

@@ -9,9 +9,30 @@ export async function cleanupDealChat(dealId: string) {
     return;
   }
 
-  const { error } = await supabase.from("dmMessage").delete().eq("roomId", roomId);
+  const [messageResult, roomResult] = await Promise.allSettled([
+    supabase.from("dmMessage").delete().eq("roomId", roomId),
+    supabase.from("dm_room").delete().eq("roomid", roomId),
+  ]);
 
-  if (error) {
-    console.error("DEAL CHAT CLEANUP ERROR:", error);
+  if (
+    messageResult.status === "fulfilled" &&
+    messageResult.value.error
+  ) {
+    console.error("DEAL CHAT MESSAGE CLEANUP ERROR:", messageResult.value.error);
+  }
+
+  if (
+    roomResult.status === "fulfilled" &&
+    roomResult.value.error
+  ) {
+    console.error("DEAL CHAT ROOM CLEANUP ERROR:", roomResult.value.error);
+  }
+
+  if (messageResult.status === "rejected") {
+    console.error("DEAL CHAT MESSAGE CLEANUP ERROR:", messageResult.reason);
+  }
+
+  if (roomResult.status === "rejected") {
+    console.error("DEAL CHAT ROOM CLEANUP ERROR:", roomResult.reason);
   }
 }

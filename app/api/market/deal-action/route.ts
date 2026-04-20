@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getDealChatRoomId } from "@/lib/deal-chat";
+import { cleanupDealChat } from "@/lib/deal-chat-cleanup";
 import { publishDealEvent } from "@/lib/deal-events";
 import { createLocalNotification } from "@/lib/local-notification-store";
 import { prisma } from "@/lib/prisma";
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -64,6 +67,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "reject") {
+      await cleanupDealChat(deal.id).catch(() => undefined);
+
       await createLocalNotification({
         userId: deal.buyer.id,
         type: "deal",
@@ -110,6 +115,22 @@ export async function POST(req: NextRequest) {
           status: "accepted",
         },
       });
+
+      const supabase = getServerSupabaseClient();
+      if (supabase) {
+        try {
+          await supabase.from("dm_room").upsert({
+            roomid: getDealChatRoomId(deal.id),
+            usera: deal.buyer.id,
+            userb: deal.seller.id,
+            useraname: deal.buyer.displayName || deal.buyer.name || "Buyer",
+            useraimage: deal.buyer.image || "/avatar.png",
+            userbname: deal.seller.displayName || deal.seller.name || "Seller",
+            userbimage: deal.seller.image || "/avatar.png",
+            updatedat: new Date().toISOString(),
+          });
+        } catch {}
+      }
 
       await createLocalNotification({
         userId: deal.buyer.id,

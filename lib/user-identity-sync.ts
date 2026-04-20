@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { syncLocalDealIdentity } from "@/lib/local-deal-store";
 import { syncLocalMarketIdentity } from "@/lib/local-market-store";
+import { prisma } from "@/lib/prisma";
 import { sanitizeUserImage, sanitizeUserName } from "@/lib/user-identity";
 
 let supabaseClient: SupabaseClient | null | undefined;
@@ -48,6 +49,18 @@ export async function syncUserIdentityEverywhere(input: {
   const supabase = getSupabaseClient();
 
   const tasks: Array<PromiseLike<unknown> | unknown> = [
+    prisma.user
+      .update({
+        where: {
+          id: userId,
+        },
+        data: {
+          name,
+          displayName: name,
+          image,
+        },
+      })
+      .catch(() => undefined),
     syncLocalMarketIdentity(userId, name, image),
     syncLocalDealIdentity(userId, name, image),
   ];

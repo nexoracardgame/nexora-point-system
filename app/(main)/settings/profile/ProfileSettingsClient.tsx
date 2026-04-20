@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useRef, useState } from "react";
 import {
   Camera,
@@ -46,6 +47,7 @@ export default function ProfileSettingsClient({
   initialProfile: ProfileData;
 }) {
   const router = useRouter();
+  const { update } = useSession();
   const [saving, setSaving] = useState(false);
   const [processingImage, setProcessingImage] = useState<ImageKind | null>(
     null
@@ -296,6 +298,11 @@ export default function ProfileSettingsClient({
       setBio(data?.user?.bio ?? bio);
       setLineLink(data?.user?.lineUrl ?? lineLink);
       setFacebookLink(data?.user?.facebookUrl ?? facebookLink);
+
+      await update({
+        name: syncedName,
+        image: syncedImage,
+      }).catch(() => undefined);
 
       emitProfileSync({
         name: syncedName,

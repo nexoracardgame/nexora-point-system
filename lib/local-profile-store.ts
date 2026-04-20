@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { prisma } from "@/lib/prisma";
 import {
   ensureLocalStoreFile,
   readLocalStoreJson,
@@ -162,6 +163,39 @@ async function readSupabaseProfile(userId: string) {
   }
 }
 
+async function readPrismaProfile(userId: string) {
+  try {
+    const data = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        displayName: true,
+        coverImage: true,
+        coverPosition: true,
+        bio: true,
+        lineUrl: true,
+        facebookUrl: true,
+        createdAt: true,
+      },
+    });
+
+    if (!data) {
+      return null;
+    }
+
+    return normalizeProfileRecord(userId, {
+      ...data,
+      updatedAt: data.createdAt.toISOString(),
+    } as unknown as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
 async function writeSupabaseProfile(
   userId: string,
   input: Omit<LocalProfileRecord, "userId" | "updatedAt">
@@ -202,7 +236,58 @@ async function writeSupabaseProfile(
   }
 }
 
+async function writePrismaProfile(
+  userId: string,
+  input: Omit<LocalProfileRecord, "userId" | "updatedAt">
+) {
+  try {
+    const data = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        name: input.displayName,
+        displayName: input.displayName,
+        image: input.image,
+        coverImage: input.coverImage,
+        coverPosition: input.coverPosition,
+        bio: input.bio,
+        lineUrl: input.lineUrl,
+        facebookUrl: input.facebookUrl,
+      },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        displayName: true,
+        coverImage: true,
+        coverPosition: true,
+        bio: true,
+        lineUrl: true,
+        facebookUrl: true,
+        createdAt: true,
+      },
+    });
+
+    return normalizeProfileRecord(userId, {
+      ...data,
+      updatedAt: new Date().toISOString(),
+    } as unknown as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
 export async function getLocalProfileByUserId(userId: string) {
+  const prismaProfile = await readPrismaProfile(userId);
+
+  if (prismaProfile) {
+    void Promise.allSettled([
+      writeLocalProfile(prismaProfile),
+    ]).catch(() => undefined);
+    return prismaProfile;
+  }
+
   const supabaseProfile = await readSupabaseProfile(userId);
 
   if (supabaseProfile) {
@@ -223,10 +308,15 @@ export async function upsertLocalProfile(
     ...input,
   };
 
-  const [supabaseProfile, localProfile] = await Promise.allSettled([
+  const [prismaProfile, supabaseProfile, localProfile] = await Promise.allSettled([
+    writePrismaProfile(userId, input),
     writeSupabaseProfile(userId, input),
     writeLocalProfile(nextRecord),
   ]);
+
+  if (prismaProfile.status === "fulfilled" && prismaProfile.value) {
+    return prismaProfile.value;
+  }
 
   if (supabaseProfile.status === "fulfilled" && supabaseProfile.value) {
     return supabaseProfile.value;
