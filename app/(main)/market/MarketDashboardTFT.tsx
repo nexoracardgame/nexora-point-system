@@ -2,29 +2,22 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
 import {
-  Heart,
-  Plus,
-  Handshake,
-  ShieldCheck,
-} from "lucide-react";
+  startTransition,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Heart, Plus, Handshake, ShieldCheck } from "lucide-react";
+import {
+  normalizeMarketListingView,
+  type MarketViewItem,
+} from "@/lib/market-listing-view";
 import { listenProfileSync } from "@/lib/profile-sync";
 
-type MarketItem = {
-  id: string;
-  cardNo: string;
-  name: string;
-  price: string;
-  likes: number;
-  rarity: string;
-  image: string;
-  createdAt?: string;
-
-  sellerId?: string;
-  sellerName?: string;
-  sellerImage?: string;
-};
+type MarketItem = MarketViewItem;
 
 type ListingApiItem = {
   id: string;
@@ -75,7 +68,8 @@ function comparePopularCards(a: MarketItem, b: MarketItem) {
     return b.likes - a.likes;
   }
 
-  const createdAtDiff = getCreatedAtValue(a.createdAt) - getCreatedAtValue(b.createdAt);
+  const createdAtDiff =
+    getCreatedAtValue(b.createdAt) - getCreatedAtValue(a.createdAt);
   if (createdAtDiff !== 0) {
     return createdAtDiff;
   }
@@ -84,7 +78,8 @@ function comparePopularCards(a: MarketItem, b: MarketItem) {
 }
 
 function compareLatestCards(a: MarketItem, b: MarketItem) {
-  const createdAtDiff = getCreatedAtValue(b.createdAt) - getCreatedAtValue(a.createdAt);
+  const createdAtDiff =
+    getCreatedAtValue(b.createdAt) - getCreatedAtValue(a.createdAt);
   if (createdAtDiff !== 0) {
     return createdAtDiff;
   }
@@ -135,6 +130,18 @@ export default function MarketDashboardTFT({
   const [likesReady, setLikesReady] = useState(false);
   const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
   const [mouse, setMouse] = useState({ x: 50, y: 50 });
+  const itemsRef = useRef(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    startTransition(() => {
+      setItems(initialItems);
+      setLoading(!initialItemsLoaded && initialItems.length === 0);
+    });
+  }, [initialItems, initialItemsLoaded]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -159,13 +166,9 @@ export default function MarketDashboardTFT({
 
   const toggleLike = (cardId: string, cardNo: string) => {
     const alreadyLiked = likedCards.includes(cardId);
-    let next: string[];
-
-    if (alreadyLiked) {
-      next = likedCards.filter((x) => x !== cardId);
-    } else {
-      next = [...likedCards, cardId];
-    }
+    const next = alreadyLiked
+      ? likedCards.filter((x) => x !== cardId)
+      : [...likedCards, cardId];
 
     setLikedCards(next);
 
@@ -186,54 +189,43 @@ export default function MarketDashboardTFT({
     }
   };
 
-  useEffect(() => {
-    let active = true;
+  const refreshListings = useEffectEvent(
+    async ({ preserveOnEmpty = false }: { preserveOnEmpty?: boolean } = {}) => {
+      try {
+        const res = await fetch("/api/market/listings", { cache: "no-store" });
+        const data = await res.json();
+        const mapped = Array.isArray(data)
+          ? (data as ListingApiItem[]).map((item) =>
+              normalizeMarketListingView(item)
+            )
+          : [];
 
-    fetch("/api/market/listings", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        const mapped = ((data || []) as ListingApiItem[]).map((item) => {
-          const cardNo = item.card_no || item.cardNo || item.id;
+        if (preserveOnEmpty && mapped.length === 0 && itemsRef.current.length > 0) {
+          startTransition(() => {
+            setLoading(false);
+          });
+          return;
+        }
 
-          return {
-            id: item.id,
-            cardNo: String(cardNo),
-            name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-            price: `฿${Number(item.price || 0).toLocaleString()}`,
-            likes: item.likes || 0,
-            rarity: item.rarity || "Legendary",
-            image:
-              item.image_url ||
-              item.imageUrl ||
-              `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
-            createdAt: item.createdAt,
-
-            sellerId: item.sellerId || item.seller?.id,
-            sellerName:
-              item.sellerName ||
-              item.seller?.displayName ||
-              item.seller?.name ||
-              "Unknown Seller",
-            sellerImage:
-              item.sellerImage ||
-              item.seller?.image ||
-              "/default-avatar.png",
-          };
+        startTransition(() => {
+          setItems(mapped);
+          setLoading(false);
         });
+      } catch {
+        startTransition(() => {
+          setLoading(false);
+        });
+      }
+    }
+  );
 
-        if (!active) return;
-        setItems(mapped);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!active) return;
-        setLoading(false);
-      });
+  useEffect(() => {
+    if (initialItemsLoaded) {
+      return;
+    }
 
-    return () => {
-      active = false;
-    };
-  }, []);
+    void refreshListings();
+  }, [initialItemsLoaded]);
 
   useEffect(() => {
     return listenProfileSync((detail) => {
@@ -263,40 +255,11 @@ export default function MarketDashboardTFT({
 
   useEffect(() => {
     const onFocus = () => {
-      void fetch("/api/market/listings", { cache: "no-store" })
-        .then((res) => res.json())
-        .then((data) => {
-          const mapped = ((data || []) as ListingApiItem[]).map((item) => {
-            const cardNo = item.card_no || item.cardNo || item.id;
+      if (document.visibilityState !== "visible") {
+        return;
+      }
 
-            return {
-              id: item.id,
-              cardNo: String(cardNo),
-              name: `${item.cardName || item.card_name || item.name || "Unknown"} #${String(cardNo).padStart(3, "0")}`,
-              price: `เธฟ${Number(item.price || 0).toLocaleString()}`,
-              likes: item.likes || 0,
-              rarity: item.rarity || "Legendary",
-              image:
-                item.image_url ||
-                item.imageUrl ||
-                `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
-              createdAt: item.createdAt,
-              sellerId: item.sellerId || item.seller?.id,
-              sellerName:
-                item.sellerName ||
-                item.seller?.displayName ||
-                item.seller?.name ||
-                "Unknown Seller",
-              sellerImage:
-                item.sellerImage ||
-                item.seller?.image ||
-                "/default-avatar.png",
-            };
-          });
-
-          setItems(mapped);
-        })
-        .catch(() => undefined);
+      void refreshListings({ preserveOnEmpty: true });
     };
 
     window.addEventListener("focus", onFocus);
@@ -323,7 +286,11 @@ export default function MarketDashboardTFT({
   }, []);
 
   const sortedItems = useMemo(() => {
-    return [...(loading ? [] : items)].sort(comparePopularCards);
+    if (loading && items.length === 0) {
+      return [];
+    }
+
+    return [...items].sort(comparePopularCards);
   }, [items, loading]);
 
   const heroTop3 = useMemo(() => {
@@ -363,7 +330,7 @@ export default function MarketDashboardTFT({
                   : "bg-white/[0.05] text-white/60"
               }`}
             >
-              ❤️ Popular
+              โค๏ธ Popular
             </button>
 
             <button
@@ -374,7 +341,7 @@ export default function MarketDashboardTFT({
                   : "bg-white/[0.05] text-white/60"
               }`}
             >
-              🆕 Latest
+              ๐• Latest
             </button>
           </div>
         </div>
@@ -399,13 +366,13 @@ export default function MarketDashboardTFT({
                 }}
                 className="absolute right-3 top-3 rounded-full bg-black/50 p-3"
               >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        likesReady && likedCards.includes(centerHero.id)
-                          ? "fill-pink-500 text-pink-500"
-                          : "text-white"
-                      }`}
-                    />
+                <Heart
+                  className={`h-5 w-5 ${
+                    likesReady && likedCards.includes(centerHero.id)
+                      ? "fill-pink-500 text-pink-500"
+                      : "text-white"
+                  }`}
+                />
               </button>
 
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4">
@@ -502,7 +469,8 @@ export default function MarketDashboardTFT({
 
                     <div className="mt-1 flex items-center gap-1 text-[10px] text-white/50">
                       <Heart className="h-3 w-3 fill-pink-500 text-pink-500" />
-                      {card.likes + (likesReady && likedCards.includes(card.id) ? 1 : 0)}
+                      {card.likes +
+                        (likesReady && likedCards.includes(card.id) ? 1 : 0)}
                     </div>
                   </div>
                 </Link>
@@ -534,7 +502,7 @@ export default function MarketDashboardTFT({
                   : "bg-white/[0.05] text-white/60"
               }`}
             >
-              ❤️ Popular
+              โค๏ธ Popular
             </button>
 
             <button
@@ -545,7 +513,7 @@ export default function MarketDashboardTFT({
                   : "bg-white/[0.05] text-white/60"
               }`}
             >
-              🆕 Latest
+              ๐• Latest
             </button>
           </div>
         </div>
@@ -571,13 +539,13 @@ export default function MarketDashboardTFT({
                   }}
                   className="absolute right-3 top-3 rounded-full bg-black/50 p-2"
                 >
-                    <Heart
-                      className={`h-4 w-4 ${
-                        likesReady && likedCards.includes(leftHero.id)
-                          ? "fill-pink-500 text-pink-500"
-                          : "text-white"
-                      }`}
-                    />
+                  <Heart
+                    className={`h-4 w-4 ${
+                      likesReady && likedCards.includes(leftHero.id)
+                        ? "fill-pink-500 text-pink-500"
+                        : "text-white"
+                    }`}
+                  />
                 </button>
 
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
@@ -617,7 +585,9 @@ export default function MarketDashboardTFT({
               href={`/market/card/${centerHero.id}`}
               className="relative z-20 w-full max-w-[400px] overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.06] shadow-[0_30px_120px_rgba(168,85,247,0.20)] backdrop-blur-xl transition duration-500 hover:-translate-y-2"
               style={{
-                transform: `translate(${(mouse.x - 50) * 0.06}px, ${(mouse.y - 50) * 0.04}px)`,
+                transform: `translate(${(mouse.x - 50) * 0.06}px, ${
+                  (mouse.y - 50) * 0.04
+                }px)`,
               }}
             >
               <img
@@ -634,13 +604,13 @@ export default function MarketDashboardTFT({
                 }}
                 className="absolute right-4 top-4 rounded-full bg-black/50 p-3"
               >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        likesReady && likedCards.includes(centerHero.id)
-                          ? "fill-pink-500 text-pink-500"
-                          : "text-white"
-                      }`}
-                    />
+                <Heart
+                  className={`h-5 w-5 ${
+                    likesReady && likedCards.includes(centerHero.id)
+                      ? "fill-pink-500 text-pink-500"
+                      : "text-white"
+                  }`}
+                />
               </button>
 
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-6">
@@ -700,13 +670,13 @@ export default function MarketDashboardTFT({
                   }}
                   className="absolute right-3 top-3 rounded-full bg-black/50 p-2"
                 >
-                    <Heart
-                      className={`h-4 w-4 ${
-                        likesReady && likedCards.includes(rightHero.id)
-                          ? "fill-pink-500 text-pink-500"
-                          : "text-white"
-                      }`}
-                    />
+                  <Heart
+                    className={`h-4 w-4 ${
+                      likesReady && likedCards.includes(rightHero.id)
+                        ? "fill-pink-500 text-pink-500"
+                        : "text-white"
+                    }`}
+                  />
                 </button>
 
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
@@ -749,32 +719,32 @@ export default function MarketDashboardTFT({
           href="/market/create"
           icon={<Plus className="h-5 w-5" />}
           title="Create Listing"
-          subtitle="สร้างรายการขายการ์ดจริง"
+          subtitle="เธชเธฃเนเธฒเธเธฃเธฒเธขเธเธฒเธฃเธเธฒเธขเธเธฒเธฃเนเธ”เธเธฃเธดเธ"
         />
         <ActionButton
           href="/market/deals"
           icon={<Handshake className="h-5 w-5" />}
           title="Deal Requests"
-          subtitle="ดูคำขอดีล / ตอบรับ"
+          subtitle="เธ”เธนเธเธณเธเธญเธ”เธตเธฅ / เธ•เธญเธเธฃเธฑเธ"
         />
         <ActionButton
           href="/market/wishlist"
           icon={<Heart className="h-5 w-5" />}
           title="Wishlist"
-          subtitle="การ์ดที่กำลังติดตาม"
+          subtitle="เธเธฒเธฃเนเธ”เธ—เธตเนเธเธณเธฅเธฑเธเธ•เธดเธ”เธ•เธฒเธก"
         />
         <ActionButton
           href="/market/seller-center"
           icon={<ShieldCheck className="h-5 w-5" />}
           title="Seller Center"
-          subtitle="จัดการโพสต์และรีวิว"
+          subtitle="เธเธฑเธ”เธเธฒเธฃเนเธเธชเธ•เนเนเธฅเธฐเธฃเธตเธงเธดเธง"
         />
       </section>
 
       {/* MARKET GRID */}
       <section>
         <div className="mb-4 text-2xl font-black lg:mb-6 lg:text-3xl">
-          🛒 Marketplace Listings
+          ๐’ Marketplace Listings
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-5">
@@ -808,9 +778,7 @@ export default function MarketDashboardTFT({
                     >
                       <Heart
                         className={`h-4 w-4 ${
-                          liked
-                            ? "fill-pink-500 text-pink-500"
-                            : "text-white/70"
+                          liked ? "fill-pink-500 text-pink-500" : "text-white/70"
                         }`}
                       />
                     </button>
