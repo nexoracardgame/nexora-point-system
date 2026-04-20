@@ -1,10 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 export default function DeleteListingButton({
   id,
 }: {
   id: string;
 }) {
+  const router = useRouter();
+
   return (
     <button
       onClick={async () => {
@@ -13,10 +17,13 @@ export default function DeleteListingButton({
 
         const res = await fetch(`/api/market/delete/${id}`, {
           method: "DELETE",
+          cache: "no-store", // 🔥 กัน cache
         });
 
+        console.log("DELETE STATUS:", res.status);
+
         if (res.ok) {
-          window.location.reload();
+          router.refresh(); // 🔥 แทน reload
         } else {
           alert("ลบไม่สำเร็จ");
         }
