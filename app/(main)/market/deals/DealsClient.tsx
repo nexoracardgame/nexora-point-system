@@ -60,6 +60,7 @@ export default function DealsClient({
   const [deals, setDeals] = useState<DealCard[]>(initialDeals);
   const [creatingChatId, setCreatingChatId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [hiddenDealIds, setHiddenDealIds] = useState<string[]>([]);
   const lastOptimisticMutationAt = useRef(0);
 
   const fetchDeals = useCallback(async () => {
@@ -79,13 +80,16 @@ export default function DealsClient({
       if (Date.now() - lastOptimisticMutationAt.current < 1800) {
         return;
       }
-      setDeals(Array.isArray(data) ? data : []);
+      const nextDeals = Array.isArray(data) ? data : [];
+      setDeals(
+        nextDeals.filter((deal) => !hiddenDealIds.includes(String(deal.id || "")))
+      );
     } catch (error) {
       console.error("FETCH DEALS ERROR:", error);
     } finally {
       setRefreshing(false);
     }
-  }, [t]);
+  }, [hiddenDealIds, t]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -134,9 +138,12 @@ export default function DealsClient({
       return prev.filter((deal) => deal.id !== dealId);
     });
 
+    setHiddenDealIds((prev) => (prev.includes(dealId) ? prev : [...prev, dealId]));
+
     return () => {
       if (!removedDeal) return;
 
+      setHiddenDealIds((prev) => prev.filter((id) => id !== dealId));
       setDeals((prev) => {
         if (prev.some((deal) => deal.id === removedDeal?.id)) {
           return prev;
@@ -147,14 +154,20 @@ export default function DealsClient({
     };
   }, []);
 
+  const visibleDeals = useMemo(
+    () =>
+      deals.filter((deal) => !hiddenDealIds.includes(String(deal.id || ""))),
+    [deals, hiddenDealIds]
+  );
+
   const pendingDeals = useMemo(
-    () => deals.filter((deal) => deal.status === "pending"),
-    [deals]
+    () => visibleDeals.filter((deal) => deal.status === "pending"),
+    [visibleDeals]
   );
 
   const acceptedDeals = useMemo(
-    () => deals.filter((deal) => deal.status === "accepted"),
-    [deals]
+    () => visibleDeals.filter((deal) => deal.status === "accepted"),
+    [visibleDeals]
   );
 
   const renderDealCard = (deal: DealCard, index: number) => {

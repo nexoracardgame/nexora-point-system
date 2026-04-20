@@ -69,19 +69,6 @@ export default function MainLayout({
   useEffect(() => {
     let mounted = true;
 
-    const nextImage = safeProfileSrc(session?.user?.image);
-
-    if (nextImage !== "/avatar.png") {
-      updateAvatar(nextImage);
-      return;
-    }
-
-    if (stableAvatarRef.current !== "/avatar.png") {
-      setProfileImage(stableAvatarRef.current);
-      setAvatarReady(true);
-      return;
-    }
-
     async function fallbackFetch() {
       try {
         const res = await fetch("/api/profile/me", {
@@ -93,9 +80,13 @@ export default function MainLayout({
 
         const dbImage = safeProfileSrc(data?.image);
         const dbName = String(data?.displayName || data?.name || "").trim();
+        const sessionImage = safeProfileSrc(session?.user?.image);
+        const sessionName = String(session?.user?.name || "").trim();
 
         if (dbImage !== "/avatar.png") {
           updateAvatar(dbImage);
+        } else if (sessionImage !== "/avatar.png") {
+          updateAvatar(sessionImage);
         } else {
           setProfileImage("/avatar.png");
           setAvatarReady(true);
@@ -103,11 +94,18 @@ export default function MainLayout({
 
         if (dbName) {
           setProfileName(dbName);
+        } else if (sessionName) {
+          setProfileName(sessionName);
         }
       } catch {
         if (!mounted) return;
-        setProfileImage("/avatar.png");
-        setAvatarReady(true);
+        const sessionImage = safeProfileSrc(session?.user?.image);
+        const sessionName = String(session?.user?.name || "").trim();
+
+        updateAvatar(sessionImage);
+        if (sessionName) {
+          setProfileName(sessionName);
+        }
       }
     }
 
@@ -116,7 +114,7 @@ export default function MainLayout({
     return () => {
       mounted = false;
     };
-  }, [session?.user?.image]);
+  }, [session?.user?.image, session?.user?.name]);
 
   useEffect(() => {
     return listenProfileSync((detail) => {

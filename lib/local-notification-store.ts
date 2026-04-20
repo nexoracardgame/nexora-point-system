@@ -1,5 +1,8 @@
-import { promises as fs } from "fs";
-import { getLocalStorePath } from "@/lib/local-store-dir";
+import {
+  ensureLocalStoreFile,
+  readLocalStoreJson,
+  writeLocalStoreJson,
+} from "@/lib/local-store-dir";
 
 export type LocalNotificationType = "deal" | "wishlist";
 
@@ -16,32 +19,20 @@ export type LocalNotificationRecord = {
 };
 
 async function ensureStoreFile() {
-  const storePath = await getLocalStorePath("local-notifications.json");
-
-  try {
-    await fs.access(storePath);
-  } catch {
-    await fs.writeFile(storePath, "[]", "utf8");
-  }
-
-  return storePath;
+  return ensureLocalStoreFile("local-notifications.json");
 }
 
 async function readStore() {
-  const storePath = await ensureStoreFile();
-
-  try {
-    const raw = await fs.readFile(storePath, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LocalNotificationRecord[]) : [];
-  } catch {
-    return [];
-  }
+  await ensureStoreFile();
+  return readLocalStoreJson<LocalNotificationRecord>("local-notifications.json");
 }
 
 async function writeStore(items: LocalNotificationRecord[]) {
-  const storePath = await ensureStoreFile();
-  await fs.writeFile(storePath, JSON.stringify(items, null, 2), "utf8");
+  await ensureStoreFile();
+  await writeLocalStoreJson(
+    "local-notifications.json",
+    JSON.stringify(items, null, 2)
+  );
 }
 
 export async function getLocalNotificationsForUser(

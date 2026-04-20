@@ -1,5 +1,8 @@
-import { promises as fs } from "fs";
-import { getLocalStorePath } from "@/lib/local-store-dir";
+import {
+  ensureLocalStoreFile,
+  readLocalStoreJson,
+  writeLocalStoreJson,
+} from "@/lib/local-store-dir";
 
 export type LocalMarketListing = {
   id: string;
@@ -19,32 +22,20 @@ export type LocalMarketListing = {
 };
 
 async function ensureStoreFile() {
-  const storePath = await getLocalStorePath("local-market-listings.json");
-
-  try {
-    await fs.access(storePath);
-  } catch {
-    await fs.writeFile(storePath, "[]", "utf8");
-  }
-
-  return storePath;
+  return ensureLocalStoreFile("local-market-listings.json");
 }
 
 async function readStore() {
-  const storePath = await ensureStoreFile();
-
-  try {
-    const raw = await fs.readFile(storePath, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LocalMarketListing[]) : [];
-  } catch {
-    return [];
-  }
+  await ensureStoreFile();
+  return readLocalStoreJson<LocalMarketListing>("local-market-listings.json");
 }
 
 async function writeStore(items: LocalMarketListing[]) {
-  const storePath = await ensureStoreFile();
-  await fs.writeFile(storePath, JSON.stringify(items, null, 2), "utf8");
+  await ensureStoreFile();
+  await writeLocalStoreJson(
+    "local-market-listings.json",
+    JSON.stringify(items, null, 2)
+  );
 }
 
 export async function getLocalMarketListings() {

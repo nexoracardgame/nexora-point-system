@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
+import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 
 type LineProfile = {
   sub?: string;
@@ -100,15 +101,22 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       const appToken = token as AppToken;
+      const userId = String(appToken.id || "").trim();
+      const localProfile = userId ? await getLocalProfileByUserId(userId) : null;
+      const resolvedName =
+        localProfile?.displayName || appToken.name || "NEXORA User";
+      const resolvedImage = getSafeSessionImage(
+        localProfile?.image || appToken.picture || "/avatar.png"
+      );
 
       if (session.user) {
-        session.user.id = appToken.id || "";
-        session.user.lineId = appToken.lineId || "";
+        session.user.id = userId;
+        session.user.lineId = appToken.lineId || userId;
         session.user.role = appToken.role || "USER";
         session.user.nexPoint = appToken.nexPoint || 0;
         session.user.coin = appToken.coin || 0;
-        session.user.name = appToken.name || "NEXORA User";
-        session.user.image = appToken.picture || "/avatar.png";
+        session.user.name = resolvedName;
+        session.user.image = resolvedImage;
       }
 
       return session;

@@ -1,5 +1,8 @@
-import { promises as fs } from "fs";
-import { getLocalStorePath } from "@/lib/local-store-dir";
+import {
+  ensureLocalStoreFile,
+  readLocalStoreJson,
+  writeLocalStoreJson,
+} from "@/lib/local-store-dir";
 
 export type LocalProfileRecord = {
   userId: string;
@@ -14,32 +17,20 @@ export type LocalProfileRecord = {
 };
 
 async function ensureStoreFile() {
-  const storePath = await getLocalStorePath("local-profiles.json");
-
-  try {
-    await fs.access(storePath);
-  } catch {
-    await fs.writeFile(storePath, "[]", "utf8");
-  }
-
-  return storePath;
+  return ensureLocalStoreFile("local-profiles.json");
 }
 
 async function readStore() {
-  const storePath = await ensureStoreFile();
-
-  try {
-    const raw = await fs.readFile(storePath, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LocalProfileRecord[]) : [];
-  } catch {
-    return [];
-  }
+  await ensureStoreFile();
+  return readLocalStoreJson<LocalProfileRecord>("local-profiles.json");
 }
 
 async function writeStore(items: LocalProfileRecord[]) {
-  const storePath = await ensureStoreFile();
-  await fs.writeFile(storePath, JSON.stringify(items, null, 2), "utf8");
+  await ensureStoreFile();
+  await writeLocalStoreJson(
+    "local-profiles.json",
+    JSON.stringify(items, null, 2)
+  );
 }
 
 export async function getLocalProfileByUserId(userId: string) {
