@@ -492,12 +492,17 @@ export default async function MarketCardDetailPage({
 
   return (
     <div className="space-y-4 text-white md:space-y-6">
-      <section className="relative overflow-hidden rounded-[28px] border border-amber-200/10 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.16),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.12),transparent_26%),linear-gradient(180deg,rgba(9,9,11,0.98)_0%,rgba(6,7,9,0.78)_100%)] px-4 py-4 shadow-[0_30px_120px_rgba(0,0,0,0.48)] md:rounded-[38px] md:px-7 md:py-6">
+      <section className="relative overflow-hidden rounded-[22px] border border-white/5 bg-[#050507] px-4 py-3 shadow-[0_20px_80px_rgba(0,0,0,0.6)] md:px-6 md:py-4">
         <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent,rgba(255,215,0,0.04),transparent)]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/30 to-transparent" />
-        <div className="absolute right-[-10%] top-[-15%] h-40 w-40 rounded-full bg-amber-300/10 blur-3xl md:h-72 md:w-72" />
-        <div className="absolute bottom-[-15%] left-[-5%] h-32 w-32 rounded-full bg-violet-400/10 blur-3xl md:h-56 md:w-56" />
+        <div className="absolute right-[-10%] top-[-15%] h-40 w-40 rounded-full bg-amber-300/10 blur-xl md:h-72 md:w-72" />
+        <div className="absolute bottom-[-15%] left-[-5%] h-32 w-32 rounded-full bg-violet-400/10 blur-xl md:h-56 md:w-56" />
         <div className="relative space-y-4">
+        <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,215,0,0.15),transparent_40%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_100%,rgba(168,85,247,0.15),transparent_40%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.04),transparent)] motion-safe:motion-safe:animate-pulse" />
+        </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-amber-200/15 bg-white/[0.03] px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.32em] text-amber-100/88 md:px-4 md:text-[10px]">
               {translate(locale, "market.card.header")}
@@ -511,7 +516,11 @@ export default async function MarketCardDetailPage({
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_360px] xl:items-end">
             <div className="space-y-3">
-              <h1 className="max-w-4xl text-[2rem] font-black leading-[0.9] tracking-[-0.07em] sm:text-[3.3rem] lg:text-[4rem] xl:text-[4.6rem]">
+              <h1 className="max-w-4xl text-[2.4rem] font-black leading-[0.9] tracking-[-0.08em] 
+              sm:text-[3.6rem] lg:text-[4.2rem] xl:text-[5rem]
+              bg-gradient-to-b from-white via-white to-white/40 
+              bg-clip-text text-transparent
+              drop-shadow-[0_0_30px_rgba(255,255,255,0.15)]">
                 {card.name}
               </h1>
 
@@ -539,9 +548,13 @@ export default async function MarketCardDetailPage({
                   <div className="text-[10px] uppercase tracking-[0.3em] text-white/38">
                     Live Price
                   </div>
-                  <div className="mt-2 text-[1.9rem] font-black tracking-[-0.06em] text-amber-300 drop-shadow-[0_0_24px_rgba(251,191,36,0.2)] md:text-[2.8rem]">
-                    {card.price}
-                  </div>
+                  <div className="mt-2 text-[2.2rem] md:text-[3rem] font-black tracking-[-0.05em] 
+                 text-amber-300 
+                 drop-shadow-[0_0_40px_rgba(251,191,36,0.6)]
+                 motion-safe:animate-pulse">
+                   {card.price}
+                </div>
+                
                 </div>
                 <div className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[10px] uppercase tracking-[0.22em] text-white/55">
                   #{card.cardNo}
@@ -1048,6 +1061,7 @@ function Panel({
 }) {
   return (
     <div className="rounded-[24px] border border-white/7 bg-[linear-gradient(180deg,rgba(18,18,24,0.46)_0%,rgba(9,10,12,0.16)_100%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur md:rounded-[28px] md:p-6">
+      
       <div className="mb-4 md:mb-5">
         <h3 className="text-lg font-black tracking-[-0.03em] text-white md:text-2xl">
           {title}
@@ -1165,13 +1179,16 @@ function CardStaticPreview({
   name: string;
 }) {
   return (
-    <div className="group relative mx-auto w-full max-w-[500px] [perspective:1800px]">
-      <div className="absolute inset-0 scale-[1.08] rounded-[52px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.05),transparent_30%)] blur-3xl" />
+    <div className="group relative mx-auto w-full max-w-[500px] [perspective:2200px]">
+      <div className="absolute inset-0 scale-[1.08] rounded-[52px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.05),transparent_30%)] blur-xl" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent rotate-12 blur-md hidden md:block animate-[shine_3s_linear_infinite]" />
+    </div>
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[52px]">
-        <div className="absolute left-10 top-10 h-2 w-2 animate-pulse rounded-full bg-yellow-300/70" />
+        <div className="absolute left-10 top-10 h-2 w-2 motion-safe:animate-pulse rounded-full bg-yellow-300/70" />
         <div className="absolute right-12 top-24 h-1.5 w-1.5 animate-ping rounded-full bg-cyan-300/60" />
-        <div className="absolute bottom-20 left-16 h-2 w-2 animate-pulse rounded-full bg-violet-300/60" />
+        <div className="absolute bottom-20 left-16 h-2 w-2 motion-safe:animate-pulse rounded-full bg-violet-300/60" />
       </div>
 
       <div className="relative rounded-[52px] bg-[linear-gradient(145deg,rgba(250,204,21,0.92)_0%,rgba(251,146,60,0.55)_26%,rgba(255,255,255,0.22)_100%)] p-[1px] shadow-[0_0_80px_rgba(245,158,11,0.16)] transition duration-500 ease-out group-hover:-translate-y-1 group-hover:rotate-[0.6deg]">
