@@ -168,7 +168,7 @@ export default function CommunityClient() {
           <div className="pointer-events-none absolute -right-24 top-8 h-72 w-72 rounded-full bg-white/80 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-[#d9def8] blur-3xl" />
 
-          <header className="relative flex items-center justify-between gap-4">
+          <header className="relative flex items-center justify-between gap-3">
             <div className="relative flex items-center gap-3">
               <div className="relative">
                 <div className="grid h-16 w-16 place-items-center rounded-full bg-white shadow-[0_18px_36px_rgba(20,20,30,0.12)] ring-1 ring-black/5">
@@ -188,27 +188,16 @@ export default function CommunityClient() {
               </div>
             </div>
 
-            <div className="rounded-full bg-white px-5 py-3 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:text-base">
+            <div className="rounded-full bg-white px-4 py-2.5 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:px-5 sm:py-3 sm:text-base">
               {friends.length} Friends
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const el = document.getElementById("community-search");
-                el?.focus();
-              }}
-              className="grid h-16 w-16 place-items-center rounded-full bg-black text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)] transition hover:scale-[1.03]"
-            >
-              <Search className="h-7 w-7" />
-            </button>
           </header>
 
-          <div className="relative mt-9 text-center">
-            <div className="text-[13px] font-black uppercase tracking-[0.38em] text-black/35">
+          <div className="relative mt-7 text-center sm:mt-9">
+            <div className="text-[11px] font-black uppercase tracking-[0.28em] text-black/35 sm:text-[13px] sm:tracking-[0.38em]">
               Find Friends
             </div>
-            <h1 className="mt-2 text-5xl font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
+            <h1 className="mt-2 text-4xl font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
               Community
             </h1>
           </div>
@@ -222,7 +211,7 @@ export default function CommunityClient() {
                     รายชื่อเพื่อน
                   </div>
                 </div>
-                <div className="rounded-full bg-[#eef0fb] px-4 py-2 text-sm font-black">
+                <div className="shrink-0 rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:px-4 sm:text-sm">
                   เก่า → ใหม่
                 </div>
               </div>
@@ -286,28 +275,28 @@ export default function CommunityClient() {
 
             <div className="space-y-4">
               <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[28px] bg-[#f5c542] p-4">
-                    <div className="text-xs font-black uppercase tracking-[0.18em] text-black/45">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="rounded-[22px] bg-[#f5c542] p-3 sm:rounded-[28px] sm:p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.12em] text-black/45 sm:text-xs sm:tracking-[0.18em]">
                       Friends
                     </div>
-                    <div className="mt-2 text-4xl font-black tracking-[-0.08em]">
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">
                       {friends.length}
                     </div>
                   </div>
-                  <div className="rounded-[28px] bg-[#e9eaf5] p-4">
-                    <div className="text-xs font-black uppercase tracking-[0.18em] text-black/45">
+                  <div className="rounded-[22px] bg-[#e9eaf5] p-3 sm:rounded-[28px] sm:p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.12em] text-black/45 sm:text-xs sm:tracking-[0.18em]">
                       Requests
                     </div>
-                    <div className="mt-2 text-4xl font-black tracking-[-0.08em]">
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">
                       {requests.length}
                     </div>
                   </div>
-                  <div className="rounded-[28px] bg-black p-4 text-white">
-                    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+                  <div className="rounded-[22px] bg-black p-3 text-white sm:rounded-[28px] sm:p-4">
+                    <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45 sm:text-xs sm:tracking-[0.18em]">
                       Suggestions
                     </div>
-                    <div className="mt-2 text-4xl font-black tracking-[-0.08em]">
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">
                       {suggestionCount}
                     </div>
                   </div>
@@ -315,7 +304,7 @@ export default function CommunityClient() {
 
                 <form
                   onSubmit={handleSearch}
-                  className="mt-5 flex min-h-[74px] items-center gap-3 rounded-full bg-black p-2 pl-5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.22)]"
+                  className="mt-5 flex min-h-[64px] items-center gap-2 rounded-full bg-black p-2 pl-4 text-white shadow-[0_18px_44px_rgba(0,0,0,0.22)] sm:min-h-[74px] sm:gap-3 sm:pl-5"
                 >
                   <Search className="h-5 w-5 shrink-0 text-white/70" />
                   <input
@@ -328,7 +317,7 @@ export default function CommunityClient() {
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white text-black transition hover:scale-[1.04] disabled:opacity-60"
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-black transition hover:scale-[1.04] disabled:opacity-60 sm:h-14 sm:w-14"
                     aria-label="Search friends"
                   >
                     <Search className="h-5 w-5" />

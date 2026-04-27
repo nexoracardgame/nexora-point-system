@@ -12,6 +12,7 @@ import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
 import {
   Gem,
+  Coins,
   Wallet,
   ShoppingBag,
   Gift,
@@ -454,16 +455,16 @@ export default function MainLayout({
         active: pathname.startsWith("/market"),
       },
       {
-        href: "/rewards",
+        href: "/wallet",
         label: t("layout.nav.rewards"),
-        icon: Trophy,
-        active: pathname.startsWith("/rewards"),
+        icon: Wallet,
+        active: pathname.startsWith("/wallet"),
       },
       {
-        href: "/redeem",
+        href: "/community",
         label: t("layout.nav.redeem"),
-        icon: Gift,
-        active: pathname.startsWith("/redeem"),
+        icon: Cat,
+        active: pathname.startsWith("/community"),
       },
       {
         href: "/dm",
@@ -549,8 +550,8 @@ export default function MainLayout({
         <div className="relative z-0 flex min-w-0 flex-1 flex-col xl:ml-[92px]">
           {/* TOPBAR */}
           <header className="sticky top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl">
-            <div className="flex h-[74px] items-center justify-between px-4 sm:px-5 xl:px-6">
-              <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-[74px] items-center justify-between gap-2 px-3 sm:px-5 xl:px-6">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                 {/* MOBILE LOGO */}
                 <PrefetchLink
                   href="/"
@@ -559,17 +560,17 @@ export default function MainLayout({
                   <Gem className="h-5 w-5" />
                 </PrefetchLink>
 
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35 sm:text-[11px]">
+                <div className="min-w-0 max-[430px]:max-w-[92px]">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35 max-[430px]:hidden sm:text-[11px]">
                     {t("layout.command")}
                   </div>
-                  <div className="truncate text-[20px] font-black leading-none sm:text-2xl">
+                  <div className="truncate text-base font-black leading-none sm:text-2xl">
                     {pageContext}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-3">
                 <NotificationBell />
 
                 <PrefetchLink
@@ -585,11 +586,21 @@ export default function MainLayout({
                   )}
                 </PrefetchLink>
 
-                <div className="rounded-xl border border-amber-300/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.16),rgba(245,158,11,0.08))] px-3 py-2 text-xs font-black text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] sm:px-4 sm:text-sm">
-                  <span className="drop-shadow-[0_0_12px_rgba(251,191,36,0.55)]">
-                    {session?.user?.nexPoint ?? 0}
-                  </span>{" "}
-                  <span className="text-amber-300">NEX</span>
+                <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+                  <div className="rounded-xl border border-amber-300/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(245,158,11,0.08))] px-2 py-2 text-[10px] font-black text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] sm:px-4 sm:text-sm">
+                    <span className="drop-shadow-[0_0_12px_rgba(251,191,36,0.55)]">
+                      {session?.user?.nexPoint ?? 0}
+                    </span>{" "}
+                    <span className="text-amber-300">NEX</span>
+                  </div>
+
+                  <div className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(0,0,0,0.16))] px-2 py-2 text-[10px] font-black text-white shadow-[0_0_22px_rgba(255,255,255,0.08)] sm:px-4 sm:text-sm">
+                    <Coins className="hidden h-3.5 w-3.5 text-white/80 sm:block" />
+                    <span className="drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]">
+                      {session?.user?.coin ?? 0}
+                    </span>{" "}
+                    <span className="text-white/72">COIN</span>
+                  </div>
                 </div>
 
                 {/* PROFILE */}
