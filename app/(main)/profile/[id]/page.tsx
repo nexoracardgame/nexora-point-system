@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import DeleteListingButton from "@/components/DeleteListingButton";
 import ProfileChatButton from "@/components/ProfileChatButton";
+import ProfileFriendButton from "@/components/ProfileFriendButton";
 import ProfileShareButton from "@/components/ProfileShareButton";
 import { authOptions } from "@/lib/auth";
 import { getMarketListings } from "@/lib/market-listings";
@@ -442,6 +443,12 @@ export default async function SellerProfilePage({
                       <BadgeCheck className="h-6 w-6 text-emerald-300 sm:h-7 sm:w-7" />
                     </div>
 
+                    {localProfile?.username ? (
+                      <div className="mt-2 text-sm font-semibold text-violet-200/88 sm:text-base">
+                        @{localProfile.username}
+                      </div>
+                    ) : null}
+
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-white/68 sm:mt-3 sm:text-base">
                       {seller.bio ||
                         "Genesis-tier NEXORA trader with elite collectible market presence."}
@@ -494,6 +501,13 @@ export default async function SellerProfilePage({
                           className="min-w-[132px]"
                         />
                       )}
+
+                      {!isOwner ? (
+                        <ProfileFriendButton
+                          targetUserId={seller.id}
+                          className="min-w-[132px]"
+                        />
+                      ) : null}
                     </div>
                   </div>
                 </div>

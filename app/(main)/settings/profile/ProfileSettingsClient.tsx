@@ -31,6 +31,7 @@ type ProfileData = {
   coverUrl?: string | null;
   coverPosition?: number | null;
   displayName?: string | null;
+  username?: string | null;
   name?: string | null;
   bio?: string | null;
   lineUrl?: string | null;
@@ -61,6 +62,7 @@ export default function ProfileSettingsClient({
   const [displayName, setDisplayName] = useState(
     initialProfile.displayName || initialProfile.name || ""
   );
+  const [username, setUsername] = useState(initialProfile.username || "");
   const [bio, setBio] = useState(initialProfile.bio || "");
   const [lineLink, setLineLink] = useState(
     initialProfile.lineUrl || initialProfile.lineLink || ""
@@ -86,6 +88,7 @@ export default function ProfileSettingsClient({
     setCoverUrl(data.coverImage || data.coverUrl || DEFAULT_COVER_URL);
     setCoverPosition(data.coverPosition ?? 50);
     setDisplayName(data.displayName || data.name || "");
+    setUsername(data.username || "");
     setBio(data.bio || "");
     setLineLink(data.lineUrl || data.lineLink || "");
     setFacebookLink(data.facebookUrl || data.facebookLink || "");
@@ -259,6 +262,7 @@ export default function ProfileSettingsClient({
         coverUrl: persistedCoverUrl,
         coverPosition,
         displayName,
+        username,
         bio,
         lineLink,
         facebookLink,
@@ -292,6 +296,7 @@ export default function ProfileSettingsClient({
           : coverPosition;
 
       setDisplayName(syncedName);
+      setUsername(data?.user?.username ?? username);
       setProfileImage(syncedImage);
       setCoverUrl(syncedCover);
       setCoverPosition(syncedCoverPosition);
@@ -490,6 +495,25 @@ export default function ProfileSettingsClient({
 
               <div>
                 <label className="text-sm font-semibold text-white/74">
+                  Username
+                </label>
+                <input
+                  value={username}
+                  onChange={(e) =>
+                    setUsername(
+                      e.target.value.replace(/\s+/g, "").replace(/^@+/, "")
+                    )
+                  }
+                  placeholder="username สำหรับให้คนค้นหาเจอ"
+                  className="mt-2 h-14 w-full rounded-[22px] border border-white/10 bg-black/38 px-4 text-white outline-none transition focus:border-violet-400/35 focus:bg-black/52"
+                />
+                <div className="mt-2 text-xs text-white/42">
+                  ใช้ค้นหาเพื่อนได้ทั้งจากชื่อและ username
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-white/74">
                   Bio
                 </label>
                 <textarea
@@ -586,6 +610,11 @@ export default function ProfileSettingsClient({
                 <div className="mt-2 truncate text-2xl font-black text-white">
                   {displayName || "NEXORA USER"}
                 </div>
+                {username && (
+                  <div className="mt-2 text-sm font-semibold text-violet-200/88">
+                    @{username}
+                  </div>
+                )}
                 <div className="mt-2 line-clamp-3 text-sm leading-6 text-white/62">
                   {bio || "พรีวิวนี้จะเปลี่ยนตามข้อมูลที่คุณกำลังแก้แบบสดๆ"}
                 </div>

@@ -22,6 +22,7 @@ export default async function ProfileSettingsPage() {
     {
       displayName: sessionUser.name || "",
       name: sessionUser.name || "",
+      username: "",
       image: sessionUser.image || "/avatar.png",
       coverImage: "/seller-cover.jpg",
       coverPosition: 50,

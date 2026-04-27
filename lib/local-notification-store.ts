@@ -4,7 +4,9 @@ import {
   writeLocalStoreJson,
 } from "@/lib/local-store-dir";
 
-export type LocalNotificationType = "deal" | "wishlist";
+export type LocalNotificationType = "deal" | "wishlist" | "friend";
+
+export type LocalNotificationMeta = Record<string, string | number | boolean | null>;
 
 export type LocalNotificationRecord = {
   id: string;
@@ -14,6 +16,7 @@ export type LocalNotificationRecord = {
   body: string;
   href: string;
   image: string;
+  meta?: LocalNotificationMeta | null;
   createdAt: string;
   readAt: string | null;
 };

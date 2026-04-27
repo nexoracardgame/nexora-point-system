@@ -25,6 +25,7 @@ export async function GET() {
       id: userId,
       name: profile?.displayName || session?.user?.name || "NEXORA User",
       displayName: profile?.displayName || session?.user?.name || "NEXORA User",
+      username: profile?.username || "",
       image: profile?.image || session?.user?.image || "/avatar.png",
       coverImage: profile?.coverImage || "/seller-cover.jpg",
       coverPosition: profile?.coverPosition ?? 50,

@@ -9,12 +9,13 @@ import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 type NotificationItem = {
   id: string;
-  type: "chat" | "deal" | "wishlist";
+  type: "chat" | "deal" | "wishlist" | "friend";
   title: string;
   body: string;
   href: string;
   image: string;
   createdAt: string;
+  meta?: Record<string, string | number | boolean | null> | null;
 };
 
 function safeImage(image?: string | null, fallback?: string | null) {
@@ -76,6 +77,7 @@ export async function GET() {
               href: item.href,
               image: safeImage(item.image),
               createdAt: item.createdAt,
+              meta: item.meta || null,
             }))
             .slice(0, 60),
         },
@@ -224,6 +226,7 @@ export async function GET() {
       href: item.href,
       image: safeImage(item.image),
       createdAt: item.createdAt,
+      meta: item.meta || null,
     }));
 
     const items = [...chatNotifications, ...storedNotifications]

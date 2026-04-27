@@ -9,6 +9,7 @@ import {
 export type LocalProfileRecord = {
   userId: string;
   displayName: string | null;
+  username: string | null;
   image: string | null;
   coverImage: string | null;
   coverPosition: number | null;
@@ -58,6 +59,8 @@ function normalizeProfileRecord(
     displayName:
       String(raw.displayName || raw.displayname || raw.name || "").trim() ||
       null,
+    username:
+      String(raw.username || raw.userName || raw.handle || "").trim() || null,
     image: String(raw.image || "").trim() || null,
     coverImage:
       String(raw.coverImage || raw.coverimage || "").trim() || null,
@@ -129,7 +132,15 @@ async function writeLocalProfile(record: LocalProfileRecord) {
   try {
     const items = await readStore();
     const next = items.some((item) => item.userId === record.userId)
-      ? items.map((item) => (item.userId === record.userId ? record : item))
+      ? items.map((item) =>
+          item.userId === record.userId
+            ? {
+                ...item,
+                ...record,
+                username: record.username ?? item.username ?? null,
+              }
+            : item
+        )
       : [record, ...items];
 
     await writeStore(next);
@@ -279,13 +290,18 @@ async function writePrismaProfile(
 }
 
 export async function getLocalProfileByUserId(userId: string) {
+  const localProfile = await readLocalProfile(userId);
   const prismaProfile = await readPrismaProfile(userId);
 
   if (prismaProfile) {
+    const mergedProfile = {
+      ...prismaProfile,
+      username: localProfile?.username ?? prismaProfile.username ?? null,
+    };
     void Promise.allSettled([
-      writeLocalProfile(prismaProfile),
+      writeLocalProfile(mergedProfile),
     ]).catch(() => undefined);
-    return prismaProfile;
+    return mergedProfile;
   }
 
   if (process.env.NODE_ENV === "production") {
@@ -295,21 +311,27 @@ export async function getLocalProfileByUserId(userId: string) {
   const supabaseProfile = await readSupabaseProfile(userId);
 
   if (supabaseProfile) {
-    void writeLocalProfile(supabaseProfile).catch(() => undefined);
-    return supabaseProfile;
+    const mergedProfile = {
+      ...supabaseProfile,
+      username: localProfile?.username ?? supabaseProfile.username ?? null,
+    };
+    void writeLocalProfile(mergedProfile).catch(() => undefined);
+    return mergedProfile;
   }
 
-  return readLocalProfile(userId);
+  return localProfile;
 }
 
 export async function upsertLocalProfile(
   userId: string,
   input: Omit<LocalProfileRecord, "userId" | "updatedAt">
 ) {
+  const currentLocalProfile = await readLocalProfile(userId);
   const nextRecord: LocalProfileRecord = {
     userId,
     updatedAt: new Date().toISOString(),
     ...input,
+    username: input.username ?? currentLocalProfile?.username ?? null,
   };
 
   const [prismaProfile, supabaseProfile, localProfile] = await Promise.allSettled([
@@ -331,4 +353,8 @@ export async function upsertLocalProfile(
   }
 
   return nextRecord;
+}
+
+export async function getAllLocalProfiles() {
+  return readStore();
 }

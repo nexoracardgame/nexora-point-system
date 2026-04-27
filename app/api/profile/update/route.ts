@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       coverUrl,
       coverPosition,
       displayName,
+      username,
       bio,
       lineLink,
       facebookLink,
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
     const fallbackUser = {
       userId,
       displayName: String(displayName || "").trim() || null,
+      username: String(username || "").trim().replace(/^@+/, "") || null,
       image: String(profileImage || "").trim() || null,
       coverImage: String(coverUrl || "").trim() || null,
       coverPosition: safePosition,
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest) {
         lineUrl: updatedUser.lineUrl,
         facebookUrl: updatedUser.facebookUrl,
         updatedAt: updatedUser.updatedAt,
+        username: updatedUser.username,
       },
     });
   } catch (error) {

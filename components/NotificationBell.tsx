@@ -10,6 +10,7 @@ import {
   Handshake,
   MessageCircle,
   ChevronRight,
+  UserPlus,
 } from "lucide-react";
 
 const supabase = createClient(
@@ -19,12 +20,13 @@ const supabase = createClient(
 
 type NotificationItem = {
   id: string;
-  type: "chat" | "deal" | "wishlist";
+  type: "chat" | "deal" | "wishlist" | "friend";
   title: string;
   body: string;
   href: string;
   image: string;
   createdAt: string;
+  meta?: Record<string, string | number | boolean | null> | null;
 };
 
 type NotificationResponse = {
@@ -60,6 +62,8 @@ function getNotificationIcon(type: NotificationItem["type"]) {
       return MessageCircle;
     case "deal":
       return Handshake;
+    case "friend":
+      return UserPlus;
     default:
       return Heart;
   }
@@ -128,6 +132,47 @@ export default function NotificationBell() {
         hiddenIdsRef.current.delete(notificationId);
         void loadNotifications();
       });
+  };
+
+  const markNotificationsRead = (notificationIds: string[]) => {
+    notificationIds
+      .map((id) => String(id || "").trim())
+      .filter(Boolean)
+      .forEach((id) => markNotificationRead(id));
+  };
+
+  const respondToFriendRequest = async (
+    notificationId: string,
+    requestId: string,
+    decision: "accept" | "reject"
+  ) => {
+    try {
+      const res = await fetch("/api/community/friends", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "respond",
+          requestId,
+          decision,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(String(data?.error || "action failed"));
+      }
+
+      markNotificationsRead([notificationId]);
+      void loadNotifications();
+    } catch {
+      alert(
+        decision === "accept"
+          ? "ยอมรับคำขอเพื่อนไม่สำเร็จ"
+          : "ปฏิเสธคำขอเพื่อนไม่สำเร็จ"
+      );
+    }
   };
 
   useEffect(() => {
@@ -270,48 +315,94 @@ export default function NotificationBell() {
 
               {unreadItems.map((item) => {
                 const Icon = getNotificationIcon(item.type);
+                const isFriendRequest =
+                  item.type === "friend" &&
+                  String(item.meta?.action || "") === "request" &&
+                  String(item.meta?.requestId || "").trim();
+                const requestId = String(item.meta?.requestId || "").trim();
 
                 return (
-                  <Link
+                  <div
                     key={item.id}
-                    href={item.href}
-                    onClick={() => {
-                      markNotificationRead(item.id);
-                      setOpen(false);
-                    }}
-                    className="group flex items-start gap-3 rounded-[22px] border border-transparent px-3 py-3 transition hover:border-amber-300/10 hover:bg-white/[0.03]"
+                    className="group rounded-[22px] border border-transparent px-3 py-3 transition hover:border-amber-300/10 hover:bg-white/[0.03]"
                   >
-                    <div className="relative shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10"
-                      />
-                      <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-black/30 bg-[#111318] text-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.16)]">
-                        <Icon className="h-3 w-3" />
-                      </div>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="line-clamp-1 text-sm font-black text-white">
-                          {item.title}
-                        </div>
-                        <div className="shrink-0 text-[11px] text-white/35">
-                          {formatNotificationTime(item.createdAt, localeTag, t)}
+                    <div className="flex items-start gap-3">
+                      <div className="relative shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10"
+                        />
+                        <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-black/30 bg-[#111318] text-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.16)]">
+                          <Icon className="h-3 w-3" />
                         </div>
                       </div>
 
-                      <div className="mt-1 line-clamp-2 text-sm text-white/62">
-                        {item.body}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="line-clamp-1 text-sm font-black text-white">
+                            {item.title}
+                          </div>
+                          <div className="shrink-0 text-[11px] text-white/35">
+                            {formatNotificationTime(item.createdAt, localeTag, t)}
+                          </div>
+                        </div>
+
+                        <div className="mt-1 line-clamp-2 text-sm text-white/62">
+                          {item.body}
+                        </div>
+
+                        {isFriendRequest && requestId ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void respondToFriendRequest(
+                                  item.id,
+                                  requestId,
+                                  "accept"
+                                )
+                              }
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-amber-300/22 bg-[linear-gradient(180deg,rgba(251,191,36,0.18),rgba(251,191,36,0.08))] px-3 text-xs font-black text-amber-100 transition hover:brightness-110"
+                            >
+                              ยอมรับ
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void respondToFriendRequest(
+                                  item.id,
+                                  requestId,
+                                  "reject"
+                                )
+                              }
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-red-300/18 bg-red-500/10 px-3 text-xs font-black text-red-200 transition hover:bg-red-500/16"
+                            >
+                              ปฏิเสธ
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="mt-3">
+                            <Link
+                              href={item.href}
+                              onClick={() => {
+                                markNotificationRead(item.id);
+                                setOpen(false);
+                              }}
+                              className="inline-flex min-h-[38px] items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-white/78 transition hover:bg-white/[0.06]"
+                            >
+                              เปิดดู
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
                       </div>
                     </div>
-
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
-                      <ChevronRight className="mt-1 h-4 w-4 text-white/24 transition group-hover:text-white/45" />
-                    </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
