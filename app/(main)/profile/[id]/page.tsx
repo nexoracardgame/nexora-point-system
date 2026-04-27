@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import DeleteListingButton from "@/components/DeleteListingButton";
 import ProfileChatButton from "@/components/ProfileChatButton";
+import ProfileShareButton from "@/components/ProfileShareButton";
 import { authOptions } from "@/lib/auth";
 import { getMarketListings } from "@/lib/market-listings";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
@@ -447,6 +448,13 @@ export default async function SellerProfilePage({
                     </p>
 
                     <div className="mt-5 flex flex-wrap items-center gap-3">
+                      <ProfileShareButton
+                        userId={seller.id}
+                        displayName={
+                          seller.displayName || seller.name || "NEXORA User"
+                        }
+                      />
+
                       {seller.lineUrl && (
                         <a
                           href={seller.lineUrl}
