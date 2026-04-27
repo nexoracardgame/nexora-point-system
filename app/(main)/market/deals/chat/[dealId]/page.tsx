@@ -142,6 +142,9 @@ export default function DealChatPage() {
   const isNearBottomRef = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeDealIdRef = useRef(dealId);
+  const activeRoomIdRef = useRef("");
+  const messageRequestIdRef = useRef(0);
   const hasValidDealRoom = Boolean(dealId);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
@@ -189,10 +192,15 @@ export default function DealChatPage() {
 
   const loadRoomInfo = async (showClosedState = true) => {
     if (!dealId) return null;
+    const expectedDealId = dealId;
 
     const res = await fetch(`/api/market/deal-chat/info?dealId=${encodeURIComponent(dealId)}`, {
       cache: "no-store",
     });
+
+    if (activeDealIdRef.current !== expectedDealId) {
+      return null;
+    }
 
     if (!res.ok) {
       if (showClosedState && (res.status === 403 || res.status === 404 || res.status === 409)) {
@@ -205,7 +213,9 @@ export default function DealChatPage() {
     const data = await res.json();
 
     setRoomClosed(false);
-    setRoomId(String(data?.roomId || ""));
+    const nextRoomId = String(data?.roomId || "");
+    activeRoomIdRef.current = nextRoomId;
+    setRoomId(nextRoomId);
     setMe(data?.me || null);
     setOther(data?.other || null);
     setCard(data?.card || null);
@@ -221,10 +231,19 @@ export default function DealChatPage() {
     otherData?: ChatUser | null
   ) => {
     if (!nextRoomId) return;
+    const expectedRoomId = nextRoomId;
+    const requestId = ++messageRequestIdRef.current;
 
     const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(nextRoomId)}`, {
       cache: "no-store",
     });
+
+    if (
+      requestId !== messageRequestIdRef.current ||
+      activeRoomIdRef.current !== expectedRoomId
+    ) {
+      return;
+    }
 
     if (!res.ok) {
       if (res.status === 403 || res.status === 404 || res.status === 409) {
@@ -234,18 +253,20 @@ export default function DealChatPage() {
     }
 
     const data = (await res.json()) as Omit<DealMessage, "sender">[];
-    const withSender: DealMessage[] = (data || []).map((message) => ({
-      ...message,
-      sender: buildSender(
-        message.senderId,
-        {
-          senderName: message.senderName,
-          senderImage: message.senderImage,
-        },
-        meData,
-        otherData
-      ),
-    }));
+    const withSender: DealMessage[] = (data || [])
+      .filter((message) => String(message.roomId || "") === expectedRoomId)
+      .map((message) => ({
+        ...message,
+        sender: buildSender(
+          message.senderId,
+          {
+            senderName: message.senderName,
+            senderImage: message.senderImage,
+          },
+          meData,
+          otherData
+        ),
+      }));
 
     setMessages((prev) => {
       const optimisticMessages = prev.filter((message) => message.optimistic);
@@ -308,13 +329,18 @@ export default function DealChatPage() {
   useEffect(() => {
     if (!dealId) return;
 
+    activeDealIdRef.current = dealId;
+    activeRoomIdRef.current = "";
+    messageRequestIdRef.current += 1;
     hasInitialScrolledRef.current = false;
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    requestAnimationFrame(() => {
-      setNewMessageCount(0);
-    });
+    setMessages([]);
+    setRoomId("");
+    setRoomClosed(false);
+    setLoadingRoom(true);
+    setNewMessageCount(0);
 
     queueMicrotask(() => {
       void refreshChatState(true);
@@ -328,7 +354,7 @@ export default function DealChatPage() {
       if (document.visibilityState === "visible") {
         void loadMessages(roomId, me, other);
       }
-    }, 1800);
+    }, 650);
 
     const onFocus = () => {
       void loadMessages(roomId, me, other);
@@ -357,7 +383,7 @@ export default function DealChatPage() {
       if (document.visibilityState === "visible") {
         void loadRoomInfo(true);
       }
-    }, 5000);
+    }, 2500);
 
     const onFocus = () => {
       void loadRoomInfo(true);

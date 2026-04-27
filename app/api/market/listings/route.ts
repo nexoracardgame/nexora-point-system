@@ -12,7 +12,7 @@ export async function GET() {
     .sort((a, b) =>
       String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
     )
-    .slice(0, 24)
+    .slice(0, 120)
     .map((item) => ({
       ...item,
       cardName:

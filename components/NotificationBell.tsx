@@ -78,9 +78,17 @@ export default function NotificationBell() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const hiddenIdsRef = useRef<Set<string>>(new Set());
   const requestIdRef = useRef(0);
+  const inFlightRef = useRef(false);
+  const queuedRef = useRef(false);
   const localeTag = getLocaleTag(locale);
 
   const loadNotifications = async () => {
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+
+    inFlightRef.current = true;
     const requestId = ++requestIdRef.current;
 
     try {
@@ -99,8 +107,14 @@ export default function NotificationBell() {
     } catch {
       return;
     } finally {
+      inFlightRef.current = false;
       if (requestId === requestIdRef.current) {
         setLoading(false);
+      }
+
+      if (queuedRef.current) {
+        queuedRef.current = false;
+        void loadNotifications();
       }
     }
   };
@@ -188,7 +202,7 @@ export default function NotificationBell() {
       if (document.visibilityState === "visible") {
         void loadNotifications();
       }
-    }, 800);
+    }, 420);
 
     const onFocus = () => {
       void loadNotifications();

@@ -3,11 +3,9 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import {
-  ArrowRight,
   Coins,
   Gift,
   Gem,
-  Layers3,
   QrCode,
   ShieldCheck,
   Sparkles,
@@ -198,8 +196,6 @@ export default async function WalletPage() {
   const usedCoupons = coupons.filter((coupon) => coupon.used).length;
 
   const liquidTotal = nexPoint + coin;
-  const nexShare = liquidTotal > 0 ? (nexPoint / liquidTotal) * 100 : 0;
-  const coinShare = liquidTotal > 0 ? (coin / liquidTotal) * 100 : 0;
 
   const activities: ActivityItem[] = [
     ...pointLogs.map((log) => ({
@@ -318,28 +314,6 @@ export default async function WalletPage() {
               </div>
             </div>
 
-            <div className="hidden">
-              <div className="inline-flex min-h-[42px] items-center rounded-full border border-white/20 bg-black px-4 py-2 text-sm font-black text-white">
-                แยกสินทรัพย์
-              </div>
-              <div className="inline-flex min-h-[42px] items-center rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-bold text-white/45">
-                แยกพอร์ต
-              </div>
-              <div className="mx-1 hidden h-8 w-px bg-white/10 sm:block" />
-              <div className="inline-flex min-h-[42px] items-center rounded-full bg-white px-4 py-2 text-sm font-black text-black">
-                ทั้งหมด
-              </div>
-              <div className="inline-flex min-h-[42px] items-center rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-bold text-white/55">
-                NEX
-              </div>
-              <div className="inline-flex min-h-[42px] items-center rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-bold text-white/55">
-                COIN
-              </div>
-              <div className="inline-flex min-h-[42px] items-center rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-bold text-white/55">
-                คูปอง
-              </div>
-            </div>
-
             <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="relative overflow-hidden rounded-[30px] border border-amber-300/12 bg-[radial-gradient(circle_at_18%_20%,rgba(251,191,36,0.22),transparent_30%),radial-gradient(circle_at_86%_18%,rgba(34,211,238,0.16),transparent_26%),linear-gradient(135deg,rgba(12,12,16,0.98)_0%,rgba(19,16,31,0.94)_58%,rgba(34,22,7,0.9)_100%)] shadow-[0_24px_100px_rgba(0,0,0,0.42)]">
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_0%,rgba(255,255,255,0.08)_42%,transparent_58%)]" />
@@ -388,23 +362,6 @@ export default async function WalletPage() {
                     </div>
                   </div>
 
-                  <div className="hidden">
-                    <div className="h-12 w-12 rounded-full border-4 border-violet-300" />
-                    <div>
-                      <div className="text-xl font-black text-white">
-                        {nexShare.toFixed(2)}%
-                      </div>
-                      <div className="text-sm text-white/52">NEX พร้อมใช้</div>
-                    </div>
-                    <div className="h-3.5 w-3.5 rounded-full bg-emerald-400" />
-                    <div>
-                      <div className="text-xl font-black text-white">
-                        {coinShare.toFixed(2)}%
-                      </div>
-                      <div className="text-sm text-white/52">COIN พร้อมใช้</div>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-white/45" />
-                  </div>
                 </div>
               </div>
 
@@ -457,10 +414,6 @@ export default async function WalletPage() {
                 <h2 className="mt-1 text-2xl font-black sm:text-3xl">
                   ภาพรวมกระเป๋า
                 </h2>
-              </div>
-              <div className="hidden">
-                <Layers3 className="h-4 w-4" />
-                จัดเรียงใหม่
               </div>
             </div>
 

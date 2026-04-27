@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Heart, Plus, Handshake, ShieldCheck } from "lucide-react";
+import { Heart, Plus, Handshake, ShieldCheck, Search } from "lucide-react";
 import {
   normalizeMarketListingView,
   type MarketViewItem,
@@ -62,6 +62,12 @@ function rarityClasses(rarity: string) {
 function getCreatedAtValue(dateString?: string) {
   const value = new Date(dateString || 0).getTime();
   return Number.isNaN(value) ? 0 : value;
+}
+
+function normalizeCardNumber(value?: string | number | null) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .replace(/^0+(?=\d)/, "");
 }
 
 function comparePopularCards(a: MarketItem, b: MarketItem) {
@@ -142,6 +148,7 @@ export default function MarketDashboardTFT({
   const [likedCards, setLikedCards] = useState<string[]>([]);
   const [likesReady, setLikesReady] = useState(false);
   const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
+  const [cardNoQuery, setCardNoQuery] = useState("");
   const [mouse, setMouse] = useState({ x: 50, y: 50 });
   const [freshListingIds, setFreshListingIds] = useState<string[]>([]);
   const itemsRef = useRef(items);
@@ -347,6 +354,21 @@ export default function MarketDashboardTFT({
 
     return [...items].sort(comparePopularCards);
   }, [items, loading]);
+
+  const normalizedCardNoQuery = normalizeCardNumber(cardNoQuery);
+  const visibleItems = useMemo(() => {
+    if (!normalizedCardNoQuery) {
+      return sortedItems;
+    }
+
+    return sortedItems.filter((item) => {
+      const normalizedCardNo = normalizeCardNumber(item.cardNo);
+      return (
+        normalizedCardNo === normalizedCardNoQuery ||
+        normalizedCardNo.endsWith(normalizedCardNoQuery)
+      );
+    });
+  }, [normalizedCardNoQuery, sortedItems]);
 
   const heroTop3 = useMemo(() => {
     const list = [...sortedItems];
@@ -798,12 +820,43 @@ export default function MarketDashboardTFT({
 
       {/* MARKET GRID */}
       <section>
-        <div className="mb-4 text-2xl font-black lg:mb-6 lg:text-3xl">
-          Marketplace Listings
+        <div className="mb-4 flex flex-col gap-3 lg:mb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-2xl font-black lg:text-3xl">
+              Marketplace Listings
+            </div>
+            <div className="mt-1 text-sm text-white/45">
+              {normalizedCardNoQuery
+                ? `เจอการ์ดเลข ${cardNoQuery} จำนวน ${visibleItems.length} รายการ`
+                : `การ์ดพร้อมซื้อขาย ${sortedItems.length} รายการ`}
+            </div>
+          </div>
+
+          <label className="group relative block w-full lg:w-[360px]">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-200/70 transition group-focus-within:text-amber-200" />
+            <input
+              value={cardNoQuery}
+              onChange={(e) => {
+                setCardNoQuery(e.target.value.replace(/[^\d]/g, ""));
+              }}
+              inputMode="numeric"
+              placeholder="ค้นหาเลขการ์ด เช่น 0006, 006, 6"
+              className="h-[52px] w-full rounded-[22px] border border-amber-200/14 bg-[linear-gradient(135deg,rgba(251,191,36,0.10),rgba(255,255,255,0.035))] px-11 py-3 text-sm font-bold text-white outline-none shadow-[0_16px_45px_rgba(0,0,0,0.25)] transition placeholder:text-white/35 focus:border-amber-200/32 focus:ring-2 focus:ring-amber-300/12"
+            />
+            {cardNoQuery ? (
+              <button
+                type="button"
+                onClick={() => setCardNoQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-black/35 px-3 py-1 text-xs font-black text-white/70 transition hover:text-white"
+              >
+                ล้าง
+              </button>
+            ) : null}
+          </label>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-5">
-          {sortedItems.map((card) => {
+          {visibleItems.map((card) => {
             const rarity = rarityClasses(card.rarity);
             const liked = likesReady && likedCards.includes(card.id);
 
@@ -880,6 +933,15 @@ export default function MarketDashboardTFT({
             );
           })}
         </div>
+
+        {visibleItems.length === 0 && (
+          <div className="mt-5 rounded-[28px] border border-amber-200/12 bg-[linear-gradient(135deg,rgba(251,191,36,0.08),rgba(255,255,255,0.025))] p-8 text-center shadow-[0_18px_55px_rgba(0,0,0,0.26)]">
+            <div className="text-lg font-black text-white">ไม่พบการ์ดเลขนี้ในตลาด</div>
+            <div className="mt-2 text-sm text-white/50">
+              ลองพิมพ์เลขแบบ 6, 006 หรือ 0006 ได้เลย ระบบจะค้นหาให้ทันที
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

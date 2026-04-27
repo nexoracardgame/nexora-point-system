@@ -144,6 +144,8 @@ export default function DMPage() {
   const isNearBottomRef = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRoomIdRef = useRef(roomId);
+  const messageRequestIdRef = useRef(0);
 
   const hasValidRoom = Boolean(roomId);
   const backHref = String(searchParams?.get("back") || "").trim();
@@ -243,10 +245,19 @@ export default function DMPage() {
 
   const loadMessages = async (meData?: ChatUser, otherData?: ChatUser) => {
     if (!roomId) return;
+    const expectedRoomId = roomId;
+    const requestId = ++messageRequestIdRef.current;
 
     const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(roomId)}`, {
       cache: "no-store",
     });
+
+    if (
+      requestId !== messageRequestIdRef.current ||
+      activeRoomIdRef.current !== expectedRoomId
+    ) {
+      return;
+    }
 
     if (!res.ok) {
       if (res.status === 403 || res.status === 404 || res.status === 409) {
@@ -256,18 +267,20 @@ export default function DMPage() {
     }
 
     const data = (await res.json()) as DMMessage[];
-    const withSender: DMMessage[] = (data || []).map((m) => ({
-      ...m,
-      sender: buildSender(
-        m.senderId,
-        {
-          senderName: m.senderName,
-          senderImage: m.senderImage,
-        },
-        meData,
-        otherData
-      ),
-    }));
+    const withSender: DMMessage[] = (data || [])
+      .filter((m) => String(m.roomId || "") === expectedRoomId)
+      .map((m) => ({
+        ...m,
+        sender: buildSender(
+          m.senderId,
+          {
+            senderName: m.senderName,
+            senderImage: m.senderImage,
+          },
+          meData,
+          otherData
+        ),
+      }));
 
     setMessages((prev) => {
       const optimisticMessages = prev.filter((message) => message.optimistic);
@@ -317,14 +330,16 @@ export default function DMPage() {
   useEffect(() => {
     if (!roomId) return;
 
+    activeRoomIdRef.current = roomId;
+    messageRequestIdRef.current += 1;
     hasInitialScrolledRef.current = false;
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    requestAnimationFrame(() => {
-      setLoadingRoom(!seededOther);
-      setNewMessageCount(0);
-    });
+    setMessages([]);
+    setRoomClosed(false);
+    setLoadingRoom(!seededOther);
+    setNewMessageCount(0);
 
     const init = async () => {
       const roomPromise = loadRoom();
@@ -351,7 +366,7 @@ export default function DMPage() {
       if (document.visibilityState === "visible") {
         void loadMessages(me, other);
       }
-    }, 1800);
+    }, 650);
 
     const onFocus = () => {
       void loadMessages(me, other);
