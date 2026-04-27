@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { FormEvent, useEffect, useState, useTransition } from "react";
+import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
@@ -35,21 +35,36 @@ type IncomingRequest = {
   bio: string;
 };
 
-export default function CommunityClient() {
+export default function CommunityClient({
+  initialFriends = [],
+  initialRequests = [],
+  hasInitialCommunityState = false,
+}: {
+  initialFriends?: FriendItem[];
+  initialRequests?: IncomingRequest[];
+  hasInitialCommunityState?: boolean;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
-  const [friends, setFriends] = useState<FriendItem[]>([]);
-  const [requests, setRequests] = useState<IncomingRequest[]>([]);
-  const [loadingResults, setLoadingResults] = useState(true);
-  const [loadingFriends, setLoadingFriends] = useState(true);
+  const [friends, setFriends] = useState<FriendItem[]>(initialFriends);
+  const [requests, setRequests] = useState<IncomingRequest[]>(initialRequests);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [bootstrappingSuggestions, setBootstrappingSuggestions] = useState(true);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const hasServerFriends =
+    hasInitialCommunityState ||
+    initialFriends.length > 0 ||
+    initialRequests.length > 0;
 
   const loadFriends = async (silent = false) => {
     if (!silent) {
       setLoadingFriends(true);
     }
+
     try {
       const res = await fetch("/api/community/friends", { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
@@ -69,6 +84,7 @@ export default function CommunityClient() {
     if (!silent) {
       setLoadingResults(true);
     }
+
     try {
       const res = await fetch(`/api/community/search?q=${encodeURIComponent(term)}`, {
         cache: "no-store",
@@ -85,8 +101,19 @@ export default function CommunityClient() {
   };
 
   useEffect(() => {
-    void Promise.all([loadFriends(), runSearch("")]);
-  }, []);
+    void loadFriends(hasServerFriends);
+
+    const bootstrapSuggestions = window.setTimeout(() => {
+      void (async () => {
+        await runSearch("", true);
+        setBootstrappingSuggestions(false);
+      })();
+    }, hasServerFriends ? 120 : 260);
+
+    return () => {
+      window.clearTimeout(bootstrapSuggestions);
+    };
+  }, [hasServerFriends]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -101,6 +128,7 @@ export default function CommunityClient() {
     };
 
     window.addEventListener("focus", onFocus);
+
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
@@ -108,11 +136,17 @@ export default function CommunityClient() {
   }, [query]);
 
   useEffect(() => {
+    if (query.trim()) {
+      setBootstrappingSuggestions(false);
+    }
+
     const debounceId = window.setTimeout(() => {
       void runSearch(query, true);
     }, 120);
 
-    return () => window.clearTimeout(debounceId);
+    return () => {
+      window.clearTimeout(debounceId);
+    };
   }, [query]);
 
   useEffect(() => {
@@ -126,7 +160,9 @@ export default function CommunityClient() {
     results
       .filter((user) => user.relation !== "self")
       .slice(0, 12)
-      .forEach((user) => router.prefetch(`/profile/${user.id}`));
+      .forEach((user) => {
+        router.prefetch(`/profile/${user.id}`);
+      });
   }, [results, router]);
 
   const handleSearch = (event?: FormEvent) => {
@@ -174,7 +210,10 @@ export default function CommunityClient() {
     });
   };
 
-  const visibleResults = results.filter((user) => user.relation !== "self");
+  const visibleResults = useMemo(
+    () => results.filter((user) => user.relation !== "self"),
+    [results]
+  );
   const suggestionCount = Math.max(visibleResults.length - friends.length, 0);
 
   return (
@@ -224,12 +263,10 @@ export default function CommunityClient() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-black/40">Your Circle</div>
-                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">
-                    รายชื่อเพื่อน
-                  </div>
+                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">รายชื่อเพื่อน</div>
                 </div>
                 <div className="shrink-0 rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:px-4 sm:text-sm">
-                  เก่า → ใหม่
+                  เก่า ไป ใหม่
                 </div>
               </div>
 
@@ -258,9 +295,7 @@ export default function CommunityClient() {
                           className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                         />
                         <div className="min-w-0">
-                          <div className="truncate text-base font-black">
-                            {friend.displayName}
-                          </div>
+                          <div className="truncate text-base font-black">{friend.displayName}</div>
                           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-black/42 sm:text-sm">
                             {friend.username ? <span>@{friend.username}</span> : null}
                             {friend.bio ? <span className="line-clamp-1">{friend.bio}</span> : null}
@@ -297,25 +332,19 @@ export default function CommunityClient() {
                     <div className="text-[10px] font-black uppercase tracking-[0.12em] text-black/45 sm:text-xs sm:tracking-[0.18em]">
                       Friends
                     </div>
-                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">
-                      {friends.length}
-                    </div>
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">{friends.length}</div>
                   </div>
                   <div className="rounded-[22px] bg-[#e9eaf5] p-3 sm:rounded-[28px] sm:p-4">
                     <div className="text-[10px] font-black uppercase tracking-[0.12em] text-black/45 sm:text-xs sm:tracking-[0.18em]">
                       Requests
                     </div>
-                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">
-                      {requests.length}
-                    </div>
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">{requests.length}</div>
                   </div>
                   <div className="rounded-[22px] bg-black p-3 text-white sm:rounded-[28px] sm:p-4">
                     <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45 sm:text-xs sm:tracking-[0.18em]">
                       Suggestions
                     </div>
-                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">
-                      {suggestionCount}
-                    </div>
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">{suggestionCount}</div>
                   </div>
                 </div>
 
@@ -328,7 +357,7 @@ export default function CommunityClient() {
                     id="community-search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="ค้นหาชื่อ หรือ username"
+                    placeholder="ค้นหาชื่อหรือ username"
                     className="min-w-0 flex-1 bg-transparent text-base font-bold outline-none placeholder:text-white/45"
                   />
                   <button
@@ -353,9 +382,7 @@ export default function CommunityClient() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-black/40">Pending</div>
-                      <div className="mt-1 text-3xl font-black tracking-[-0.05em]">
-                        คำขอเป็นเพื่อน
-                      </div>
+                      <div className="mt-1 text-3xl font-black tracking-[-0.05em]">คำขอเป็นเพื่อน</div>
                     </div>
                     <div className="grid h-11 w-11 place-items-center rounded-full bg-[#ff4b55] text-sm font-black text-white">
                       {requests.length}
@@ -375,9 +402,7 @@ export default function CommunityClient() {
                             className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                           />
                           <div className="min-w-0">
-                            <div className="truncate text-base font-black">
-                              {request.displayName}
-                            </div>
+                            <div className="truncate text-base font-black">{request.displayName}</div>
                             <div className="mt-1 text-sm font-bold text-black/42">
                               {request.username ? `@${request.username}` : "NEXORA User"}
                             </div>
@@ -455,9 +480,9 @@ export default function CommunityClient() {
             </div>
 
             <div className="relative mt-6 grid gap-3 lg:grid-cols-2">
-              {loadingResults ? (
+              {loadingResults || bootstrappingSuggestions ? (
                 <div className="rounded-[30px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45 lg:col-span-2">
-                  กำลังค้นหา...
+                  กำลังโหลดคำแนะนำ...
                 </div>
               ) : visibleResults.length === 0 ? (
                 <div className="rounded-[30px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45 lg:col-span-2">

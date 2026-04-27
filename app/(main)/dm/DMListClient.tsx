@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -34,12 +34,6 @@ function formatRoomTime(dateString?: string) {
     day: "numeric",
     month: "short",
   });
-}
-
-function formatDealPrice(value?: number) {
-  const amount = Number(value || 0);
-  if (!amount) return "-";
-  return `฿${amount.toLocaleString("th-TH")}`;
 }
 
 function formatDealPriceLabel(value?: number) {
@@ -276,178 +270,186 @@ export default function DMListClient({
   }, []);
 
   return (
-    <div className="mx-auto max-w-[920px] px-3 py-4 text-white sm:py-6">
-      <div className="mb-5 flex items-end justify-between gap-4">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-yellow-200/45">
-            NEXORA COMMS
-          </div>
-          <h1 className="mt-1 text-2xl font-black sm:text-3xl">แชท</h1>
-        </div>
-        <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-bold text-white/45">
-          {rooms.length} rooms
-        </div>
-      </div>
+    <div className="min-h-full overflow-hidden bg-[#f4f0f7] text-[#08080a]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.92),transparent_26%),radial-gradient(circle_at_78%_0%,rgba(255,217,102,0.22),transparent_22%),linear-gradient(180deg,#f8f5fb_0%,#e7e8f7_100%)]" />
+      <div className="relative mx-auto max-w-7xl px-0 py-0 sm:px-6 sm:py-5 lg:px-8">
+        <section className="relative overflow-hidden rounded-[26px] bg-[#f8f7fb] px-3 pb-5 pt-4 shadow-[0_28px_90px_rgba(60,50,80,0.16)] ring-1 ring-black/5 sm:rounded-[48px] sm:px-7 sm:pb-7 sm:pt-5 lg:px-10">
+          <div className="pointer-events-none absolute -right-24 top-8 h-72 w-72 rounded-full bg-white/80 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-[#d9def8] blur-3xl" />
 
-      <div className="space-y-2">
-        {loading && rooms.length === 0 && (
-          <>
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3"
-              >
-                <div className="h-12 w-12 animate-pulse rounded-full bg-white/10" />
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 h-4 w-40 animate-pulse rounded bg-white/10" />
-                  <div className="h-3 w-28 animate-pulse rounded bg-white/5" />
+          <header className="relative flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.28em] text-black/35 sm:text-[13px] sm:tracking-[0.38em]">
+                Nexora Comms
+              </div>
+              <h1 className="mt-2 text-4xl font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
+                แชท
+              </h1>
+            </div>
+            <div className="rounded-full bg-white px-4 py-2.5 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:px-5 sm:py-3 sm:text-base">
+              {rooms.length} ห้อง
+            </div>
+          </header>
+
+          <div className="relative mt-6 grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
+            <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-black/40">Direct</div>
+                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">แชทส่วนตัว</div>
+                </div>
+                <div className="rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:px-4 sm:text-sm">
+                  {directRooms.length} active
                 </div>
               </div>
-            ))}
-          </>
-        )}
 
-        {directRooms.length > 0 && (
-          <section>
-            <div className="mb-2 flex items-center justify-between px-1">
-              <h2 className="text-sm font-black text-white">DM ส่วนตัว</h2>
-              <span className="text-[11px] font-bold text-white/35">
-                {directRooms.length} active
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {directRooms.map((room) => (
-                <Link
-                  key={room.roomId}
-                  href={`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`}
-                  prefetch
-                  onMouseEnter={() => {
-                    saveDmRoomSeed(room.roomId, {
-                      name: room.otherName,
-                      image: room.otherImage,
-                      otherUserId: room.otherUserId,
-                    });
-                  }}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    markRoomReadLocally(room.roomId);
-                    saveDmRoomSeed(room.roomId, {
-                      name: room.otherName,
-                      image: room.otherImage,
-                      otherUserId: room.otherUserId,
-                    });
-                    void openDirectRoom(room);
-                  }}
-                  className="group flex items-center gap-3 rounded-[24px] border border-white/5 bg-[linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition hover:border-yellow-300/20 hover:bg-white/[0.055]"
-                >
-                  <div className="relative">
-                    <img
-                      src={room.otherImage}
-                      alt={room.otherName}
-                      className="h-[52px] w-[52px] rounded-full border border-white/10 object-cover"
-                    />
-
-                    {room.unread > 0 && (
-                      <div className="absolute -right-1 -top-1 min-w-[21px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
-                        {room.unread > 99 ? "99+" : room.unread}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="truncate font-black">{room.otherName}</div>
-                      <div className="shrink-0 text-[11px] text-white/35">
-                        {formatRoomTime(room.createdAt)}
-                      </div>
-                    </div>
-
+              <div className="space-y-3">
+                {loading && rooms.length === 0 ? (
+                  Array.from({ length: 5 }).map((_, index) => (
                     <div
-                      className={`truncate text-sm ${
-                        room.unread > 0
-                          ? "font-semibold text-white/90"
-                          : "text-white/50"
-                      }`}
+                      key={index}
+                      className="flex items-center gap-3 rounded-[28px] bg-[#f4f3f8] p-3"
                     >
-                      {room.lastMessage}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {dealRooms.length > 0 && (
-          <section className="pt-5">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <h2 className="text-sm font-black text-cyan-100">ห้องดีล</h2>
-              <span className="rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-bold text-cyan-100/70">
-                synced deals
-              </span>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              {dealRooms.map((room) => (
-                <Link
-                  key={room.roomId}
-                  href={`/market/deals/chat/${room.dealId}`}
-                  prefetch
-                  onClick={() => markRoomReadLocally(room.roomId)}
-                  className="group relative overflow-hidden rounded-[22px] border border-cyan-300/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.09),rgba(255,255,255,0.025))] p-3 transition hover:border-cyan-200/25 hover:shadow-[0_0_28px_rgba(34,211,238,0.10)]"
-                >
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.10),transparent_34%)] opacity-70" />
-                  <div className="relative flex items-start gap-3">
-                    <div className="relative shrink-0">
-                      <img
-                        src={room.otherImage}
-                        alt={room.otherName}
-                        className="h-11 w-11 rounded-2xl border border-white/10 object-cover"
-                      />
-                      {room.unread > 0 && (
-                        <div className="absolute -right-1 -top-1 min-w-[20px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
-                          {room.unread > 99 ? "99+" : room.unread}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="min-w-0 text-sm font-black text-white">
-                            <div className="truncate">
-                              {room.dealCardName || "Deal chat"}
-                            </div>
-                            <div className="mt-0.5 truncate text-xs font-black text-yellow-200/85 sm:text-sm">
-                              ({formatDealPriceLabel(room.dealPrice)})
-                            </div>
-                          </div>
-                          <div className="mt-0.5 truncate text-[11px] font-semibold text-cyan-100/55">
-                            Seller: {room.sellerName || room.otherName}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-[10px] text-white/32">
-                          {formatRoomTime(room.createdAt)}
-                        </div>
-                      </div>
-
-                      <div className="mt-2 truncate text-xs text-white/50">
-                        คุยกับ {room.otherName} · {room.lastMessage}
+                      <div className="h-12 w-12 animate-pulse rounded-full bg-white" />
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-2 h-4 w-40 animate-pulse rounded bg-black/10" />
+                        <div className="h-3 w-28 animate-pulse rounded bg-black/5" />
                       </div>
                     </div>
+                  ))
+                ) : directRooms.length === 0 ? (
+                  <div className="rounded-[28px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45">
+                    ยังไม่มีแชทส่วนตัว
                   </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+                ) : (
+                  directRooms.map((room) => (
+                    <Link
+                      key={room.roomId}
+                      href={`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`}
+                      prefetch
+                      onMouseEnter={() => {
+                        saveDmRoomSeed(room.roomId, {
+                          name: room.otherName,
+                          image: room.otherImage,
+                          otherUserId: room.otherUserId,
+                        });
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        markRoomReadLocally(room.roomId);
+                        saveDmRoomSeed(room.roomId, {
+                          name: room.otherName,
+                          image: room.otherImage,
+                          otherUserId: room.otherUserId,
+                        });
+                        void openDirectRoom(room);
+                      }}
+                      className="group flex items-center gap-3 rounded-[30px] bg-[#f4f3f8] p-3 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
+                    >
+                      <div className="relative">
+                        <img
+                          src={room.otherImage}
+                          alt={room.otherName}
+                          className="h-[56px] w-[56px] rounded-full object-cover ring-4 ring-white"
+                        />
+                        {room.unread > 0 ? (
+                          <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
+                            {room.unread > 99 ? "99+" : room.unread}
+                          </div>
+                        ) : null}
+                      </div>
 
-        {!loading && rooms.length === 0 && (
-          <div className="mt-10 rounded-[28px] border border-white/5 bg-white/[0.02] px-5 py-12 text-center text-white/40">
-            ยังไม่มีแชท
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="truncate text-base font-black text-black">{room.otherName}</div>
+                          <div className="shrink-0 text-[11px] font-bold text-black/35">
+                            {formatRoomTime(room.createdAt)}
+                          </div>
+                        </div>
+                        <div
+                          className={`mt-1 truncate text-sm ${
+                            room.unread > 0 ? "font-semibold text-black/80" : "text-black/45"
+                          }`}
+                        >
+                          {room.lastMessage || "เริ่มบทสนทนา"}
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-black/40">Deal Rooms</div>
+                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">ห้องดีล</div>
+                </div>
+                <div className="rounded-full bg-black px-3 py-2 text-xs font-black text-white sm:px-4 sm:text-sm">
+                  {dealRooms.length} synced
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {dealRooms.length === 0 ? (
+                  <div className="rounded-[28px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45">
+                    ยังไม่มีห้องดีล
+                  </div>
+                ) : (
+                  dealRooms.map((room) => (
+                    <Link
+                      key={room.roomId}
+                      href={`/market/deals/chat/${room.dealId}`}
+                      prefetch
+                      onClick={() => markRoomReadLocally(room.roomId)}
+                      className="group relative overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,#111214,#1d1f28)] p-4 text-white shadow-[0_24px_54px_rgba(15,15,20,0.2)] transition hover:-translate-y-0.5"
+                    >
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.12),transparent_34%)] opacity-80" />
+                      <div className="relative flex items-start gap-3">
+                        <div className="relative shrink-0">
+                          <img
+                            src={room.otherImage}
+                            alt={room.otherName}
+                            className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white/10"
+                          />
+                          {room.unread > 0 ? (
+                            <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
+                              {room.unread > 99 ? "99+" : room.unread}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-black text-white sm:text-base">
+                                {room.dealCardName || "Deal chat"}
+                              </div>
+                              <div className="mt-1 break-words text-xs font-black text-yellow-200 sm:text-sm">
+                                {formatDealPriceLabel(room.dealPrice)}
+                              </div>
+                              <div className="mt-1 truncate text-[11px] font-semibold text-white/55">
+                                Seller: {room.sellerName || room.otherName}
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-[10px] font-semibold text-white/40">
+                              {formatRoomTime(room.createdAt)}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 line-clamp-2 text-xs text-white/65">
+                            {room.lastMessage || `กำลังคุยกับ ${room.otherName}`}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
-        )}
+        </section>
       </div>
     </div>
   );
