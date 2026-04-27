@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState, useTransition } from "react";
-import {
-  Check,
-  Search,
-  Trash2,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
+import { Check, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 
 type SearchUser = {
   id: string;
@@ -112,6 +105,14 @@ export default function CommunityClient() {
     };
   }, [query]);
 
+  useEffect(() => {
+    const debounceId = window.setTimeout(() => {
+      void runSearch(query, true);
+    }, 260);
+
+    return () => window.clearTimeout(debounceId);
+  }, [query]);
+
   const handleSearch = (event?: FormEvent) => {
     event?.preventDefault();
     void runSearch(query);
@@ -157,216 +158,338 @@ export default function CommunityClient() {
     });
   };
 
+  const suggestionCount = Math.max(results.length - friends.length, 0);
+
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top,#1f153b_0%,#0a0c14_42%,#06070b_100%)] text-white">
-      <div className="mx-auto max-w-7xl space-y-5 px-3 py-3 sm:px-5 sm:py-5 xl:px-6">
-        <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(123,92,255,0.18),rgba(11,13,20,0.92)_55%,rgba(34,211,238,0.12))] p-5 shadow-[0_35px_120px_rgba(0,0,0,0.4)] backdrop-blur-2xl sm:rounded-[38px] sm:p-7">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/42">
-                NEXORA COMMUNITY
+    <div className="min-h-full overflow-hidden bg-[#f4f0f7] text-[#08080a]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.92),transparent_26%),radial-gradient(circle_at_78%_0%,rgba(255,217,102,0.22),transparent_22%),linear-gradient(180deg,#f8f5fb_0%,#e7e8f7_100%)]" />
+      <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[38px] bg-[#f8f7fb] px-4 pb-7 pt-5 shadow-[0_28px_90px_rgba(60,50,80,0.16)] ring-1 ring-black/5 sm:rounded-[48px] sm:px-7 lg:px-10">
+          <div className="pointer-events-none absolute -right-24 top-8 h-72 w-72 rounded-full bg-white/80 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-[#d9def8] blur-3xl" />
+
+          <header className="relative flex items-center justify-between gap-4">
+            <div className="relative flex items-center gap-3">
+              <div className="relative">
+                <div className="grid h-16 w-16 place-items-center rounded-full bg-white shadow-[0_18px_36px_rgba(20,20,30,0.12)] ring-1 ring-black/5">
+                  <Users className="h-7 w-7 text-black" />
+                </div>
+                {requests.length > 0 ? (
+                  <div className="absolute -right-2 -top-1 grid h-9 w-9 place-items-center rounded-full bg-[#ff4b55] text-sm font-black text-white shadow-[0_12px_24px_rgba(255,75,85,0.32)]">
+                    {requests.length}
+                  </div>
+                ) : null}
               </div>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-5xl">
-                ค้นหาเพื่อนและจัดการคอมมูนิตี้
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base">
-                ค้นหาจากชื่อหรือ username, ส่งคำขอเพื่อน, รับคำขอจากกระดิ่ง และลบเพื่อนได้จากที่นี่ในหน้าเดียว
-              </p>
+              <div className="hidden sm:block">
+                <div className="text-xs font-black uppercase tracking-[0.32em] text-black/35">
+                  Nexora Social
+                </div>
+                <div className="mt-1 text-xl font-black">Community Hub</div>
+              </div>
             </div>
 
-            <div className="rounded-[26px] border border-white/10 bg-black/24 px-5 py-4 backdrop-blur-xl">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-white/42">
-                Friends
-              </div>
-              <div className="mt-2 flex items-center gap-3 text-3xl font-black text-amber-300">
-                <Users className="h-7 w-7" />
-                {friends.length}
-              </div>
-            </div>
-          </div>
-
-          <form
-            onSubmit={handleSearch}
-            className="mt-6 flex flex-col gap-3 rounded-[28px] border border-white/10 bg-black/24 p-3 backdrop-blur-xl sm:flex-row sm:items-center sm:p-4"
-          >
-            <div className="flex min-h-[58px] flex-1 items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-4">
-              <Search className="h-5 w-5 text-cyan-200/80" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="ค้นหาจากชื่อหรือ username"
-                className="h-full w-full bg-transparent text-sm text-white outline-none placeholder:text-white/35 sm:text-base"
-              />
+            <div className="rounded-full bg-white px-5 py-3 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:text-base">
+              {friends.length} Friends
             </div>
 
             <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex min-h-[58px] items-center justify-center gap-2 rounded-[22px] border border-amber-300/24 bg-[linear-gradient(180deg,rgba(251,191,36,0.2),rgba(251,191,36,0.08))] px-6 text-sm font-black text-amber-100 shadow-[0_18px_38px_rgba(251,191,36,0.12)] transition hover:scale-[1.02] hover:brightness-110 disabled:opacity-60"
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("community-search");
+                el?.focus();
+              }}
+              className="grid h-16 w-16 place-items-center rounded-full bg-black text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)] transition hover:scale-[1.03]"
             >
-              <Search className="h-4 w-4" />
-              ค้นหา
+              <Search className="h-7 w-7" />
             </button>
-          </form>
-        </section>
+          </header>
 
-        {error ? (
-          <div className="rounded-[22px] border border-red-400/16 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            {error}
-          </div>
-        ) : null}
-
-        {requests.length > 0 ? (
-          <section className="rounded-[28px] border border-amber-300/14 bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(255,255,255,0.035))] p-4 shadow-[0_20px_70px_rgba(251,191,36,0.08)] backdrop-blur-2xl sm:rounded-[32px] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-amber-100/48">
-                  Pending Requests
-                </div>
-                <div className="mt-1 text-xl font-black text-white sm:text-2xl">
-                  คำขอเป็นเพื่อนที่รออยู่
-                </div>
-              </div>
-              <div className="rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-100">
-                {requests.length}
-              </div>
+          <div className="relative mt-9 text-center">
+            <div className="text-[13px] font-black uppercase tracking-[0.38em] text-black/35">
+              Find Friends
             </div>
+            <h1 className="mt-2 text-5xl font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
+              Community
+            </h1>
+          </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {requests.map((request) => (
-                <div
-                  key={request.id}
-                  className="flex flex-col gap-3 rounded-[22px] border border-white/10 bg-black/22 p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <Link
-                    href={`/profile/${request.fromUserId}`}
-                    className="flex min-w-0 items-center gap-3"
-                  >
-                    <img
-                      src={request.image || "/avatar.png"}
-                      alt={request.displayName}
-                      className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10"
-                    />
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-black text-white sm:text-base">
-                        {request.displayName}
-                      </div>
-                      <div className="mt-1 text-xs text-white/50 sm:text-sm">
-                        {request.username ? `@${request.username}` : "NEXORA User"}
-                      </div>
-                    </div>
-                  </Link>
-
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() =>
-                        submitAction(
-                          {
-                            action: "respond",
-                            requestId: request.id,
-                            decision: "accept",
-                          },
-                          () => {
-                            setRequests((prev) =>
-                              prev.filter((item) => item.id !== request.id)
-                            );
-                            applyRelation(request.fromUserId, "friends", null);
-                          }
-                        )
-                      }
-                      className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-[16px] border border-amber-300/24 bg-amber-300/12 px-4 text-sm font-black text-amber-100 transition hover:brightness-110 sm:flex-none"
-                    >
-                      <Check className="h-4 w-4" />
-                      รับ
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() =>
-                        submitAction(
-                          {
-                            action: "respond",
-                            requestId: request.id,
-                            decision: "reject",
-                          },
-                          () => {
-                            setRequests((prev) =>
-                              prev.filter((item) => item.id !== request.id)
-                            );
-                            applyRelation(request.fromUserId, "none", null);
-                          }
-                        )
-                      }
-                      className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-[16px] border border-red-300/18 bg-red-500/10 px-4 text-sm font-black text-red-200 transition hover:bg-red-500/16 sm:flex-none"
-                    >
-                      <X className="h-4 w-4" />
-                      ปฏิเสธ
-                    </button>
+          <div className="relative mt-8 grid gap-4 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
+            <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-black/40">Your Circle</div>
+                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">
+                    รายชื่อเพื่อน
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-          <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,18,28,0.92)_0%,rgba(9,10,16,0.86)_100%)] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[34px] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/38">
-                  Search Result
+                <div className="rounded-full bg-[#eef0fb] px-4 py-2 text-sm font-black">
+                  เก่า → ใหม่
                 </div>
-                <div className="mt-1 text-2xl font-black text-white">
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {loadingFriends ? (
+                  <div className="rounded-[28px] bg-[#f2f1f7] px-5 py-8 text-sm font-bold text-black/45">
+                    กำลังโหลดรายชื่อเพื่อน...
+                  </div>
+                ) : friends.length === 0 ? (
+                  <div className="rounded-[28px] bg-[#f2f1f7] px-5 py-8 text-sm font-bold leading-6 text-black/45">
+                    ยังไม่มีเพื่อนในระบบ ลองค้นหาชื่อหรือ username แล้วกดเพิ่มเพื่อนได้เลย
+                  </div>
+                ) : (
+                  friends.map((friend) => (
+                    <div
+                      key={friend.id}
+                      className="flex items-center gap-3 rounded-[30px] bg-[#f4f3f8] p-3 transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
+                    >
+                      <Link
+                        href={`/profile/${friend.friendId}`}
+                        className="flex min-w-0 flex-1 items-center gap-3"
+                      >
+                        <img
+                          src={friend.image || "/avatar.png"}
+                          alt={friend.displayName}
+                          className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate text-base font-black">
+                            {friend.displayName}
+                          </div>
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-black/42 sm:text-sm">
+                            {friend.username ? <span>@{friend.username}</span> : null}
+                            {friend.bio ? <span className="line-clamp-1">{friend.bio}</span> : null}
+                          </div>
+                        </div>
+                      </Link>
+
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() =>
+                          submitAction({ action: "remove", targetUserId: friend.friendId }, () => {
+                            setFriends((prev) =>
+                              prev.filter((item) => item.friendId !== friend.friendId)
+                            );
+                            applyRelation(friend.friendId, "none", null);
+                          })
+                        }
+                        className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-red-500 shadow-sm ring-1 ring-black/5 transition hover:scale-[1.04] hover:bg-red-50 disabled:opacity-60"
+                        aria-label="Remove friend"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <div className="space-y-4">
+              <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[28px] bg-[#f5c542] p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-black/45">
+                      Friends
+                    </div>
+                    <div className="mt-2 text-4xl font-black tracking-[-0.08em]">
+                      {friends.length}
+                    </div>
+                  </div>
+                  <div className="rounded-[28px] bg-[#e9eaf5] p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-black/45">
+                      Requests
+                    </div>
+                    <div className="mt-2 text-4xl font-black tracking-[-0.08em]">
+                      {requests.length}
+                    </div>
+                  </div>
+                  <div className="rounded-[28px] bg-black p-4 text-white">
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+                      Suggestions
+                    </div>
+                    <div className="mt-2 text-4xl font-black tracking-[-0.08em]">
+                      {suggestionCount}
+                    </div>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={handleSearch}
+                  className="mt-5 flex min-h-[74px] items-center gap-3 rounded-full bg-black p-2 pl-5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.22)]"
+                >
+                  <Search className="h-5 w-5 shrink-0 text-white/70" />
+                  <input
+                    id="community-search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="ค้นหาชื่อ หรือ username"
+                    className="min-w-0 flex-1 bg-transparent text-base font-bold outline-none placeholder:text-white/45"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white text-black transition hover:scale-[1.04] disabled:opacity-60"
+                    aria-label="Search friends"
+                  >
+                    <Search className="h-5 w-5" />
+                  </button>
+                </form>
+              </section>
+
+              {error ? (
+                <div className="rounded-[28px] bg-red-50 px-5 py-4 text-sm font-black text-red-600 ring-1 ring-red-100">
+                  {error}
+                </div>
+              ) : null}
+
+              {requests.length > 0 ? (
+                <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-black/40">Pending</div>
+                      <div className="mt-1 text-3xl font-black tracking-[-0.05em]">
+                        คำขอเป็นเพื่อน
+                      </div>
+                    </div>
+                    <div className="grid h-11 w-11 place-items-center rounded-full bg-[#ff4b55] text-sm font-black text-white">
+                      {requests.length}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    {requests.map((request) => (
+                      <div key={request.id} className="rounded-[30px] bg-[#f4f3f8] p-3">
+                        <Link
+                          href={`/profile/${request.fromUserId}`}
+                          className="flex min-w-0 items-center gap-3"
+                        >
+                          <img
+                            src={request.image || "/avatar.png"}
+                            alt={request.displayName}
+                            className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
+                          />
+                          <div className="min-w-0">
+                            <div className="truncate text-base font-black">
+                              {request.displayName}
+                            </div>
+                            <div className="mt-1 text-sm font-bold text-black/42">
+                              {request.username ? `@${request.username}` : "NEXORA User"}
+                            </div>
+                          </div>
+                        </Link>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() =>
+                              submitAction(
+                                {
+                                  action: "respond",
+                                  requestId: request.id,
+                                  decision: "accept",
+                                },
+                                () => {
+                                  setRequests((prev) =>
+                                    prev.filter((item) => item.id !== request.id)
+                                  );
+                                  applyRelation(request.fromUserId, "friends", null);
+                                }
+                              )
+                            }
+                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
+                          >
+                            <Check className="h-4 w-4" />
+                            รับ
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() =>
+                              submitAction(
+                                {
+                                  action: "respond",
+                                  requestId: request.id,
+                                  decision: "reject",
+                                },
+                                () => {
+                                  setRequests((prev) =>
+                                    prev.filter((item) => item.id !== request.id)
+                                  );
+                                  applyRelation(request.fromUserId, "none", null);
+                                }
+                              )
+                            }
+                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
+                          >
+                            <X className="h-4 w-4" />
+                            ปฏิเสธ
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </div>
+
+          <section className="relative mt-4 overflow-hidden rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+            <div className="absolute left-1/2 top-0 h-12 w-28 -translate-x-1/2 rounded-b-[36px] bg-[#e9eaf5]" />
+            <div className="relative flex items-center justify-between gap-3 pt-2">
+              <div>
+                <div className="text-sm font-bold text-black/40">Search Results</div>
+                <div className="mt-1 text-3xl font-black tracking-[-0.05em]">
                   คนที่ค้นหาเจอ
                 </div>
               </div>
-              <div className="rounded-full border border-cyan-300/16 bg-cyan-400/10 px-3 py-1.5 text-xs font-black text-cyan-100">
+              <div className="rounded-full bg-[#eef0fb] px-4 py-2 text-sm font-black">
                 {results.length} คน
               </div>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="relative mt-6 grid gap-3 lg:grid-cols-2">
               {loadingResults ? (
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/52">
+                <div className="rounded-[30px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45 lg:col-span-2">
                   กำลังค้นหา...
                 </div>
               ) : results.length === 0 ? (
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/52">
+                <div className="rounded-[30px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45 lg:col-span-2">
                   ไม่พบผู้ใช้ที่ค้นหา
                 </div>
               ) : (
                 results.map((user) => (
                   <div
                     key={user.id}
-                    className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/14 hover:bg-white/[0.045] sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-4 rounded-[30px] bg-[#f4f3f8] p-3 transition hover:-translate-y-0.5 hover:bg-[#eeedf5] sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <Link href={`/profile/${user.id}`} className="flex min-w-0 items-center gap-4">
+                    <Link href={`/profile/${user.id}`} className="flex min-w-0 items-center gap-3">
                       <img
                         src={user.image || "/avatar.png"}
                         alt={user.displayName}
-                        className="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/10"
+                        className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                       />
                       <div className="min-w-0">
-                        <div className="truncate text-base font-black text-white">
-                          {user.displayName}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/54">
+                        <div className="truncate text-base font-black">{user.displayName}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-black/42 sm:text-sm">
                           {user.username ? <span>@{user.username}</span> : null}
                           {user.bio ? <span className="line-clamp-1">{user.bio}</span> : null}
                         </div>
                       </div>
                     </Link>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      {user.relation === "friends" ? (
-                        <div className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-violet-300/22 bg-violet-400/10 px-4 text-sm font-black text-violet-100">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      {user.relation === "self" ? (
+                        <div className="inline-flex min-h-[46px] items-center justify-center rounded-full bg-white px-5 text-sm font-black text-black/45 ring-1 ring-black/5">
+                          โปรไฟล์ของคุณ
+                        </div>
+                      ) : user.relation === "friends" ? (
+                        <div className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-black text-black ring-1 ring-black/5">
                           <Users className="h-4 w-4" />
                           เป็นเพื่อนแล้ว
                         </div>
                       ) : user.relation === "outgoing" ? (
-                        <div className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-amber-300/22 bg-amber-300/10 px-4 text-sm font-black text-amber-100">
+                        <div className="inline-flex min-h-[46px] items-center justify-center rounded-full bg-[#fff1c6] px-5 text-sm font-black text-black">
                           ส่งคำขอแล้ว
                         </div>
                       ) : user.relation === "incoming" && user.requestId ? (
@@ -380,7 +503,7 @@ export default function CommunityClient() {
                                 () => applyRelation(user.id, "friends")
                               )
                             }
-                            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-emerald-300/24 bg-emerald-400/12 px-4 text-sm font-black text-emerald-100 transition hover:bg-emerald-400/18"
+                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
                           >
                             <Check className="h-4 w-4" />
                             รับ
@@ -394,7 +517,7 @@ export default function CommunityClient() {
                                 () => applyRelation(user.id, "none", null)
                               )
                             }
-                            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-red-300/18 bg-red-500/10 px-4 text-sm font-black text-red-200 transition hover:bg-red-500/16"
+                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
                           >
                             <X className="h-4 w-4" />
                             ปฏิเสธ
@@ -411,11 +534,14 @@ export default function CommunityClient() {
                                 applyRelation(
                                   user.id,
                                   "outgoing",
-                                  String((data?.relation as { requestId?: string } | undefined)?.requestId || "")
+                                  String(
+                                    (data?.relation as { requestId?: string } | undefined)
+                                      ?.requestId || ""
+                                  )
                                 )
                             )
                           }
-                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-cyan-300/24 bg-cyan-400/10 px-4 text-sm font-black text-cyan-100 shadow-[0_14px_30px_rgba(34,211,238,0.08)] transition hover:bg-cyan-400/18"
+                          className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white shadow-[0_16px_34px_rgba(0,0,0,0.16)] transition hover:scale-[1.02] disabled:opacity-60"
                         >
                           <UserPlus className="h-4 w-4" />
                           เพิ่มเพื่อน
@@ -427,73 +553,7 @@ export default function CommunityClient() {
               )}
             </div>
           </section>
-
-          <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,18,28,0.92)_0%,rgba(9,10,16,0.86)_100%)] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[34px] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/38">
-                  Friend List
-                </div>
-                <div className="mt-1 text-2xl font-black text-white">
-                  รายชื่อเพื่อน
-                </div>
-              </div>
-              <div className="rounded-full border border-amber-300/16 bg-amber-300/10 px-3 py-1.5 text-xs font-black text-amber-100">
-                เก่าสุด → ใหม่สุด
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {loadingFriends ? (
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/52">
-                  กำลังโหลดรายชื่อเพื่อน...
-                </div>
-              ) : friends.length === 0 ? (
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/52">
-                  ยังไม่มีเพื่อนในระบบ ลองค้นหาแล้วกดเพิ่มเพื่อนได้เลย
-                </div>
-              ) : (
-                friends.map((friend) => (
-                  <div
-                    key={friend.id}
-                    className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.03] p-3"
-                  >
-                    <Link href={`/profile/${friend.friendId}`} className="flex min-w-0 flex-1 items-center gap-3">
-                      <img
-                        src={friend.image || "/avatar.png"}
-                        alt={friend.displayName}
-                        className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10"
-                      />
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-black text-white sm:text-base">
-                          {friend.displayName}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/50 sm:text-sm">
-                          {friend.username ? <span>@{friend.username}</span> : null}
-                          {friend.bio ? <span className="line-clamp-1">{friend.bio}</span> : null}
-                        </div>
-                      </div>
-                    </Link>
-
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() =>
-                        submitAction({ action: "remove", targetUserId: friend.friendId }, () => {
-                          setFriends((prev) => prev.filter((item) => item.friendId !== friend.friendId));
-                          applyRelation(friend.friendId, "none", null);
-                        })
-                      }
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-red-300/16 bg-red-500/10 text-red-200 transition hover:bg-red-500/16"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
+        </section>
       </div>
     </div>
   );
