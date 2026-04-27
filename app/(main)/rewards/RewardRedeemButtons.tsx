@@ -89,7 +89,7 @@ export default function RewardRedeemButtons({
           disabled={!canRedeemWithCoin || loadingKey === `${rewardId}-COIN`}
           className={`w-full rounded-full px-4 py-4 text-sm font-black transition ${
             canRedeemWithCoin
-              ? "bg-white text-black shadow-[0_18px_38px_rgba(255,255,255,0.12)] hover:scale-[1.01]"
+              ? "bg-[linear-gradient(135deg,#ffffff,#d9dde5)] text-black shadow-[0_18px_38px_rgba(255,255,255,0.12)] hover:scale-[1.01]"
               : "bg-white/[0.06] text-white/32 ring-1 ring-white/8"
           }`}
         >
