@@ -131,6 +131,19 @@ export async function POST(req: Request) {
   if (action === "remove") {
     const targetUserId = String(body?.targetUserId || "").trim();
     await removeFriendship(userId, targetUserId);
+    const currentProfile = await getLocalProfileByUserId(userId);
+    await createLocalNotification({
+      userId: targetUserId,
+      type: "friend",
+      title: `${currentProfile?.displayName || sessionUser?.name || "NEXORA User"} ลบคุณออกจากเพื่อน`,
+      body: "รายชื่อนี้ถูกลบออกจาก Community แล้ว",
+      href: "/community",
+      image: currentProfile?.image || String(sessionUser?.image || "/avatar.png"),
+      meta: {
+        fromUserId: userId,
+        action: "removed",
+      },
+    }).catch(() => undefined);
     return NextResponse.json(
       { success: true },
       { headers: { "Cache-Control": "no-store" } }

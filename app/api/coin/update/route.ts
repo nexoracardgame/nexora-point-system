@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createLocalNotification } from "@/lib/local-notification-store";
 
 export async function POST(req: Request) {
   try {
@@ -51,6 +52,27 @@ export async function POST(req: Request) {
         coin: action === "add" ? user.coin + amount : user.coin - amount,
       },
     });
+
+    await createLocalNotification({
+      userId: updatedUser.id,
+      type: "wallet",
+      title:
+        action === "add"
+          ? `ได้รับ ${amount.toLocaleString("th-TH")} COIN`
+          : `ใช้ ${amount.toLocaleString("th-TH")} COIN`,
+      body:
+        action === "add"
+          ? "ยอด COIN ถูกเพิ่มเข้ากระเป๋าแล้ว"
+          : "ยอด COIN ถูกหักจากกระเป๋าแล้ว",
+      href: "/wallet",
+      image: updatedUser.image || "/avatar.png",
+      meta: {
+        asset: "COIN",
+        amount,
+        action,
+        source: "coin-update",
+      },
+    }).catch(() => undefined);
 
     return NextResponse.json({
       success: true,

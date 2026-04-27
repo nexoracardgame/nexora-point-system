@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { createLocalNotification } from "@/lib/local-notification-store";
 
 export async function POST(req: Request) {
   try {
@@ -70,6 +71,20 @@ export async function POST(req: Request) {
 
       return user;
     });
+
+    await createLocalNotification({
+      userId: result.id,
+      type: "wallet",
+      title: `ได้รับ ${point.toLocaleString("th-TH")} NEX`,
+      body: `จากการสแกนการ์ด ${type.toUpperCase()} จำนวน ${qty}`,
+      href: "/wallet",
+      image: result.image || "/avatar.png",
+      meta: {
+        asset: "NEX",
+        amount: point,
+        source: "point-add",
+      },
+    }).catch(() => undefined);
 
     return NextResponse.json({
       success: true,

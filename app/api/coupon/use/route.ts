@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import { isStaffRole } from "@/lib/staff-auth";
+import { createLocalNotification } from "@/lib/local-notification-store";
 
 export async function POST(req: Request) {
   try {
@@ -97,6 +98,22 @@ export async function POST(req: Request) {
         },
       },
     });
+
+    await createLocalNotification({
+      userId: usedCoupon.user.id,
+      type: "wallet",
+      title: "คูปองถูกใช้งานแล้ว",
+      body: usedCoupon.reward.name
+        ? `ยืนยันใช้คูปอง ${usedCoupon.reward.name} สำเร็จ`
+        : "คูปองถูกยืนยันการใช้งานสำเร็จ",
+      href: `/redeem?open=${encodeURIComponent(usedCoupon.code)}`,
+      image: usedCoupon.reward.imageUrl || usedCoupon.user.image || "/avatar.png",
+      meta: {
+        source: "coupon-use",
+        couponCode: usedCoupon.code,
+        rewardName: usedCoupon.reward.name || null,
+      },
+    }).catch(() => undefined);
 
     return NextResponse.json({
       success: true,

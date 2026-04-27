@@ -49,6 +49,7 @@ export default function MainLayout({
   const [profileName, setProfileName] = useState("");
   const [avatarReady, setAvatarReady] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [walletUnreadCount, setWalletUnreadCount] = useState(0);
 
   const stableAvatarRef = useRef("/avatar.png");
   const profileVersionRef = useRef("");
@@ -270,6 +271,63 @@ export default function MainLayout({
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const syncWalletUnread = async () => {
+      if (cancelled) return;
+
+      try {
+        const res = await fetch(`/api/wallet/notifications?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        setWalletUnreadCount(Math.max(0, Number(data?.count || 0)));
+      } catch {
+        return;
+      }
+    };
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncWalletUnread();
+      }
+    }, 1500);
+
+    const handleFocus = () => void syncWalletUnread();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncWalletUnread();
+      }
+    };
+
+    void syncWalletUnread();
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [pathname]);
+
+  const markWalletSeen = () => {
+    if (walletUnreadCount <= 0) return;
+    setWalletUnreadCount(0);
+    void fetch("/api/wallet/notifications", {
+      method: "POST",
+      keepalive: true,
+    }).catch(() => undefined);
+  };
 
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
 
@@ -511,9 +569,15 @@ export default function MainLayout({
 
                 <PrefetchLink
                   href="/wallet"
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)]"
+                  onClick={markWalletSeen}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)]"
                 >
                   <Wallet className="h-4 w-4" />
+                  {walletUnreadCount > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 min-w-[20px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
+                      {walletUnreadCount > 99 ? "99+" : walletUnreadCount}
+                    </span>
+                  )}
                 </PrefetchLink>
 
                 <div className="rounded-xl border border-amber-300/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.16),rgba(245,158,11,0.08))] px-3 py-2 text-xs font-black text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] sm:px-4 sm:text-sm">
@@ -578,10 +642,18 @@ export default function MainLayout({
 
                       <PrefetchLink
                         href="/wallet"
-                        onClick={() => setMenuOpen(false)}
+                        onClick={() => {
+                          markWalletSeen();
+                          setMenuOpen(false);
+                        }}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >
-                        <Wallet className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
+                        <span className="relative">
+                          <Wallet className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
+                          {walletUnreadCount > 0 && (
+                            <span className="absolute -right-2 -top-2 h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
+                          )}
+                        </span>
                         {t("layout.nav.wallet")}
                       </PrefetchLink>
 
@@ -717,7 +789,12 @@ export default function MainLayout({
                 <PrefetchLink
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMobileNavOpen(false)}
+                  onClick={() => {
+                    if (item.href === "/wallet") {
+                      markWalletSeen();
+                    }
+                    setMobileNavOpen(false);
+                  }}
                   className={`flex items-center justify-between rounded-2xl border px-4 py-4 transition ${
                     item.active
                       ? "border-amber-300/18 bg-amber-300/10 text-amber-200 shadow-[0_0_24px_rgba(251,191,36,0.10)]"
@@ -736,6 +813,11 @@ export default function MainLayout({
                       {item.href === "/dm" && chatUnreadCount > 0 && (
                         <span className="absolute -right-1.5 -top-1.5 min-w-[19px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
                           {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                        </span>
+                      )}
+                      {item.href === "/wallet" && walletUnreadCount > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 min-w-[19px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
+                          {walletUnreadCount > 99 ? "99+" : walletUnreadCount}
                         </span>
                       )}
                     </div>

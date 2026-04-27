@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildCouponCode } from "@/lib/coupon-utils";
+import { createLocalNotification } from "@/lib/local-notification-store";
 
 export async function POST(req: Request) {
   try {
@@ -122,6 +123,37 @@ export async function POST(req: Request) {
 
       return coupon;
     });
+
+    const coupon = await prisma.coupon.findUnique({
+      where: { id: redeemed.id },
+      include: {
+        reward: {
+          select: {
+            name: true,
+            imageUrl: true,
+            nexCost: true,
+            coinCost: true,
+          },
+        },
+      },
+    });
+
+    await createLocalNotification({
+      userId,
+      type: "wallet",
+      title: "แลกรางวัลสำเร็จ",
+      body: coupon?.reward?.name
+        ? `ได้รับคูปอง ${coupon.reward.name}`
+        : "คูปองใหม่ถูกสร้างใน Redeem แล้ว",
+      href: `/redeem?open=${encodeURIComponent(redeemed.code)}`,
+      image: coupon?.reward?.imageUrl || "/avatar.png",
+      meta: {
+        source: "reward-redeem",
+        couponCode: redeemed.code,
+        rewardName: coupon?.reward?.name || null,
+        currency,
+      },
+    }).catch(() => undefined);
 
     return NextResponse.json({
       success: true,

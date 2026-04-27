@@ -10,7 +10,7 @@ import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 type NotificationItem = {
   id: string;
-  type: "chat" | "deal" | "wishlist" | "friend";
+  type: "chat" | "deal" | "wishlist" | "friend" | "wallet";
   title: string;
   body: string;
   href: string;
@@ -51,15 +51,8 @@ export async function GET() {
       );
     }
 
-    if (!supabase) {
-      return NextResponse.json(
-        { items: [] },
-        { headers: { "Cache-Control": "no-store" }, status: 500 }
-      );
-    }
-
     const [allowedRoomIds, localNotifications] = await Promise.all([
-      getAccessibleRoomIds(currentUserId, currentLineId),
+      supabase ? getAccessibleRoomIds(currentUserId, currentLineId) : Promise.resolve([]),
       getLocalNotificationsForUser(currentUserId, {
         unreadOnly: true,
         limit: 60,
@@ -88,11 +81,12 @@ export async function GET() {
     );
     const visibleLocalNotifications = localNotifications.filter(
       (item) =>
-        item.type !== "friend" ||
-        String(item.meta?.action || "") !== "request"
+        item.type !== "wallet" &&
+        (item.type !== "friend" ||
+          String(item.meta?.action || "") !== "request")
     );
 
-    if (allowedRoomIds.length === 0) {
+    if (!supabase || allowedRoomIds.length === 0) {
       return NextResponse.json(
         {
           items: [...friendNotifications, ...visibleLocalNotifications]
