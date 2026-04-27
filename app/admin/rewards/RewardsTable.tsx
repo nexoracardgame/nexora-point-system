@@ -22,12 +22,16 @@ export default function RewardsTable({ rewards }: Props) {
   const router = useRouter();
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [nexCost, setNexCost] = useState("");
   const [coinCost, setCoinCost] = useState("");
   const [stock, setStock] = useState("");
 
   const startEdit = (reward: RewardRow) => {
     setEditingId(reward.id);
+    setName(reward.name || "");
+    setImageUrl(reward.imageUrl || "");
     setNexCost(reward.nexCost?.toString() || "");
     setCoinCost(reward.coinCost?.toString() || "");
     setStock(reward.stock.toString());
@@ -43,6 +47,8 @@ export default function RewardsTable({ rewards }: Props) {
       },
       body: JSON.stringify({
         id: editingId,
+        name,
+        imageUrl,
         nexCost: nexCost ? Number(nexCost) : null,
         coinCost: coinCost ? Number(coinCost) : null,
         stock: Number(stock),
@@ -57,6 +63,8 @@ export default function RewardsTable({ rewards }: Props) {
     }
 
     setEditingId(null);
+    setName("");
+    setImageUrl("");
     router.refresh();
   };
 
@@ -192,8 +200,56 @@ export default function RewardsTable({ rewards }: Props) {
         <div style={modalWrap}>
           <div style={modalBox}>
             <h2 style={{ marginBottom: 16 }}>
-              แก้ไขราคา + สต๊อก
+              แก้ไขรางวัล
             </h2>
+
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="ชื่อรางวัล"
+              style={inputStyle}
+            />
+
+            <input
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="ลิงก์รูปรางวัล"
+              style={inputStyle}
+            />
+
+            <div
+              style={{
+                marginBottom: 12,
+                borderRadius: 14,
+                border: "1px solid #2a2a2a",
+                background: "#0d0d0d",
+                padding: 12,
+              }}
+            >
+              <div
+                style={{
+                  marginBottom: 8,
+                  fontSize: 12,
+                  color: "#888",
+                }}
+              >
+                ตัวอย่างรูป
+              </div>
+              <img
+                src={
+                  imageUrl ||
+                  "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"
+                }
+                alt={name || "reward preview"}
+                style={{
+                  width: "100%",
+                  maxHeight: 220,
+                  objectFit: "contain",
+                  borderRadius: 12,
+                  background: "#111",
+                }}
+              />
+            </div>
 
             <input
               value={nexCost}
@@ -228,7 +284,11 @@ export default function RewardsTable({ rewards }: Props) {
               </button>
 
               <button
-                onClick={() => setEditingId(null)}
+                onClick={() => {
+                  setEditingId(null);
+                  setName("");
+                  setImageUrl("");
+                }}
                 style={cancelBtnStyle}
               >
                 ปิด
