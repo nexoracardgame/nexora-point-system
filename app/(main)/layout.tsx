@@ -456,13 +456,13 @@ export default function MainLayout({
       },
       {
         href: "/wallet",
-        label: t("layout.nav.rewards"),
+        label: t("layout.nav.wallet"),
         icon: Wallet,
         active: pathname.startsWith("/wallet"),
       },
       {
         href: "/community",
-        label: t("layout.nav.redeem"),
+        label: t("layout.nav.community"),
         icon: Cat,
         active: pathname.startsWith("/community"),
       },

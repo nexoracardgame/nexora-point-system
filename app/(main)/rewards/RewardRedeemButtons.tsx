@@ -64,16 +64,16 @@ export default function RewardRedeemButtons({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {nexCost != null ? (
         <button
           type="button"
           onClick={() => void handleRedeem("NEX")}
           disabled={!canRedeemWithNex || loadingKey === `${rewardId}-NEX`}
-          className={`w-full rounded-2xl px-4 py-3 text-sm font-black transition ${
+          className={`w-full rounded-full px-4 py-4 text-sm font-black transition ${
             canRedeemWithNex
-              ? "bg-gradient-to-r from-amber-400 to-yellow-300 text-black hover:scale-[1.01]"
-              : "bg-white/[0.05] text-white/30"
+              ? "bg-[linear-gradient(135deg,#f7c948,#fff0a3)] text-black shadow-[0_18px_38px_rgba(247,201,72,0.18)] hover:scale-[1.01]"
+              : "bg-white/[0.06] text-white/32 ring-1 ring-white/8"
           }`}
         >
           {loadingKey === `${rewardId}-NEX`
@@ -87,10 +87,10 @@ export default function RewardRedeemButtons({
           type="button"
           onClick={() => void handleRedeem("COIN")}
           disabled={!canRedeemWithCoin || loadingKey === `${rewardId}-COIN`}
-          className={`w-full rounded-2xl px-4 py-3 text-sm font-black transition ${
+          className={`w-full rounded-full px-4 py-4 text-sm font-black transition ${
             canRedeemWithCoin
-              ? "bg-gradient-to-r from-cyan-400 to-emerald-300 text-black hover:scale-[1.01]"
-              : "bg-white/[0.05] text-white/30"
+              ? "bg-white text-black shadow-[0_18px_38px_rgba(255,255,255,0.12)] hover:scale-[1.01]"
+              : "bg-white/[0.06] text-white/32 ring-1 ring-white/8"
           }`}
         >
           {loadingKey === `${rewardId}-COIN`
@@ -99,7 +99,11 @@ export default function RewardRedeemButtons({
         </button>
       ) : null}
 
-      {error ? <div className="text-xs text-red-300">{error}</div> : null}
+      {error ? (
+        <div className="rounded-2xl bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200 ring-1 ring-red-300/15">
+          {error}
+        </div>
+      ) : null}
     </div>
   );
 }
