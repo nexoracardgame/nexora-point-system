@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, Send, Smile, X, MoreHorizontal } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
+import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 
 type ChatUser = {
   id: string;
@@ -122,15 +123,23 @@ export default function DealChatPage() {
   const params = useParams();
   const dealId = typeof params?.dealId === "string" ? params.dealId : "";
   const router = useRouter();
+  const cachedDealRoom = useMemo(
+    () =>
+      readChatHistoryCache<
+        DealMessage,
+        { me?: ChatUser | null; other?: ChatUser | null; card?: DealCardInfo | null; deal?: DealInfo | null; roomId?: string }
+      >("deal-room", dealId),
+    [dealId]
+  );
 
-  const [roomId, setRoomId] = useState("");
-  const [messages, setMessages] = useState<DealMessage[]>([]);
+  const [roomId, setRoomId] = useState(String(cachedDealRoom?.meta?.roomId || ""));
+  const [messages, setMessages] = useState<DealMessage[]>(cachedDealRoom?.messages || []);
   const [text, setText] = useState("");
-  const [me, setMe] = useState<ChatUser | null>(null);
-  const [other, setOther] = useState<ChatUser | null>(null);
-  const [card, setCard] = useState<DealCardInfo | null>(null);
-  const [deal, setDeal] = useState<DealInfo | null>(null);
-  const [loadingRoom, setLoadingRoom] = useState(true);
+  const [me, setMe] = useState<ChatUser | null>(cachedDealRoom?.meta?.me || null);
+  const [other, setOther] = useState<ChatUser | null>(cachedDealRoom?.meta?.other || null);
+  const [card, setCard] = useState<DealCardInfo | null>(cachedDealRoom?.meta?.card || null);
+  const [deal, setDeal] = useState<DealInfo | null>(cachedDealRoom?.meta?.deal || null);
+  const [loadingRoom, setLoadingRoom] = useState(!cachedDealRoom);
   const [roomClosed, setRoomClosed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
@@ -228,6 +237,17 @@ export default function DealChatPage() {
     setCard(data?.card || null);
     setDeal(data?.deal || null);
     setLoadingRoom(false);
+    writeChatHistoryCache("deal-room", expectedDealId, {
+      messages: cachedDealRoom?.messages || messages,
+      meta: {
+        roomId: nextRoomId,
+        me: data?.me || null,
+        other: data?.other || null,
+        card: data?.card || null,
+        deal: data?.deal || null,
+      },
+      cachedAt: Date.now(),
+    });
 
     return data;
   };
@@ -274,6 +294,18 @@ export default function DealChatPage() {
           otherData
         ),
       }));
+
+    writeChatHistoryCache("deal-room", dealId, {
+      messages: withSender,
+      meta: {
+        roomId: expectedRoomId,
+        me: meData || null,
+        other: otherData || null,
+        card,
+        deal,
+      },
+      cachedAt: Date.now(),
+    });
 
     setMessages((prev) => {
       const optimisticMessages = prev.filter((message) => message.optimistic);
@@ -391,16 +423,20 @@ export default function DealChatPage() {
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    setMessages([]);
-    setRoomId("");
+    setMessages(cachedDealRoom?.messages || []);
+    setRoomId(String(cachedDealRoom?.meta?.roomId || ""));
     setRoomClosed(false);
-    setLoadingRoom(true);
+    setLoadingRoom(!cachedDealRoom);
     setNewMessageCount(0);
+    setMe(cachedDealRoom?.meta?.me || null);
+    setOther(cachedDealRoom?.meta?.other || null);
+    setCard(cachedDealRoom?.meta?.card || null);
+    setDeal(cachedDealRoom?.meta?.deal || null);
 
     queueMicrotask(() => {
       void refreshChatState(true);
     });
-  }, [dealId]);
+  }, [cachedDealRoom, dealId]);
 
   useEffect(() => {
     if (!roomId || !me?.id || roomClosed) return;

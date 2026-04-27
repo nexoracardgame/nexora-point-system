@@ -212,6 +212,16 @@ export default function DMPage() {
     const data = await res.json();
 
     setMe(data.user);
+    if (roomId) {
+      writeChatHistoryCache("dm-room", roomId, {
+        messages: cachedRoom?.messages || messages,
+        meta: {
+          me: data.user || null,
+          other,
+        },
+        cachedAt: Date.now(),
+      });
+    }
     return data.user;
   };
 
@@ -258,6 +268,14 @@ export default function DMPage() {
     setOther(data.otherUser);
     setRoomClosed(false);
     setLoadingRoom(false);
+    writeChatHistoryCache("dm-room", roomId, {
+      messages: cachedRoom?.messages || messages,
+      meta: {
+        me,
+        other: data.otherUser || null,
+      },
+      cachedAt: Date.now(),
+    });
     return data.otherUser;
   };
 
@@ -299,6 +317,15 @@ export default function DMPage() {
           otherData
         ),
       }));
+
+    writeChatHistoryCache("dm-room", expectedRoomId, {
+      messages: withSender,
+      meta: {
+        me: meData || null,
+        other: otherData || null,
+      },
+      cachedAt: Date.now(),
+    });
 
     setMessages((prev) => {
       const optimisticMessages = prev.filter((message) => message.optimistic);
@@ -404,10 +431,13 @@ export default function DMPage() {
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    setMessages([]);
+    setMessages(cachedRoom?.messages || []);
     setRoomClosed(false);
-    setLoadingRoom(!seededOther);
+    setLoadingRoom(!seededOther && !(cachedRoom?.meta?.me || cachedRoom?.meta?.other));
     setNewMessageCount(0);
+
+    setMe(cachedRoom?.meta?.me || null);
+    setOther(cachedRoom?.meta?.other || seededOther);
 
     const init = async () => {
       const roomPromise = loadRoom();
@@ -425,7 +455,7 @@ export default function DMPage() {
     };
 
     void init();
-  }, [roomId, seededOther]);
+  }, [cachedRoom, roomId, seededOther]);
 
   useEffect(() => {
     if (!roomId || !me?.id || roomClosed) return;

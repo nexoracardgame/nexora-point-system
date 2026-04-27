@@ -560,11 +560,11 @@ export default function MainLayout({
                   <Gem className="h-5 w-5" />
                 </PrefetchLink>
 
-                <div className="min-w-0 max-[430px]:max-w-[92px]">
+                <div className="min-w-0 max-[430px]:max-w-[108px]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35 max-[430px]:hidden sm:text-[11px]">
                     {t("layout.command")}
                   </div>
-                  <div className="truncate text-base font-black leading-none sm:text-2xl">
+                  <div className="line-clamp-2 text-base font-black leading-[1.05] sm:text-2xl sm:leading-none">
                     {pageContext}
                   </div>
                 </div>
@@ -587,19 +587,25 @@ export default function MainLayout({
                 </PrefetchLink>
 
                 <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-                  <div className="rounded-xl border border-amber-300/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(245,158,11,0.08))] px-2 py-2 text-[10px] font-black text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] sm:px-4 sm:text-sm">
-                    <span className="drop-shadow-[0_0_12px_rgba(251,191,36,0.55)]">
+                  <div className="min-w-0 rounded-[16px] border border-white/14 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] px-2.5 py-1.5 text-white shadow-[0_0_26px_rgba(255,255,255,0.08)] backdrop-blur-xl sm:px-4 sm:py-2.5">
+                    <div className="truncate text-[15px] font-black leading-none text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.45)] sm:text-[18px]">
                       {session?.user?.nexPoint ?? 0}
-                    </span>{" "}
-                    <span className="text-amber-300">NEX</span>
+                    </div>
+                    <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-white/62 sm:text-[10px]">
+                      NEX
+                    </div>
                   </div>
 
-                  <div className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(0,0,0,0.16))] px-2 py-2 text-[10px] font-black text-white shadow-[0_0_22px_rgba(255,255,255,0.08)] sm:px-4 sm:text-sm">
-                    <Coins className="hidden h-3.5 w-3.5 text-white/80 sm:block" />
-                    <span className="drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]">
-                      {session?.user?.coin ?? 0}
-                    </span>{" "}
-                    <span className="text-white/72">COIN</span>
+                  <div className="min-w-0 rounded-[16px] border border-amber-300/18 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(245,158,11,0.08))] px-2.5 py-1.5 text-amber-50 shadow-[0_0_28px_rgba(251,191,36,0.14)] backdrop-blur-xl sm:px-4 sm:py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <Coins className="hidden h-3.5 w-3.5 text-amber-200 sm:block" />
+                      <div className="truncate text-[15px] font-black leading-none text-amber-50 drop-shadow-[0_0_12px_rgba(251,191,36,0.52)] sm:text-[18px]">
+                        {session?.user?.coin ?? 0}
+                      </div>
+                    </div>
+                    <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-amber-200/72 sm:text-[10px]">
+                      COIN
+                    </div>
                   </div>
                 </div>
 

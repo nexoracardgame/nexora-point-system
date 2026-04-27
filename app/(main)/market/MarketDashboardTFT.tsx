@@ -124,13 +124,13 @@ function ActionButton({
   return (
     <Link
       href={href}
-      className="rounded-[20px] border border-white/10 bg-white/[0.03] p-4 transition hover:border-violet-300/30 hover:bg-white/[0.05] md:rounded-[24px] md:p-5"
+      className="rounded-[22px] border border-white/65 bg-[linear-gradient(180deg,#ffffff_0%,#f1f4fb_100%)] p-4 text-[#09090b] shadow-[0_20px_55px_rgba(20,20,30,0.12)] ring-1 ring-black/5 transition hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(20,20,30,0.16)] md:rounded-[26px] md:p-5"
     >
-      <div className="mb-3 inline-flex rounded-2xl bg-violet-300/10 p-3 text-violet-300 md:mb-4">
+      <div className="mb-3 inline-flex rounded-2xl bg-[#eef2fa] p-3 text-[#09090b] shadow-[0_10px_24px_rgba(20,20,30,0.08)] md:mb-4">
         {icon}
       </div>
       <div className="text-base font-black md:text-lg">{title}</div>
-      <div className="mt-1 text-xs text-white/50 md:text-sm">{safeSubtitle}</div>
+      <div className="mt-1 text-xs text-black/48 md:text-sm">{safeSubtitle}</div>
     </Link>
   );
 }
@@ -387,10 +387,10 @@ export default function MarketDashboardTFT({
   return (
     <div className="space-y-6 lg:space-y-8">
       {/* MOBILE HERO */}
-      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(120,80,255,0.18),transparent_38%),linear-gradient(180deg,#111218_0%,#0b0c11_100%)] p-4 lg:hidden">
+      <section className="overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] p-4 text-[#09090b] shadow-[0_24px_70px_rgba(20,20,30,0.12)] ring-1 ring-black/5 lg:hidden">
         <div className="flex flex-col gap-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.42em] text-violet-300/80">
+            <div className="text-[10px] uppercase tracking-[0.42em] text-black/35">
               NEXORA ELITE MARKET
             </div>
             <h1 className="mt-3 text-3xl font-black tracking-[-0.04em]">
@@ -403,8 +403,8 @@ export default function MarketDashboardTFT({
               onClick={() => setHeroMode("popular")}
               className={`rounded-2xl px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "popular"
-                  ? "border border-pink-300/20 bg-[linear-gradient(135deg,rgba(236,72,153,0.26),rgba(168,85,247,0.18))] text-pink-200 shadow-[0_0_28px_rgba(236,72,153,0.18)]"
-                  : "border border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                  ? "border border-black/8 bg-black text-white shadow-[0_16px_34px_rgba(20,20,30,0.12)]"
+                  : "border border-black/8 bg-white text-black/55 hover:text-black"
               }`}
             >
               Popular
@@ -414,8 +414,8 @@ export default function MarketDashboardTFT({
               onClick={() => setHeroMode("latest")}
               className={`rounded-2xl px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "latest"
-                  ? "border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.18))] text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.16)]"
-                  : "border border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                  ? "border border-black/8 bg-black text-white shadow-[0_16px_34px_rgba(20,20,30,0.12)]"
+                  : "border border-black/8 bg-white text-black/55 hover:text-black"
               }`}
             >
               Latest
@@ -458,9 +458,9 @@ export default function MarketDashboardTFT({
                     FEATURED CARD
                   </div>
 
-                  <div className="mt-2 line-clamp-2 text-xl font-black leading-tight">
-                    {centerHero.name}
-                  </div>
+                    <div className="mt-2 line-clamp-2 text-[1.35rem] font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.9)]">
+                      {centerHero.name}
+                    </div>
 
                   <div className="mt-3 flex items-center gap-2">
                     <img
@@ -474,7 +474,7 @@ export default function MarketDashboardTFT({
                   </div>
 
                   <div className="mt-3 flex items-center justify-between">
-                    <div className="text-base font-bold text-amber-300">
+                    <div className="text-lg font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
                       {centerHero.price}
                     </div>
 
@@ -525,11 +525,11 @@ export default function MarketDashboardTFT({
                   </button>
 
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3">
-                    <div className="line-clamp-2 text-sm font-black leading-tight">
+                    <div className="line-clamp-2 text-base font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
                       {card.name}
                     </div>
 
-                    <div className="mt-1 text-xs font-bold text-amber-300">
+                    <div className="mt-1 text-sm font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
                       {card.price}
                     </div>
 
@@ -558,10 +558,10 @@ export default function MarketDashboardTFT({
       </section>
 
       {/* DESKTOP HERO - ORIGINAL */}
-      <section className="relative hidden overflow-hidden rounded-[42px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(120,80,255,0.14),transparent_35%),linear-gradient(180deg,#111218_0%,#0b0c11_100%)] px-8 py-12 xl:px-14 xl:py-16 lg:block">
+      <section className="relative hidden overflow-hidden rounded-[42px] border border-white/75 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] px-8 py-12 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.12)] ring-1 ring-black/5 xl:px-14 xl:py-16 lg:block">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase tracking-[0.5em] text-violet-300/80">
+            <div className="text-xs uppercase tracking-[0.5em] text-black/35">
               NEXORA ELITE MARKET
             </div>
 
@@ -575,8 +575,8 @@ export default function MarketDashboardTFT({
               onClick={() => setHeroMode("popular")}
               className={`rounded-2xl border px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "popular"
-                  ? "border-pink-300/20 bg-[linear-gradient(135deg,rgba(236,72,153,0.26),rgba(168,85,247,0.18))] text-pink-200 shadow-[0_0_28px_rgba(236,72,153,0.18)]"
-                  : "border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                  ? "border-black/8 bg-black text-white shadow-[0_16px_34px_rgba(20,20,30,0.12)]"
+                  : "border-black/8 bg-white text-black/55 hover:text-black"
               }`}
             >
               Popular
@@ -586,8 +586,8 @@ export default function MarketDashboardTFT({
               onClick={() => setHeroMode("latest")}
               className={`rounded-2xl border px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                 heroMode === "latest"
-                  ? "border-cyan-300/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.18))] text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.16)]"
-                  : "border-white/5 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                  ? "border-black/8 bg-black text-white shadow-[0_16px_34px_rgba(20,20,30,0.12)]"
+                  : "border-black/8 bg-white text-black/55 hover:text-black"
               }`}
             >
               Latest
@@ -626,9 +626,9 @@ export default function MarketDashboardTFT({
                 </button>
 
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
-                  <div className="line-clamp-2 text-sm font-black leading-tight">
-                    {leftHero.name}
-                  </div>
+                    <div className="line-clamp-2 text-base font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+                      {leftHero.name}
+                    </div>
 
                   <div className="mt-2 flex items-center gap-2">
                     <img
@@ -642,7 +642,7 @@ export default function MarketDashboardTFT({
                   </div>
 
                   <div className="mt-2 flex items-center justify-between">
-                    <div className="text-sm font-bold text-amber-300">
+                    <div className="text-base font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
                       {leftHero.price}
                     </div>
 
@@ -696,7 +696,7 @@ export default function MarketDashboardTFT({
                     FEATURED CARD
                   </div>
 
-                  <div className="mt-2 text-3xl font-black">
+                  <div className="mt-2 text-[2.15rem] font-black text-white [text-shadow:0_4px_22px_rgba(0,0,0,0.92)]">
                     {centerHero.name}
                   </div>
 
@@ -712,7 +712,7 @@ export default function MarketDashboardTFT({
                   </div>
 
                   <div className="mt-3 flex items-center justify-between">
-                    <div className="text-lg font-bold text-amber-300">
+                    <div className="text-xl font-black text-amber-300 [text-shadow:0_4px_22px_rgba(0,0,0,0.92)]">
                       {centerHero.price}
                     </div>
 
@@ -757,9 +757,9 @@ export default function MarketDashboardTFT({
                 </button>
 
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
-                  <div className="line-clamp-2 text-sm font-black leading-tight">
-                    {rightHero.name}
-                  </div>
+                    <div className="line-clamp-2 text-base font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+                      {rightHero.name}
+                    </div>
 
                   <div className="mt-2 flex items-center gap-2">
                     <img
@@ -773,7 +773,7 @@ export default function MarketDashboardTFT({
                   </div>
 
                   <div className="mt-2 flex items-center justify-between">
-                    <div className="text-sm font-bold text-amber-300">
+                    <div className="text-base font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
                       {rightHero.price}
                     </div>
 
@@ -855,7 +855,7 @@ export default function MarketDashboardTFT({
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-6 xl:grid-cols-8">
           {visibleItems.map((card) => {
             const rarity = rarityClasses(card.rarity);
             const liked = likesReady && likedCards.includes(card.id);
@@ -901,11 +901,11 @@ export default function MarketDashboardTFT({
                     </button>
 
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 lg:p-4">
-                      <div className="line-clamp-2 text-sm font-black leading-tight text-white lg:text-base">
+                      <div className="line-clamp-2 text-base font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)] lg:text-[1.05rem]">
                         {card.name}
                       </div>
 
-                      <div className="mt-1 text-xs font-bold text-amber-300 lg:text-sm">
+                      <div className="mt-1 text-sm font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)] lg:text-base">
                         {card.price}
                       </div>
 
@@ -916,7 +916,7 @@ export default function MarketDashboardTFT({
                             alt={card.sellerName || "Seller"}
                             className="h-6 w-6 rounded-full object-cover ring-1 ring-white/10"
                           />
-                          <span className="truncate text-[10px] text-white/60 lg:text-xs">
+                          <span className="truncate text-[11px] text-white/78 [text-shadow:0_4px_16px_rgba(0,0,0,0.88)] lg:text-[12px]">
                             {card.sellerName}
                           </span>
                         </div>
