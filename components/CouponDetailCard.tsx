@@ -9,7 +9,6 @@ import {
   Gift,
   QrCode,
   ShieldCheck,
-  Sparkles,
   Ticket,
 } from "lucide-react";
 
@@ -51,104 +50,93 @@ export default function CouponDetailCard({
   coupon: CouponViewModel;
   compact?: boolean;
 }) {
-  const sectionRadius = compact ? "rounded-[26px] sm:rounded-[30px]" : "rounded-[30px]";
-  const sectionPadding = compact ? "p-4 sm:p-5" : "p-5";
-  const titleSize = compact
-    ? "text-xl sm:text-[2rem]"
-    : "text-2xl sm:text-[2rem]";
-  const qrSize = compact ? 144 : 188;
+  const qrSize = compact ? 166 : 196;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+    <div className="grid gap-4 lg:grid-cols-[0.96fr_1.04fr]">
       <div
-        className={`relative overflow-hidden border border-white/10 bg-[linear-gradient(180deg,rgba(18,21,35,0.96),rgba(10,12,20,0.96))] shadow-[0_20px_80px_rgba(0,0,0,0.36)] ${sectionRadius} ${sectionPadding}`}
+        className={`overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#ffffff_0%,#f2f5fb_100%)] shadow-[0_24px_70px_rgba(20,20,30,0.12)] ring-1 ring-black/5 ${
+          compact ? "p-4 sm:p-5" : "p-5"
+        }`}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.15),transparent_30%),radial-gradient(circle_at_bottom,rgba(34,211,238,0.14),transparent_34%)]" />
-
-        <div className="relative flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.24em] text-amber-200 sm:text-[10px] sm:tracking-[0.28em]">
-            <Ticket className="h-3.5 w-3.5" />
-            REWARD COUPON
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-white">
+            <Ticket className="h-3.5 w-3.5 text-[#ffe486]" />
+            Reward Coupon
           </div>
-
           <div
-            className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] sm:text-[10px] sm:tracking-[0.22em] ${
+            className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] ${
               coupon.used
-                ? "border border-white/10 bg-white/10 text-white/70"
-                : "border border-emerald-300/18 bg-emerald-300/12 text-emerald-300"
+                ? "bg-black text-white"
+                : "bg-[#e7fff1] text-[#0f9f68]"
             }`}
           >
             {coupon.statusLabel}
           </div>
         </div>
 
-        <div className="relative mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 sm:mt-5 sm:rounded-[28px] sm:p-4">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_18%,rgba(251,191,36,0.18),transparent_26%),radial-gradient(circle_at_76%_18%,rgba(34,211,238,0.13),transparent_28%)]" />
-          <div className="relative grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
-            <div className="grid gap-3 sm:grid-cols-[0.92fr_1.08fr] lg:grid-cols-1">
-              <div className="relative min-h-[168px] overflow-hidden rounded-[24px] border border-amber-200/20 bg-black/30 shadow-[0_22px_70px_rgba(251,191,36,0.12)] sm:min-h-[206px] lg:min-h-[255px]">
-                <Image
-                  src={coupon.rewardImageUrl}
-                  alt={coupon.rewardName}
-                  fill
-                  sizes="(max-width: 640px) 45vw, (max-width: 1024px) 240px, 360px"
-                  className="object-cover"
-                  priority={compact}
-                />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,rgba(0,0,0,0.74))]" />
-                <div className="absolute bottom-3 left-3 right-3">
-                  <div className="inline-flex rounded-full border border-amber-200/25 bg-black/45 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-amber-100 backdrop-blur-md">
-                    Reward Item
-                  </div>
-                  <div className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white sm:text-xl">
-                    {coupon.rewardName}
-                  </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="space-y-4">
+            <div className="relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#eef2fa] ring-1 ring-black/5 sm:min-h-[280px]">
+              <Image
+                src={coupon.rewardImageUrl}
+                alt={coupon.rewardName}
+                fill
+                sizes="(max-width: 1024px) 100vw, 420px"
+                className="object-cover"
+                priority={compact}
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(9,9,11,0.74))] p-4">
+                <div className="inline-flex rounded-full bg-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white backdrop-blur-md">
+                  Reward Item
+                </div>
+                <div className="mt-2 line-clamp-2 text-xl font-black leading-tight text-white sm:text-2xl">
+                  {coupon.rewardName}
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-center rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.09),rgba(255,255,255,0.025)_58%,rgba(0,0,0,0.18))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <div className="rounded-[22px] bg-white p-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:rounded-[26px] sm:p-3">
+            <div className="rounded-[26px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
+                Coupon Code
+              </div>
+              <div className="mt-2 break-all text-sm font-black text-black/86 sm:text-base">
+                {coupon.code}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-[28px] bg-[#f7f9fd] p-5 text-center ring-1 ring-black/5">
+              <div className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                <QrCode className="h-3.5 w-3.5 text-[#ffe486]" />
+                Scan To Redeem
+              </div>
+              <div className="mt-4 flex justify-center">
+                <div className="rounded-[28px] bg-white p-3 shadow-[0_18px_46px_rgba(20,20,30,0.12)] ring-1 ring-black/5">
                   <QRCodeCanvas value={coupon.code} size={qrSize} />
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3 sm:space-y-4">
-              <div>
-                <div className="text-[9px] uppercase tracking-[0.22em] text-white/38 sm:text-[10px] sm:tracking-[0.28em]">
-                  รางวัลที่แลก
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
+                  <Gift className="h-3.5 w-3.5 text-[#f5b623]" />
+                  มูลค่า
                 </div>
-                <div className={`mt-2 font-black leading-tight text-white ${titleSize}`}>
-                  {coupon.rewardName}
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                <div className="rounded-[22px] border border-white/8 bg-black/20 p-3">
-                  <div className="text-[9px] uppercase tracking-[0.16em] text-white/35 sm:text-[10px] sm:tracking-[0.22em]">
-                    มูลค่า
-                  </div>
-                  <div className="mt-1 text-base font-black text-amber-300 sm:text-lg">
-                    {coupon.valueLabel}
-                  </div>
-                </div>
-
-                <div className="rounded-[22px] border border-white/8 bg-black/20 p-3">
-                  <div className="text-[9px] uppercase tracking-[0.16em] text-white/35 sm:text-[10px] sm:tracking-[0.22em]">
-                    วันหมดอายุ
-                  </div>
-                  <div className="mt-1 text-base font-black text-cyan-200 sm:text-lg">
-                    {coupon.expiryLabel}
-                  </div>
+                <div className="mt-2 text-lg font-black text-black sm:text-xl">
+                  {coupon.valueLabel}
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-3">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-white/35 sm:text-[10px] sm:tracking-[0.22em]">
-                  รหัสคูปอง
+              <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
+                  <Clock3 className="h-3.5 w-3.5 text-black/65" />
+                  หมดอายุ
                 </div>
-                <div className="mt-1 break-all text-[13px] font-black text-white/88 sm:text-base">
-                  {coupon.code}
+                <div className="mt-2 text-lg font-black text-black sm:text-xl">
+                  {coupon.expiryLabel}
                 </div>
               </div>
             </div>
@@ -158,94 +146,65 @@ export default function CouponDetailCard({
 
       <div className="space-y-4">
         <div
-          className={`border border-white/10 bg-[linear-gradient(180deg,rgba(14,16,26,0.96),rgba(10,11,18,0.92))] shadow-[0_20px_80px_rgba(0,0,0,0.28)] ${sectionRadius} ${sectionPadding}`}
+          className={`rounded-[28px] bg-[linear-gradient(180deg,#ffffff_0%,#f2f5fb_100%)] shadow-[0_20px_60px_rgba(20,20,30,0.1)] ring-1 ring-black/5 ${
+            compact ? "p-4 sm:p-5" : "p-5"
+          }`}
         >
-          <div className="flex items-center gap-2 text-base font-black text-white sm:text-lg">
-            <Sparkles className="h-5 w-5 text-cyan-300" />
+          <div className="flex items-center gap-2 text-base font-black text-black sm:text-lg">
+            <ShieldCheck className="h-5 w-5 text-[#0f9f68]" />
             รายละเอียดคูปอง
           </div>
 
           <div className="mt-4 grid gap-3">
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/35 sm:text-[11px] sm:tracking-[0.24em]">
-                <Gift className="h-3.5 w-3.5 text-amber-300" />
-                รายการที่แลก
+            <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
+                รางวัลที่แลก
               </div>
-              <div className="mt-2 text-lg font-black sm:text-xl">{coupon.rewardName}</div>
+              <div className="mt-2 text-lg font-black text-black sm:text-xl">
+                {coupon.rewardName}
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-white/35 sm:text-[10px] sm:tracking-[0.24em]">
+              <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
                   สร้างเมื่อ
                 </div>
-                <div className="mt-2 text-sm font-bold text-white/80">
+                <div className="mt-2 text-sm font-black text-black/82 sm:text-base">
                   {formatDateTime(coupon.createdAt)}
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-white/35 sm:text-[10px] sm:tracking-[0.24em]">
+              <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
                   ใช้งานเมื่อ
                 </div>
-                <div className="mt-2 text-sm font-bold text-white/80">
+                <div className="mt-2 text-sm font-black text-black/82 sm:text-base">
                   {formatDateTime(coupon.usedAt)}
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/35 sm:text-[11px] sm:tracking-[0.24em]">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
-                สถานะการรับสิทธิ์
+            <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-black/35">
+                <CheckCircle2 className="h-3.5 w-3.5 text-black/65" />
+                สถานะ
               </div>
-              <div className="mt-2 flex items-start gap-3">
-                <CheckCircle2
-                  className={`mt-0.5 h-4 w-4 ${
-                    coupon.used ? "text-white/60" : "text-emerald-300"
-                  }`}
-                />
-                <div>
-                  <div className="font-black text-white">{coupon.statusLabel}</div>
-                  <div className="mt-1 text-[13px] leading-6 text-white/58 sm:text-sm">
-                    {coupon.used
-                      ? "คูปองใบนี้ถูกใช้งานแล้วและไม่สามารถสแกนซ้ำได้อีก"
-                      : "เมื่อถึงเวลารับของ ให้เปิดหน้าต่างนี้เพื่อให้พนักงานยิงสแกน QR แล้วระบบจะอัปเดตทันที"}
-                  </div>
-                </div>
+              <div className="mt-2 text-lg font-black text-black sm:text-xl">
+                {coupon.statusLabel}
               </div>
             </div>
           </div>
         </div>
 
-        <div
-          className={`border border-white/10 bg-[linear-gradient(180deg,rgba(14,16,26,0.96),rgba(10,11,18,0.92))] shadow-[0_20px_80px_rgba(0,0,0,0.28)] ${sectionRadius} ${sectionPadding}`}
-        >
-          <div className="flex items-center gap-2 text-base font-black text-white sm:text-lg">
-            <QrCode className="h-5 w-5 text-violet-300" />
-            วิธีใช้งาน
-          </div>
-
-          <div className="mt-4 space-y-3 text-[13px] leading-6 text-white/60 sm:text-sm">
-            <p>1. แตะหรือคลิกคูปองใบนี้ตอนอยู่หน้ารับของ</p>
-            <p>2. เปิด QR ให้พนักงานที่หน้า /staff ยิงสแกน</p>
-            <p>3. หลังสแกนสำเร็จ คูปองจะเปลี่ยนสถานะเป็นใช้งานแล้วทันที</p>
-          </div>
-
-          {!compact ? (
-            <Link
-              href="/redeem"
-              className="mt-4 inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-black text-white transition hover:bg-white/[0.1]"
-            >
-              กลับไปหน้า Redeem
-            </Link>
-          ) : null}
-
-          <div className="mt-4 flex items-start gap-2 rounded-[22px] border border-white/8 bg-black/20 p-4 text-sm text-white/52">
-            <Clock3 className="mt-0.5 h-4 w-4 text-cyan-300" />
-            ระบบจะซิงก์สถานะคูปองอัตโนมัติเมื่อมีการใช้งานจากฝั่งพนักงาน
-          </div>
-        </div>
+        {!compact ? (
+          <Link
+            href="/redeem"
+            className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-black text-white shadow-[0_18px_36px_rgba(20,20,30,0.16)] transition hover:scale-[1.01]"
+          >
+            กลับไปหน้า Redeem
+          </Link>
+        ) : null}
       </div>
     </div>
   );
