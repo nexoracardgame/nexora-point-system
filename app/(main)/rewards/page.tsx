@@ -291,7 +291,6 @@ export default async function RewardsPage() {
                   <div className="mt-4">
                     <RewardRedeemButtons
                       rewardId={reward.id}
-                      lineId={safeUser.lineId}
                       rewardName={reward.name}
                       stock={reward.stock}
                       userNexPoint={nexPoint}

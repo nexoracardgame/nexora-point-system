@@ -1,89 +1,103 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCouponCode } from "@/lib/coupon-utils";
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const userId = String(
+      (session?.user as { id?: string } | undefined)?.id || ""
+    ).trim();
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "กรุณาเข้าสู่ระบบก่อน" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
-    const lineId = String(body?.lineId || "").trim();
     const rewardId = String(body?.rewardId || "").trim();
-    const currency = String(body?.currency || "NEX").trim();
+    const currency = String(body?.currency || "").trim().toUpperCase();
 
-    if (!lineId || !rewardId) {
+    if (!rewardId || (currency !== "NEX" && currency !== "COIN")) {
       return NextResponse.json(
-        { success: false, error: "ข้อมูลไม่ครบ" },
+        { success: false, error: "ข้อมูลการแลกไม่ถูกต้อง" },
         { status: 400 }
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { lineId },
-    });
+    const redeemed = await prisma.$transaction(async (tx) => {
+      const [user, reward] = await Promise.all([
+        tx.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            lineId: true,
+            nexPoint: true,
+            coin: true,
+          },
+        }),
+        tx.reward.findUnique({
+          where: { id: rewardId },
+          select: {
+            id: true,
+            name: true,
+            stock: true,
+            nexCost: true,
+            coinCost: true,
+          },
+        }),
+      ]);
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "ไม่พบผู้ใช้งาน" },
-        { status: 404 }
-      );
-    }
+      if (!user) {
+        throw new Error("ไม่พบผู้ใช้");
+      }
 
-    const reward = await prisma.reward.findUnique({
-      where: { id: rewardId },
-    });
+      if (!reward) {
+        throw new Error("ไม่พบรางวัล");
+      }
 
-    if (!reward) {
-      return NextResponse.json(
-        { success: false, error: "ไม่พบรางวัล" },
-        { status: 404 }
-      );
-    }
+      if (reward.stock <= 0) {
+        throw new Error("รางวัลชิ้นนี้หมดแล้ว");
+      }
 
-    if (reward.stock <= 0) {
-      return NextResponse.json(
-        { success: false, error: "รางวัลหมดแล้ว" },
-        { status: 400 }
-      );
-    }
+      const amount =
+        currency === "NEX" ? Number(reward.nexCost) : Number(reward.coinCost);
 
-    if (currency === "NEX") {
-      if (reward.nexCost == null || user.nexPoint < reward.nexCost) {
-        return NextResponse.json(
-          { success: false, error: "แต้ม NEX ไม่เพียงพอ" },
-          { status: 400 }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error(
+          currency === "NEX"
+            ? "รางวัลนี้ไม่รองรับการแลกด้วย NEX"
+            : "รางวัลนี้ไม่รองรับการแลกด้วย COIN"
         );
       }
-    }
 
-    if (currency === "COIN") {
-      if (reward.coinCost == null || user.coin < reward.coinCost) {
-        return NextResponse.json(
-          { success: false, error: "เหรียญ COIN ไม่เพียงพอ" },
-          { status: 400 }
-        );
-      }
-    }
-
-    const coupon = await prisma.$transaction(async (tx) => {
-      if (currency === "NEX" && reward.nexCost != null) {
-        await tx.user.update({
-          where: { lineId },
-          data: {
-            nexPoint: {
-              decrement: reward.nexCost,
-            },
-          },
-        });
+      if (currency === "NEX" && Number(user.nexPoint || 0) < amount) {
+        throw new Error("แต้ม NEX ไม่เพียงพอ");
       }
 
-      if (currency === "COIN" && reward.coinCost != null) {
-        await tx.user.update({
-          where: { lineId },
-          data: {
-            coin: {
-              decrement: reward.coinCost,
-            },
-          },
-        });
+      if (currency === "COIN" && Number(user.coin || 0) < amount) {
+        throw new Error("เหรียญ COIN ไม่เพียงพอ");
       }
+
+      await tx.user.update({
+        where: { id: user.id },
+        data:
+          currency === "NEX"
+            ? {
+                nexPoint: {
+                  decrement: amount,
+                },
+              }
+            : {
+                coin: {
+                  decrement: Math.round(amount),
+                },
+              },
+      });
 
       await tx.reward.update({
         where: { id: reward.id },
@@ -94,30 +108,40 @@ export async function POST(req: Request) {
         },
       });
 
-      return tx.coupon.create({
+      const coupon = await tx.coupon.create({
         data: {
-          code: `NXR-${Date.now()}`,
+          code: buildCouponCode(currency as "NEX" | "COIN", amount),
           userId: user.id,
           rewardId: reward.id,
         },
+        select: {
+          id: true,
+          code: true,
+        },
       });
+
+      return coupon;
     });
 
     return NextResponse.json({
       success: true,
       message: "แลกรางวัลสำเร็จ",
-      couponId: coupon.id,
-      couponUrl: `/coupon/${coupon.code}`,
+      couponId: redeemed.id,
+      couponCode: redeemed.code,
+      couponUrl: `/redeem?open=${encodeURIComponent(redeemed.code)}`,
     });
   } catch (error) {
-    console.error("REDEEM ERROR:", error);
+    const message =
+      error instanceof Error && error.message.trim()
+        ? error.message
+        : "เกิดข้อผิดพลาดในระบบ";
 
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "เกิดข้อผิดพลาดในระบบ",
+        error: message,
       },
-      { status: 500 }
+      { status: 400 }
     );
   }
 }

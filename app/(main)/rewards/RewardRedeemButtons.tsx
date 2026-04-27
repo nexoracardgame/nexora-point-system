@@ -7,7 +7,6 @@ type Currency = "NEX" | "COIN";
 export default function RewardRedeemButtons({
   rewardId,
   rewardName,
-  lineId,
   stock,
   userNexPoint,
   userCoin,
@@ -16,7 +15,6 @@ export default function RewardRedeemButtons({
 }: {
   rewardId: string;
   rewardName: string;
-  lineId: string;
   stock: number;
   userNexPoint: number;
   userCoin: number;
@@ -43,7 +41,6 @@ export default function RewardRedeemButtons({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          lineId,
           rewardId,
           currency,
         }),

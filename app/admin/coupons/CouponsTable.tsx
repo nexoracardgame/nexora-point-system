@@ -1,145 +1,147 @@
 "use client";
 
-type CouponRow = {
-  id: string;
-  code: string;
-  used: boolean;
-  createdAt: string;
-  usedAt: string | null;
-  userName: string | null;
-  lineId: string;
-  rewardName: string;
-};
+import type { CouponViewModel } from "@/components/CouponDetailCard";
 
 type Props = {
-  coupons: CouponRow[];
+  coupons: CouponViewModel[];
 };
 
 export default function CouponsTable({ coupons }: Props) {
   return (
-    <>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-          background: "#111",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-      >
-        <thead>
-          <tr style={{ borderBottom: "1px solid #333" }}>
-            <th style={thLeft}>Code</th>
-            <th style={thLeft}>สมาชิก</th>
-            <th style={thLeft}>Reward</th>
-            <th style={thCenter}>สถานะ</th>
-            <th style={thCenter}>สร้างเมื่อ</th>
-            <th style={thCenter}>ใช้เมื่อ</th>
-          </tr>
-        </thead>
+    <div style={{ display: "grid", gap: 14 }}>
+      {coupons.length === 0 ? (
+        <div
+          style={{
+            padding: 20,
+            textAlign: "center",
+            color: "#aaa",
+            borderRadius: 16,
+            border: "1px solid #222",
+            background: "#111",
+          }}
+        >
+          ไม่พบคูปอง
+        </div>
+      ) : (
+        coupons.map((coupon) => (
+          <div
+            key={coupon.id}
+            style={{
+              border: "1px solid #222",
+              borderRadius: 18,
+              background: "#111",
+              padding: 16,
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={labelStyle}>Coupon Code</div>
+                <div style={{ marginTop: 6, fontWeight: 800, wordBreak: "break-all" }}>
+                  {coupon.code}
+                </div>
+              </div>
 
-        <tbody>
-          {coupons.length === 0 ? (
-            <tr>
-              <td
-                colSpan={6}
+              <span
                 style={{
-                  padding: 20,
-                  textAlign: "center",
-                  color: "#aaa",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  background: coupon.used
+                    ? "rgba(0,180,90,0.15)"
+                    : "rgba(212,175,55,0.15)",
+                  color: coupon.used ? "#57d68d" : "#d4af37",
+                  border: `1px solid ${
+                    coupon.used ? "rgba(87,214,141,0.3)" : "rgba(212,175,55,0.3)"
+                  }`,
                 }}
               >
-                ไม่พบคูปอง
-              </td>
-            </tr>
-          ) : (
-            coupons.map((coupon) => (
-              <tr
-                key={coupon.id}
-                className="hover-row"
-                style={{ borderBottom: "1px solid #222" }}
-              >
-                <td style={tdLeftBreak}>{coupon.code}</td>
+                {coupon.statusLabel}
+              </span>
+            </div>
 
-                <td style={tdLeftBreak}>
-                  <div style={{ fontWeight: "bold" }}>
-                    {coupon.userName || "-"}
-                  </div>
-                  <div style={{ color: "#aaa", fontSize: 12 }}>
-                    {coupon.lineId}
-                  </div>
-                </td>
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              }}
+            >
+              <div style={cardStyle}>
+                <div style={labelStyle}>สมาชิก</div>
+                <div style={valueStyle}>{coupon.userName}</div>
+                <div style={{ color: "#8a8a8a", fontSize: 12 }}>{coupon.lineId}</div>
+              </div>
 
-                <td style={tdLeft}>{coupon.rewardName}</td>
+              <div style={cardStyle}>
+                <div style={labelStyle}>Reward</div>
+                <div style={valueStyle}>{coupon.rewardName}</div>
+              </div>
 
-                <td style={tdCenter}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "6px 10px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: "bold",
-                      background: coupon.used
-                        ? "rgba(0,180,90,0.15)"
-                        : "rgba(212,175,55,0.15)",
-                      color: coupon.used ? "#57d68d" : "#d4af37",
-                      border: `1px solid ${
-                        coupon.used ? "rgba(87,214,141,0.3)" : "rgba(212,175,55,0.3)"
-                      }`,
-                    }}
-                  >
-                    {coupon.used ? "ใช้แล้ว" : "ยังไม่ใช้"}
-                  </span>
-                </td>
+              <div style={cardStyle}>
+                <div style={labelStyle}>Value</div>
+                <div style={valueStyle}>{coupon.valueLabel}</div>
+              </div>
 
-                <td style={tdCenter}>
+              <div style={cardStyle}>
+                <div style={labelStyle}>Expiry</div>
+                <div style={valueStyle}>{coupon.expiryLabel}</div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={labelStyle}>Created</div>
+                <div style={valueStyleSmall}>
                   {new Date(coupon.createdAt).toLocaleString()}
-                </td>
+                </div>
+              </div>
 
-                <td style={tdCenter}>
-                  {coupon.usedAt
-                    ? new Date(coupon.usedAt).toLocaleString()
-                    : "-"}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
-      <style jsx>{`
-        .hover-row:hover {
-          background: #1a1a1a;
-        }
-      `}</style>
-    </>
+              <div style={cardStyle}>
+                <div style={labelStyle}>Used At</div>
+                <div style={valueStyleSmall}>
+                  {coupon.usedAt ? new Date(coupon.usedAt).toLocaleString() : "-"}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 
-const thLeft: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
   padding: 12,
-  textAlign: "left",
+  borderRadius: 14,
+  border: "1px solid #242424",
+  background: "#151515",
 };
 
-const thCenter: React.CSSProperties = {
-  padding: 12,
-  textAlign: "center",
+const labelStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "#8a8a8a",
+  textTransform: "uppercase",
+  letterSpacing: "0.12em",
 };
 
-const tdLeft: React.CSSProperties = {
-  padding: 12,
-  textAlign: "left",
+const valueStyle: React.CSSProperties = {
+  marginTop: 8,
+  fontWeight: 800,
 };
 
-const tdLeftBreak: React.CSSProperties = {
-  padding: 12,
-  textAlign: "left",
-  wordBreak: "break-all",
-};
-
-const tdCenter: React.CSSProperties = {
-  padding: 12,
-  textAlign: "center",
+const valueStyleSmall: React.CSSProperties = {
+  marginTop: 8,
+  fontWeight: 700,
+  fontSize: 13,
+  lineHeight: 1.5,
 };

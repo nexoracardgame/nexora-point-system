@@ -7,14 +7,13 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   const menus = [
-    { href: "/admin", label: "📊 Dashboard", exact: true },
-    { href: "/admin/members", label: "👥 Members" },
-    { href: "/admin/rewards", label: "🎁 Rewards" },
-    { href: "/admin/coupons", label: "🎟️ Coupons" },
-    { href: "/admin/point-logs", label: "⚡ Point Logs" },
-    { href: "/staff", label: "➕ Add Point" },
-    { href: "/redeem", label: "💳 Redeem" },
-    { href: "/staff/scan", label: "📷 Scan Coupon" },
+    { href: "/admin", label: "Dashboard", exact: true },
+    { href: "/admin/members", label: "Members" },
+    { href: "/admin/rewards", label: "Rewards" },
+    { href: "/admin/coupons", label: "Coupons" },
+    { href: "/admin/point-logs", label: "Point Logs" },
+    { href: "/staff", label: "Staff Scan" },
+    { href: "/redeem", label: "Redeem Wallet" },
   ];
 
   return (

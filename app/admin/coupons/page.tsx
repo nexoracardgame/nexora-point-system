@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serializeCouponRecord } from "@/lib/coupon-utils";
 import CouponsTable from "./CouponsTable";
 
 type PageProps = {
@@ -18,6 +19,7 @@ export default async function AdminCouponsPage({ searchParams }: PageProps) {
             OR: [
               { code: { contains: q } },
               { user: { name: { contains: q } } },
+              { user: { displayName: { contains: q } } },
               { user: { lineId: { contains: q } } },
               { reward: { name: { contains: q } } },
             ],
@@ -27,16 +29,32 @@ export default async function AdminCouponsPage({ searchParams }: PageProps) {
       ...(status === "unused" ? { used: false } : {}),
     },
     include: {
-      user: true,
-      reward: true,
+      user: {
+        select: {
+          id: true,
+          lineId: true,
+          name: true,
+          displayName: true,
+          image: true,
+        },
+      },
+      reward: {
+        select: {
+          id: true,
+          name: true,
+          imageUrl: true,
+          nexCost: true,
+          coinCost: true,
+        },
+      },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ used: "asc" }, { createdAt: "desc" }],
   });
 
   return (
     <div style={{ color: "#fff" }}>
       <h1 style={{ fontSize: 28, fontWeight: "bold", marginBottom: 20 }}>
-        🎟️ Coupons
+        Coupons
       </h1>
 
       <form
@@ -62,8 +80,8 @@ export default async function AdminCouponsPage({ searchParams }: PageProps) {
           style={{ ...inputStyle, maxWidth: 180 }}
         >
           <option value="all">ทั้งหมด</option>
-          <option value="used">ใช้แล้ว</option>
-          <option value="unused">ยังไม่ใช้</option>
+          <option value="used">ใช้งานแล้ว</option>
+          <option value="unused">พร้อมใช้งาน</option>
         </select>
 
         <button type="submit" style={goldBtnStyle}>
@@ -71,18 +89,7 @@ export default async function AdminCouponsPage({ searchParams }: PageProps) {
         </button>
       </form>
 
-      <CouponsTable
-        coupons={coupons.map((coupon: any) => ({
-          id: coupon.id,
-          code: coupon.code,
-          used: coupon.used,
-          createdAt: coupon.createdAt.toISOString(),
-          usedAt: coupon.usedAt ? coupon.usedAt.toISOString() : null,
-          userName: coupon.user.name,
-          lineId: coupon.user.lineId,
-          rewardName: coupon.reward.name,
-        }))}
-      />
+      <CouponsTable coupons={coupons.map((coupon) => serializeCouponRecord(coupon))} />
     </div>
   );
 }
