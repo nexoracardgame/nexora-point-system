@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  requireAdminApi,
+  sanitizeNullableUrl,
+  toNonNegativeInt,
+  toNullableNonNegativeNumber,
+} from "@/lib/admin-auth";
 
 export async function POST(req: Request) {
   try {
+    const adminError = await requireAdminApi();
+    if (adminError) return adminError;
+
     const body = await req.json();
-    const { id, nexCost, coinCost, stock } = body;
+    const { id, name, imageUrl, nexCost, coinCost, stock } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -16,17 +25,13 @@ export async function POST(req: Request) {
     const reward = await prisma.reward.update({
       where: { id },
       data: {
-        nexCost:
-          nexCost === null || nexCost === ""
-            ? null
-            : Number(nexCost),
-
-        coinCost:
-          coinCost === null || coinCost === ""
-            ? null
-            : Number(coinCost),
-
-        stock: Number(stock),
+        ...(String(name || "").trim()
+          ? { name: String(name || "").trim() }
+          : {}),
+        imageUrl: sanitizeNullableUrl(imageUrl),
+        nexCost: toNullableNonNegativeNumber(nexCost),
+        coinCost: toNullableNonNegativeNumber(coinCost),
+        stock: toNonNegativeInt(stock),
       },
     });
 

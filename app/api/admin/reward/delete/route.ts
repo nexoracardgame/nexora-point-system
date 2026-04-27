@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminApi } from "@/lib/admin-auth";
 
 export async function POST(req: Request) {
   try {
+    const adminError = await requireAdminApi();
+    if (adminError) return adminError;
+
     const body = await req.json();
     const { id } = body;
 
