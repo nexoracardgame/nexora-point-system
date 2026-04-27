@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
+import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
 
 type DMMessage = {
@@ -127,12 +128,22 @@ export default function DMPage() {
         : null,
     [initialOtherImage, initialOtherName, initialOtherUserId]
   );
+  const cachedRoom = useMemo(
+    () =>
+      readChatHistoryCache<DMMessage, { me?: ChatUser; other?: ChatUser }>(
+        "dm-room",
+        roomId
+      ),
+    [roomId]
+  );
 
-  const [messages, setMessages] = useState<DMMessage[]>([]);
+  const [messages, setMessages] = useState<DMMessage[]>(cachedRoom?.messages || []);
   const [text, setText] = useState("");
-  const [me, setMe] = useState<ChatUser>(null);
-  const [other, setOther] = useState<ChatUser>(seededOther);
-  const [loadingRoom, setLoadingRoom] = useState(!seededOther);
+  const [me, setMe] = useState<ChatUser>(cachedRoom?.meta?.me || null);
+  const [other, setOther] = useState<ChatUser>(cachedRoom?.meta?.other || seededOther);
+  const [loadingRoom, setLoadingRoom] = useState(
+    !seededOther && !(cachedRoom?.meta?.me || cachedRoom?.meta?.other)
+  );
   const [roomClosed, setRoomClosed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
