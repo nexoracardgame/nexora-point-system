@@ -195,7 +195,32 @@ export default async function WalletPage() {
   const activeCoupons = coupons.filter((coupon) => !coupon.used).length;
   const usedCoupons = coupons.filter((coupon) => coupon.used).length;
 
+  const spentNexFromCoupons = coupons.reduce(
+    (sum, coupon) => sum + Number(coupon.reward.nexCost || 0),
+    0
+  );
+  const spentCoinFromCoupons = coupons.reduce(
+    (sum, coupon) => sum + Number(coupon.reward.coinCost || 0),
+    0
+  );
   const liquidTotal = nexPoint + coin;
+  const lifetimeNex = Math.max(
+    totalEarnedNex,
+    nexPoint + spentNexFromCoupons
+  );
+  const lifetimeCoin = coin + spentCoinFromCoupons;
+  const walletRank =
+    lifetimeNex >= 1_000_000
+      ? "NEX 1M LEGEND"
+      : lifetimeNex >= 500_000
+        ? "NEX 500K MYTHIC"
+        : lifetimeNex >= 100_000
+          ? "NEX 100K ELITE"
+          : lifetimeNex >= 50_000
+            ? "NEX 50K PRO"
+            : lifetimeNex >= 10_000
+              ? "NEX 10K RISING"
+              : "NEX STARTER";
 
   const activities: ActivityItem[] = [
     ...pointLogs.map((log) => ({
@@ -282,15 +307,23 @@ export default async function WalletPage() {
 
         <main className="relative mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8 xl:px-8">
           <section className="mx-auto w-full max-w-[430px] rounded-[46px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,16,24,0.92),rgba(8,8,12,0.98))] p-5 shadow-[0_40px_130px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:p-7 lg:rotate-[-1.5deg]">
-            <div className="flex items-center justify-between text-sm font-black text-white">
-              <span>9:41</span>
-              <div className="h-7 w-28 rounded-full bg-black/80 shadow-[inset_0_0_18px_rgba(99,102,241,0.28)]" />
-              <span className="rounded-md bg-white/12 px-1.5 py-0.5 text-[11px]">32</span>
+            <div className="flex items-center justify-between">
+              <div className="grid h-14 w-14 place-items-center rounded-full bg-violet-500 text-white shadow-[0_0_34px_rgba(139,92,246,0.26)]">
+                <Wallet className="h-7 w-7" />
+              </div>
+              <div className="flex items-center gap-5 text-4xl font-light text-white">
+                <span>+</span>
+                <span className="text-3xl">⌕</span>
+                <span className="text-3xl">≡</span>
+              </div>
             </div>
 
             <div className="mt-10 flex flex-col items-center text-center">
               <div className="relative">
-                <div className="relative h-20 w-20 overflow-hidden rounded-[28px] border border-white/16 bg-white/8 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
+                <Link
+                  href="/profile/me"
+                  className="relative block h-20 w-20 overflow-hidden rounded-[28px] border border-white/16 bg-white/8 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.42)] transition hover:scale-[1.03]"
+                >
                   <Image
                     src={safeImage(safeUser.image)}
                     alt={displayName}
@@ -299,7 +332,7 @@ export default async function WalletPage() {
                     className="object-cover p-1"
                     priority
                   />
-                </div>
+                </Link>
                 <div className="absolute -bottom-1 -right-2 grid h-8 w-8 place-items-center rounded-full bg-[#fff2a8] text-black shadow-[0_0_25px_rgba(253,224,71,0.28)]">
                   <Sparkles className="h-4 w-4" />
                 </div>
@@ -307,13 +340,15 @@ export default async function WalletPage() {
 
               <div className="mt-5 text-sm text-white/42">Available Balance</div>
               <h1 className="mt-1 text-[42px] font-light tracking-[-0.07em] text-white sm:text-[50px]">
-                {formatNumber(liquidTotal)}
+                {formatNumber(nexPoint)} NEX
               </h1>
-              <div className="mt-1 text-sm font-bold text-white/48">NEXORA UNITS</div>
+              <div className="mt-1 text-2xl font-light tracking-[-0.04em] text-white/62">
+                {formatNumber(coin)} COIN
+              </div>
 
               <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.045] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.24)]">
-                <span className="font-black text-white">Main Wallet</span>
-                <span className="text-white/36">0x38 .... 0x69</span>
+                <span className="font-black text-white">Rank</span>
+                <span className="text-white/52">{walletRank}</span>
               </div>
             </div>
 
@@ -366,8 +401,8 @@ export default async function WalletPage() {
               {[
                 { href: "/redeem", title: "Redeem", sub: "Open QR coupons", icon: QrCode },
                 { href: "/rewards", title: "Rewards", sub: "Claim items", icon: Gift },
-                { href: "/scan", title: "Scan", sub: "Earn NEX fast", icon: Sparkles },
                 { href: "/profile/me", title: "Profile", sub: "Wallet owner", icon: ShieldCheck },
+                { href: "/community", title: "Community", sub: "Friend network", icon: Sparkles },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
@@ -391,19 +426,13 @@ export default async function WalletPage() {
           </section>
 
           <section className="mx-auto w-full max-w-[560px] rounded-[46px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,23,0.93),rgba(8,8,12,0.99))] p-5 shadow-[0_40px_130px_rgba(0,0,0,0.54)] backdrop-blur-2xl sm:p-7 lg:rotate-[1.3deg]">
-            <div className="flex items-center justify-between text-sm font-black text-white">
-              <span>9:41</span>
-              <div className="h-7 w-28 rounded-full bg-black/80 shadow-[inset_0_0_18px_rgba(99,102,241,0.28)]" />
-              <span className="rounded-md bg-white/12 px-1.5 py-0.5 text-[11px]">32</span>
-            </div>
-
-            <div className="mt-10 flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="grid h-12 w-12 place-items-center rounded-full bg-violet-500 text-white">
                   <Wallet className="h-6 w-6" />
                 </div>
                 <div className="rounded-2xl bg-white/[0.055] px-4 py-2 font-bold text-white/88">
-                  0x38 .... 0x69
+                  {walletRank}
                 </div>
               </div>
               <div className="flex gap-4 text-3xl font-light text-white">
@@ -417,18 +446,23 @@ export default async function WalletPage() {
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10 text-white shadow-[0_0_55px_rgba(255,255,255,0.08)]">
                 <Gem className="h-8 w-8" />
               </div>
-              <div className="mt-8 text-sm text-white/42">NEXORA Balance</div>
-              <div className="mt-2 text-[48px] font-light tracking-[-0.07em]">{formatNumber(nexPoint)}</div>
+              <div className="mt-8 text-sm text-white/42">Lifetime Earned</div>
+              <div className="mt-2 text-[48px] font-light tracking-[-0.07em]">
+                {formatNumber(lifetimeNex)} NEX
+              </div>
+              <div className="mt-1 text-2xl font-light tracking-[-0.04em] text-white/58">
+                {formatNumber(lifetimeCoin)} COIN
+              </div>
             </div>
 
             <div className="mt-8 grid grid-cols-[1.4fr_1fr_0.7fr_0.45fr] gap-2">
               <div>
                 <div className="h-3 rounded-full bg-[linear-gradient(90deg,#8b5cf6,#fb7185)]" />
-                <div className="mt-2 text-xs text-white/72">{formatNumber(nexPoint)} NEX</div>
+                <div className="mt-2 text-xs text-white/72">{formatNumber(lifetimeNex)} NEX</div>
               </div>
               <div>
                 <div className="h-3 rounded-full bg-[linear-gradient(90deg,#f87171,#facc15)]" />
-                <div className="mt-2 text-xs text-white/72">{formatNumber(coin)} COIN</div>
+                <div className="mt-2 text-xs text-white/72">{formatNumber(lifetimeCoin)} COIN</div>
               </div>
               <div>
                 <div className="h-3 rounded-full bg-[#f7ffc7]" />
@@ -453,9 +487,9 @@ export default async function WalletPage() {
                 </div>
               </div>
               <div className="mt-5 flex justify-center gap-5 text-sm text-white/78">
-                <span>• NEX {formatNumber(nexPoint)}</span>
-                <span>• COIN {formatNumber(coin)}</span>
-                <span>• QR {formatNumber(activeCoupons)}</span>
+                <span>• Rank {walletRank}</span>
+                <span>• Active QR {formatNumber(activeCoupons)}</span>
+                <span>• Used {formatNumber(usedCoupons)}</span>
               </div>
             </div>
 
