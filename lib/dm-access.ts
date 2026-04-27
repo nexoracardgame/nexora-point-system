@@ -208,12 +208,21 @@ export async function getDmRoomAccess(input: {
     room.userb === userId ||
     (lineId ? room.usera === lineId || room.userb === lineId : false);
 
-  if (!allowed) {
+  const canonicalUserA = await resolveCanonicalUserId(String(room.usera || ""));
+  const canonicalUserB = await resolveCanonicalUserId(String(room.userb || ""));
+  const allowedByCanonical =
+    canonicalUserA === userId ||
+    canonicalUserB === userId ||
+    (lineId ? canonicalUserA === lineId || canonicalUserB === lineId : false);
+
+  if (!allowed && !allowedByCanonical) {
     return { ok: false, reason: "unauthorized" };
   }
 
   const roomUserAIsMe =
-    room.usera === userId || (lineId ? room.usera === lineId : false);
+    room.usera === userId ||
+    canonicalUserA === userId ||
+    (lineId ? room.usera === lineId || canonicalUserA === lineId : false);
   const otherUserId = String(roomUserAIsMe ? room.userb : room.usera || "").trim();
   const canonicalOtherUserId = await resolveCanonicalUserId(otherUserId);
 
