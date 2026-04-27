@@ -13,6 +13,7 @@ import {
   getMarketListings,
 } from "@/lib/market-listings";
 import { prisma } from "@/lib/prisma";
+import { formatThaiDateTime } from "@/lib/thai-time";
 import CardStatsClient from "./CardStatsClient";
 import RequestDealButton from "./RequestDealButton";
 import WishlistButton from "./WishlistButton";
@@ -91,10 +92,7 @@ function formatCurrency(value: number, locale: Locale) {
 }
 
 function formatDateTime(date: Date, locale: Locale) {
-  return date.toLocaleString(getLocaleTag(locale), {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return formatThaiDateTime(date, getLocaleTag(locale));
 }
 
 function formatRelativeDays(date: Date, locale: Locale) {
