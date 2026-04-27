@@ -491,10 +491,15 @@ export default function DMPage() {
     }
 
     if (!res.ok) {
+      const errorPayload = await res.json().catch(() => null);
       setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
       if (res.status === 403 || res.status === 404 || res.status === 409) {
         setRoomClosed(true);
       }
+      alert(
+        String(errorPayload?.error || "").trim() ||
+          "ส่งรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+      );
       setSending(false);
       return;
     }

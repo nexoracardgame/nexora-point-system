@@ -48,6 +48,7 @@ export default function MainLayout({
   const [profileImage, setProfileImage] = useState("");
   const [profileName, setProfileName] = useState("");
   const [avatarReady, setAvatarReady] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const stableAvatarRef = useRef("/avatar.png");
   const profileVersionRef = useRef("");
@@ -216,6 +217,59 @@ export default function MainLayout({
       window.removeEventListener("focus", handleFocus);
     };
   }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const syncChatUnread = async () => {
+      if (cancelled) return;
+
+      try {
+        const res = await fetch(`/api/dm/unread?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        setChatUnreadCount(Math.max(0, Number(data?.count || 0)));
+      } catch {
+        return;
+      }
+    };
+
+    intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncChatUnread();
+      }
+    }, 5000);
+
+    const handleFocus = () => {
+      void syncChatUnread();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncChatUnread();
+      }
+    };
+
+    void syncChatUnread();
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [pathname]);
 
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
 
@@ -409,13 +463,18 @@ export default function MainLayout({
                   <PrefetchLink
                     key={item.href}
                     href={item.href}
-                    className={`group flex h-12 w-12 items-center justify-center rounded-2xl border transition ${
+                    className={`group relative flex h-12 w-12 items-center justify-center rounded-2xl border transition ${
                       item.active
                         ? "border-amber-300/20 bg-amber-300/12 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.18)]"
                         : "border-white/5 bg-white/[0.02] text-white/45 hover:border-amber-300/10 hover:bg-amber-300/[0.06] hover:text-amber-200 hover:shadow-[0_0_18px_rgba(251,191,36,0.10)]"
                     }`}
                   >
                     <Icon className="h-[18px] w-[18px]" />
+                    {item.href === "/dm" && chatUnreadCount > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 min-w-[20px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
+                        {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                      </span>
+                    )}
                   </PrefetchLink>
                 );
               })}
@@ -667,13 +726,18 @@ export default function MainLayout({
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-xl ${
                         item.active
                           ? "bg-amber-300/12 text-amber-300"
                           : "bg-white/[0.04] text-white/65"
                       }`}
                     >
                       <Icon className="h-5 w-5" />
+                      {item.href === "/dm" && chatUnreadCount > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 min-w-[19px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
+                          {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                        </span>
+                      )}
                     </div>
                     <span className="text-sm font-bold">{item.label}</span>
                   </div>
@@ -725,6 +789,11 @@ export default function MainLayout({
                     <span className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
                   )}
                   <Icon className="h-5 w-5" />
+                  {item.href === "/dm" && chatUnreadCount > 0 && (
+                    <span className="absolute right-2 top-2 min-w-[19px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
+                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                    </span>
+                  )}
                   <span className="mt-1 text-[10px] font-bold leading-none sm:text-[11px]">
                     {item.label}
                   </span>

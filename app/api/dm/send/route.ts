@@ -165,12 +165,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "empty message" }, { status: 400 });
   }
 
+  const contentForDb = content || (imageUrl ? "" : null);
+
   const { data, error } = await supabase
     .from("dmMessage")
     .insert({
       roomId: access.roomId,
       senderId,
-      content: content || null,
+      content: contentForDb,
       imageUrl: imageUrl || null,
       senderName: identity.name,
       senderImage: identity.image,
