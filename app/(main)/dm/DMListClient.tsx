@@ -42,6 +42,12 @@ function formatDealPrice(value?: number) {
   return `฿${amount.toLocaleString("th-TH")}`;
 }
 
+function formatDealPriceLabel(value?: number) {
+  const amount = Number(value || 0);
+  if (!amount) return "-";
+  return `฿${amount.toLocaleString("th-TH")}`;
+}
+
 function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
   return {
     kind: room.kind === "deal" ? "deal" : "direct",
@@ -156,6 +162,19 @@ export default function DMListClient({
     } finally {
       setLoading(false);
     }
+  };
+
+  const markRoomReadLocally = (roomId: string) => {
+    setRooms((prev) =>
+      prev.map((room) =>
+        room.roomId === roomId ? { ...room, unread: 0 } : room
+      )
+    );
+    window.dispatchEvent(
+      new CustomEvent("nexora:chat-read", {
+        detail: { roomId },
+      })
+    );
   };
 
   const openDirectRoom = async (room: DMRoomListItem) => {
@@ -312,6 +331,7 @@ export default function DMListClient({
                   }}
                   onClick={(event) => {
                     event.preventDefault();
+                    markRoomReadLocally(room.roomId);
                     saveDmRoomSeed(room.roomId, {
                       name: room.otherName,
                       image: room.otherImage,
@@ -374,6 +394,7 @@ export default function DMListClient({
                   key={room.roomId}
                   href={`/market/deals/chat/${room.dealId}`}
                   prefetch
+                  onClick={() => markRoomReadLocally(room.roomId)}
                   className="group relative overflow-hidden rounded-[22px] border border-cyan-300/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.09),rgba(255,255,255,0.025))] p-3 transition hover:border-cyan-200/25 hover:shadow-[0_0_28px_rgba(34,211,238,0.10)]"
                 >
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.10),transparent_34%)] opacity-70" />
@@ -394,11 +415,13 @@ export default function DMListClient({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-black text-white">
-                            {room.dealCardName || "Deal chat"}{" "}
-                            <span className="text-yellow-200/80">
-                              ({formatDealPrice(room.dealPrice)})
-                            </span>
+                          <div className="min-w-0 text-sm font-black text-white">
+                            <div className="truncate">
+                              {room.dealCardName || "Deal chat"}
+                            </div>
+                            <div className="mt-0.5 truncate text-xs font-black text-yellow-200/85 sm:text-sm">
+                              ({formatDealPriceLabel(room.dealPrice)})
+                            </div>
                           </div>
                           <div className="mt-0.5 truncate text-[11px] font-semibold text-cyan-100/55">
                             Seller: {room.sellerName || room.otherName}

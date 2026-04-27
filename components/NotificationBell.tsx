@@ -215,11 +215,13 @@ export default function NotificationBell() {
     };
 
     window.addEventListener("focus", onFocus);
+    window.addEventListener("nexora:chat-read", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("nexora:chat-read", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);

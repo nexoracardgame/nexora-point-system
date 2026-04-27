@@ -257,9 +257,13 @@ export default function MainLayout({
         void syncChatUnread();
       }
     };
+    const handleChatRead = () => {
+      void syncChatUnread();
+    };
 
     void syncChatUnread();
     window.addEventListener("focus", handleFocus);
+    window.addEventListener("nexora:chat-read", handleChatRead);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
@@ -268,6 +272,7 @@ export default function MainLayout({
         clearInterval(intervalId);
       }
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("nexora:chat-read", handleChatRead);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [pathname]);

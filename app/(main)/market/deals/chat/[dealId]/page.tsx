@@ -285,6 +285,7 @@ export default function DealChatPage() {
 
       return next;
     });
+    void markLoadedRoomSeen(expectedRoomId, withSender, meData);
 
     if (!hasInitialScrolledRef.current || isNearBottomRef.current) {
       requestAnimationFrame(() => {
@@ -330,6 +331,54 @@ export default function DealChatPage() {
           ? { ...message, seenAt }
           : message
       )
+    );
+  };
+
+  const markLoadedRoomSeen = async (
+    targetRoomId: string,
+    nextMessages: DealMessage[],
+    meData?: ChatUser | null
+  ) => {
+    const myId = String(meData?.id || "").trim();
+    if (!targetRoomId || !myId) return;
+
+    const hasUnread = nextMessages.some(
+      (message) => message.senderId !== myId && !message.seenAt
+    );
+    if (!hasUnread) return;
+
+    const seenAt = new Date().toISOString();
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.senderId !== myId && !message.seenAt
+          ? { ...message, seenAt }
+          : message
+      )
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("nexora:chat-read", {
+        detail: { roomId: targetRoomId },
+      })
+    );
+
+    const res = await fetch("/api/dm/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roomId: targetRoomId,
+        action: "markSeen",
+      }),
+    }).catch(() => null);
+
+    if (!res?.ok) return;
+
+    window.dispatchEvent(
+      new CustomEvent("nexora:chat-read", {
+        detail: { roomId: targetRoomId },
+      })
     );
   };
 
