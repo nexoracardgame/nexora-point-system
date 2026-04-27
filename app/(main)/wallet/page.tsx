@@ -210,17 +210,104 @@ export default async function WalletPage() {
   );
   const lifetimeCoin = coin + spentCoinFromCoupons;
   const walletRank =
-    lifetimeNex >= 1_000_000
-      ? "NEX 1M LEGEND"
-      : lifetimeNex >= 500_000
-        ? "NEX 500K MYTHIC"
-        : lifetimeNex >= 100_000
-          ? "NEX 100K ELITE"
-          : lifetimeNex >= 50_000
-            ? "NEX 50K PRO"
-            : lifetimeNex >= 10_000
-              ? "NEX 10K RISING"
-              : "NEX STARTER";
+    lifetimeNex >= 10_000_000
+      ? "Challenger"
+      : lifetimeNex >= 5_000_000
+        ? "Grandmaster"
+        : lifetimeNex >= 1_000_000
+          ? "Master"
+          : lifetimeNex >= 500_000
+            ? "Diamond"
+            : lifetimeNex >= 300_000
+              ? "Emerald"
+              : lifetimeNex >= 100_000
+                ? "Platinum"
+                : lifetimeNex >= 50_000
+                  ? "Gold"
+                  : lifetimeNex >= 10_000
+                    ? "Silver"
+                    : lifetimeNex >= 5_000
+                      ? "Bronze"
+                      : lifetimeNex >= 1_000
+                        ? "Iron"
+                        : "Rookie";
+  const rankStyle =
+    walletRank === "Challenger"
+      ? {
+          shell:
+            "border-fuchsia-200/35 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.42),transparent_25%),linear-gradient(135deg,#f0abfc,#f43f5e,#facc15)] text-white shadow-[0_0_42px_rgba(217,70,239,0.42)]",
+          icon: "bg-[linear-gradient(135deg,#f0abfc,#facc15,#67e8f9)] text-black shadow-[0_0_42px_rgba(250,204,21,0.45)]",
+          glow: "from-fuchsia-400 via-rose-400 to-amber-200",
+        }
+      : walletRank === "Grandmaster"
+        ? {
+            shell:
+              "border-violet-200/32 bg-[linear-gradient(135deg,#7c3aed,#db2777,#f97316)] text-white shadow-[0_0_38px_rgba(168,85,247,0.36)]",
+            icon: "bg-[linear-gradient(135deg,#8b5cf6,#ec4899)] text-white shadow-[0_0_36px_rgba(236,72,153,0.38)]",
+            glow: "from-violet-400 via-pink-400 to-orange-300",
+          }
+        : walletRank === "Master"
+          ? {
+              shell:
+                "border-rose-200/28 bg-[linear-gradient(135deg,#be123c,#7f1d1d,#f59e0b)] text-white shadow-[0_0_34px_rgba(244,63,94,0.32)]",
+              icon: "bg-[linear-gradient(135deg,#ef4444,#f59e0b)] text-white shadow-[0_0_34px_rgba(245,158,11,0.34)]",
+              glow: "from-rose-400 via-red-400 to-amber-300",
+            }
+          : walletRank === "Diamond"
+            ? {
+                shell:
+                  "border-cyan-100/34 bg-[linear-gradient(135deg,#22d3ee,#2563eb,#a78bfa)] text-white shadow-[0_0_34px_rgba(34,211,238,0.34)]",
+                icon: "bg-[linear-gradient(135deg,#67e8f9,#818cf8)] text-black shadow-[0_0_34px_rgba(103,232,249,0.34)]",
+                glow: "from-cyan-300 via-blue-400 to-violet-300",
+              }
+            : walletRank === "Emerald"
+              ? {
+                  shell:
+                    "border-emerald-200/30 bg-[linear-gradient(135deg,#10b981,#047857,#22d3ee)] text-white shadow-[0_0_30px_rgba(16,185,129,0.30)]",
+                  icon: "bg-[linear-gradient(135deg,#34d399,#06b6d4)] text-black shadow-[0_0_30px_rgba(52,211,153,0.32)]",
+                  glow: "from-emerald-300 via-teal-300 to-cyan-300",
+                }
+              : walletRank === "Platinum"
+                ? {
+                    shell:
+                      "border-slate-100/28 bg-[linear-gradient(135deg,#e2e8f0,#94a3b8,#64748b)] text-black shadow-[0_0_28px_rgba(226,232,240,0.24)]",
+                    icon: "bg-[linear-gradient(135deg,#f8fafc,#94a3b8)] text-black shadow-[0_0_28px_rgba(226,232,240,0.28)]",
+                    glow: "from-slate-100 via-slate-300 to-slate-500",
+                  }
+                : walletRank === "Gold"
+                  ? {
+                      shell:
+                        "border-amber-200/30 bg-[linear-gradient(135deg,#facc15,#f59e0b,#92400e)] text-black shadow-[0_0_28px_rgba(250,204,21,0.28)]",
+                      icon: "bg-[linear-gradient(135deg,#fde68a,#f59e0b)] text-black shadow-[0_0_26px_rgba(245,158,11,0.30)]",
+                      glow: "from-yellow-200 via-amber-300 to-orange-500",
+                    }
+                  : walletRank === "Silver"
+                    ? {
+                        shell:
+                          "border-zinc-100/24 bg-[linear-gradient(135deg,#f4f4f5,#a1a1aa,#52525b)] text-black shadow-[0_0_24px_rgba(212,212,216,0.22)]",
+                        icon: "bg-[linear-gradient(135deg,#fafafa,#a1a1aa)] text-black shadow-[0_0_22px_rgba(212,212,216,0.22)]",
+                        glow: "from-zinc-100 via-zinc-300 to-zinc-500",
+                      }
+                    : walletRank === "Bronze"
+                      ? {
+                          shell:
+                            "border-orange-200/24 bg-[linear-gradient(135deg,#fb923c,#9a3412,#431407)] text-white shadow-[0_0_22px_rgba(251,146,60,0.20)]",
+                          icon: "bg-[linear-gradient(135deg,#fdba74,#c2410c)] text-black shadow-[0_0_20px_rgba(251,146,60,0.22)]",
+                          glow: "from-orange-300 via-orange-600 to-stone-800",
+                        }
+                      : walletRank === "Iron"
+                        ? {
+                            shell:
+                              "border-stone-300/20 bg-[linear-gradient(135deg,#78716c,#44403c,#1c1917)] text-white shadow-[0_0_18px_rgba(120,113,108,0.18)]",
+                            icon: "bg-[linear-gradient(135deg,#a8a29e,#44403c)] text-white shadow-[0_0_18px_rgba(120,113,108,0.20)]",
+                            glow: "from-stone-300 via-stone-500 to-stone-800",
+                          }
+                        : {
+                            shell:
+                              "border-white/12 bg-white/[0.055] text-white shadow-[0_0_18px_rgba(255,255,255,0.10)]",
+                            icon: "bg-violet-500 text-white shadow-[0_0_24px_rgba(139,92,246,0.26)]",
+                            glow: "from-violet-400 via-white/40 to-white/10",
+                          };
 
   const activities: ActivityItem[] = [
     ...pointLogs.map((log) => ({
@@ -308,10 +395,10 @@ export default async function WalletPage() {
         <main className="relative mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8 xl:px-8">
           <section className="mx-auto w-full max-w-[430px] rounded-[46px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,16,24,0.92),rgba(8,8,12,0.98))] p-5 shadow-[0_40px_130px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:p-7 lg:rotate-[-1.5deg]">
             <div className="flex items-center justify-between">
-              <div className="grid h-14 w-14 place-items-center rounded-full bg-violet-500 text-white shadow-[0_0_34px_rgba(139,92,246,0.26)]">
-                <Wallet className="h-7 w-7" />
+              <div className={`grid h-14 w-14 place-items-center rounded-full ${rankStyle.icon}`}>
+                <Gem className="h-7 w-7" />
               </div>
-              <div className="flex items-center gap-5 text-4xl font-light text-white">
+              <div className="hidden">
                 <span>+</span>
                 <span className="text-3xl">⌕</span>
                 <span className="text-3xl">≡</span>
@@ -346,9 +433,10 @@ export default async function WalletPage() {
                 {formatNumber(coin)} COIN
               </div>
 
-              <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.045] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.24)]">
+              <div className={`relative mt-5 flex items-center gap-2 overflow-hidden rounded-2xl border px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.24)] ${rankStyle.shell}`}>
+                <div className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${rankStyle.glow}`} />
                 <span className="font-black text-white">Rank</span>
-                <span className="text-white/52">{walletRank}</span>
+                <span className="text-white/80">{walletRank}</span>
               </div>
             </div>
 
@@ -428,14 +516,14 @@ export default async function WalletPage() {
           <section className="mx-auto w-full max-w-[560px] rounded-[46px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,23,0.93),rgba(8,8,12,0.99))] p-5 shadow-[0_40px_130px_rgba(0,0,0,0.54)] backdrop-blur-2xl sm:p-7 lg:rotate-[1.3deg]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-violet-500 text-white">
-                  <Wallet className="h-6 w-6" />
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-[linear-gradient(135deg,#06b6d4,#2563eb)] text-white shadow-[0_0_28px_rgba(34,211,238,0.25)]">
+                  <Coins className="h-6 w-6" />
                 </div>
-                <div className="rounded-2xl bg-white/[0.055] px-4 py-2 font-bold text-white/88">
+                <div className={`rounded-2xl border px-4 py-2 font-black uppercase tracking-[0.12em] ${rankStyle.shell}`}>
                   {walletRank}
                 </div>
               </div>
-              <div className="flex gap-4 text-3xl font-light text-white">
+              <div className="hidden">
                 <span>+</span>
                 <span>⌕</span>
                 <span>≡</span>
