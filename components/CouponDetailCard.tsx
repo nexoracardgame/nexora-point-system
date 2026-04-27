@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { QRCodeCanvas } from "qrcode.react";
 import {
   CheckCircle2,
@@ -81,11 +82,35 @@ export default function CouponDetailCard({
           </div>
         </div>
 
-        <div className="relative mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-3 sm:mt-5 sm:rounded-[28px] sm:p-4">
-          <div className="pointer-events-none absolute inset-y-0 left-[42px] hidden w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)] sm:block sm:left-[60px]" />
-          <div className="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
-            <div className="mx-auto rounded-[20px] bg-white p-2.5 shadow-[0_18px_50px_rgba(255,255,255,0.08)] sm:mx-0 sm:rounded-[24px] sm:p-3">
-              <QRCodeCanvas value={coupon.code} size={qrSize} />
+        <div className="relative mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 sm:mt-5 sm:rounded-[28px] sm:p-4">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_18%,rgba(251,191,36,0.18),transparent_26%),radial-gradient(circle_at_76%_18%,rgba(34,211,238,0.13),transparent_28%)]" />
+          <div className="relative grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
+            <div className="grid gap-3 sm:grid-cols-[0.92fr_1.08fr] lg:grid-cols-1">
+              <div className="relative min-h-[168px] overflow-hidden rounded-[24px] border border-amber-200/20 bg-black/30 shadow-[0_22px_70px_rgba(251,191,36,0.12)] sm:min-h-[206px] lg:min-h-[255px]">
+                <Image
+                  src={coupon.rewardImageUrl}
+                  alt={coupon.rewardName}
+                  fill
+                  sizes="(max-width: 640px) 45vw, (max-width: 1024px) 240px, 360px"
+                  className="object-cover"
+                  priority={compact}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,rgba(0,0,0,0.74))]" />
+                <div className="absolute bottom-3 left-3 right-3">
+                  <div className="inline-flex rounded-full border border-amber-200/25 bg-black/45 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-amber-100 backdrop-blur-md">
+                    Reward Item
+                  </div>
+                  <div className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white sm:text-xl">
+                    {coupon.rewardName}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.09),rgba(255,255,255,0.025)_58%,rgba(0,0,0,0.18))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <div className="rounded-[22px] bg-white p-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:rounded-[26px] sm:p-3">
+                  <QRCodeCanvas value={coupon.code} size={qrSize} />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3 sm:space-y-4">

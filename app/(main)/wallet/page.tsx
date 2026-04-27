@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth";
 import {
   ArrowRight,
   Coins,
-  Eye,
   Gift,
   Gem,
   Layers3,
@@ -287,15 +286,15 @@ export default async function WalletPage() {
               <div>
                 <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.24em] text-white/38">
                   <Wallet className="h-4 w-4" />
-                  Asset Wallet
+                  NEXORA WALLET
                 </div>
                 <div className="mt-3 flex items-center gap-3">
                   <h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl xl:text-5xl">
                     สินทรัพย์ของฉัน
                   </h1>
                   <div className="hidden rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/58 sm:inline-flex sm:items-center sm:gap-2">
-                    <Eye className="h-4 w-4" />
-                    Asset Tracker
+                    <Sparkles className="h-4 w-4" />
+                    Live Ready
                   </div>
                 </div>
               </div>
@@ -319,7 +318,7 @@ export default async function WalletPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="hidden">
               <div className="inline-flex min-h-[42px] items-center rounded-full border border-white/20 bg-black px-4 py-2 text-sm font-black text-white">
                 แยกสินทรัพย์
               </div>
@@ -342,7 +341,8 @@ export default async function WalletPage() {
             </div>
 
             <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-              <div className="overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(135deg,rgba(19,19,19,0.98)_0%,rgba(10,46,27,0.9)_68%,rgba(43,82,35,0.82)_100%)]">
+              <div className="relative overflow-hidden rounded-[30px] border border-amber-300/12 bg-[radial-gradient(circle_at_18%_20%,rgba(251,191,36,0.22),transparent_30%),radial-gradient(circle_at_86%_18%,rgba(34,211,238,0.16),transparent_26%),linear-gradient(135deg,rgba(12,12,16,0.98)_0%,rgba(19,16,31,0.94)_58%,rgba(34,22,7,0.9)_100%)] shadow-[0_24px_100px_rgba(0,0,0,0.42)]">
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_0%,rgba(255,255,255,0.08)_42%,transparent_58%)]" />
                 <div className="flex h-full flex-col justify-between gap-5 p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -388,7 +388,7 @@ export default async function WalletPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-[auto_1fr_auto_1fr_auto] items-center gap-3 border-t border-white/10 pt-4">
+                  <div className="hidden">
                     <div className="h-12 w-12 rounded-full border-4 border-violet-300" />
                     <div>
                       <div className="text-xl font-black text-white">
@@ -458,7 +458,7 @@ export default async function WalletPage() {
                   ภาพรวมกระเป๋า
                 </h2>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/60">
+              <div className="hidden">
                 <Layers3 className="h-4 w-4" />
                 จัดเรียงใหม่
               </div>
