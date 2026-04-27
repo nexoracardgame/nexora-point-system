@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Send, ArrowLeft, Image as ImageIcon, Smile, X } from "lucide-react";
+import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
@@ -107,16 +107,17 @@ export default function DMPage() {
   const seededFromStorage = useMemo(() => readDmRoomSeed(roomId), [roomId]);
   const initialOtherName = String(seededFromStorage?.name || "").trim();
   const initialOtherImage = String(seededFromStorage?.image || "").trim();
+  const initialOtherUserId = String(seededFromStorage?.otherUserId || "").trim();
   const seededOther = useMemo<ChatUser>(
     () =>
-      initialOtherName || initialOtherImage
+      initialOtherName || initialOtherImage || initialOtherUserId
         ? {
-            id: "",
+            id: initialOtherUserId,
             name: initialOtherName || "User",
             image: initialOtherImage || "/avatar.png",
           }
         : null,
-    [initialOtherImage, initialOtherName]
+    [initialOtherImage, initialOtherName, initialOtherUserId]
   );
 
   const [messages, setMessages] = useState<DMMessage[]>([]);
@@ -131,6 +132,7 @@ export default function DMPage() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sending, setSending] = useState(false);
+  const [messageMenuId, setMessageMenuId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +143,7 @@ export default function DMPage() {
   const hasMarkedSeenRef = useRef(false);
   const isNearBottomRef = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasValidRoom = Boolean(roomId);
   const backHref = String(searchParams?.get("back") || "").trim();
@@ -200,6 +203,32 @@ export default function DMPage() {
     });
 
     if (!res.ok) {
+      if (initialOtherUserId) {
+        const repairRes = await fetch("/api/dm/create-room", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user2: initialOtherUserId,
+            user2Name: initialOtherName,
+            user2Image: initialOtherImage,
+          }),
+        }).catch(() => null);
+
+        if (repairRes?.ok) {
+          const repaired = await repairRes.json().catch(() => null);
+          const repairedRoomId = String(repaired?.roomId || "").trim();
+
+          if (repairedRoomId && repairedRoomId !== roomId) {
+            router.replace(
+              `/dm/${encodeURIComponent(repairedRoomId)}?back=${encodeURIComponent("/dm")}`
+            );
+            return seededOther;
+          }
+        }
+      }
+
       setRoomClosed(true);
       setLoadingRoom(false);
       return null;
@@ -528,6 +557,47 @@ export default function DMPage() {
     scrollToBottom("smooth");
   };
 
+  const deleteMessage = async (messageId: string) => {
+    if (!messageId || !roomId) return;
+
+    const snapshot = messages;
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+    setMessageMenuId(null);
+
+    const res = await fetch("/api/dm/messages", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roomId,
+        messageId,
+      }),
+    }).catch(() => null);
+
+    if (!res?.ok) {
+      setMessages(snapshot);
+      alert("ลบข้อความไม่สำเร็จ กรุณาลองใหม่");
+    }
+  };
+
+  const startLongPress = (messageId: string) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      setMessageMenuId(messageId);
+    }, 650);
+  };
+
+  const stopLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   const openOtherProfile = () => {
     if (!other?.id) return;
     router.push(`/profile/${other.id}`);
@@ -654,21 +724,60 @@ export default function DMPage() {
                       )}
 
                       <div
-                        className={`bubble-in break-words rounded-[22px] px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
-                          mine
-                            ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
-                            : "bg-white/10 text-white backdrop-blur"
-                        }`}
+                        className="group/message relative"
+                        onTouchStart={() => mine && startLongPress(m.id)}
+                        onTouchEnd={stopLongPress}
+                        onTouchCancel={stopLongPress}
                       >
-                        {m.imageUrl && (
-                          <img
-                            src={m.imageUrl}
-                            onClick={() => setPreview(m.imageUrl || null)}
-                            className="mb-2 rounded-xl max-h-[220px] cursor-pointer"
-                          />
+                        <div
+                          className={`bubble-in break-words rounded-[22px] px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
+                            mine
+                              ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
+                              : "bg-white/10 text-white backdrop-blur"
+                          }`}
+                        >
+                          {m.imageUrl && (
+                            <img
+                              src={m.imageUrl}
+                              onClick={() => setPreview(m.imageUrl || null)}
+                              className="mb-2 rounded-xl max-h-[220px] cursor-pointer"
+                            />
+                          )}
+
+                          {m.content}
+                        </div>
+
+                        {mine && !m.optimistic && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMessageMenuId((current) =>
+                                current === m.id ? null : m.id
+                              )
+                            }
+                            className={`absolute top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-[#111318]/95 p-1.5 text-white/65 opacity-0 shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition hover:text-white group-hover/message:opacity-100 ${
+                              mine ? "-left-9" : "-right-9"
+                            } ${messageMenuId === m.id ? "opacity-100" : ""}`}
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
                         )}
 
-                        {m.content}
+                        {messageMenuId === m.id && (
+                          <div
+                            className={`absolute z-30 mt-2 min-w-[132px] overflow-hidden rounded-2xl border border-red-300/15 bg-[#121318]/98 p-1 shadow-[0_20px_55px_rgba(0,0,0,0.55)] ${
+                              mine ? "right-0" : "left-0"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => void deleteMessage(m.id)}
+                              className="w-full rounded-xl px-3 py-2 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/12"
+                            >
+                              ลบข้อความ
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div

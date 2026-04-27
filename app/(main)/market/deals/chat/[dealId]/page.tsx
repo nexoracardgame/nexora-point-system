@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Image as ImageIcon, Send, Smile, X } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, Send, Smile, X, MoreHorizontal } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 
@@ -130,6 +130,7 @@ export default function DealChatPage() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sending, setSending] = useState(false);
+  const [messageMenuId, setMessageMenuId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +141,7 @@ export default function DealChatPage() {
   const hasMarkedSeenRef = useRef(false);
   const isNearBottomRef = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasValidDealRoom = Boolean(dealId);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
@@ -565,6 +567,47 @@ export default function DealChatPage() {
     scrollToBottom("smooth");
   };
 
+  const deleteMessage = async (messageId: string) => {
+    if (!messageId || !roomId) return;
+
+    const snapshot = messages;
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+    setMessageMenuId(null);
+
+    const res = await fetch("/api/dm/messages", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roomId,
+        messageId,
+      }),
+    }).catch(() => null);
+
+    if (!res?.ok) {
+      setMessages(snapshot);
+      alert("ลบข้อความไม่สำเร็จ กรุณาลองใหม่");
+    }
+  };
+
+  const startLongPress = (messageId: string) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      setMessageMenuId(messageId);
+    }, 650);
+  };
+
+  const stopLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   if (!hasValidDealRoom || loadingRoom) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center pb-[env(safe-area-inset-bottom)] text-white">
@@ -733,22 +776,61 @@ export default function DealChatPage() {
                       )}
 
                       <div
-                        className={`break-words rounded-[22px] px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
-                          mine
-                            ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
-                            : "bg-white/10 text-white backdrop-blur"
-                        }`}
+                        className="group/message relative"
+                        onTouchStart={() => mine && startLongPress(message.id)}
+                        onTouchEnd={stopLongPress}
+                        onTouchCancel={stopLongPress}
                       >
-                        {message.imageUrl && (
-                          <img
-                            src={message.imageUrl}
-                            alt="deal chat attachment"
-                            onClick={() => setPreview(message.imageUrl || null)}
-                            className="mb-2 max-h-[220px] cursor-pointer rounded-xl"
-                          />
+                        <div
+                          className={`break-words rounded-[22px] px-4 py-2.5 text-[14px] leading-relaxed shadow-lg sm:text-[15px] ${
+                            mine
+                              ? "bg-gradient-to-r from-yellow-400 to-yellow-300 text-black"
+                              : "bg-white/10 text-white backdrop-blur"
+                          }`}
+                        >
+                          {message.imageUrl && (
+                            <img
+                              src={message.imageUrl}
+                              alt="deal chat attachment"
+                              onClick={() => setPreview(message.imageUrl || null)}
+                              className="mb-2 max-h-[220px] cursor-pointer rounded-xl"
+                            />
+                          )}
+
+                          {message.content}
+                        </div>
+
+                        {mine && !message.optimistic && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMessageMenuId((current) =>
+                                current === message.id ? null : message.id
+                              )
+                            }
+                            className={`absolute top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-[#111318]/95 p-1.5 text-white/65 opacity-0 shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition hover:text-white group-hover/message:opacity-100 ${
+                              mine ? "-left-9" : "-right-9"
+                            } ${messageMenuId === message.id ? "opacity-100" : ""}`}
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
                         )}
 
-                        {message.content}
+                        {messageMenuId === message.id && (
+                          <div
+                            className={`absolute z-30 mt-2 min-w-[132px] overflow-hidden rounded-2xl border border-red-300/15 bg-[#121318]/98 p-1 shadow-[0_20px_55px_rgba(0,0,0,0.55)] ${
+                              mine ? "right-0" : "left-0"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => void deleteMessage(message.id)}
+                              className="w-full rounded-xl px-3 py-2 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/12"
+                            >
+                              ลบข้อความ
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div

@@ -6,6 +6,7 @@ import { getServerSupabaseClient } from "@/lib/supabase-server";
 export type DMRoomListItem = {
   kind: "direct" | "deal";
   roomId: string;
+  otherUserId?: string;
   dealId?: string;
   lastMessage: string;
   createdAt: string;
@@ -301,7 +302,7 @@ export async function getDmRoomsForUser(
     };
   });
 
-  return [...Array.from(directByOther.values()), ...dealItems]
-    .map(({ otherUserId, ...item }) => item)
-    .sort((a, b) => latestTime(b.createdAt) - latestTime(a.createdAt));
+  return [...Array.from(directByOther.values()), ...dealItems].sort(
+    (a, b) => latestTime(b.createdAt) - latestTime(a.createdAt)
+  );
 }

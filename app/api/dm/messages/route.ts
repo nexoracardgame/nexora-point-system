@@ -129,3 +129,84 @@ export async function POST(req: NextRequest) {
     seenAt,
   });
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const userId = String(session?.user?.id || "").trim();
+  const lineId = getSessionLineId(session);
+
+  if (!userId) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const roomId = String(body?.roomId || "").trim();
+  const messageId = String(body?.messageId || "").trim();
+
+  if (!roomId || !messageId) {
+    return NextResponse.json({ error: "bad request" }, { status: 400 });
+  }
+
+  const access = await getDmRoomAccess({
+    roomId,
+    userId,
+    lineId,
+  });
+
+  if (!access.ok) {
+    const status =
+      access.reason === "not-found"
+        ? 404
+        : access.reason === "closed"
+          ? 409
+          : 403;
+
+    return NextResponse.json({ error: access.reason }, { status });
+  }
+
+  const supabase = getServerSupabaseClient();
+
+  if (!supabase) {
+    return NextResponse.json({ error: "system unavailable" }, { status: 500 });
+  }
+
+  const { data: message, error: loadError } = await supabase
+    .from("dmMessage")
+    .select("id,roomId,senderId")
+    .eq("id", messageId)
+    .eq("roomId", access.roomId)
+    .maybeSingle();
+
+  if (loadError) {
+    console.error("LOAD DELETE DM MESSAGE ERROR:", loadError);
+    return NextResponse.json({ error: "delete failed" }, { status: 500 });
+  }
+
+  if (!message) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  const isMine =
+    message.senderId === userId || (lineId ? message.senderId === lineId : false);
+
+  if (!isMine) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const { error } = await supabase
+    .from("dmMessage")
+    .delete()
+    .eq("id", messageId)
+    .eq("roomId", access.roomId);
+
+  if (error) {
+    console.error("DELETE DM MESSAGE ERROR:", error);
+    return NextResponse.json({ error: "delete failed" }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    roomId: access.roomId,
+    messageId,
+  });
+}

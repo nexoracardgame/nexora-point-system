@@ -1,4 +1,5 @@
 export type DmRoomSeed = {
+  otherUserId?: string;
   name?: string;
   image?: string;
 };

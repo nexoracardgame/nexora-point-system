@@ -45,6 +45,7 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
   return {
     kind: room.kind === "deal" ? "deal" : "direct",
     roomId: String(room.roomId || ""),
+    otherUserId: room.otherUserId ? String(room.otherUserId) : undefined,
     dealId: room.dealId ? String(room.dealId) : undefined,
     otherName: String(room.otherName || "User"),
     otherImage: String(room.otherImage || "/avatar.png"),
@@ -254,18 +255,20 @@ export default function DMListClient({
               {directRooms.map((room) => (
                 <Link
                   key={room.roomId}
-                  href={`/dm/${room.roomId}?back=${encodeURIComponent("/dm")}`}
+                  href={`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`}
                   prefetch
                   onMouseEnter={() => {
                     saveDmRoomSeed(room.roomId, {
                       name: room.otherName,
                       image: room.otherImage,
+                      otherUserId: room.otherUserId,
                     });
                   }}
                   onClick={() => {
                     saveDmRoomSeed(room.roomId, {
                       name: room.otherName,
                       image: room.otherImage,
+                      otherUserId: room.otherUserId,
                     });
                   }}
                   className="group flex items-center gap-3 rounded-[24px] border border-white/5 bg-[linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition hover:border-yellow-300/20 hover:bg-white/[0.055]"
