@@ -99,6 +99,14 @@ function mergeMessage(
   return [...prev, nextMessage];
 }
 
+function getMessageRoomId(message: DMMessage) {
+  return String(
+    message.roomId ||
+      (message as unknown as { roomid?: string | null }).roomid ||
+      ""
+  ).trim();
+}
+
 export default function DMPage() {
   const params = useParams();
   const roomId = typeof params?.roomId === "string" ? params.roomId : "";
@@ -145,7 +153,6 @@ export default function DMPage() {
   const lastMessageIdRef = useRef<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRoomIdRef = useRef(roomId);
-  const messageRequestIdRef = useRef(0);
 
   const hasValidRoom = Boolean(roomId);
   const backHref = String(searchParams?.get("back") || "").trim();
@@ -246,16 +253,12 @@ export default function DMPage() {
   const loadMessages = async (meData?: ChatUser, otherData?: ChatUser) => {
     if (!roomId) return;
     const expectedRoomId = roomId;
-    const requestId = ++messageRequestIdRef.current;
 
     const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(roomId)}`, {
       cache: "no-store",
     });
 
-    if (
-      requestId !== messageRequestIdRef.current ||
-      activeRoomIdRef.current !== expectedRoomId
-    ) {
+    if (activeRoomIdRef.current !== expectedRoomId) {
       return;
     }
 
@@ -268,9 +271,13 @@ export default function DMPage() {
 
     const data = (await res.json()) as DMMessage[];
     const withSender: DMMessage[] = (data || [])
-      .filter((m) => String(m.roomId || "") === expectedRoomId)
+      .filter((m) => {
+        const messageRoomId = getMessageRoomId(m);
+        return !messageRoomId || messageRoomId === expectedRoomId;
+      })
       .map((m) => ({
         ...m,
+        roomId: expectedRoomId,
         sender: buildSender(
           m.senderId,
           {
@@ -331,7 +338,6 @@ export default function DMPage() {
     if (!roomId) return;
 
     activeRoomIdRef.current = roomId;
-    messageRequestIdRef.current += 1;
     hasInitialScrolledRef.current = false;
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;

@@ -110,6 +110,14 @@ function mergeMessage(
   return [...prev, nextMessage];
 }
 
+function getMessageRoomId(message: Omit<DealMessage, "sender"> | DealMessage) {
+  return String(
+    message.roomId ||
+      (message as unknown as { roomid?: string | null }).roomid ||
+      ""
+  ).trim();
+}
+
 export default function DealChatPage() {
   const params = useParams();
   const dealId = typeof params?.dealId === "string" ? params.dealId : "";
@@ -144,7 +152,6 @@ export default function DealChatPage() {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDealIdRef = useRef(dealId);
   const activeRoomIdRef = useRef("");
-  const messageRequestIdRef = useRef(0);
   const hasValidDealRoom = Boolean(dealId);
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
@@ -232,16 +239,12 @@ export default function DealChatPage() {
   ) => {
     if (!nextRoomId) return;
     const expectedRoomId = nextRoomId;
-    const requestId = ++messageRequestIdRef.current;
 
     const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(nextRoomId)}`, {
       cache: "no-store",
     });
 
-    if (
-      requestId !== messageRequestIdRef.current ||
-      activeRoomIdRef.current !== expectedRoomId
-    ) {
+    if (activeRoomIdRef.current !== expectedRoomId) {
       return;
     }
 
@@ -254,9 +257,13 @@ export default function DealChatPage() {
 
     const data = (await res.json()) as Omit<DealMessage, "sender">[];
     const withSender: DealMessage[] = (data || [])
-      .filter((message) => String(message.roomId || "") === expectedRoomId)
+      .filter((message) => {
+        const messageRoomId = getMessageRoomId(message);
+        return !messageRoomId || messageRoomId === expectedRoomId;
+      })
       .map((message) => ({
         ...message,
+        roomId: expectedRoomId,
         sender: buildSender(
           message.senderId,
           {
@@ -331,7 +338,6 @@ export default function DealChatPage() {
 
     activeDealIdRef.current = dealId;
     activeRoomIdRef.current = "";
-    messageRequestIdRef.current += 1;
     hasInitialScrolledRef.current = false;
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
