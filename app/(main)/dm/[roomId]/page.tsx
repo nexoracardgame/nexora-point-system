@@ -2,9 +2,9 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Send, ArrowLeft, Image as ImageIcon, Smile } from "lucide-react";
+import { Send, ArrowLeft, Image as ImageIcon, Smile, X } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
-import { uploadChatImageFile } from "@/lib/chat-image-client";
+import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
 
 type DMMessage = {
@@ -126,11 +126,14 @@ export default function DMPage() {
   const [loadingRoom, setLoadingRoom] = useState(!seededOther);
   const [roomClosed, setRoomClosed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  const [sending, setSending] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -349,6 +352,20 @@ export default function DMPage() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!file) {
+      setSelectedImagePreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setSelectedImagePreview(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [file]);
+
   useLayoutEffect(() => {
     if (!messages.length || hasInitialScrolledRef.current) return;
 
@@ -395,27 +412,24 @@ export default function DMPage() {
   }, [messages, me?.id]);
 
   const send = async () => {
-    if ((!text.trim() && !file) || !me?.id || !roomId || roomClosed) return;
+    if (sending || (!text.trim() && !file) || !me?.id || !roomId || roomClosed) return;
 
-    let imageUrl: string | null = null;
+    const msg = text.trim();
+    const selectedFile = file;
+    const optimisticImageUrl = selectedFile ? selectedImagePreview : null;
+    let uploadFile: File | null = null;
 
-    if (file) {
+    if (selectedFile) {
       try {
-        imageUrl = await uploadChatImageFile(file);
+        uploadFile = await prepareChatImageFile(selectedFile);
       } catch (error) {
         console.error("UPLOAD ERROR:", error);
         alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
-      setFile(null);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
 
-    const msg = text.trim();
-    setText("");
+    setSending(true);
     setShowEmoji(false);
 
     const optimisticId = `temp-${Date.now()}`;
@@ -424,7 +438,7 @@ export default function DMPage() {
       roomId,
       senderId: me.id,
       content: msg || null,
-      imageUrl,
+      imageUrl: optimisticImageUrl,
       seenAt: null,
       createdAt: new Date().toISOString(),
       senderName: me.name || "You",
@@ -444,24 +458,44 @@ export default function DMPage() {
     setMessages((prev) => mergeMessage(prev, optimisticMessage, me, other));
     scrollToBottom("smooth");
 
-    const res = await fetch("/api/dm/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        roomId,
-        content: msg,
-        imageUrl,
-      }),
-    });
+    let res: Response;
+
+    try {
+      if (uploadFile) {
+        const formData = new FormData();
+        formData.append("roomId", roomId);
+        formData.append("content", msg);
+        formData.append("file", uploadFile);
+
+        res = await fetch("/api/dm/send", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        res = await fetch("/api/dm/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            roomId,
+            content: msg,
+          }),
+        });
+      }
+    } catch (error) {
+      console.error("SEND DM ERROR:", error);
+      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setSending(false);
+      return;
+    }
 
     if (!res.ok) {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
-      setText(msg);
       if (res.status === 403 || res.status === 404 || res.status === 409) {
         setRoomClosed(true);
       }
+      setSending(false);
       return;
     }
 
@@ -470,6 +504,12 @@ export default function DMPage() {
       const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
       return mergeMessage(withoutOptimistic, insertedMessage, me, other);
     });
+    setText("");
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setSending(false);
     scrollToBottom("smooth");
   };
 
@@ -677,6 +717,7 @@ export default function DMPage() {
 
             <div className="flex items-center gap-2 rounded-[28px] border border-white/10 bg-black/70 px-3 py-2 shadow-[0_10px_40px_rgba(0,0,0,0.4)]">
               <input
+                ref={textInputRef}
                 value={text}
                 onChange={(e) => {
                   setText(e.target.value);
@@ -707,7 +748,12 @@ export default function DMPage() {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setFile(e.target.files?.[0] || null);
+                    requestAnimationFrame(() => {
+                      textInputRef.current?.focus();
+                    });
+                  }}
                   className="hidden"
                 />
               </label>
@@ -721,15 +767,39 @@ export default function DMPage() {
 
               <button
                 onClick={() => void send()}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98]"
+                disabled={sending}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"
               >
                 <Send size={18} />
               </button>
             </div>
 
-            {file && (
-              <div className="mt-2 px-2 text-xs text-white/60">
-                เลือกไฟล์แล้ว: {file.name}
+            {file && selectedImagePreview && (
+              <div className="mt-3 flex items-center gap-3 rounded-3xl border border-yellow-300/20 bg-[linear-gradient(135deg,rgba(250,204,21,0.12),rgba(255,255,255,0.04))] p-2 pr-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                <img
+                  src={selectedImagePreview}
+                  alt="selected image preview"
+                  className="h-16 w-16 rounded-2xl object-cover ring-1 ring-white/15"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-bold text-white/85">{file.name}</div>
+                  <div className="mt-1 text-[11px] text-yellow-200/70">Enter เพื่อส่งรูป</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
+                    requestAnimationFrame(() => {
+                      textInputRef.current?.focus();
+                    });
+                  }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/75 transition hover:bg-white/20 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
               </div>
             )}
           </div>

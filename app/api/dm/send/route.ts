@@ -1,9 +1,103 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mkdir, writeFile } from "fs/promises";
+import crypto from "crypto";
+import path from "path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDmRoomAccess } from "@/lib/dm-access";
 import { resolveUserIdentity } from "@/lib/user-identity";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
+
+type SendPayload = {
+  roomId: string;
+  content: string;
+  imageUrl: string;
+  file: File | null;
+};
+
+function getImageExtension(contentType: string) {
+  if (contentType === "image/png") return ".png";
+  if (contentType === "image/webp") return ".webp";
+  if (contentType === "image/gif") return ".gif";
+  return ".jpg";
+}
+
+async function readPayload(req: NextRequest): Promise<SendPayload> {
+  const contentType = req.headers.get("content-type") || "";
+
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await req.formData();
+    const file = formData.get("file");
+
+    return {
+      roomId: String(formData.get("roomId") || "").trim(),
+      content: String(formData.get("content") || "").trim(),
+      imageUrl: String(formData.get("imageUrl") || "").trim(),
+      file: file instanceof File && file.size > 0 ? file : null,
+    };
+  }
+
+  const body = await req.json();
+
+  return {
+    roomId: String(body?.roomId || "").trim(),
+    content: String(body?.content || "").trim(),
+    imageUrl: String(body?.imageUrl || "").trim(),
+    file: null,
+  };
+}
+
+async function uploadMessageImage({
+  file,
+  userId,
+  supabase,
+}: {
+  file: File;
+  userId: string;
+  supabase: SupabaseClient;
+}) {
+  const contentType = String(file.type || "image/jpeg").trim();
+
+  if (!contentType.startsWith("image/")) {
+    throw new Error("invalid image");
+  }
+
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+  const extension = getImageExtension(contentType);
+  const fileName = `chat/${userId}-${Date.now()}-${crypto.randomUUID()}${extension}`;
+
+  const uploadResult = await supabase.storage
+    .from("chat-images")
+    .upload(fileName, buffer, {
+      upsert: false,
+      contentType,
+      cacheControl: "31536000",
+    });
+
+  if (!uploadResult.error) {
+    const { data: publicUrl } = supabase.storage
+      .from("chat-images")
+      .getPublicUrl(fileName);
+
+    return publicUrl.publicUrl;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    console.error("SEND DM IMAGE UPLOAD ERROR:", uploadResult.error);
+    throw new Error("upload failed");
+  }
+
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "chat");
+  const localFileName = `${userId}-${Date.now()}-${crypto.randomUUID()}${extension}`;
+  const filePath = path.join(uploadDir, localFileName);
+
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(filePath, buffer);
+
+  return `/uploads/chat/${localFileName}`;
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -17,16 +111,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const roomId = String(body?.roomId || "").trim();
-  const content = String(body?.content || "").trim();
-  const imageUrl = String(body?.imageUrl || "").trim();
+  const payload = await readPayload(req);
+  const roomId = payload.roomId;
+  const content = payload.content;
 
   if (!roomId) {
     return NextResponse.json({ error: "missing roomId" }, { status: 400 });
   }
 
-  if (!content && !imageUrl) {
+  if (!content && !payload.imageUrl && !payload.file) {
     return NextResponse.json({ error: "empty message" }, { status: 400 });
   }
 
@@ -53,6 +146,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: access.reason }, { status });
   }
 
+  let imageUrl = payload.imageUrl;
+
+  if (payload.file) {
+    try {
+      imageUrl = await uploadMessageImage({
+        file: payload.file,
+        userId: senderId,
+        supabase,
+      });
+    } catch (error) {
+      console.error("SEND DM IMAGE ERROR:", error);
+      return NextResponse.json({ error: "upload failed" }, { status: 500 });
+    }
+  }
+
+  if (!content && !imageUrl) {
+    return NextResponse.json({ error: "empty message" }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from("dmMessage")
     .insert({
@@ -76,5 +188,8 @@ export async function POST(req: NextRequest) {
     .update({ updatedat: new Date().toISOString() })
     .eq("roomid", access.roomId);
 
-  return NextResponse.json(data);
+  return NextResponse.json({
+    ...data,
+    imageUrl: data?.imageUrl || imageUrl || null,
+  });
 }
