@@ -186,7 +186,7 @@ export default function NotificationBell() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       void loadNotifications();
-    }, 5000);
+    }, 1500);
 
     const onFocus = () => {
       void loadNotifications();

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleRoomIds } from "@/lib/dm-access";
+import { listIncomingFriendRequests } from "@/lib/friend-store";
 import { getLocalNotificationsForUser } from "@/lib/local-notification-store";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
@@ -64,11 +65,37 @@ export async function GET() {
         limit: 60,
       }),
     ]);
+    const incomingFriendRequests = await listIncomingFriendRequests(
+      currentUserId,
+      currentLineId ? [currentLineId] : []
+    ).catch(() => []);
+
+    const friendNotifications: NotificationItem[] = incomingFriendRequests.map(
+      (request) => ({
+        id: `friend-request-${request.id}`,
+        type: "friend",
+        title: `${safeName(request.displayName)} ส่งคำขอเป็นเพื่อน`,
+        body: "ยอมรับหรือปฏิเสธได้ทันทีจากกระดิ่ง",
+        href: "/community",
+        image: safeImage(request.image),
+        createdAt: request.createdAt,
+        meta: {
+          requestId: request.id,
+          fromUserId: request.fromUserId,
+          action: "request",
+        },
+      })
+    );
+    const visibleLocalNotifications = localNotifications.filter(
+      (item) =>
+        item.type !== "friend" ||
+        String(item.meta?.action || "") !== "request"
+    );
 
     if (allowedRoomIds.length === 0) {
       return NextResponse.json(
         {
-          items: localNotifications
+          items: [...friendNotifications, ...visibleLocalNotifications]
             .map((item) => ({
               id: item.id,
               type: item.type,
@@ -79,6 +106,7 @@ export async function GET() {
               createdAt: item.createdAt,
               meta: item.meta || null,
             }))
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .slice(0, 60),
         },
         {
@@ -218,7 +246,7 @@ export async function GET() {
       };
     });
 
-    const storedNotifications: NotificationItem[] = localNotifications.map((item) => ({
+    const storedNotifications: NotificationItem[] = visibleLocalNotifications.map((item) => ({
       id: item.id,
       type: item.type,
       title: item.title,
@@ -229,7 +257,7 @@ export async function GET() {
       meta: item.meta || null,
     }));
 
-    const items = [...chatNotifications, ...storedNotifications]
+    const items = [...chatNotifications, ...friendNotifications, ...storedNotifications]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 60);
 

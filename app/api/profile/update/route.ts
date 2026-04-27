@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     };
 
     if (lineId) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT'
+      ).catch(() => undefined);
       await prisma.user
         .upsert({
           where: {
@@ -78,6 +81,11 @@ export async function POST(req: NextRequest) {
           },
         })
         .catch(() => undefined);
+      await prisma.$executeRawUnsafe(
+        'UPDATE "User" SET "username" = $2 WHERE "lineId" = $1',
+        lineId,
+        fallbackUser.username
+      ).catch(() => undefined);
     }
 
     const updatedUser = await upsertLocalProfile(userId, fallbackUser).catch(

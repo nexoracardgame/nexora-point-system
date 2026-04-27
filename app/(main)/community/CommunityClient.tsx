@@ -51,8 +51,10 @@ export default function CommunityClient() {
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const loadFriends = async () => {
-    setLoadingFriends(true);
+  const loadFriends = async (silent = false) => {
+    if (!silent) {
+      setLoadingFriends(true);
+    }
     try {
       const res = await fetch("/api/community/friends", { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
@@ -62,12 +64,16 @@ export default function CommunityClient() {
       setFriends([]);
       setRequests([]);
     } finally {
-      setLoadingFriends(false);
+      if (!silent) {
+        setLoadingFriends(false);
+      }
     }
   };
 
-  const runSearch = async (term: string) => {
-    setLoadingResults(true);
+  const runSearch = async (term: string, silent = false) => {
+    if (!silent) {
+      setLoadingResults(true);
+    }
     try {
       const res = await fetch(`/api/community/search?q=${encodeURIComponent(term)}`, {
         cache: "no-store",
@@ -77,7 +83,9 @@ export default function CommunityClient() {
     } catch {
       setResults([]);
     } finally {
-      setLoadingResults(false);
+      if (!silent) {
+        setLoadingResults(false);
+      }
     }
   };
 
@@ -88,13 +96,13 @@ export default function CommunityClient() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void loadFriends();
+        void loadFriends(true);
       }
-    }, 3000);
+    }, 1500);
 
     const onFocus = () => {
-      void loadFriends();
-      void runSearch(query);
+      void loadFriends(true);
+      void runSearch(query, true);
     };
 
     window.addEventListener("focus", onFocus);
@@ -140,8 +148,8 @@ export default function CommunityClient() {
             return;
           }
           onDone?.(data as Record<string, unknown>);
-          void loadFriends();
-          void runSearch(query);
+          void loadFriends(true);
+          void runSearch(query, true);
         } catch {
           setError("ดำเนินการไม่สำเร็จ");
         }

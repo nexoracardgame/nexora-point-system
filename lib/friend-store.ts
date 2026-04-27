@@ -24,9 +24,85 @@ export type FriendshipRecord = {
   createdAt: string;
 };
 
+type FriendRequestWithNotify = FriendRequestRecord & {
+  shouldNotify?: boolean;
+};
+
+let schemaReadyPromise: Promise<void> | null = null;
+
+function normalizeDbRequest(row: Record<string, unknown>): FriendRequestRecord {
+  return {
+    id: String(row.id || ""),
+    fromUserId: String(row.fromUserId || row.fromuserid || ""),
+    toUserId: String(row.toUserId || row.touserid || ""),
+    status: String(row.status || "pending") as FriendRequestStatus,
+    createdAt: new Date(String(row.createdAt || row.createdat || new Date().toISOString())).toISOString(),
+    updatedAt: new Date(String(row.updatedAt || row.updatedat || new Date().toISOString())).toISOString(),
+  };
+}
+
+function normalizeDbFriendship(row: Record<string, unknown>): FriendshipRecord {
+  return {
+    id: String(row.id || ""),
+    userA: String(row.userA || row.usera || ""),
+    userB: String(row.userB || row.userb || ""),
+    createdAt: new Date(String(row.createdAt || row.createdat || new Date().toISOString())).toISOString(),
+  };
+}
+
+async function ensureCommunitySchema() {
+  if (!schemaReadyPromise) {
+    schemaReadyPromise = (async () => {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT'
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE TABLE IF NOT EXISTS "FriendRequest" ("id" TEXT PRIMARY KEY, "fromUserId" TEXT NOT NULL, "toUserId" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT \'pending\', "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS "FriendRequest_to_status_idx" ON "FriendRequest" ("toUserId", "status", "createdAt")'
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS "FriendRequest_pair_idx" ON "FriendRequest" ("fromUserId", "toUserId", "status")'
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE TABLE IF NOT EXISTS "Friendship" ("id" TEXT PRIMARY KEY, "userA" TEXT NOT NULL, "userB" TEXT NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), CONSTRAINT "Friendship_pair_unique" UNIQUE ("userA", "userB"))'
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS "Friendship_userA_idx" ON "Friendship" ("userA", "createdAt")'
+      );
+      await prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS "Friendship_userB_idx" ON "Friendship" ("userB", "createdAt")'
+      );
+    })();
+  }
+
+  return schemaReadyPromise;
+}
+
+async function readDbRequests() {
+  await ensureCommunitySchema();
+  const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+    'SELECT * FROM "FriendRequest" ORDER BY "createdAt" DESC'
+  );
+  return rows.map(normalizeDbRequest);
+}
+
+async function readDbFriendships() {
+  await ensureCommunitySchema();
+  const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+    'SELECT * FROM "Friendship" ORDER BY "createdAt" ASC'
+  );
+  return rows.map(normalizeDbFriendship);
+}
+
 async function readRequests() {
-  await ensureLocalStoreFile("local-friend-requests.json");
-  return readLocalStoreJson<FriendRequestRecord>("local-friend-requests.json");
+  try {
+    return await readDbRequests();
+  } catch {
+    await ensureLocalStoreFile("local-friend-requests.json");
+    return readLocalStoreJson<FriendRequestRecord>("local-friend-requests.json");
+  }
 }
 
 async function writeRequests(items: FriendRequestRecord[]) {
@@ -37,8 +113,12 @@ async function writeRequests(items: FriendRequestRecord[]) {
 }
 
 async function readFriendships() {
-  await ensureLocalStoreFile("local-friendships.json");
-  return readLocalStoreJson<FriendshipRecord>("local-friendships.json");
+  try {
+    return await readDbFriendships();
+  } catch {
+    await ensureLocalStoreFile("local-friendships.json");
+    return readLocalStoreJson<FriendshipRecord>("local-friendships.json");
+  }
 }
 
 async function writeFriendships(items: FriendshipRecord[]) {
@@ -93,7 +173,10 @@ export async function getFriendRelation(userId: string, otherUserId: string) {
   return { status: "incoming" as const, requestId: pending.id };
 }
 
-export async function createFriendRequestRecord(fromUserId: string, toUserId: string) {
+export async function createFriendRequestRecord(
+  fromUserId: string,
+  toUserId: string
+): Promise<FriendRequestWithNotify> {
   if (!fromUserId || !toUserId || fromUserId === toUserId) {
     throw new Error("ไม่สามารถส่งคำขอเพื่อนรายการนี้ได้");
   }
@@ -102,8 +185,58 @@ export async function createFriendRequestRecord(fromUserId: string, toUserId: st
     throw new Error("เป็นเพื่อนกันอยู่แล้ว");
   }
 
-  const requests = await readRequests();
   const now = new Date().toISOString();
+  try {
+    await ensureCommunitySchema();
+    const existingRows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'SELECT * FROM "FriendRequest" WHERE (("fromUserId" = $1 AND "toUserId" = $2) OR ("fromUserId" = $2 AND "toUserId" = $1)) ORDER BY "createdAt" DESC',
+      fromUserId,
+      toUserId
+    );
+    const existing = existingRows.map(normalizeDbRequest);
+    const existingIncoming = existing.find(
+      (item) =>
+        item.status === "pending" &&
+        item.fromUserId === toUserId &&
+        item.toUserId === fromUserId
+    );
+
+    if (existingIncoming) {
+      return { ...existingIncoming, shouldNotify: false };
+    }
+
+    const existingOutgoing = existing.find(
+      (item) => item.fromUserId === fromUserId && item.toUserId === toUserId
+    );
+
+    if (existingOutgoing) {
+      if (existingOutgoing.status === "pending") {
+        return { ...existingOutgoing, shouldNotify: false };
+      }
+
+      const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+        'UPDATE "FriendRequest" SET "status" = \'pending\', "createdAt" = NOW(), "updatedAt" = NOW() WHERE "id" = $1 RETURNING *',
+        existingOutgoing.id
+      );
+      return { ...normalizeDbRequest(rows[0]), shouldNotify: true };
+    }
+
+    const requestId = `friend-request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'INSERT INTO "FriendRequest" ("id", "fromUserId", "toUserId", "status", "createdAt", "updatedAt") VALUES ($1, $2, $3, \'pending\', NOW(), NOW()) RETURNING *',
+      requestId,
+      fromUserId,
+      toUserId
+    );
+    return { ...normalizeDbRequest(rows[0]), shouldNotify: true };
+  } catch {
+    // Local fallback for development environments without DB migrations.
+  }
+
+  const requests = await readLocalStoreJson<FriendRequestRecord>("local-friend-requests.json").catch(async () => {
+    await ensureLocalStoreFile("local-friend-requests.json");
+    return readLocalStoreJson<FriendRequestRecord>("local-friend-requests.json");
+  });
 
   const existingIncoming = requests.find(
     (item) =>
@@ -113,7 +246,7 @@ export async function createFriendRequestRecord(fromUserId: string, toUserId: st
   );
 
   if (existingIncoming) {
-    return existingIncoming;
+    return { ...existingIncoming, shouldNotify: false };
   }
 
   const existingOutgoing = requests.find(
@@ -129,7 +262,7 @@ export async function createFriendRequestRecord(fromUserId: string, toUserId: st
         : item
     );
     await writeRequests(next);
-    return next.find((item) => item.id === existingOutgoing.id)!;
+    return { ...next.find((item) => item.id === existingOutgoing.id)!, shouldNotify: existingOutgoing.status !== "pending" };
   }
 
   const nextRequest: FriendRequestRecord = {
@@ -142,7 +275,7 @@ export async function createFriendRequestRecord(fromUserId: string, toUserId: st
   };
 
   await writeRequests([nextRequest, ...requests]);
-  return nextRequest;
+  return { ...nextRequest, shouldNotify: true };
 }
 
 export async function respondToFriendRequest(
@@ -150,6 +283,56 @@ export async function respondToFriendRequest(
   targetUserId: string | string[],
   action: "accept" | "reject"
 ) {
+  try {
+    await ensureCommunitySchema();
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'SELECT * FROM "FriendRequest" WHERE "id" = $1 LIMIT 1',
+      requestId
+    );
+    const request = rows[0] ? normalizeDbRequest(rows[0]) : null;
+    const targetUserIds = Array.isArray(targetUserId)
+      ? targetUserId.filter(Boolean)
+      : [targetUserId].filter(Boolean);
+
+    if (!request || !targetUserIds.includes(request.toUserId)) {
+      throw new Error("ไม่พบคำขอเพื่อนนี้");
+    }
+
+    if (request.status !== "pending") {
+      throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
+    }
+
+    const updatedRows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'UPDATE "FriendRequest" SET "status" = $2, "updatedAt" = NOW() WHERE "id" = $1 RETURNING *',
+      requestId,
+      action === "accept" ? "accepted" : "rejected"
+    );
+    const updatedRequest = normalizeDbRequest(updatedRows[0]);
+
+    if (action === "accept") {
+      const [userA, userB] = sortPair(request.fromUserId, request.toUserId);
+      const friendshipId = `friendship-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const friendshipRows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+        'INSERT INTO "Friendship" ("id", "userA", "userB", "createdAt") VALUES ($1, $2, $3, NOW()) ON CONFLICT ("userA", "userB") DO UPDATE SET "userA" = EXCLUDED."userA" RETURNING *',
+        friendshipId,
+        userA,
+        userB
+      );
+      return {
+        request: updatedRequest,
+        friendship: friendshipRows[0] ? normalizeDbFriendship(friendshipRows[0]) : null,
+      };
+    }
+
+    return { request: updatedRequest, friendship: null };
+  } catch (error) {
+    if (error instanceof Error && !error.message.includes("ไม่พบ") && !error.message.includes("ดำเนินการ")) {
+      // Fall through to local fallback only for infrastructure issues.
+    } else {
+      throw error;
+    }
+  }
+
   const requests = await readRequests();
   const request = requests.find((item) => item.id === requestId);
   const targetUserIds = Array.isArray(targetUserId)
@@ -201,6 +384,19 @@ export async function respondToFriendRequest(
 }
 
 export async function removeFriendship(userId: string, otherUserId: string) {
+  try {
+    await ensureCommunitySchema();
+    const [userA, userB] = sortPair(userId, otherUserId);
+    await prisma.$executeRawUnsafe(
+      'DELETE FROM "Friendship" WHERE "userA" = $1 AND "userB" = $2',
+      userA,
+      userB
+    );
+    return;
+  } catch {
+    // Local fallback below.
+  }
+
   const friendships = await readFriendships();
   const key = friendshipKey(userId, otherUserId);
   const next = friendships.filter(
@@ -270,18 +466,20 @@ export async function listFriendsForUser(userId: string) {
 
 export async function searchCommunityUsers(currentUserId: string, query: string) {
   const term = String(query || "").trim().toLowerCase();
-  const dbUsers = await prisma.user.findMany({
-    select: {
-      id: true,
-      lineId: true,
-      name: true,
-      displayName: true,
-      image: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 500,
-  });
+  await ensureCommunitySchema().catch(() => undefined);
+  const dbUsers = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      lineId: string | null;
+      name: string | null;
+      displayName: string | null;
+      username: string | null;
+      image: string | null;
+      createdAt: Date | string;
+    }>
+  >(
+    'SELECT "id", "lineId", "name", "displayName", "username", "image", "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 500'
+  ).catch(() => []);
   const localProfiles = await getAllLocalProfiles();
   const localMap = new Map(localProfiles.map((item) => [item.userId, item]));
 
@@ -289,7 +487,7 @@ export async function searchCommunityUsers(currentUserId: string, query: string)
       const local = localMap.get(user.id);
       const displayName =
         local?.displayName || user.displayName || user.name || "NEXORA User";
-      const username = local?.username || null;
+      const username = local?.username || user.username || null;
       return {
         id: user.id,
         displayName,

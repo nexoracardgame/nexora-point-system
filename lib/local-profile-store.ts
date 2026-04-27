@@ -20,6 +20,19 @@ export type LocalProfileRecord = {
 };
 
 let supabaseClient: SupabaseClient | null | undefined;
+let userProfileSchemaReadyPromise: Promise<void> | null = null;
+
+async function ensureUserProfileSchema() {
+  if (!userProfileSchemaReadyPromise) {
+    userProfileSchemaReadyPromise = prisma
+      .$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT'
+      )
+      .then(() => undefined);
+  }
+
+  return userProfileSchemaReadyPromise;
+}
 
 function getSupabaseClient() {
   if (supabaseClient !== undefined) {
@@ -176,23 +189,12 @@ async function readSupabaseProfile(userId: string) {
 
 async function readPrismaProfile(userId: string) {
   try {
-    const data = await prisma.user.findFirst({
-      where: {
-        OR: [{ id: userId }, { lineId: userId }],
-      },
-      select: {
-        id: true,
-        name: true,
-        image: true,
-        displayName: true,
-        coverImage: true,
-        coverPosition: true,
-        bio: true,
-        lineUrl: true,
-        facebookUrl: true,
-        createdAt: true,
-      },
-    });
+    await ensureUserProfileSchema();
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'SELECT "id", "name", "image", "displayName", "username", "coverImage", "coverPosition", "bio", "lineUrl", "facebookUrl", "createdAt" FROM "User" WHERE "id" = $1 OR "lineId" = $1 LIMIT 1',
+      userId
+    );
+    const data = rows[0];
 
     if (!data) {
       return null;
@@ -200,7 +202,7 @@ async function readPrismaProfile(userId: string) {
 
     return normalizeProfileRecord(String(data.id || userId), {
       ...data,
-      updatedAt: data.createdAt.toISOString(),
+      updatedAt: new Date(String(data.createdAt || new Date().toISOString())).toISOString(),
     } as unknown as Record<string, unknown>);
   } catch {
     return null;
@@ -252,33 +254,24 @@ async function writePrismaProfile(
   input: Omit<LocalProfileRecord, "userId" | "updatedAt">
 ) {
   try {
-    const data = await prisma.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        name: input.displayName,
-        displayName: input.displayName,
-        image: input.image,
-        coverImage: input.coverImage,
-        coverPosition: input.coverPosition,
-        bio: input.bio,
-        lineUrl: input.lineUrl,
-        facebookUrl: input.facebookUrl,
-      },
-      select: {
-        id: true,
-        name: true,
-        image: true,
-        displayName: true,
-        coverImage: true,
-        coverPosition: true,
-        bio: true,
-        lineUrl: true,
-        facebookUrl: true,
-        createdAt: true,
-      },
-    });
+    await ensureUserProfileSchema();
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'UPDATE "User" SET "name" = $2, "displayName" = $2, "username" = $3, "image" = $4, "coverImage" = $5, "coverPosition" = $6, "bio" = $7, "lineUrl" = $8, "facebookUrl" = $9 WHERE "id" = $1 RETURNING "id", "name", "image", "displayName", "username", "coverImage", "coverPosition", "bio", "lineUrl", "facebookUrl", "createdAt"',
+      userId,
+      input.displayName,
+      input.username,
+      input.image,
+      input.coverImage,
+      input.coverPosition,
+      input.bio,
+      input.lineUrl,
+      input.facebookUrl
+    );
+    const data = rows[0];
+
+    if (!data) {
+      return null;
+    }
 
     return normalizeProfileRecord(userId, {
       ...data,
