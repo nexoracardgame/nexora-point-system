@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
     const user2 = String(body?.user2 || "").trim();
     const user2Name = String(body?.user2Name || "").trim();
     const user2Image = String(body?.user2Image || "").trim();
+    const legacyRoomId = String(body?.legacyRoomId || "").trim();
 
     if (!user2) {
       return NextResponse.json(
@@ -80,6 +82,49 @@ export async function POST(req: NextRequest) {
         { error: "ไม่สามารถสร้างห้องแชทได้" },
         { status: 500 }
       );
+    }
+
+    if (legacyRoomId && legacyRoomId !== roomId) {
+      const sessionLineId = String(
+        ((session?.user || {}) as { lineId?: string }).lineId || ""
+      ).trim();
+      const { data: legacyRoom } = await supabase
+        .from("dm_room")
+        .select("roomid,usera,userb")
+        .eq("roomid", legacyRoomId)
+        .maybeSingle();
+
+      const targetUser = await prisma.user.findFirst({
+        where: {
+          OR: [{ id: user2 }, { lineId: user2 }],
+        },
+        select: {
+          id: true,
+          lineId: true,
+        },
+      });
+      const otherIdentityValues = new Set(
+        [user2, targetUser?.id, targetUser?.lineId]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      );
+      const legacyUsers = [
+        String(legacyRoom?.usera || "").trim(),
+        String(legacyRoom?.userb || "").trim(),
+      ];
+      const includesMe = legacyUsers.some(
+        (value) => value === user1 || (sessionLineId ? value === sessionLineId : false)
+      );
+      const includesOther = legacyUsers.some((value) => otherIdentityValues.has(value));
+
+      if (legacyRoom && includesMe && includesOther) {
+        await supabase
+          .from("dmMessage")
+          .update({ roomId })
+          .eq("roomId", legacyRoomId);
+
+        await supabase.from("dm_room").delete().eq("roomid", legacyRoomId);
+      }
     }
 
     return NextResponse.json({

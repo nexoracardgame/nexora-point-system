@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
@@ -66,10 +67,12 @@ export default function DMListClient({
   initialRooms: DMRoomListItem[];
   initialMe: SessionUser | null;
 }) {
+  const router = useRouter();
   const [rooms, setRooms] = useState<DMRoomListItem[]>(
     initialRooms.map(normalizeRoom)
   );
   const [loading, setLoading] = useState(initialRooms.length === 0);
+  const [openingRoomId, setOpeningRoomId] = useState<string | null>(null);
 
   const hasInit = useRef(false);
   const meRef = useRef<SessionUser | null>(initialMe);
@@ -152,6 +155,49 @@ export default function DMListClient({
       void hydrateUnknownRooms(nextRooms);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openDirectRoom = async (room: DMRoomListItem) => {
+    if (openingRoomId || !room.otherUserId) {
+      router.push(`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`);
+      return;
+    }
+
+    setOpeningRoomId(room.roomId);
+
+    try {
+      const res = await fetch("/api/dm/create-room", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user2: room.otherUserId,
+          user2Name: room.otherName,
+          user2Image: room.otherImage,
+          legacyRoomId: room.roomId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("open failed");
+      }
+
+      const data = await res.json();
+      const nextRoomId = String(data?.roomId || room.roomId).trim();
+
+      saveDmRoomSeed(nextRoomId, {
+        name: room.otherName,
+        image: room.otherImage,
+        otherUserId: room.otherUserId,
+      });
+
+      router.push(`/dm/${encodeURIComponent(nextRoomId)}?back=${encodeURIComponent("/dm")}`);
+    } catch {
+      router.push(`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`);
+    } finally {
+      setOpeningRoomId(null);
     }
   };
 
@@ -264,12 +310,14 @@ export default function DMListClient({
                       otherUserId: room.otherUserId,
                     });
                   }}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.preventDefault();
                     saveDmRoomSeed(room.roomId, {
                       name: room.otherName,
                       image: room.otherImage,
                       otherUserId: room.otherUserId,
                     });
+                    void openDirectRoom(room);
                   }}
                   className="group flex items-center gap-3 rounded-[24px] border border-white/5 bg-[linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.18)] transition hover:border-yellow-300/20 hover:bg-white/[0.055]"
                 >
