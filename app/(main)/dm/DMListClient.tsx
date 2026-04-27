@@ -391,9 +391,9 @@ export default function DMListClient({
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-[28px] bg-[#f4f3f8] p-2.5 sm:p-3">
                 {dealRooms.length === 0 ? (
-                  <div className="rounded-[28px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45">
+                  <div className="rounded-[24px] bg-white px-5 py-8 text-sm font-bold text-black/45 shadow-[0_16px_34px_rgba(20,20,30,0.06)]">
                     ยังไม่มีห้องดีล
                   </div>
                 ) : (
@@ -403,15 +403,15 @@ export default function DMListClient({
                       href={`/market/deals/chat/${room.dealId}`}
                       prefetch
                       onClick={() => markRoomReadLocally(room.roomId)}
-                      className="group relative overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,#111214,#1d1f28)] p-4 text-white shadow-[0_24px_54px_rgba(15,15,20,0.2)] transition hover:-translate-y-0.5"
+                      className="group relative block overflow-hidden rounded-[30px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-4 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:p-4.5"
                     >
-                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.12),transparent_34%)] opacity-80" />
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_32%)] opacity-90" />
                       <div className="relative flex items-start gap-3">
                         <div className="relative shrink-0">
                           <img
                             src={room.otherImage}
                             alt={room.otherName}
-                            className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white/10"
+                            className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white/12 shadow-[0_12px_26px_rgba(0,0,0,0.25)] sm:h-14 sm:w-14"
                           />
                           {room.unread > 0 ? (
                             <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
@@ -423,14 +423,14 @@ export default function DMListClient({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-white sm:text-base">
+                              <div className="line-clamp-1 text-sm font-black text-white sm:text-base">
                                 {room.dealCardName || "Deal chat"}
                               </div>
-                              <div className="mt-1 break-words text-xs font-black text-yellow-200 sm:text-sm">
+                              <div className="mt-1 text-sm font-black text-[#ffe27a] sm:text-base">
                                 {formatDealPriceLabel(room.dealPrice)}
                               </div>
-                              <div className="mt-1 truncate text-[11px] font-semibold text-white/55">
-                                Seller: {room.sellerName || room.otherName}
+                              <div className="mt-1 line-clamp-1 text-[11px] font-semibold text-white/62 sm:text-xs">
+                                ผู้ขาย: {room.sellerName || room.otherName}
                               </div>
                             </div>
                             <div className="shrink-0 text-[10px] font-semibold text-white/40">
@@ -438,7 +438,7 @@ export default function DMListClient({
                             </div>
                           </div>
 
-                          <div className="mt-3 line-clamp-2 text-xs text-white/65">
+                          <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.05] px-3 py-2.5 text-xs font-medium text-white/72">
                             {room.lastMessage || `กำลังคุยกับ ${room.otherName}`}
                           </div>
                         </div>
