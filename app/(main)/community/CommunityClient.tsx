@@ -31,10 +31,21 @@ type FriendItem = {
   bio: string;
 };
 
+type IncomingRequest = {
+  id: string;
+  fromUserId: string;
+  createdAt: string;
+  displayName: string;
+  username: string | null;
+  image: string;
+  bio: string;
+};
+
 export default function CommunityClient() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
   const [friends, setFriends] = useState<FriendItem[]>([]);
+  const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loadingResults, setLoadingResults] = useState(true);
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [error, setError] = useState("");
@@ -46,8 +57,10 @@ export default function CommunityClient() {
       const res = await fetch("/api/community/friends", { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       setFriends(Array.isArray(data?.friends) ? data.friends : []);
+      setRequests(Array.isArray(data?.requests) ? data.requests : []);
     } catch {
       setFriends([]);
+      setRequests([]);
     } finally {
       setLoadingFriends(false);
     }
@@ -71,6 +84,25 @@ export default function CommunityClient() {
   useEffect(() => {
     void Promise.all([loadFriends(), runSearch("")]);
   }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadFriends();
+      }
+    }, 3000);
+
+    const onFocus = () => {
+      void loadFriends();
+      void runSearch(query);
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [query]);
 
   const handleSearch = (event?: FormEvent) => {
     event?.preventDefault();
@@ -174,6 +206,101 @@ export default function CommunityClient() {
           <div className="rounded-[22px] border border-red-400/16 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
+        ) : null}
+
+        {requests.length > 0 ? (
+          <section className="rounded-[28px] border border-amber-300/14 bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(255,255,255,0.035))] p-4 shadow-[0_20px_70px_rgba(251,191,36,0.08)] backdrop-blur-2xl sm:rounded-[32px] sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-amber-100/48">
+                  Pending Requests
+                </div>
+                <div className="mt-1 text-xl font-black text-white sm:text-2xl">
+                  คำขอเป็นเพื่อนที่รออยู่
+                </div>
+              </div>
+              <div className="rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-100">
+                {requests.length}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {requests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex flex-col gap-3 rounded-[22px] border border-white/10 bg-black/22 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <Link
+                    href={`/profile/${request.fromUserId}`}
+                    className="flex min-w-0 items-center gap-3"
+                  >
+                    <img
+                      src={request.image || "/avatar.png"}
+                      alt={request.displayName}
+                      className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10"
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black text-white sm:text-base">
+                        {request.displayName}
+                      </div>
+                      <div className="mt-1 text-xs text-white/50 sm:text-sm">
+                        {request.username ? `@${request.username}` : "NEXORA User"}
+                      </div>
+                    </div>
+                  </Link>
+
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() =>
+                        submitAction(
+                          {
+                            action: "respond",
+                            requestId: request.id,
+                            decision: "accept",
+                          },
+                          () => {
+                            setRequests((prev) =>
+                              prev.filter((item) => item.id !== request.id)
+                            );
+                            applyRelation(request.fromUserId, "friends", null);
+                          }
+                        )
+                      }
+                      className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-[16px] border border-amber-300/24 bg-amber-300/12 px-4 text-sm font-black text-amber-100 transition hover:brightness-110 sm:flex-none"
+                    >
+                      <Check className="h-4 w-4" />
+                      รับ
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() =>
+                        submitAction(
+                          {
+                            action: "respond",
+                            requestId: request.id,
+                            decision: "reject",
+                          },
+                          () => {
+                            setRequests((prev) =>
+                              prev.filter((item) => item.id !== request.id)
+                            );
+                            applyRelation(request.fromUserId, "none", null);
+                          }
+                        )
+                      }
+                      className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-[16px] border border-red-300/18 bg-red-500/10 px-4 text-sm font-black text-red-200 transition hover:bg-red-500/16 sm:flex-none"
+                    >
+                      <X className="h-4 w-4" />
+                      ปฏิเสธ
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">

@@ -298,14 +298,12 @@ export async function getLocalProfileByUserId(userId: string) {
       ...prismaProfile,
       username: localProfile?.username ?? prismaProfile.username ?? null,
     };
-    void Promise.allSettled([
-      writeLocalProfile(mergedProfile),
-    ]).catch(() => undefined);
+    await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
     return mergedProfile;
   }
 
-  if (process.env.NODE_ENV === "production") {
-    return null;
+  if (localProfile) {
+    return localProfile;
   }
 
   const supabaseProfile = await readSupabaseProfile(userId);
@@ -313,13 +311,13 @@ export async function getLocalProfileByUserId(userId: string) {
   if (supabaseProfile) {
     const mergedProfile = {
       ...supabaseProfile,
-      username: localProfile?.username ?? supabaseProfile.username ?? null,
+      username: supabaseProfile.username ?? null,
     };
-    void writeLocalProfile(mergedProfile).catch(() => undefined);
+    await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
     return mergedProfile;
   }
 
-  return localProfile;
+  return null;
 }
 
 export async function upsertLocalProfile(
@@ -340,16 +338,22 @@ export async function upsertLocalProfile(
     writeLocalProfile(nextRecord),
   ]);
 
+  if (localProfile.status === "fulfilled" && localProfile.value) {
+    return localProfile.value;
+  }
+
   if (prismaProfile.status === "fulfilled" && prismaProfile.value) {
-    return prismaProfile.value;
+    return {
+      ...prismaProfile.value,
+      username: nextRecord.username,
+    };
   }
 
   if (supabaseProfile.status === "fulfilled" && supabaseProfile.value) {
-    return supabaseProfile.value;
-  }
-
-  if (localProfile.status === "fulfilled" && localProfile.value) {
-    return localProfile.value;
+    return {
+      ...supabaseProfile.value,
+      username: nextRecord.username,
+    };
   }
 
   return nextRecord;

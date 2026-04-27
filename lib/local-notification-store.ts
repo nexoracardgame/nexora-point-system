@@ -100,3 +100,41 @@ export async function markLocalNotificationsRead(userId: string, ids: string[]) 
   await writeStore(next);
   return updated;
 }
+
+export async function markLocalFriendRequestNotificationsRead(
+  userIds: string[],
+  requestId: string
+) {
+  const userIdSet = new Set(userIds.map((id) => String(id || "").trim()).filter(Boolean));
+  const targetRequestId = String(requestId || "").trim();
+
+  if (userIdSet.size === 0 || !targetRequestId) {
+    return [];
+  }
+
+  const readAt = new Date().toISOString();
+  const items = await readStore();
+  const updated: LocalNotificationRecord[] = [];
+
+  const next = items.map((item) => {
+    if (
+      item.readAt ||
+      item.type !== "friend" ||
+      !userIdSet.has(item.userId) ||
+      String(item.meta?.requestId || "") !== targetRequestId
+    ) {
+      return item;
+    }
+
+    const nextItem = {
+      ...item,
+      readAt,
+    };
+
+    updated.push(nextItem);
+    return nextItem;
+  });
+
+  await writeStore(next);
+  return updated;
+}

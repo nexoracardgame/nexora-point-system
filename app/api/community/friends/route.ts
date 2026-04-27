@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createLocalNotification } from "@/lib/local-notification-store";
+import {
+  createLocalNotification,
+  markLocalFriendRequestNotificationsRead,
+} from "@/lib/local-notification-store";
 import {
   createFriendRequestRecord,
   getFriendRelation,
+  listIncomingFriendRequests,
   listFriendsForUser,
   removeFriendship,
   respondToFriendRequest,
@@ -14,17 +18,23 @@ import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 export async function GET() {
   const session = await getServerSession(authOptions);
   const userId = String(session?.user?.id || "").trim();
+  const lineId = String((session?.user as { lineId?: string } | undefined)?.lineId || "").trim();
   if (!userId) {
-    return NextResponse.json({ friends: [] }, { status: 401 });
+    return NextResponse.json({ friends: [], requests: [] }, { status: 401 });
   }
 
-  const friends = await listFriendsForUser(userId);
-  return NextResponse.json({ friends });
+  const [friends, requests] = await Promise.all([
+    listFriendsForUser(userId),
+    listIncomingFriendRequests(userId, lineId ? [lineId] : []),
+  ]);
+
+  return NextResponse.json({ friends, requests });
 }
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   const userId = String(session?.user?.id || "").trim();
+  const lineId = String((session?.user as { lineId?: string } | undefined)?.lineId || "").trim();
   const sessionUser = session?.user;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,7 +69,15 @@ export async function POST(req: Request) {
   if (action === "respond") {
     const requestId = String(body?.requestId || "").trim();
     const decision = String(body?.decision || "").trim() === "accept" ? "accept" : "reject";
-    const result = await respondToFriendRequest(requestId, userId, decision);
+    const result = await respondToFriendRequest(
+      requestId,
+      lineId ? [userId, lineId] : userId,
+      decision
+    );
+    await markLocalFriendRequestNotificationsRead(
+      lineId ? [userId, lineId] : [userId],
+      requestId
+    ).catch(() => undefined);
 
     if (decision === "accept") {
       const currentProfile = await getLocalProfileByUserId(userId);

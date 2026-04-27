@@ -147,13 +147,16 @@ export async function createFriendRequestRecord(fromUserId: string, toUserId: st
 
 export async function respondToFriendRequest(
   requestId: string,
-  targetUserId: string,
+  targetUserId: string | string[],
   action: "accept" | "reject"
 ) {
   const requests = await readRequests();
   const request = requests.find((item) => item.id === requestId);
+  const targetUserIds = Array.isArray(targetUserId)
+    ? targetUserId.filter(Boolean)
+    : [targetUserId].filter(Boolean);
 
-  if (!request || request.toUserId !== targetUserId) {
+  if (!request || !targetUserIds.includes(request.toUserId)) {
     throw new Error("ไม่พบคำขอเพื่อนนี้");
   }
 
@@ -206,6 +209,32 @@ export async function removeFriendship(userId: string, otherUserId: string) {
   await writeFriendships(next);
 }
 
+export async function listIncomingFriendRequests(
+  userId: string,
+  aliases: string[] = []
+) {
+  const userIds = Array.from(new Set([userId, ...aliases].filter(Boolean)));
+  const requests = await readRequests();
+  const incoming = requests
+    .filter((item) => item.status === "pending" && userIds.includes(item.toUserId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  return Promise.all(
+    incoming.map(async (request) => {
+      const profile = await getLocalProfileByUserId(request.fromUserId);
+      return {
+        id: request.id,
+        fromUserId: request.fromUserId,
+        createdAt: request.createdAt,
+        displayName: profile?.displayName || "NEXORA User",
+        username: profile?.username || null,
+        image: profile?.image || "/avatar.png",
+        bio: profile?.bio || "",
+      };
+    })
+  );
+}
+
 export async function listFriendsForUser(userId: string) {
   const friendships = await readFriendships();
   const mine = friendships
@@ -256,9 +285,7 @@ export async function searchCommunityUsers(currentUserId: string, query: string)
   const localProfiles = await getAllLocalProfiles();
   const localMap = new Map(localProfiles.map((item) => [item.userId, item]));
 
-  const candidates = dbUsers
-    .filter((user) => user.id !== currentUserId)
-    .map((user) => {
+  const dbCandidates = dbUsers.map((user) => {
       const local = localMap.get(user.id);
       const displayName =
         local?.displayName || user.displayName || user.name || "NEXORA User";
@@ -271,6 +298,26 @@ export async function searchCommunityUsers(currentUserId: string, query: string)
         bio: local?.bio || "",
       };
     });
+
+  const candidateMap = new Map(dbCandidates.map((user) => [user.id, user]));
+
+  localProfiles.forEach((profile) => {
+    if (!profile.userId || candidateMap.has(profile.userId)) {
+      return;
+    }
+
+    candidateMap.set(profile.userId, {
+      id: profile.userId,
+      displayName: profile.displayName || "NEXORA User",
+      username: profile.username || null,
+      image: profile.image || "/avatar.png",
+      bio: profile.bio || "",
+    });
+  });
+
+  const candidates = Array.from(candidateMap.values()).filter(
+    (user) => user.id !== currentUserId
+  );
 
   const filtered = term
     ? candidates.filter((user) => {
