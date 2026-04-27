@@ -270,7 +270,221 @@ export default async function WalletPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#090909] text-white">
+    <>
+      <div className="min-h-screen overflow-hidden bg-[#111119] text-white">
+        <div className="pointer-events-none fixed inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(151,139,255,0.20),transparent_34%),radial-gradient(circle_at_12%_32%,rgba(251,113,133,0.11),transparent_24%),radial-gradient(circle_at_88%_70%,rgba(253,224,71,0.10),transparent_20%),linear-gradient(180deg,#171722_0%,#0d0d12_48%,#08080b_100%)]" />
+          <div className="absolute inset-0 opacity-[0.23] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:34px_34px]" />
+          <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/8" />
+          <div className="absolute -left-20 top-32 h-[430px] w-[430px] rounded-full border border-white/6" />
+          <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/7" />
+        </div>
+
+        <main className="relative mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8 xl:px-8">
+          <section className="mx-auto w-full max-w-[430px] rounded-[46px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,16,24,0.92),rgba(8,8,12,0.98))] p-5 shadow-[0_40px_130px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:p-7 lg:rotate-[-1.5deg]">
+            <div className="flex items-center justify-between text-sm font-black text-white">
+              <span>9:41</span>
+              <div className="h-7 w-28 rounded-full bg-black/80 shadow-[inset_0_0_18px_rgba(99,102,241,0.28)]" />
+              <span className="rounded-md bg-white/12 px-1.5 py-0.5 text-[11px]">32</span>
+            </div>
+
+            <div className="mt-10 flex flex-col items-center text-center">
+              <div className="relative">
+                <div className="relative h-20 w-20 overflow-hidden rounded-[28px] border border-white/16 bg-white/8 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
+                  <Image
+                    src={safeImage(safeUser.image)}
+                    alt={displayName}
+                    fill
+                    sizes="80px"
+                    className="object-cover p-1"
+                    priority
+                  />
+                </div>
+                <div className="absolute -bottom-1 -right-2 grid h-8 w-8 place-items-center rounded-full bg-[#fff2a8] text-black shadow-[0_0_25px_rgba(253,224,71,0.28)]">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+              </div>
+
+              <div className="mt-5 text-sm text-white/42">Available Balance</div>
+              <h1 className="mt-1 text-[42px] font-light tracking-[-0.07em] text-white sm:text-[50px]">
+                {formatNumber(liquidTotal)}
+              </h1>
+              <div className="mt-1 text-sm font-bold text-white/48">NEXORA UNITS</div>
+
+              <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.045] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.24)]">
+                <span className="font-black text-white">Main Wallet</span>
+                <span className="text-white/36">0x38 .... 0x69</span>
+              </div>
+            </div>
+
+            <div className="mt-7 grid grid-cols-[1.4fr_1fr_0.7fr_0.45fr] gap-2">
+              <div>
+                <div className="h-3 rounded-full bg-[linear-gradient(90deg,#8b5cf6,#fb7185)]" />
+                <div className="mt-2 text-xs text-white/72">{formatNumber(nexPoint)} NEX</div>
+              </div>
+              <div>
+                <div className="h-3 rounded-full bg-[linear-gradient(90deg,#f87171,#fecaca)]" />
+                <div className="mt-2 text-xs text-white/72">{formatNumber(coin)} COIN</div>
+              </div>
+              <div>
+                <div className="h-3 rounded-full bg-[#fff7b8]" />
+                <div className="mt-2 text-xs text-white/72">{formatNumber(activeCoupons)} coupons</div>
+              </div>
+              <div>
+                <div className="h-3 rounded-full bg-white/10" />
+                <div className="mt-2 text-xs text-white/28">live</div>
+              </div>
+            </div>
+
+            <Link
+              href="/rewards"
+              className="group mt-8 flex items-center justify-between rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] p-5 transition hover:border-amber-200/25"
+            >
+              <div className="flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-black">
+                  <Gift className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="font-black">Exchange Rewards</div>
+                  <div className="mt-1 text-sm text-white/46">Fast reward redeem method</div>
+                </div>
+              </div>
+              <div className="flex -space-x-3">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-white/10 text-violet-200">
+                  <Gem className="h-5 w-5" />
+                </div>
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-black">
+                  <Ticket className="h-5 w-5" />
+                </div>
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-white/10 text-cyan-200">
+                  <Coins className="h-5 w-5" />
+                </div>
+              </div>
+            </Link>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {[
+                { href: "/redeem", title: "Redeem", sub: "Open QR coupons", icon: QrCode },
+                { href: "/rewards", title: "Rewards", sub: "Claim items", icon: Gift },
+                { href: "/scan", title: "Scan", sub: "Earn NEX fast", icon: Sparkles },
+                { href: "/profile/me", title: "Profile", sub: "Wallet owner", icon: ShieldCheck },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="rounded-[24px] border border-white/9 bg-white/[0.035] p-4 transition hover:bg-white/[0.06]"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-black">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <span className="text-xl leading-none text-white/70">⌝</span>
+                    </div>
+                    <div className="mt-5 font-black">{item.title}</div>
+                    <div className="mt-1 text-sm text-white/42">{item.sub}</div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mx-auto w-full max-w-[560px] rounded-[46px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,23,0.93),rgba(8,8,12,0.99))] p-5 shadow-[0_40px_130px_rgba(0,0,0,0.54)] backdrop-blur-2xl sm:p-7 lg:rotate-[1.3deg]">
+            <div className="flex items-center justify-between text-sm font-black text-white">
+              <span>9:41</span>
+              <div className="h-7 w-28 rounded-full bg-black/80 shadow-[inset_0_0_18px_rgba(99,102,241,0.28)]" />
+              <span className="rounded-md bg-white/12 px-1.5 py-0.5 text-[11px]">32</span>
+            </div>
+
+            <div className="mt-10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-violet-500 text-white">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <div className="rounded-2xl bg-white/[0.055] px-4 py-2 font-bold text-white/88">
+                  0x38 .... 0x69
+                </div>
+              </div>
+              <div className="flex gap-4 text-3xl font-light text-white">
+                <span>+</span>
+                <span>⌕</span>
+                <span>≡</span>
+              </div>
+            </div>
+
+            <div className="relative mt-12 text-center">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10 text-white shadow-[0_0_55px_rgba(255,255,255,0.08)]">
+                <Gem className="h-8 w-8" />
+              </div>
+              <div className="mt-8 text-sm text-white/42">NEXORA Balance</div>
+              <div className="mt-2 text-[48px] font-light tracking-[-0.07em]">{formatNumber(nexPoint)}</div>
+            </div>
+
+            <div className="mt-8 grid grid-cols-[1.4fr_1fr_0.7fr_0.45fr] gap-2">
+              <div>
+                <div className="h-3 rounded-full bg-[linear-gradient(90deg,#8b5cf6,#fb7185)]" />
+                <div className="mt-2 text-xs text-white/72">{formatNumber(nexPoint)} NEX</div>
+              </div>
+              <div>
+                <div className="h-3 rounded-full bg-[linear-gradient(90deg,#f87171,#facc15)]" />
+                <div className="mt-2 text-xs text-white/72">{formatNumber(coin)} COIN</div>
+              </div>
+              <div>
+                <div className="h-3 rounded-full bg-[#f7ffc7]" />
+                <div className="mt-2 text-xs text-white/72">{formatNumber(activeCoupons)} QR</div>
+              </div>
+              <div>
+                <div className="h-3 rounded-full bg-white/10" />
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-[30px] border border-white/10 bg-white/[0.028] p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black">Wallet Pulse</h2>
+                <Coins className="h-5 w-5 text-white" />
+              </div>
+              <div className="mt-7 flex justify-center">
+                <div className="relative h-44 w-44 rounded-full border-[14px] border-white/10 border-l-pink-400 border-t-pink-300 border-r-violet-300">
+                  <div className="absolute inset-8 rounded-full border border-white/10" />
+                  <div className="absolute bottom-9 left-1/2 h-1 w-16 origin-left rotate-[-24deg] rounded-full bg-white" />
+                  <div className="absolute bottom-[31px] left-[76px] h-4 w-4 rounded-full bg-white" />
+                  <div className="absolute inset-0 grid place-items-center text-lg font-black">Live</div>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-center gap-5 text-sm text-white/78">
+                <span>• NEX {formatNumber(nexPoint)}</span>
+                <span>• COIN {formatNumber(coin)}</span>
+                <span>• QR {formatNumber(activeCoupons)}</span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <h2 className="text-xl font-black">Recent Movement</h2>
+              <div className="mt-4 overflow-hidden rounded-[24px] border border-white/10">
+                {(activities.length ? activities.slice(0, 4) : assetCards).map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-[1fr_auto] gap-3 border-b border-white/8 px-4 py-3 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-bold text-white">
+                        {"title" in item ? item.title : item.label}
+                      </div>
+                      <div className="mt-1 truncate text-sm text-white/42">{item.subtitle}</div>
+                    </div>
+                    <div className="text-right text-sm font-black text-white/78">
+                      {"createdAt" in item ? timeAgo(item.createdAt) : index === 0 ? "Live" : "Ready"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <div className="hidden min-h-screen bg-[#090909] text-white">
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.16),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.1),transparent_18%),linear-gradient(180deg,#090909_0%,#0b0b0d_42%,#101119_100%)]" />
       </div>
@@ -544,6 +758,7 @@ export default async function WalletPage() {
           </div>
         </section>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
