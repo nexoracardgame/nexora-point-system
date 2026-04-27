@@ -1,7 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { Noto_Sans_Thai, Sora } from "next/font/google";
 import { ShieldCheck, Gift, Gem, Coins } from "lucide-react";
+
+const thaiSans = Noto_Sans_Thai({
+  subsets: ["thai", "latin"],
+  variable: "--font-reward-thai",
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--font-reward-display",
+  weight: ["400", "600", "700", "800"],
+});
 
 type Reward = {
   id: string;
@@ -63,20 +76,22 @@ export default function RewardRedeemClient({
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1d1440_0%,#090b12_45%,#04060b_100%)] text-white">
+    <div
+      className={`${thaiSans.variable} ${sora.variable} min-h-screen bg-[radial-gradient(circle_at_top,#1d1440_0%,#090b12_45%,#04060b_100%)] text-white`}
+    >
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-8">
         {/* HERO */}
-        <div className="rounded-[28px] border border-cyan-400/10 bg-white/[0.03] p-4 shadow-[0_20px_100px_rgba(0,0,0,0.45)] backdrop-blur-2xl md:rounded-[42px] md:p-8">
+        <div className="overflow-hidden rounded-[28px] border border-cyan-400/10 bg-white/[0.03] p-4 shadow-[0_20px_100px_rgba(0,0,0,0.45)] backdrop-blur-2xl md:rounded-[42px] md:p-8">
           <div className="flex items-center gap-3 md:gap-4">
             <div className="rounded-2xl bg-cyan-400/10 p-3 md:rounded-3xl md:p-4">
               <Gift className="h-6 w-6 text-cyan-300 md:h-8 md:w-8" />
             </div>
 
             <div>
-              <h1 className="text-2xl font-black tracking-tight md:text-5xl">
+              <h1 className="font-[family:var(--font-reward-display)] text-2xl font-black tracking-tight md:text-5xl">
                 NEXORA REWARD CENTER
               </h1>
-              <p className="mt-1 text-[11px] text-white/50 md:mt-2 md:text-sm">
+              <p className="mt-1 font-[family:var(--font-reward-thai)] text-[11px] text-white/50 md:mt-2 md:text-sm">
                 Dual currency reward exchange system
               </p>
             </div>
@@ -84,21 +99,43 @@ export default function RewardRedeemClient({
 
           {/* MOBILE = 2 compact balance cards */}
           <div className="mt-5 grid grid-cols-2 gap-3 md:mt-8 md:gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl bg-amber-400/10 p-4 shadow-xl md:rounded-3xl md:p-6">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 md:text-xs">
-                NEX
+            <div className="relative overflow-hidden rounded-[28px] border border-black/8 bg-[linear-gradient(145deg,#ffffff_0%,#f8f1de_48%,#eef3ff_100%)] p-4 text-[#111111] shadow-[0_24px_60px_rgba(12,12,18,0.18)] ring-1 ring-white/70 md:rounded-[32px] md:p-6">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.92),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.18),transparent_38%)]" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-[family:var(--font-reward-display)] text-[10px] uppercase tracking-[0.34em] text-black/46 md:text-xs">
+                    NEX
+                  </div>
+                  <div className="mt-2 font-[family:var(--font-reward-display)] text-2xl font-extrabold tracking-[-0.05em] text-black md:text-5xl">
+                    {user.nexPoint.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-amber-300/35 bg-white/70 p-2.5 text-amber-500 shadow-[0_14px_28px_rgba(250,204,21,0.16)] md:p-3">
+                  <Gem className="h-4 w-4 md:h-5 md:w-5" />
+                </div>
               </div>
-              <div className="mt-2 text-2xl font-black text-amber-300 md:text-5xl">
-                {user.nexPoint.toLocaleString()}
+              <div className="relative mt-2 font-[family:var(--font-reward-display)] text-[11px] font-bold uppercase tracking-[0.24em] text-black/58 md:text-xs">
+                READY BALANCE
               </div>
             </div>
 
-            <div className="rounded-2xl bg-emerald-400/10 p-4 shadow-xl md:rounded-3xl md:p-6">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 md:text-xs">
-                COIN
+            <div className="relative overflow-hidden rounded-[28px] border border-black/8 bg-[linear-gradient(145deg,#ffffff_0%,#f3f7ff_44%,#ecfbf4_100%)] p-4 text-[#111111] shadow-[0_24px_60px_rgba(12,12,18,0.18)] ring-1 ring-white/70 md:rounded-[32px] md:p-6">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.94),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.16),transparent_40%)]" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-[family:var(--font-reward-display)] text-[10px] uppercase tracking-[0.34em] text-black/46 md:text-xs">
+                    COIN
+                  </div>
+                  <div className="mt-2 font-[family:var(--font-reward-display)] text-2xl font-extrabold tracking-[-0.05em] text-black md:text-5xl">
+                    {user.coin.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-cyan-300/35 bg-white/70 p-2.5 text-cyan-500 shadow-[0_14px_28px_rgba(34,211,238,0.16)] md:p-3">
+                  <Coins className="h-4 w-4 md:h-5 md:w-5" />
+                </div>
               </div>
-              <div className="mt-2 text-2xl font-black text-emerald-300 md:text-5xl">
-                {user.coin.toLocaleString()}
+              <div className="relative mt-2 font-[family:var(--font-reward-display)] text-[11px] font-bold uppercase tracking-[0.24em] text-black/58 md:text-xs">
+                READY BALANCE
               </div>
             </div>
           </div>

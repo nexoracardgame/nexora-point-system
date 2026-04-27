@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Noto_Sans_Thai, Sora } from "next/font/google";
 import { useSession } from "next-auth/react";
 import {
   startTransition,
@@ -17,6 +18,21 @@ import {
 } from "@/lib/market-listing-view";
 import { listenMarketSync } from "@/lib/market-sync";
 import { listenProfileSync } from "@/lib/profile-sync";
+
+const thaiSans = Noto_Sans_Thai({
+  subsets: ["thai", "latin"],
+  variable: "--font-market-thai",
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--font-market-display",
+  weight: ["400", "600", "700", "800"],
+});
+
+const TOP3_BACKGROUND_URL =
+  "https://r4.wallpaperflare.com/wallpaper/976/74/465/multiple-display-mountains-snow-nature-wallpaper-c1b4ba2a902ec5b27032d3c4aefe604d.jpg";
 
 type MarketItem = MarketViewItem;
 
@@ -385,15 +401,25 @@ export default function MarketDashboardTFT({
   const rightHero = heroTop3[2];
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div
+      className={`${thaiSans.variable} ${sora.variable} space-y-6 lg:space-y-8`}
+    >
       {/* MOBILE HERO */}
-      <section className="overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] p-4 text-[#09090b] shadow-[0_24px_70px_rgba(20,20,30,0.12)] ring-1 ring-black/5 lg:hidden">
-        <div className="flex flex-col gap-4">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] p-4 text-[#09090b] shadow-[0_24px_70px_rgba(20,20,30,0.12)] ring-1 ring-black/5 lg:hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: `url(${TOP3_BACKGROUND_URL})` }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(238,242,250,0.90))]" />
+        </div>
+
+        <div className="relative flex flex-col gap-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.42em] text-black/35">
+            <div className="font-[family:var(--font-market-display)] text-[10px] uppercase tracking-[0.42em] text-black/35">
               NEXORA ELITE MARKET
             </div>
-            <h1 className="mt-3 text-3xl font-black tracking-[-0.04em]">
+            <h1 className="font-[family:var(--font-market-display)] mt-3 text-3xl font-black tracking-[-0.05em]">
               FEATURED TOP 3
             </h1>
           </div>
@@ -426,7 +452,7 @@ export default function MarketDashboardTFT({
         {centerHero && (
           <Link
             href={`/market/card/${centerHero.id}`}
-            className="mt-5 block overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.06] shadow-[0_25px_80px_rgba(168,85,247,0.20)] backdrop-blur-xl"
+            className="relative mt-5 block overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.06] shadow-[0_25px_80px_rgba(168,85,247,0.20)] backdrop-blur-xl"
           >
             <div className="relative">
               <img
@@ -454,13 +480,13 @@ export default function MarketDashboardTFT({
 
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4">
                 <div className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur-md">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/60">
+                  <div className="font-[family:var(--font-market-display)] text-[10px] uppercase tracking-[0.3em] text-white/60">
                     FEATURED CARD
                   </div>
 
-                    <div className="mt-2 line-clamp-2 text-[1.35rem] font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.9)]">
-                      {centerHero.name}
-                    </div>
+                  <div className="mt-2 line-clamp-2 text-[1.35rem] font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.9)]">
+                    {centerHero.name}
+                  </div>
 
                   <div className="mt-3 flex items-center gap-2">
                     <img
@@ -559,13 +585,22 @@ export default function MarketDashboardTFT({
 
       {/* DESKTOP HERO - ORIGINAL */}
       <section className="relative hidden overflow-hidden rounded-[42px] border border-white/75 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] px-8 py-12 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.12)] ring-1 ring-black/5 xl:px-14 xl:py-16 lg:block">
-        <div className="flex items-center justify-between">
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: `url(${TOP3_BACKGROUND_URL})` }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(238,242,250,0.92))]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.72),transparent_36%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.34),transparent_38%)]" />
+        </div>
+
+        <div className="relative flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase tracking-[0.5em] text-black/35">
+            <div className="font-[family:var(--font-market-display)] text-xs uppercase tracking-[0.5em] text-black/35">
               NEXORA ELITE MARKET
             </div>
 
-            <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] md:text-6xl">
+            <h1 className="font-[family:var(--font-market-display)] mt-4 text-4xl font-black tracking-[-0.05em] md:text-6xl">
               FEATURED TOP 3
             </h1>
           </div>
@@ -626,9 +661,9 @@ export default function MarketDashboardTFT({
                 </button>
 
                 <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
-                    <div className="line-clamp-2 text-base font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
-                      {leftHero.name}
-                    </div>
+                  <div className="line-clamp-2 text-base font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+                    {leftHero.name}
+                  </div>
 
                   <div className="mt-2 flex items-center gap-2">
                     <img
