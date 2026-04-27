@@ -2,14 +2,9 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { ArrowLeft, Image as ImageIcon, Send, Smile } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { uploadChatImageFile } from "@/lib/chat-image-client";
 
 type ChatUser = {
   id: string;
@@ -452,22 +447,13 @@ export default function DealChatPage() {
     let imageUrl: string | null = null;
 
     if (file) {
-      const fileName = `${Date.now()}-${file.name}`;
-
-      const { error } = await supabase.storage
-        .from("chat-images")
-        .upload(fileName, file);
-
-      if (error) {
+      try {
+        imageUrl = await uploadChatImageFile(file);
+      } catch (error) {
         console.error("DEAL CHAT UPLOAD ERROR:", error);
+        alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
-
-      const { data: url } = supabase.storage
-        .from("chat-images")
-        .getPublicUrl(fileName);
-
-      imageUrl = url.publicUrl;
       setFile(null);
 
       if (fileInputRef.current) {
