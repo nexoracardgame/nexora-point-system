@@ -298,8 +298,18 @@ export default function DMPage() {
     });
 
     const init = async () => {
-      const [meData, otherData] = await Promise.all([loadSession(), loadRoom()]);
-      await loadMessages(meData, otherData);
+      const roomPromise = loadRoom();
+      const meData = await loadSession();
+
+      if (seededOther) {
+        await loadMessages(meData, seededOther);
+      }
+
+      const otherData = await roomPromise;
+
+      if (!seededOther || otherData?.id !== seededOther?.id) {
+        await loadMessages(meData, otherData);
+      }
     };
 
     void init();
