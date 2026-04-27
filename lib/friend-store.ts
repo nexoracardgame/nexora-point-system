@@ -464,8 +464,60 @@ export async function listFriendsForUser(userId: string) {
   });
 }
 
-export async function searchCommunityUsers(currentUserId: string, query: string) {
+function normalizeSearchValue(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+}
+
+function scoreCommunityCandidate(
+  user: {
+    displayName: string;
+    username: string | null;
+    bio: string;
+  },
+  term: string
+) {
+  if (!term) return 1;
+
+  const normalizedTerm = normalizeSearchValue(term);
+  const displayName = normalizeSearchValue(user.displayName);
+  const username = normalizeSearchValue(user.username);
+  const bio = normalizeSearchValue(user.bio);
+
+  if (username && username === normalizedTerm) return 100;
+  if (displayName === normalizedTerm) return 96;
+  if (username && username.startsWith(normalizedTerm)) return 84;
+  if (displayName.startsWith(normalizedTerm)) return 78;
+  if (username && username.includes(normalizedTerm)) return 66;
+  if (displayName.includes(normalizedTerm)) return 60;
+
+  const pieces = normalizedTerm.split(/\s+/).filter(Boolean);
+  if (
+    pieces.length > 1 &&
+    pieces.every(
+      (piece) =>
+        displayName.includes(piece) ||
+        username.includes(piece) ||
+        bio.includes(piece)
+    )
+  ) {
+    return 48;
+  }
+
+  if (bio.includes(normalizedTerm)) return 24;
+
+  return 0;
+}
+
+export async function searchCommunityUsers(
+  currentUserId: string,
+  query: string,
+  currentUserAliases: string[] = []
+) {
   const term = String(query || "").trim().toLowerCase();
+  const normalizedTerm = normalizeSearchValue(query);
   await ensureCommunitySchema().catch(() => undefined);
   const dbUsers = await prisma.$queryRawUnsafe<
     Array<{
@@ -513,20 +565,37 @@ export async function searchCommunityUsers(currentUserId: string, query: string)
     });
   });
 
-  const candidates = Array.from(candidateMap.values()).filter(
-    (user) => user.id !== currentUserId
+  const selfIds = new Set(
+    [currentUserId, ...currentUserAliases]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
   );
 
-  const filtered = term
-    ? candidates.filter((user) => {
-        const haystacks = [
-          user.displayName,
-          user.username || "",
-          user.bio || "",
-        ].map((value) => value.toLowerCase());
-        return haystacks.some((value) => value.includes(term));
+  const candidates = Array.from(candidateMap.values()).filter(
+    (user) => !selfIds.has(user.id)
+  );
+
+  const scored = candidates
+    .map((user) => ({
+      user,
+      score: scoreCommunityCandidate(user, term),
+    }))
+    .filter((item) => !term || item.score > 0);
+
+  const exactMatches = normalizedTerm
+    ? scored.filter((item) => {
+        const username = normalizeSearchValue(item.user.username);
+        const displayName = normalizeSearchValue(item.user.displayName);
+        return username === normalizedTerm || displayName === normalizedTerm;
       })
-    : candidates;
+    : [];
+
+  const filtered = (exactMatches.length === 1 ? exactMatches : scored)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.user.displayName.localeCompare(b.user.displayName);
+    })
+    .map((item) => item.user);
 
   const relations = await Promise.all(
     filtered.slice(0, 50).map(async (user) => ({

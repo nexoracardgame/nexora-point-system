@@ -224,6 +224,7 @@ async function writeSupabaseProfile(
     name: input.displayName,
     image: input.image,
     displayName: input.displayName,
+    username: input.username,
     coverImage: input.coverImage,
     coverPosition: input.coverPosition,
     bio: input.bio,
@@ -289,7 +290,7 @@ export async function getLocalProfileByUserId(userId: string) {
   if (prismaProfile) {
     const mergedProfile = {
       ...prismaProfile,
-      username: localProfile?.username ?? prismaProfile.username ?? null,
+      username: prismaProfile.username ?? localProfile?.username ?? null,
     };
     await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
     return mergedProfile;

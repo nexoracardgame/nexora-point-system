@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import PrefetchLink from "@/components/PrefetchLink";
 
 type SearchUser = {
   id: string;
@@ -35,6 +36,7 @@ type IncomingRequest = {
 };
 
 export default function CommunityClient() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
   const [friends, setFriends] = useState<FriendItem[]>([]);
@@ -108,10 +110,24 @@ export default function CommunityClient() {
   useEffect(() => {
     const debounceId = window.setTimeout(() => {
       void runSearch(query, true);
-    }, 260);
+    }, 120);
 
     return () => window.clearTimeout(debounceId);
   }, [query]);
+
+  useEffect(() => {
+    [...friends, ...requests].forEach((item) => {
+      const profileId = "friendId" in item ? item.friendId : item.fromUserId;
+      router.prefetch(`/profile/${profileId}`);
+    });
+  }, [friends, requests, router]);
+
+  useEffect(() => {
+    results
+      .filter((user) => user.relation !== "self")
+      .slice(0, 12)
+      .forEach((user) => router.prefetch(`/profile/${user.id}`));
+  }, [results, router]);
 
   const handleSearch = (event?: FormEvent) => {
     event?.preventDefault();
@@ -158,13 +174,14 @@ export default function CommunityClient() {
     });
   };
 
-  const suggestionCount = Math.max(results.length - friends.length, 0);
+  const visibleResults = results.filter((user) => user.relation !== "self");
+  const suggestionCount = Math.max(visibleResults.length - friends.length, 0);
 
   return (
     <div className="min-h-full overflow-hidden bg-[#f4f0f7] text-[#08080a]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.92),transparent_26%),radial-gradient(circle_at_78%_0%,rgba(255,217,102,0.22),transparent_22%),linear-gradient(180deg,#f8f5fb_0%,#e7e8f7_100%)]" />
-      <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <section className="relative overflow-hidden rounded-[38px] bg-[#f8f7fb] px-4 pb-7 pt-5 shadow-[0_28px_90px_rgba(60,50,80,0.16)] ring-1 ring-black/5 sm:rounded-[48px] sm:px-7 lg:px-10">
+      <div className="relative mx-auto max-w-7xl px-0 py-0 sm:px-6 sm:py-5 lg:px-8">
+        <section className="relative overflow-hidden rounded-[26px] bg-[#f8f7fb] px-3 pb-5 pt-4 shadow-[0_28px_90px_rgba(60,50,80,0.16)] ring-1 ring-black/5 sm:rounded-[48px] sm:px-7 sm:pb-7 sm:pt-5 lg:px-10">
           <div className="pointer-events-none absolute -right-24 top-8 h-72 w-72 rounded-full bg-white/80 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-[#d9def8] blur-3xl" />
 
@@ -231,7 +248,7 @@ export default function CommunityClient() {
                       key={friend.id}
                       className="flex items-center gap-3 rounded-[30px] bg-[#f4f3f8] p-3 transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
                     >
-                      <Link
+                      <PrefetchLink
                         href={`/profile/${friend.friendId}`}
                         className="flex min-w-0 flex-1 items-center gap-3"
                       >
@@ -249,7 +266,7 @@ export default function CommunityClient() {
                             {friend.bio ? <span className="line-clamp-1">{friend.bio}</span> : null}
                           </div>
                         </div>
-                      </Link>
+                      </PrefetchLink>
 
                       <button
                         type="button"
@@ -348,7 +365,7 @@ export default function CommunityClient() {
                   <div className="mt-5 grid gap-3 md:grid-cols-2">
                     {requests.map((request) => (
                       <div key={request.id} className="rounded-[30px] bg-[#f4f3f8] p-3">
-                        <Link
+                        <PrefetchLink
                           href={`/profile/${request.fromUserId}`}
                           className="flex min-w-0 items-center gap-3"
                         >
@@ -365,7 +382,7 @@ export default function CommunityClient() {
                               {request.username ? `@${request.username}` : "NEXORA User"}
                             </div>
                           </div>
-                        </Link>
+                        </PrefetchLink>
 
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           <button
@@ -423,17 +440,17 @@ export default function CommunityClient() {
             </div>
           </div>
 
-          <section className="relative mt-4 overflow-hidden rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
+          <section className="relative mt-4 overflow-hidden rounded-[26px] bg-white p-3 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:rounded-[34px] sm:p-5 lg:rounded-[42px]">
             <div className="absolute left-1/2 top-0 h-12 w-28 -translate-x-1/2 rounded-b-[36px] bg-[#e9eaf5]" />
-            <div className="relative flex items-center justify-between gap-3 pt-2">
-              <div>
+            <div className="relative flex items-center justify-between gap-2 pt-2">
+              <div className="min-w-0">
                 <div className="text-sm font-bold text-black/40">Search Results</div>
-                <div className="mt-1 text-3xl font-black tracking-[-0.05em]">
+                <div className="mt-1 truncate text-2xl font-black tracking-[-0.05em] sm:text-3xl">
                   คนที่ค้นหาเจอ
                 </div>
               </div>
-              <div className="rounded-full bg-[#eef0fb] px-4 py-2 text-sm font-black">
-                {results.length} คน
+              <div className="shrink-0 rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:px-4 sm:text-sm">
+                {visibleResults.length} คน
               </div>
             </div>
 
@@ -442,17 +459,17 @@ export default function CommunityClient() {
                 <div className="rounded-[30px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45 lg:col-span-2">
                   กำลังค้นหา...
                 </div>
-              ) : results.length === 0 ? (
+              ) : visibleResults.length === 0 ? (
                 <div className="rounded-[30px] bg-[#f4f3f8] px-5 py-8 text-sm font-bold text-black/45 lg:col-span-2">
                   ไม่พบผู้ใช้ที่ค้นหา
                 </div>
               ) : (
-                results.map((user) => (
+                visibleResults.map((user) => (
                   <div
                     key={user.id}
                     className="flex flex-col gap-4 rounded-[30px] bg-[#f4f3f8] p-3 transition hover:-translate-y-0.5 hover:bg-[#eeedf5] sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <Link href={`/profile/${user.id}`} className="flex min-w-0 items-center gap-3">
+                    <PrefetchLink href={`/profile/${user.id}`} className="flex min-w-0 items-center gap-3">
                       <img
                         src={user.image || "/avatar.png"}
                         alt={user.displayName}
@@ -465,7 +482,7 @@ export default function CommunityClient() {
                           {user.bio ? <span className="line-clamp-1">{user.bio}</span> : null}
                         </div>
                       </div>
-                    </Link>
+                    </PrefetchLink>
 
                     <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       {user.relation === "self" ? (

@@ -62,6 +62,12 @@ export async function POST(req: Request) {
 
   if (action === "request") {
     const targetUserId = String(body?.targetUserId || "").trim();
+    if (!targetUserId || aliases.includes(targetUserId)) {
+      return NextResponse.json(
+        { error: "Cannot add yourself" },
+        { status: 400 }
+      );
+    }
     const request = await createFriendRequestRecord(userId, targetUserId);
     const senderProfile = await getLocalProfileByUserId(userId);
 
