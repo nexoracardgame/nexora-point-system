@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -14,13 +13,8 @@ type RewardRow = {
   createdAt: string;
 };
 
-type Props = {
-  rewards: RewardRow[];
-};
-
-export default function RewardsTable({ rewards }: Props) {
+export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
   const router = useRouter();
-
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -39,12 +33,9 @@ export default function RewardsTable({ rewards }: Props) {
 
   const saveEdit = async () => {
     if (!editingId) return;
-
     const res = await fetch("/api/admin/reward/update", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: editingId,
         name,
@@ -54,14 +45,8 @@ export default function RewardsTable({ rewards }: Props) {
         stock: Number(stock),
       }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error || "อัปเดตไม่สำเร็จ");
-      return;
-    }
-
+    if (!res.ok) return alert(data.error || "อัปเดตไม่สำเร็จ");
     setEditingId(null);
     setName("");
     setImageUrl("");
@@ -69,311 +54,78 @@ export default function RewardsTable({ rewards }: Props) {
   };
 
   const deleteReward = async (reward: RewardRow) => {
-    const ok = confirm(`ยืนยันลบรางวัล "${reward.name}" ?`);
-    if (!ok) return;
-
+    if (!confirm(`ยืนยันลบรางวัล "${reward.name}" ?`)) return;
     const res = await fetch("/api/admin/reward/delete", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: reward.id,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: reward.id }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error || "ลบไม่สำเร็จ");
-      return;
-    }
-
+    if (!res.ok) return alert(data.error || "ลบไม่สำเร็จ");
     router.refresh();
   };
 
   return (
-    <div
-      style={{
-        background: "#111",
-        border: "1px solid #222",
-        borderRadius: 16,
-        overflow: "hidden",
-      }}
-    >
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-        }}
-      >
-        <thead>
-          <tr style={{ borderBottom: "1px solid #222" }}>
-            <th style={thLeft}>รางวัล</th>
-            <th style={thCenter}>NEX</th>
-            <th style={thCenter}>COIN</th>
-            <th style={thCenter}>Stock</th>
-            <th style={thCenter}>สร้างเมื่อ</th>
-            <th style={thCenter}>จัดการ</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {rewards.map((reward) => (
-            <tr
-              key={reward.id}
-              style={{ borderBottom: "1px solid #1c1c1c" }}
-            >
-              <td style={tdLeft}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  <img
-                    src={
-                      reward.imageUrl ||
-                      "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"
-                    }
-                    alt={reward.name}
-                    style={{
-                      width: 64,
-                      height: 64,
-                      objectFit: "contain",
-                      borderRadius: 12,
-                      background: "#0f0f0f",
-                      padding: 4,
-                    }}
-                  />
-                  <div style={{ fontWeight: "bold" }}>
-                    {reward.name}
-                  </div>
-                </div>
-              </td>
-
-              <td style={tdCenter}>
-                {reward.nexCost?.toLocaleString() || "-"}
-              </td>
-
-              <td style={tdCenter}>
-                {reward.coinCost?.toLocaleString() || "-"}
-              </td>
-
-              <td style={tdCenter}>{reward.stock}</td>
-
-              <td style={tdCenter}>
-                {new Date(reward.createdAt).toLocaleString()}
-              </td>
-
-              <td style={tdCenter}>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    justifyContent: "center",
-                  }}
-                >
-                  <button
-                    onClick={() => startEdit(reward)}
-                    style={goldBtnStyle}
-                  >
-                    แก้ไข
-                  </button>
-
-                  <button
-                    onClick={() => deleteReward(reward)}
-                    style={deleteBtnStyle}
-                  >
-                    ลบ
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {editingId && (
-        <div style={modalWrap}>
-          <div style={modalBox}>
-            <h2 style={{ marginBottom: 16 }}>
-              แก้ไขรางวัล
-            </h2>
-
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="ชื่อรางวัล"
-              style={inputStyle}
+    <div className="grid gap-3">
+      {rewards.map((reward) => (
+        <div key={reward.id} className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <img
+              src={reward.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
+              alt={reward.name}
+              className="h-28 w-full rounded-[22px] border border-white/8 bg-black/20 object-contain p-2 sm:h-32 sm:w-32"
             />
-
-            <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="ลิงก์รูปรางวัล"
-              style={inputStyle}
-            />
-
-            <div
-              style={{
-                marginBottom: 12,
-                borderRadius: 14,
-                border: "1px solid #2a2a2a",
-                background: "#0d0d0d",
-                padding: 12,
-              }}
-            >
-              <div
-                style={{
-                  marginBottom: 8,
-                  fontSize: 12,
-                  color: "#888",
-                }}
-              >
-                ตัวอย่างรูป
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xl font-black">{reward.name}</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-2xl border border-amber-300/12 bg-amber-300/10 p-3 text-amber-300">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/70">NEX</div>
+                  <div className="mt-1 font-black">{reward.nexCost?.toLocaleString() || "-"}</div>
+                </div>
+                <div className="rounded-2xl border border-sky-300/12 bg-sky-300/10 p-3 text-sky-300">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-sky-100/70">COIN</div>
+                  <div className="mt-1 font-black">{reward.coinCost?.toLocaleString() || "-"}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/38">STOCK</div>
+                  <div className="mt-1 font-black text-white">{reward.stock}</div>
+                </div>
               </div>
-              <img
-                src={
-                  imageUrl ||
-                  "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"
-                }
-                alt={name || "reward preview"}
-                style={{
-                  width: "100%",
-                  maxHeight: 220,
-                  objectFit: "contain",
-                  borderRadius: 12,
-                  background: "#111",
-                }}
-              />
-            </div>
-
-            <input
-              value={nexCost}
-              onChange={(e) => setNexCost(e.target.value)}
-              placeholder="ราคา NEX"
-              type="number"
-              style={inputStyle}
-            />
-
-            <input
-              value={coinCost}
-              onChange={(e) => setCoinCost(e.target.value)}
-              placeholder="ราคา COIN"
-              type="number"
-              style={inputStyle}
-            />
-
-            <input
-              value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              placeholder="Stock"
-              type="number"
-              style={inputStyle}
-            />
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={saveEdit}
-                style={goldBtnStyle}
-              >
-                บันทึก
-              </button>
-
-              <button
-                onClick={() => {
-                  setEditingId(null);
-                  setName("");
-                  setImageUrl("");
-                }}
-                style={cancelBtnStyle}
-              >
-                ปิด
-              </button>
+              <div className="mt-3 text-xs text-white/42">{new Date(reward.createdAt).toLocaleString()}</div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={() => startEdit(reward)} className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black">
+                  แก้ไข
+                </button>
+                <button type="button" onClick={() => deleteReward(reward)} className="rounded-2xl border border-red-400/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-300">
+                  ลบ
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      )}
+      ))}
+
+      {editingId ? (
+        <div className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5">
+          <div className="w-full rounded-t-[28px] border border-white/10 bg-[#101118] p-4 sm:max-w-lg sm:rounded-[28px]">
+            <h2 className="text-xl font-black">แก้ไขรางวัล</h2>
+            <div className="mt-4 space-y-3">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อรางวัล" className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none" />
+              <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="ลิงก์รูปรางวัล" className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none" />
+              <img src={imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"} alt={name || "preview"} className="h-44 w-full rounded-[22px] border border-white/10 bg-black/20 object-contain p-3" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <input value={nexCost} onChange={(e) => setNexCost(e.target.value)} placeholder="NEX" type="number" className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none" />
+                <input value={coinCost} onChange={(e) => setCoinCost(e.target.value)} placeholder="COIN" type="number" className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none" />
+                <input value={stock} onChange={(e) => setStock(e.target.value)} placeholder="Stock" type="number" className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none" />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={saveEdit} className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black">บันทึก</button>
+                <button type="button" onClick={() => setEditingId(null)} className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-black text-white">ปิด</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
-
-const thLeft: CSSProperties = {
-  padding: 16,
-  textAlign: "left",
-};
-
-const thCenter: CSSProperties = {
-  padding: 16,
-  textAlign: "center",
-};
-
-const tdLeft: CSSProperties = {
-  padding: 16,
-  textAlign: "left",
-};
-
-const tdCenter: CSSProperties = {
-  padding: 16,
-  textAlign: "center",
-};
-
-const goldBtnStyle: CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "none",
-  background: "#d4af37",
-  color: "#000",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
-
-const deleteBtnStyle: CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,99,99,0.25)",
-  background: "rgba(255,99,99,0.12)",
-  color: "#ff7b7b",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
-
-const cancelBtnStyle: CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1px solid #333",
-  background: "#1a1a1a",
-  color: "#fff",
-  cursor: "pointer",
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  marginBottom: 12,
-  borderRadius: 10,
-  border: "1px solid #333",
-  background: "#151515",
-  color: "#fff",
-};
-
-const modalWrap: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.65)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 9999,
-};
-
-const modalBox: CSSProperties = {
-  width: 420,
-  background: "#111",
-  border: "1px solid #222",
-  borderRadius: 16,
-  padding: 24,
-};

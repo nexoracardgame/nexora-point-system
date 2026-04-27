@@ -4,262 +4,98 @@ import DashboardCharts from "./DashboardCharts";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function StatCard({ title, value, accent }: { title: string; value: number; accent?: string }) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+      <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/38">{title}</div>
+      <div className={`mt-3 text-3xl font-black sm:text-4xl ${accent || "text-white"}`}>
+        {value.toLocaleString("th-TH")}
+      </div>
+    </div>
+  );
+}
+
 export default async function AdminDashboardPage() {
   let totalUsers = 0;
   let totalRewards = 0;
   let totalCoupons = 0;
   let usedCoupons = 0;
   let users: Array<{ createdAt: Date; nexPoint: number; coin: number }> = [];
-  let latestLogs: any[] = [];
+  let latestLogs: Array<{ id: string; lineId: string; type: string; amount: number; point: number; createdAt: Date }> = [];
 
   try {
-    [totalUsers, totalRewards, totalCoupons, usedCoupons, users, latestLogs] =
-      await Promise.all([
-        prisma.user.count(),
-        prisma.reward.count(),
-        prisma.coupon.count(),
-        prisma.coupon.count({
-          where: { used: true },
-        }),
-        prisma.user.findMany({
-          orderBy: { createdAt: "asc" },
-          select: {
-            createdAt: true,
-            nexPoint: true,
-            coin: true,
-          },
-        }),
-        prisma.pointLog.findMany({
-          orderBy: { createdAt: "desc" },
-          take: 10,
-        }),
-      ]);
-  } catch {
-    totalUsers = 0;
-    totalRewards = 0;
-    totalCoupons = 0;
-    usedCoupons = 0;
-    users = [];
-    latestLogs = [];
-  }
+    [totalUsers, totalRewards, totalCoupons, usedCoupons, users, latestLogs] = await Promise.all([
+      prisma.user.count(),
+      prisma.reward.count(),
+      prisma.coupon.count(),
+      prisma.coupon.count({ where: { used: true } }),
+      prisma.user.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true, nexPoint: true, coin: true },
+      }),
+      prisma.pointLog.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+    ]);
+  } catch {}
 
-  const totalNex = users.reduce(
-  (sum: number, user: any) => sum + user.nexPoint,
-  0
-);
-
-const totalCoin = users.reduce(
-  (sum: number, user: any) => sum + user.coin,
-  0
-);
+  const totalNex = users.reduce((sum, user) => sum + Number(user.nexPoint || 0), 0);
+  const totalCoin = users.reduce((sum, user) => sum + Number(user.coin || 0), 0);
 
   const groupedMap = new Map<string, number>();
-
   for (const user of users) {
     const date = new Date(user.createdAt).toLocaleDateString("th-TH");
     groupedMap.set(date, (groupedMap.get(date) || 0) + 1);
   }
 
-  const chartData = Array.from(groupedMap.entries()).map(([date, count]) => ({
-    date,
-    count,
-  }));
+  const chartData = Array.from(groupedMap.entries()).map(([date, count]) => ({ date, count }));
 
   return (
-    <div>
-      <h1
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          marginBottom: 24,
-          color: "#fff",
-        }}
-      >
-        📊 Dashboard
-      </h1>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        <StatCard title="สมาชิกทั้งหมด" value={totalUsers} />
-        <StatCard title="ของรางวัลทั้งหมด" value={totalRewards} />
-        <StatCard title="คูปองทั้งหมด" value={totalCoupons} />
-        <StatCard title="คูปองใช้แล้ว" value={usedCoupons} />
-        <StatCard title="NEX รวม" value={totalNex} />
-        <StatCard title="Coin รวม" value={totalCoin} />
+    <div className="space-y-5">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">Admin Dashboard</div>
+        <h1 className="mt-2 text-3xl font-black sm:text-4xl">ภาพรวมระบบ</h1>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <DashboardCharts chartData={chartData} totalUsers={totalUsers} />
+      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+        <StatCard title="Users" value={totalUsers} accent="text-cyan-200" />
+        <StatCard title="Rewards" value={totalRewards} accent="text-violet-200" />
+        <StatCard title="Coupons" value={totalCoupons} accent="text-white" />
+        <StatCard title="Used Coupons" value={usedCoupons} accent="text-emerald-300" />
+        <StatCard title="Total NEX" value={Math.round(totalNex)} accent="text-amber-300" />
+        <StatCard title="Total Coin" value={totalCoin} accent="text-sky-300" />
       </div>
 
-      <div
-        style={{
-          background: "#111",
-          border: "1px solid #222",
-          borderRadius: 16,
-          padding: 20,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 20,
-            marginBottom: 16,
-            color: "#fff",
-          }}
-        >
-          ⚡ Point Log ล่าสุด
-        </h2>
+      <DashboardCharts chartData={chartData} totalUsers={totalUsers} />
 
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "fixed",
-          }}
-        >
-          <thead>
-            <tr style={{ borderBottom: "1px solid #333" }}>
-              <th style={thLeft}>Line ID</th>
-              <th style={thCenter}>ประเภท</th>
-              <th style={thCenter}>จำนวน</th>
-              <th style={thCenter}>แต้ม</th>
-              <th style={thCenter}>เวลา</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {latestLogs.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  style={{
-                    padding: 16,
-                    textAlign: "center",
-                    color: "#aaa",
-                  }}
-                >
-                  ยังไม่มีประวัติการเพิ่มแต้ม
-                </td>
-              </tr>
-            ) : (
-              latestLogs.map((log: any) => (
-                <tr
-                  key={log.id}
-                  style={{ borderBottom: "1px solid #222" }}
-                >
-                  <td style={tdLeftBreak}>{log.lineId}</td>
-
-                  <td style={tdCenter}>
-                    <span
-                      style={{
-                        textTransform: "capitalize",
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        background:
-                          log.type === "gold"
-                            ? "rgba(212,175,55,0.15)"
-                            : "rgba(255,255,255,0.06)",
-                        color:
-                          log.type === "gold" ? "#d4af37" : "#fff",
-                        border:
-                          log.type === "gold"
-                            ? "1px solid rgba(212,175,55,0.3)"
-                            : "1px solid rgba(255,255,255,0.08)",
-                        fontSize: 12,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {log.type}
-                    </span>
-                  </td>
-
-                  <td style={tdCenter}>{log.amount}</td>
-
-                  <td
-                    style={{
-                      ...tdCenter,
-                      color: "#d4af37",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {log.point}
-                  </td>
-
-                  <td style={tdCenter}>
-                    {new Date(log.createdAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <h2 className="text-lg font-black sm:text-xl">Point Log ล่าสุด</h2>
+        <div className="mt-4 grid gap-3">
+          {latestLogs.length === 0 ? (
+            <div className="rounded-[22px] border border-white/8 bg-black/20 p-5 text-sm text-white/45">
+              ยังไม่มีประวัติการเพิ่มแต้ม
+            </div>
+          ) : (
+            latestLogs.map((log) => (
+              <div
+                key={log.id}
+                className="grid gap-3 rounded-[22px] border border-white/8 bg-black/20 p-4 sm:grid-cols-[1.2fr_auto_auto]"
+              >
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Line ID</div>
+                  <div className="mt-1 break-all text-sm font-bold text-white/88">{log.lineId}</div>
+                </div>
+                <div className="flex items-center">
+                  <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase text-amber-300">
+                    {log.type}
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-white/72 sm:text-right">
+                  +{log.point} • {new Date(log.createdAt).toLocaleString()}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 }
-
-function StatCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: number;
-}) {
-  return (
-    <div
-      style={{
-        background: "#111",
-        border: "1px solid #222",
-        borderRadius: 16,
-        padding: 20,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 14,
-          color: "#aaa",
-          marginBottom: 10,
-        }}
-      >
-        {title}
-      </div>
-
-      <div
-        style={{
-          fontSize: 34,
-          fontWeight: "bold",
-          color: "#d4af37",
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-const thLeft: React.CSSProperties = {
-  padding: 12,
-  textAlign: "left",
-};
-
-const thCenter: React.CSSProperties = {
-  padding: 12,
-  textAlign: "center",
-};
-
-const tdCenter: React.CSSProperties = {
-  padding: 12,
-  textAlign: "center",
-};
-
-const tdLeftBreak: React.CSSProperties = {
-  padding: 12,
-  textAlign: "left",
-  wordBreak: "break-all",
-};

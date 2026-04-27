@@ -9,136 +9,29 @@ type PointLogRow = {
   createdAt: string;
 };
 
-type Props = {
-  logs: PointLogRow[];
-};
-
-export default function PointLogsTable({ logs }: Props) {
+export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
   return (
-    <>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-          background: "#111",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-      >
-        <thead>
-          <tr style={{ borderBottom: "1px solid #333" }}>
-            <th style={thLeft}>Line ID</th>
-            <th style={thCenter}>ประเภท</th>
-            <th style={thCenter}>จำนวน</th>
-            <th style={thCenter}>แต้ม</th>
-            <th style={thCenter}>เวลา</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {logs.length === 0 ? (
-            <tr>
-              <td
-                colSpan={5}
-                style={{
-                  padding: 20,
-                  textAlign: "center",
-                  color: "#aaa",
-                }}
-              >
-                ไม่พบประวัติการเพิ่มแต้ม
-              </td>
-            </tr>
-          ) : (
-            logs.map((log) => (
-              <tr
-                key={log.id}
-                className="hover-row"
-                style={{ borderBottom: "1px solid #222" }}
-              >
-                <td style={tdLeftBreak}>{log.lineId}</td>
-
-                <td style={tdCenter}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "6px 10px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: "bold",
-                      textTransform: "capitalize",
-                      background:
-                        log.type === "gold"
-                          ? "rgba(212,175,55,0.15)"
-                          : log.type === "silver"
-                          ? "rgba(180,180,180,0.12)"
-                          : "rgba(255,255,255,0.06)",
-                      color:
-                        log.type === "gold"
-                          ? "#d4af37"
-                          : log.type === "silver"
-                          ? "#d9d9d9"
-                          : "#fff",
-                      border:
-                        log.type === "gold"
-                          ? "1px solid rgba(212,175,55,0.3)"
-                          : log.type === "silver"
-                          ? "1px solid rgba(217,217,217,0.2)"
-                          : "1px solid rgba(255,255,255,0.08)",
-                    }}
-                  >
-                    {log.type}
-                  </span>
-                </td>
-
-                <td style={tdCenter}>{log.amount}</td>
-
-                <td
-                  style={{
-                    ...tdCenter,
-                    color: "#d4af37",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {log.point}
-                </td>
-
-                <td style={tdCenter}>
-                  {new Date(log.createdAt).toLocaleString()}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
-      <style jsx>{`
-        .hover-row:hover {
-          background: #1a1a1a;
-        }
-      `}</style>
-    </>
+    <div className="grid gap-3">
+      {logs.length === 0 ? (
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/45">
+          ไม่พบประวัติการเพิ่มแต้ม
+        </div>
+      ) : (
+        logs.map((log) => (
+          <div key={log.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <div className="grid gap-3 sm:grid-cols-[1.3fr_auto_auto_auto] sm:items-center">
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">Line ID</div>
+                <div className="mt-1 break-all text-sm font-bold text-white/86">{log.lineId}</div>
+              </div>
+              <span className="rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase text-amber-300">{log.type}</span>
+              <div className="text-sm font-bold text-white/78">จำนวน {log.amount}</div>
+              <div className="text-sm font-black text-amber-300">+{log.point}</div>
+            </div>
+            <div className="mt-3 text-xs text-white/42">{new Date(log.createdAt).toLocaleString()}</div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
-
-const thLeft: React.CSSProperties = {
-  padding: 12,
-  textAlign: "left",
-};
-
-const thCenter: React.CSSProperties = {
-  padding: 12,
-  textAlign: "center",
-};
-
-const tdCenter: React.CSSProperties = {
-  padding: 12,
-  textAlign: "center",
-};
-
-const tdLeftBreak: React.CSSProperties = {
-  padding: 12,
-  textAlign: "left",
-  wordBreak: "break-all",
-};

@@ -1,15 +1,15 @@
 "use client";
 
 import {
-  LineChart,
+  Cell,
   Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 
 type Props = {
@@ -20,99 +20,37 @@ type Props = {
   totalUsers: number;
 };
 
-export default function DashboardCharts({
-  chartData,
-  totalUsers,
-}: Props) {
-  const usersWithPoint =
-    chartData.length > 0 ? chartData[chartData.length - 1]?.count ?? 0 : 0;
-
-  const pieData = [
-    { name: "สมาชิกทั้งหมด", value: totalUsers },
-  ];
-
+export default function DashboardCharts({ chartData, totalUsers }: Props) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1fr",
-        gap: 16,
-      }}
-    >
-      <div
-        style={{
-          background: "#111",
-          border: "1px solid #222",
-          borderRadius: 16,
-          padding: 20,
-          minHeight: 360,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 18,
-            marginBottom: 16,
-            color: "#fff",
-          }}
-        >
-          สมาชิกใหม่ตามวัน
-        </h2>
-
-        <div style={{ width: "100%", height: 280 }}>
+    <div className="grid gap-4 xl:grid-cols-[1.35fr_0.8fr]">
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <h2 className="text-lg font-black text-white sm:text-xl">สมาชิกใหม่ตามวัน</h2>
+        <div className="mt-4 h-[260px] sm:h-[300px]">
           <ResponsiveContainer>
             <LineChart data={chartData}>
-              <XAxis dataKey="date" stroke="#aaa" />
-              <YAxis stroke="#aaa" allowDecimals={false} />
+              <XAxis dataKey="date" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" allowDecimals={false} />
               <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="count"
-                stroke="#d4af37"
-                strokeWidth={3}
-              />
+              <Line type="monotone" dataKey="count" stroke="#fbbf24" strokeWidth={3} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div
-        style={{
-          background: "#111",
-          border: "1px solid #222",
-          borderRadius: 16,
-          padding: 20,
-          minHeight: 360,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 18,
-            marginBottom: 16,
-            color: "#fff",
-          }}
-        >
-          สมาชิกทั้งหมด
-        </h2>
-
-        <div style={{ width: "100%", height: 260 }}>
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <h2 className="text-lg font-black text-white sm:text-xl">สมาชิกทั้งหมด</h2>
+        <div className="mt-4 h-[240px] sm:h-[300px]">
           <ResponsiveContainer>
             <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={60}
-                outerRadius={90}
-              >
-                <Cell fill="#d4af37" />
+              <Pie data={[{ name: "Users", value: totalUsers }]} dataKey="value" innerRadius={60} outerRadius={90}>
+                <Cell fill="#fbbf24" />
               </Pie>
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
         </div>
-
-        <div style={{ textAlign: "center", color: "#fff" }}>
-          ทั้งหมด {totalUsers} คน
+        <div className="text-center text-sm font-bold text-white/72 sm:text-base">
+          ทั้งหมด {totalUsers.toLocaleString("th-TH")} คน
         </div>
       </div>
     </div>

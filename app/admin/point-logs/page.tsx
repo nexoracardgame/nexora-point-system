@@ -2,75 +2,42 @@ import { prisma } from "@/lib/prisma";
 import PointLogsTable from "./PointLogsTable";
 
 type PageProps = {
-  searchParams: Promise<{
-    q?: string;
-    type?: string;
-  }>;
+  searchParams: Promise<{ q?: string; type?: string }>;
 };
 
 export default async function PointLogsPage({ searchParams }: PageProps) {
   const { q = "", type = "all" } = await searchParams;
-
   const logs = await prisma.pointLog.findMany({
     where: {
-      ...(q
-        ? {
-            lineId: {
-              contains: q,
-            },
-          }
-        : {}),
-      ...(type !== "all"
-        ? {
-            type,
-          }
-        : {}),
+      ...(q ? { lineId: { contains: q } } : {}),
+      ...(type !== "all" ? { type } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
 
   return (
-    <div style={{ color: "#fff" }}>
-      <h1 style={{ fontSize: 28, fontWeight: "bold", marginBottom: 20 }}>
-        ⚡ Point Logs
-      </h1>
+    <div className="space-y-5 text-white">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">Admin Logs</div>
+        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Point Logs</h1>
+      </div>
 
-      <form
-        method="GET"
-        style={{
-          display: "flex",
-          gap: 12,
-          marginBottom: 20,
-          flexWrap: "wrap",
-        }}
-      >
-        <input
-          type="text"
-          name="q"
-          defaultValue={q}
-          placeholder="ค้นหา Line ID"
-          style={inputStyle}
-        />
-
-        <select
-          name="type"
-          defaultValue={type}
-          style={{ ...inputStyle, maxWidth: 180 }}
-        >
+      <form method="GET" className="grid gap-3 sm:grid-cols-[1fr_200px_auto]">
+        <input type="text" name="q" defaultValue={q} placeholder="ค้นหา Line ID" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none" />
+        <select name="type" defaultValue={type} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none">
           <option value="all">ทั้งหมด</option>
           <option value="bronze">bronze</option>
           <option value="silver">silver</option>
           <option value="gold">gold</option>
         </select>
-
-        <button type="submit" style={goldBtnStyle}>
+        <button type="submit" className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-5 py-3 text-sm font-black text-black">
           ค้นหา
         </button>
       </form>
 
       <PointLogsTable
-        logs={logs.map((log: any) => ({
+        logs={logs.map((log) => ({
           id: log.id,
           lineId: log.lineId,
           type: log.type,
@@ -82,24 +49,3 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 220,
-  padding: "12px 14px",
-  borderRadius: 10,
-  border: "1px solid #333",
-  background: "#151515",
-  color: "#fff",
-  outline: "none",
-};
-
-const goldBtnStyle: React.CSSProperties = {
-  padding: "12px 18px",
-  borderRadius: 10,
-  border: "none",
-  background: "#d4af37",
-  color: "#000",
-  fontWeight: "bold",
-  cursor: "pointer",
-};

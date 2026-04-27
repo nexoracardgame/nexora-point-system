@@ -3,22 +3,19 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import MemberActions from "./MemberActions";
 
-type PageProps = {
-  params: Promise<{
-    id: string;
-  }>;
-};
+function Card({ title, value, gold }: { title: string; value: string; gold?: boolean }) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">{title}</div>
+      <div className={`mt-3 break-all text-xl font-black ${gold ? "text-amber-300" : "text-white"}`}>{value}</div>
+    </div>
+  );
+}
 
-export default async function MemberDetailPage({ params }: PageProps) {
+export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  const user = await prisma.user.findUnique({
-    where: { id },
-  });
-
-  if (!user) {
-    notFound();
-  }
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) notFound();
 
   const logs = await prisma.pointLog.findMany({
     where: { lineId: user.lineId },
@@ -27,42 +24,18 @@ export default async function MemberDetailPage({ params }: PageProps) {
   });
 
   return (
-    <div style={{ color: "#fff" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <h1 style={{ fontSize: 28, fontWeight: "bold", margin: 0 }}>
-          👤 รายละเอียดสมาชิก
-        </h1>
-
-        <Link
-          href="/admin/members"
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            background: "#1a1a1a",
-            color: "#fff",
-            textDecoration: "none",
-            border: "1px solid #333",
-          }}
-        >
-          ← กลับหน้าสมาชิก
+    <div className="space-y-5 text-white">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">Member Detail</div>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">รายละเอียดสมาชิก</h1>
+        </div>
+        <Link href="/admin/members" className="inline-flex rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-black text-white">
+          กลับหน้าสมาชิก
         </Link>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <Card title="ชื่อ" value={user.name || "-"} />
         <Card title="Line ID" value={user.lineId} />
         <Card title="NEX" value={String(user.nexPoint)} gold />
@@ -71,122 +44,25 @@ export default async function MemberDetailPage({ params }: PageProps) {
 
       <MemberActions lineId={user.lineId} />
 
-      <div
-        style={{
-          background: "#111",
-          border: "1px solid #222",
-          borderRadius: 16,
-          padding: 20,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 20,
-            marginBottom: 16,
-          }}
-        >
-          ประวัติการเพิ่มแต้ม
-        </h2>
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "fixed",
-          }}
-        >
-          <thead>
-            <tr style={{ borderBottom: "1px solid #333" }}>
-              <th style={{ padding: 12, textAlign: "left", width: "20%" }}>
-                ประเภท
-              </th>
-              <th style={{ padding: 12, textAlign: "center", width: "15%" }}>
-                จำนวน
-              </th>
-              <th style={{ padding: 12, textAlign: "center", width: "15%" }}>
-                แต้ม
-              </th>
-              <th style={{ padding: 12, textAlign: "center", width: "50%" }}>
-                เวลา
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {logs.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  style={{
-                    padding: 16,
-                    textAlign: "center",
-                    color: "#aaa",
-                  }}
-                >
-                  ยังไม่มีประวัติการเพิ่มแต้ม
-                </td>
-              </tr>
-            ) : (
-              logs.map((log: any) => (
-                <tr key={log.id} style={{ borderBottom: "1px solid #222" }}>
-                  <td style={{ padding: 12, textTransform: "capitalize" }}>
-                    {log.type}
-                  </td>
-                  <td style={{ padding: 12, textAlign: "center" }}>
-                    {log.amount}
-                  </td>
-                  <td
-                    style={{
-                      padding: 12,
-                      textAlign: "center",
-                      color: "#d4af37",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {log.point}
-                  </td>
-                  <td style={{ padding: 12, textAlign: "center" }}>
-                    {new Date(log.createdAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function Card({
-  title,
-  value,
-  gold,
-}: {
-  title: string;
-  value: string;
-  gold?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        background: "#111",
-        border: "1px solid #222",
-        borderRadius: 16,
-        padding: 20,
-      }}
-    >
-      <div style={{ fontSize: 14, color: "#aaa", marginBottom: 10 }}>{title}</div>
-      <div
-        style={{
-          fontSize: 24,
-          fontWeight: "bold",
-          color: gold ? "#d4af37" : "#fff",
-          wordBreak: "break-all",
-        }}
-      >
-        {value}
-      </div>
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <h2 className="text-lg font-black sm:text-xl">ประวัติการเพิ่มแต้ม</h2>
+        <div className="mt-4 grid gap-3">
+          {logs.length === 0 ? (
+            <div className="rounded-[22px] border border-white/8 bg-black/20 p-5 text-sm text-white/45">
+              ยังไม่มีประวัติการเพิ่มแต้ม
+            </div>
+          ) : (
+            logs.map((log) => (
+              <div key={log.id} className="grid gap-3 rounded-[22px] border border-white/8 bg-black/20 p-4 sm:grid-cols-[auto_auto_auto_1fr] sm:items-center">
+                <span className="rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase text-amber-300">{log.type}</span>
+                <div className="text-sm font-bold text-white/75">จำนวน {log.amount}</div>
+                <div className="text-sm font-black text-amber-300">+{log.point}</div>
+                <div className="text-xs text-white/42 sm:text-right">{new Date(log.createdAt).toLocaleString()}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 }

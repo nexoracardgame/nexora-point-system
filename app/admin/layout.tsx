@@ -15,31 +15,18 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  if ((session.user as any).role !== "admin") {
+  if ((session.user as { role?: string }).role !== "admin") {
     redirect("/");
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        background: "#000",
-        color: "#fff",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <AdminSidebar />
-
-      <main
-        style={{
-          flex: 1,
-          padding: 24,
-          background: "#000",
-        }}
-      >
-        {children}
-      </main>
+    <div className="min-h-screen bg-[#050608] text-white">
+      <div className="mx-auto flex min-h-screen max-w-[1800px] xl:items-stretch">
+        <AdminSidebar />
+        <main className="min-w-0 flex-1 px-3 pb-6 pt-3 sm:px-4 lg:px-5 xl:p-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

@@ -2,9 +2,7 @@ import { prisma } from "@/lib/prisma";
 import MembersTable from "./MembersTable";
 
 type PageProps = {
-  searchParams: Promise<{
-    q?: string;
-  }>;
+  searchParams: Promise<{ q?: string }>;
 };
 
 export default async function MembersPage({ searchParams }: PageProps) {
@@ -13,68 +11,37 @@ export default async function MembersPage({ searchParams }: PageProps) {
   const users = await prisma.user.findMany({
     where: q
       ? {
-          OR: [
-            { name: { contains: q } },
-            { lineId: { contains: q } },
-          ],
+          OR: [{ name: { contains: q } }, { lineId: { contains: q } }],
         }
       : undefined,
     orderBy: { createdAt: "desc" },
   });
 
   return (
-    <div
-      style={{
-        padding: 20,
-        color: "#fff",
-        background: "#000",
-        minHeight: "100vh",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <h1 style={{ fontSize: 24, marginBottom: 20 }}>👥 สมาชิกทั้งหมด</h1>
+    <div className="space-y-5">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">Admin Members</div>
+        <h1 className="mt-2 text-3xl font-black sm:text-4xl">สมาชิกทั้งหมด</h1>
+      </div>
 
-      <form
-        method="GET"
-        style={{
-          display: "flex",
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
+      <form method="GET" className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <input
           type="text"
           name="q"
           defaultValue={q}
           placeholder="ค้นหาชื่อ หรือ Line ID"
-          style={{
-            flex: 1,
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid #333",
-            background: "#111",
-            color: "#fff",
-            outline: "none",
-          }}
+          className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none transition focus:border-amber-300/25"
         />
         <button
           type="submit"
-          style={{
-            padding: "12px 18px",
-            borderRadius: 10,
-            border: "none",
-            background: "#d4af37",
-            color: "#000",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
+          className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-5 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.22)]"
         >
           ค้นหา
         </button>
       </form>
 
       <MembersTable
-        users={users.map((user: any) => ({
+        users={users.map((user) => ({
           id: user.id,
           name: user.name,
           lineId: user.lineId,

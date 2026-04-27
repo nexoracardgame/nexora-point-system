@@ -1,51 +1,29 @@
 import { prisma } from "@/lib/prisma";
-import RewardsTable from "./RewardsTable";
 import RewardCreateForm from "./RewardCreateForm";
+import RewardsTable from "./RewardsTable";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminRewardsPage() {
-  let rewards: Awaited<ReturnType<typeof prisma.reward.findMany>> = [];
-
-  try {
-    rewards = await prisma.reward.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-  } catch {
-    rewards = [];
-  }
+  const rewards = await prisma.reward.findMany({ orderBy: { createdAt: "desc" } }).catch(() => []);
 
   return (
-    <div style={{ color: "#fff" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <h1 style={{ fontSize: 28, fontWeight: "bold", margin: 0 }}>
-          🎁 Rewards
-        </h1>
+    <div className="space-y-5 text-white">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">Admin Rewards</div>
+        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Rewards</h1>
       </div>
 
-      <div
-        style={{
-          marginBottom: 24,
-          background: "#111",
-          border: "1px solid #222",
-          borderRadius: 16,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ fontSize: 20, marginBottom: 16 }}>เพิ่มของรางวัล</h2>
-        <RewardCreateForm />
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <h2 className="text-lg font-black sm:text-xl">เพิ่มของรางวัล</h2>
+        <div className="mt-4">
+          <RewardCreateForm />
+        </div>
       </div>
 
       <RewardsTable
-        rewards={rewards.map((reward: any) => ({
+        rewards={rewards.map((reward) => ({
           id: reward.id,
           name: reward.name,
           imageUrl: reward.imageUrl,
