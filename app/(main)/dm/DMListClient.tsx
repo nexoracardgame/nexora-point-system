@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
+import { formatThaiRoomTime } from "@/lib/thai-time";
 
 type SessionUser = {
   id: string;
@@ -12,29 +13,6 @@ type SessionUser = {
   name?: string | null;
   image?: string | null;
 };
-
-function formatRoomTime(dateString?: string) {
-  if (!dateString) return "";
-
-  const date = new Date(dateString);
-  const now = new Date();
-  const isSameDay =
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear();
-
-  if (isSameDay) {
-    return date.toLocaleTimeString("th-TH", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  return date.toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-  });
-}
 
 function formatDealPriceLabel(value?: number) {
   const amount = Number(value || 0);
@@ -54,6 +32,8 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
     createdAt: String(room.createdAt || ""),
     unread: Number(room.unread || 0),
     dealCardName: room.dealCardName ? String(room.dealCardName) : undefined,
+    dealCardImage: room.dealCardImage ? String(room.dealCardImage) : undefined,
+    dealCardNo: room.dealCardNo ? String(room.dealCardNo) : undefined,
     dealPrice: Number(room.dealPrice || 0),
     sellerName: room.sellerName ? String(room.sellerName) : undefined,
     sellerImage: room.sellerImage ? String(room.sellerImage) : undefined,
@@ -362,8 +342,8 @@ export default function DMListClient({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="truncate text-base font-black text-black">{room.otherName}</div>
-                          <div className="shrink-0 text-[11px] font-bold text-black/35">
-                            {formatRoomTime(room.createdAt)}
+                            <div className="shrink-0 text-[11px] font-bold text-black/35">
+                            {formatThaiRoomTime(room.createdAt)}
                           </div>
                         </div>
                         <div
@@ -434,12 +414,29 @@ export default function DMListClient({
                               </div>
                             </div>
                             <div className="shrink-0 text-[10px] font-semibold text-white/40">
-                              {formatRoomTime(room.createdAt)}
+                              {formatThaiRoomTime(room.createdAt)}
                             </div>
                           </div>
 
-                          <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.05] px-3 py-2.5 text-xs font-medium text-white/72">
-                            {room.lastMessage || `กำลังคุยกับ ${room.otherName}`}
+                          <div className="mt-3 grid grid-cols-[1fr_auto] gap-3 rounded-[20px] border border-white/8 bg-white/[0.05] p-2.5">
+                            <div className="min-w-0 rounded-[16px] px-1 py-1 text-xs font-medium text-white/72">
+                              {room.lastMessage || `กำลังคุยกับ ${room.otherName}`}
+                            </div>
+                            <div className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-black/20 px-2.5 py-2">
+                              <img
+                                src={room.dealCardImage || "/cards/001.jpg"}
+                                alt={room.dealCardName || "Deal card"}
+                                className="h-12 w-9 rounded-[10px] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.28)]"
+                              />
+                              <div className="min-w-0">
+                                <div className="max-w-[110px] truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#ffe27a]">
+                                  {room.dealCardNo ? `CARD ${room.dealCardNo}` : "DEAL CARD"}
+                                </div>
+                                <div className="mt-0.5 max-w-[110px] truncate text-[11px] font-semibold text-white/78">
+                                  {room.dealCardName || "Unknown card"}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

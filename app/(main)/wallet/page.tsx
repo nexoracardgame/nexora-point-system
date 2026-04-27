@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { formatThaiDateTime, formatThaiTimeAgo } from "@/lib/thai-time";
 
 export const revalidate = 30;
 export const dynamic = "force-dynamic";
@@ -33,27 +34,6 @@ function safeImage(image?: string | null) {
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("th-TH");
-}
-
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
-}
-
-function timeAgo(value: Date) {
-  const diff = Date.now() - value.getTime();
-  const mins = Math.floor(diff / 60000);
-
-  if (mins < 1) return "เมื่อสักครู่";
-  if (mins < 60) return `${mins} นาทีที่แล้ว`;
-
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`;
-
-  const days = Math.floor(hours / 24);
-  return `${days} วันที่แล้ว`;
 }
 
 function activityToneClass(tone: ActivityItem["tone"]) {
@@ -325,7 +305,7 @@ export default async function WalletPage() {
         ? `ใช้สิทธิ์ ${coupon.reward.name} แล้ว`
         : `แลกรางวัล ${coupon.reward.name}`,
       subtitle: coupon.used
-        ? `ใช้งานเมื่อ ${formatDateTime(coupon.usedAt || coupon.createdAt)}`
+        ? `ใช้งานเมื่อ ${formatThaiDateTime(coupon.usedAt || coupon.createdAt)}`
         : coupon.reward.nexCost != null
           ? `คูปองพร้อมใช้ ใช้ ${formatNumber(Number(coupon.reward.nexCost))} NEX`
           : coupon.reward.coinCost != null
@@ -596,7 +576,7 @@ export default async function WalletPage() {
                       <div className="mt-1 truncate text-sm text-white/42">{item.subtitle}</div>
                     </div>
                     <div className="text-right text-sm font-black text-white/78">
-                      {"createdAt" in item ? timeAgo(item.createdAt) : index === 0 ? "Live" : "Ready"}
+                      {"createdAt" in item ? formatThaiTimeAgo(item.createdAt) : index === 0 ? "Live" : "Ready"}
                     </div>
                   </div>
                 ))}
@@ -644,7 +624,7 @@ export default async function WalletPage() {
                 <div className="hidden min-w-0 sm:block">
                   <div className="truncate text-sm font-black">{displayName}</div>
                   <div className="text-xs text-white/45">
-                    สมาชิกตั้งแต่ {formatDateTime(safeUser.createdAt)}
+                    สมาชิกตั้งแต่ {formatThaiDateTime(safeUser.createdAt)}
                   </div>
                 </div>
               </div>
@@ -664,7 +644,7 @@ export default async function WalletPage() {
                       </div>
                     </div>
                     <div className="text-right text-xs text-white/56">
-                      {formatDateTime(new Date())}
+                      {formatThaiDateTime(new Date())}
                     </div>
                   </div>
 
@@ -814,7 +794,7 @@ export default async function WalletPage() {
                     สมาชิกตั้งแต่
                   </div>
                   <div className="mt-2 text-lg font-black">
-                    {formatDateTime(safeUser.createdAt)}
+                    {formatThaiDateTime(safeUser.createdAt)}
                   </div>
                 </div>
 
@@ -869,7 +849,7 @@ export default async function WalletPage() {
                             activity.tone
                           )}`}
                         >
-                          {timeAgo(activity.createdAt)}
+                          {formatThaiTimeAgo(activity.createdAt)}
                         </div>
                       </div>
                     </div>

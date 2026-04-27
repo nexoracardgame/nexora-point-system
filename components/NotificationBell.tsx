@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import { getLocaleTag, useLanguage } from "@/lib/i18n";
+import { formatThaiShortDate } from "@/lib/thai-time";
 import {
   Bell,
   Heart,
@@ -50,10 +51,7 @@ function formatNotificationTime(
   if (diffHours < 24) return t("notifications.hours", { count: diffHours });
   if (diffDays < 7) return t("notifications.days", { count: diffDays });
 
-  return date.toLocaleDateString(localeTag, {
-    day: "numeric",
-    month: "short",
-  });
+  return formatThaiShortDate(dateString, localeTag);
 }
 
 function getNotificationIcon(type: NotificationItem["type"]) {

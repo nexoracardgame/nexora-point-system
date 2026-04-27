@@ -1,4 +1,5 @@
 import { getAllLocalDeals } from "@/lib/local-deal-store";
+import { formatThaiDateTime } from "@/lib/thai-time";
 
 export default async function MarketHistoryPage() {
   const history = (await getAllLocalDeals())
@@ -22,7 +23,7 @@ export default async function MarketHistoryPage() {
               className="flex items-center gap-4 rounded-xl bg-zinc-900 p-4"
             >
               <div className="text-sm text-zinc-400">
-                {new Date(item.createdAt).toLocaleString("th-TH")}
+                {formatThaiDateTime(item.createdAt)}
               </div>
 
               <div className="font-bold text-green-400">

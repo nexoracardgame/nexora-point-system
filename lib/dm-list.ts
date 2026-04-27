@@ -14,6 +14,8 @@ export type DMRoomListItem = {
   otherImage: string;
   unread: number;
   dealCardName?: string;
+  dealCardImage?: string;
+  dealCardNo?: string;
   dealPrice?: number;
   sellerName?: string;
   sellerImage?: string;
@@ -204,13 +206,14 @@ export async function getDmRoomsForUser(
             in: dealCardIds,
           },
         },
-        select: {
-          id: true,
-          cardName: true,
-          cardNo: true,
-          price: true,
-        },
-      })
+      select: {
+        id: true,
+        cardName: true,
+        cardNo: true,
+        imageUrl: true,
+        price: true,
+      },
+    })
     : [];
   const dealCardById = new Map(dealCards.map((card) => [card.id, card]));
 
@@ -296,6 +299,10 @@ export async function getDmRoomsForUser(
       otherImage: safeImage(other.image),
       unread: unreadCountByRoom.get(roomId) || 0,
       dealCardName: cardName,
+      dealCardImage:
+        String(card?.imageUrl || "").trim() ||
+        `/cards/${String(card?.cardNo || "001").padStart(3, "0")}.jpg`,
+      dealCardNo: String(card?.cardNo || "001").padStart(3, "0"),
       dealPrice: Number(deal.offeredPrice || card?.price || 0),
       sellerName: seller.displayName || seller.name || "Seller",
       sellerImage: safeImage(seller.image),

@@ -7,6 +7,7 @@ import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
+import { formatThaiTime } from "@/lib/thai-time";
 
 type DMMessage = {
   id: string;
@@ -31,16 +32,6 @@ type ChatUser = {
   name?: string | null;
   image?: string | null;
 } | null;
-
-function formatTime(dateString?: string | null) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-
-  return date.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function buildSender(
   senderId: string,
@@ -898,7 +889,7 @@ export default function DMPage() {
                           mine ? "text-right" : "text-left"
                         }`}
                       >
-                        {formatTime(m.createdAt)}
+                      {formatThaiTime(m.createdAt)}
                       </div>
 
                       {mine && lastSeenMineId === m.id && m.seenAt && (

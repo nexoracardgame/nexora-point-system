@@ -6,6 +6,7 @@ import { ArrowLeft, Image as ImageIcon, Send, Smile, X, MoreHorizontal } from "l
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
+import { formatThaiTime } from "@/lib/thai-time";
 
 type ChatUser = {
   id: string;
@@ -39,15 +40,6 @@ type DealMessage = {
   senderImage?: string | null;
   optimistic?: boolean;
 };
-
-function formatTime(dateString?: string | null) {
-  if (!dateString) return "";
-
-  return new Date(dateString).toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function formatPrice(value?: number | null) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
@@ -955,7 +947,7 @@ export default function DealChatPage() {
                           mine ? "text-right" : "text-left"
                         }`}
                       >
-                        {formatTime(message.createdAt)}
+                      {formatThaiTime(message.createdAt)}
                       </div>
 
                       {mine && lastSeenMineId === message.id && message.seenAt && (
