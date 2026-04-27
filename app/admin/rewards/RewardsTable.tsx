@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { formatThaiDateTime } from "@/lib/thai-time";
 
 type RewardRow = {
   id: string;
@@ -91,7 +92,7 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
                   <div className="mt-1 font-black text-white">{reward.stock}</div>
                 </div>
               </div>
-              <div className="mt-3 text-xs text-white/42">{new Date(reward.createdAt).toLocaleString()}</div>
+              <div className="mt-3 text-xs text-white/42">{formatThaiDateTime(reward.createdAt)}</div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="button" onClick={() => startEdit(reward)} className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black">
                   แก้ไข

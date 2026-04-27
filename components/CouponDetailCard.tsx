@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Ticket,
 } from "lucide-react";
+import { formatThaiDateTime } from "@/lib/thai-time";
 
 export type CouponViewModel = {
   id: string;
@@ -37,10 +38,7 @@ export type CouponViewModel = {
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
 
-  return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatThaiDateTime(value);
 }
 
 export default function CouponDetailCard({

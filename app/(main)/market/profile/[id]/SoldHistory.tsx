@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatThaiDate } from "@/lib/thai-time";
 
 type SoldItem = {
   id: string;
@@ -52,9 +53,7 @@ export default function SoldHistory({ userId }: { userId: string }) {
               ฿{item.price?.toLocaleString()}
             </div>
 
-            <div className="text-xs text-zinc-400">
-              {new Date(item.createdAt).toLocaleDateString()}
-            </div>
+            <div className="text-xs text-zinc-400">{formatThaiDate(item.createdAt)}</div>
           </div>
         ))}
       </div>

@@ -12,15 +12,13 @@ import {
   Ticket,
   X,
 } from "lucide-react";
+import { formatThaiDateTime } from "@/lib/thai-time";
 import CouponDetailCard, { type CouponViewModel } from "./CouponDetailCard";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
 
-  return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatThaiDateTime(value);
 }
 
 export default function RedeemCouponsClient({

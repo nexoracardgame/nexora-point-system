@@ -1,5 +1,7 @@
 "use client";
 
+import { formatThaiDateTime } from "@/lib/thai-time";
+
 type PointLogRow = {
   id: string;
   lineId: string;
@@ -28,7 +30,7 @@ export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
               <div className="text-sm font-bold text-white/78">จำนวน {log.amount}</div>
               <div className="text-sm font-black text-amber-300">+{log.point}</div>
             </div>
-            <div className="mt-3 text-xs text-white/42">{new Date(log.createdAt).toLocaleString()}</div>
+            <div className="mt-3 text-xs text-white/42">{formatThaiDateTime(log.createdAt)}</div>
           </div>
         ))
       )}

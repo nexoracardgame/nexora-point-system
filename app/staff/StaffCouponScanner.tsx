@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { CouponViewModel } from "@/components/CouponDetailCard";
+import { formatThaiDateTime } from "@/lib/thai-time";
 
 declare global {
   interface Window {
@@ -395,12 +396,12 @@ export default function StaffCouponScanner() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">สร้างเมื่อ</div>
-                    <div className="mt-2 text-sm font-bold text-white/75">{new Date(result.createdAt).toLocaleString()}</div>
+                    <div className="mt-2 text-sm font-bold text-white/75">{formatThaiDateTime(result.createdAt)}</div>
                   </div>
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">ใช้งานเมื่อ</div>
                     <div className="mt-2 text-sm font-bold text-white/75">
-                      {result.usedAt ? new Date(result.usedAt).toLocaleString() : "-"}
+                      {result.usedAt ? formatThaiDateTime(result.usedAt) : "-"}
                     </div>
                   </div>
                 </div>

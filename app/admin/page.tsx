@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatThaiDate, formatThaiDateTime } from "@/lib/thai-time";
 import DashboardCharts from "./DashboardCharts";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export default async function AdminDashboardPage() {
 
   const groupedMap = new Map<string, number>();
   for (const user of users) {
-    const date = new Date(user.createdAt).toLocaleDateString("th-TH");
+    const date = formatThaiDate(user.createdAt);
     groupedMap.set(date, (groupedMap.get(date) || 0) + 1);
   }
 
@@ -89,7 +90,7 @@ export default async function AdminDashboardPage() {
                   </span>
                 </div>
                 <div className="text-sm font-bold text-white/72 sm:text-right">
-                  +{log.point} • {new Date(log.createdAt).toLocaleString()}
+                  +{log.point} • {formatThaiDateTime(log.createdAt)}
                 </div>
               </div>
             ))

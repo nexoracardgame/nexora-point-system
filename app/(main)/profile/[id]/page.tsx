@@ -15,6 +15,7 @@ import { authOptions } from "@/lib/auth";
 import { getMarketListings } from "@/lib/market-listings";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
+import { formatThaiDate } from "@/lib/thai-time";
 import {
   buildRankLabel,
   buildSellerScore,
@@ -713,9 +714,7 @@ export default async function SellerProfilePage({
                         )}
                       </div>
 
-                      <div className="mt-2 text-xs text-white/55">
-                        {new Date(item.createdAt).toLocaleDateString("th-TH")}
-                      </div>
+                      <div className="mt-2 text-xs text-white/55">{formatThaiDate(item.createdAt)}</div>
                     </div>
                   </div>
                 </div>

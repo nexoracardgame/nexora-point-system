@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { formatThaiDateTime } from "@/lib/thai-time";
 import MemberActions from "./MemberActions";
 
 function Card({ title, value, gold }: { title: string; value: string; gold?: boolean }) {
@@ -57,7 +58,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 <span className="rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase text-amber-300">{log.type}</span>
                 <div className="text-sm font-bold text-white/75">จำนวน {log.amount}</div>
                 <div className="text-sm font-black text-amber-300">+{log.point}</div>
-                <div className="text-xs text-white/42 sm:text-right">{new Date(log.createdAt).toLocaleString()}</div>
+                <div className="text-xs text-white/42 sm:text-right">{formatThaiDateTime(log.createdAt)}</div>
               </div>
             ))
           )}

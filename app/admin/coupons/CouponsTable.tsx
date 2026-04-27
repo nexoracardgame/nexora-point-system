@@ -1,6 +1,7 @@
 "use client";
 
 import type { CouponViewModel } from "@/components/CouponDetailCard";
+import { formatThaiDateTime } from "@/lib/thai-time";
 
 type Props = {
   coupons: CouponViewModel[];
@@ -102,14 +103,14 @@ export default function CouponsTable({ coupons }: Props) {
               <div style={cardStyle}>
                 <div style={labelStyle}>Created</div>
                 <div style={valueStyleSmall}>
-                  {new Date(coupon.createdAt).toLocaleString()}
+                  {formatThaiDateTime(coupon.createdAt)}
                 </div>
               </div>
 
               <div style={cardStyle}>
                 <div style={labelStyle}>Used At</div>
                 <div style={valueStyleSmall}>
-                  {coupon.usedAt ? new Date(coupon.usedAt).toLocaleString() : "-"}
+                  {coupon.usedAt ? formatThaiDateTime(coupon.usedAt) : "-"}
                 </div>
               </div>
             </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { formatThaiDateTime } from "@/lib/thai-time";
 
 type UserRow = {
   id: string;
@@ -79,7 +80,7 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
             </div>
           </div>
 
-          <div className="mt-3 text-xs text-white/42">{new Date(user.createdAt).toLocaleString()}</div>
+          <div className="mt-3 text-xs text-white/42">{formatThaiDateTime(user.createdAt)}</div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
             <input
