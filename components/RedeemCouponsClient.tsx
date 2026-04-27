@@ -293,7 +293,7 @@ export default function RedeemCouponsClient({
 
       {selectedCoupon ? (
         <div className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/75 p-0 backdrop-blur-md sm:items-center sm:p-5">
-          <div className="relative max-h-[100dvh] w-full overflow-auto rounded-t-[30px] border border-white/10 bg-[#080a11] p-3 shadow-[0_30px_120px_rgba(0,0,0,0.65)] sm:max-h-[92vh] sm:max-w-6xl sm:rounded-[30px] sm:p-5">
+          <div className="relative max-h-[100dvh] w-full overflow-auto rounded-t-[30px] border border-white/10 bg-[#080a11] px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 shadow-[0_30px_120px_rgba(0,0,0,0.65)] sm:max-h-[92vh] sm:max-w-6xl sm:rounded-[30px] sm:p-5">
             <button
               type="button"
               onClick={() => setSelectedCode("")}
@@ -302,7 +302,9 @@ export default function RedeemCouponsClient({
               <X className="h-5 w-5" />
             </button>
 
-            <CouponDetailCard coupon={selectedCoupon} compact />
+            <div className="mt-2">
+              <CouponDetailCard coupon={selectedCoupon} compact />
+            </div>
           </div>
         </div>
       ) : null}

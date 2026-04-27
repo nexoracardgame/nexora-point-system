@@ -360,10 +360,10 @@ export default function MainLayout({
         active: pathname.startsWith("/redeem"),
       },
       {
-        href: "/collections",
-        label: t("layout.nav.collections"),
-        icon: FolderKanban,
-        active: pathname.startsWith("/collections"),
+        href: "/redeem",
+        label: t("layout.nav.redeem"),
+        icon: Gift,
+        active: pathname.startsWith("/redeem"),
       },
       {
         href: "/community",
