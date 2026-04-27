@@ -143,7 +143,10 @@ export default function MarketDashboardTFT({
   const [likesReady, setLikesReady] = useState(false);
   const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
   const [mouse, setMouse] = useState({ x: 50, y: 50 });
+  const [freshListingIds, setFreshListingIds] = useState<string[]>([]);
   const itemsRef = useRef(items);
+  const seenListingIdsRef = useRef<Set<string>>(new Set(initialItems.map((item) => item.id)));
+  const refreshInFlightRef = useRef(false);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -220,10 +223,28 @@ export default function MarketDashboardTFT({
           return;
         }
 
+        const previousIds = seenListingIdsRef.current;
+        const newIds = mapped
+          .map((item) => item.id)
+          .filter((id) => !previousIds.has(id));
+
+        seenListingIdsRef.current = new Set(mapped.map((item) => item.id));
+
         startTransition(() => {
           setItems(mapped);
           setLoading(false);
+          if (newIds.length > 0 && itemsRef.current.length > 0) {
+            setFreshListingIds(newIds);
+          }
         });
+
+        if (newIds.length > 0) {
+          window.setTimeout(() => {
+            setFreshListingIds((prev) =>
+              prev.filter((id) => !newIds.includes(id))
+            );
+          }, 5000);
+        }
       } catch {
         startTransition(() => {
           setLoading(false);
@@ -288,6 +309,21 @@ export default function MarketDashboardTFT({
     return listenMarketSync(() => {
       void refreshListings({ preserveOnEmpty: false });
     });
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible" || refreshInFlightRef.current) {
+        return;
+      }
+
+      refreshInFlightRef.current = true;
+      void refreshListings({ preserveOnEmpty: true }).finally(() => {
+        refreshInFlightRef.current = false;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -775,8 +811,17 @@ export default function MarketDashboardTFT({
               <Link
                 key={card.id}
                 href={`/market/card/${card.id}`}
-                className={`group relative transition-all duration-500 hover:-translate-y-2 ${rarity.ring}`}
+                className={`group relative transition-all duration-500 hover:-translate-y-2 ${rarity.ring} ${
+                  freshListingIds.includes(card.id)
+                    ? "animate-[pulse_1.4s_ease-in-out_3]"
+                    : ""
+                }`}
               >
+                {freshListingIds.includes(card.id) && (
+                  <div className="absolute -top-2 left-3 z-30 rounded-full border border-amber-300/30 bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(251,191,36,0.35)]">
+                    NEW
+                  </div>
+                )}
                 <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-[#0d0f16] shadow-[0_20px_60px_rgba(0,0,0,0.4)] lg:rounded-[28px]">
                   <div className={`absolute inset-0 bg-gradient-to-b ${rarity.glow}`} />
 

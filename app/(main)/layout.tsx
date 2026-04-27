@@ -246,7 +246,7 @@ export default function MainLayout({
       if (document.visibilityState === "visible") {
         void syncChatUnread();
       }
-    }, 5000);
+    }, 900);
 
     const handleFocus = () => {
       void syncChatUnread();
@@ -299,7 +299,7 @@ export default function MainLayout({
       if (document.visibilityState === "visible") {
         void syncWalletUnread();
       }
-    }, 1500);
+    }, 900);
 
     const handleFocus = () => void syncWalletUnread();
     const handleVisibility = () => {

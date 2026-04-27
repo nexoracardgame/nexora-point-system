@@ -185,8 +185,10 @@ export default function NotificationBell() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      void loadNotifications();
-    }, 1500);
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+      }
+    }, 800);
 
     const onFocus = () => {
       void loadNotifications();
@@ -227,6 +229,22 @@ export default function NotificationBell() {
     channel.on(
       "postgres_changes",
       { event: "*", schema: "public", table: "dm_room" },
+      () => {
+        void loadNotifications();
+      }
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "AppNotification" },
+      () => {
+        void loadNotifications();
+      }
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "FriendRequest" },
       () => {
         void loadNotifications();
       }
