@@ -17,7 +17,6 @@ import {
   writeClientViewCache,
 } from "@/lib/client-view-cache";
 import { formatThaiDateTime } from "@/lib/thai-time";
-import { trackUiFetch } from "@/lib/ui-activity";
 import CouponDetailCard, { type CouponViewModel } from "./CouponDetailCard";
 
 type RedeemCouponsCache = {
@@ -97,7 +96,7 @@ export default function RedeemCouponsClient({
 
       try {
         setLoading(true);
-        const res = await trackUiFetch(`/api/coupon/list?ts=${Date.now()}`, {
+        const res = await fetch(`/api/coupon/list?ts=${Date.now()}`, {
           cache: "no-store",
         });
 
