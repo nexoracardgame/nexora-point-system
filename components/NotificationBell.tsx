@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -13,11 +14,12 @@ import {
   MessageCircle,
   ChevronRight,
   UserPlus,
+  Gift,
 } from "lucide-react";
 
 type NotificationItem = {
   id: string;
-  type: "chat" | "deal" | "wishlist" | "friend";
+  type: "chat" | "deal" | "wishlist" | "friend" | "wallet";
   title: string;
   body: string;
   href: string;
@@ -29,6 +31,55 @@ type NotificationItem = {
 type NotificationResponse = {
   items: NotificationItem[];
 };
+
+const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
+
+function isSystemNotificationSupported() {
+  return (
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    "serviceWorker" in navigator
+  );
+}
+
+function readDeliveredNotificationIds() {
+  if (typeof window === "undefined") {
+    return new Set<string>();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(DELIVERED_NOTIFICATION_STORAGE_KEY);
+    if (!raw) {
+      return new Set<string>();
+    }
+
+    const parsed = JSON.parse(raw) as string[] | null;
+    if (!Array.isArray(parsed)) {
+      return new Set<string>();
+    }
+
+    return new Set(
+      parsed.map((id) => String(id || "").trim()).filter(Boolean)
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeDeliveredNotificationIds(ids: Set<string>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      DELIVERED_NOTIFICATION_STORAGE_KEY,
+      JSON.stringify(Array.from(ids).slice(-240))
+    );
+  } catch {
+    return;
+  }
+}
 
 function formatNotificationTime(
   dateString: string,
@@ -58,23 +109,100 @@ function getNotificationIcon(type: NotificationItem["type"]) {
       return Handshake;
     case "friend":
       return UserPlus;
+    case "wallet":
+      return Gift;
     default:
       return Heart;
   }
 }
 
 export default function NotificationBell() {
+  const pathname = usePathname();
   const { locale, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const hiddenIdsRef = useRef<Set<string>>(new Set());
+  const deliveredIdsRef = useRef<Set<string>>(new Set());
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const hasInitialSyncRef = useRef(false);
+  const permissionBootstrapBoundRef = useRef(false);
   const requestIdRef = useRef(0);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
   const localeTag = getLocaleTag(locale);
+
+  const rememberDeliveredNotification = (notificationId: string) => {
+    const safeId = String(notificationId || "").trim();
+    if (!safeId) {
+      return;
+    }
+
+    deliveredIdsRef.current.add(safeId);
+    writeDeliveredNotificationIds(deliveredIdsRef.current);
+  };
+
+  const showSystemNotification = async (item: NotificationItem) => {
+    if (!isSystemNotificationSupported()) {
+      return;
+    }
+
+    if (Notification.permission !== "granted") {
+      return;
+    }
+
+    if (
+      document.visibilityState === "visible" &&
+      String(item.href || "").trim() === pathname
+    ) {
+      rememberDeliveredNotification(item.id);
+      return;
+    }
+
+    try {
+      const registration =
+        swRegistrationRef.current || (await navigator.serviceWorker.ready);
+
+      swRegistrationRef.current = registration;
+
+      await registration.showNotification(item.title, {
+        body: item.body,
+        icon: item.image || "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: item.id,
+        data: {
+          href: item.href || "/",
+          id: item.id,
+        },
+      });
+
+      rememberDeliveredNotification(item.id);
+    } catch {
+      return;
+    }
+  };
+
+  const requestSystemNotificationPermission = async () => {
+    if (!isSystemNotificationSupported()) {
+      return;
+    }
+
+    if (Notification.permission !== "default") {
+      return;
+    }
+
+    try {
+      const result = await Notification.requestPermission();
+      if (result === "granted") {
+        void loadNotifications();
+      }
+    } catch {
+      return;
+    }
+  };
 
   const loadNotifications = async () => {
     if (inFlightRef.current) {
@@ -97,7 +225,30 @@ export default function NotificationBell() {
 
       const nextItems = Array.isArray(data?.items) ? data.items : [];
       const hiddenIds = hiddenIdsRef.current;
-      setItems(nextItems.filter((item) => !hiddenIds.has(item.id)));
+      const visibleItems = nextItems.filter((item) => !hiddenIds.has(item.id));
+      setItems(visibleItems);
+
+      if (!hasInitialSyncRef.current) {
+        hasInitialSyncRef.current = true;
+        for (const item of visibleItems) {
+          knownIdsRef.current.add(item.id);
+        }
+        return;
+      }
+
+      const newItems = visibleItems.filter(
+        (item) =>
+          !knownIdsRef.current.has(item.id) &&
+          !deliveredIdsRef.current.has(item.id)
+      );
+
+      for (const item of visibleItems) {
+        knownIdsRef.current.add(item.id);
+      }
+
+      for (const item of newItems) {
+        void showSystemNotification(item);
+      }
     } catch {
       return;
     } finally {
@@ -182,6 +333,69 @@ export default function NotificationBell() {
       );
     }
   };
+
+  useEffect(() => {
+    deliveredIdsRef.current = readDeliveredNotificationIds();
+  }, []);
+
+  useEffect(() => {
+    if (!isSystemNotificationSupported()) {
+      return;
+    }
+
+    let mounted = true;
+
+    void navigator.serviceWorker
+      .register("/sw.js", {
+        scope: "/",
+        updateViaCache: "none",
+      })
+      .then((registration) => {
+        if (!mounted) {
+          return;
+        }
+
+        swRegistrationRef.current = registration;
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSystemNotificationSupported()) {
+      return;
+    }
+
+    if (Notification.permission !== "default" || permissionBootstrapBoundRef.current) {
+      return;
+    }
+
+    permissionBootstrapBoundRef.current = true;
+
+    const requestOnInteraction = () => {
+      void requestSystemNotificationPermission();
+      window.removeEventListener("pointerdown", requestOnInteraction);
+      window.removeEventListener("keydown", requestOnInteraction);
+      permissionBootstrapBoundRef.current = false;
+    };
+
+    window.addEventListener("pointerdown", requestOnInteraction, {
+      once: true,
+      passive: true,
+    });
+    window.addEventListener("keydown", requestOnInteraction, {
+      once: true,
+    });
+
+    return () => {
+      window.removeEventListener("pointerdown", requestOnInteraction);
+      window.removeEventListener("keydown", requestOnInteraction);
+      permissionBootstrapBoundRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -294,8 +508,11 @@ export default function NotificationBell() {
     <div className="relative z-[700]" ref={wrapRef}>
       <button
         type="button"
-        onClick={(e) => {
+        onClick={async (e) => {
           e.stopPropagation();
+          if (isSystemNotificationSupported() && Notification.permission === "default") {
+            await requestSystemNotificationPermission();
+          }
           setOpen((prev) => !prev);
         }}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-amber-300 transition hover:bg-white/[0.06] hover:shadow-[0_0_18px_rgba(251,191,36,0.14)]"

@@ -667,29 +667,29 @@ export default function MainLayout({
                 </PrefetchLink>
 
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                  <div className="w-[122px] shrink-0 rounded-[14px] border border-white/10 bg-[#121418] px-2 py-1.5 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:hidden">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06] text-white">
-                        <Gem className="h-3 w-3" />
+                  <div className="w-[110px] shrink-0 rounded-[13px] border border-white/10 bg-[#121418] px-1.5 py-1.5 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:hidden">
+                    <div className="flex min-w-0 items-center justify-between gap-1">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[8px] bg-white/[0.06] text-white">
+                        <Gem className="h-[10px] w-[10px]" />
                       </div>
-                      <div className="min-w-0 truncate text-[12px] font-black leading-none text-white">
+                      <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[10px] font-black leading-none text-white">
                         {formatBalance(liveBalances.nexPoint)}
-                        <span className="ml-1 text-[8px] font-bold uppercase tracking-[0.14em] text-white/62">
-                          NEX
-                        </span>
+                      </div>
+                      <div className="shrink-0 text-[6.5px] font-bold uppercase tracking-[0.1em] text-white/62">
+                        NEX
                       </div>
                     </div>
 
                     <div className="mt-1 border-t border-white/8 pt-1">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06] text-white">
-                          <Coins className="h-3 w-3" />
+                      <div className="flex min-w-0 items-center justify-between gap-1">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[8px] bg-white/[0.06] text-white">
+                          <Coins className="h-[10px] w-[10px]" />
                         </div>
-                        <div className="min-w-0 truncate text-[12px] font-black leading-none text-white">
+                        <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-[10px] font-black leading-none text-white">
                           {formatBalance(liveBalances.coin)}
-                          <span className="ml-1 text-[8px] font-bold uppercase tracking-[0.14em] text-white/62">
-                            COIN
-                          </span>
+                        </div>
+                        <div className="shrink-0 text-[6.5px] font-bold uppercase tracking-[0.1em] text-white/62">
+                          COIN
                         </div>
                       </div>
                     </div>
