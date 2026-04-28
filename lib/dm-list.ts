@@ -1,7 +1,9 @@
 import { getDealChatRoomId } from "@/lib/deal-chat";
 import { resolveCardDisplayImage } from "@/lib/card-image";
 import {
+  getDmConversationClearedAtMap,
   getDmRoomClearedAtMap,
+  getLatestClearTimestamp,
   isRoomActivityVisibleAfterClear,
 } from "@/lib/dm-room-clear-state";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
@@ -234,6 +236,10 @@ export async function getDmRoomsForUser(
   const otherUserIdMap = new Map(
     profileRows.map((item) => [item.roomId, item.otherUserId])
   );
+  const conversationClearAtByOtherUserId = await getDmConversationClearedAtMap(
+    myId,
+    profileRows.map((item) => item.otherUserId)
+  );
 
   const dealCardIds = Array.from(
     new Set(deals.map((deal) => String(deal.cardId || "")).filter(Boolean))
@@ -267,6 +273,10 @@ export async function getDmRoomsForUser(
       String(roomUserAIsMe ? room.userb : room.usera || "").trim();
     const lastMessageAt = String(latestMessage?.createdAt || "").trim();
     const createdAt = lastMessageAt || String(room.updatedat || "").trim();
+    const clearedAt = getLatestClearTimestamp(
+      directRoomClearAtByRoomId.get(roomId) || null,
+      conversationClearAtByOtherUserId.get(otherUserId) || null
+    );
 
     return {
       kind: "direct" as const,
@@ -287,9 +297,10 @@ export async function getDmRoomsForUser(
         safeImage(roomUserAIsMe ? room.userbimage : room.useraimage) ||
         safeImage(latestMessage?.senderImage),
       unread: unreadCountByRoom.get(roomId) || 0,
+      __clearedAt: clearedAt,
     };
   }).filter((item) => {
-    const clearedAt = directRoomClearAtByRoomId.get(item.roomId) || null;
+    const clearedAt = String(item.__clearedAt || "").trim() || null;
     if (!clearedAt) {
       return true;
     }

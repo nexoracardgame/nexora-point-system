@@ -5,7 +5,13 @@ type DmRoomClearStateRow = {
   clearedAt: Date | string;
 };
 
+type DmConversationClearStateRow = {
+  peerUserId: string;
+  clearedAt: Date | string;
+};
+
 let dmRoomClearStateSchemaReadyPromise: Promise<void> | null = null;
+let dmConversationClearStateSchemaReadyPromise: Promise<void> | null = null;
 
 function normalizeTimestamp(value?: string | Date | null) {
   if (!value) {
@@ -49,6 +55,41 @@ async function ensureDmRoomClearStateSchema() {
   }
 
   return dmRoomClearStateSchemaReadyPromise;
+}
+
+async function ensureDmConversationClearStateSchema() {
+  if (!dmConversationClearStateSchemaReadyPromise) {
+    dmConversationClearStateSchemaReadyPromise = (async () => {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "dmConversationClearState" (
+          "id" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "peerUserId" TEXT NOT NULL,
+          "clearedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "dmConversationClearState_pkey" PRIMARY KEY ("id")
+        )
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "dmConversationClearState_userId_peerUserId_key"
+        ON "dmConversationClearState"("userId", "peerUserId")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "dmConversationClearState_userId_idx"
+        ON "dmConversationClearState"("userId")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "dmConversationClearState_peerUserId_idx"
+        ON "dmConversationClearState"("peerUserId")
+      `);
+    })().catch((error) => {
+      dmConversationClearStateSchemaReadyPromise = null;
+      throw error;
+    });
+  }
+
+  return dmConversationClearStateSchemaReadyPromise;
 }
 
 export function isRoomActivityVisibleAfterClear(
@@ -114,6 +155,52 @@ export async function getDmRoomClearedAtForUser(userId: string, roomId: string) 
   return map.get(String(roomId || "").trim()) || null;
 }
 
+export async function getDmConversationClearedAtMap(
+  userId: string,
+  peerUserIds: string[]
+) {
+  const safeUserId = String(userId || "").trim();
+  const safePeerUserIds = Array.from(
+    new Set(peerUserIds.map((peerUserId) => String(peerUserId || "").trim()).filter(Boolean))
+  );
+
+  if (!safeUserId || safePeerUserIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  try {
+    await ensureDmConversationClearStateSchema();
+    const placeholders = safePeerUserIds
+      .map((_, index) => `$${index + 2}`)
+      .join(", ");
+    const rows = await prisma.$queryRawUnsafe<DmConversationClearStateRow[]>(
+      `SELECT "peerUserId", "clearedAt" FROM "dmConversationClearState" WHERE "userId" = $1 AND "peerUserId" IN (${placeholders})`,
+      safeUserId,
+      ...safePeerUserIds
+    );
+
+    return new Map(
+      (rows || [])
+        .map((row) => [
+          String(row.peerUserId || "").trim(),
+          normalizeTimestamp(row.clearedAt) || "",
+        ] as const)
+        .filter(([peerUserId, clearedAt]) => Boolean(peerUserId && clearedAt))
+    );
+  } catch (error) {
+    console.error("LOAD DM CONVERSATION CLEAR STATE MAP ERROR:", error);
+    return new Map<string, string>();
+  }
+}
+
+export async function getDmConversationClearedAtForUser(
+  userId: string,
+  peerUserId: string
+) {
+  const map = await getDmConversationClearedAtMap(userId, [peerUserId]);
+  return map.get(String(peerUserId || "").trim()) || null;
+}
+
 export async function clearDmRoomForUser(
   userId: string,
   roomId: string,
@@ -147,4 +234,55 @@ export async function clearDmRoomForUser(
     console.error("UPSERT DM CLEAR STATE ERROR:", error);
     return null;
   }
+}
+
+export async function clearDmConversationForUser(
+  userId: string,
+  peerUserId: string,
+  clearedAtInput?: string | Date | null
+) {
+  const safeUserId = String(userId || "").trim();
+  const safePeerUserId = String(peerUserId || "").trim();
+  const clearedAt = normalizeTimestamp(clearedAtInput) || new Date().toISOString();
+
+  if (!safeUserId || !safePeerUserId) {
+    return null;
+  }
+
+  try {
+    await ensureDmConversationClearStateSchema();
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "dmConversationClearState" ("id", "userId", "peerUserId", "clearedAt", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $4, $4)
+        ON CONFLICT ("userId", "peerUserId")
+        DO UPDATE SET "clearedAt" = EXCLUDED."clearedAt", "updatedAt" = EXCLUDED."updatedAt"
+      `,
+      `${safeUserId}:${safePeerUserId}`,
+      safeUserId,
+      safePeerUserId,
+      clearedAt
+    );
+
+    return clearedAt;
+  } catch (error) {
+    console.error("UPSERT DM CONVERSATION CLEAR STATE ERROR:", error);
+    return null;
+  }
+}
+
+export function getLatestClearTimestamp(
+  ...values: Array<string | Date | null | undefined>
+) {
+  const timestamps = values
+    .map((value) => normalizeTimestamp(value))
+    .filter(Boolean)
+    .map((value) => new Date(String(value)).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
 }

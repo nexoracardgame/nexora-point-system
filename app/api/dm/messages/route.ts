@@ -3,7 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getChatMessagesPage } from "@/lib/chat-room-server";
 import { getDmRoomAccess } from "@/lib/dm-access";
-import { getDmRoomClearedAtForUser } from "@/lib/dm-room-clear-state";
+import {
+  getDmConversationClearedAtForUser,
+  getDmRoomClearedAtForUser,
+  getLatestClearTimestamp,
+} from "@/lib/dm-room-clear-state";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +56,10 @@ export async function GET(req: NextRequest) {
   const supabase = getServerSupabaseClient();
   const clearedAt =
     access.kind === "direct"
-      ? await getDmRoomClearedAtForUser(userId, access.roomId)
+      ? getLatestClearTimestamp(
+          await getDmRoomClearedAtForUser(userId, access.roomId),
+          await getDmConversationClearedAtForUser(userId, access.otherUserId)
+        )
       : null;
 
   if (!supabase) {

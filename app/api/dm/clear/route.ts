@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDmRoomAccess } from "@/lib/dm-access";
-import { clearDmRoomForUser } from "@/lib/dm-room-clear-state";
+import {
+  clearDmConversationForUser,
+  clearDmRoomForUser,
+} from "@/lib/dm-room-clear-state";
 import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -141,8 +144,11 @@ export async function POST(req: NextRequest) {
       clearDmRoomForUser(userId, targetRoomId, clearedAt)
     )
   );
+  const conversationClearResult = canonicalOtherUserId
+    ? await clearDmConversationForUser(userId, canonicalOtherUserId, clearedAt)
+    : null;
 
-  if (results.every((value) => !value)) {
+  if (results.every((value) => !value) && !conversationClearResult) {
     return NextResponse.json({ error: "clear failed" }, { status: 500 });
   }
 

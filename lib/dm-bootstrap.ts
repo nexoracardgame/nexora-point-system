@@ -6,7 +6,11 @@ import {
   type ChatMessage,
   type ChatUser,
 } from "@/lib/chat-room-types";
-import { getDmRoomClearedAtForUser } from "@/lib/dm-room-clear-state";
+import {
+  getDmConversationClearedAtForUser,
+  getDmRoomClearedAtForUser,
+  getLatestClearTimestamp,
+} from "@/lib/dm-room-clear-state";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { resolveUserIdentity, type SessionIdentityUser } from "@/lib/user-identity";
 
@@ -65,7 +69,11 @@ export async function getDirectChatBootstrap(input: {
   }
 
   const meIdentity = await resolveUserIdentity(input.sessionUser);
-  const clearedAt = await getDmRoomClearedAtForUser(userId, access.roomId);
+  const [roomClearedAt, conversationClearedAt] = await Promise.all([
+    getDmRoomClearedAtForUser(userId, access.roomId),
+    getDmConversationClearedAtForUser(userId, access.otherUserId),
+  ]);
+  const clearedAt = getLatestClearTimestamp(roomClearedAt, conversationClearedAt);
   const otherProfile = access.otherUserId
     ? await getLocalProfileByUserId(access.otherUserId)
     : null;
