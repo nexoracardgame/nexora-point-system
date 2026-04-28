@@ -32,6 +32,10 @@ function safeProfileSrc(image?: string | null) {
   return raw || "/avatar.png";
 }
 
+function formatBalance(value?: number | null) {
+  return Number(value || 0).toLocaleString("th-TH");
+}
+
 export default function MainLayout({
   children,
 }: {
@@ -586,25 +590,32 @@ export default function MainLayout({
                   )}
                 </PrefetchLink>
 
-                <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-                  <div className="min-w-0 rounded-[16px] border border-white/14 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] px-2.5 py-1.5 text-white shadow-[0_0_26px_rgba(255,255,255,0.08)] backdrop-blur-xl sm:px-4 sm:py-2.5">
-                    <div className="truncate text-[15px] font-black leading-none text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.45)] sm:text-[18px]">
-                      {session?.user?.nexPoint ?? 0}
+                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                  <div className="flex min-w-0 items-center gap-2 rounded-[16px] border border-white/10 bg-[#121418] px-2.5 py-2 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:px-3.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white sm:h-8 sm:w-8">
+                      <Gem className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
-                    <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-white/62 sm:text-[10px]">
-                      NEX
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-black leading-none text-white sm:text-[16px]">
+                        {formatBalance(session?.user?.nexPoint)}
+                      </div>
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/58 sm:text-[10px]">
+                        NEX
+                      </div>
                     </div>
                   </div>
 
-                  <div className="min-w-0 rounded-[16px] border border-amber-300/18 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(245,158,11,0.08))] px-2.5 py-1.5 text-amber-50 shadow-[0_0_28px_rgba(251,191,36,0.14)] backdrop-blur-xl sm:px-4 sm:py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <Coins className="hidden h-3.5 w-3.5 text-amber-200 sm:block" />
-                      <div className="truncate text-[15px] font-black leading-none text-amber-50 drop-shadow-[0_0_12px_rgba(251,191,36,0.52)] sm:text-[18px]">
-                        {session?.user?.coin ?? 0}
-                      </div>
+                  <div className="flex min-w-0 items-center gap-2 rounded-[16px] border border-white/10 bg-[#121418] px-2.5 py-2 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:px-3.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white sm:h-8 sm:w-8">
+                      <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
-                    <div className="mt-0.5 text-[9px] font-black uppercase tracking-[0.22em] text-amber-200/72 sm:text-[10px]">
-                      COIN
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-black leading-none text-white sm:text-[16px]">
+                        {formatBalance(session?.user?.coin)}
+                      </div>
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/58 sm:text-[10px]">
+                        COIN
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -796,8 +807,15 @@ export default function MainLayout({
                 <div className="truncate text-base font-black">
                   {displayedProfileName}
                 </div>
-                <div className="mt-1 inline-flex rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-200">
-                  {session?.user?.nexPoint ?? 0} TFT
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#121418] px-3 py-1.5 text-xs font-black text-white">
+                    <Gem className="h-3.5 w-3.5 text-white/80" />
+                    {formatBalance(session?.user?.nexPoint)} NEX
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#121418] px-3 py-1.5 text-xs font-black text-white">
+                    <Coins className="h-3.5 w-3.5 text-white/80" />
+                    {formatBalance(session?.user?.coin)} COIN
+                  </div>
                 </div>
               </div>
             </div>
