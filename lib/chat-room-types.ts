@@ -37,6 +37,39 @@ function safeTime(value?: string | null) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function safeText(value?: string | null) {
+  return String(value || "").trim();
+}
+
+function hasImage(message?: ChatMessage | null) {
+  return Boolean(safeText(message?.imageUrl));
+}
+
+function isLikelyOptimisticReplacement(
+  existing: ChatMessage,
+  incoming: ChatMessage
+) {
+  if (!existing.optimistic || incoming.optimistic) {
+    return false;
+  }
+
+  if (
+    safeText(existing.roomId) !== safeText(incoming.roomId) ||
+    safeText(existing.senderId) !== safeText(incoming.senderId)
+  ) {
+    return false;
+  }
+
+  const textMatches = safeText(existing.content) === safeText(incoming.content);
+  const imageMatches = hasImage(existing) && hasImage(incoming);
+
+  if (!textMatches && !imageMatches) {
+    return false;
+  }
+
+  return Math.abs(safeTime(existing.createdAt) - safeTime(incoming.createdAt)) <= 120000;
+}
+
 export function buildChatUser(
   id?: string | null,
   name?: string | null,
@@ -105,6 +138,11 @@ export function sortChatMessages<T extends ChatMessage>(messages: T[]) {
       return timeDiff;
     }
 
+    const optimisticDiff = Number(Boolean(a.optimistic)) - Number(Boolean(b.optimistic));
+    if (optimisticDiff !== 0) {
+      return optimisticDiff;
+    }
+
     return String(a.id || "").localeCompare(String(b.id || ""));
   });
 }
@@ -129,12 +167,23 @@ export function mergeChatMessages<T extends ChatMessage>(
     const normalized = normalizeChatMessage(message, roomId, me, other) as T;
     const existing = nextById.get(normalized.id);
 
+    if (!existing) {
+      for (const [existingId, existingMessage] of nextById.entries()) {
+        if (isLikelyOptimisticReplacement(existingMessage, normalized)) {
+          nextById.delete(existingId);
+          break;
+        }
+      }
+    }
+
     nextById.set(
       normalized.id,
       existing
         ? ({
             ...existing,
             ...normalized,
+            optimistic: Boolean(normalized.optimistic),
+            seenAt: normalized.seenAt || existing.seenAt || null,
           } as T)
         : normalized
     );

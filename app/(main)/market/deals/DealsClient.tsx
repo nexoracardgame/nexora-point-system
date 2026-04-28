@@ -20,6 +20,10 @@ import {
   listenDealServerSync,
   listenDealSync,
 } from "@/lib/deal-sync";
+import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
 import { prefetchDealChatRoom } from "@/lib/chat-room-prefetch";
 import type { DealCard } from "@/lib/market-deals";
 import CancelDealButton from "./CancelDealButton";
@@ -66,11 +70,20 @@ export default function DealsClient({
 }: {
   initialDeals: DealCard[];
 }) {
+  const cachedDeals = useMemo(
+    () =>
+      readClientViewCache<DealCard[]>("deal-center", {
+        maxAgeMs: 180000,
+      }),
+    []
+  );
   const router = useRouter();
   const { t } = useLanguage();
-  const [deals, setDeals] = useState<DealCard[]>(initialDeals);
+  const [deals, setDeals] = useState<DealCard[]>(
+    initialDeals.length > 0 ? initialDeals : cachedDeals?.data || []
+  );
   const [creatingChatId, setCreatingChatId] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(initialDeals.length === 0 && !cachedDeals?.data?.length);
   const [hiddenDealIds, setHiddenDealIds] = useState<string[]>([]);
   const lastOptimisticMutationAt = useRef(0);
   const hiddenDealIdsRef = useRef<Set<string>>(new Set());
@@ -110,6 +123,10 @@ export default function DealsClient({
   }, [deals]);
 
   useEffect(() => {
+    if (initialDeals.length === 0) {
+      return;
+    }
+
     setDeals(
       sortDeals(
         initialDeals.filter(
@@ -118,6 +135,31 @@ export default function DealsClient({
       )
     );
   }, [initialDeals, sortDeals]);
+
+  useEffect(() => {
+    if (initialDeals.length > 0 || dealsRef.current.length > 0) {
+      return;
+    }
+
+    const cached = readClientViewCache<DealCard[]>("deal-center", {
+      maxAgeMs: 180000,
+    });
+
+    if (!cached?.data?.length) {
+      return;
+    }
+
+    setDeals(sortDeals(cached.data));
+    setRefreshing(false);
+  }, [initialDeals.length, sortDeals]);
+
+  useEffect(() => {
+    if (deals.length === 0) {
+      return;
+    }
+
+    writeClientViewCache("deal-center", deals);
+  }, [deals]);
 
   const fetchDeals = useCallback(async (preserveOnEmpty = true) => {
     const requestId = ++requestIdRef.current;
@@ -196,6 +238,16 @@ export default function DealsClient({
       window.clearInterval(interval);
     };
   }, [fetchDeals]);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void fetchDeals(true);
+    }, initialDeals.length > 0 || cachedDeals?.data?.length ? 80 : 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [cachedDeals?.data?.length, fetchDeals, initialDeals.length]);
 
   useEffect(() => {
     return listenDealSync(() => {

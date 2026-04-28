@@ -4,6 +4,10 @@ import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
+import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
 
 type SearchUser = {
   id: string;
@@ -35,6 +39,12 @@ type IncomingRequest = {
   bio: string;
 };
 
+type CommunityCache = {
+  friends: FriendItem[];
+  requests: IncomingRequest[];
+  results: SearchUser[];
+};
+
 export default function CommunityClient({
   initialFriends = [],
   initialRequests = [],
@@ -44,21 +54,47 @@ export default function CommunityClient({
   initialRequests?: IncomingRequest[];
   hasInitialCommunityState?: boolean;
 }) {
+  const cachedCommunityState = useMemo(
+    () =>
+      readClientViewCache<CommunityCache>("community-hub", {
+        maxAgeMs: 180000,
+      }),
+    []
+  );
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchUser[]>([]);
-  const [friends, setFriends] = useState<FriendItem[]>(initialFriends);
-  const [requests, setRequests] = useState<IncomingRequest[]>(initialRequests);
+  const [results, setResults] = useState<SearchUser[]>(
+    cachedCommunityState?.data?.results || []
+  );
+  const [friends, setFriends] = useState<FriendItem[]>(
+    initialFriends.length > 0
+      ? initialFriends
+      : cachedCommunityState?.data?.friends || []
+  );
+  const [requests, setRequests] = useState<IncomingRequest[]>(
+    initialRequests.length > 0
+      ? initialRequests
+      : cachedCommunityState?.data?.requests || []
+  );
   const [loadingResults, setLoadingResults] = useState(false);
-  const [loadingFriends, setLoadingFriends] = useState(false);
-  const [bootstrappingSuggestions, setBootstrappingSuggestions] = useState(true);
+  const [loadingFriends, setLoadingFriends] = useState(
+    !initialFriends.length &&
+      !initialRequests.length &&
+      !cachedCommunityState?.data?.friends?.length &&
+      !cachedCommunityState?.data?.requests?.length
+  );
+  const [bootstrappingSuggestions, setBootstrappingSuggestions] = useState(
+    !(cachedCommunityState?.data?.results?.length)
+  );
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const hasServerFriends =
     hasInitialCommunityState ||
     initialFriends.length > 0 ||
-    initialRequests.length > 0;
+    initialRequests.length > 0 ||
+    Boolean(cachedCommunityState?.data?.friends?.length) ||
+    Boolean(cachedCommunityState?.data?.requests?.length);
 
   const loadFriends = async (silent = false) => {
     if (!silent) {
@@ -71,8 +107,7 @@ export default function CommunityClient({
       setFriends(Array.isArray(data?.friends) ? data.friends : []);
       setRequests(Array.isArray(data?.requests) ? data.requests : []);
     } catch {
-      setFriends([]);
-      setRequests([]);
+      return;
     } finally {
       if (!silent) {
         setLoadingFriends(false);
@@ -92,7 +127,7 @@ export default function CommunityClient({
       const data = await res.json().catch(() => ({}));
       setResults(Array.isArray(data?.users) ? data.users : []);
     } catch {
-      setResults([]);
+      return;
     } finally {
       if (!silent) {
         setLoadingResults(false);
@@ -116,11 +151,52 @@ export default function CommunityClient({
   }, [hasServerFriends]);
 
   useEffect(() => {
+    if (initialFriends.length > 0 || initialRequests.length > 0 || results.length > 0) {
+      return;
+    }
+
+    const cached = readClientViewCache<CommunityCache>("community-hub", {
+      maxAgeMs: 180000,
+    });
+
+    if (!cached?.data) {
+      return;
+    }
+
+    if (Array.isArray(cached.data.friends) && cached.data.friends.length > 0) {
+      setFriends(cached.data.friends);
+    }
+
+    if (Array.isArray(cached.data.requests) && cached.data.requests.length > 0) {
+      setRequests(cached.data.requests);
+    }
+
+    if (Array.isArray(cached.data.results) && cached.data.results.length > 0) {
+      setResults(cached.data.results);
+      setBootstrappingSuggestions(false);
+    }
+
+    setLoadingFriends(false);
+  }, [initialFriends.length, initialRequests.length, results.length]);
+
+  useEffect(() => {
+    if (friends.length === 0 && requests.length === 0 && results.length === 0) {
+      return;
+    }
+
+    writeClientViewCache("community-hub", {
+      friends,
+      requests,
+      results,
+    } satisfies CommunityCache);
+  }, [friends, requests, results]);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadFriends(true);
       }
-    }, 1500);
+    }, 15000);
 
     const onFocus = () => {
       void loadFriends(true);

@@ -1,16 +1,9 @@
 export default function MainLoading() {
   return (
-    <div className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] animate-pulse rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 sm:min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height-sm))] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:p-6">
-      <div className="mx-auto h-full max-w-7xl space-y-4">
-        <div className="h-8 w-40 rounded-2xl bg-white/8" />
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="h-40 rounded-[28px] bg-white/6 md:col-span-2" />
-          <div className="h-40 rounded-[28px] bg-white/6" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div className="h-48 rounded-[28px] bg-white/6" />
-          <div className="h-48 rounded-[28px] bg-white/6" />
-          <div className="h-48 rounded-[28px] bg-white/6" />
+    <div className="pointer-events-none px-3 pb-3 pt-4 sm:px-4 xl:px-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-full border border-white/6 bg-white/[0.03]">
+          <div className="h-1.5 w-1/3 animate-[shimmer_1.1s_linear_infinite] bg-[linear-gradient(90deg,rgba(250,204,21,0)_0%,rgba(250,204,21,0.72)_50%,rgba(250,204,21,0)_100%)] bg-[length:200%_100%]" />
         </div>
       </div>
     </div>

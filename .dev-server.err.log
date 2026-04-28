@@ -157,3 +157,163 @@ Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
     }
   }
 }
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 55438,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 55439,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 55626,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 55627,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 55940,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 55945,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 58465,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 58465,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 58477,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 58477,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}

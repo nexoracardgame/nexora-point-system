@@ -17,6 +17,10 @@ import {
   type MarketViewItem,
 } from "@/lib/market-listing-view";
 import SafeCardImage from "@/components/SafeCardImage";
+import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
 import { listenMarketSync } from "@/lib/market-sync";
 import { listenProfileSync } from "@/lib/profile-sync";
 
@@ -159,9 +163,20 @@ export default function MarketDashboardTFT({
   initialItems?: MarketItem[];
   initialItemsLoaded?: boolean;
 }) {
+  const cachedMarketItems = useMemo(
+    () =>
+      readClientViewCache<MarketItem[]>("market-dashboard", {
+        maxAgeMs: 180000,
+      }),
+    []
+  );
   const { data: session } = useSession();
-  const [items, setItems] = useState<MarketItem[]>(initialItems);
-  const [loading, setLoading] = useState(!initialItemsLoaded);
+  const [items, setItems] = useState<MarketItem[]>(
+    initialItems.length > 0 ? initialItems : cachedMarketItems?.data || []
+  );
+  const [loading, setLoading] = useState(
+    !(initialItemsLoaded || initialItems.length > 0 || cachedMarketItems?.data?.length)
+  );
   const [likedCards, setLikedCards] = useState<string[]>([]);
   const [likesReady, setLikesReady] = useState(false);
   const [heroMode, setHeroMode] = useState<"popular" | "latest">("popular");
@@ -178,10 +193,48 @@ export default function MarketDashboardTFT({
 
   useEffect(() => {
     startTransition(() => {
-      setItems(initialItems);
-      setLoading(!initialItemsLoaded && initialItems.length === 0);
+      if (initialItems.length > 0) {
+        setItems(initialItems);
+        setLoading(false);
+        seenListingIdsRef.current = new Set(initialItems.map((item) => item.id));
+        return;
+      }
+
+      if (initialItemsLoaded) {
+        setItems([]);
+        setLoading(false);
+        seenListingIdsRef.current = new Set();
+      }
     });
   }, [initialItems, initialItemsLoaded]);
+
+  useEffect(() => {
+    if (initialItems.length > 0 || initialItemsLoaded || itemsRef.current.length > 0) {
+      return;
+    }
+
+    const cached = readClientViewCache<MarketItem[]>("market-dashboard", {
+      maxAgeMs: 180000,
+    });
+
+    if (!cached?.data?.length) {
+      return;
+    }
+
+    startTransition(() => {
+      setItems(cached.data);
+      setLoading(false);
+      seenListingIdsRef.current = new Set(cached.data.map((item) => item.id));
+    });
+  }, [initialItems.length, initialItemsLoaded]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      return;
+    }
+
+    writeClientViewCache("market-dashboard", items);
+  }, [items]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

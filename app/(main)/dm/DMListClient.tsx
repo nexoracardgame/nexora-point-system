@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prefetchDealChatRoom, prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
+import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -15,6 +19,11 @@ type SessionUser = {
   lineId?: string | null;
   name?: string | null;
   image?: string | null;
+};
+
+type DmListCache = {
+  rooms: DMRoomListItem[];
+  me: SessionUser | null;
 };
 
 function formatDealPriceLabel(value?: number) {
@@ -65,12 +74,26 @@ export default function DMListClient({
   initialRooms: DMRoomListItem[];
   initialMe: SessionUser | null;
 }) {
-  const router = useRouter();
-  const [currentMe, setCurrentMe] = useState<SessionUser | null>(initialMe);
-  const [rooms, setRooms] = useState<DMRoomListItem[]>(
-    initialRooms.map(normalizeRoom)
+  const cachedList = useMemo(
+    () =>
+      readClientViewCache<DmListCache>("dm-list", {
+        maxAgeMs: 180000,
+      }),
+    []
   );
-  const [loading, setLoading] = useState(initialRooms.length === 0);
+  const router = useRouter();
+  const [currentMe, setCurrentMe] = useState<SessionUser | null>(
+    initialMe || cachedList?.data?.me || null
+  );
+  const [rooms, setRooms] = useState<DMRoomListItem[]>(
+    (initialRooms.length > 0
+      ? initialRooms
+      : cachedList?.data?.rooms || []
+    ).map(normalizeRoom)
+  );
+  const [loading, setLoading] = useState(
+    initialRooms.length === 0 && !(cachedList?.data?.rooms?.length)
+  );
   const [openingRoomId, setOpeningRoomId] = useState<string | null>(null);
 
   const hasInit = useRef(false);
@@ -159,6 +182,17 @@ export default function DMListClient({
       })
     );
   };
+
+  useEffect(() => {
+    if (rooms.length === 0 && !currentMe) {
+      return;
+    }
+
+    writeClientViewCache("dm-list", {
+      rooms,
+      me: currentMe,
+    } satisfies DmListCache);
+  }, [currentMe, rooms]);
 
   const loadRooms = async () => {
     try {
@@ -263,6 +297,31 @@ export default function DMListClient({
       void hydrateUnknownRooms(initialRooms.map(normalizeRoom));
     }
   }, [initialRooms]);
+
+  useEffect(() => {
+    if (initialRooms.length > 0 || rooms.length > 0 || currentMe) {
+      return;
+    }
+
+    const cached = readClientViewCache<DmListCache>("dm-list", {
+      maxAgeMs: 180000,
+    });
+
+    if (!cached?.data) {
+      return;
+    }
+
+    if (cached.data.me) {
+      setCurrentMe(cached.data.me);
+    }
+
+    if (Array.isArray(cached.data.rooms) && cached.data.rooms.length > 0) {
+      const nextRooms = cached.data.rooms.map(normalizeRoom);
+      setRooms(nextRooms);
+      setLoading(false);
+      void hydrateUnknownRooms(nextRooms);
+    }
+  }, [currentMe, initialRooms.length, rooms.length]);
 
   useEffect(() => {
     if (hasInit.current) return;

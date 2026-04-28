@@ -7,6 +7,7 @@ import EmojiPicker, { Theme } from "emoji-picker-react";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
+import { getDealChatRoomId } from "@/lib/deal-chat";
 import {
   CHAT_HISTORY_PAGE_SIZE,
   buildChatSender,
@@ -363,6 +364,75 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     }, 320);
   });
 
+  useEffect(() => {
+    const cached = readChatHistoryCache<DealMessage, DealRoomCacheMeta>(
+      "deal-room",
+      dealId
+    );
+
+    if (!cached) {
+      return;
+    }
+
+    const cachedRoomId =
+      String(cached.meta?.roomId || "").trim() || getDealChatRoomId(dealId);
+    const cachedMe = cached.meta?.me
+      ? buildChatUser(cached.meta.me.id, cached.meta.me.name, cached.meta.me.image, "You")
+      : null;
+    const cachedOther = cached.meta?.other
+      ? buildChatUser(cached.meta.other.id, cached.meta.other.name, cached.meta.other.image)
+      : null;
+    const cachedMessages = Array.isArray(cached.messages)
+      ? cached.messages.map((message) =>
+          normalizeChatMessage(message, cachedRoomId, cachedMe, cachedOther)
+        )
+      : [];
+
+    if (cachedRoomId) {
+      activeRoomIdRef.current = cachedRoomId;
+      setRoomId((prev) => prev || cachedRoomId);
+    }
+
+    if (cachedMessages.length > 0) {
+      setMessages((prev) =>
+        prev.length > 0
+          ? prev
+          : mergeChatMessages(prev, cachedMessages, cachedRoomId, cachedMe, cachedOther)
+      );
+    }
+
+    if (cachedMe) {
+      setMe((prev) => prev || cachedMe);
+    }
+
+    if (cachedOther) {
+      setOther((prev) => prev || cachedOther);
+    }
+
+    if (cached.meta?.card) {
+      setCard((prev) => prev || cached.meta?.card || null);
+    }
+
+    if (cached.meta?.deal) {
+      setDeal((prev) => prev || cached.meta?.deal || null);
+    }
+
+    if (cached.meta?.hasMore) {
+      setHasMore(true);
+    }
+
+    if (cached.meta?.nextCursor) {
+      setNextCursor((prev) => prev || cached.meta?.nextCursor || null);
+    }
+
+    if (
+      cachedMessages.length > 0 ||
+      (cachedRoomId && cached.meta?.card && cached.meta?.deal && cachedMe && cachedOther)
+    ) {
+      setLoadingRoom(false);
+    }
+  }, [dealId]);
+
   const markSeenNow = async () => {
     if (!roomId || !me?.id) return;
 
@@ -500,29 +570,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
 
     channel.subscribe();
 
-    const onFocus = () => {
-      void loadBootstrap();
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void loadBootstrap();
-      }
-    };
-
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadBootstrap();
-      }
-    }, 20000);
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
     };
   }, [dealId, me, other, roomClosed, roomId]);
@@ -758,8 +806,39 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
 
   if (loadingRoom) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center pb-[env(safe-area-inset-bottom)] text-white">
-        กำลังโหลดห้องแชทดีล...
+      <div className="h-full min-h-0 overflow-hidden">
+        <div className="flex h-full min-h-0 w-full flex-col bg-[#050608]">
+          <div className="sticky top-0 z-20 border-b border-white/10 bg-black/75 backdrop-blur-xl">
+            <div className="mx-auto flex w-full max-w-[980px] items-center gap-3 px-3 py-3 sm:px-4">
+              <div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="h-11 w-11 animate-pulse rounded-full bg-white/10" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-40 animate-pulse rounded-full bg-white/10" />
+                  <div className="h-3 w-28 animate-pulse rounded-full bg-white/8" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden px-3 py-4 sm:px-4">
+            <div className="mx-auto flex h-full w-full max-w-[980px] flex-col justify-end gap-3">
+              <div className="rounded-[22px] border border-cyan-300/10 bg-white/[0.03] p-4">
+                <div className="flex items-center gap-3">
+                  <div className="aspect-[2/3] w-14 animate-pulse rounded-xl bg-white/10" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="h-4 w-44 animate-pulse rounded-full bg-white/10" />
+                    <div className="h-3 w-32 animate-pulse rounded-full bg-white/8" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="ml-auto h-16 w-[68%] animate-pulse rounded-[22px] bg-yellow-400/15" />
+              <div className="h-16 w-[76%] animate-pulse rounded-[22px] bg-white/8" />
+              <div className="ml-auto h-16 w-[54%] animate-pulse rounded-[22px] bg-yellow-400/15" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -98,7 +98,12 @@ function DMRoomContent({
     cachedRoom?.meta?.other || initialOther
   );
   const [loadingRoom, setLoadingRoom] = useState(
-    !(cachedRoom?.meta?.me || cachedRoom?.meta?.other || initialOther)
+    !(
+      cachedRoom?.messages?.length ||
+      cachedRoom?.meta?.me ||
+      cachedRoom?.meta?.other ||
+      initialOther
+    )
   );
   const [roomClosed, setRoomClosed] = useState(false);
   const [hasMore, setHasMore] = useState(Boolean(cachedRoom?.meta?.hasMore));
@@ -395,6 +400,57 @@ function DMRoomContent({
     }, 320);
   });
 
+  useEffect(() => {
+    const cached = readChatHistoryCache<DMMessage, DMRoomCacheMeta>(
+      "dm-room",
+      roomId
+    );
+
+    if (!cached) {
+      return;
+    }
+
+    const cachedMe = cached.meta?.me
+      ? buildChatUser(cached.meta.me.id, cached.meta.me.name, cached.meta.me.image, "You")
+      : null;
+    const cachedOther = cached.meta?.other
+      ? buildChatUser(cached.meta.other.id, cached.meta.other.name, cached.meta.other.image)
+      : initialOther;
+    const cachedMessages = Array.isArray(cached.messages)
+      ? cached.messages.map((message) =>
+          normalizeChatMessage(message, roomId, cachedMe, cachedOther)
+        )
+      : [];
+
+    if (cachedMessages.length > 0) {
+      setMessages((prev) =>
+        prev.length > 0
+          ? prev
+          : mergeChatMessages(prev, cachedMessages, roomId, cachedMe, cachedOther)
+      );
+    }
+
+    if (cachedMe) {
+      setMe((prev) => prev || cachedMe);
+    }
+
+    if (cachedOther) {
+      setOther((prev) => prev || cachedOther);
+    }
+
+    if (cached.meta?.hasMore) {
+      setHasMore(true);
+    }
+
+    if (cached.meta?.nextCursor) {
+      setNextCursor((prev) => prev || cached.meta?.nextCursor || null);
+    }
+
+    if (cachedMessages.length > 0 || cachedMe || cachedOther) {
+      setLoadingRoom(false);
+    }
+  }, [initialOther, roomId]);
+
   const markSeenNow = async () => {
     if (!roomId || !me?.id) return;
 
@@ -523,29 +579,7 @@ function DMRoomContent({
 
     channel.subscribe();
 
-    const onFocus = () => {
-      void loadBootstrap();
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void loadBootstrap();
-      }
-    };
-
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadBootstrap();
-      }
-    }, 20000);
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
     };
   }, [me, other, roomClosed, roomId]);
