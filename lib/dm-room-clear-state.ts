@@ -22,6 +22,34 @@ function normalizeTimestamp(value?: string | Date | null) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
+async function resolveUserAliases(rawUserId: string) {
+  const value = String(rawUserId || "").trim();
+
+  if (!value) {
+    return [];
+  }
+
+  const user = await prisma.user
+    .findFirst({
+      where: {
+        OR: [{ id: value }, { lineId: value }],
+      },
+      select: {
+        id: true,
+        lineId: true,
+      },
+    })
+    .catch(() => null);
+
+  return Array.from(
+    new Set(
+      [value, user?.id, user?.lineId]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 async function ensureDmRoomClearStateSchema() {
   if (!dmRoomClearStateSchemaReadyPromise) {
     dmRoomClearStateSchemaReadyPromise = (async () => {
@@ -201,6 +229,25 @@ export async function getDmConversationClearedAtForUser(
   return map.get(String(peerUserId || "").trim()) || null;
 }
 
+export async function getDmConversationClearedAtForUserAliases(
+  userId: string,
+  peerUserIds: string[]
+) {
+  const aliasLists = await Promise.all(
+    peerUserIds.map((peerUserId) => resolveUserAliases(peerUserId))
+  );
+  const aliases = Array.from(new Set(aliasLists.flat().filter(Boolean)));
+
+  if (aliases.length === 0) {
+    return null;
+  }
+
+  const map = await getDmConversationClearedAtMap(userId, aliases);
+  return getLatestClearTimestamp(
+    ...aliases.map((alias) => map.get(alias) || null)
+  );
+}
+
 export async function clearDmRoomForUser(
   userId: string,
   roomId: string,
@@ -269,6 +316,29 @@ export async function clearDmConversationForUser(
     console.error("UPSERT DM CONVERSATION CLEAR STATE ERROR:", error);
     return null;
   }
+}
+
+export async function clearDmConversationForUserAliases(
+  userId: string,
+  peerUserIds: string[],
+  clearedAtInput?: string | Date | null
+) {
+  const aliasLists = await Promise.all(
+    peerUserIds.map((peerUserId) => resolveUserAliases(peerUserId))
+  );
+  const aliases = Array.from(new Set(aliasLists.flat().filter(Boolean)));
+
+  if (aliases.length === 0) {
+    return null;
+  }
+
+  const results = await Promise.all(
+    aliases.map((alias) =>
+      clearDmConversationForUser(userId, alias, clearedAtInput)
+    )
+  );
+
+  return getLatestClearTimestamp(...results);
 }
 
 export function getLatestClearTimestamp(

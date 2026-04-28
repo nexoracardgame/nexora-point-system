@@ -43,7 +43,9 @@ export default function NexoraLuxuryHome() {
   }, []);
 
   return (
-    <section className="relative min-h-[calc(var(--app-shell-height)-140px)] overflow-hidden rounded-[36px] border border-black/8 bg-[#f7f4ee] text-black shadow-[0_32px_90px_rgba(24,24,24,0.12)]">
+    <section
+      className={`relative min-h-[calc(var(--app-shell-height)-140px)] overflow-hidden rounded-[28px] border border-black/8 bg-[#f7f4ee] text-black shadow-[0_32px_90px_rgba(24,24,24,0.12)] sm:rounded-[36px] ${notoSansThai.className}`}
+    >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_18%),linear-gradient(180deg,#fbfaf7_0%,#f2eee6_100%)]" />
       <div
         className="absolute inset-0 opacity-60"
@@ -58,15 +60,15 @@ export default function NexoraLuxuryHome() {
 
       <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,rgba(255,255,255,0.96)_0%,rgba(255,255,255,0.86)_32%,rgba(255,255,255,0.32)_56%,rgba(255,255,255,0.06)_76%,rgba(255,255,255,0)_100%)]" />
 
-      <div className="pointer-events-none absolute left-4 top-3 z-10 text-[22vw] font-black leading-none tracking-[-0.065em] text-black/[0.96] sm:left-8 sm:top-5 lg:text-[18vw]">
+      <div className="pointer-events-none absolute left-4 top-5 z-10 text-[28vw] font-black leading-none tracking-[-0.065em] text-black/[0.96] sm:left-8 sm:top-5 sm:text-[22vw] lg:text-[18vw]">
         Nexora
       </div>
 
-      <div className="absolute right-4 top-4 z-30 max-w-[220px] text-right text-[1.5rem] font-black leading-[1.02] tracking-[0.01em] text-black/62 sm:right-8 sm:top-8 sm:max-w-[280px] sm:text-[2.1rem] lg:max-w-[340px] lg:text-[2.9rem]">
+      <div className="absolute right-4 top-5 z-30 max-w-[124px] text-right text-[0.82rem] font-bold leading-[1.1] tracking-[0.02em] text-black/56 sm:right-8 sm:top-8 sm:max-w-[170px] sm:text-[1rem] lg:max-w-[230px] lg:text-[1.35rem]">
         ประสบการณ์ระดับเวิลด์คลาส
       </div>
 
-      <div className="absolute left-4 top-[33%] z-30 flex max-w-[calc(100%-2rem)] flex-wrap gap-2.5 text-[11px] font-black tracking-[0.12em] text-black/74 sm:left-8 sm:gap-3 sm:text-sm lg:max-w-[620px]">
+      <div className="absolute left-4 top-[39%] z-30 flex max-w-[calc(100%-2rem)] flex-wrap gap-2 text-[10px] font-black tracking-[0.08em] text-black/74 sm:left-8 sm:top-[33%] sm:gap-3 sm:text-sm lg:max-w-[620px]">
         {["สะสม +", "ต่อสู้ +", "แลกเปลี่ยน +", "รับรางวัล +"].map((item) => (
           <span
             key={item}
@@ -87,32 +89,30 @@ export default function NexoraLuxuryHome() {
           width={1200}
           height={1600}
           priority
-          sizes="(max-width: 640px) 82vw, (max-width: 1024px) 64vw, 54vw"
-          className="h-[68dvh] w-auto object-contain drop-shadow-[0_18px_50px_rgba(0,0,0,0.20)] sm:h-[80dvh] lg:h-[86dvh]"
+          sizes="(max-width: 640px) 84vw, (max-width: 1024px) 64vw, 54vw"
+          className="h-[54dvh] w-auto object-contain drop-shadow-[0_18px_50px_rgba(0,0,0,0.20)] sm:h-[80dvh] lg:h-[86dvh]"
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-4 top-[57%] z-40 flex -translate-y-1/2 justify-center sm:inset-x-8 sm:top-auto sm:bottom-10 sm:translate-y-0">
+      <div className="pointer-events-none absolute inset-x-4 top-[29%] z-40 flex justify-center sm:inset-x-8 sm:top-auto sm:bottom-10">
         <AppInstallButton variant="dark" />
       </div>
 
-      <div
-        className={`absolute bottom-6 left-4 z-30 max-w-[560px] sm:bottom-10 sm:left-8 ${notoSansThai.className}`}
-      >
-        <div className="max-w-[420px] text-[15px] font-extrabold tracking-[0.08em] text-amber-800 sm:max-w-[520px] sm:text-lg">
+      <div className="absolute bottom-6 left-4 z-30 max-w-[calc(100%-2rem)] pr-1 sm:bottom-10 sm:left-8 sm:max-w-[560px]">
+        <div className="max-w-[350px] text-[13px] font-extrabold tracking-[0.06em] text-amber-800 sm:max-w-[520px] sm:text-lg">
           สะสม ต่อสู้ แลกเปลี่ยน และรับรางวัลในจักรวาล NEXORA
         </div>
-        <div className="mt-3 max-w-[650px] text-[1.7rem] font-extrabold leading-[1.34] tracking-[-0.045em] text-black/76 sm:text-[2.1rem] sm:leading-[1.28] lg:text-[2.55rem]">
+        <div className="mt-3 max-w-[300px] text-[1.08rem] font-extrabold leading-[1.2] tracking-[-0.045em] text-black/78 sm:max-w-[650px] sm:text-[2.1rem] sm:leading-[1.28] lg:text-[2.55rem]">
           ก้าวเข้าสู่ยุคใหม่ของการ์ดสะสมระดับพรีเมียม ด้วยตลาดที่ไวระดับโลก
         </div>
-        <div className="mt-3 max-w-[560px] text-[11px] font-semibold leading-5 tracking-[0.01em] text-black/54 sm:text-[13px] sm:leading-6 lg:text-[14px]">
+        <div className="mt-1.5 max-w-[330px] text-[0.98rem] font-semibold leading-[1.38] tracking-[0.01em] text-black/58 sm:mt-3 sm:max-w-[560px] sm:text-[1.02rem] sm:leading-6 lg:text-[1.08rem]">
           แชทเรียลไทม์ การครอบครองที่มีคุณค่า และรางวัลที่ยกระดับทุกคอลเลกชันของคุณ
         </div>
-        <div className="mt-3 max-w-[520px] text-[13px] font-semibold leading-6 text-black/52 sm:mt-4 sm:text-[15px] sm:leading-7">
+        <div className="mt-1 max-w-[330px] text-[0.96rem] font-semibold leading-[1.38] text-black/54 sm:max-w-[520px] sm:text-[1rem] sm:leading-6">
           ซื้อขายลื่นไหลบนมือถือ คอม และเว็บแอพในประสบการณ์เดียวกัน
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <PrefetchLink
             href="/market"
             className="rounded-2xl bg-black px-6 py-3 text-sm font-black text-white shadow-[0_18px_32px_rgba(0,0,0,0.16)] transition hover:scale-[1.03] hover:bg-black/88"

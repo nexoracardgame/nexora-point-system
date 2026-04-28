@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDmRoomAccess } from "@/lib/dm-access";
 import {
-  clearDmConversationForUser,
+  clearDmConversationForUserAliases,
   clearDmRoomForUser,
 } from "@/lib/dm-room-clear-state";
 import { prisma } from "@/lib/prisma";
@@ -144,8 +144,13 @@ export async function POST(req: NextRequest) {
       clearDmRoomForUser(userId, targetRoomId, clearedAt)
     )
   );
-  const conversationClearResult = canonicalOtherUserId
-    ? await clearDmConversationForUser(userId, canonicalOtherUserId, clearedAt)
+  const conversationClearResult =
+    canonicalOtherUserId || otherAliases.length > 0
+      ? await clearDmConversationForUserAliases(
+          userId,
+          [canonicalOtherUserId, ...otherAliases].filter(Boolean),
+          clearedAt
+        )
     : null;
 
   if (results.every((value) => !value) && !conversationClearResult) {

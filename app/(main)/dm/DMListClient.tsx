@@ -494,6 +494,22 @@ export default function DMListClient({
       }
     );
 
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dmRoomClearState" },
+      () => {
+        void loadRooms();
+      }
+    );
+
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dmConversationClearState" },
+      () => {
+        void loadRooms();
+      }
+    );
+
     channel?.subscribe();
 
     const interval = window.setInterval(() => {

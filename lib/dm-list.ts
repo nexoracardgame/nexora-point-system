@@ -76,6 +76,30 @@ async function resolveCanonicalUserId(rawUserId: string) {
   return String(user?.id || value).trim();
 }
 
+async function resolveUserAliases(rawUserId: string) {
+  const value = String(rawUserId || "").trim();
+
+  if (!value) return [];
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: value }, { lineId: value }],
+    },
+    select: {
+      id: true,
+      lineId: true,
+    },
+  });
+
+  return Array.from(
+    new Set(
+      [value, user?.id, user?.lineId]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 export async function getDmRoomsForUser(
   myId: string,
   myLineId?: string | null
@@ -225,6 +249,7 @@ export async function getDmRoomsForUser(
       return {
         roomId: String(room.roomid),
         otherUserId: otherUserId || rawOtherUserId,
+        otherUserAliases: await resolveUserAliases(otherUserId || rawOtherUserId),
         profile,
       };
     })
@@ -236,9 +261,12 @@ export async function getDmRoomsForUser(
   const otherUserIdMap = new Map(
     profileRows.map((item) => [item.roomId, item.otherUserId])
   );
-  const conversationClearAtByOtherUserId = await getDmConversationClearedAtMap(
+  const otherUserAliasesByRoomId = new Map(
+    profileRows.map((item) => [item.roomId, item.otherUserAliases || []])
+  );
+  const conversationClearAtByPeerAlias = await getDmConversationClearedAtMap(
     myId,
-    profileRows.map((item) => item.otherUserId)
+    profileRows.flatMap((item) => item.otherUserAliases || [])
   );
 
   const dealCardIds = Array.from(
@@ -271,11 +299,15 @@ export async function getDmRoomsForUser(
     const otherUserId =
       otherUserIdMap.get(roomId) ||
       String(roomUserAIsMe ? room.userb : room.usera || "").trim();
+    const otherUserAliases = otherUserAliasesByRoomId.get(roomId) || [];
     const lastMessageAt = String(latestMessage?.createdAt || "").trim();
     const createdAt = lastMessageAt || String(room.updatedat || "").trim();
     const clearedAt = getLatestClearTimestamp(
       directRoomClearAtByRoomId.get(roomId) || null,
-      conversationClearAtByOtherUserId.get(otherUserId) || null
+      conversationClearAtByPeerAlias.get(otherUserId) || null,
+      ...otherUserAliases.map(
+        (alias) => conversationClearAtByPeerAlias.get(alias) || null
+      )
     );
 
     return {

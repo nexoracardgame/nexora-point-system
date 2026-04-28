@@ -413,3 +413,355 @@ Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
     }
   }
 }
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52017,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52018,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52214,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52213,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52407,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52406,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52523,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52524,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52623,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52622,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52719,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52720,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52847,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52848,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52952,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 52951,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 53122,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 53123,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 53583,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 53582,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 53971,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 53972,
+      remoteAddress: '172.234.24.211',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}

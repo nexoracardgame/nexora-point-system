@@ -7,7 +7,7 @@ import {
   type ChatUser,
 } from "@/lib/chat-room-types";
 import {
-  getDmConversationClearedAtForUser,
+  getDmConversationClearedAtForUserAliases,
   getDmRoomClearedAtForUser,
   getLatestClearTimestamp,
 } from "@/lib/dm-room-clear-state";
@@ -71,7 +71,7 @@ export async function getDirectChatBootstrap(input: {
   const meIdentity = await resolveUserIdentity(input.sessionUser);
   const [roomClearedAt, conversationClearedAt] = await Promise.all([
     getDmRoomClearedAtForUser(userId, access.roomId),
-    getDmConversationClearedAtForUser(userId, access.otherUserId),
+    getDmConversationClearedAtForUserAliases(userId, [access.otherUserId]),
   ]);
   const clearedAt = getLatestClearTimestamp(roomClearedAt, conversationClearedAt);
   const otherProfile = access.otherUserId

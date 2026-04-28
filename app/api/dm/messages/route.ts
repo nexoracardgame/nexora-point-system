@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getChatMessagesPage } from "@/lib/chat-room-server";
 import { getDmRoomAccess } from "@/lib/dm-access";
 import {
-  getDmConversationClearedAtForUser,
+  getDmConversationClearedAtForUserAliases,
   getDmRoomClearedAtForUser,
   getLatestClearTimestamp,
 } from "@/lib/dm-room-clear-state";
@@ -58,7 +58,9 @@ export async function GET(req: NextRequest) {
     access.kind === "direct"
       ? getLatestClearTimestamp(
           await getDmRoomClearedAtForUser(userId, access.roomId),
-          await getDmConversationClearedAtForUser(userId, access.otherUserId)
+          await getDmConversationClearedAtForUserAliases(userId, [
+            access.otherUserId,
+          ])
         )
       : null;
 
