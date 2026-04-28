@@ -172,7 +172,7 @@ export default function AppInstallButton({
       <button
         type="button"
         onClick={handleInstall}
-        className={`group relative flex w-full max-w-[360px] items-center justify-between gap-4 overflow-hidden rounded-[26px] px-4 py-3.5 text-left shadow-[0_24px_60px_rgba(0,0,0,0.18),0_0_30px_rgba(250,204,21,0.08)] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 sm:px-5 sm:py-4 ${
+        className={`pointer-events-auto group relative flex w-full max-w-[360px] items-center justify-between gap-4 overflow-hidden rounded-[26px] px-4 py-3.5 text-left shadow-[0_24px_60px_rgba(0,0,0,0.18),0_0_30px_rgba(250,204,21,0.08)] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 sm:px-5 sm:py-4 ${
           isLight
             ? "border border-black/10 bg-white/92 text-black hover:border-amber-500/45 hover:shadow-[0_30px_70px_rgba(0,0,0,0.14),0_0_40px_rgba(250,204,21,0.12)]"
             : "border border-white/10 bg-[linear-gradient(180deg,rgba(8,9,12,0.96),rgba(2,2,4,0.98))] text-white hover:border-white/20 hover:shadow-[0_30px_70px_rgba(0,0,0,0.42),0_0_40px_rgba(255,255,255,0.06)]"

@@ -62,7 +62,7 @@ export default function NexoraLuxuryHome() {
         Nexora
       </div>
 
-      <div className="absolute right-4 top-4 z-30 text-[10px] uppercase tracking-[0.28em] text-black/54 sm:right-8 sm:top-8">
+      <div className="absolute right-4 top-4 z-30 max-w-[220px] text-right text-[1.5rem] font-black leading-[1.02] tracking-[0.01em] text-black/62 sm:right-8 sm:top-8 sm:max-w-[280px] sm:text-[2.1rem] lg:max-w-[340px] lg:text-[2.9rem]">
         ประสบการณ์ระดับเวิลด์คลาส
       </div>
 
@@ -92,20 +92,22 @@ export default function NexoraLuxuryHome() {
         />
       </div>
 
-      <div className="absolute inset-x-4 top-[57%] z-40 flex -translate-y-1/2 justify-center sm:inset-x-8 sm:top-auto sm:bottom-10 sm:translate-y-0">
+      <div className="pointer-events-none absolute inset-x-4 top-[57%] z-40 flex -translate-y-1/2 justify-center sm:inset-x-8 sm:top-auto sm:bottom-10 sm:translate-y-0">
         <AppInstallButton variant="dark" />
       </div>
 
-      <div className={`absolute bottom-6 left-4 z-30 max-w-[560px] sm:bottom-10 sm:left-8 ${notoSansThai.className}`}>
+      <div
+        className={`absolute bottom-6 left-4 z-30 max-w-[560px] sm:bottom-10 sm:left-8 ${notoSansThai.className}`}
+      >
         <div className="max-w-[420px] text-[15px] font-extrabold tracking-[0.08em] text-amber-800 sm:max-w-[520px] sm:text-lg">
           สะสม ต่อสู้ แลกเปลี่ยน และรับรางวัลในจักรวาล NEXORA
         </div>
         <div className="mt-3 max-w-[650px] text-[1.7rem] font-extrabold leading-[1.34] tracking-[-0.045em] text-black/76 sm:text-[2.1rem] sm:leading-[1.28] lg:text-[2.55rem]">
-          ก้าวเข้าสู่ยุคใหม่ของการ์ดสะสมระดับพรีเมียม
-          ด้วยตลาดที่ไวระดับโลก แชทเรียลไทม์ การครอบครองที่มีคุณค่า
-          และรางวัลที่ยกระดับทุกคอลเลกชันของคุณ
+          ก้าวเข้าสู่ยุคใหม่ของการ์ดสะสมระดับพรีเมียม ด้วยตลาดที่ไวระดับโลก
         </div>
-
+        <div className="mt-3 max-w-[560px] text-[11px] font-semibold leading-5 tracking-[0.01em] text-black/54 sm:text-[13px] sm:leading-6 lg:text-[14px]">
+          แชทเรียลไทม์ การครอบครองที่มีคุณค่า และรางวัลที่ยกระดับทุกคอลเลกชันของคุณ
+        </div>
         <div className="mt-3 max-w-[520px] text-[13px] font-semibold leading-6 text-black/52 sm:mt-4 sm:text-[15px] sm:leading-7">
           ซื้อขายลื่นไหลบนมือถือ คอม และเว็บแอพในประสบการณ์เดียวกัน
         </div>
@@ -118,10 +120,10 @@ export default function NexoraLuxuryHome() {
             เข้าสู่ตลาด
           </PrefetchLink>
           <PrefetchLink
-            href="/collections"
+            href="/community"
             className="rounded-2xl border border-black/12 bg-white/72 px-6 py-3 text-sm font-black text-black backdrop-blur-xl transition hover:scale-[1.03] hover:bg-white"
           >
-            ดูชุดการ์ด
+            คอมมูนิตี้
           </PrefetchLink>
         </div>
       </div>
