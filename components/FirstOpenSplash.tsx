@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const FIRST_OPEN_SPLASH_KEY = "nexora:first-open-splash:v1";
+const FIRST_OPEN_SPLASH_KEY = "nexora:first-open-splash:v2";
 
 export default function FirstOpenSplash() {
   const [visible, setVisible] = useState(false);
@@ -45,16 +45,16 @@ export default function FirstOpenSplash() {
 
       <div className="relative flex w-full max-w-[560px] flex-col items-center text-center">
         <div className="rounded-full border border-amber-300/22 bg-amber-300/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.34em] text-amber-200">
-          NEXORA EXPERIENCE
+          ประสบการณ์พรีเมียม NEXORA
         </div>
 
         <div className="mt-6 text-[15vw] font-black uppercase leading-none tracking-[-0.08em] text-white sm:text-[92px]">
           NEXORA
         </div>
 
-        <div className="mt-3 max-w-[420px] text-sm font-semibold leading-6 text-white/58 sm:text-base">
-          Loading premium marketplace systems, real-time chat, and collectible
-          experiences.
+        <div className="mt-3 max-w-[460px] text-sm font-semibold leading-6 text-white/58 sm:text-base">
+          กำลังเตรียมตลาดพรีเมียม ระบบแชทเรียลไทม์
+          และประสบการณ์สะสมการ์ดระดับเวิลด์คลาสสำหรับคุณ
         </div>
 
         <div className="mt-8 w-full max-w-[360px] overflow-hidden rounded-full border border-amber-300/18 bg-white/6 p-1">

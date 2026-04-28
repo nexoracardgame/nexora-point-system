@@ -383,7 +383,6 @@ export default function DMListClient({
       return;
     }
 
-    const previousRooms = rooms;
     setClearingRoomId(safeRoomId);
     setRooms((prev) => prev.filter((item) => item.roomId !== safeRoomId));
     clearChatHistoryCache("dm-room", safeRoomId);
@@ -398,12 +397,15 @@ export default function DMListClient({
       },
       body: JSON.stringify({
         roomId: safeRoomId,
+        otherUserId: room.otherUserId,
       }),
     }).catch(() => null);
 
     if (!res?.ok) {
-      setRooms(previousRooms);
-      alert("ลบแชทไม่สำเร็จ กรุณาลองใหม่");
+      console.error("CLEAR DM ROOM ERROR:", res?.status || "network");
+      window.setTimeout(() => {
+        void loadRooms();
+      }, 700);
     }
 
     setClearingRoomId((current) => (current === safeRoomId ? null : current));
