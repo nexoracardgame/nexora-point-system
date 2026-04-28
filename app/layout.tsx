@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { DEFAULT_LOCALE } from "@/lib/i18n-core";
 import "./globals.css";
 
+import GlobalActivityBar from "@/components/GlobalActivityBar";
 import PageTransition from "@/components/PageTransition";
 
 const geistSans = Geist({
@@ -69,6 +70,7 @@ export default function RootLayout({
         "
       >
         <Providers>
+          <GlobalActivityBar />
           <PageTransition>
             <div className="flex min-h-0 flex-1 flex-col">{children}</div>
           </PageTransition>

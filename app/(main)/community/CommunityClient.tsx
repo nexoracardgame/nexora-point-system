@@ -1,13 +1,14 @@
 ﻿"use client";
 
-import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, LoaderCircle, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
 import {
   readClientViewCache,
   writeClientViewCache,
 } from "@/lib/client-view-cache";
+import { trackUiFetch } from "@/lib/ui-activity";
 
 type SearchUser = {
   id: string;
@@ -40,6 +41,12 @@ type IncomingRequest = {
 };
 
 type CommunityCache = {
+  friends: FriendItem[];
+  requests: IncomingRequest[];
+  results: SearchUser[];
+};
+
+type CommunitySnapshot = {
   friends: FriendItem[];
   requests: IncomingRequest[];
   results: SearchUser[];
@@ -87,7 +94,9 @@ export default function CommunityClient({
     !(cachedCommunityState?.data?.results?.length)
   );
   const [error, setError] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const hasServerFriends =
     hasInitialCommunityState ||
@@ -102,7 +111,9 @@ export default function CommunityClient({
     }
 
     try {
-      const res = await fetch("/api/community/friends", { cache: "no-store" });
+      const res = await (silent ? fetch : trackUiFetch)("/api/community/friends", {
+        cache: "no-store",
+      });
       const data = await res.json().catch(() => ({}));
       setFriends(Array.isArray(data?.friends) ? data.friends : []);
       setRequests(Array.isArray(data?.requests) ? data.requests : []);
@@ -121,9 +132,12 @@ export default function CommunityClient({
     }
 
     try {
-      const res = await fetch(`/api/community/search?q=${encodeURIComponent(term)}`, {
-        cache: "no-store",
-      });
+      const res = await (silent ? fetch : trackUiFetch)(
+        `/api/community/search?q=${encodeURIComponent(term)}`,
+        {
+          cache: "no-store",
+        }
+      );
       const data = await res.json().catch(() => ({}));
       setResults(Array.isArray(data?.users) ? data.users : []);
     } catch {
@@ -258,32 +272,74 @@ export default function CommunityClient({
     );
   };
 
-  const submitAction = (
-    payload: Record<string, unknown>,
-    onDone?: (data: Record<string, unknown>) => void
-  ) => {
-    startTransition(() => {
-      void (async () => {
-        try {
-          setError("");
-          const res = await fetch("/api/community/friends", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            setError(String(data?.error || "ดำเนินการไม่สำเร็จ"));
-            return;
-          }
-          onDone?.(data as Record<string, unknown>);
-          void loadFriends(true);
-          void runSearch(query, true);
-        } catch {
-          setError("ดำเนินการไม่สำเร็จ");
-        }
-      })();
+  const createSnapshot = (): CommunitySnapshot => ({
+    friends,
+    requests,
+    results,
+  });
+
+  const restoreSnapshot = (snapshot: CommunitySnapshot) => {
+    setFriends(snapshot.friends);
+    setRequests(snapshot.requests);
+    setResults(snapshot.results);
+  };
+
+  const setPendingAction = (actionKey: string, active: boolean) => {
+    setPendingActions((prev) => {
+      const next = { ...prev };
+
+      if (active) {
+        next[actionKey] = true;
+      } else {
+        delete next[actionKey];
+      }
+
+      return next;
     });
+  };
+
+  const isActionPending = (actionKey: string) => Boolean(pendingActions[actionKey]);
+
+  const submitAction = ({
+    actionKey,
+    payload,
+    optimisticUpdate,
+    onDone,
+  }: {
+    actionKey: string;
+    payload: Record<string, unknown>;
+    optimisticUpdate?: () => void;
+    onDone?: (data: Record<string, unknown>) => void;
+  }) => {
+    const snapshot = createSnapshot();
+
+    optimisticUpdate?.();
+    setPendingAction(actionKey, true);
+
+    void (async () => {
+      try {
+        setError("");
+        const res = await trackUiFetch("/api/community/friends", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          restoreSnapshot(snapshot);
+          setError(String(data?.error || "ดำเนินการไม่สำเร็จ"));
+          return;
+        }
+        onDone?.(data as Record<string, unknown>);
+        void loadFriends(true);
+        void runSearch(query, true);
+      } catch {
+        restoreSnapshot(snapshot);
+        setError("ดำเนินการไม่สำเร็จ");
+      } finally {
+        setPendingAction(actionKey, false);
+      }
+    })();
   };
 
   const visibleResults = useMemo(
@@ -379,22 +435,41 @@ export default function CommunityClient({
                         </div>
                       </PrefetchLink>
 
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() =>
-                          submitAction({ action: "remove", targetUserId: friend.friendId }, () => {
-                            setFriends((prev) =>
-                              prev.filter((item) => item.friendId !== friend.friendId)
-                            );
-                            applyRelation(friend.friendId, "none", null);
-                          })
-                        }
-                        className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-red-500 shadow-sm ring-1 ring-black/5 transition hover:scale-[1.04] hover:bg-red-50 disabled:opacity-60"
-                        aria-label="Remove friend"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
+                      {(() => {
+                        const actionKey = `remove:${friend.friendId}`;
+
+                        return (
+                          <button
+                            type="button"
+                            disabled={isActionPending(actionKey)}
+                            onClick={() =>
+                              submitAction({
+                                actionKey,
+                                payload: {
+                                  action: "remove",
+                                  targetUserId: friend.friendId,
+                                },
+                                optimisticUpdate: () => {
+                                  setFriends((prev) =>
+                                    prev.filter(
+                                      (item) => item.friendId !== friend.friendId
+                                    )
+                                  );
+                                  applyRelation(friend.friendId, "none", null);
+                                },
+                              })
+                            }
+                            className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-red-500 shadow-sm ring-1 ring-black/5 transition hover:scale-[1.04] hover:bg-red-50 disabled:opacity-60"
+                            aria-label="Remove friend"
+                          >
+                            {isActionPending(actionKey) ? (
+                              <LoaderCircle className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-5 w-5" />
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   ))
                 )}
@@ -438,11 +513,15 @@ export default function CommunityClient({
                   />
                   <button
                     type="submit"
-                    disabled={isPending}
+                    disabled={loadingResults}
                     className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-black transition hover:scale-[1.04] disabled:opacity-60 sm:h-14 sm:w-14"
                     aria-label="Search friends"
                   >
-                    <Search className="h-5 w-5" />
+                    {loadingResults ? (
+                      <LoaderCircle className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Search className="h-5 w-5" />
+                    )}
                   </button>
                 </form>
               </section>
@@ -486,52 +565,100 @@ export default function CommunityClient({
                         </PrefetchLink>
 
                         <div className="mt-3 grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() =>
-                              submitAction(
-                                {
-                                  action: "respond",
-                                  requestId: request.id,
-                                  decision: "accept",
-                                },
-                                () => {
-                                  setRequests((prev) =>
-                                    prev.filter((item) => item.id !== request.id)
-                                  );
-                                  applyRelation(request.fromUserId, "friends", null);
-                                }
-                              )
-                            }
-                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
-                          >
-                            <Check className="h-4 w-4" />
-                            รับ
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() =>
-                              submitAction(
-                                {
-                                  action: "respond",
-                                  requestId: request.id,
-                                  decision: "reject",
-                                },
-                                () => {
-                                  setRequests((prev) =>
-                                    prev.filter((item) => item.id !== request.id)
-                                  );
-                                  applyRelation(request.fromUserId, "none", null);
-                                }
-                              )
-                            }
-                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
-                          >
-                            <X className="h-4 w-4" />
-                            ปฏิเสธ
-                          </button>
+                          {(() => {
+                            const acceptActionKey = `respond:${request.id}:accept`;
+                            const rejectActionKey = `respond:${request.id}:reject`;
+                            const optimisticFriend: FriendItem = {
+                              id: `accepted-${request.id}`,
+                              friendId: request.fromUserId,
+                              createdAt: new Date().toISOString(),
+                              displayName: request.displayName,
+                              username: request.username,
+                              image: request.image,
+                              bio: request.bio,
+                            };
+
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isActionPending(acceptActionKey)}
+                                  onClick={() =>
+                                    submitAction({
+                                      actionKey: acceptActionKey,
+                                      payload: {
+                                        action: "respond",
+                                        requestId: request.id,
+                                        decision: "accept",
+                                      },
+                                      optimisticUpdate: () => {
+                                        setRequests((prev) =>
+                                          prev.filter((item) => item.id !== request.id)
+                                        );
+                                        setFriends((prev) =>
+                                          prev.some(
+                                            (item) =>
+                                              item.friendId === request.fromUserId
+                                          )
+                                            ? prev
+                                            : [optimisticFriend, ...prev]
+                                        );
+                                        applyRelation(
+                                          request.fromUserId,
+                                          "friends",
+                                          null
+                                        );
+                                      },
+                                    })
+                                  }
+                                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
+                                >
+                                  {isActionPending(acceptActionKey) ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4" />
+                                  )}
+                                  {isActionPending(acceptActionKey)
+                                    ? "กำลังรับ..."
+                                    : "รับ"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isActionPending(rejectActionKey)}
+                                  onClick={() =>
+                                    submitAction({
+                                      actionKey: rejectActionKey,
+                                      payload: {
+                                        action: "respond",
+                                        requestId: request.id,
+                                        decision: "reject",
+                                      },
+                                      optimisticUpdate: () => {
+                                        setRequests((prev) =>
+                                          prev.filter((item) => item.id !== request.id)
+                                        );
+                                        applyRelation(
+                                          request.fromUserId,
+                                          "none",
+                                          null
+                                        );
+                                      },
+                                    })
+                                  }
+                                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
+                                >
+                                  {isActionPending(rejectActionKey) ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                  {isActionPending(rejectActionKey)
+                                    ? "กำลังปฏิเสธ..."
+                                    : "ปฏิเสธ"}
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -601,58 +728,136 @@ export default function CommunityClient({
                         </div>
                       ) : user.relation === "incoming" && user.requestId ? (
                         <>
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() =>
-                              submitAction(
-                                { action: "respond", requestId: user.requestId, decision: "accept" },
-                                () => applyRelation(user.id, "friends")
-                              )
-                            }
-                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
-                          >
-                            <Check className="h-4 w-4" />
-                            รับ
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() =>
-                              submitAction(
-                                { action: "respond", requestId: user.requestId, decision: "reject" },
-                                () => applyRelation(user.id, "none", null)
-                              )
-                            }
-                            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
-                          >
-                            <X className="h-4 w-4" />
-                            ปฏิเสธ
-                          </button>
+                          {(() => {
+                            const acceptActionKey = `respond:${user.requestId}:accept`;
+                            const rejectActionKey = `respond:${user.requestId}:reject`;
+                            const optimisticFriend: FriendItem = {
+                              id: `accepted-${user.requestId}`,
+                              friendId: user.id,
+                              createdAt: new Date().toISOString(),
+                              displayName: user.displayName,
+                              username: user.username,
+                              image: user.image,
+                              bio: user.bio,
+                            };
+
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isActionPending(acceptActionKey)}
+                                  onClick={() =>
+                                    submitAction({
+                                      actionKey: acceptActionKey,
+                                      payload: {
+                                        action: "respond",
+                                        requestId: user.requestId,
+                                        decision: "accept",
+                                      },
+                                      optimisticUpdate: () => {
+                                        setRequests((prev) =>
+                                          prev.filter(
+                                            (item) => item.id !== user.requestId
+                                          )
+                                        );
+                                        setFriends((prev) =>
+                                          prev.some((item) => item.friendId === user.id)
+                                            ? prev
+                                            : [optimisticFriend, ...prev]
+                                        );
+                                        applyRelation(user.id, "friends");
+                                      },
+                                    })
+                                  }
+                                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
+                                >
+                                  {isActionPending(acceptActionKey) ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4" />
+                                  )}
+                                  {isActionPending(acceptActionKey)
+                                    ? "กำลังรับ..."
+                                    : "รับ"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isActionPending(rejectActionKey)}
+                                  onClick={() =>
+                                    submitAction({
+                                      actionKey: rejectActionKey,
+                                      payload: {
+                                        action: "respond",
+                                        requestId: user.requestId,
+                                        decision: "reject",
+                                      },
+                                      optimisticUpdate: () => {
+                                        setRequests((prev) =>
+                                          prev.filter(
+                                            (item) => item.id !== user.requestId
+                                          )
+                                        );
+                                        applyRelation(user.id, "none", null);
+                                      },
+                                    })
+                                  }
+                                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
+                                >
+                                  {isActionPending(rejectActionKey) ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                  {isActionPending(rejectActionKey)
+                                    ? "กำลังปฏิเสธ..."
+                                    : "ปฏิเสธ"}
+                                </button>
+                              </>
+                            );
+                          })()}
                         </>
                       ) : (
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() =>
-                            submitAction(
-                              { action: "request", targetUserId: user.id },
-                              (data) =>
-                                applyRelation(
-                                  user.id,
-                                  "outgoing",
-                                  String(
-                                    (data?.relation as { requestId?: string } | undefined)
-                                      ?.requestId || ""
-                                  )
-                                )
-                            )
-                          }
-                          className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white shadow-[0_16px_34px_rgba(0,0,0,0.16)] transition hover:scale-[1.02] disabled:opacity-60"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                          เพิ่มเพื่อน
-                        </button>
+                        (() => {
+                          const requestActionKey = `request:${user.id}`;
+
+                          return (
+                            <button
+                              type="button"
+                              disabled={isActionPending(requestActionKey)}
+                              onClick={() =>
+                                submitAction({
+                                  actionKey: requestActionKey,
+                                  payload: {
+                                    action: "request",
+                                    targetUserId: user.id,
+                                  },
+                                  optimisticUpdate: () =>
+                                    applyRelation(user.id, "outgoing", null),
+                                  onDone: (data) =>
+                                    applyRelation(
+                                      user.id,
+                                      "outgoing",
+                                      String(
+                                        (data?.relation as
+                                          | { requestId?: string }
+                                          | undefined)?.requestId || ""
+                                      )
+                                    ),
+                                })
+                              }
+                              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white shadow-[0_16px_34px_rgba(0,0,0,0.16)] transition hover:scale-[1.02] disabled:opacity-60"
+                            >
+                              {isActionPending(requestActionKey) ? (
+                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <UserPlus className="h-4 w-4" />
+                              )}
+                              {isActionPending(requestActionKey)
+                                ? "กำลังส่ง..."
+                                : "เพิ่มเพื่อน"}
+                            </button>
+                          );
+                        })()
                       )}
                     </div>
                   </div>
