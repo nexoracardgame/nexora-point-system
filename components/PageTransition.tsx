@@ -9,20 +9,18 @@ export default function PageTransition({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [visible, setVisible] = useState(true);
+  const [show, setShow] = useState(true);
 
   useEffect(() => {
-    setVisible(false);
-    const t = setTimeout(() => setVisible(true), 120); // delay สั้นๆ ให้เกิด fade
+    setShow(false);
+    const t = setTimeout(() => setShow(true), 80); // 🔥 เร็วมาก
     return () => clearTimeout(t);
   }, [pathname]);
 
   return (
     <div
-      className={`transition-all duration-300 ease-out ${
-        visible
-          ? "opacity-100 scale-100 blur-0"
-          : "opacity-0 scale-[0.98] blur-[6px]"
+      className={`transition-all duration-200 ${
+        show ? "opacity-100" : "opacity-0"
       }`}
     >
       {children}

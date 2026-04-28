@@ -5,8 +5,8 @@ import { DEFAULT_LOCALE } from "@/lib/i18n-core";
 import "./globals.css";
 
 import AppSplash from "@/components/AppSplash";
-import PageLoader from "@/components/PageLoader";
 import PageTransition from "@/components/PageTransition";
+import MobileNav from "@/components/MobileNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,15 +20,13 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-/* 🔥 META (PWA + SEO + APP MODE) */
+/* 🔥 META (PWA + APP MODE) */
 export const metadata: Metadata = {
   title: "NEXORA",
   description: "NEXORA CARDGAME Marketplace",
   applicationName: "NEXORA",
 
-  // ✅ ใช้ app/manifest.ts
   manifest: "/manifest",
-
   themeColor: "#050507",
 
   appleWebApp: {
@@ -45,18 +43,17 @@ export const metadata: Metadata = {
     apple: "/icon-192.png",
   },
 
-  // กัน flash สีขาวตอนโหลด
   colorScheme: "dark",
 };
 
-/* 🔥 MOBILE VIEW (ฟีลแอพจริง) */
+/* 🔥 MOBILE VIEW */
 export const viewport: Viewport = {
   themeColor: "#050507",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover", // iPhone เต็มขอบ
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -79,20 +76,20 @@ export default function RootLayout({
           selection:bg-amber-400/20 selection:text-amber-200
         "
       >
-        {/* 🔥 Splash (เปิดแอพครั้งแรก) */}
+        {/* 🔥 Splash ครั้งแรก */}
         <AppSplash />
-
-        {/* 🔥 Loader ตอนเปลี่ยนหน้า */}
-        <PageLoader />
 
         {/* 🔥 App Core */}
         <Providers>
-          {/* 🔥 Transition ระดับแอพ (fade + zoom + blur เบาๆ) */}
+          {/* 🔥 Transition เร็วแบบแอพ (ไม่มีหน่วง) */}
           <PageTransition>
-            <main className="flex-1 flex flex-col will-change-[transform,opacity]">
+            <main className="flex-1 flex flex-col pb-16">
               {children}
             </main>
           </PageTransition>
+
+          {/* 🔥 เมนูติดล่างแบบแอพ */}
+          <MobileNav />
         </Providers>
       </body>
     </html>
