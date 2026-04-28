@@ -69,9 +69,16 @@ export async function getDirectChatBootstrap(input: {
   }
 
   const meIdentity = await resolveUserIdentity(input.sessionUser);
+  const rawOtherUserId =
+    access.room.usera === userId || (lineId ? access.room.usera === lineId : false)
+      ? String(access.room.userb || "").trim()
+      : String(access.room.usera || "").trim();
   const [roomClearedAt, conversationClearedAt] = await Promise.all([
     getDmRoomClearedAtForUser(userId, access.roomId),
-    getDmConversationClearedAtForUserAliases(userId, [access.otherUserId]),
+    getDmConversationClearedAtForUserAliases(userId, [
+      access.otherUserId,
+      rawOtherUserId,
+    ]),
   ]);
   const clearedAt = getLatestClearTimestamp(roomClearedAt, conversationClearedAt);
   const otherProfile = access.otherUserId

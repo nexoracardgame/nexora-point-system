@@ -3,7 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleRoomIds } from "@/lib/dm-access";
 import {
+  getDmConversationClearedAtMap,
   getDmRoomClearedAtMap,
+  getLatestClearTimestamp,
   isRoomActivityVisibleAfterClear,
 } from "@/lib/dm-room-clear-state";
 import { listIncomingFriendRequests } from "@/lib/friend-store";
@@ -36,6 +38,16 @@ function buildPreview(content?: string | null, imageUrl?: string | null) {
   if (text) return text;
   if (imageUrl) return "ส่งรูปภาพ";
   return "ส่งข้อความ";
+}
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 export const dynamic = "force-dynamic";
@@ -169,15 +181,35 @@ export async function GET() {
     }
 
     const roomById = new Map((roomResult.data || []).map((room) => [room.roomid, room]));
+    const currentAliases = uniqueStrings([currentUserId, currentLineId]);
+    const peerAliasByRoomId = new Map(
+      (roomResult.data || []).map((room) => {
+        const roomId = String(room.roomid || "").trim();
+        const userA = String(room.usera || "").trim();
+        const userB = String(room.userb || "").trim();
+        const peer = currentAliases.includes(userA) ? userB : userA;
+        return [roomId, uniqueStrings([peer])] as const;
+      })
+    );
+    const conversationClearAtByPeerAlias = await getDmConversationClearedAtMap(
+      currentUserId,
+      Array.from(peerAliasByRoomId.values()).flat()
+    );
     const relevantUnreadRows = (unreadResult.data || []).filter((row) => {
       const roomId = String(row.roomId || "").trim();
       if (!roomId || roomId.startsWith("deal:")) {
         return true;
       }
+      const clearedAt = getLatestClearTimestamp(
+        directRoomClearAtByRoomId.get(roomId) || null,
+        ...(peerAliasByRoomId.get(roomId) || []).map(
+          (alias) => conversationClearAtByPeerAlias.get(alias) || null
+        )
+      );
 
       return isRoomActivityVisibleAfterClear(
         String(row.createdAt || "").trim(),
-        directRoomClearAtByRoomId.get(roomId) || null
+        clearedAt
       );
     });
 

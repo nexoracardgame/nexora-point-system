@@ -3,10 +3,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleRoomIds } from "@/lib/dm-access";
 import {
+  getDmConversationClearedAtMap,
   getDmRoomClearedAtMap,
+  getLatestClearTimestamp,
   isRoomActivityVisibleAfterClear,
 } from "@/lib/dm-room-clear-state";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -35,28 +47,61 @@ export async function GET() {
     directRoomIds
   );
 
-  const { data, error: unreadErr } = await supabase
-    .from("dmMessage")
-    .select("roomId,createdAt")
-    .in("roomId", myRoomIds)
-    .neq("senderId", userId)
-    .neq("senderId", lineId || "__never__")
-    .is("seenAt", null);
+  const [roomResult, unreadResult] = await Promise.all([
+    directRoomIds.length
+      ? supabase
+          .from("dm_room")
+          .select("roomid,usera,userb")
+          .in("roomid", directRoomIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("dmMessage")
+      .select("roomId,createdAt")
+      .in("roomId", myRoomIds)
+      .neq("senderId", userId)
+      .neq("senderId", lineId || "__never__")
+      .is("seenAt", null),
+  ]);
 
-  if (unreadErr) {
-    console.error("UNREAD MESSAGE ERROR:", unreadErr);
+  if (roomResult.error) {
+    console.error("UNREAD ROOM ERROR:", roomResult.error);
+  }
+
+  if (unreadResult.error) {
+    console.error("UNREAD MESSAGE ERROR:", unreadResult.error);
     return NextResponse.json({ count: 0 }, { status: 500 });
   }
 
-  const count = (data || []).filter((row) => {
+  const currentAliases = uniqueStrings([String(userId), String(lineId || "")]);
+  const peerAliasByRoomId = new Map(
+    (roomResult.data || []).map((room) => {
+      const roomId = String(room.roomid || "").trim();
+      const userA = String(room.usera || "").trim();
+      const userB = String(room.userb || "").trim();
+      const peer = currentAliases.includes(userA) ? userB : userA;
+      return [roomId, uniqueStrings([peer])] as const;
+    })
+  );
+  const conversationClearAtByPeerAlias = await getDmConversationClearedAtMap(
+    String(userId),
+    Array.from(peerAliasByRoomId.values()).flat()
+  );
+
+  const count = (unreadResult.data || []).filter((row) => {
     const roomId = String(row.roomId || "").trim();
     if (!roomId || roomId.startsWith("deal:")) {
       return true;
     }
+    const clearedAt = getLatestClearTimestamp(
+      directRoomClearAtByRoomId.get(roomId) || null,
+      ...(peerAliasByRoomId.get(roomId) || []).map(
+        (alias) => conversationClearAtByPeerAlias.get(alias) || null
+      )
+    );
 
     return isRoomActivityVisibleAfterClear(
       String(row.createdAt || "").trim(),
-      directRoomClearAtByRoomId.get(roomId) || null
+      clearedAt
     );
   }).length;
 

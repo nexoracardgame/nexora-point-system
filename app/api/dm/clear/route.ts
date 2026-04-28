@@ -19,6 +19,16 @@ function buildCanonicalDirectRoomId(userA: string, userB: string) {
     .join("__");
 }
 
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 async function resolveUserAliases(rawUserId: string) {
   const value = String(rawUserId || "").trim();
 
@@ -109,13 +119,25 @@ export async function POST(req: NextRequest) {
   });
 
   const myAliases = await resolveUserAliases(userId);
+  const rawOtherUserId =
+    access.ok && access.kind === "direct"
+      ? myAliases.includes(String(access.room.usera || "").trim())
+        ? String(access.room.userb || "").trim()
+        : String(access.room.usera || "").trim()
+      : "";
   const canonicalOtherUserId =
     access.ok && access.kind === "direct"
       ? access.otherUserId
       : otherUserIdInput;
-  const otherAliases = canonicalOtherUserId
-    ? await resolveUserAliases(canonicalOtherUserId)
-    : [];
+  const otherSeeds = uniqueStrings([
+    canonicalOtherUserId,
+    otherUserIdInput,
+    rawOtherUserId,
+  ]);
+  const otherAliases = uniqueStrings([
+    ...otherSeeds,
+    ...(await Promise.all(otherSeeds.map(resolveUserAliases))).flat(),
+  ]);
   const relatedRoomIds = await findDirectRoomIdsForPair(myAliases, otherAliases);
 
   if ((!access.ok || access.kind !== "direct") && relatedRoomIds.length === 0) {
@@ -130,11 +152,16 @@ export async function POST(req: NextRequest) {
   }
 
   const clearedAt = new Date().toISOString();
+  const canonicalRoomIds = myAliases.flatMap((myAlias) =>
+    otherAliases.map((otherAlias) =>
+      buildCanonicalDirectRoomId(myAlias, otherAlias)
+    )
+  );
   const roomIdsToClear = Array.from(
     new Set([
       roomId,
       access.ok && access.kind === "direct" ? access.roomId : "",
-      buildCanonicalDirectRoomId(userId, otherAliases[0] || canonicalOtherUserId),
+      ...canonicalRoomIds,
       ...relatedRoomIds,
     ].filter(Boolean))
   );
@@ -145,10 +172,10 @@ export async function POST(req: NextRequest) {
     )
   );
   const conversationClearResult =
-    canonicalOtherUserId || otherAliases.length > 0
+    otherAliases.length > 0
       ? await clearDmConversationForUserAliases(
           userId,
-          [canonicalOtherUserId, ...otherAliases].filter(Boolean),
+          otherAliases,
           clearedAt
         )
     : null;

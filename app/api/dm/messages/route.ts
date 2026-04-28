@@ -54,12 +54,22 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getServerSupabaseClient();
+  const rawOtherUserId =
+    access.kind === "direct"
+      ? String(
+          access.room.usera === userId ||
+            (lineId ? access.room.usera === lineId : false)
+            ? access.room.userb
+            : access.room.usera || ""
+        ).trim()
+      : "";
   const clearedAt =
     access.kind === "direct"
       ? getLatestClearTimestamp(
           await getDmRoomClearedAtForUser(userId, access.roomId),
           await getDmConversationClearedAtForUserAliases(userId, [
             access.otherUserId,
+            rawOtherUserId,
           ])
         )
       : null;

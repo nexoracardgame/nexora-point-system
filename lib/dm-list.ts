@@ -179,14 +179,16 @@ export async function getDmRoomsForUser(
           "roomId,senderId,senderName,senderImage,content,imageUrl,createdAt"
         )
         .in("roomId", roomIds)
-        .order("createdAt", { ascending: false }),
+        .order("createdAt", { ascending: false })
+        .limit(Math.max(120, roomIds.length * 8)),
       supabase
         .from("dmMessage")
         .select("roomId,senderId,seenAt,createdAt")
         .in("roomId", roomIds)
         .neq("senderId", myId)
         .neq("senderId", myLineId || "__never__")
-        .is("seenAt", null),
+        .is("seenAt", null)
+        .limit(500),
     ]);
 
   if (msgErr) {
@@ -242,6 +244,14 @@ export async function getDmRoomsForUser(
         roomUserAIsMe ? room.userb : room.usera || ""
       ).trim();
       const otherUserId = await resolveCanonicalUserId(rawOtherUserId);
+      const otherUserAliases = Array.from(
+        new Set([
+          rawOtherUserId,
+          otherUserId,
+          ...(await resolveUserAliases(rawOtherUserId)),
+          ...(await resolveUserAliases(otherUserId || rawOtherUserId)),
+        ].filter(Boolean))
+      );
       const profile = otherUserId
         ? await getLocalProfileByUserId(otherUserId)
         : null;
@@ -249,7 +259,7 @@ export async function getDmRoomsForUser(
       return {
         roomId: String(room.roomid),
         otherUserId: otherUserId || rawOtherUserId,
-        otherUserAliases: await resolveUserAliases(otherUserId || rawOtherUserId),
+        otherUserAliases,
         profile,
       };
     })

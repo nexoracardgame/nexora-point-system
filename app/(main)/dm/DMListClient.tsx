@@ -46,6 +46,103 @@ type DmRoomFastCacheMeta = {
   [key: string]: unknown;
 };
 
+type DmMessageRealtimeRow = {
+  id?: string | number | null;
+  roomId?: string | null;
+  senderId?: string | null;
+  senderName?: string | null;
+  senderImage?: string | null;
+  content?: string | null;
+  imageUrl?: string | null;
+  createdAt?: string | null;
+};
+
+type LocalDmClearMap = Map<string, string>;
+
+const DM_LIST_CACHE_KEY = "dm-list";
+
+function buildLocalClearStorageKey(userId?: string | null) {
+  return `nexora:dm-cleared:${String(userId || "guest").trim() || "guest"}`;
+}
+
+function safeTime(value?: string | null) {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function latestIsoTimestamp(values: Array<string | null | undefined>) {
+  const latest = values
+    .map((value) => safeTime(value))
+    .filter((value) => value > 0)
+    .sort((a, b) => b - a)[0];
+
+  return latest ? new Date(latest).toISOString() : "";
+}
+
+function readLocalDmClearMap(userId?: string | null): LocalDmClearMap {
+  if (typeof window === "undefined") {
+    return new Map();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(buildLocalClearStorageKey(userId));
+    const parsed = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+
+    return new Map(
+      Object.entries(parsed || {})
+        .map(([key, value]) => [
+          String(key || "").trim(),
+          String(value || "").trim(),
+        ] as const)
+        .filter(([key, value]) => Boolean(key && value))
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function writeLocalDmClearMap(userId: string | null | undefined, map: LocalDmClearMap) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      buildLocalClearStorageKey(userId),
+      JSON.stringify(Object.fromEntries(map))
+    );
+  } catch {
+    return;
+  }
+}
+
+function rememberLocalDmClear(
+  userId: string | null | undefined,
+  keys: string[],
+  clearedAt: string
+) {
+  const map = readLocalDmClearMap(userId);
+  const safeClearedAt = String(clearedAt || new Date().toISOString()).trim();
+
+  keys
+    .map((key) => String(key || "").trim())
+    .filter(Boolean)
+    .forEach((key) => {
+      const current = map.get(key);
+      map.set(key, latestIsoTimestamp([current, safeClearedAt]) || safeClearedAt);
+    });
+
+  writeLocalDmClearMap(userId, map);
+  return map;
+}
+
+function buildPreview(content?: string | null, imageUrl?: string | null) {
+  const text = String(content || "").trim();
+  if (text) return text;
+  if (imageUrl) return "รูปภาพ";
+  return "เริ่มแชท";
+}
+
 function formatDealPriceLabel(value?: number) {
   const amount = Number(value || 0);
   if (!amount) return "-";
@@ -106,6 +203,61 @@ function sortRoomsByActivity(list: DMRoomListItem[]) {
   });
 }
 
+function getDirectRoomLocalClearKeys(
+  room: DMRoomListItem,
+  me?: SessionUser | null
+) {
+  if (room.kind === "deal") {
+    return [];
+  }
+
+  const myId = String(me?.id || "").trim();
+  const myLineId = String(me?.lineId || "").trim();
+  const otherUserId = String(room.otherUserId || "").trim();
+
+  return Array.from(
+    new Set(
+      [
+        room.roomId,
+        otherUserId,
+        myId && otherUserId ? buildDirectRoomId(myId, otherUserId) : "",
+        myLineId && otherUserId ? buildDirectRoomId(myLineId, otherUserId) : "",
+      ]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function getLocalClearedAtForRoom(
+  room: DMRoomListItem,
+  me: SessionUser | null | undefined,
+  clearMap: LocalDmClearMap
+) {
+  return latestIsoTimestamp(
+    getDirectRoomLocalClearKeys(room, me).map((key) => clearMap.get(key) || null)
+  );
+}
+
+function filterRoomsWithLocalClears(
+  list: DMRoomListItem[],
+  me?: SessionUser | null,
+  clearMap = readLocalDmClearMap(me?.id)
+) {
+  return list.filter((room) => {
+    if (room.kind === "deal") {
+      return true;
+    }
+
+    const clearedAt = getLocalClearedAtForRoom(room, me, clearMap);
+    if (!clearedAt) {
+      return true;
+    }
+
+    return safeTime(room.lastMessageAt) > safeTime(clearedAt);
+  });
+}
+
 export default function DMListClient({
   initialRooms,
   initialMe,
@@ -115,21 +267,23 @@ export default function DMListClient({
 }) {
   const cachedList = useMemo(
     () =>
-      readClientViewCache<DmListCache>("dm-list", {
+      readClientViewCache<DmListCache>(DM_LIST_CACHE_KEY, {
         maxAgeMs: 180000,
       }),
     []
   );
   const router = useRouter();
-  const [currentMe, setCurrentMe] = useState<SessionUser | null>(
-    initialMe || cachedList?.data?.me || null
-  );
+  const initialMeCandidate = initialMe || cachedList?.data?.me || null;
+  const [currentMe, setCurrentMe] = useState<SessionUser | null>(initialMeCandidate);
   const [rooms, setRooms] = useState<DMRoomListItem[]>(
-    sortRoomsByActivity(
-      (initialRooms.length > 0
-        ? initialRooms
-        : cachedList?.data?.rooms || []
-      ).map(normalizeRoom)
+    filterRoomsWithLocalClears(
+      sortRoomsByActivity(
+        (initialRooms.length > 0
+          ? initialRooms
+          : cachedList?.data?.rooms || []
+        ).map(normalizeRoom)
+      ),
+      initialMeCandidate
     )
   );
   const [loading, setLoading] = useState(
@@ -139,6 +293,16 @@ export default function DMListClient({
   const [clearingRoomId, setClearingRoomId] = useState<string | null>(null);
 
   const hasInit = useRef(false);
+  const roomsRef = useRef<DMRoomListItem[]>(rooms);
+  const currentMeRef = useRef<SessionUser | null>(currentMe);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
+
+  useEffect(() => {
+    currentMeRef.current = currentMe;
+  }, [currentMe]);
 
   const getTargetDirectRoomId = useCallback((room: DMRoomListItem) => {
     const myUserId = String(currentMe?.id || "").trim();
@@ -270,13 +434,22 @@ export default function DMListClient({
       return;
     }
 
-    writeClientViewCache("dm-list", {
-      rooms,
+    writeClientViewCache(DM_LIST_CACHE_KEY, {
+      rooms: filterRoomsWithLocalClears(rooms, currentMe),
       me: currentMe,
     } satisfies DmListCache);
   }, [currentMe, rooms]);
 
-  const loadRooms = async () => {
+  useEffect(() => {
+    if (!currentMe) {
+      return;
+    }
+
+    setRooms((prev) => filterRoomsWithLocalClears(prev, currentMe));
+  }, [currentMe]);
+
+  const loadRooms = async (meOverride?: SessionUser | null) => {
+    const effectiveMe = meOverride === undefined ? currentMe : meOverride;
     try {
       const res = await fetch("/api/dm/list", {
         cache: "no-store",
@@ -291,9 +464,10 @@ export default function DMListClient({
       const nextRooms: DMRoomListItem[] = Array.isArray(data?.rooms)
         ? sortRoomsByActivity(data.rooms.map(normalizeRoom))
         : [];
+      const visibleRooms = filterRoomsWithLocalClears(nextRooms, effectiveMe);
 
-      setRooms(nextRooms);
-      void hydrateUnknownRooms(nextRooms);
+      setRooms(visibleRooms);
+      void hydrateUnknownRooms(visibleRooms);
     } finally {
       setLoading(false);
     }
@@ -384,7 +558,25 @@ export default function DMListClient({
     }
 
     setClearingRoomId(safeRoomId);
-    setRooms((prev) => prev.filter((item) => item.roomId !== safeRoomId));
+    const clearedAt = new Date().toISOString();
+    const localClearKeys = getDirectRoomLocalClearKeys(room, currentMe);
+    const nextClearMap = rememberLocalDmClear(
+      currentMe?.id,
+      [safeRoomId, targetRoomId, ...localClearKeys],
+      clearedAt
+    );
+    setRooms((prev) => {
+      const nextRooms = filterRoomsWithLocalClears(
+        prev.filter((item) => item.roomId !== safeRoomId),
+        currentMe,
+        nextClearMap
+      );
+      writeClientViewCache(DM_LIST_CACHE_KEY, {
+        rooms: nextRooms,
+        me: currentMe,
+      } satisfies DmListCache);
+      return nextRooms;
+    });
     clearChatHistoryCache("dm-room", safeRoomId);
     if (targetRoomId && targetRoomId !== safeRoomId) {
       clearChatHistoryCache("dm-room", targetRoomId);
@@ -401,15 +593,92 @@ export default function DMListClient({
       }),
     }).catch(() => null);
 
-    if (!res?.ok) {
+    if (res?.ok) {
+      const data = await res.json().catch(() => null);
+      const clearedRoomIds = Array.isArray(data?.clearedRoomIds)
+        ? data.clearedRoomIds.map((item: unknown) => String(item || "").trim())
+        : [];
+      rememberLocalDmClear(
+        currentMe?.id,
+        [...clearedRoomIds, safeRoomId, targetRoomId, ...localClearKeys],
+        String(data?.clearedAt || clearedAt)
+      );
+    } else {
       console.error("CLEAR DM ROOM ERROR:", res?.status || "network");
-      window.setTimeout(() => {
-        void loadRooms();
-      }, 700);
     }
 
     setClearingRoomId((current) => (current === safeRoomId ? null : current));
   };
+
+  const applyRealtimeMessage = useCallback((message: DmMessageRealtimeRow) => {
+    const roomId = String(message?.roomId || "").trim();
+    const createdAt =
+      String(message?.createdAt || "").trim() || new Date().toISOString();
+
+    if (!roomId) {
+      return;
+    }
+
+    const activeMe = currentMeRef.current;
+    const getTargetRoomId = (room: DMRoomListItem) => {
+      const myUserId = String(activeMe?.id || "").trim();
+      const otherUserId = String(room.otherUserId || "").trim();
+
+      if (!myUserId || !otherUserId) {
+        return room.roomId;
+      }
+
+      return buildDirectRoomId(myUserId, otherUserId) || room.roomId;
+    };
+    const senderId = String(message?.senderId || "").trim();
+    const isMine =
+      senderId === String(activeMe?.id || "").trim() ||
+      senderId === String(activeMe?.lineId || "").trim();
+    const preview = buildPreview(message?.content, message?.imageUrl);
+    const hadExistingRoom = roomsRef.current.some((room) => {
+      const targetRoomId =
+        room.kind === "deal" ? room.roomId : getTargetRoomId(room);
+      return (
+        room.roomId === roomId ||
+        targetRoomId === roomId ||
+        (room.kind === "deal" && room.dealId && roomId === `deal:${room.dealId}`)
+      );
+    });
+
+    setRooms((prev) => {
+      const nextRooms = prev.map((room) => {
+        const targetRoomId =
+          room.kind === "deal" ? room.roomId : getTargetRoomId(room);
+        const matches =
+          room.roomId === roomId ||
+          targetRoomId === roomId ||
+          (room.kind === "deal" &&
+            room.dealId &&
+            roomId === `deal:${room.dealId}`);
+
+        if (!matches) {
+          return room;
+        }
+
+        return {
+          ...room,
+          lastMessage: preview,
+          lastMessageAt: createdAt,
+          createdAt,
+          unread: isMine ? room.unread : room.unread + 1,
+        };
+      });
+
+      return filterRoomsWithLocalClears(
+        sortRoomsByActivity(nextRooms),
+        activeMe
+      );
+    });
+
+    if (!hadExistingRoom) {
+      void loadRooms(activeMe);
+    }
+  }, []);
 
   useEffect(() => {
     if (initialRooms.length > 0) {
@@ -422,7 +691,7 @@ export default function DMListClient({
       return;
     }
 
-    const cached = readClientViewCache<DmListCache>("dm-list", {
+    const cached = readClientViewCache<DmListCache>(DM_LIST_CACHE_KEY, {
       maxAgeMs: 180000,
     });
 
@@ -435,7 +704,10 @@ export default function DMListClient({
     }
 
     if (Array.isArray(cached.data.rooms) && cached.data.rooms.length > 0) {
-      const nextRooms = sortRoomsByActivity(cached.data.rooms.map(normalizeRoom));
+      const nextRooms = filterRoomsWithLocalClears(
+        sortRoomsByActivity(cached.data.rooms.map(normalizeRoom)),
+        cached.data.me || currentMe
+      );
       setRooms(nextRooms);
       setLoading(false);
       void hydrateUnknownRooms(nextRooms);
@@ -447,19 +719,21 @@ export default function DMListClient({
     hasInit.current = true;
 
     void (async () => {
-      if (!currentMe) {
+      let effectiveMe = currentMe;
+      if (!effectiveMe) {
         const sessionRes = await fetch("/api/auth/session", {
           cache: "no-store",
         });
         const sessionData = await sessionRes.json();
-        setCurrentMe((sessionData?.user || null) as SessionUser | null);
+        effectiveMe = (sessionData?.user || null) as SessionUser | null;
+        setCurrentMe(effectiveMe);
       }
 
       if (initialRooms.length === 0) {
-        await loadRooms();
+        await loadRooms(effectiveMe);
       } else {
         setLoading(false);
-        void loadRooms();
+        void loadRooms(effectiveMe);
       }
     })();
   }, [currentMe, initialRooms.length]);
@@ -473,8 +747,14 @@ export default function DMListClient({
     channel?.on(
       "postgres_changes",
       { event: "*", schema: "public", table: "dmMessage" },
-      () => {
-        void loadRooms();
+      (payload) => {
+        const nextMessage = (payload as { new?: DmMessageRealtimeRow })?.new;
+        if (nextMessage?.roomId) {
+          applyRealtimeMessage(nextMessage);
+          return;
+        }
+
+        void loadRooms(currentMeRef.current);
       }
     );
 
@@ -482,7 +762,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dm_room" },
       () => {
-        void loadRooms();
+        void loadRooms(currentMeRef.current);
       }
     );
 
@@ -490,7 +770,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "DealRequest" },
       () => {
-        void loadRooms();
+        void loadRooms(currentMeRef.current);
       }
     );
 
@@ -498,7 +778,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dmRoomClearState" },
       () => {
-        void loadRooms();
+        void loadRooms(currentMeRef.current);
       }
     );
 
@@ -506,7 +786,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dmConversationClearState" },
       () => {
-        void loadRooms();
+        void loadRooms(currentMeRef.current);
       }
     );
 
@@ -514,17 +794,17 @@ export default function DMListClient({
 
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void loadRooms();
+        void loadRooms(currentMeRef.current);
       }
     }, 4000);
 
     const onFocus = () => {
-      void loadRooms();
+      void loadRooms(currentMeRef.current);
     };
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        void loadRooms();
+        void loadRooms(currentMeRef.current);
       }
     };
 
