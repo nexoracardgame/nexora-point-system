@@ -405,13 +405,14 @@ export default function MarketDashboardTFT({
       className={`${thaiSans.variable} ${sora.variable} space-y-6 lg:space-y-8`}
     >
       {/* MOBILE HERO */}
-      <section className="relative overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] p-4 text-[#09090b] shadow-[0_24px_70px_rgba(20,20,30,0.12)] ring-1 ring-black/5 lg:hidden">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/70 bg-[#edf2fb] p-4 text-[#09090b] shadow-[0_24px_70px_rgba(20,20,30,0.12)] ring-1 ring-black/5 lg:hidden">
         <div className="pointer-events-none absolute inset-0">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-30"
             style={{ backgroundImage: `url(${TOP3_BACKGROUND_URL})` }}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(238,242,250,0.90))]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.50),rgba(237,242,251,0.60))]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.42),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.22),transparent_34%)]" />
         </div>
 
         <div className="relative flex flex-col gap-4">
@@ -584,14 +585,14 @@ export default function MarketDashboardTFT({
       </section>
 
       {/* DESKTOP HERO - ORIGINAL */}
-      <section className="relative hidden overflow-hidden rounded-[42px] border border-white/75 bg-[linear-gradient(180deg,#ffffff_0%,#eef2fa_100%)] px-8 py-12 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.12)] ring-1 ring-black/5 xl:px-14 xl:py-16 lg:block">
+      <section className="relative hidden overflow-hidden rounded-[42px] border border-white/75 bg-[#edf2fb] px-8 py-12 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.12)] ring-1 ring-black/5 xl:px-14 xl:py-16 lg:block">
         <div className="pointer-events-none absolute inset-0">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-30"
             style={{ backgroundImage: `url(${TOP3_BACKGROUND_URL})` }}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(238,242,250,0.92))]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.72),transparent_36%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.34),transparent_38%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(237,242,251,0.56))]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.38),transparent_24%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_26%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.18),transparent_34%)]" />
         </div>
 
         <div className="relative flex items-center justify-between">
