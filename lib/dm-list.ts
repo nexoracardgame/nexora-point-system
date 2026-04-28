@@ -39,6 +39,20 @@ function latestTime(value?: string | null) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function compareRoomsByLatest(
+  a: { lastMessageAt?: string | null; createdAt?: string | null },
+  b: { lastMessageAt?: string | null; createdAt?: string | null }
+) {
+  const aLastMessageTime = latestTime(a.lastMessageAt);
+  const bLastMessageTime = latestTime(b.lastMessageAt);
+
+  if (aLastMessageTime !== bLastMessageTime) {
+    return bLastMessageTime - aLastMessageTime;
+  }
+
+  return latestTime(b.createdAt) - latestTime(a.createdAt);
+}
+
 async function resolveCanonicalUserId(rawUserId: string) {
   const value = String(rawUserId || "").trim();
 
@@ -228,16 +242,15 @@ export async function getDmRoomsForUser(
     const otherUserId =
       otherUserIdMap.get(roomId) ||
       String(roomUserAIsMe ? room.userb : room.usera || "").trim();
-    const createdAt =
-      String(latestMessage?.createdAt || "").trim() ||
-      String(room.updatedat || "").trim();
+    const lastMessageAt = String(latestMessage?.createdAt || "").trim();
+    const createdAt = lastMessageAt || String(room.updatedat || "").trim();
 
     return {
       kind: "direct" as const,
       roomId,
       otherUserId,
       createdAt,
-      lastMessageAt: createdAt,
+      lastMessageAt,
       lastMessage: latestMessage
         ? buildPreview(latestMessage.content, latestMessage.imageUrl)
         : "เริ่มแชท",
@@ -259,9 +272,7 @@ export async function getDmRoomsForUser(
     (DMRoomListItem & { otherUserId?: string })
   >();
 
-  for (const item of directItems.sort(
-    (a, b) => latestTime(b.createdAt) - latestTime(a.createdAt)
-  )) {
+  for (const item of directItems.sort(compareRoomsByLatest)) {
     const key = item.otherUserId || item.roomId;
     const existing = directByOther.get(key);
 
@@ -286,16 +297,15 @@ export async function getDmRoomsForUser(
     const cardName =
       String(card?.cardName || "").trim() ||
       `Card #${String(card?.cardNo || "").padStart(3, "0")}`;
-    const createdAt =
-      String(latestMessage?.createdAt || "").trim() ||
-      String(deal.createdAt || "").trim();
+    const lastMessageAt = String(latestMessage?.createdAt || "").trim();
+    const createdAt = lastMessageAt || String(deal.createdAt || "").trim();
 
     return {
       kind: "deal",
       roomId,
       dealId: deal.id,
       createdAt,
-      lastMessageAt: createdAt,
+      lastMessageAt,
       lastMessage: latestMessage
         ? buildPreview(latestMessage.content, latestMessage.imageUrl)
         : "เริ่มคุยห้องดีล",
@@ -312,6 +322,6 @@ export async function getDmRoomsForUser(
   });
 
   return [...Array.from(directByOther.values()), ...dealItems].sort(
-    (a, b) => latestTime(b.createdAt) - latestTime(a.createdAt)
+    compareRoomsByLatest
   );
 }

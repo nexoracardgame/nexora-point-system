@@ -622,27 +622,27 @@ export default function MainLayout({
                 </PrefetchLink>
 
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                  <div className="min-w-0 rounded-[16px] border border-white/10 bg-[#121418] px-2.5 py-2 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:hidden">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white">
-                        <Gem className="h-3.5 w-3.5" />
+                  <div className="w-[122px] shrink-0 rounded-[14px] border border-white/10 bg-[#121418] px-2 py-1.5 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:hidden">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06] text-white">
+                        <Gem className="h-3 w-3" />
                       </div>
-                      <div className="min-w-0 truncate text-[13px] font-black leading-none text-white">
+                      <div className="min-w-0 truncate text-[12px] font-black leading-none text-white">
                         {formatBalance(session?.user?.nexPoint)}
-                        <span className="ml-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/62">
+                        <span className="ml-1 text-[8px] font-bold uppercase tracking-[0.14em] text-white/62">
                           NEX
                         </span>
                       </div>
                     </div>
 
-                    <div className="mt-1.5 border-t border-white/8 pt-1.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white">
-                          <Coins className="h-3.5 w-3.5" />
+                    <div className="mt-1 border-t border-white/8 pt-1">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06] text-white">
+                          <Coins className="h-3 w-3" />
                         </div>
-                        <div className="min-w-0 truncate text-[13px] font-black leading-none text-white">
+                        <div className="min-w-0 truncate text-[12px] font-black leading-none text-white">
                           {formatBalance(session?.user?.coin)}
-                          <span className="ml-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/62">
+                          <span className="ml-1 text-[8px] font-bold uppercase tracking-[0.14em] text-white/62">
                             COIN
                           </span>
                         </div>

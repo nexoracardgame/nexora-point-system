@@ -57,7 +57,7 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
     otherImage: String(room.otherImage || "/avatar.png"),
     lastMessage: String(room.lastMessage || ""),
     createdAt: String(room.createdAt || ""),
-    lastMessageAt: String(room.lastMessageAt || room.createdAt || ""),
+    lastMessageAt: room.lastMessageAt ? String(room.lastMessageAt) : "",
     unread: Number(room.unread || 0),
     dealCardName: room.dealCardName ? String(room.dealCardName) : undefined,
     dealCardImage: room.dealCardImage ? String(room.dealCardImage) : undefined,
@@ -73,14 +73,17 @@ function latestTime(value?: string | null) {
   return Number.isFinite(time) ? time : 0;
 }
 
-function getRoomActivityAt(room: Partial<DMRoomListItem>) {
-  return String(room.lastMessageAt || room.createdAt || "").trim();
-}
-
 function sortRoomsByActivity(list: DMRoomListItem[]) {
-  return [...list].sort(
-    (a, b) => latestTime(getRoomActivityAt(b)) - latestTime(getRoomActivityAt(a))
-  );
+  return [...list].sort((a, b) => {
+    const aLastMessageTime = latestTime(a.lastMessageAt);
+    const bLastMessageTime = latestTime(b.lastMessageAt);
+
+    if (aLastMessageTime !== bLastMessageTime) {
+      return bLastMessageTime - aLastMessageTime;
+    }
+
+    return latestTime(b.createdAt) - latestTime(a.createdAt);
+  });
 }
 
 export default function DMListClient({
@@ -509,9 +512,9 @@ export default function DMListClient({
                         <div className="flex items-start justify-between gap-3">
                           <div className="truncate text-base font-black text-black">{room.otherName}</div>
                             <div className="shrink-0 text-[11px] font-bold text-black/35">
-                            {formatThaiChatActivityTime(
-                              room.lastMessageAt || room.createdAt
-                            )}
+                            {room.lastMessageAt
+                              ? formatThaiChatActivityTime(room.lastMessageAt)
+                              : ""}
                           </div>
                         </div>
                         <div
