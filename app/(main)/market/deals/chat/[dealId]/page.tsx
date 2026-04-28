@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Image as ImageIcon, Send, Smile, X, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
+import {
+  CHAT_HISTORY_PAGE_SIZE,
+  buildChatSender,
+  buildChatUser,
+  mergeChatMessages,
+  mergeSingleChatMessage,
+  normalizeChatMessage,
+  removeChatMessage,
+  type ChatMessage as DealMessage,
+  type ChatUser,
+} from "@/lib/chat-room-types";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { formatThaiTime } from "@/lib/thai-time";
-
-type ChatUser = {
-  id: string;
-  name: string;
-  image: string;
-};
 
 type DealCardInfo = {
   id: string;
@@ -27,114 +33,76 @@ type DealInfo = {
   offeredPrice: number;
 };
 
-type DealMessage = {
-  id: string;
+type DealRoomCacheMeta = {
+  me?: ChatUser | null;
+  other?: ChatUser | null;
+  card?: DealCardInfo | null;
+  deal?: DealInfo | null;
+  roomId?: string;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+};
+
+type DealChatBootstrap = {
   roomId: string;
-  senderId: string;
-  sender: ChatUser;
-  content?: string | null;
-  imageUrl?: string | null;
-  createdAt?: string | null;
-  seenAt?: string | null;
-  senderName?: string | null;
-  senderImage?: string | null;
-  optimistic?: boolean;
+  me: ChatUser;
+  other: ChatUser;
+  card: DealCardInfo;
+  deal: DealInfo;
+  messages: DealMessage[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+type DealChatPage = {
+  messages: DealMessage[];
+  hasMore: boolean;
+  nextCursor: string | null;
 };
 
 function formatPrice(value?: number | null) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
 }
 
-function buildSender(
-  senderId: string,
-  msg?: { senderName?: string | null; senderImage?: string | null },
-  me?: ChatUser | null,
-  other?: ChatUser | null
-) {
-  const isMine = senderId === me?.id;
-
-  if (isMine) {
-    return {
-      id: senderId,
-      name: me?.name || msg?.senderName || "You",
-      image: me?.image || msg?.senderImage || "/avatar.png",
-    };
-  }
-
-  return {
-    id: senderId,
-    name: other?.name || msg?.senderName || "User",
-    image: other?.image || msg?.senderImage || "/avatar.png",
-  };
-}
-
-function mergeMessage(
-  prev: DealMessage[],
-  incoming: DealMessage,
-  me?: ChatUser | null,
-  other?: ChatUser | null
-) {
-  const nextMessage: DealMessage = {
-    ...incoming,
-    sender:
-      incoming.sender ||
-      buildSender(
-        incoming.senderId,
-        {
-          senderName: incoming.senderName,
-          senderImage: incoming.senderImage,
-        },
-        me,
-        other
-      ),
-  };
-
-  const existingIndex = prev.findIndex((item) => item.id === incoming.id);
-
-  if (existingIndex >= 0) {
-    const next = [...prev];
-    next[existingIndex] = {
-      ...next[existingIndex],
-      ...nextMessage,
-    };
-    return next;
-  }
-
-  return [...prev, nextMessage];
-}
-
-function getMessageRoomId(message: Omit<DealMessage, "sender"> | DealMessage) {
-  return String(
-    message.roomId ||
-      (message as unknown as { roomid?: string | null }).roomid ||
-      ""
-  ).trim();
-}
-
 export default function DealChatPage() {
   const params = useParams();
   const dealId = typeof params?.dealId === "string" ? params.dealId : "";
+
+  if (!dealId) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center pb-[env(safe-area-inset-bottom)] text-white">
+        กำลังโหลดห้องแชทดีล...
+      </div>
+    );
+  }
+
+  return <DealChatRoomContent key={dealId} dealId={dealId} />;
+}
+
+function DealChatRoomContent({ dealId }: { dealId: string }) {
   const router = useRouter();
-  const cachedDealRoom = useMemo(
+  const cachedRoom = useMemo(
     () =>
-      readChatHistoryCache<
-        DealMessage,
-        { me?: ChatUser | null; other?: ChatUser | null; card?: DealCardInfo | null; deal?: DealInfo | null; roomId?: string }
-      >("deal-room", dealId),
+      readChatHistoryCache<DealMessage, DealRoomCacheMeta>("deal-room", dealId),
     [dealId]
   );
 
-  const [roomId, setRoomId] = useState(String(cachedDealRoom?.meta?.roomId || ""));
-  const [messages, setMessages] = useState<DealMessage[]>(cachedDealRoom?.messages || []);
+  const [roomId, setRoomId] = useState(String(cachedRoom?.meta?.roomId || ""));
+  const [messages, setMessages] = useState<DealMessage[]>(cachedRoom?.messages || []);
   const [text, setText] = useState("");
-  const [me, setMe] = useState<ChatUser | null>(cachedDealRoom?.meta?.me || null);
-  const [other, setOther] = useState<ChatUser | null>(cachedDealRoom?.meta?.other || null);
-  const [card, setCard] = useState<DealCardInfo | null>(cachedDealRoom?.meta?.card || null);
-  const [deal, setDeal] = useState<DealInfo | null>(cachedDealRoom?.meta?.deal || null);
-  const [loadingRoom, setLoadingRoom] = useState(!cachedDealRoom);
+  const [me, setMe] = useState<ChatUser | null>(cachedRoom?.meta?.me || null);
+  const [other, setOther] = useState<ChatUser | null>(cachedRoom?.meta?.other || null);
+  const [card, setCard] = useState<DealCardInfo | null>(cachedRoom?.meta?.card || null);
+  const [deal, setDeal] = useState<DealInfo | null>(cachedRoom?.meta?.deal || null);
+  const [loadingRoom, setLoadingRoom] = useState(
+    !(cachedRoom?.meta?.roomId && cachedRoom?.meta?.me && cachedRoom?.meta?.other)
+  );
   const [roomClosed, setRoomClosed] = useState(false);
+  const [hasMore, setHasMore] = useState(Boolean(cachedRoom?.meta?.hasMore));
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    cachedRoom?.meta?.nextCursor || null
+  );
   const [file, setFile] = useState<File | null>(null);
-  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
@@ -152,19 +120,29 @@ export default function DealChatPage() {
   const lastMessageIdRef = useRef<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDealIdRef = useRef(dealId);
-  const activeRoomIdRef = useRef("");
-  const hasValidDealRoom = Boolean(dealId);
+  const activeRoomIdRef = useRef(String(cachedRoom?.meta?.roomId || ""));
+  const loadingOlderRef = useRef(false);
+  const olderTimerRef = useRef<number | null>(null);
+  const olderIdleRef = useRef<number | null>(null);
 
-  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
-    const el = scrollRef.current;
+  const selectedImagePreview = useMemo(
+    () => (file ? URL.createObjectURL(file) : null),
+    [file]
+  );
 
-    if (el) {
-      el.scrollTo({
-        top: el.scrollHeight,
-        behavior,
-      });
+  const cancelOlderPrefetch = () => {
+    if (olderTimerRef.current) {
+      window.clearTimeout(olderTimerRef.current);
+      olderTimerRef.current = null;
     }
 
+    if (olderIdleRef.current && "cancelIdleCallback" in window) {
+      window.cancelIdleCallback(olderIdleRef.current);
+      olderIdleRef.current = null;
+    }
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     bottomRef.current?.scrollIntoView({
       block: "end",
       behavior,
@@ -174,6 +152,7 @@ export default function DealChatPage() {
   const getDistanceFromBottom = () => {
     const el = scrollRef.current;
     if (!el) return 0;
+
     return el.scrollHeight - el.scrollTop - el.clientHeight;
   };
 
@@ -189,149 +168,204 @@ export default function DealChatPage() {
     return distanceFromBottom <= autoScrollThreshold;
   };
 
-  const handleScroll = () => {
-    const nearBottom = checkIsNearBottom();
-    isNearBottomRef.current = nearBottom;
-
-    if (nearBottom) {
-      setNewMessageCount(0);
-    }
-  };
-
-  const loadRoomInfo = async (showClosedState = true) => {
-    if (!dealId) return null;
-    const expectedDealId = dealId;
-
-    const res = await fetch(`/api/market/deal-chat/info?dealId=${encodeURIComponent(dealId)}`, {
-      cache: "no-store",
-    });
-
-    if (activeDealIdRef.current !== expectedDealId) {
-      return null;
-    }
-
-    if (!res.ok) {
-      if (showClosedState && (res.status === 403 || res.status === 404 || res.status === 409)) {
-        setRoomClosed(true);
-        setLoadingRoom(false);
-      }
-      return null;
-    }
-
-    const data = await res.json();
-
-    setRoomClosed(false);
-    const nextRoomId = String(data?.roomId || "");
-    activeRoomIdRef.current = nextRoomId;
-    setRoomId(nextRoomId);
-    setMe(data?.me || null);
-    setOther(data?.other || null);
-    setCard(data?.card || null);
-    setDeal(data?.deal || null);
-    setLoadingRoom(false);
-    writeChatHistoryCache("deal-room", expectedDealId, {
-      messages: cachedDealRoom?.messages || messages,
-      meta: {
-        roomId: nextRoomId,
-        me: data?.me || null,
-        other: data?.other || null,
-        card: data?.card || null,
-        deal: data?.deal || null,
-      },
-      cachedAt: Date.now(),
-    });
-
-    return data;
-  };
-
-  const loadMessages = async (
-    nextRoomId: string,
-    meData?: ChatUser | null,
-    otherData?: ChatUser | null
-  ) => {
-    if (!nextRoomId) return;
-    const expectedRoomId = nextRoomId;
-
-    const res = await fetch(`/api/dm/messages?roomId=${encodeURIComponent(nextRoomId)}`, {
-      cache: "no-store",
-    });
-
-    if (activeRoomIdRef.current !== expectedRoomId) {
-      return;
-    }
-
-    if (!res.ok) {
-      if (res.status === 403 || res.status === 404 || res.status === 409) {
-        setRoomClosed(true);
-      }
-      return;
-    }
-
-    const data = (await res.json()) as Omit<DealMessage, "sender">[];
-    const withSender: DealMessage[] = (data || [])
-      .filter((message) => {
-        const messageRoomId = getMessageRoomId(message);
-        return !messageRoomId || messageRoomId === expectedRoomId;
-      })
-      .map((message) => ({
-        ...message,
-        roomId: expectedRoomId,
-        sender: buildSender(
-          message.senderId,
-          {
-            senderName: message.senderName,
-            senderImage: message.senderImage,
-          },
-          meData,
-          otherData
-        ),
-      }));
+  const persistCache = useEffectEvent(() => {
+    if (!dealId) return;
 
     writeChatHistoryCache("deal-room", dealId, {
-      messages: withSender,
+      messages,
       meta: {
-        roomId: expectedRoomId,
-        me: meData || null,
-        other: otherData || null,
+        roomId,
+        me,
+        other,
         card,
         deal,
+        hasMore,
+        nextCursor,
       },
       cachedAt: Date.now(),
     });
+  });
 
-    setMessages((prev) => {
-      const optimisticMessages = prev.filter((message) => message.optimistic);
-      let next = withSender;
+  const emitChatRead = useEffectEvent((targetRoomId: string) => {
+    window.dispatchEvent(
+      new CustomEvent("nexora:chat-read", {
+        detail: { roomId: targetRoomId },
+      })
+    );
+  });
 
-      optimisticMessages.forEach((message) => {
-        next = mergeMessage(next, message, meData, otherData);
-      });
+  const markLoadedRoomSeen = useEffectEvent(
+    async (targetRoomId: string, nextMessages: DealMessage[], meData?: ChatUser | null) => {
+      const myId = String(meData?.id || "").trim();
+      if (!targetRoomId || !myId) return;
 
-      return next;
-    });
-    void markLoadedRoomSeen(expectedRoomId, withSender, meData);
+      const hasUnread = nextMessages.some(
+        (message) => message.senderId !== myId && !message.seenAt
+      );
+      if (!hasUnread) return;
 
-    if (!hasInitialScrolledRef.current || isNearBottomRef.current) {
-      requestAnimationFrame(() => {
-        scrollToBottom("auto");
-        isNearBottomRef.current = true;
-      });
+      const seenAt = new Date().toISOString();
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.senderId !== myId && !message.seenAt
+            ? { ...message, seenAt }
+            : message
+        )
+      );
+
+      emitChatRead(targetRoomId);
+
+      const res = await fetch("/api/dm/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomId: targetRoomId,
+          action: "markSeen",
+        }),
+      }).catch(() => null);
+
+      if (!res?.ok) {
+        return;
+      }
+
+      emitChatRead(targetRoomId);
+    }
+  );
+
+  const applyBootstrap = useEffectEvent((data: DealChatBootstrap) => {
+    if (!data?.roomId || activeDealIdRef.current !== dealId) {
+      return;
+    }
+
+    const nextMe = data.me ? buildChatUser(data.me.id, data.me.name, data.me.image, "You") : null;
+    const nextOther = data.other ? buildChatUser(data.other.id, data.other.name, data.other.image) : null;
+    const nextRoomId = String(data.roomId || "").trim();
+    const nextMessages = Array.isArray(data.messages)
+      ? data.messages.map((message) =>
+          normalizeChatMessage(message, nextRoomId, nextMe, nextOther)
+        )
+      : [];
+
+    activeRoomIdRef.current = nextRoomId;
+    setRoomId(nextRoomId);
+    setMe(nextMe);
+    setOther(nextOther);
+    setCard(data.card || null);
+    setDeal(data.deal || null);
+    setRoomClosed(false);
+    setLoadingRoom(false);
+    setHasMore(Boolean(data.hasMore));
+    setNextCursor(String(data.nextCursor || "").trim() || null);
+    setMessages((prev) => mergeChatMessages(prev, nextMessages, nextRoomId, nextMe, nextOther));
+    void markLoadedRoomSeen(nextRoomId, nextMessages, nextMe);
+  });
+
+  const loadBootstrap = useEffectEvent(async () => {
+    if (!dealId) return;
+
+    const expectedDealId = dealId;
+    const res = await fetch(
+      `/api/market/deal-chat/bootstrap?dealId=${encodeURIComponent(dealId)}`,
+      {
+        cache: "no-store",
+      }
+    ).catch(() => null);
+
+    if (activeDealIdRef.current !== expectedDealId) {
+      return;
+    }
+
+    if (!res?.ok) {
+      if (res?.status === 403 || res?.status === 404 || res?.status === 409) {
+        setRoomClosed(true);
+      }
+      setLoadingRoom(false);
+      return;
+    }
+
+    const data = (await res.json()) as DealChatBootstrap;
+    applyBootstrap(data);
+  });
+
+  const loadOlderMessages = async () => {
+    const currentRoomId = String(activeRoomIdRef.current || "").trim();
+    const cursor = String(nextCursor || "").trim();
+    if (!currentRoomId || !cursor || loadingOlderRef.current || roomClosed) return;
+
+    loadingOlderRef.current = true;
+
+    try {
+      const res = await fetch(
+        `/api/dm/messages?roomId=${encodeURIComponent(currentRoomId)}&before=${encodeURIComponent(cursor)}&limit=${CHAT_HISTORY_PAGE_SIZE}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      if (activeRoomIdRef.current !== currentRoomId) {
+        return;
+      }
+
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 404 || res.status === 409) {
+          setRoomClosed(true);
+        }
+        return;
+      }
+
+      const data = (await res.json()) as DealChatPage;
+      const olderMessages = Array.isArray(data?.messages)
+        ? data.messages.map((message) =>
+            normalizeChatMessage(message, currentRoomId, me, other)
+          )
+        : [];
+
+      setHasMore(Boolean(data?.hasMore));
+      setNextCursor(String(data?.nextCursor || "").trim() || null);
+      setMessages((prev) =>
+        mergeChatMessages(prev, olderMessages, currentRoomId, me, other)
+      );
+    } finally {
+      loadingOlderRef.current = false;
     }
   };
 
-  const refreshChatState = async (showClosedState = false) => {
-    const info = await loadRoomInfo(showClosedState);
-    if (!info?.roomId) return;
-    await loadMessages(info.roomId, info.me, info.other);
-  };
+  const scheduleOlderPrefetch = useEffectEvent(() => {
+    if (!roomId || roomClosed || !hasMore || !nextCursor || loadingOlderRef.current) {
+      return;
+    }
+
+    cancelOlderPrefetch();
+    const requestIdleCallback = (window as Window & {
+      requestIdleCallback?: (
+        callback: IdleRequestCallback,
+        options?: IdleRequestOptions
+      ) => number;
+    }).requestIdleCallback;
+
+    if (requestIdleCallback) {
+      olderIdleRef.current = requestIdleCallback(
+        () => {
+          olderIdleRef.current = null;
+          void loadOlderMessages();
+        },
+        { timeout: 1400 }
+      );
+      return;
+    }
+
+    olderTimerRef.current = window.setTimeout(() => {
+      olderTimerRef.current = null;
+      void loadOlderMessages();
+    }, 320);
+  });
 
   const markSeenNow = async () => {
     if (!roomId || !me?.id) return;
 
-    const hasUnread = messages.some(
-      (message) => message.senderId !== me.id && !message.seenAt
-    );
-
+    const hasUnread = messages.some((message) => message.senderId !== me.id && !message.seenAt);
     if (!hasUnread) return;
 
     const res = await fetch("/api/dm/messages", {
@@ -345,10 +379,13 @@ export default function DealChatPage() {
       }),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      return;
+    }
 
     const payload = await res.json();
     const seenAt = String(payload?.seenAt || new Date().toISOString());
+
     setMessages((prev) =>
       prev.map((message) =>
         message.senderId !== me.id && !message.seenAt
@@ -358,146 +395,140 @@ export default function DealChatPage() {
     );
   };
 
-  const markLoadedRoomSeen = async (
-    targetRoomId: string,
-    nextMessages: DealMessage[],
-    meData?: ChatUser | null
-  ) => {
-    const myId = String(meData?.id || "").trim();
-    if (!targetRoomId || !myId) return;
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    const nearBottom = checkIsNearBottom();
+    isNearBottomRef.current = nearBottom;
 
-    const hasUnread = nextMessages.some(
-      (message) => message.senderId !== myId && !message.seenAt
-    );
-    if (!hasUnread) return;
+    if (nearBottom) {
+      setNewMessageCount(0);
+    }
 
-    const seenAt = new Date().toISOString();
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.senderId !== myId && !message.seenAt
-          ? { ...message, seenAt }
-          : message
-      )
-    );
-
-    window.dispatchEvent(
-      new CustomEvent("nexora:chat-read", {
-        detail: { roomId: targetRoomId },
-      })
-    );
-
-    const res = await fetch("/api/dm/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        roomId: targetRoomId,
-        action: "markSeen",
-      }),
-    }).catch(() => null);
-
-    if (!res?.ok) return;
-
-    window.dispatchEvent(
-      new CustomEvent("nexora:chat-read", {
-        detail: { roomId: targetRoomId },
-      })
-    );
+    if (el && el.scrollTop < 160 && hasMore) {
+      void loadOlderMessages();
+    }
   };
 
   useEffect(() => {
-    if (!dealId) return;
-
     activeDealIdRef.current = dealId;
-    activeRoomIdRef.current = "";
+    activeRoomIdRef.current = String(roomId || "");
     hasInitialScrolledRef.current = false;
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    setMessages(cachedDealRoom?.messages || []);
-    setRoomId(String(cachedDealRoom?.meta?.roomId || ""));
-    setRoomClosed(false);
-    setLoadingRoom(!cachedDealRoom);
-    setNewMessageCount(0);
-    setMe(cachedDealRoom?.meta?.me || null);
-    setOther(cachedDealRoom?.meta?.other || null);
-    setCard(cachedDealRoom?.meta?.card || null);
-    setDeal(cachedDealRoom?.meta?.deal || null);
+    loadingOlderRef.current = false;
+    cancelOlderPrefetch();
 
     queueMicrotask(() => {
-      void refreshChatState(true);
+      void loadBootstrap();
     });
-  }, [cachedDealRoom, dealId]);
+
+    return () => {
+      cancelOlderPrefetch();
+    };
+  }, [dealId, roomId]);
 
   useEffect(() => {
-    if (!roomId || !me?.id || roomClosed) return;
+    persistCache();
+  }, [card, deal, hasMore, me, messages, nextCursor, other, roomId]);
 
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadMessages(roomId, me, other);
+  useEffect(() => {
+    if (!roomId || roomClosed) return;
+    scheduleOlderPrefetch();
+
+    return () => {
+      cancelOlderPrefetch();
+    };
+  }, [hasMore, messages.length, nextCursor, roomClosed, roomId]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    const currentRoomId = String(roomId || "").trim();
+
+    if (!supabase || !currentRoomId || roomClosed) {
+      return;
+    }
+
+    const channel = supabase.channel(`deal-room-${dealId}-${Date.now()}`);
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dmMessage", filter: `roomId=eq.${currentRoomId}` },
+      (payload) => {
+        if (activeRoomIdRef.current !== currentRoomId) {
+          return;
+        }
+
+        if (payload.eventType === "DELETE") {
+          const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
+          if (!deletedId) return;
+
+          setMessages((prev) => removeChatMessage(prev, deletedId));
+          setMessageMenuId((current) => (current === deletedId ? null : current));
+          return;
+        }
+
+        const incoming = normalizeChatMessage(
+          payload.new as DealMessage,
+          currentRoomId,
+          me,
+          other
+        );
+
+        setMessages((prev) =>
+          mergeSingleChatMessage(prev, incoming, currentRoomId, me, other)
+        );
+
+        if (
+          payload.eventType === "INSERT" &&
+          incoming.senderId !== me?.id &&
+          document.visibilityState === "visible"
+        ) {
+          void markLoadedRoomSeen(currentRoomId, [incoming], me);
+        }
       }
-    }, 650);
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "DealRequest", filter: `id=eq.${dealId}` },
+      () => {
+        void loadBootstrap();
+      }
+    );
+
+    channel.subscribe();
 
     const onFocus = () => {
-      void loadMessages(roomId, me, other);
+      void loadBootstrap();
     };
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        void loadMessages(roomId, me, other);
+        void loadBootstrap();
       }
     };
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadBootstrap();
+      }
+    }, 20000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      clearInterval(interval);
+      window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      void supabase.removeChannel(channel);
     };
-  }, [roomId, me, other, roomClosed]);
+  }, [dealId, me, other, roomClosed, roomId]);
 
   useEffect(() => {
-    if (!dealId || !roomId || roomClosed) return;
-
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadRoomInfo(true);
-      }
-    }, 2500);
-
-    const onFocus = () => {
-      void loadRoomInfo(true);
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void loadRoomInfo(true);
-      }
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [dealId, roomId, roomClosed]);
-
-  const lastSeenMineId = useMemo(() => {
-    const mineSeen = messages.filter((message) => message.senderId === me?.id && !!message.seenAt);
-    if (mineSeen.length === 0) return null;
-    return mineSeen[mineSeen.length - 1]?.id || null;
-  }, [messages, me?.id]);
-
-  useEffect(() => {
-    const onClickOutside = (e: MouseEvent) => {
-      if (!emojiRef.current) return;
-      if (!emojiRef.current.contains(e.target as Node)) {
+    const onClickOutside = (event: MouseEvent) => {
+      if (!emojiRef.current?.contains(event.target as Node)) {
         setShowEmoji(false);
       }
     };
@@ -507,18 +538,12 @@ export default function DealChatPage() {
   }, []);
 
   useEffect(() => {
-    if (!file) {
-      setSelectedImagePreview(null);
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(file);
-    setSelectedImagePreview(previewUrl);
-
     return () => {
-      URL.revokeObjectURL(previewUrl);
+      if (selectedImagePreview) {
+        URL.revokeObjectURL(selectedImagePreview);
+      }
     };
-  }, [file]);
+  }, [selectedImagePreview]);
 
   useLayoutEffect(() => {
     if (!messages.length || hasInitialScrolledRef.current) return;
@@ -529,7 +554,7 @@ export default function DealChatPage() {
       lastMessageIdRef.current = messages[messages.length - 1]?.id || null;
       hasInitialScrolledRef.current = true;
     });
-  }, [messages.length]);
+  }, [messages]);
 
   useEffect(() => {
     if (!messages.length || !hasInitialScrolledRef.current) return;
@@ -562,6 +587,12 @@ export default function DealChatPage() {
     requestAnimationFrame(() => {
       setNewMessageCount((prev) => prev + 1);
     });
+  }, [me?.id, messages]);
+
+  const lastSeenMineId = useMemo(() => {
+    const mineSeen = messages.filter((message) => message.senderId === me?.id && !!message.seenAt);
+    if (mineSeen.length === 0) return null;
+    return mineSeen[mineSeen.length - 1]?.id || null;
   }, [messages, me?.id]);
 
   const openOtherProfile = () => {
@@ -570,7 +601,9 @@ export default function DealChatPage() {
   };
 
   const send = async () => {
-    if (sending || (!text.trim() && !file) || !me?.id || !other?.id || !roomId || roomClosed) return;
+    if (sending || (!text.trim() && !file) || !me?.id || !other?.id || !roomId || roomClosed) {
+      return;
+    }
 
     const msg = text.trim();
     const selectedFile = file;
@@ -601,7 +634,7 @@ export default function DealChatPage() {
       createdAt: new Date().toISOString(),
       senderName: me.name,
       senderImage: me.image,
-      sender: buildSender(
+      sender: buildChatSender(
         me.id,
         {
           senderName: me.name,
@@ -613,7 +646,7 @@ export default function DealChatPage() {
       optimistic: true,
     };
 
-    setMessages((prev) => mergeMessage(prev, optimisticMessage, me, other));
+    setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
     scrollToBottom("smooth");
 
     let res: Response;
@@ -643,29 +676,34 @@ export default function DealChatPage() {
       }
     } catch (error) {
       console.error("SEND DEAL CHAT ERROR:", error);
-      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setMessages((prev) => removeChatMessage(prev, optimisticId));
       setSending(false);
       return;
     }
 
     if (!res.ok) {
       const errorPayload = await res.json().catch(() => null);
-      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setMessages((prev) => removeChatMessage(prev, optimisticId));
       if (res.status === 403 || res.status === 404 || res.status === 409) {
         setRoomClosed(true);
       }
       alert(
         String(errorPayload?.error || "").trim() ||
-          "ส่งรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+          "ส่งข้อความไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
       );
       setSending(false);
       return;
     }
 
-    const insertedMessage = (await res.json()) as DealMessage;
+    const insertedMessage = normalizeChatMessage(
+      (await res.json()) as DealMessage,
+      roomId,
+      me,
+      other
+    );
     setMessages((prev) => {
-      const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
-      return mergeMessage(withoutOptimistic, insertedMessage, me, other);
+      const withoutOptimistic = removeChatMessage(prev, optimisticId);
+      return mergeSingleChatMessage(withoutOptimistic, insertedMessage, roomId, me, other);
     });
     setText("");
     setFile(null);
@@ -680,7 +718,7 @@ export default function DealChatPage() {
     if (!messageId || !roomId) return;
 
     const snapshot = messages;
-    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+    setMessages((prev) => removeChatMessage(prev, messageId));
     setMessageMenuId(null);
 
     const res = await fetch("/api/dm/messages", {
@@ -717,7 +755,7 @@ export default function DealChatPage() {
     }
   };
 
-  if (!hasValidDealRoom || loadingRoom) {
+  if (loadingRoom) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center pb-[env(safe-area-inset-bottom)] text-white">
         กำลังโหลดห้องแชทดีล...
@@ -747,7 +785,7 @@ export default function DealChatPage() {
   return (
     <div className="h-full min-h-0 overflow-hidden">
       <div className="flex h-full min-h-0 w-full flex-col bg-[#050608]">
-        <div className="sticky top-0 z-20 border-b border-white/10 bg-black/75 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="sticky top-0 z-20 border-b border-white/10 bg-black/75 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-[980px] items-center gap-3 px-3 py-3 sm:px-4">
             <button
               onClick={() => router.push("/market/deals")}
@@ -764,8 +802,8 @@ export default function DealChatPage() {
                 src={other.image || "/avatar.png"}
                 alt={other.name}
                 className="h-11 w-11 rounded-full border border-white/15 object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = "/avatar.png";
+                onError={(event) => {
+                  event.currentTarget.src = "/avatar.png";
                 }}
               />
 
@@ -799,8 +837,8 @@ export default function DealChatPage() {
                     src={card.image}
                     alt={card.name}
                     className="aspect-[2/3] h-[44px] w-auto rounded-xl object-cover sm:h-[52px]"
-                    onError={(e) => {
-                      e.currentTarget.src = "/cards/001.jpg";
+                    onError={(event) => {
+                      event.currentTarget.src = "/cards/001.jpg";
                     }}
                   />
                 </div>
@@ -821,8 +859,8 @@ export default function DealChatPage() {
                   src={card.image}
                   alt={card.name}
                   className="aspect-[2/3] w-14 rounded-xl border border-white/10 object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = "/cards/001.jpg";
+                  onError={(event) => {
+                    event.currentTarget.src = "/cards/001.jpg";
                   }}
                 />
                 <div className="min-w-0">
@@ -866,23 +904,23 @@ export default function DealChatPage() {
                   }`}
                 >
                   <div className="flex max-w-[94%] items-end gap-2 sm:max-w-[78%]">
-                    {!mine && (
+                    {!mine ? (
                       <img
                         src={sender?.image || "/avatar.png"}
                         alt={sender?.name || "User"}
                         className="h-8 w-8 shrink-0 rounded-full border border-white/10 object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = "/avatar.png";
+                        onError={(event) => {
+                          event.currentTarget.src = "/avatar.png";
                         }}
                       />
-                    )}
+                    ) : null}
 
                     <div className={`${mine ? "items-end" : "items-start"} flex flex-col`}>
-                      {!mine && (
+                      {!mine ? (
                         <div className="mb-1 text-left text-[11px] text-white/40">
                           {sender?.name || "User"}
                         </div>
-                      )}
+                      ) : null}
 
                       <div
                         className="group/message relative"
@@ -897,19 +935,19 @@ export default function DealChatPage() {
                               : "bg-white/10 text-white backdrop-blur"
                           }`}
                         >
-                          {message.imageUrl && (
+                          {message.imageUrl ? (
                             <img
                               src={message.imageUrl}
                               alt="deal chat attachment"
                               onClick={() => setPreview(message.imageUrl || null)}
                               className="mb-2 max-h-[220px] cursor-pointer rounded-xl"
                             />
-                          )}
+                          ) : null}
 
                           {message.content}
                         </div>
 
-                        {mine && !message.optimistic && (
+                        {mine && !message.optimistic ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -923,9 +961,9 @@ export default function DealChatPage() {
                           >
                             <MoreHorizontal size={16} />
                           </button>
-                        )}
+                        ) : null}
 
-                        {messageMenuId === message.id && (
+                        {messageMenuId === message.id ? (
                           <div
                             className={`absolute z-30 mt-2 min-w-[132px] overflow-hidden rounded-2xl border border-red-300/15 bg-[#121318]/98 p-1 shadow-[0_20px_55px_rgba(0,0,0,0.55)] ${
                               mine ? "right-0" : "left-0"
@@ -939,7 +977,7 @@ export default function DealChatPage() {
                               ลบข้อความ
                             </button>
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
                       <div
@@ -947,14 +985,14 @@ export default function DealChatPage() {
                           mine ? "text-right" : "text-left"
                         }`}
                       >
-                      {formatThaiTime(message.createdAt)}
+                        {formatThaiTime(message.createdAt)}
                       </div>
 
-                      {mine && lastSeenMineId === message.id && message.seenAt && (
+                      {mine && lastSeenMineId === message.id && message.seenAt ? (
                         <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
                           อ่านแล้ว
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -965,8 +1003,8 @@ export default function DealChatPage() {
         </div>
 
         <div className="sticky bottom-0 z-20 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.18),rgba(5,6,8,0.92)_18%,rgba(5,6,8,0.98)_100%)] px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-2xl sm:px-4">
-          <div className="mx-auto relative w-full max-w-[980px]">
-            {newMessageCount > 0 && (
+          <div className="relative mx-auto w-full max-w-[980px]">
+            {newMessageCount > 0 ? (
               <div className="pointer-events-none absolute -top-14 left-1/2 z-20 -translate-x-1/2">
                 <button
                   type="button"
@@ -980,9 +1018,9 @@ export default function DealChatPage() {
                   มีข้อความใหม่ {newMessageCount > 1 ? `(${newMessageCount}) ` : ""}ดู
                 </button>
               </div>
-            )}
+            ) : null}
 
-            {showEmoji && (
+            {showEmoji ? (
               <div
                 ref={emojiRef}
                 className="absolute bottom-[calc(100%+12px)] right-0 z-[9999] overflow-hidden rounded-2xl border border-white/10 bg-[#111318] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
@@ -997,14 +1035,14 @@ export default function DealChatPage() {
                   height={400}
                 />
               </div>
-            )}
+            ) : null}
 
             <div className="flex items-center gap-2 rounded-[28px] border border-white/10 bg-black/70 px-3 py-2 shadow-[0_10px_40px_rgba(0,0,0,0.4)]">
               <input
                 ref={textInputRef}
                 value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
+                onChange={(event) => {
+                  setText(event.target.value);
                 }}
                 onFocus={async () => {
                   if (hasMarkedSeenRef.current) return;
@@ -1018,9 +1056,9 @@ export default function DealChatPage() {
                 autoComplete="off"
                 className="h-12 min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 sm:text-[15px]"
                 placeholder="พิมพ์นัดสถานที่หรือรายละเอียดดีล..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
                     void send();
                   }
                 }}
@@ -1032,8 +1070,8 @@ export default function DealChatPage() {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
-                    setFile(e.target.files?.[0] || null);
+                  onChange={(event) => {
+                    setFile(event.target.files?.[0] || null);
                     requestAnimationFrame(() => {
                       textInputRef.current?.focus();
                     });
@@ -1043,7 +1081,7 @@ export default function DealChatPage() {
               </label>
 
               <button
-                onClick={() => setShowEmoji((prev) => !prev)}
+                onClick={() => setShowEmoji((current) => !current)}
                 className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-95"
               >
                 <Smile size={18} />
@@ -1058,7 +1096,7 @@ export default function DealChatPage() {
               </button>
             </div>
 
-            {file && selectedImagePreview && (
+            {file && selectedImagePreview ? (
               <div className="mt-3 flex items-center gap-3 rounded-3xl border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.13),rgba(250,204,21,0.06),rgba(255,255,255,0.04))] p-2 pr-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                 <img
                   src={selectedImagePreview}
@@ -1085,11 +1123,11 @@ export default function DealChatPage() {
                   <X size={16} />
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {preview && (
+        {preview ? (
           <div
             onClick={() => setPreview(null)}
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90"
@@ -1100,7 +1138,7 @@ export default function DealChatPage() {
               className="max-h-[90%] max-w-[90%] rounded-xl"
             />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

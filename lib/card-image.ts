@@ -41,5 +41,5 @@ export function sanitizeCardImageUrl(value: unknown) {
 }
 
 export function resolveCardDisplayImage(cardNo: unknown, imageUrl: unknown) {
-  return sanitizeCardImageUrl(imageUrl) || buildLocalCardImage(cardNo);
+  return buildLocalCardImage(cardNo) || sanitizeCardImageUrl(imageUrl) || "/cards/001.jpg";
 }

@@ -16,6 +16,7 @@ import {
   normalizeMarketListingView,
   type MarketViewItem,
 } from "@/lib/market-listing-view";
+import SafeCardImage from "@/components/SafeCardImage";
 import { listenMarketSync } from "@/lib/market-sync";
 import { listenProfileSync } from "@/lib/profile-sync";
 
@@ -456,9 +457,12 @@ export default function MarketDashboardTFT({
             className="relative mt-5 block overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.06] shadow-[0_25px_80px_rgba(168,85,247,0.20)] backdrop-blur-xl"
           >
             <div className="relative">
-              <img
-                src={centerHero.image}
+              <SafeCardImage
+                cardNo={centerHero.cardNo}
+                imageUrl={centerHero.image}
                 alt={centerHero.name}
+                loading="eager"
+                fetchPriority="high"
                 className="h-[300px] w-full object-cover"
               />
 
@@ -528,8 +532,9 @@ export default function MarketDashboardTFT({
                   href={`/market/card/${card.id}`}
                   className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04]"
                 >
-                  <img
-                    src={card.image}
+                  <SafeCardImage
+                    cardNo={card.cardNo}
+                    imageUrl={card.image}
                     alt={card.name}
                     className="h-[180px] w-full object-cover"
                   />
@@ -638,9 +643,12 @@ export default function MarketDashboardTFT({
               className="absolute left-10 bottom-0 hidden lg:block"
             >
               <div className="group relative">
-                <img
-                  src={leftHero.image}
+                <SafeCardImage
+                  cardNo={leftHero.cardNo}
+                  imageUrl={leftHero.image}
                   alt={leftHero.name}
+                  loading="eager"
+                  fetchPriority="high"
                   className="h-[380px] w-[260px] rotate-[-10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
                 />
 
@@ -703,9 +711,12 @@ export default function MarketDashboardTFT({
                 }px)`,
               }}
             >
-              <img
-                src={centerHero.image}
+              <SafeCardImage
+                cardNo={centerHero.cardNo}
+                imageUrl={centerHero.image}
                 alt={centerHero.name}
+                loading="eager"
+                fetchPriority="high"
                 className="h-[560px] w-full object-cover"
               />
 
@@ -769,9 +780,12 @@ export default function MarketDashboardTFT({
               className="absolute right-10 bottom-0 hidden lg:block"
             >
               <div className="group relative">
-                <img
-                  src={rightHero.image}
+                <SafeCardImage
+                  cardNo={rightHero.cardNo}
+                  imageUrl={rightHero.image}
                   alt={rightHero.name}
+                  loading="eager"
+                  fetchPriority="high"
                   className="h-[380px] w-[260px] rotate-[10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
                 />
 
@@ -915,8 +929,9 @@ export default function MarketDashboardTFT({
                   <div className={`absolute inset-0 bg-gradient-to-b ${rarity.glow}`} />
 
                   <div className="relative aspect-[2/3] w-full overflow-hidden">
-                    <img
-                      src={card.image}
+                    <SafeCardImage
+                      cardNo={card.cardNo}
+                      imageUrl={card.image}
                       alt={card.name}
                       className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                     />

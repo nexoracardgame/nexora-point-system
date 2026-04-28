@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { prefetchDealChatRoom, prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { formatThaiRoomTime } from "@/lib/thai-time";
 
 type SessionUser = {
@@ -186,6 +188,8 @@ export default function DMListClient({
         otherUserId: room.otherUserId,
       });
 
+      await prefetchDirectChatRoom(nextRoomId).catch(() => null);
+
       router.push(`/dm/${encodeURIComponent(nextRoomId)}?back=${encodeURIComponent("/dm")}`);
     } catch {
       router.push(`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`);
@@ -223,11 +227,42 @@ export default function DMListClient({
   }, [initialRooms.length]);
 
   useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    const channel = supabase
+      ? supabase.channel(`dm-list-${Date.now()}`)
+      : null;
+
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dmMessage" },
+      () => {
+        void loadRooms();
+      }
+    );
+
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dm_room" },
+      () => {
+        void loadRooms();
+      }
+    );
+
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "DealRequest" },
+      () => {
+        void loadRooms();
+      }
+    );
+
+    channel?.subscribe();
+
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadRooms();
       }
-    }, 2500);
+    }, 15000);
 
     const onFocus = () => {
       void loadRooms();
@@ -246,6 +281,9 @@ export default function DMListClient({
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      if (supabase && channel) {
+        void supabase.removeChannel(channel);
+      }
     };
   }, []);
 
@@ -313,6 +351,7 @@ export default function DMListClient({
                           image: room.otherImage,
                           otherUserId: room.otherUserId,
                         });
+                        void prefetchDirectChatRoom(room.roomId);
                       }}
                       onClick={(event) => {
                         event.preventDefault();
@@ -382,7 +421,17 @@ export default function DMListClient({
                       key={room.roomId}
                       href={`/market/deals/chat/${room.dealId}`}
                       prefetch
-                      onClick={() => markRoomReadLocally(room.roomId)}
+                      onMouseEnter={() => {
+                        if (room.dealId) {
+                          void prefetchDealChatRoom(room.dealId);
+                        }
+                      }}
+                      onClick={() => {
+                        markRoomReadLocally(room.roomId);
+                        if (room.dealId) {
+                          void prefetchDealChatRoom(room.dealId);
+                        }
+                      }}
                       className="group relative block overflow-hidden rounded-[30px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-4 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:p-4.5"
                     >
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_32%)] opacity-90" />

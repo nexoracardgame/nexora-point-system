@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Coins, Pencil } from "lucide-react";
 import { useState } from "react";
 import DeleteListingButton from "@/components/DeleteListingButton";
+import SafeCardImage from "@/components/SafeCardImage";
 
 type SellerListing = {
   id: string;
@@ -38,10 +39,9 @@ export default function SellerCenterClient({
               href={`/market/card/${item.id}`}
               className="relative block aspect-[3/4] overflow-hidden"
             >
-              <img
-                src={
-                  item.imageUrl || `/cards/${String(item.cardNo).padStart(3, "0")}.jpg`
-                }
+              <SafeCardImage
+                cardNo={item.cardNo}
+                imageUrl={item.imageUrl}
                 alt={`Card ${item.cardNo}`}
                 className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
               />

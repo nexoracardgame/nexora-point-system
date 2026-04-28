@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
+import { prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
 
 export default function ProfileChatButton({
@@ -62,6 +63,8 @@ export default function ProfileChatButton({
         name: targetUserName,
         image: targetUserImage,
       });
+
+      await prefetchDirectChatRoom(String(data.roomId)).catch(() => null);
 
       const targetHref = `/dm/${data.roomId}?back=${encodeURIComponent(profileBackHref)}`;
       router.prefetch(targetHref);

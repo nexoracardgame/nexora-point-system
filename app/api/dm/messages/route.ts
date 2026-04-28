@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getChatMessagesPage } from "@/lib/chat-room-server";
 import { getDmRoomAccess } from "@/lib/dm-access";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
   const userId = String(session?.user?.id || "").trim();
   const lineId = getSessionLineId(session);
   const roomId = req.nextUrl.searchParams.get("roomId");
+  const before = String(req.nextUrl.searchParams.get("before") || "").trim() || null;
+  const limit = Number(req.nextUrl.searchParams.get("limit") || 0) || 0;
 
   if (!userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -48,6 +51,26 @@ export async function GET(req: NextRequest) {
 
   if (!supabase) {
     return NextResponse.json({ error: "system unavailable" }, { status: 500 });
+  }
+
+  if (limit > 0 || before) {
+    try {
+      const page = await getChatMessagesPage({
+        roomId: access.roomId,
+        before,
+        limit: limit || undefined,
+        supabase,
+      });
+
+      return NextResponse.json(page, {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      console.error("LOAD DM API MESSAGE PAGE ERROR:", error);
+      return NextResponse.json({ error: "load failed" }, { status: 500 });
+    }
   }
 
   const { data, error } = await supabase

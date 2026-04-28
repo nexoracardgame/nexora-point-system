@@ -19,6 +19,7 @@ import {
   listenDealServerSync,
   listenDealSync,
 } from "@/lib/deal-sync";
+import { prefetchDealChatRoom } from "@/lib/chat-room-prefetch";
 import type { DealCard } from "@/lib/market-deals";
 import CancelDealButton from "./CancelDealButton";
 import DealActionButtons from "./DealActionButtons";
@@ -207,6 +208,7 @@ export default function DealsClient({
     if (!dealId || creatingChatId) return;
 
     setCreatingChatId(dealId);
+    await prefetchDealChatRoom(dealId).catch(() => null);
     router.push(`/market/deals/chat/${dealId}`);
   };
 
@@ -354,6 +356,9 @@ export default function DealsClient({
         {canOpenChat && (
           <button
             onClick={() => handleChat(deal.id)}
+            onMouseEnter={() => {
+              void prefetchDealChatRoom(deal.id);
+            }}
             disabled={isOpeningChat}
             className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
           >

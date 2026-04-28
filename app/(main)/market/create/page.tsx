@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SafeCardImage from "@/components/SafeCardImage";
 
 type CardData = {
   cardNo: string;
@@ -119,9 +120,12 @@ export default function CreateListingConsole() {
           <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5 text-center backdrop-blur-2xl">
             {card ? (
               <>
-                <img
-                  src={card.imageUrl}
+                <SafeCardImage
+                  cardNo={card.cardNo}
+                  imageUrl={card.imageUrl}
                   alt={card.cardName}
+                  loading="eager"
+                  fetchPriority="high"
                   className="mx-auto aspect-[3/4] w-full max-w-[280px] rounded-3xl object-cover shadow-[0_0_40px_rgba(251,191,36,0.18)] sm:max-w-sm"
                 />
 

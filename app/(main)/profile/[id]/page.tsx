@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import SafeCardImage from "@/components/SafeCardImage";
 import DeleteListingButton from "@/components/DeleteListingButton";
 import ProfileChatButton from "@/components/ProfileChatButton";
 import ProfileFriendButton from "@/components/ProfileFriendButton";
@@ -593,11 +594,9 @@ export default async function SellerProfilePage({
                 >
                   <Link href={`/market/card/${item.id}`}>
                     <div className="relative overflow-hidden">
-                      <img
-                        src={
-                          item.imageUrl ||
-                          `/cards/${String(item.cardNo).padStart(3, "0")}.jpg`
-                        }
+                      <SafeCardImage
+                        cardNo={item.cardNo}
+                        imageUrl={item.imageUrl}
                         alt={String(item.cardNo)}
                         className="aspect-[2.5/3.5] w-full object-cover transition duration-700 group-hover:scale-105"
                       />
@@ -685,13 +684,9 @@ export default async function SellerProfilePage({
                   className="group overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] transition duration-500 hover:-translate-y-1 hover:border-amber-400/30 hover:shadow-[0_0_70px_rgba(251,191,36,0.12)]"
                 >
                   <div className="relative overflow-hidden">
-                    <img
-                      src={
-                        item.listing?.imageUrl ||
-                        `/cards/${String(
-                          item.listing?.cardNo || "001"
-                        ).padStart(3, "0")}.jpg`
-                      }
+                    <SafeCardImage
+                      cardNo={item.listing?.cardNo || "001"}
+                      imageUrl={item.listing?.imageUrl}
                       alt={item.listing?.cardName || "Sold Card"}
                       className="aspect-[2.5/3.5] w-full object-cover transition duration-700 group-hover:scale-105"
                     />

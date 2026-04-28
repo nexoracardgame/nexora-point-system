@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClient, RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { getLocaleTag, useLanguage } from "@/lib/i18n";
 import { formatThaiShortDate } from "@/lib/thai-time";
 import {
@@ -13,11 +14,6 @@ import {
   ChevronRight,
   UserPlus,
 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 type NotificationItem = {
   id: string;
@@ -200,7 +196,7 @@ export default function NotificationBell() {
       if (document.visibilityState === "visible") {
         void loadNotifications();
       }
-    }, 420);
+    }, 15000);
 
     const onFocus = () => {
       void loadNotifications();
@@ -225,6 +221,11 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) {
+      return;
+    }
+
     if (channelRef.current) {
       void supabase.removeChannel(channelRef.current);
       channelRef.current = null;

@@ -10,6 +10,7 @@ import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
   Gem,
   Coins,
@@ -226,7 +227,10 @@ export default function MainLayout({
 
   useEffect(() => {
     let cancelled = false;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const supabase = getBrowserSupabaseClient();
+    const channel = supabase
+      ? supabase.channel(`layout-chat-unread-${Date.now()}`)
+      : null;
 
     const syncChatUnread = async () => {
       if (cancelled) return;
@@ -247,11 +251,37 @@ export default function MainLayout({
       }
     };
 
-    intervalId = setInterval(() => {
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dmMessage" },
+      () => {
+        void syncChatUnread();
+      }
+    );
+
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dm_room" },
+      () => {
+        void syncChatUnread();
+      }
+    );
+
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "DealRequest" },
+      () => {
+        void syncChatUnread();
+      }
+    );
+
+    channel?.subscribe();
+
+    const intervalId = setInterval(() => {
       if (document.visibilityState === "visible") {
         void syncChatUnread();
       }
-    }, 900);
+    }, 15000);
 
     const handleFocus = () => {
       void syncChatUnread();
@@ -273,12 +303,13 @@ export default function MainLayout({
 
     return () => {
       cancelled = true;
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("nexora:chat-read", handleChatRead);
       document.removeEventListener("visibilitychange", handleVisibility);
+      if (supabase && channel) {
+        void supabase.removeChannel(channel);
+      }
     };
   }, [pathname]);
 
