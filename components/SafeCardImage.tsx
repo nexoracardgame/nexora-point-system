@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   buildLocalCardImage,
   buildLocalCardImageCandidates,
@@ -36,11 +36,12 @@ export default function SafeCardImage({
     ) as string[];
   }, [cardNo, imageUrl]);
 
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [candidates]);
+  const candidateKey = candidates.join("|");
+  const [state, setState] = useState<{ key: string; index: number }>({
+    key: candidateKey,
+    index: 0,
+  });
+  const index = state.key === candidateKey ? state.index : 0;
 
   return (
     <img
@@ -51,7 +52,13 @@ export default function SafeCardImage({
       decoding={decoding}
       className={className}
       onError={() => {
-        setIndex((prev) => (prev < candidates.length - 1 ? prev + 1 : prev));
+        setState((prev) => {
+          const baseIndex = prev.key === candidateKey ? prev.index : 0;
+          return {
+            key: candidateKey,
+            index: baseIndex < candidates.length - 1 ? baseIndex + 1 : baseIndex,
+          };
+        });
       }}
     />
   );

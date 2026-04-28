@@ -1,3 +1,4 @@
+import { resolveCardDisplayImage } from "@/lib/card-image";
 import { prisma } from "@/lib/prisma";
 
 export type DealMember = {
@@ -122,9 +123,7 @@ export async function getMarketDealsForUser(
       },
       cardName: safeMemberName(listing?.cardName, "การ์ดไม่พบข้อมูล"),
       cardNo,
-      cardImage:
-        String(listing?.imageUrl || "").trim() ||
-        `/cards/${cardNo.padStart(3, "0")}.jpg`,
+      cardImage: resolveCardDisplayImage(cardNo, listing?.imageUrl),
       listingStatus: String(listing?.status || "active"),
     };
   });

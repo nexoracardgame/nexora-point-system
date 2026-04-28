@@ -294,6 +294,23 @@ function DMRoomContent({
             );
             return;
           }
+
+          const retryRes = await fetch(
+            `/api/dm/bootstrap?roomId=${encodeURIComponent(repairedRoomId || roomId)}`,
+            {
+              cache: "no-store",
+            }
+          ).catch(() => null);
+
+          if (activeRoomIdRef.current !== expectedRoomId) {
+            return;
+          }
+
+          if (retryRes?.ok) {
+            const retryData = (await retryRes.json()) as DirectChatBootstrap;
+            applyBootstrap(retryData);
+            return;
+          }
         }
       }
 

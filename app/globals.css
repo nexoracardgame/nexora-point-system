@@ -2,8 +2,8 @@
 
 /* ================== ROOT ================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050507;
+  --foreground: #ffffff;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -14,7 +14,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #050507;
     --foreground: #ededed;
   }
 }
@@ -35,35 +35,77 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
 }
 
-/* ================== ANIMATIONS ================== */
+/* ================== CORE ANIMATIONS ================== */
 
-/* 🔥 รูป fade-in */
+/* 🔥 fade */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-/* 🔥 ข้อความ slide */
+/* 🔥 slide */
 @keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 🔥 bubble */
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 🔥 shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* 🔥 typing */
+@keyframes typingDots {
+  0% { opacity: 0.2; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 0.2; transform: translateY(0); }
+}
+
+/* 🔥 splash loading */
+@keyframes splashLoad {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(240%); }
+}
+
+/* 🔥 shine effect */
+@keyframes shine {
+  0% { transform: translateX(-100%) rotate(12deg); }
+  100% { transform: translateX(200%) rotate(12deg); }
+}
+
+/* ================== HOME ANIMATIONS ================== */
+
+@keyframes homeFloat {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes homeFloatSlow {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -14px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes homeFadeUp {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -71,44 +113,24 @@ body {
   }
 }
 
-/* 🔥 bubble แชท (เนียนกว่า slideUp) */
-@keyframes bubbleIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* 🔥 shimmer skeleton */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-/* 🔥 typing dots */
-@keyframes typingDots {
-  0% { opacity: 0.2; transform: translateY(0); }
-  50% { opacity: 1; transform: translateY(-2px); }
-  100% { opacity: 0.2; transform: translateY(0); }
+@keyframes homeMarquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 /* ================== UTILS ================== */
 
-/* รูป */
+/* fade */
 .fade-in {
   animation: fadeIn 0.25s ease forwards;
 }
 
-/* ข้อความ */
+/* slide */
 .slide-up {
   animation: slideUp 0.25s ease forwards;
 }
 
-/* bubble แชท */
+/* bubble */
 .bubble-in {
   animation: bubbleIn 0.25s ease forwards;
 }
@@ -125,7 +147,7 @@ body {
   animation: shimmer 1.2s infinite;
 }
 
-/* ปุ่มกด */
+/* press */
 .press {
   transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
@@ -144,46 +166,29 @@ body {
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .typing-dot:nth-child(3) { animation-delay: 0.3s; }
 
-@keyframes homeFloat {
-  0% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -12px, 0); }
-  100% { transform: translate3d(0, 0, 0); }
+/* shine */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.12), transparent);
+  animation: shine 3s linear infinite;
 }
 
-@keyframes homeFloatSlow {
-  0% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -16px, 0); }
-  100% { transform: translate3d(0, 0, 0); }
-}
-
-@keyframes homeFadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes homeMarquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
+/* home */
 .home-hero-float {
   animation: homeFloatSlow 7s ease-in-out infinite;
 }
-
 .home-float-card {
   animation: homeFloat 5s ease-in-out infinite;
 }
-
 .home-float-card-delay {
   animation: homeFloatSlow 6.5s ease-in-out infinite;
 }
-
 .home-fade-up,
 .home-fade-up-delay,
 .home-fade-up-delay-2,
@@ -191,34 +196,27 @@ body {
   opacity: 0;
   animation: homeFadeUp 0.8s ease-out forwards;
 }
-
-.home-fade-up-delay {
-  animation-delay: 120ms;
-}
-
-.home-fade-up-delay-2 {
-  animation-delay: 220ms;
-}
-
-.home-fade-up-delay-3 {
-  animation-delay: 320ms;
-}
+.home-fade-up-delay { animation-delay: 120ms; }
+.home-fade-up-delay-2 { animation-delay: 220ms; }
+.home-fade-up-delay-3 { animation-delay: 320ms; }
 
 .home-marquee {
   animation: homeMarquee 24s linear infinite;
 }
 
+/* ================== PERFORMANCE (สำคัญมาก) ================== */
+
+/* ลด animation บนมือถือ */
+@media (max-width: 768px) {
+  .shine::after {
+    animation: none;
+  }
+}
+
+/* รองรับเครื่องช้า */
 @media (prefers-reduced-motion: reduce) {
-  .home-hero-float,
-  .home-float-card,
-  .home-float-card-delay,
-  .home-fade-up,
-  .home-fade-up-delay,
-  .home-fade-up-delay-2,
-  .home-fade-up-delay-3,
-  .home-marquee {
+  * {
     animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
+    transition: none !important;
   }
 }

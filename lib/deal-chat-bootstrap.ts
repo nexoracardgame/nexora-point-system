@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { resolveCardDisplayImage } from "@/lib/card-image";
 import { getChatMessagesPage } from "@/lib/chat-room-server";
 import {
   buildChatUser,
@@ -196,8 +197,8 @@ export async function getDealChatBootstrap(input: {
         "Unknown Card"
       ),
       image: safeDealChatImage(
-        listing?.imageUrl,
-        `/cards/${String(listing?.cardNo || "001").padStart(3, "0")}.jpg`
+        resolveCardDisplayImage(listing?.cardNo || "001", listing?.imageUrl),
+        "/cards/001.jpg"
       ),
       listedPrice: Number(listing?.price || 0),
     },

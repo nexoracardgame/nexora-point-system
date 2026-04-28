@@ -1,4 +1,5 @@
 import { getDealChatRoomId } from "@/lib/deal-chat";
+import { resolveCardDisplayImage } from "@/lib/card-image";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
@@ -299,9 +300,7 @@ export async function getDmRoomsForUser(
       otherImage: safeImage(other.image),
       unread: unreadCountByRoom.get(roomId) || 0,
       dealCardName: cardName,
-      dealCardImage:
-        String(card?.imageUrl || "").trim() ||
-        `/cards/${String(card?.cardNo || "001").padStart(3, "0")}.jpg`,
+      dealCardImage: resolveCardDisplayImage(card?.cardNo || "001", card?.imageUrl),
       dealCardNo: String(card?.cardNo || "001").padStart(3, "0"),
       dealPrice: Number(deal.offeredPrice || card?.price || 0),
       sellerName: seller.displayName || seller.name || "Seller",

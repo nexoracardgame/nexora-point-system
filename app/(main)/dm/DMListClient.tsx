@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import SafeCardImage from "@/components/SafeCardImage";
 import { prefetchDealChatRoom, prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
@@ -20,6 +21,21 @@ function formatDealPriceLabel(value?: number) {
   const amount = Number(value || 0);
   if (!amount) return "-";
   return `฿${amount.toLocaleString("th-TH")}`;
+}
+
+function buildDirectRoomId(userA?: string | null, userB?: string | null) {
+  return [String(userA || "").trim(), String(userB || "").trim()]
+    .filter(Boolean)
+    .sort()
+    .join("__");
+}
+
+function buildDirectRoomHref(roomId: string) {
+  return `/dm/${encodeURIComponent(roomId)}?back=${encodeURIComponent("/dm")}`;
+}
+
+function buildDealRoomHref(dealId: string) {
+  return `/market/deals/chat/${encodeURIComponent(dealId)}`;
 }
 
 function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
@@ -50,6 +66,7 @@ export default function DMListClient({
   initialMe: SessionUser | null;
 }) {
   const router = useRouter();
+  const [currentMe, setCurrentMe] = useState<SessionUser | null>(initialMe);
   const [rooms, setRooms] = useState<DMRoomListItem[]>(
     initialRooms.map(normalizeRoom)
   );
@@ -57,7 +74,33 @@ export default function DMListClient({
   const [openingRoomId, setOpeningRoomId] = useState<string | null>(null);
 
   const hasInit = useRef(false);
-  const meRef = useRef<SessionUser | null>(initialMe);
+
+  const getTargetDirectRoomId = useCallback((room: DMRoomListItem) => {
+    const myUserId = String(currentMe?.id || "").trim();
+    const otherUserId = String(room.otherUserId || "").trim();
+
+    if (!myUserId || !otherUserId) {
+      return room.roomId;
+    }
+
+    return buildDirectRoomId(myUserId, otherUserId) || room.roomId;
+  }, [currentMe?.id]);
+
+  const seedDirectRoom = useCallback((roomId: string, room: DMRoomListItem) => {
+    saveDmRoomSeed(roomId, {
+      name: room.otherName,
+      image: room.otherImage,
+      otherUserId: room.otherUserId,
+    });
+  }, []);
+
+  const warmDealRoom = useCallback((dealId?: string) => {
+    const safeDealId = String(dealId || "").trim();
+    if (!safeDealId) return;
+
+    router.prefetch(buildDealRoomHref(safeDealId));
+    void prefetchDealChatRoom(safeDealId).catch(() => null);
+  }, [router]);
 
   const directRooms = useMemo(
     () => rooms.filter((room) => room.kind !== "deal"),
@@ -153,49 +196,66 @@ export default function DMListClient({
     );
   };
 
-  const openDirectRoom = async (room: DMRoomListItem) => {
-    if (openingRoomId || !room.otherUserId) {
-      router.push(`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`);
+  const warmDirectRoom = useCallback((room: DMRoomListItem) => {
+    const targetRoomId = getTargetDirectRoomId(room);
+    seedDirectRoom(targetRoomId, room);
+    router.prefetch(buildDirectRoomHref(targetRoomId));
+
+    if (targetRoomId === room.roomId) {
+      void prefetchDirectChatRoom(targetRoomId).catch(() => null);
+    }
+  }, [getTargetDirectRoomId, router, seedDirectRoom]);
+
+  const openDirectRoom = (room: DMRoomListItem) => {
+    const targetRoomId = getTargetDirectRoomId(room);
+    const targetHref = buildDirectRoomHref(targetRoomId);
+
+    if (openingRoomId) {
+      router.push(targetHref);
       return;
     }
 
-    setOpeningRoomId(room.roomId);
+    seedDirectRoom(room.roomId, room);
+    seedDirectRoom(targetRoomId, room);
+    setOpeningRoomId(targetRoomId);
+    router.push(targetHref);
 
-    try {
-      const res = await fetch("/api/dm/create-room", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user2: room.otherUserId,
-          user2Name: room.otherName,
-          user2Image: room.otherImage,
-          legacyRoomId: room.roomId,
-        }),
-      });
+    void (async () => {
+      try {
+        if (room.otherUserId) {
+          const res = await fetch("/api/dm/create-room", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user2: room.otherUserId,
+              user2Name: room.otherName,
+              user2Image: room.otherImage,
+              legacyRoomId: room.roomId,
+            }),
+          });
 
-      if (!res.ok) {
-        throw new Error("open failed");
+          if (res.ok) {
+            const data = await res.json().catch(() => null);
+            const nextRoomId = String(data?.roomId || targetRoomId).trim() || targetRoomId;
+            seedDirectRoom(nextRoomId, room);
+            void prefetchDirectChatRoom(nextRoomId).catch(() => null);
+            return;
+          }
+        }
+
+        if (targetRoomId === room.roomId) {
+          void prefetchDirectChatRoom(targetRoomId).catch(() => null);
+        }
+      } catch {
+        if (targetRoomId === room.roomId) {
+          void prefetchDirectChatRoom(targetRoomId).catch(() => null);
+        }
+      } finally {
+        setOpeningRoomId((current) => (current === targetRoomId ? null : current));
       }
-
-      const data = await res.json();
-      const nextRoomId = String(data?.roomId || room.roomId).trim();
-
-      saveDmRoomSeed(nextRoomId, {
-        name: room.otherName,
-        image: room.otherImage,
-        otherUserId: room.otherUserId,
-      });
-
-      await prefetchDirectChatRoom(nextRoomId).catch(() => null);
-
-      router.push(`/dm/${encodeURIComponent(nextRoomId)}?back=${encodeURIComponent("/dm")}`);
-    } catch {
-      router.push(`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`);
-    } finally {
-      setOpeningRoomId(null);
-    }
+    })();
   };
 
   useEffect(() => {
@@ -209,12 +269,12 @@ export default function DMListClient({
     hasInit.current = true;
 
     void (async () => {
-      if (!meRef.current) {
+      if (!currentMe) {
         const sessionRes = await fetch("/api/auth/session", {
           cache: "no-store",
         });
         const sessionData = await sessionRes.json();
-        meRef.current = (sessionData?.user || null) as SessionUser | null;
+        setCurrentMe((sessionData?.user || null) as SessionUser | null);
       }
 
       if (initialRooms.length === 0) {
@@ -224,7 +284,7 @@ export default function DMListClient({
         void loadRooms();
       }
     })();
-  }, [initialRooms.length]);
+  }, [currentMe, initialRooms.length]);
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
@@ -343,24 +403,14 @@ export default function DMListClient({
                   directRooms.map((room) => (
                     <Link
                       key={room.roomId}
-                      href={`/dm/${encodeURIComponent(room.roomId)}?back=${encodeURIComponent("/dm")}`}
+                      href={buildDirectRoomHref(getTargetDirectRoomId(room))}
                       prefetch
-                      onMouseEnter={() => {
-                        saveDmRoomSeed(room.roomId, {
-                          name: room.otherName,
-                          image: room.otherImage,
-                          otherUserId: room.otherUserId,
-                        });
-                        void prefetchDirectChatRoom(room.roomId);
-                      }}
+                      onMouseEnter={() => warmDirectRoom(room)}
+                      onTouchStart={() => warmDirectRoom(room)}
+                      onFocus={() => warmDirectRoom(room)}
                       onClick={(event) => {
                         event.preventDefault();
                         markRoomReadLocally(room.roomId);
-                        saveDmRoomSeed(room.roomId, {
-                          name: room.otherName,
-                          image: room.otherImage,
-                          otherUserId: room.otherUserId,
-                        });
                         void openDirectRoom(room);
                       }}
                       className="group flex items-center gap-3 rounded-[30px] bg-[#f4f3f8] p-3 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
@@ -419,18 +469,14 @@ export default function DMListClient({
                   dealRooms.map((room) => (
                     <Link
                       key={room.roomId}
-                      href={`/market/deals/chat/${room.dealId}`}
+                      href={buildDealRoomHref(String(room.dealId || ""))}
                       prefetch
-                      onMouseEnter={() => {
-                        if (room.dealId) {
-                          void prefetchDealChatRoom(room.dealId);
-                        }
-                      }}
+                      onMouseEnter={() => warmDealRoom(room.dealId)}
+                      onTouchStart={() => warmDealRoom(room.dealId)}
+                      onFocus={() => warmDealRoom(room.dealId)}
                       onClick={() => {
                         markRoomReadLocally(room.roomId);
-                        if (room.dealId) {
-                          void prefetchDealChatRoom(room.dealId);
-                        }
+                        warmDealRoom(room.dealId);
                       }}
                       className="group relative block overflow-hidden rounded-[30px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-4 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:p-4.5"
                     >
@@ -472,8 +518,9 @@ export default function DMListClient({
                               {room.lastMessage || `กำลังคุยกับ ${room.otherName}`}
                             </div>
                             <div className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-black/20 px-2.5 py-2">
-                              <img
-                                src={room.dealCardImage || "/cards/001.jpg"}
+                              <SafeCardImage
+                                cardNo={room.dealCardNo || "001"}
+                                imageUrl={room.dealCardImage}
                                 alt={room.dealCardName || "Deal card"}
                                 className="h-12 w-9 rounded-[10px] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.28)]"
                               />

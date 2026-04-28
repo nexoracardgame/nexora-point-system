@@ -21,6 +21,34 @@ export type LocalProfileRecord = {
 
 let supabaseClient: SupabaseClient | null | undefined;
 let userProfileSchemaReadyPromise: Promise<void> | null = null;
+const LOCAL_PROFILE_CACHE_TTL_MS = 60_000;
+const localProfileCache = new Map<
+  string,
+  { value: LocalProfileRecord | null; expiresAt: number }
+>();
+const localProfileRequestCache = new Map<string, Promise<LocalProfileRecord | null>>();
+
+function readCachedProfile(userId: string) {
+  const cached = localProfileCache.get(userId);
+
+  if (!cached) {
+    return undefined;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    localProfileCache.delete(userId);
+    return undefined;
+  }
+
+  return cached.value;
+}
+
+function writeCachedProfile(userId: string, value: LocalProfileRecord | null) {
+  localProfileCache.set(userId, {
+    value,
+    expiresAt: Date.now() + LOCAL_PROFILE_CACHE_TTL_MS,
+  });
+}
 
 async function ensureUserProfileSchema() {
   if (!userProfileSchemaReadyPromise) {
@@ -157,8 +185,10 @@ async function writeLocalProfile(record: LocalProfileRecord) {
       : [record, ...items];
 
     await writeStore(next);
+    writeCachedProfile(record.userId, record);
     return record;
   } catch {
+    writeCachedProfile(record.userId, record);
     return record;
   }
 }
@@ -284,34 +314,60 @@ async function writePrismaProfile(
 }
 
 export async function getLocalProfileByUserId(userId: string) {
-  const localProfile = await readLocalProfile(userId);
-  const prismaProfile = await readPrismaProfile(userId);
-
-  if (prismaProfile) {
-    const mergedProfile = {
-      ...prismaProfile,
-      username: prismaProfile.username ?? localProfile?.username ?? null,
-    };
-    await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
-    return mergedProfile;
+  const safeUserId = String(userId || "").trim();
+  if (!safeUserId) {
+    return null;
   }
 
-  if (localProfile) {
-    return localProfile;
+  const cached = readCachedProfile(safeUserId);
+  if (cached !== undefined) {
+    return cached;
   }
 
-  const supabaseProfile = await readSupabaseProfile(userId);
-
-  if (supabaseProfile) {
-    const mergedProfile = {
-      ...supabaseProfile,
-      username: supabaseProfile.username ?? null,
-    };
-    await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
-    return mergedProfile;
+  const pending = localProfileRequestCache.get(safeUserId);
+  if (pending) {
+    return pending;
   }
 
-  return null;
+  const task = (async () => {
+    const localProfile = await readLocalProfile(safeUserId);
+    const prismaProfile = await readPrismaProfile(safeUserId);
+
+    if (prismaProfile) {
+      const mergedProfile = {
+        ...prismaProfile,
+        username: prismaProfile.username ?? localProfile?.username ?? null,
+      };
+      await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
+      writeCachedProfile(safeUserId, mergedProfile);
+      return mergedProfile;
+    }
+
+    if (localProfile) {
+      writeCachedProfile(safeUserId, localProfile);
+      return localProfile;
+    }
+
+    const supabaseProfile = await readSupabaseProfile(safeUserId);
+
+    if (supabaseProfile) {
+      const mergedProfile = {
+        ...supabaseProfile,
+        username: supabaseProfile.username ?? null,
+      };
+      await writeLocalProfile(mergedProfile).catch(() => mergedProfile);
+      writeCachedProfile(safeUserId, mergedProfile);
+      return mergedProfile;
+    }
+
+    writeCachedProfile(safeUserId, null);
+    return null;
+  })().finally(() => {
+    localProfileRequestCache.delete(safeUserId);
+  });
+
+  localProfileRequestCache.set(safeUserId, task);
+  return task;
 }
 
 export async function upsertLocalProfile(
@@ -333,23 +389,29 @@ export async function upsertLocalProfile(
   ]);
 
   if (localProfile.status === "fulfilled" && localProfile.value) {
+    writeCachedProfile(userId, localProfile.value);
     return localProfile.value;
   }
 
   if (prismaProfile.status === "fulfilled" && prismaProfile.value) {
-    return {
+    const nextValue = {
       ...prismaProfile.value,
       username: nextRecord.username,
     };
+    writeCachedProfile(userId, nextValue);
+    return nextValue;
   }
 
   if (supabaseProfile.status === "fulfilled" && supabaseProfile.value) {
-    return {
+    const nextValue = {
       ...supabaseProfile.value,
       username: nextRecord.username,
     };
+    writeCachedProfile(userId, nextValue);
+    return nextValue;
   }
 
+  writeCachedProfile(userId, nextRecord);
   return nextRecord;
 }
 

@@ -13,6 +13,7 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
+import SafeCardImage from "@/components/SafeCardImage";
 import { useLanguage } from "@/lib/i18n";
 import {
   emitDealSync,
@@ -28,6 +29,10 @@ import VerifySaleButton from "./VerifySaleButton";
 function safeImage(src?: string | null, fallback = "/avatar.png") {
   const raw = String(src || "").trim();
   return raw || fallback;
+}
+
+function buildDealChatHref(dealId: string) {
+  return `/market/deals/chat/${encodeURIComponent(dealId)}`;
 }
 
 function getStatusUI(
@@ -204,12 +209,19 @@ export default function DealsClient({
     });
   }, [fetchDeals]);
 
-  const handleChat = async (dealId: string) => {
+  const warmDealChat = useCallback((dealId: string) => {
+    if (!dealId) return;
+
+    router.prefetch(buildDealChatHref(dealId));
+    void prefetchDealChatRoom(dealId).catch(() => null);
+  }, [router]);
+
+  const handleChat = (dealId: string) => {
     if (!dealId || creatingChatId) return;
 
     setCreatingChatId(dealId);
-    await prefetchDealChatRoom(dealId).catch(() => null);
-    router.push(`/market/deals/chat/${dealId}`);
+    warmDealChat(dealId);
+    router.push(buildDealChatHref(dealId));
   };
 
   const optimisticallyRemoveDeal = useCallback((dealId: string) => {
@@ -356,9 +368,9 @@ export default function DealsClient({
         {canOpenChat && (
           <button
             onClick={() => handleChat(deal.id)}
-            onMouseEnter={() => {
-              void prefetchDealChatRoom(deal.id);
-            }}
+            onMouseEnter={() => warmDealChat(deal.id)}
+            onTouchStart={() => warmDealChat(deal.id)}
+            onFocus={() => warmDealChat(deal.id)}
             disabled={isOpeningChat}
             className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
           >
@@ -374,12 +386,13 @@ export default function DealsClient({
 
             <div className="mt-3 flex items-center gap-4">
               <div className="relative aspect-[2/3] w-20 overflow-hidden rounded-2xl border border-white/10 shadow-xl sm:w-24">
-                <Image
-                  src={safeImage(deal.cardImage, "/cards/001.jpg")}
+                <SafeCardImage
+                  cardNo={deal.cardNo}
+                  imageUrl={deal.cardImage}
                   alt={deal.cardName}
-                  fill
-                  sizes="(max-width: 640px) 80px, 96px"
-                  className="object-cover"
+                  className="h-full w-full object-cover"
+                  loading="eager"
+                  fetchPriority="high"
                 />
               </div>
 

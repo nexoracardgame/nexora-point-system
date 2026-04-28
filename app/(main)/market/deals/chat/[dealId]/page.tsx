@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState }
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 import {
@@ -426,7 +427,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     return () => {
       cancelOlderPrefetch();
     };
-  }, [dealId, roomId]);
+  }, [dealId]);
 
   useEffect(() => {
     persistCache();
@@ -833,13 +834,13 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
 
               <div className="ml-1 shrink-0">
                 <div className="overflow-hidden rounded-2xl border border-cyan-300/18 bg-white/[0.04] p-1 shadow-[0_0_18px_rgba(34,211,238,0.10)]">
-                  <img
-                    src={card.image}
+                  <SafeCardImage
+                    cardNo={card.no}
+                    imageUrl={card.image}
                     alt={card.name}
                     className="aspect-[2/3] h-[44px] w-auto rounded-xl object-cover sm:h-[52px]"
-                    onError={(event) => {
-                      event.currentTarget.src = "/cards/001.jpg";
-                    }}
+                    loading="eager"
+                    fetchPriority="high"
                   />
                 </div>
               </div>
@@ -855,13 +856,13 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
           <div className="mx-auto flex min-h-full w-full max-w-[980px] flex-col justify-end px-3 pb-4 pt-4 sm:px-4 sm:pb-5">
             <div className="mb-4 rounded-[22px] border border-cyan-300/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.08),rgba(8,10,16,0.92))] p-3 sm:p-4">
               <div className="flex items-center gap-3">
-                <img
-                  src={card.image}
+                <SafeCardImage
+                  cardNo={card.no}
+                  imageUrl={card.image}
                   alt={card.name}
                   className="aspect-[2/3] w-14 rounded-xl border border-white/10 object-cover"
-                  onError={(event) => {
-                    event.currentTarget.src = "/cards/001.jpg";
-                  }}
+                  loading="eager"
+                  fetchPriority="high"
                 />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-black text-white">

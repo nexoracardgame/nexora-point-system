@@ -6,6 +6,7 @@ import {
   safeDealChatImage,
   safeDealChatName,
 } from "@/lib/deal-chat";
+import { resolveCardDisplayImage } from "@/lib/card-image";
 import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -153,8 +154,8 @@ export async function GET(req: Request) {
         "Unknown Card"
       ),
       image: safeDealChatImage(
-        listing?.imageUrl,
-        `/cards/${String(listing?.cardNo || "001").padStart(3, "0")}.jpg`
+        resolveCardDisplayImage(listing?.cardNo || "001", listing?.imageUrl),
+        "/cards/001.jpg"
       ),
       listedPrice: Number(listing?.price || 0),
     },
