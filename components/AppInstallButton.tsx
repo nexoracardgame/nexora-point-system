@@ -231,8 +231,8 @@ export default function AppInstallButton({
       </button>
 
       {guideOpen ? (
-        <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-black/55 p-4 backdrop-blur-md sm:items-center">
-          <div className="w-full max-w-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-[#0d1118]/98 text-white shadow-[0_28px_90px_rgba(0,0,0,0.48)]">
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/55 px-3 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 backdrop-blur-md sm:p-6">
+          <div className="w-full max-w-[420px] self-center overflow-hidden rounded-[28px] border border-white/10 bg-[#0d1118]/98 text-white shadow-[0_28px_90px_rgba(0,0,0,0.48)] max-h-[calc(100dvh-env(safe-area-inset-bottom)-26px)] sm:max-h-[min(86dvh,720px)]">
             <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/85">
@@ -254,7 +254,11 @@ export default function AppInstallButton({
               </button>
             </div>
 
-            <div className="space-y-3 px-5 py-5 text-sm text-white/78">
+            <div className="max-h-[calc(100dvh-env(safe-area-inset-bottom)-120px)] space-y-3 overflow-y-auto overscroll-contain px-5 py-5 text-sm text-white/78 sm:max-h-[min(70dvh,560px)]">
+              <div className="rounded-[22px] border border-amber-300/12 bg-amber-300/8 px-4 py-3 text-xs font-semibold leading-6 text-amber-100/88">
+                ถ้าอุปกรณ์รองรับ ระบบจะเปิดหน้าต่างติดตั้งให้อัตโนมัติทันที
+                หากเบราว์เซอร์ยังไม่แสดง prompt ให้ทำตามขั้นตอนด้านล่างได้เลย
+              </div>
               {isIosDevice() ? (
                 <>
                   <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">

@@ -1,9 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import { Noto_Sans_Thai } from "next/font/google";
 import { useEffect, useState } from "react";
 import AppInstallButton from "@/components/AppInstallButton";
 import PrefetchLink from "@/components/PrefetchLink";
+
+const notoSansThai = Noto_Sans_Thai({
+  subsets: ["thai", "latin"],
+  weight: ["500", "700", "800", "900"],
+});
 
 export default function NexoraLuxuryHome() {
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
@@ -90,17 +96,17 @@ export default function NexoraLuxuryHome() {
         <AppInstallButton variant="dark" />
       </div>
 
-      <div className="absolute bottom-6 left-4 z-30 max-w-[560px] sm:bottom-10 sm:left-8">
-        <div className="text-base font-black tracking-[0.12em] text-amber-800 sm:text-xl">
+      <div className={`absolute bottom-6 left-4 z-30 max-w-[560px] sm:bottom-10 sm:left-8 ${notoSansThai.className}`}>
+        <div className="max-w-[420px] text-[15px] font-extrabold tracking-[0.08em] text-amber-800 sm:max-w-[520px] sm:text-lg">
           สะสม ต่อสู้ แลกเปลี่ยน และรับรางวัลในจักรวาล NEXORA
         </div>
-        <div className="mt-3 text-lg font-semibold leading-8 text-black/78 sm:text-[2rem] sm:leading-[1.42]">
+        <div className="mt-3 max-w-[650px] text-[1.7rem] font-extrabold leading-[1.34] tracking-[-0.045em] text-black/76 sm:text-[2.1rem] sm:leading-[1.28] lg:text-[2.55rem]">
           ก้าวเข้าสู่ยุคใหม่ของการ์ดสะสมระดับพรีเมียม
           ด้วยตลาดที่ไวระดับโลก แชทเรียลไทม์ การครอบครองที่มีคุณค่า
           และรางวัลที่ยกระดับทุกคอลเลกชันของคุณ
         </div>
 
-        <div className="mt-3 text-sm font-medium leading-7 text-black/58 sm:mt-4 sm:text-base">
+        <div className="mt-3 max-w-[520px] text-[13px] font-semibold leading-6 text-black/52 sm:mt-4 sm:text-[15px] sm:leading-7">
           ซื้อขายลื่นไหลบนมือถือ คอม และเว็บแอพในประสบการณ์เดียวกัน
         </div>
 
