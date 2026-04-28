@@ -526,35 +526,35 @@ export default function DMListClient({
   }, []);
 
   return (
-    <div className="min-h-full bg-[#f4f0f7] text-[#08080a]">
+    <div className="min-h-full overflow-x-hidden bg-[#f4f0f7] text-[#08080a]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.92),transparent_26%),radial-gradient(circle_at_78%_0%,rgba(255,217,102,0.22),transparent_22%),linear-gradient(180deg,#f8f5fb_0%,#e7e8f7_100%)]" />
       <div className="relative mx-auto max-w-7xl px-0 py-0 sm:px-6 sm:py-5 lg:px-8">
-        <section className="relative overflow-hidden px-3 pb-[calc(env(safe-area-inset-bottom)+102px)] pt-3 sm:rounded-[48px] sm:bg-[#f8f7fb] sm:px-7 sm:pb-7 sm:pt-5 sm:shadow-[0_28px_90px_rgba(60,50,80,0.16)] sm:ring-1 sm:ring-black/5 lg:px-10">
+        <section className="relative overflow-hidden px-2.5 pb-[calc(env(safe-area-inset-bottom)+108px)] pt-2.5 sm:rounded-[48px] sm:bg-[#f8f7fb] sm:px-7 sm:pb-7 sm:pt-5 sm:shadow-[0_28px_90px_rgba(60,50,80,0.16)] sm:ring-1 sm:ring-black/5 lg:px-10">
           <div className="pointer-events-none absolute -right-24 top-8 h-72 w-72 rounded-full bg-white/80 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-[#d9def8] blur-3xl" />
 
-          <header className="relative flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <header className="relative flex flex-col items-start gap-2.5 px-0.5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.28em] text-black/35 sm:text-[13px] sm:tracking-[0.38em]">
                 Nexora Comms
               </div>
-              <h1 className="mt-2 text-[2.35rem] font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
+              <h1 className="mt-1.5 text-[2.15rem] font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
                 แชท
               </h1>
             </div>
-            <div className="self-end rounded-full bg-white px-4 py-2.5 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:self-auto sm:px-5 sm:py-3 sm:text-base">
+            <div className="self-start rounded-full bg-white px-3.5 py-2 text-center text-xs font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:self-auto sm:px-5 sm:py-3 sm:text-base">
               {rooms.length} ห้อง
             </div>
           </header>
 
           <div className="relative mt-4 grid gap-3 sm:mt-6 sm:gap-4 xl:grid-cols-[1.02fr_0.98fr]">
-            <section className="rounded-[28px] bg-white p-3.5 shadow-[0_18px_34px_rgba(20,20,30,0.08)] sm:rounded-[34px] sm:p-5 sm:shadow-[0_24px_54px_rgba(20,20,30,0.1)] lg:rounded-[42px]">
-              <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <section className="min-w-0 rounded-[24px] bg-white p-3 shadow-[0_18px_34px_rgba(20,20,30,0.08)] sm:rounded-[34px] sm:p-5 sm:shadow-[0_24px_54px_rgba(20,20,30,0.1)] lg:rounded-[42px]">
+              <div className="mb-3 flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-bold text-black/40">Direct</div>
-                  <div className="mt-1 text-[1.9rem] font-black tracking-[-0.05em] sm:text-3xl">แชทส่วนตัว</div>
+                  <div className="mt-1 text-[1.72rem] font-black tracking-[-0.05em] sm:text-3xl">แชทส่วนตัว</div>
                 </div>
-                <div className="self-end rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:self-auto sm:px-4 sm:text-sm">
+                <div className="self-start rounded-full bg-[#eef0fb] px-3 py-1.5 text-[11px] font-black sm:self-auto sm:px-4 sm:py-2 sm:text-sm">
                   {directRooms.length} active
                 </div>
               </div>
@@ -581,7 +581,7 @@ export default function DMListClient({
                   directRooms.map((room) => (
                     <div
                       key={room.roomId}
-                      className="group flex items-center gap-2 rounded-[30px] bg-[#f4f3f8] p-3 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
+                      className="group flex min-w-0 items-center gap-2 rounded-[24px] bg-[#f4f3f8] p-2.5 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5] sm:rounded-[30px] sm:p-3"
                     >
                       <button
                         type="button"
@@ -592,13 +592,13 @@ export default function DMListClient({
                           markRoomReadLocally(room.roomId);
                           void openDirectRoom(room);
                         }}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        className="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-3"
                       >
                         <div className="relative">
                           <img
                             src={room.otherImage}
                             alt={room.otherName}
-                            className="h-[56px] w-[56px] rounded-full object-cover ring-4 ring-white"
+                            className="h-[52px] w-[52px] rounded-full object-cover ring-4 ring-white sm:h-[56px] sm:w-[56px]"
                           />
                           {room.unread > 0 ? (
                             <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
@@ -608,18 +608,18 @@ export default function DMListClient({
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="truncate text-base font-black text-black">
+                          <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                            <div className="truncate text-[15px] font-black leading-5 text-black sm:text-base">
                               {room.otherName}
                             </div>
-                            <div className="shrink-0 text-[11px] font-bold text-black/35">
+                            <div className="shrink-0 text-[10px] font-bold leading-none text-black/35 sm:pt-0.5 sm:text-[11px]">
                               {room.lastMessageAt
                                 ? formatThaiChatActivityTime(room.lastMessageAt)
                                 : ""}
                             </div>
                           </div>
                           <div
-                            className={`mt-1 truncate text-sm ${
+                            className={`mt-0.5 truncate pr-1 text-[13px] leading-5 sm:mt-1 sm:text-sm ${
                               room.unread > 0 ? "font-semibold text-black/80" : "text-black/45"
                             }`}
                           >
@@ -635,7 +635,7 @@ export default function DMListClient({
                           void clearDirectRoom(room);
                         }}
                         disabled={clearingRoomId === room.roomId}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-red-300/25 bg-red-500/10 text-red-500 shadow-[0_10px_24px_rgba(239,68,68,0.12)] transition hover:bg-red-500/16 hover:text-red-600 disabled:cursor-wait disabled:opacity-60"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-full border border-red-300/25 bg-red-500/10 text-red-500 shadow-[0_10px_24px_rgba(239,68,68,0.12)] transition hover:bg-red-500/16 hover:text-red-600 disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:w-11"
                         aria-label={`ลบแชทกับ ${room.otherName}`}
                         title={`ลบแชทกับ ${room.otherName}`}
                       >
@@ -647,13 +647,13 @@ export default function DMListClient({
               </div>
             </section>
 
-            <section className="rounded-[28px] bg-white p-3.5 shadow-[0_18px_34px_rgba(20,20,30,0.08)] sm:rounded-[34px] sm:p-5 sm:shadow-[0_24px_54px_rgba(20,20,30,0.1)] lg:rounded-[42px]">
-              <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <section className="min-w-0 rounded-[24px] bg-white p-3 shadow-[0_18px_34px_rgba(20,20,30,0.08)] sm:rounded-[34px] sm:p-5 sm:shadow-[0_24px_54px_rgba(20,20,30,0.1)] lg:rounded-[42px]">
+              <div className="mb-3 flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-bold text-black/40">Deal Rooms</div>
-                  <div className="mt-1 text-[1.9rem] font-black tracking-[-0.05em] sm:text-3xl">ห้องดีล</div>
+                  <div className="mt-1 text-[1.72rem] font-black tracking-[-0.05em] sm:text-3xl">ห้องดีล</div>
                 </div>
-                <div className="self-end rounded-full bg-black px-3 py-2 text-xs font-black text-white sm:self-auto sm:px-4 sm:text-sm">
+                <div className="self-start rounded-full bg-black px-3 py-1.5 text-[11px] font-black text-white sm:self-auto sm:px-4 sm:py-2 sm:text-sm">
                   {dealRooms.length} synced
                 </div>
               </div>
@@ -676,15 +676,15 @@ export default function DMListClient({
                         markRoomReadLocally(room.roomId);
                         warmDealRoom(room.dealId);
                       }}
-                      className="group relative block overflow-hidden rounded-[30px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-4 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:p-4.5"
+                      className="group relative block min-w-0 overflow-hidden rounded-[24px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-3 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:rounded-[30px] sm:p-4.5"
                     >
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_32%)] opacity-90" />
-                      <div className="relative flex items-start gap-3">
+                      <div className="relative flex min-w-0 items-start gap-2.5 sm:gap-3">
                         <div className="relative shrink-0">
                           <img
                             src={room.otherImage}
                             alt={room.otherName}
-                            className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white/12 shadow-[0_12px_26px_rgba(0,0,0,0.25)] sm:h-14 sm:w-14"
+                            className="h-11 w-11 rounded-2xl object-cover ring-2 ring-white/12 shadow-[0_12px_26px_rgba(0,0,0,0.25)] sm:h-14 sm:w-14"
                           />
                           {room.unread > 0 ? (
                             <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
@@ -694,7 +694,7 @@ export default function DMListClient({
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <div className="line-clamp-1 text-sm font-black text-white sm:text-base">
                                 {room.dealCardName || "Deal chat"}
@@ -706,29 +706,29 @@ export default function DMListClient({
                                 ผู้ขาย: {room.sellerName || room.otherName}
                               </div>
                             </div>
-                            <div className="shrink-0 text-[10px] font-semibold text-white/40">
+                            <div className="shrink-0 text-[10px] font-semibold leading-none text-white/40">
                               {formatThaiChatActivityTime(
                                 room.lastMessageAt || room.createdAt
                               )}
                             </div>
                           </div>
 
-                          <div className="mt-3 grid grid-cols-[1fr_auto] gap-3 rounded-[20px] border border-white/8 bg-white/[0.05] p-2.5">
-                            <div className="min-w-0 rounded-[16px] px-1 py-1 text-xs font-medium text-white/72">
+                          <div className="mt-3 grid grid-cols-1 gap-2.5 rounded-[20px] border border-white/8 bg-white/[0.05] p-2.5 sm:grid-cols-[1fr_auto] sm:gap-3">
+                            <div className="min-w-0 rounded-[16px] px-1 py-1 text-xs font-medium leading-5 text-white/72">
                               {room.lastMessage || `กำลังคุยกับ ${room.otherName}`}
                             </div>
-                            <div className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-black/20 px-2.5 py-2">
+                            <div className="flex min-w-0 items-center gap-2 rounded-[16px] border border-white/10 bg-black/20 px-2.5 py-2 sm:justify-start">
                               <SafeCardImage
                                 cardNo={room.dealCardNo || "001"}
                                 imageUrl={room.dealCardImage}
                                 alt={room.dealCardName || "Deal card"}
                                 className="h-12 w-9 rounded-[10px] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.28)]"
                               />
-                              <div className="min-w-0">
-                                <div className="max-w-[110px] truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#ffe27a]">
+                              <div className="min-w-0 flex-1">
+                                <div className="max-w-full truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#ffe27a] sm:max-w-[110px]">
                                   {room.dealCardNo ? `CARD ${room.dealCardNo}` : "DEAL CARD"}
                                 </div>
-                                <div className="mt-0.5 max-w-[110px] truncate text-[11px] font-semibold text-white/78">
+                                <div className="mt-0.5 max-w-full truncate text-[11px] font-semibold text-white/78 sm:max-w-[110px]">
                                   {room.dealCardName || "Unknown card"}
                                 </div>
                               </div>
