@@ -28,6 +28,7 @@ export default async function SellerCenterPage() {
       price: Number(item.price || 0),
     })
   );
+  const ownProfileHref = `/profile/${session.user.id}`;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1830_0%,#090a10_55%,#05060a_100%)] px-3 py-4 text-white sm:px-6 sm:py-10">
@@ -49,7 +50,7 @@ export default async function SellerCenterPage() {
           </div>
 
           <Link
-            href="/profile/me"
+            href={ownProfileHref}
             className="w-fit rounded-2xl border border-violet-400/20 bg-violet-500/10 px-4 py-3 text-xs font-bold text-violet-300 transition hover:bg-violet-500/20 sm:px-5 sm:text-sm"
           >
             ดูโปรไฟล์ฉัน

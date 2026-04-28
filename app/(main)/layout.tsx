@@ -65,6 +65,9 @@ export default function MainLayout({
   const profileVersionRef = useRef("");
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
+  const ownProfileHref = session?.user?.id
+    ? `/profile/${session.user.id}`
+    : "/profile/me";
 
   function updateAvatar(src?: string | null) {
     const nextSrc = safeProfileSrc(src);
@@ -116,6 +119,84 @@ export default function MainLayout({
       window.removeEventListener(
         "nexora:balance-updated",
         handleBalanceUpdate as EventListener
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const root = document.documentElement;
+    let rafId = 0;
+    let timeoutA = 0;
+    let timeoutB = 0;
+
+    const syncShellHeight = () => {
+      const nextHeight = Math.round(
+        window.visualViewport?.height || window.innerHeight || 0
+      );
+      if (nextHeight > 0) {
+        root.style.setProperty("--app-shell-height", `${nextHeight}px`);
+      }
+    };
+
+    const scheduleShellHeightSync = () => {
+      syncShellHeight();
+
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+      if (timeoutA) {
+        window.clearTimeout(timeoutA);
+      }
+      if (timeoutB) {
+        window.clearTimeout(timeoutB);
+      }
+
+      rafId = window.requestAnimationFrame(syncShellHeight);
+      timeoutA = window.setTimeout(syncShellHeight, 120);
+      timeoutB = window.setTimeout(syncShellHeight, 320);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        scheduleShellHeightSync();
+      }
+    };
+
+    scheduleShellHeightSync();
+    window.addEventListener("resize", scheduleShellHeightSync);
+    window.addEventListener("orientationchange", scheduleShellHeightSync);
+    window.addEventListener("focus", scheduleShellHeightSync);
+    window.addEventListener("pageshow", scheduleShellHeightSync);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.visualViewport?.addEventListener("resize", scheduleShellHeightSync);
+    window.visualViewport?.addEventListener("scroll", scheduleShellHeightSync);
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+      if (timeoutA) {
+        window.clearTimeout(timeoutA);
+      }
+      if (timeoutB) {
+        window.clearTimeout(timeoutB);
+      }
+      window.removeEventListener("resize", scheduleShellHeightSync);
+      window.removeEventListener("orientationchange", scheduleShellHeightSync);
+      window.removeEventListener("focus", scheduleShellHeightSync);
+      window.removeEventListener("pageshow", scheduleShellHeightSync);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.visualViewport?.removeEventListener(
+        "resize",
+        scheduleShellHeightSync
+      );
+      window.visualViewport?.removeEventListener(
+        "scroll",
+        scheduleShellHeightSync
       );
     };
   }, []);
@@ -438,7 +519,7 @@ export default function MainLayout({
       "/collections",
       "/wallet",
       "/dm",
-      "/profile/me",
+      ownProfileHref,
       "/settings/profile",
     ];
 
@@ -458,7 +539,7 @@ export default function MainLayout({
 
     const timeoutId = globalThis.setTimeout(warmRoutes, 250);
     return () => globalThis.clearTimeout(timeoutId);
-  }, [router]);
+  }, [ownProfileHref, router]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -522,7 +603,7 @@ export default function MainLayout({
        active: pathname.startsWith("/dm"),
       },
     ],
-    [pathname, t]
+    [ownProfileHref, pathname, t]
   );
 
   const mobileBottomItems = useMemo(
@@ -553,13 +634,13 @@ export default function MainLayout({
         active: pathname.startsWith("/dm"),
       },
       {
-        href: "/profile/me",
+        href: ownProfileHref,
         label: "ฉัน",
         icon: User,
         active: pathname.startsWith("/profile"),
       },
     ],
-    [pathname, t]
+    [ownProfileHref, pathname, t]
   );
 
   const drawerLinks = [
@@ -571,7 +652,7 @@ export default function MainLayout({
       active: pathname.startsWith("/wallet"),
     },
     {
-      href: "/profile/me",
+      href: ownProfileHref,
       label: t("layout.nav.profile"),
       icon: User,
       active: pathname.startsWith("/profile"),
@@ -797,7 +878,11 @@ export default function MainLayout({
                       </PrefetchLink>
 
                       <PrefetchLink
-                        href="/profile/me"
+                        href={
+                          session?.user?.id
+                            ? `/profile/${session.user.id}`
+                            : "/profile/me"
+                        }
                         onClick={() => setMenuOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/85 transition hover:bg-amber-300/[0.06]"
                       >

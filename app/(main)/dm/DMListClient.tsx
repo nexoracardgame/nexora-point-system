@@ -524,35 +524,35 @@ export default function DMListClient({
   }, []);
 
   return (
-    <div className="min-h-full overflow-hidden bg-[#f4f0f7] text-[#08080a]">
+    <div className="min-h-full bg-[#f4f0f7] text-[#08080a]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.92),transparent_26%),radial-gradient(circle_at_78%_0%,rgba(255,217,102,0.22),transparent_22%),linear-gradient(180deg,#f8f5fb_0%,#e7e8f7_100%)]" />
       <div className="relative mx-auto max-w-7xl px-0 py-0 sm:px-6 sm:py-5 lg:px-8">
-        <section className="relative overflow-hidden rounded-[26px] bg-[#f8f7fb] px-3 pb-5 pt-4 shadow-[0_28px_90px_rgba(60,50,80,0.16)] ring-1 ring-black/5 sm:rounded-[48px] sm:px-7 sm:pb-7 sm:pt-5 lg:px-10">
+        <section className="relative overflow-hidden px-3 pb-[calc(env(safe-area-inset-bottom)+102px)] pt-3 sm:rounded-[48px] sm:bg-[#f8f7fb] sm:px-7 sm:pb-7 sm:pt-5 sm:shadow-[0_28px_90px_rgba(60,50,80,0.16)] sm:ring-1 sm:ring-black/5 lg:px-10">
           <div className="pointer-events-none absolute -right-24 top-8 h-72 w-72 rounded-full bg-white/80 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-[#d9def8] blur-3xl" />
 
-          <header className="relative flex items-center justify-between gap-3">
+          <header className="relative flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.28em] text-black/35 sm:text-[13px] sm:tracking-[0.38em]">
                 Nexora Comms
               </div>
-              <h1 className="mt-2 text-4xl font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
+              <h1 className="mt-2 text-[2.35rem] font-black tracking-[-0.08em] text-black sm:text-6xl lg:text-7xl">
                 แชท
               </h1>
             </div>
-            <div className="rounded-full bg-white px-4 py-2.5 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:px-5 sm:py-3 sm:text-base">
+            <div className="self-end rounded-full bg-white px-4 py-2.5 text-center text-sm font-black shadow-[0_16px_34px_rgba(20,20,30,0.1)] ring-1 ring-black/5 sm:self-auto sm:px-5 sm:py-3 sm:text-base">
               {rooms.length} ห้อง
             </div>
           </header>
 
-          <div className="relative mt-6 grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
-            <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
-              <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="relative mt-4 grid gap-3 sm:mt-6 sm:gap-4 xl:grid-cols-[1.02fr_0.98fr]">
+            <section className="rounded-[28px] bg-white p-3.5 shadow-[0_18px_34px_rgba(20,20,30,0.08)] sm:rounded-[34px] sm:p-5 sm:shadow-[0_24px_54px_rgba(20,20,30,0.1)] lg:rounded-[42px]">
+              <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-bold text-black/40">Direct</div>
-                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">แชทส่วนตัว</div>
+                  <div className="mt-1 text-[1.9rem] font-black tracking-[-0.05em] sm:text-3xl">แชทส่วนตัว</div>
                 </div>
-                <div className="rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:px-4 sm:text-sm">
+                <div className="self-end rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:self-auto sm:px-4 sm:text-sm">
                   {directRooms.length} active
                 </div>
               </div>
@@ -645,13 +645,13 @@ export default function DMListClient({
               </div>
             </section>
 
-            <section className="rounded-[34px] bg-white p-4 shadow-[0_24px_54px_rgba(20,20,30,0.1)] sm:p-5 lg:rounded-[42px]">
-              <div className="mb-3 flex items-center justify-between gap-3">
+            <section className="rounded-[28px] bg-white p-3.5 shadow-[0_18px_34px_rgba(20,20,30,0.08)] sm:rounded-[34px] sm:p-5 sm:shadow-[0_24px_54px_rgba(20,20,30,0.1)] lg:rounded-[42px]">
+              <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-bold text-black/40">Deal Rooms</div>
-                  <div className="mt-1 text-3xl font-black tracking-[-0.05em]">ห้องดีล</div>
+                  <div className="mt-1 text-[1.9rem] font-black tracking-[-0.05em] sm:text-3xl">ห้องดีล</div>
                 </div>
-                <div className="rounded-full bg-black px-3 py-2 text-xs font-black text-white sm:px-4 sm:text-sm">
+                <div className="self-end rounded-full bg-black px-3 py-2 text-xs font-black text-white sm:self-auto sm:px-4 sm:text-sm">
                   {dealRooms.length} synced
                 </div>
               </div>

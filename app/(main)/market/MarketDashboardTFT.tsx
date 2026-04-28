@@ -184,7 +184,9 @@ export default function MarketDashboardTFT({
   const [mouse, setMouse] = useState({ x: 50, y: 50 });
   const [freshListingIds, setFreshListingIds] = useState<string[]>([]);
   const itemsRef = useRef(items);
-  const seenListingIdsRef = useRef<Set<string>>(new Set(initialItems.map((item) => item.id)));
+  const seenListingIdsRef = useRef<Set<string>>(
+    new Set(initialItems.map((item) => item.id))
+  );
   const refreshInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -197,6 +199,7 @@ export default function MarketDashboardTFT({
         setItems(initialItems);
         setLoading(false);
         seenListingIdsRef.current = new Set(initialItems.map((item) => item.id));
+        setFreshListingIds([]);
         return;
       }
 
@@ -204,6 +207,7 @@ export default function MarketDashboardTFT({
         setItems([]);
         setLoading(false);
         seenListingIdsRef.current = new Set();
+        setFreshListingIds([]);
       }
     });
   }, [initialItems, initialItemsLoaded]);
@@ -225,6 +229,7 @@ export default function MarketDashboardTFT({
       setItems(cached.data);
       setLoading(false);
       seenListingIdsRef.current = new Set(cached.data.map((item) => item.id));
+      setFreshListingIds([]);
     });
   }, [initialItems.length, initialItemsLoaded]);
 
@@ -300,28 +305,24 @@ export default function MarketDashboardTFT({
           return;
         }
 
-        const previousIds = seenListingIdsRef.current;
-        const newIds = mapped
-          .map((item) => item.id)
-          .filter((id) => !previousIds.has(id));
-
-        seenListingIdsRef.current = new Set(mapped.map((item) => item.id));
+        const currentIds = mapped.map((item) => item.id);
+        const knownIds = new Set(seenListingIdsRef.current);
+        const newIds = currentIds.filter((id) => !knownIds.has(id));
+        currentIds.forEach((id) => knownIds.add(id));
+        seenListingIdsRef.current = knownIds;
 
         startTransition(() => {
           setItems(mapped);
           setLoading(false);
           if (newIds.length > 0 && itemsRef.current.length > 0) {
-            setFreshListingIds(newIds);
+            setFreshListingIds((prev) => {
+              const visibleFreshIds = prev.filter((id) => currentIds.includes(id));
+              const nextIds = new Set(visibleFreshIds);
+              newIds.forEach((id) => nextIds.add(id));
+              return Array.from(nextIds);
+            });
           }
         });
-
-        if (newIds.length > 0) {
-          window.setTimeout(() => {
-            setFreshListingIds((prev) =>
-              prev.filter((id) => !newIds.includes(id))
-            );
-          }, 5000);
-        }
       } catch {
         startTransition(() => {
           setLoading(false);

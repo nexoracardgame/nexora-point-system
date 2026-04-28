@@ -13,7 +13,7 @@ import ProfileChatButton from "@/components/ProfileChatButton";
 import ProfileFriendButton from "@/components/ProfileFriendButton";
 import ProfileShareButton from "@/components/ProfileShareButton";
 import { authOptions } from "@/lib/auth";
-import { getMarketListings } from "@/lib/market-listings";
+import { getMarketListingsBySeller } from "@/lib/market-listings";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
 import { formatThaiDate } from "@/lib/thai-time";
@@ -114,55 +114,177 @@ export default async function SellerProfilePage({
     image?: string | null;
   };
 
-  const [allListings, allDeals] = await Promise.all([
-    getMarketListings(),
-    prisma.dealRequest.findMany({
-      include: {
-        buyer: {
-          select: {
-            id: true,
-            displayName: true,
-            name: true,
-            image: true,
+  const [
+    localProfile,
+    sellerFromDb,
+    sellerListings,
+    completedSales,
+    latestSellerDeal,
+    listingStatsRows,
+    soldStatsRows,
+    reviewAggregate,
+  ] = await Promise.all([
+    getLocalProfileByUserId(id),
+    prisma.user
+      .findUnique({
+        where: {
+          id,
+        },
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          image: true,
+          coverImage: true,
+          coverPosition: true,
+          bio: true,
+          facebookUrl: true,
+          lineUrl: true,
+          createdAt: true,
+        },
+      })
+      .catch(() => null),
+    getMarketListingsBySeller(id),
+    prisma.dealRequest
+      .findMany({
+        where: {
+          sellerId: id,
+          status: {
+            equals: "completed",
+            mode: "insensitive",
           },
         },
-        seller: {
-          select: {
-            id: true,
-            displayName: true,
-            name: true,
-            image: true,
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+          cardId: true,
+          offeredPrice: true,
+          createdAt: true,
+          sellerId: true,
+          seller: {
+            select: {
+              displayName: true,
+              name: true,
+              image: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    }),
+      })
+      .catch(() => []),
+    prisma.dealRequest
+      .findFirst({
+        where: {
+          sellerId: id,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          createdAt: true,
+          sellerId: true,
+          seller: {
+            select: {
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+      })
+      .catch(() => null),
+    prisma.marketListing
+      .groupBy({
+        by: ["sellerId"],
+        where: {
+          NOT: {
+            status: {
+              equals: "sold",
+              mode: "insensitive",
+            },
+          },
+        },
+        _count: {
+          _all: true,
+        },
+        _sum: {
+          likes: true,
+        },
+        _min: {
+          createdAt: true,
+        },
+      })
+      .catch(() => []),
+    prisma.dealRequest
+      .groupBy({
+        by: ["sellerId"],
+        where: {
+          status: {
+            equals: "completed",
+            mode: "insensitive",
+          },
+        },
+        _count: {
+          _all: true,
+        },
+        _sum: {
+          offeredPrice: true,
+        },
+        _min: {
+          createdAt: true,
+        },
+      })
+      .catch(() => []),
+    prisma.sellerReview
+      .aggregate({
+        where: {
+          sellerId: id,
+        },
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      })
+      .catch(
+        () =>
+          ({
+            _avg: { rating: null },
+            _count: { rating: 0 },
+          }) as ReviewAggregate
+      ),
   ]);
-  const localProfile = await getLocalProfileByUserId(id);
-
-  const activeMarketListings = allListings.filter(
-    (item) => String(item.status || "").toLowerCase() !== "sold"
-  );
-
-  const sellerListings = activeMarketListings
-    .filter((item) => item.sellerId === id)
-    .sort((a, b) =>
-      String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
-    );
-
-  const completedSales = allDeals
-    .filter((item) => item.sellerId === id && item.status === "completed")
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   const sellerSnapshot =
-    sellerListings[0] ||
-    completedSales[0] ||
-    allDeals.find((item) => item.sellerId === id) ||
-    null;
+    sellerListings[0] || latestSellerDeal || completedSales[0] || null;
 
   let seller: SellerProfileFallback | null = null;
+
+  if (sellerFromDb) {
+    seller = {
+      id: sellerFromDb.id,
+      name:
+        sellerFromDb.name ||
+        localProfile?.displayName ||
+        sellerFromDb.displayName ||
+        "NEXORA User",
+      displayName:
+        localProfile?.displayName ||
+        sellerFromDb.displayName ||
+        sellerFromDb.name ||
+        "NEXORA User",
+      image: localProfile?.image || sellerFromDb.image || "/avatar.png",
+      coverImage: localProfile?.coverImage || sellerFromDb.coverImage || null,
+      coverPosition:
+        localProfile?.coverPosition ?? sellerFromDb.coverPosition ?? 50,
+      bio: localProfile?.bio || sellerFromDb.bio || null,
+      facebookUrl: localProfile?.facebookUrl || sellerFromDb.facebookUrl || null,
+      lineUrl: localProfile?.lineUrl || sellerFromDb.lineUrl || null,
+      createdAt: sellerFromDb.createdAt,
+    };
+  }
 
   if (!seller && isOwner && currentUserId) {
     seller = {
@@ -228,7 +350,36 @@ export default async function SellerProfilePage({
     price: Number(item.price || 0),
   }));
 
-  const listingById = new Map(allListings.map((item) => [item.id, item]));
+  const soldListingIds = [
+    ...new Set(
+      completedSales
+        .slice(0, 24)
+        .map((item) => String(item.cardId || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  const soldListingRows =
+    soldListingIds.length > 0
+      ? await prisma.marketListing
+          .findMany({
+            where: {
+              id: {
+                in: soldListingIds,
+              },
+            },
+            select: {
+              id: true,
+              cardNo: true,
+              cardName: true,
+              imageUrl: true,
+              price: true,
+            },
+          })
+          .catch(() => [])
+      : [];
+
+  const soldListingById = new Map(soldListingRows.map((item) => [item.id, item]));
 
   const soldHistory: SoldHistoryItem[] = completedSales.slice(0, 24).map(
     (item) => ({
@@ -236,93 +387,80 @@ export default async function SellerProfilePage({
       createdAt: item.createdAt,
       price: Number(item.offeredPrice || 0),
       listing: {
-        cardNo: listingById.get(item.cardId)?.cardNo || null,
-        cardName: listingById.get(item.cardId)?.cardName || null,
-        imageUrl: listingById.get(item.cardId)?.imageUrl || null,
+        cardNo: soldListingById.get(item.cardId)?.cardNo || null,
+        cardName: soldListingById.get(item.cardId)?.cardName || null,
+        imageUrl: soldListingById.get(item.cardId)?.imageUrl || null,
         price: Number(item.offeredPrice || 0),
       },
     })
   );
 
-  const reviewAggregate: ReviewAggregate = {
-    _avg: { rating: null as number | null },
-    _count: { rating: 0 },
-  };
-
   const listingStatMap = new Map<
     string,
-    { activeListings: number; totalLikes: number }
-  >();
-
-  activeMarketListings.forEach((item) => {
-    const current = listingStatMap.get(item.sellerId) || {
-      activeListings: 0,
-      totalLikes: 0,
-    };
-
-    listingStatMap.set(item.sellerId, {
-      activeListings: current.activeListings + 1,
-      totalLikes: current.totalLikes + Number(item.likes || 0),
-    });
-  });
-
-  const soldStatMap = new Map<string, { soldCount: number; totalVolume: number }>();
-
-  allDeals
-    .filter((item) => item.status === "completed")
-    .forEach((item) => {
-      const current = soldStatMap.get(item.sellerId) || {
-        soldCount: 0,
-        totalVolume: 0,
-      };
-
-      soldStatMap.set(item.sellerId, {
-        soldCount: current.soldCount + 1,
-        totalVolume: current.totalVolume + Number(item.offeredPrice || 0),
-      });
-    });
-
-  const firstSeenMap = new Map<string, Date>();
-
-  [...allListings, ...allDeals].forEach((item) => {
-    const actorId = item.sellerId;
-    if (!actorId) return;
-
-    const createdAt = new Date(
-      String(item.createdAt || seller.createdAt.toISOString())
-    );
-    const current = firstSeenMap.get(actorId);
-
-    if (!current || createdAt.getTime() < current.getTime()) {
-      firstSeenMap.set(actorId, createdAt);
-    }
-  });
-
-  const sellerIds = new Set<string>([
-    ...listingStatMap.keys(),
-    ...soldStatMap.keys(),
-    seller.id,
-  ]);
-
-  const listingTimes = allListings.map((item) =>
-    new Date(String(item.createdAt)).getTime()
-  );
-  const dealTimes = allDeals.map((item) =>
-    new Date(String(item.createdAt)).getTime()
+    { activeListings: number; totalLikes: number; startedAt: Date | null }
+  >(
+    listingStatsRows.map((row) => [
+      row.sellerId,
+      {
+        activeListings: row._count._all,
+        totalLikes: Number(row._sum.likes || 0),
+        startedAt: row._min.createdAt || null,
+      },
+    ])
   );
 
-  const now = Math.max(
-    seller.createdAt.getTime(),
-    ...(listingTimes.length ? listingTimes : [seller.createdAt.getTime()]),
-    ...(dealTimes.length ? dealTimes : [seller.createdAt.getTime()])
+  const soldStatMap = new Map<
+    string,
+    { soldCount: number; totalVolume: number; startedAt: Date | null }
+  >(
+    soldStatsRows.map((row) => [
+      row.sellerId,
+      {
+        soldCount: row._count._all,
+        totalVolume: Number(row._sum.offeredPrice || 0),
+        startedAt: row._min.createdAt || null,
+      },
+    ])
   );
 
-  const ranking = [...sellerIds]
+  const sellerIds = Array.from(
+    new Set([
+      ...listingStatsRows.map((row) => row.sellerId),
+      ...soldStatsRows.map((row) => row.sellerId),
+      seller.id,
+    ])
+  );
+
+  const sellerAgeRows =
+    sellerIds.length > 0
+      ? await prisma.user
+          .findMany({
+            where: {
+              id: {
+                in: sellerIds,
+              },
+            },
+            select: {
+              id: true,
+              createdAt: true,
+            },
+          })
+          .catch(() => [])
+      : [];
+
+  const sellerAgeMap = new Map(
+    sellerAgeRows.map((item) => [item.id, item.createdAt])
+  );
+  const now = Date.now();
+
+  const ranking = sellerIds
     .map((userId) => {
       const listingStats = listingStatMap.get(userId);
       const soldStats = soldStatMap.get(userId);
       const startedAt =
-        firstSeenMap.get(userId) ||
+        listingStats?.startedAt ||
+        soldStats?.startedAt ||
+        sellerAgeMap.get(userId) ||
         (userId === seller.id ? seller.createdAt : new Date(now));
 
       const metrics = {
@@ -354,7 +492,7 @@ export default async function SellerProfilePage({
   const metrics = {
     soldCount: sellerSoldMetrics?.soldCount || 0,
     totalVolume: sellerSoldMetrics?.totalVolume || 0,
-    activeListings: sellerListingMetrics?.activeListings || listings.length,
+    activeListings: sellerListingMetrics?.activeListings ?? listings.length,
     totalLikes: sellerListingMetrics?.totalLikes || 0,
     avgRating: Number(reviewAggregate._avg.rating || 0),
     reviewCount: reviewAggregate._count.rating || 0,

@@ -62,6 +62,7 @@ export default async function WalletPage() {
   };
 
   const userId = String(sessionUser.id || "").trim();
+  const ownProfileHref = `/profile/${userId}`;
 
   if (!userId) {
     redirect("/login");
@@ -388,7 +389,7 @@ export default async function WalletPage() {
             <div className="mt-10 flex flex-col items-center text-center">
               <div className="relative">
                 <Link
-                  href="/profile/me"
+                  href={ownProfileHref}
                   className="relative block h-20 w-20 overflow-hidden rounded-[28px] border border-white/16 bg-white/8 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.42)] transition hover:scale-[1.03]"
                 >
                   <Image
@@ -469,7 +470,7 @@ export default async function WalletPage() {
               {[
                 { href: "/redeem", title: "Redeem", sub: "Open QR coupons", icon: QrCode },
                 { href: "/rewards", title: "Rewards", sub: "Claim items", icon: Gift },
-                { href: "/profile/me", title: "Profile", sub: "Wallet owner", icon: ShieldCheck },
+                { href: ownProfileHref, title: "Profile", sub: "Wallet owner", icon: ShieldCheck },
                 { href: "/community", title: "Community", sub: "Friend network", icon: Sparkles },
               ].map((item) => {
                 const Icon = item.icon;
