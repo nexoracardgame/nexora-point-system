@@ -35,7 +35,7 @@ export default function NexoraLuxuryHome() {
   }, []);
 
   return (
-    <section className="relative min-h-[calc(100vh-140px)] overflow-hidden rounded-[36px] bg-black text-white">
+    <section className="relative min-h-[calc(var(--app-shell-height)-140px)] overflow-hidden rounded-[36px] bg-black text-white">
       {/* BG */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#02070c] via-[#020b14] to-black" />
       <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_70%,rgba(255,255,255,0.18),transparent_28%)]" />
@@ -70,7 +70,7 @@ export default function NexoraLuxuryHome() {
           height={1600}
           priority
           sizes="(max-width: 640px) 80vw, (max-width: 1024px) 62vw, 52vw"
-          className="h-[70vh] w-auto object-contain sm:h-[82vh] lg:h-[88vh] drop-shadow-[0_0_80px_rgba(255,255,255,0.08)]"
+          className="h-[70dvh] w-auto object-contain sm:h-[82dvh] lg:h-[88dvh] drop-shadow-[0_0_80px_rgba(255,255,255,0.08)]"
         />
       </div>
 

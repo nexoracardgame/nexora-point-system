@@ -224,7 +224,7 @@ export default function StaffCouponScanner() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#181222_0%,#090a11_42%,#04050a_100%)] text-white">
+    <div className="min-h-[var(--app-shell-height)] bg-[radial-gradient(circle_at_top,#181222_0%,#090a11_42%,#04050a_100%)] text-white">
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.1),transparent_28%)]" />
       </div>

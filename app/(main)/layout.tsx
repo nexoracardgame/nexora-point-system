@@ -540,12 +540,12 @@ export default function MainLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-[#050608] text-white">
+    <div className="min-h-[var(--app-shell-height)] bg-[#050608] text-white">
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.06),transparent_24%)]" />
 
-      <div className="relative flex min-h-screen">
+      <div className="relative flex min-h-[var(--app-shell-height)]">
         {/* DESKTOP LEFT DOCK */}
-        <aside className="hidden xl:flex fixed left-0 top-0 h-screen w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex-col xl:items-center z-[600]">
+        <aside className="fixed left-0 top-0 z-[600] hidden h-[var(--app-shell-height)] w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex xl:flex-col xl:items-center">
           <div className="flex h-full w-full flex-col items-center py-5">
             <PrefetchLink
               href="/"
@@ -762,14 +762,14 @@ export default function MainLayout({
             className={`relative z-0 min-w-0 flex-1 bg-[#07080b] ${
               isChatRoomPage
                 ? "overflow-hidden p-0 pb-0"
-                : "p-3 pb-[90px] sm:p-4 sm:pb-[100px] xl:p-6 xl:pb-6"
+                : "p-3 pb-[calc(env(safe-area-inset-bottom)+90px)] sm:p-4 sm:pb-[calc(env(safe-area-inset-bottom)+100px)] xl:p-6 xl:pb-6"
             }`}
           >
             <div
               className={`${
                 isChatRoomPage
-                  ? "h-[calc(100dvh-74px)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(100dvh-74px)]"
-                  : "min-h-[calc(100vh-74px-92px)] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(100vh-74px-96px)] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(100vh-122px)] xl:p-6"
+                  ? "h-[calc(var(--app-shell-height)-var(--app-header-height))] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none"
+                  : "min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height-sm))] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:p-6"
               }`}
             >
               {children}

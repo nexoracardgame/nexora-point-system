@@ -79,7 +79,7 @@ export default function LoginClient({
   }, [callbackUrl]);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-white">
+    <main className="relative min-h-[var(--app-shell-height)] overflow-hidden bg-black text-white">
       <motion.div
         initial={{ scale: 1.08 }}
         animate={{ scale: 1 }}
@@ -160,7 +160,7 @@ export default function LoginClient({
         </button>
       </div>
 
-      <div className="relative z-10 flex min-h-[calc(100vh-72px)] flex-col items-center justify-center px-5 text-center md:px-10">
+      <div className="relative z-10 flex min-h-[calc(var(--app-shell-height)-72px)] flex-col items-center justify-center px-5 text-center md:px-10">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}

@@ -20,8 +20,8 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#050608] text-white">
-      <div className="mx-auto flex min-h-screen max-w-[1800px] xl:items-stretch">
+    <div className="min-h-[var(--app-shell-height)] bg-[#050608] text-white">
+      <div className="mx-auto flex min-h-[var(--app-shell-height)] max-w-[1800px] xl:items-stretch">
         <AdminSidebar />
         <main className="min-w-0 flex-1 px-3 pb-6 pt-3 sm:px-4 lg:px-5 xl:p-6">
           {children}
