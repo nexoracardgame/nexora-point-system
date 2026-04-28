@@ -317,3 +317,35 @@ Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
     }
   }
 }
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 59013,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 213,
+      bytesRead: 0
+    }
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error [SocketError]: other side closed
+      at ignore-listed frames {
+    code: 'UND_ERR_SOCKET',
+    socket: {
+      localAddress: '192.168.1.117',
+      localPort: 59012,
+      remoteAddress: '172.239.57.117',
+      remotePort: 443,
+      remoteFamily: 'IPv4',
+      timeout: undefined,
+      bytesWritten: 207,
+      bytesRead: 0
+    }
+  }
+}

@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "NEXORA CARDGAME",
-    short_name: "NEXORA",
+    short_name: "NEXORA POINT",
     description: "NEXORA Point System",
     start_url: "/",
     display: "standalone",

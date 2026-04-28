@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NEXORA",
+  title: "NEXORA POINT",
   description: "NEXORA CARDGAME Marketplace",
   applicationName: "NEXORA",
   manifest: "/manifest",

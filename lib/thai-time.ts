@@ -94,6 +94,24 @@ export function formatThaiRoomTime(value: DateInput, locale = DEFAULT_LOCALE) {
   return formatThaiShortDate(value, locale);
 }
 
+export function formatThaiChatActivityTime(
+  value: DateInput,
+  locale = DEFAULT_LOCALE
+) {
+  if (!value) return "";
+
+  if (isSameThaiDay(value, new Date())) {
+    return formatThaiTime(value, locale);
+  }
+
+  return formatWithOptions(value, locale, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatThaiTimeAgo(value: DateInput) {
   const date = toDate(value);
   if (!date) return "";

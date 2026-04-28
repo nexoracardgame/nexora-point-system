@@ -11,6 +11,7 @@ export type DMRoomListItem = {
   dealId?: string;
   lastMessage: string;
   createdAt: string;
+  lastMessageAt?: string;
   otherName: string;
   otherImage: string;
   unread: number;
@@ -236,6 +237,7 @@ export async function getDmRoomsForUser(
       roomId,
       otherUserId,
       createdAt,
+      lastMessageAt: createdAt,
       lastMessage: latestMessage
         ? buildPreview(latestMessage.content, latestMessage.imageUrl)
         : "เริ่มแชท",
@@ -293,6 +295,7 @@ export async function getDmRoomsForUser(
       roomId,
       dealId: deal.id,
       createdAt,
+      lastMessageAt: createdAt,
       lastMessage: latestMessage
         ? buildPreview(latestMessage.content, latestMessage.imageUrl)
         : "เริ่มคุยห้องดีล",

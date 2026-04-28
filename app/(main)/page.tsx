@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import AppInstallButton from "@/components/AppInstallButton";
 import PrefetchLink from "@/components/PrefetchLink";
 
 export default function NexoraLuxuryHome() {
@@ -72,6 +73,10 @@ export default function NexoraLuxuryHome() {
           sizes="(max-width: 640px) 80vw, (max-width: 1024px) 62vw, 52vw"
           className="h-[70dvh] w-auto object-contain sm:h-[82dvh] lg:h-[88dvh] drop-shadow-[0_0_80px_rgba(255,255,255,0.08)]"
         />
+      </div>
+
+      <div className="absolute inset-x-4 top-[54%] z-40 flex -translate-y-1/2 justify-center sm:inset-x-8 sm:top-auto sm:bottom-10 sm:translate-y-0">
+        <AppInstallButton />
       </div>
 
       {/* BOTTOM LEFT COPY */}

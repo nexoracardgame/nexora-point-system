@@ -12,7 +12,7 @@ import {
 import type { DMRoomListItem } from "@/lib/dm-list";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
-import { formatThaiRoomTime } from "@/lib/thai-time";
+import { formatThaiChatActivityTime } from "@/lib/thai-time";
 
 type SessionUser = {
   id: string;
@@ -57,6 +57,7 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
     otherImage: String(room.otherImage || "/avatar.png"),
     lastMessage: String(room.lastMessage || ""),
     createdAt: String(room.createdAt || ""),
+    lastMessageAt: String(room.lastMessageAt || room.createdAt || ""),
     unread: Number(room.unread || 0),
     dealCardName: room.dealCardName ? String(room.dealCardName) : undefined,
     dealCardImage: room.dealCardImage ? String(room.dealCardImage) : undefined,
@@ -65,6 +66,21 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
     sellerName: room.sellerName ? String(room.sellerName) : undefined,
     sellerImage: room.sellerImage ? String(room.sellerImage) : undefined,
   };
+}
+
+function latestTime(value?: string | null) {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getRoomActivityAt(room: Partial<DMRoomListItem>) {
+  return String(room.lastMessageAt || room.createdAt || "").trim();
+}
+
+function sortRoomsByActivity(list: DMRoomListItem[]) {
+  return [...list].sort(
+    (a, b) => latestTime(getRoomActivityAt(b)) - latestTime(getRoomActivityAt(a))
+  );
 }
 
 export default function DMListClient({
@@ -86,10 +102,12 @@ export default function DMListClient({
     initialMe || cachedList?.data?.me || null
   );
   const [rooms, setRooms] = useState<DMRoomListItem[]>(
-    (initialRooms.length > 0
-      ? initialRooms
-      : cachedList?.data?.rooms || []
-    ).map(normalizeRoom)
+    sortRoomsByActivity(
+      (initialRooms.length > 0
+        ? initialRooms
+        : cachedList?.data?.rooms || []
+      ).map(normalizeRoom)
+    )
   );
   const [loading, setLoading] = useState(
     initialRooms.length === 0 && !(cachedList?.data?.rooms?.length)
@@ -207,7 +225,7 @@ export default function DMListClient({
 
       const data = await res.json();
       const nextRooms: DMRoomListItem[] = Array.isArray(data?.rooms)
-        ? data.rooms.map(normalizeRoom)
+        ? sortRoomsByActivity(data.rooms.map(normalizeRoom))
         : [];
 
       setRooms(nextRooms);
@@ -316,7 +334,7 @@ export default function DMListClient({
     }
 
     if (Array.isArray(cached.data.rooms) && cached.data.rooms.length > 0) {
-      const nextRooms = cached.data.rooms.map(normalizeRoom);
+      const nextRooms = sortRoomsByActivity(cached.data.rooms.map(normalizeRoom));
       setRooms(nextRooms);
       setLoading(false);
       void hydrateUnknownRooms(nextRooms);
@@ -491,7 +509,9 @@ export default function DMListClient({
                         <div className="flex items-start justify-between gap-3">
                           <div className="truncate text-base font-black text-black">{room.otherName}</div>
                             <div className="shrink-0 text-[11px] font-bold text-black/35">
-                            {formatThaiRoomTime(room.createdAt)}
+                            {formatThaiChatActivityTime(
+                              room.lastMessageAt || room.createdAt
+                            )}
                           </div>
                         </div>
                         <div
@@ -568,7 +588,9 @@ export default function DMListClient({
                               </div>
                             </div>
                             <div className="shrink-0 text-[10px] font-semibold text-white/40">
-                              {formatThaiRoomTime(room.createdAt)}
+                              {formatThaiChatActivityTime(
+                                room.lastMessageAt || room.createdAt
+                              )}
                             </div>
                           </div>
 
