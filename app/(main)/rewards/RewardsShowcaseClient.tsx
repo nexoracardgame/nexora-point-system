@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Coins,
   Gem,
@@ -45,6 +45,51 @@ export default function RewardsShowcaseClient({
   rewards: RewardItem[];
 }) {
   const [query, setQuery] = useState("");
+  const [balances, setBalances] = useState({
+    nexPoint: Number(nexPoint || 0),
+    coin: Number(coin || 0),
+  });
+
+  useEffect(() => {
+    setBalances({
+      nexPoint: Number(nexPoint || 0),
+      coin: Number(coin || 0),
+    });
+  }, [coin, nexPoint]);
+
+  useEffect(() => {
+    const handleBalanceUpdate = (
+      event: Event
+    ) => {
+      const detail = (event as CustomEvent<{
+        nexPoint?: number;
+        coin?: number;
+      }>).detail;
+
+      if (!detail) {
+        return;
+      }
+
+      setBalances((current) => ({
+        nexPoint: Number(
+          detail.nexPoint != null ? detail.nexPoint : current.nexPoint
+        ),
+        coin: Number(detail.coin != null ? detail.coin : current.coin),
+      }));
+    };
+
+    window.addEventListener(
+      "nexora:balance-updated",
+      handleBalanceUpdate as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "nexora:balance-updated",
+        handleBalanceUpdate as EventListener
+      );
+    };
+  }, []);
 
   const filteredRewards = useMemo(() => {
     const keyword = normalizeRewardName(query);
@@ -134,10 +179,10 @@ export default function RewardsShowcaseClient({
                   <div className="text-right">
                     <div className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-2 text-xs font-black text-white sm:px-4">
                       <Gem className="h-3.5 w-3.5 text-amber-300" />
-                      {formatNumber(nexPoint)}
+                      {formatNumber(balances.nexPoint)}
                     </div>
                     <div className="mt-5 text-3xl font-black tracking-[-0.06em] sm:text-5xl">
-                      {formatNumber(nexPoint)}
+                      {formatNumber(balances.nexPoint)}
                     </div>
                     <div className="mt-1 text-xs font-bold text-black/38">
                       Available NEX
@@ -173,10 +218,10 @@ export default function RewardsShowcaseClient({
                   <div className="text-right">
                     <div className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-2 text-xs font-black text-white sm:px-4">
                       <Coins className="h-3.5 w-3.5 text-white" />
-                      {formatNumber(coin)}
+                      {formatNumber(balances.coin)}
                     </div>
                     <div className="mt-5 text-3xl font-black tracking-[-0.06em] sm:text-5xl">
-                      {formatNumber(coin)}
+                      {formatNumber(balances.coin)}
                     </div>
                     <div className="mt-1 text-xs font-bold text-black/38">
                       Available COIN
@@ -291,8 +336,8 @@ export default function RewardsShowcaseClient({
                         rewardId={reward.id}
                         rewardName={reward.name}
                         stock={reward.stock}
-                        userNexPoint={nexPoint}
-                        userCoin={coin}
+                        userNexPoint={balances.nexPoint}
+                        userCoin={balances.coin}
                         nexCost={reward.nexCost}
                         coinCost={reward.coinCost}
                       />

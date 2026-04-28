@@ -11,7 +11,7 @@ export default function GlobalActivityBar() {
   const [visible, setVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const activeCountRef = useRef(0);
-  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const progressTimer = window.setInterval(() => {

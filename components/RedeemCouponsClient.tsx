@@ -12,8 +12,36 @@ import {
   Ticket,
   X,
 } from "lucide-react";
+import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
 import { formatThaiDateTime } from "@/lib/thai-time";
+import { trackUiFetch } from "@/lib/ui-activity";
 import CouponDetailCard, { type CouponViewModel } from "./CouponDetailCard";
+
+type RedeemCouponsCache = {
+  coupons: CouponViewModel[];
+  openCode: string;
+};
+
+function mergeCoupons(
+  coupons: CouponViewModel[],
+  fallbackCoupons: CouponViewModel[]
+) {
+  const map = new Map<string, CouponViewModel>();
+
+  for (const coupon of [...coupons, ...fallbackCoupons]) {
+    const key = String(coupon.code || coupon.id);
+    if (!key || map.has(key)) continue;
+    map.set(key, coupon);
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
@@ -28,12 +56,23 @@ export default function RedeemCouponsClient({
   initialCoupons: CouponViewModel[];
   initialOpenCode?: string;
 }) {
-  const [coupons, setCoupons] = useState(initialCoupons);
-  const [selectedCode, setSelectedCode] = useState(initialOpenCode || "");
+  const cachedRedeemState = useMemo(
+    () =>
+      readClientViewCache<RedeemCouponsCache>("redeem-coupons", {
+        maxAgeMs: 180000,
+      }),
+    []
+  );
+  const [coupons, setCoupons] = useState(() =>
+    mergeCoupons(initialCoupons, cachedRedeemState?.data?.coupons || [])
+  );
+  const [selectedCode, setSelectedCode] = useState(
+    initialOpenCode || cachedRedeemState?.data?.openCode || ""
+  );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setCoupons(initialCoupons);
+    setCoupons((prev) => mergeCoupons(initialCoupons, prev));
   }, [initialCoupons]);
 
   useEffect(() => {
@@ -41,6 +80,13 @@ export default function RedeemCouponsClient({
       setSelectedCode(initialOpenCode);
     }
   }, [initialOpenCode]);
+
+  useEffect(() => {
+    writeClientViewCache("redeem-coupons", {
+      coupons,
+      openCode: selectedCode,
+    } satisfies RedeemCouponsCache);
+  }, [coupons, selectedCode]);
 
   useEffect(() => {
     let disposed = false;
@@ -51,7 +97,7 @@ export default function RedeemCouponsClient({
 
       try {
         setLoading(true);
-        const res = await fetch(`/api/coupon/list?ts=${Date.now()}`, {
+        const res = await trackUiFetch(`/api/coupon/list?ts=${Date.now()}`, {
           cache: "no-store",
         });
 

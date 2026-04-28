@@ -56,6 +56,10 @@ export default function MainLayout({
   const [avatarReady, setAvatarReady] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [walletUnreadCount, setWalletUnreadCount] = useState(0);
+  const [liveBalances, setLiveBalances] = useState({
+    nexPoint: Number(session?.user?.nexPoint || 0),
+    coin: Number(session?.user?.coin || 0),
+  });
 
   const stableAvatarRef = useRef("/avatar.png");
   const profileVersionRef = useRef("");
@@ -74,6 +78,47 @@ export default function MainLayout({
 
     setAvatarReady(true);
   }
+
+  useEffect(() => {
+    setLiveBalances({
+      nexPoint: Number(session?.user?.nexPoint || 0),
+      coin: Number(session?.user?.coin || 0),
+    });
+  }, [session?.user?.coin, session?.user?.nexPoint]);
+
+  useEffect(() => {
+    const handleBalanceUpdate = (
+      event: Event
+    ) => {
+      const detail = (event as CustomEvent<{
+        nexPoint?: number;
+        coin?: number;
+      }>).detail;
+
+      if (!detail) {
+        return;
+      }
+
+      setLiveBalances((current) => ({
+        nexPoint: Number(
+          detail.nexPoint != null ? detail.nexPoint : current.nexPoint
+        ),
+        coin: Number(detail.coin != null ? detail.coin : current.coin),
+      }));
+    };
+
+    window.addEventListener(
+      "nexora:balance-updated",
+      handleBalanceUpdate as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "nexora:balance-updated",
+        handleBalanceUpdate as EventListener
+      );
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -628,7 +673,7 @@ export default function MainLayout({
                         <Gem className="h-3 w-3" />
                       </div>
                       <div className="min-w-0 truncate text-[12px] font-black leading-none text-white">
-                        {formatBalance(session?.user?.nexPoint)}
+                        {formatBalance(liveBalances.nexPoint)}
                         <span className="ml-1 text-[8px] font-bold uppercase tracking-[0.14em] text-white/62">
                           NEX
                         </span>
@@ -641,7 +686,7 @@ export default function MainLayout({
                           <Coins className="h-3 w-3" />
                         </div>
                         <div className="min-w-0 truncate text-[12px] font-black leading-none text-white">
-                          {formatBalance(session?.user?.coin)}
+                          {formatBalance(liveBalances.coin)}
                           <span className="ml-1 text-[8px] font-bold uppercase tracking-[0.14em] text-white/62">
                             COIN
                           </span>
@@ -657,7 +702,7 @@ export default function MainLayout({
                       </div>
                       <div className="min-w-0">
                         <div className="truncate text-[14px] font-black leading-none text-white sm:text-[16px]">
-                          {formatBalance(session?.user?.nexPoint)}
+                          {formatBalance(liveBalances.nexPoint)}
                         </div>
                         <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/58 sm:text-[10px]">
                           NEX
@@ -671,7 +716,7 @@ export default function MainLayout({
                       </div>
                       <div className="min-w-0">
                         <div className="truncate text-[14px] font-black leading-none text-white sm:text-[16px]">
-                          {formatBalance(session?.user?.coin)}
+                          {formatBalance(liveBalances.coin)}
                         </div>
                         <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/58 sm:text-[10px]">
                           COIN
@@ -871,11 +916,11 @@ export default function MainLayout({
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#121418] px-3 py-1.5 text-xs font-black text-white">
                     <Gem className="h-3.5 w-3.5 text-white/80" />
-                    {formatBalance(session?.user?.nexPoint)} NEX
+                    {formatBalance(liveBalances.nexPoint)} NEX
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#121418] px-3 py-1.5 text-xs font-black text-white">
                     <Coins className="h-3.5 w-3.5 text-white/80" />
-                    {formatBalance(session?.user?.coin)} COIN
+                    {formatBalance(liveBalances.coin)} COIN
                   </div>
                 </div>
               </div>

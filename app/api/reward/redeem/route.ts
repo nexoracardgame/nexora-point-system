@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { buildCouponCode, serializeCouponRecord } from "@/lib/coupon-utils";
 import { prisma } from "@/lib/prisma";
-import { buildCouponCode } from "@/lib/coupon-utils";
 import { createLocalNotification } from "@/lib/local-notification-store";
 
 export async function POST(req: Request) {
@@ -121,14 +121,37 @@ export async function POST(req: Request) {
         },
       });
 
-      return coupon;
+      return {
+        coupon,
+        balances: {
+          nexPoint:
+            currency === "NEX"
+              ? Math.max(0, Number(user.nexPoint || 0) - amount)
+              : Number(user.nexPoint || 0),
+          coin:
+            currency === "COIN"
+              ? Math.max(0, Number(user.coin || 0) - amount)
+              : Number(user.coin || 0),
+        },
+        rewardStock: Math.max(0, Number(reward.stock || 0) - 1),
+      };
     });
 
     const coupon = await prisma.coupon.findUnique({
-      where: { id: redeemed.id },
+      where: { id: redeemed.coupon.id },
       include: {
+        user: {
+          select: {
+            id: true,
+            lineId: true,
+            name: true,
+            displayName: true,
+            image: true,
+          },
+        },
         reward: {
           select: {
+            id: true,
             name: true,
             imageUrl: true,
             nexCost: true,
@@ -145,11 +168,11 @@ export async function POST(req: Request) {
       body: coupon?.reward?.name
         ? `ได้รับคูปอง ${coupon.reward.name}`
         : "คูปองใหม่ถูกสร้างใน Redeem แล้ว",
-      href: `/redeem?open=${encodeURIComponent(redeemed.code)}`,
+      href: `/redeem?open=${encodeURIComponent(redeemed.coupon.code)}`,
       image: coupon?.reward?.imageUrl || "/avatar.png",
       meta: {
         source: "reward-redeem",
-        couponCode: redeemed.code,
+        couponCode: redeemed.coupon.code,
         rewardName: coupon?.reward?.name || null,
         currency,
       },
@@ -158,9 +181,12 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: "แลกรางวัลสำเร็จ",
-      couponId: redeemed.id,
-      couponCode: redeemed.code,
-      couponUrl: `/redeem?open=${encodeURIComponent(redeemed.code)}`,
+      couponId: redeemed.coupon.id,
+      couponCode: redeemed.coupon.code,
+      couponUrl: `/redeem?open=${encodeURIComponent(redeemed.coupon.code)}`,
+      coupon: coupon ? serializeCouponRecord(coupon) : null,
+      balances: redeemed.balances,
+      rewardStock: redeemed.rewardStock,
     });
   } catch (error) {
     const message =

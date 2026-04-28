@@ -1,9 +1,32 @@
 "use client";
 
 import { AlertTriangle, Coins, Gem, Sparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { CouponViewModel } from "@/components/CouponDetailCard";
+import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
+import { trackUiFetch } from "@/lib/ui-activity";
 
 type Currency = "NEX" | "COIN";
+type RedeemCouponsCache = {
+  coupons: CouponViewModel[];
+  openCode: string;
+};
+
+function mergeCoupons(
+  coupons: CouponViewModel[],
+  nextCoupon: CouponViewModel
+) {
+  return [
+    nextCoupon,
+    ...coupons.filter(
+      (coupon) => coupon.id !== nextCoupon.id && coupon.code !== nextCoupon.code
+    ),
+  ];
+}
 
 export default function RewardRedeemButtons({
   rewardId,
@@ -22,9 +45,14 @@ export default function RewardRedeemButtons({
   nexCost?: number | null;
   coinCost?: number | null;
 }) {
+  const router = useRouter();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [confirmCurrency, setConfirmCurrency] = useState<Currency | null>(null);
+
+  useEffect(() => {
+    router.prefetch("/redeem");
+  }, [router]);
 
   const canRedeemWithNex =
     nexCost != null && stock > 0 && userNexPoint >= Number(nexCost);
@@ -60,12 +88,14 @@ export default function RewardRedeemButtons({
   }, [coinCost, confirmCurrency, nexCost]);
 
   const handleRedeem = async (currency: Currency) => {
+    let keepDialogOpen = false;
+
     try {
       const key = `${rewardId}-${currency}`;
       setLoadingKey(key);
       setError("");
 
-      const res = await fetch("/api/reward/redeem", {
+      const res = await trackUiFetch("/api/reward/redeem", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,14 +113,43 @@ export default function RewardRedeemButtons({
         return;
       }
 
+      if (data?.coupon) {
+        const cached = readClientViewCache<RedeemCouponsCache>("redeem-coupons", {
+          maxAgeMs: 180000,
+        });
+
+        writeClientViewCache("redeem-coupons", {
+          coupons: mergeCoupons(
+            cached?.data?.coupons || [],
+            data.coupon as CouponViewModel
+          ),
+          openCode: String(
+            (data.coupon as CouponViewModel | undefined)?.code || ""
+          ),
+        } satisfies RedeemCouponsCache);
+      }
+
+      if (data?.balances) {
+        window.dispatchEvent(
+          new CustomEvent("nexora:balance-updated", {
+            detail: data.balances,
+          })
+        );
+      }
+
       if (data?.couponUrl) {
-        window.location.href = String(data.couponUrl);
+        keepDialogOpen = true;
+        router.prefetch(String(data.couponUrl));
+        router.push(String(data.couponUrl));
+        return;
       }
     } catch {
       setError("เกิดข้อผิดพลาดระหว่างแลกรางวัล");
     } finally {
-      setLoadingKey(null);
-      setConfirmCurrency(null);
+      if (!keepDialogOpen) {
+        setLoadingKey(null);
+        setConfirmCurrency(null);
+      }
     }
   };
 
