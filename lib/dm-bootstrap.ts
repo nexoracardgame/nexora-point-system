@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type ChatUser,
 } from "@/lib/chat-room-types";
+import { getDmRoomClearedAtForUser } from "@/lib/dm-room-clear-state";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { resolveUserIdentity, type SessionIdentityUser } from "@/lib/user-identity";
 
@@ -64,6 +65,7 @@ export async function getDirectChatBootstrap(input: {
   }
 
   const meIdentity = await resolveUserIdentity(input.sessionUser);
+  const clearedAt = await getDmRoomClearedAtForUser(userId, access.roomId);
   const otherProfile = access.otherUserId
     ? await getLocalProfileByUserId(access.otherUserId)
     : null;
@@ -84,6 +86,7 @@ export async function getDirectChatBootstrap(input: {
     roomId: access.roomId,
     limit: input.limit || CHAT_HISTORY_PAGE_SIZE,
     before: input.before,
+    after: clearedAt,
   });
 
   return {

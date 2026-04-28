@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleRoomIds } from "@/lib/dm-access";
+import {
+  getDmRoomClearedAtMap,
+  isRoomActivityVisibleAfterClear,
+} from "@/lib/dm-room-clear-state";
 import { listIncomingFriendRequests } from "@/lib/friend-store";
 import { getLocalNotificationsForUser } from "@/lib/local-notification-store";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
@@ -111,14 +115,12 @@ export async function GET() {
       );
     }
 
+    const directRoomIds = allowedRoomIds.filter((roomId) => !roomId.startsWith("deal:"));
     const [roomResult, unreadResult, acceptedDeals] = await Promise.all([
       supabase
         .from("dm_room")
         .select("roomid,usera,userb,useraname,useraimage,userbname,userbimage")
-        .in(
-          "roomid",
-          allowedRoomIds.filter((roomId) => !roomId.startsWith("deal:"))
-        ),
+        .in("roomid", directRoomIds),
       supabase
         .from("dmMessage")
         .select("id,roomId,senderId,senderName,senderImage,content,imageUrl,createdAt")
@@ -153,6 +155,10 @@ export async function GET() {
         },
       }),
     ]);
+    const directRoomClearAtByRoomId = await getDmRoomClearedAtMap(
+      currentUserId,
+      directRoomIds
+    );
 
     if (roomResult.error) {
       console.error("NOTIFICATION ROOM ERROR:", roomResult.error);
@@ -163,7 +169,17 @@ export async function GET() {
     }
 
     const roomById = new Map((roomResult.data || []).map((room) => [room.roomid, room]));
-    const relevantUnreadRows = unreadResult.data || [];
+    const relevantUnreadRows = (unreadResult.data || []).filter((row) => {
+      const roomId = String(row.roomId || "").trim();
+      if (!roomId || roomId.startsWith("deal:")) {
+        return true;
+      }
+
+      return isRoomActivityVisibleAfterClear(
+        String(row.createdAt || "").trim(),
+        directRoomClearAtByRoomId.get(roomId) || null
+      );
+    });
 
     const unreadSenderIds = Array.from(
       new Set(

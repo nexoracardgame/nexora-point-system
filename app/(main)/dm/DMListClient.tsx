@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
+import {
+  clearChatHistoryCache,
+  readChatHistoryCache,
+  writeChatHistoryCache,
+} from "@/lib/chat-history-cache";
 import { prefetchDealChatRoom, prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
 import {
   readClientViewCache,
@@ -24,6 +30,20 @@ type SessionUser = {
 type DmListCache = {
   rooms: DMRoomListItem[];
   me: SessionUser | null;
+};
+
+type DmRoomFastCacheMeta = {
+  me?: {
+    id: string;
+    name: string;
+    image: string;
+  } | null;
+  other?: {
+    id: string;
+    name: string;
+    image: string;
+  } | null;
+  [key: string]: unknown;
 };
 
 function formatDealPriceLabel(value?: number) {
@@ -116,6 +136,7 @@ export default function DMListClient({
     initialRooms.length === 0 && !(cachedList?.data?.rooms?.length)
   );
   const [openingRoomId, setOpeningRoomId] = useState<string | null>(null);
+  const [clearingRoomId, setClearingRoomId] = useState<string | null>(null);
 
   const hasInit = useRef(false);
 
@@ -130,13 +151,43 @@ export default function DMListClient({
     return buildDirectRoomId(myUserId, otherUserId) || room.roomId;
   }, [currentMe?.id]);
 
+  const primeDirectRoomCache = useCallback((roomId: string, room: DMRoomListItem) => {
+    const safeRoomId = String(roomId || "").trim();
+    if (!safeRoomId) return;
+
+    const existing = readChatHistoryCache<unknown, DmRoomFastCacheMeta>(
+      "dm-room",
+      safeRoomId
+    );
+    writeChatHistoryCache("dm-room", safeRoomId, {
+      messages: Array.isArray(existing?.messages) ? existing.messages : [],
+      meta: {
+        ...(existing?.meta || {}),
+        me: currentMe
+          ? {
+              id: String(currentMe.id || "").trim(),
+              name: String(currentMe.name || "").trim() || "You",
+              image: String(currentMe.image || "").trim() || "/avatar.png",
+            }
+          : existing?.meta?.me || null,
+        other: {
+          id: String(room.otherUserId || "").trim(),
+          name: String(room.otherName || "").trim() || "User",
+          image: String(room.otherImage || "").trim() || "/avatar.png",
+        },
+      },
+      cachedAt: Date.now(),
+    });
+  }, [currentMe]);
+
   const seedDirectRoom = useCallback((roomId: string, room: DMRoomListItem) => {
     saveDmRoomSeed(roomId, {
       name: room.otherName,
       image: room.otherImage,
       otherUserId: room.otherUserId,
     });
-  }, []);
+    primeDirectRoomCache(roomId, room);
+  }, [primeDirectRoomCache]);
 
   const warmDealRoom = useCallback((dealId?: string) => {
     const safeDealId = String(dealId || "").trim();
@@ -154,6 +205,16 @@ export default function DMListClient({
     () => rooms.filter((room) => room.kind === "deal" && room.dealId),
     [rooms]
   );
+
+  useEffect(() => {
+    directRooms.forEach((room) => {
+      seedDirectRoom(room.roomId, room);
+      const targetRoomId = getTargetDirectRoomId(room);
+      if (targetRoomId && targetRoomId !== room.roomId) {
+        seedDirectRoom(targetRoomId, room);
+      }
+    });
+  }, [directRooms, getTargetDirectRoomId, seedDirectRoom]);
 
   const hydrateUnknownRooms = async (baseRooms: DMRoomListItem[]) => {
     const unknownRooms = baseRooms.filter(
@@ -253,6 +314,7 @@ export default function DMListClient({
 
   const warmDirectRoom = useCallback((room: DMRoomListItem) => {
     const targetRoomId = getTargetDirectRoomId(room);
+    seedDirectRoom(room.roomId, room);
     seedDirectRoom(targetRoomId, room);
     router.prefetch(buildDirectRoomHref(targetRoomId));
 
@@ -311,6 +373,40 @@ export default function DMListClient({
         setOpeningRoomId((current) => (current === targetRoomId ? null : current));
       }
     })();
+  };
+
+  const clearDirectRoom = async (room: DMRoomListItem) => {
+    const safeRoomId = String(room.roomId || "").trim();
+    const targetRoomId = getTargetDirectRoomId(room);
+
+    if (!safeRoomId || clearingRoomId) {
+      return;
+    }
+
+    const previousRooms = rooms;
+    setClearingRoomId(safeRoomId);
+    setRooms((prev) => prev.filter((item) => item.roomId !== safeRoomId));
+    clearChatHistoryCache("dm-room", safeRoomId);
+    if (targetRoomId && targetRoomId !== safeRoomId) {
+      clearChatHistoryCache("dm-room", targetRoomId);
+    }
+
+    const res = await fetch("/api/dm/clear", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roomId: safeRoomId,
+      }),
+    }).catch(() => null);
+
+    if (!res?.ok) {
+      setRooms(previousRooms);
+      alert("ลบแชทไม่สำเร็จ กรุณาลองใหม่");
+    }
+
+    setClearingRoomId((current) => (current === safeRoomId ? null : current));
   };
 
   useEffect(() => {
@@ -481,51 +577,69 @@ export default function DMListClient({
                   </div>
                 ) : (
                   directRooms.map((room) => (
-                    <Link
+                    <div
                       key={room.roomId}
-                      href={buildDirectRoomHref(getTargetDirectRoomId(room))}
-                      prefetch
-                      onMouseEnter={() => warmDirectRoom(room)}
-                      onTouchStart={() => warmDirectRoom(room)}
-                      onFocus={() => warmDirectRoom(room)}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        markRoomReadLocally(room.roomId);
-                        void openDirectRoom(room);
-                      }}
-                      className="group flex items-center gap-3 rounded-[30px] bg-[#f4f3f8] p-3 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
+                      className="group flex items-center gap-2 rounded-[30px] bg-[#f4f3f8] p-3 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
                     >
-                      <div className="relative">
-                        <img
-                          src={room.otherImage}
-                          alt={room.otherName}
-                          className="h-[56px] w-[56px] rounded-full object-cover ring-4 ring-white"
-                        />
-                        {room.unread > 0 ? (
-                          <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
-                            {room.unread > 99 ? "99+" : room.unread}
-                          </div>
-                        ) : null}
-                      </div>
+                      <button
+                        type="button"
+                        onMouseEnter={() => warmDirectRoom(room)}
+                        onTouchStart={() => warmDirectRoom(room)}
+                        onFocus={() => warmDirectRoom(room)}
+                        onClick={() => {
+                          markRoomReadLocally(room.roomId);
+                          void openDirectRoom(room);
+                        }}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <div className="relative">
+                          <img
+                            src={room.otherImage}
+                            alt={room.otherName}
+                            className="h-[56px] w-[56px] rounded-full object-cover ring-4 ring-white"
+                          />
+                          {room.unread > 0 ? (
+                            <div className="absolute -right-1 -top-1 min-w-[22px] rounded-full bg-[#ff4b55] px-1.5 py-0.5 text-center text-[10px] font-black text-white shadow-[0_10px_20px_rgba(255,75,85,0.28)]">
+                              {room.unread > 99 ? "99+" : room.unread}
+                            </div>
+                          ) : null}
+                        </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="truncate text-base font-black text-black">{room.otherName}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="truncate text-base font-black text-black">
+                              {room.otherName}
+                            </div>
                             <div className="shrink-0 text-[11px] font-bold text-black/35">
-                            {room.lastMessageAt
-                              ? formatThaiChatActivityTime(room.lastMessageAt)
-                              : ""}
+                              {room.lastMessageAt
+                                ? formatThaiChatActivityTime(room.lastMessageAt)
+                                : ""}
+                            </div>
+                          </div>
+                          <div
+                            className={`mt-1 truncate text-sm ${
+                              room.unread > 0 ? "font-semibold text-black/80" : "text-black/45"
+                            }`}
+                          >
+                            {room.lastMessage || "เริ่มบทสนทนา"}
                           </div>
                         </div>
-                        <div
-                          className={`mt-1 truncate text-sm ${
-                            room.unread > 0 ? "font-semibold text-black/80" : "text-black/45"
-                          }`}
-                        >
-                          {room.lastMessage || "เริ่มบทสนทนา"}
-                        </div>
-                      </div>
-                    </Link>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void clearDirectRoom(room);
+                        }}
+                        disabled={clearingRoomId === room.roomId}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-red-300/25 bg-red-500/10 text-red-500 shadow-[0_10px_24px_rgba(239,68,68,0.12)] transition hover:bg-red-500/16 hover:text-red-600 disabled:cursor-wait disabled:opacity-60"
+                        aria-label={`ลบแชทกับ ${room.otherName}`}
+                        title={`ลบแชทกับ ${room.otherName}`}
+                      >
+                        <Trash2 className="h-[18px] w-[18px]" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>

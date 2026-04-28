@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getChatMessagesPage } from "@/lib/chat-room-server";
 import { getDmRoomAccess } from "@/lib/dm-access";
+import { getDmRoomClearedAtForUser } from "@/lib/dm-room-clear-state";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,10 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getServerSupabaseClient();
+  const clearedAt =
+    access.kind === "direct"
+      ? await getDmRoomClearedAtForUser(userId, access.roomId)
+      : null;
 
   if (!supabase) {
     return NextResponse.json({ error: "system unavailable" }, { status: 500 });
@@ -59,6 +64,7 @@ export async function GET(req: NextRequest) {
         roomId: access.roomId,
         before,
         limit: limit || undefined,
+        after: clearedAt,
         supabase,
       });
 
@@ -77,6 +83,7 @@ export async function GET(req: NextRequest) {
     .from("dmMessage")
     .select("*")
     .eq("roomId", access.roomId)
+    .gt("createdAt", clearedAt || "1970-01-01T00:00:00.000Z")
     .order("createdAt", { ascending: true });
 
   if (error) {

@@ -1,5 +1,9 @@
 import { getDealChatRoomId } from "@/lib/deal-chat";
 import { resolveCardDisplayImage } from "@/lib/card-image";
+import {
+  getDmRoomClearedAtMap,
+  isRoomActivityVisibleAfterClear,
+} from "@/lib/dm-room-clear-state";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
@@ -135,6 +139,7 @@ export async function getDmRoomsForUser(
   const directRoomIds = dedupedRooms.map((room) => String(room.roomid));
   const dealRoomIds = deals.map((deal) => getDealChatRoomId(deal.id));
   const roomIds = Array.from(new Set([...directRoomIds, ...dealRoomIds]));
+  const directRoomClearAtByRoomId = await getDmRoomClearedAtMap(myId, directRoomIds);
 
   if (roomIds.length === 0) {
     return [];
@@ -151,7 +156,7 @@ export async function getDmRoomsForUser(
         .order("createdAt", { ascending: false }),
       supabase
         .from("dmMessage")
-        .select("roomId,senderId,seenAt")
+        .select("roomId,senderId,seenAt,createdAt")
         .in("roomId", roomIds)
         .neq("senderId", myId)
         .neq("senderId", myLineId || "__never__")
@@ -175,6 +180,15 @@ export async function getDmRoomsForUser(
   for (const message of messages || []) {
     const roomId = String(message.roomId || "");
     if (!roomId || latestMessageByRoom.has(roomId)) continue;
+    if (
+      directRoomClearAtByRoomId.has(roomId) &&
+      !isRoomActivityVisibleAfterClear(
+        String(message.createdAt || "").trim(),
+        directRoomClearAtByRoomId.get(roomId) || null
+      )
+    ) {
+      continue;
+    }
     latestMessageByRoom.set(roomId, message);
   }
 
@@ -182,6 +196,15 @@ export async function getDmRoomsForUser(
   for (const row of unreadRows || []) {
     const roomId = String(row.roomId || "");
     if (!roomId) continue;
+    if (
+      directRoomClearAtByRoomId.has(roomId) &&
+      !isRoomActivityVisibleAfterClear(
+        String(row.createdAt || "").trim(),
+        directRoomClearAtByRoomId.get(roomId) || null
+      )
+    ) {
+      continue;
+    }
     unreadCountByRoom.set(roomId, (unreadCountByRoom.get(roomId) || 0) + 1);
   }
 
@@ -265,6 +288,13 @@ export async function getDmRoomsForUser(
         safeImage(latestMessage?.senderImage),
       unread: unreadCountByRoom.get(roomId) || 0,
     };
+  }).filter((item) => {
+    const clearedAt = directRoomClearAtByRoomId.get(item.roomId) || null;
+    if (!clearedAt) {
+      return true;
+    }
+
+    return isRoomActivityVisibleAfterClear(item.lastMessageAt, clearedAt);
   });
 
   const directByOther = new Map<

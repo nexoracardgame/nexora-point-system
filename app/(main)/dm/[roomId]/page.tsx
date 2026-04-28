@@ -259,7 +259,16 @@ function DMRoomContent({
     setLoadingRoom(false);
     setHasMore(Boolean(data.hasMore));
     setNextCursor(String(data.nextCursor || "").trim() || null);
-    setMessages((prev) => mergeChatMessages(prev, nextMessages, data.roomId, nextMe, nextOther));
+    setMessages((prev) => {
+      const optimisticMessages = prev.filter((message) => message.optimistic);
+      return mergeChatMessages(
+        nextMessages,
+        optimisticMessages,
+        data.roomId,
+        nextMe,
+        nextOther
+      );
+    });
     void markLoadedRoomSeen(data.roomId, nextMessages, nextMe);
   });
 
@@ -857,21 +866,27 @@ function DMRoomContent({
             >
               {loadingRoom ? (
                 <div className="h-11 w-11 animate-pulse rounded-full bg-white/10" />
-              ) : (
+              ) : other?.image ? (
                 <img
-                  src={other?.image || "/avatar.png"}
-                  alt={other?.name || "profile"}
+                  src={other.image}
+                  alt={other.name || "profile"}
                   className="h-11 w-11 rounded-full border border-white/15 object-cover"
                   onError={(event) => {
                     event.currentTarget.src = "/avatar.png";
                   }}
                 />
+              ) : (
+                <div className="h-11 w-11 animate-pulse rounded-full bg-white/10" />
               )}
 
               <div className="min-w-0">
-                <div className="truncate text-[15px] font-bold sm:text-base">
-                  {other?.name || "User"}
-                </div>
+                {other?.name ? (
+                  <div className="truncate text-[15px] font-bold sm:text-base">
+                    {other.name}
+                  </div>
+                ) : (
+                  <div className="h-4 w-28 animate-pulse rounded-full bg-white/10 sm:h-5 sm:w-36" />
+                )}
 
                 <div className="flex items-center gap-2 text-xs text-white/45">
                   <span className="h-2 w-2 rounded-full bg-green-400" />
@@ -898,7 +913,23 @@ function DMRoomContent({
 
             {messages.map((message) => {
               const mine = message.senderId === me?.id;
-              const sender = message.sender;
+              const sender = mine
+                ? buildChatSender(
+                    String(message.senderId || "").trim(),
+                    {
+                      senderName: message.senderName,
+                      senderImage: message.senderImage,
+                    },
+                    me,
+                    other
+                  )
+                : {
+                    id: String(other?.id || message.senderId || "").trim(),
+                    name:
+                      String(other?.name || message.senderName || "").trim() || null,
+                    image:
+                      String(other?.image || message.senderImage || "").trim() || null,
+                  };
 
               return (
                 <div
@@ -909,12 +940,12 @@ function DMRoomContent({
                 >
                   <div className="flex max-w-[94%] items-end gap-2 sm:max-w-[78%]">
                     {!mine &&
-                      (loadingRoom ? (
+                      (!sender.image && !message.senderImage ? (
                         <div className="h-8 w-8 animate-pulse rounded-full bg-white/10" />
                       ) : (
                         <img
-                          src={sender?.image || "/avatar.png"}
-                          alt={sender?.name || "User"}
+                          src={sender.image || "/avatar.png"}
+                          alt={sender.name || "profile"}
                           className="h-8 w-8 shrink-0 rounded-full border border-white/10 object-cover"
                           onError={(event) => {
                             event.currentTarget.src = "/avatar.png";
@@ -923,14 +954,14 @@ function DMRoomContent({
                       ))}
 
                     <div className={`${mine ? "items-end" : "items-start"} flex flex-col`}>
-                      {!mine && (
+                      {!mine && sender.name ? (
                         <button
                           onClick={openOtherProfile}
                           className="mb-1 text-left text-[11px] text-white/40 transition hover:text-white/70"
                         >
-                          {sender?.name || "User"}
+                          {sender.name}
                         </button>
-                      )}
+                      ) : null}
 
                       <div
                         className="group/message relative"

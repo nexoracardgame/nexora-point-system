@@ -48,3 +48,13 @@ export function writeChatHistoryCache<TMessage, TMeta = Record<string, unknown>>
     return;
   }
 }
+
+export function clearChatHistoryCache(scope: string, id: string) {
+  if (typeof window === "undefined" || !scope || !id) return;
+
+  try {
+    window.sessionStorage.removeItem(buildKey(scope, id));
+  } catch {
+    return;
+  }
+}

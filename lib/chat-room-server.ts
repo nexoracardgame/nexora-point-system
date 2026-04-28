@@ -12,11 +12,13 @@ export async function getChatMessagesPage(input: {
   roomId: string;
   limit?: number;
   before?: string | null;
+  after?: string | null;
   supabase?: SupabaseClient | null;
 }): Promise<ChatHistoryPage> {
   const roomId = String(input.roomId || "").trim();
   const limit = Math.max(1, Math.min(200, Number(input.limit || CHAT_HISTORY_PAGE_SIZE)));
   const before = String(input.before || "").trim() || null;
+  const after = String(input.after || "").trim() || null;
   const supabase = input.supabase ?? getServerSupabaseClient();
 
   if (!roomId || !supabase) {
@@ -36,6 +38,10 @@ export async function getChatMessagesPage(input: {
 
   if (before) {
     query = query.lt("createdAt", before);
+  }
+
+  if (after) {
+    query = query.gt("createdAt", after);
   }
 
   const { data, error } = await query;

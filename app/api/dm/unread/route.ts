@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleRoomIds } from "@/lib/dm-access";
+import {
+  getDmRoomClearedAtMap,
+  isRoomActivityVisibleAfterClear,
+} from "@/lib/dm-room-clear-state";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET() {
@@ -25,9 +29,15 @@ export async function GET() {
     return NextResponse.json({ count: 0 });
   }
 
-  const { count, error: unreadErr } = await supabase
+  const directRoomIds = myRoomIds.filter((roomId) => !roomId.startsWith("deal:"));
+  const directRoomClearAtByRoomId = await getDmRoomClearedAtMap(
+    String(userId),
+    directRoomIds
+  );
+
+  const { data, error: unreadErr } = await supabase
     .from("dmMessage")
-    .select("*", { count: "exact", head: true })
+    .select("roomId,createdAt")
     .in("roomId", myRoomIds)
     .neq("senderId", userId)
     .neq("senderId", lineId || "__never__")
@@ -38,5 +48,17 @@ export async function GET() {
     return NextResponse.json({ count: 0 }, { status: 500 });
   }
 
-  return NextResponse.json({ count: count || 0 });
+  const count = (data || []).filter((row) => {
+    const roomId = String(row.roomId || "").trim();
+    if (!roomId || roomId.startsWith("deal:")) {
+      return true;
+    }
+
+    return isRoomActivityVisibleAfterClear(
+      String(row.createdAt || "").trim(),
+      directRoomClearAtByRoomId.get(roomId) || null
+    );
+  }).length;
+
+  return NextResponse.json({ count });
 }
