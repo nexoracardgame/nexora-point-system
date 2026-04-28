@@ -15,6 +15,9 @@ import {
 } from "@/lib/friend-store";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 function getSessionIds(session: Awaited<ReturnType<typeof getServerSession>>) {
   const sessionUser = (session as { user?: { id?: string; lineId?: string } } | null)?.user;
   const userId = String(sessionUser?.id || "").trim();
@@ -38,7 +41,7 @@ export async function GET() {
   }
 
   const [friends, requests] = await Promise.all([
-    listFriendsForUser(userId),
+    listFriendsForUser(userId, lineId ? [lineId] : []),
     listIncomingFriendRequests(userId, lineId ? [lineId] : []),
   ]);
 

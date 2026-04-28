@@ -12,6 +12,10 @@ import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
+  readClientViewCache,
+  writeClientViewCache,
+} from "@/lib/client-view-cache";
+import {
   Gem,
   Coins,
   Wallet,
@@ -517,14 +521,47 @@ export default function MainLayout({
       "/rewards",
       "/redeem",
       "/collections",
+      "/community",
       "/wallet",
       "/dm",
       ownProfileHref,
       "/settings/profile",
     ];
 
+    const warmCommunityFriends = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const res = await fetch("/api/community/friends", {
+          cache: "no-store",
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json().catch(() => ({}));
+        const cached = readClientViewCache<{
+          friends?: unknown[];
+          requests?: unknown[];
+          results?: unknown[];
+          friendsLoadedAt?: number;
+          resultsLoadedAt?: number;
+        }>("community-hub", { maxAgeMs: 180000 })?.data;
+
+        writeClientViewCache("community-hub", {
+          friends: Array.isArray(data?.friends) ? data.friends : [],
+          requests: Array.isArray(data?.requests) ? data.requests : [],
+          results: Array.isArray(cached?.results) ? cached.results : [],
+          friendsLoadedAt: Date.now(),
+          resultsLoadedAt: cached?.resultsLoadedAt,
+        });
+      } catch {
+        return;
+      }
+    };
+
     const warmRoutes = () => {
       importantRoutes.forEach((route) => router.prefetch(route));
+      void warmCommunityFriends();
     };
 
     if (typeof window === "undefined") return;
@@ -539,7 +576,7 @@ export default function MainLayout({
 
     const timeoutId = globalThis.setTimeout(warmRoutes, 250);
     return () => globalThis.clearTimeout(timeoutId);
-  }, [ownProfileHref, router]);
+  }, [ownProfileHref, router, session?.user?.id]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;

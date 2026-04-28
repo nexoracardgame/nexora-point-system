@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, LoaderCircle, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
@@ -44,6 +44,8 @@ type CommunityCache = {
   friends: FriendItem[];
   requests: IncomingRequest[];
   results: SearchUser[];
+  friendsLoadedAt?: number;
+  resultsLoadedAt?: number;
 };
 
 type CommunitySnapshot = {
@@ -68,42 +70,59 @@ export default function CommunityClient({
       }),
     []
   );
+  const cachedFriends = Array.isArray(cachedCommunityState?.data?.friends)
+    ? cachedCommunityState.data.friends
+    : [];
+  const cachedRequests = Array.isArray(cachedCommunityState?.data?.requests)
+    ? cachedCommunityState.data.requests
+    : [];
+  const cachedResults = Array.isArray(cachedCommunityState?.data?.results)
+    ? cachedCommunityState.data.results
+    : [];
+  const cachedHasFriendsSnapshot = Boolean(
+    cachedCommunityState?.data &&
+      (typeof cachedCommunityState.data.friendsLoadedAt === "number" ||
+        cachedFriends.length > 0 ||
+        cachedRequests.length > 0)
+  );
+  const cachedHasResultsSnapshot = Boolean(
+    cachedCommunityState?.data &&
+      (typeof cachedCommunityState.data.resultsLoadedAt === "number" ||
+        cachedResults.length > 0)
+  );
+  const hasReadyFriendsSnapshot =
+    hasInitialCommunityState ||
+    initialFriends.length > 0 ||
+    initialRequests.length > 0 ||
+    cachedHasFriendsSnapshot;
+  const didBootstrapSuggestionsRef = useRef(
+    cachedHasResultsSnapshot || cachedResults.length > 0
+  );
+  const previousQueryRef = useRef("");
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchUser[]>(
-    cachedCommunityState?.data?.results || []
-  );
+  const [results, setResults] = useState<SearchUser[]>(cachedResults);
   const [friends, setFriends] = useState<FriendItem[]>(
-    initialFriends.length > 0
-      ? initialFriends
-      : cachedCommunityState?.data?.friends || []
+    initialFriends.length > 0 ? initialFriends : cachedFriends
   );
   const [requests, setRequests] = useState<IncomingRequest[]>(
-    initialRequests.length > 0
-      ? initialRequests
-      : cachedCommunityState?.data?.requests || []
+    initialRequests.length > 0 ? initialRequests : cachedRequests
   );
   const [loadingResults, setLoadingResults] = useState(false);
-  const [loadingFriends, setLoadingFriends] = useState(
-    !initialFriends.length &&
-      !initialRequests.length &&
-      !cachedCommunityState?.data?.friends?.length &&
-      !cachedCommunityState?.data?.requests?.length
+  const [loadingFriends, setLoadingFriends] = useState(!hasReadyFriendsSnapshot);
+  const [friendsHydrated, setFriendsHydrated] = useState(
+    hasReadyFriendsSnapshot
+  );
+  const [resultsHydrated, setResultsHydrated] = useState(
+    cachedHasResultsSnapshot || cachedResults.length > 0
   );
   const [bootstrappingSuggestions, setBootstrappingSuggestions] = useState(
-    !(cachedCommunityState?.data?.results?.length)
+    !(cachedHasResultsSnapshot || cachedResults.length > 0)
   );
   const [error, setError] = useState("");
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {}
   );
-
-  const hasServerFriends =
-    hasInitialCommunityState ||
-    initialFriends.length > 0 ||
-    initialRequests.length > 0 ||
-    Boolean(cachedCommunityState?.data?.friends?.length) ||
-    Boolean(cachedCommunityState?.data?.requests?.length);
 
   const loadFriends = async (silent = false) => {
     if (!silent) {
@@ -117,6 +136,7 @@ export default function CommunityClient({
       const data = await res.json().catch(() => ({}));
       setFriends(Array.isArray(data?.friends) ? data.friends : []);
       setRequests(Array.isArray(data?.requests) ? data.requests : []);
+      setFriendsHydrated(true);
     } catch {
       return;
     } finally {
@@ -140,6 +160,7 @@ export default function CommunityClient({
       );
       const data = await res.json().catch(() => ({}));
       setResults(Array.isArray(data?.users) ? data.users : []);
+      setResultsHydrated(true);
     } catch {
       return;
     } finally {
@@ -150,22 +171,38 @@ export default function CommunityClient({
   };
 
   useEffect(() => {
-    void loadFriends(hasServerFriends);
+    void loadFriends(hasReadyFriendsSnapshot);
+  }, [hasReadyFriendsSnapshot]);
+
+  useEffect(() => {
+    if (
+      !friendsHydrated ||
+      didBootstrapSuggestionsRef.current ||
+      query.trim()
+    ) {
+      return;
+    }
 
     const bootstrapSuggestions = window.setTimeout(() => {
+      didBootstrapSuggestionsRef.current = true;
       void (async () => {
         await runSearch("", true);
         setBootstrappingSuggestions(false);
       })();
-    }, hasServerFriends ? 120 : 260);
+    }, hasReadyFriendsSnapshot ? 220 : 520);
 
     return () => {
       window.clearTimeout(bootstrapSuggestions);
     };
-  }, [hasServerFriends]);
+  }, [friendsHydrated, hasReadyFriendsSnapshot, query]);
 
   useEffect(() => {
-    if (initialFriends.length > 0 || initialRequests.length > 0 || results.length > 0) {
+    if (
+      initialFriends.length > 0 ||
+      initialRequests.length > 0 ||
+      results.length > 0 ||
+      friendsHydrated
+    ) {
       return;
     }
 
@@ -177,24 +214,40 @@ export default function CommunityClient({
       return;
     }
 
-    if (Array.isArray(cached.data.friends) && cached.data.friends.length > 0) {
+    if (Array.isArray(cached.data.friends)) {
       setFriends(cached.data.friends);
     }
 
-    if (Array.isArray(cached.data.requests) && cached.data.requests.length > 0) {
+    if (Array.isArray(cached.data.requests)) {
       setRequests(cached.data.requests);
     }
 
     if (Array.isArray(cached.data.results) && cached.data.results.length > 0) {
       setResults(cached.data.results);
       setBootstrappingSuggestions(false);
+      setResultsHydrated(true);
+    }
+
+    if (typeof cached.data.friendsLoadedAt === "number") {
+      setFriendsHydrated(true);
     }
 
     setLoadingFriends(false);
-  }, [initialFriends.length, initialRequests.length, results.length]);
+  }, [
+    friendsHydrated,
+    initialFriends.length,
+    initialRequests.length,
+    results.length,
+  ]);
 
   useEffect(() => {
-    if (friends.length === 0 && requests.length === 0 && results.length === 0) {
+    if (
+      !friendsHydrated &&
+      !resultsHydrated &&
+      friends.length === 0 &&
+      requests.length === 0 &&
+      results.length === 0
+    ) {
       return;
     }
 
@@ -202,8 +255,22 @@ export default function CommunityClient({
       friends,
       requests,
       results,
+      friendsLoadedAt: friendsHydrated
+        ? Date.now()
+        : cachedCommunityState?.data?.friendsLoadedAt,
+      resultsLoadedAt: resultsHydrated
+        ? Date.now()
+        : cachedCommunityState?.data?.resultsLoadedAt,
     } satisfies CommunityCache);
-  }, [friends, requests, results]);
+  }, [
+    cachedCommunityState?.data?.friendsLoadedAt,
+    cachedCommunityState?.data?.resultsLoadedAt,
+    friends,
+    friendsHydrated,
+    requests,
+    results,
+    resultsHydrated,
+  ]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -214,7 +281,9 @@ export default function CommunityClient({
 
     const onFocus = () => {
       void loadFriends(true);
-      void runSearch(query, true);
+      if (query.trim() || resultsHydrated) {
+        void runSearch(query, true);
+      }
     };
 
     window.addEventListener("focus", onFocus);
@@ -223,15 +292,33 @@ export default function CommunityClient({
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
     };
-  }, [query]);
+  }, [query, resultsHydrated]);
 
   useEffect(() => {
-    if (query.trim()) {
+    const cleanQuery = query.trim();
+    const previousQuery = previousQueryRef.current.trim();
+    previousQueryRef.current = query;
+
+    if (!cleanQuery) {
+      if (previousQuery) {
+        const debounceId = window.setTimeout(() => {
+          void runSearch("", true);
+        }, 220);
+
+        return () => {
+          window.clearTimeout(debounceId);
+        };
+      }
+
+      return;
+    }
+
+    if (cleanQuery) {
       setBootstrappingSuggestions(false);
     }
 
     const debounceId = window.setTimeout(() => {
-      void runSearch(query, true);
+      void runSearch(cleanQuery, true);
     }, 120);
 
     return () => {

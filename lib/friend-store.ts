@@ -4,7 +4,11 @@ import {
   readLocalStoreJson,
   writeLocalStoreJson,
 } from "@/lib/local-store-dir";
-import { getAllLocalProfiles, getLocalProfileByUserId } from "@/lib/local-profile-store";
+import {
+  getAllLocalProfiles,
+  getLocalProfileByUserId,
+  getLocalProfilesByUserIds,
+} from "@/lib/local-profile-store";
 
 export type FriendRequestStatus = "pending" | "accepted" | "rejected";
 
@@ -26,6 +30,11 @@ export type FriendshipRecord = {
 
 type FriendRequestWithNotify = FriendRequestRecord & {
   shouldNotify?: boolean;
+};
+
+type FriendRelation = {
+  status: "none" | "incoming" | "outgoing" | "friends" | "self";
+  requestId: string | null;
 };
 
 let schemaReadyPromise: Promise<void> | null = null;
@@ -96,6 +105,126 @@ async function readDbFriendships() {
   return rows.map(normalizeDbFriendship);
 }
 
+function uniqueStrings(values: string[]) {
+  return Array.from(
+    new Set(values.map((value) => String(value || "").trim()).filter(Boolean))
+  );
+}
+
+function buildInClause(values: string[], startIndex = 1) {
+  return values.map((_, index) => `$${startIndex + index}`).join(", ");
+}
+
+async function readDbFriendshipsForUsers(userIds: string[]) {
+  const safeUserIds = uniqueStrings(userIds);
+
+  if (safeUserIds.length === 0) {
+    return [];
+  }
+
+  await ensureCommunitySchema();
+
+  const userClause = buildInClause(safeUserIds);
+  const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+    `SELECT * FROM "Friendship" WHERE "userA" IN (${userClause}) OR "userB" IN (${userClause}) ORDER BY "createdAt" ASC LIMIT 500`,
+    ...safeUserIds
+  );
+
+  return rows.map(normalizeDbFriendship);
+}
+
+async function readFriendshipsForUsers(userIds: string[]) {
+  const safeUserIds = uniqueStrings(userIds);
+
+  if (safeUserIds.length === 0) {
+    return [];
+  }
+
+  try {
+    return await readDbFriendshipsForUsers(safeUserIds);
+  } catch {
+    const userSet = new Set(safeUserIds);
+    const items = await readFriendships();
+    return items.filter(
+      (item) => userSet.has(item.userA) || userSet.has(item.userB)
+    );
+  }
+}
+
+async function readDbIncomingRequestsForUsers(userIds: string[]) {
+  const safeUserIds = uniqueStrings(userIds);
+
+  if (safeUserIds.length === 0) {
+    return [];
+  }
+
+  await ensureCommunitySchema();
+
+  const userClause = buildInClause(safeUserIds);
+  const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+    `SELECT * FROM "FriendRequest" WHERE "status" = 'pending' AND "toUserId" IN (${userClause}) ORDER BY "createdAt" DESC LIMIT 120`,
+    ...safeUserIds
+  );
+
+  return rows.map(normalizeDbRequest);
+}
+
+async function readIncomingRequestsForUsers(userIds: string[]) {
+  const safeUserIds = uniqueStrings(userIds);
+
+  if (safeUserIds.length === 0) {
+    return [];
+  }
+
+  try {
+    return await readDbIncomingRequestsForUsers(safeUserIds);
+  } catch {
+    const userSet = new Set(safeUserIds);
+    const requests = await readRequests();
+    return requests
+      .filter((item) => item.status === "pending" && userSet.has(item.toUserId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+}
+
+async function readPendingRequestsBetween(
+  currentUserIds: string[],
+  otherUserIds: string[]
+) {
+  const mine = uniqueStrings(currentUserIds);
+  const others = uniqueStrings(otherUserIds);
+
+  if (mine.length === 0 || others.length === 0) {
+    return [];
+  }
+
+  try {
+    await ensureCommunitySchema();
+
+    const mineClause = buildInClause(mine);
+    const otherClause = buildInClause(others, mine.length + 1);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `SELECT * FROM "FriendRequest" WHERE "status" = 'pending' AND (("fromUserId" IN (${mineClause}) AND "toUserId" IN (${otherClause})) OR ("fromUserId" IN (${otherClause}) AND "toUserId" IN (${mineClause}))) ORDER BY "createdAt" DESC LIMIT 240`,
+      ...mine,
+      ...others
+    );
+
+    return rows.map(normalizeDbRequest);
+  } catch {
+    const mineSet = new Set(mine);
+    const otherSet = new Set(others);
+    const requests = await readRequests();
+    return requests
+      .filter((item) => item.status === "pending")
+      .filter(
+        (item) =>
+          (mineSet.has(item.fromUserId) && otherSet.has(item.toUserId)) ||
+          (otherSet.has(item.fromUserId) && mineSet.has(item.toUserId))
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+}
+
 async function readRequests() {
   try {
     return await readDbRequests();
@@ -138,39 +267,45 @@ function friendshipKey(a: string, b: string) {
 }
 
 export async function areFriends(userId: string, otherUserId: string) {
-  const items = await readFriendships();
+  if (!userId || !otherUserId) {
+    return false;
+  }
+
   const key = friendshipKey(userId, otherUserId);
+
+  try {
+    await ensureCommunitySchema();
+    const [userA, userB] = sortPair(userId, otherUserId);
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      'SELECT "id" FROM "Friendship" WHERE "userA" = $1 AND "userB" = $2 LIMIT 1',
+      userA,
+      userB
+    );
+    return rows.length > 0;
+  } catch {
+    // Local fallback below.
+  }
+
+  const items = await readFriendshipsForUsers([userId, otherUserId]);
   return items.some((item) => friendshipKey(item.userA, item.userB) === key);
 }
 
 export async function getFriendRelation(userId: string, otherUserId: string) {
-  if (!userId || !otherUserId || userId === otherUserId) {
-    return { status: "self" as const, requestId: null as string | null };
-  }
-
-  if (await areFriends(userId, otherUserId)) {
-    return { status: "friends" as const, requestId: null as string | null };
-  }
-
-  const requests = await readRequests();
-  const pending = requests
-    .filter((item) => item.status === "pending")
-    .filter(
-      (item) =>
-        (item.fromUserId === userId && item.toUserId === otherUserId) ||
-        (item.fromUserId === otherUserId && item.toUserId === userId)
-    )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
-  if (!pending) {
+  if (!userId || !otherUserId) {
     return { status: "none" as const, requestId: null as string | null };
   }
 
-  if (pending.fromUserId === userId) {
-    return { status: "outgoing" as const, requestId: pending.id };
+  if (userId === otherUserId) {
+    return { status: "self" as const, requestId: null as string | null };
   }
 
-  return { status: "incoming" as const, requestId: pending.id };
+  const relations = await getFriendRelationsForUsers(userId, [otherUserId]);
+  return (
+    relations.get(otherUserId) || {
+      status: "none" as const,
+      requestId: null as string | null,
+    }
+  );
 }
 
 export async function createFriendRequestRecord(
@@ -409,48 +544,43 @@ export async function listIncomingFriendRequests(
   userId: string,
   aliases: string[] = []
 ) {
-  const userIds = Array.from(new Set([userId, ...aliases].filter(Boolean)));
-  const requests = await readRequests();
-  const incoming = requests
-    .filter((item) => item.status === "pending" && userIds.includes(item.toUserId))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  return Promise.all(
-    incoming.map(async (request) => {
-      const profile = await getLocalProfileByUserId(request.fromUserId);
-      return {
-        id: request.id,
-        fromUserId: request.fromUserId,
-        createdAt: request.createdAt,
-        displayName: profile?.displayName || "NEXORA User",
-        username: profile?.username || null,
-        image: profile?.image || "/avatar.png",
-        bio: profile?.bio || "",
-      };
-    })
+  const userIds = uniqueStrings([userId, ...aliases]);
+  const incoming = await readIncomingRequestsForUsers(userIds);
+  const profileMap = await getLocalProfilesByUserIds(
+    incoming.map((request) => request.fromUserId)
   );
+
+  return incoming.map((request) => {
+    const profile = profileMap.get(request.fromUserId);
+
+    return {
+      id: request.id,
+      fromUserId: request.fromUserId,
+      createdAt: request.createdAt,
+      displayName: profile?.displayName || "NEXORA User",
+      username: profile?.username || null,
+      image: profile?.image || "/avatar.png",
+      bio: profile?.bio || "",
+    };
+  });
 }
 
-export async function listFriendsForUser(userId: string) {
-  const friendships = await readFriendships();
+export async function listFriendsForUser(userId: string, aliases: string[] = []) {
+  const userIds = uniqueStrings([userId, ...aliases]);
+  const userSet = new Set(userIds);
+  const friendships = await readFriendshipsForUsers(userIds);
   const mine = friendships
-    .filter((item) => item.userA === userId || item.userB === userId)
+    .filter((item) => userSet.has(item.userA) || userSet.has(item.userB))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const friendIds = mine.map((item) => (item.userA === userId ? item.userB : item.userA));
-  const uniqueFriendIds = Array.from(new Set(friendIds));
-
-  const entries = await Promise.all(
-    uniqueFriendIds.map(async (friendId) => {
-      const profile = await getLocalProfileByUserId(friendId);
-      return [friendId, profile] as const;
-    })
+  const friendIds = mine.map((item) =>
+    userSet.has(item.userA) ? item.userB : item.userA
   );
-
-  const profileMap = new Map(entries);
+  const uniqueFriendIds = Array.from(new Set(friendIds));
+  const profileMap = await getLocalProfilesByUserIds(uniqueFriendIds);
 
   return mine.map((item) => {
-    const friendId = item.userA === userId ? item.userB : item.userA;
+    const friendId = userSet.has(item.userA) ? item.userB : item.userA;
     const profile = profileMap.get(friendId);
     return {
       id: item.id,
@@ -462,6 +592,79 @@ export async function listFriendsForUser(userId: string) {
       bio: profile?.bio || "",
     };
   });
+}
+
+export async function getFriendRelationsForUsers(
+  currentUserId: string,
+  targetUserIds: string[],
+  currentUserAliases: string[] = []
+) {
+  const selfIds = uniqueStrings([currentUserId, ...currentUserAliases]);
+  const targets = uniqueStrings(targetUserIds);
+  const selfSet = new Set(selfIds);
+  const targetSet = new Set(targets);
+  const relations = new Map<string, FriendRelation>();
+
+  targets.forEach((targetUserId) => {
+    relations.set(targetUserId, {
+      status: selfSet.has(targetUserId) ? "self" : "none",
+      requestId: null,
+    });
+  });
+
+  const relationTargets = targets.filter((targetUserId) => !selfSet.has(targetUserId));
+
+  if (selfIds.length === 0 || relationTargets.length === 0) {
+    return relations;
+  }
+
+  const [friendships, pendingRequests] = await Promise.all([
+    readFriendshipsForUsers(selfIds),
+    readPendingRequestsBetween(selfIds, relationTargets),
+  ]);
+
+  friendships.forEach((item) => {
+    const friendId = selfSet.has(item.userA)
+      ? item.userB
+      : selfSet.has(item.userB)
+        ? item.userA
+        : "";
+
+    if (!friendId || !targetSet.has(friendId)) {
+      return;
+    }
+
+    relations.set(friendId, {
+      status: "friends",
+      requestId: null,
+    });
+  });
+
+  pendingRequests.forEach((request) => {
+    if (selfSet.has(request.fromUserId) && targetSet.has(request.toUserId)) {
+      const current = relations.get(request.toUserId);
+
+      if (current?.status !== "friends") {
+        relations.set(request.toUserId, {
+          status: "outgoing",
+          requestId: request.id,
+        });
+      }
+    }
+
+    if (targetSet.has(request.fromUserId) && selfSet.has(request.toUserId)) {
+      const current = relations.get(request.fromUserId);
+
+      if (current?.status !== "friends") {
+        relations.set(request.fromUserId, {
+          status: "incoming",
+          requestId: request.id,
+        });
+      }
+    }
+  });
+
+  return relations;
 }
 
 function normalizeSearchValue(value: string | null | undefined) {
@@ -597,16 +800,23 @@ export async function searchCommunityUsers(
     })
     .map((item) => item.user);
 
-  const relations = await Promise.all(
-    filtered.slice(0, 50).map(async (user) => ({
-      user,
-      relation: await getFriendRelation(currentUserId, user.id),
-    }))
+  const limitedUsers = filtered.slice(0, term ? 50 : 28);
+  const relationMap = await getFriendRelationsForUsers(
+    currentUserId,
+    limitedUsers.map((user) => user.id),
+    currentUserAliases
   );
 
-  return relations.map(({ user, relation }) => ({
+  return limitedUsers.map((user) => {
+    const relation = relationMap.get(user.id) || {
+      status: "none" as const,
+      requestId: null as string | null,
+    };
+
+    return {
     ...user,
     relation: relation.status,
     requestId: relation.requestId,
-  }));
+    };
+  });
 }

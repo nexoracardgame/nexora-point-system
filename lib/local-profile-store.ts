@@ -370,6 +370,87 @@ export async function getLocalProfileByUserId(userId: string) {
   return task;
 }
 
+export async function getLocalProfilesByUserIds(userIds: string[]) {
+  const safeUserIds = Array.from(
+    new Set(userIds.map((item) => String(item || "").trim()).filter(Boolean))
+  );
+  const result = new Map<string, LocalProfileRecord | null>();
+
+  if (safeUserIds.length === 0) {
+    return result;
+  }
+
+  const missingUserIds: string[] = [];
+
+  safeUserIds.forEach((userId) => {
+    const cached = readCachedProfile(userId);
+
+    if (cached !== undefined) {
+      result.set(userId, cached);
+    } else {
+      missingUserIds.push(userId);
+    }
+  });
+
+  if (missingUserIds.length === 0) {
+    return result;
+  }
+
+  const localProfiles = await readStore();
+  const localProfileMap = new Map(
+    localProfiles.map((profile) => [profile.userId, profile])
+  );
+
+  try {
+    await ensureUserProfileSchema();
+
+    const placeholders = missingUserIds
+      .map((_, index) => `$${index + 1}`)
+      .join(", ");
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `SELECT "id", "lineId", "name", "image", "displayName", "username", "coverImage", "coverPosition", "bio", "lineUrl", "facebookUrl", "createdAt" FROM "User" WHERE "id" IN (${placeholders}) OR "lineId" IN (${placeholders})`,
+      ...missingUserIds
+    );
+
+    rows.forEach((row) => {
+      const canonicalId = String(row.id || "").trim();
+      const lineId = String(row.lineId || row.lineid || "").trim();
+      const profile = normalizeProfileRecord(canonicalId || lineId, {
+        ...row,
+        updatedAt: new Date(
+          String(row.createdAt || row.createdat || new Date().toISOString())
+        ).toISOString(),
+      });
+
+      if (!profile) {
+        return;
+      }
+
+      [canonicalId, lineId].filter(Boolean).forEach((lookupId) => {
+        if (missingUserIds.includes(lookupId)) {
+          result.set(lookupId, profile);
+        }
+
+        writeCachedProfile(lookupId, profile);
+      });
+    });
+  } catch {
+    // Local profile cache remains a fast fallback when DB lookup is unavailable.
+  }
+
+  missingUserIds.forEach((userId) => {
+    if (result.has(userId)) {
+      return;
+    }
+
+    const localProfile = localProfileMap.get(userId) || null;
+    result.set(userId, localProfile);
+    writeCachedProfile(userId, localProfile);
+  });
+
+  return result;
+}
+
 export async function upsertLocalProfile(
   userId: string,
   input: Omit<LocalProfileRecord, "userId" | "updatedAt">

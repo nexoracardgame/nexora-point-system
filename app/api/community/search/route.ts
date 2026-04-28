@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { searchCommunityUsers } from "@/lib/friend-store";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const sessionUser = session?.user as
@@ -16,5 +19,8 @@ export async function GET(req: NextRequest) {
 
   const q = req.nextUrl.searchParams.get("q") || "";
   const users = await searchCommunityUsers(userId, q, lineId ? [lineId] : []);
-  return NextResponse.json({ users });
+  return NextResponse.json(
+    { users },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
