@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveCardDisplayImage } from "@/lib/card-image";
 import { getMarketListings } from "@/lib/market-listings";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,7 @@ export async function GET() {
       ...item,
       cardName:
         item.cardName || `Card #${String(item.cardNo || item.id).padStart(3, "0")}`,
-      imageUrl:
-        item.imageUrl ||
-        `/cards/${String(item.cardNo || item.id).padStart(3, "0")}.jpg`,
+      imageUrl: resolveCardDisplayImage(item.cardNo || item.id, item.imageUrl),
       rarity: item.rarity || "Legendary",
       sellerId: item.sellerId,
       sellerName: item.sellerName || "Unknown Seller",

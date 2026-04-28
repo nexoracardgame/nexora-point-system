@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  buildLocalCardImageCandidates,
+  sanitizeCardImageUrl,
+} from "@/lib/card-image";
 
 type Props = {
   image: string;
@@ -16,23 +20,20 @@ export default function Card3DPreview({
   remoteImageUrl,
 }: Props) {
   const candidates = useMemo(() => {
-    const list: string[] = [];
-    const num = String(cardNo || "").trim().padStart(3, "0");
+    const list = [
+      ...buildLocalCardImageCandidates(cardNo),
+      sanitizeCardImageUrl(image),
+      sanitizeCardImageUrl(remoteImageUrl),
+    ].filter(Boolean) as string[];
 
-    if (num && num !== "000") {
-      list.push(`/cards/${num}.jpg`);
-      list.push(`/cards/${num}.png`);
-      list.push(`/cards/${num}.jpeg`);
-      list.push(`/cards/${num}.webp`);
-    }
-
-    if (image) list.push(image);
-    if (remoteImageUrl && !list.includes(remoteImageUrl)) list.push(remoteImageUrl);
-
-    return list.filter(Boolean);
+    return Array.from(new Set(list));
   }, [cardNo, image, remoteImageUrl]);
 
   const [imgIndex, setImgIndex] = useState(0);
+
+  useEffect(() => {
+    setImgIndex(0);
+  }, [candidates]);
 
   const currentImage = candidates[imgIndex] || image || remoteImageUrl || "";
 
@@ -75,6 +76,9 @@ export default function Card3DPreview({
               <img
                 src={currentImage}
                 alt={name}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="h-full w-full object-cover"
                 onError={() => {
                   if (imgIndex < candidates.length - 1) {

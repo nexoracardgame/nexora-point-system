@@ -1,3 +1,5 @@
+import { resolveCardDisplayImage } from "@/lib/card-image";
+
 export type MarketViewItem = {
   id: string;
   cardNo: string;
@@ -60,7 +62,10 @@ export function normalizeMarketListingView(
     }`,
     likes: Number(item.likes || 0),
     rarity: item.rarity || "Legendary",
-    image: item.image_url || item.imageUrl || `/cards/${paddedCardNo}.jpg`,
+    image: resolveCardDisplayImage(
+      paddedCardNo,
+      item.image_url || item.imageUrl
+    ),
     createdAt:
       typeof item.createdAt === "string"
         ? item.createdAt

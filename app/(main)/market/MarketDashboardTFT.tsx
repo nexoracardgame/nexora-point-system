@@ -588,7 +588,7 @@ export default function MarketDashboardTFT({
       <section className="relative hidden overflow-hidden rounded-[42px] border border-white/75 bg-[#edf2fb] px-8 py-12 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.12)] ring-1 ring-black/5 xl:px-14 xl:py-16 lg:block">
         <div className="pointer-events-none absolute inset-0">
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-30"
+            className="absolute inset-0 bg-cover bg-center opacity-60"
             style={{ backgroundImage: `url(${TOP3_BACKGROUND_URL})` }}
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(237,242,251,0.56))]" />

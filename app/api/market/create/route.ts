@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { sanitizeCardImageUrl } from "@/lib/card-image";
 import { prisma } from "@/lib/prisma";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
@@ -245,7 +246,7 @@ export async function POST(req: NextRequest) {
       serialNo: normalizedSerialNo,
       price: numericPrice,
       cardName: String(cardName || "").trim() || null,
-      imageUrl: String(imageUrl || "").trim() || null,
+      imageUrl: sanitizeCardImageUrl(imageUrl),
       rarity: String(rarity || "").trim() || null,
     });
 

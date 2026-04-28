@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { sanitizeCardImageUrl } from "@/lib/card-image";
 import {
   createLocalMarketListing,
   deleteLocalMarketListing,
@@ -64,7 +65,7 @@ function toMarketListingRecord(item: {
     views: Number(item.views || 0),
     createdAt: item.createdAt.toISOString(),
     cardName: item.cardName || null,
-    imageUrl: item.imageUrl || null,
+    imageUrl: sanitizeCardImageUrl(item.imageUrl),
     rarity: item.rarity || null,
   };
 }

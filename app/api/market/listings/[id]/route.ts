@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveCardDisplayImage } from "@/lib/card-image";
 import { getMarketListingById } from "@/lib/market-listings";
 
 export async function GET(
@@ -18,9 +19,7 @@ export async function GET(
     cardName:
       listing.cardName ||
       `Card #${String(listing.cardNo).padStart(3, "0")}`,
-    imageUrl:
-      listing.imageUrl ||
-      `/cards/${String(listing.cardNo).padStart(3, "0")}.jpg`,
+    imageUrl: resolveCardDisplayImage(listing.cardNo, listing.imageUrl),
     rarity: listing.rarity || "Legendary",
   });
 }

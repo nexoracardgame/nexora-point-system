@@ -3,6 +3,10 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import {
+  buildLocalCardImage,
+  sanitizeCardImageUrl,
+} from "@/lib/card-image";
+import {
   getLocaleTag,
   resolveLocale,
   translate,
@@ -14,6 +18,7 @@ import {
 } from "@/lib/market-listings";
 import { prisma } from "@/lib/prisma";
 import { formatThaiDateTime } from "@/lib/thai-time";
+import Card3DPreview from "./Card3DPreview";
 import CardStatsClient from "./CardStatsClient";
 import RequestDealButton from "./RequestDealButton";
 import WishlistButton from "./WishlistButton";
@@ -77,10 +82,6 @@ type CompletedDealSnapshot = {
   offeredPrice: number;
   createdAt: string | Date;
 };
-
-function getLocalCardImage(cardNo: string) {
-  return `/cards/${String(cardNo || "").trim().padStart(3, "0")}.jpg`;
-}
 
 function toDate(value?: string | Date | null) {
   if (value instanceof Date) return value;
@@ -471,8 +472,8 @@ export default async function MarketCardDetailPage({
     price: formatCurrency(Number(listing.price || 0), locale),
     rarity: listing.rarity || "Unspecified",
     views: Number(listing.views || 0),
-    image: listing.imageUrl || getLocalCardImage(String(listing.cardNo)),
-    remoteImageUrl: listing.imageUrl || "",
+    image: buildLocalCardImage(String(listing.cardNo)),
+    remoteImageUrl: sanitizeCardImageUrl(listing.imageUrl) || "",
     owner: currentProfileName,
     rewardBadges: badgeItems,
   };
@@ -578,7 +579,12 @@ export default async function MarketCardDetailPage({
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] md:gap-6">
         <div className="rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(250,204,21,0.06),transparent_32%),linear-gradient(180deg,rgba(18,18,24,0.76)_0%,rgba(8,9,11,0.42)_100%)] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.34)] md:rounded-[36px] md:p-5">
-          <CardStaticPreview image={card.image} name={card.name} />
+          <Card3DPreview
+            image={card.image}
+            name={card.name}
+            cardNo={card.cardNo}
+            remoteImageUrl={card.remoteImageUrl}
+          />
         </div>
 
         <div className="space-y-4 md:space-y-6">
