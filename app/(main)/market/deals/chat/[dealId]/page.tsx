@@ -260,7 +260,16 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     setLoadingRoom(false);
     setHasMore(Boolean(data.hasMore));
     setNextCursor(String(data.nextCursor || "").trim() || null);
-    setMessages((prev) => mergeChatMessages(prev, nextMessages, nextRoomId, nextMe, nextOther));
+    setMessages((prev) => {
+      const optimisticMessages = prev.filter((message) => message.optimistic);
+      return mergeChatMessages(
+        nextMessages,
+        optimisticMessages,
+        nextRoomId,
+        nextMe,
+        nextOther
+      );
+    });
     void markLoadedRoomSeen(nextRoomId, nextMessages, nextMe);
   });
 
@@ -333,6 +342,50 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       loadingOlderRef.current = false;
     }
   };
+
+  const syncLatestMessages = useEffectEvent(async () => {
+    const currentRoomId = String(activeRoomIdRef.current || roomId).trim();
+    if (!currentRoomId || roomClosed) {
+      return;
+    }
+
+    const latestTimestamp = String(
+      messages[messages.length - 1]?.createdAt || ""
+    ).trim();
+    const query = latestTimestamp
+      ? `after=${encodeURIComponent(latestTimestamp)}&limit=40`
+      : "limit=24";
+
+    const res = await fetch(
+      `/api/dm/messages?roomId=${encodeURIComponent(currentRoomId)}&${query}`,
+      {
+        cache: "no-store",
+      }
+    ).catch(() => null);
+
+    if (activeRoomIdRef.current !== currentRoomId || !res?.ok) {
+      return;
+    }
+
+    const data = (await res.json().catch(() => null)) as DealChatPage | null;
+    const freshMessages = Array.isArray(data?.messages)
+      ? data.messages.map((message) =>
+          normalizeChatMessage(message, currentRoomId, me, other)
+        )
+      : [];
+
+    if (freshMessages.length === 0) {
+      return;
+    }
+
+    setMessages((prev) =>
+      mergeChatMessages(prev, freshMessages, currentRoomId, me, other)
+    );
+
+    if (document.visibilityState === "visible") {
+      void markLoadedRoomSeen(currentRoomId, freshMessages, me);
+    }
+  });
 
   const scheduleOlderPrefetch = useEffectEvent(() => {
     if (!roomId || roomClosed || !hasMore || !nextCursor || loadingOlderRef.current) {
@@ -511,6 +564,34 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       cancelOlderPrefetch();
     };
   }, [hasMore, messages.length, nextCursor, roomClosed, roomId]);
+
+  useEffect(() => {
+    if (!roomId || roomClosed) {
+      return;
+    }
+
+    const syncNow = () => {
+      if (document.visibilityState === "visible") {
+        void syncLatestMessages();
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncLatestMessages();
+      }
+    };
+
+    const intervalId = window.setInterval(syncNow, 1500);
+    window.addEventListener("focus", syncNow);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", syncNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [roomClosed, roomId]);
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();

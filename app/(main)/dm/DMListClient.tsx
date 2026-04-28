@@ -498,7 +498,7 @@ export default function DMListClient({
       if (document.visibilityState === "visible") {
         void loadRooms();
       }
-    }, 15000);
+    }, 4000);
 
     const onFocus = () => {
       void loadRooms();

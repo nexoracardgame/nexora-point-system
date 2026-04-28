@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   const lineId = getSessionLineId(session);
   const roomId = req.nextUrl.searchParams.get("roomId");
   const before = String(req.nextUrl.searchParams.get("before") || "").trim() || null;
+  const after = String(req.nextUrl.searchParams.get("after") || "").trim() || null;
   const limit = Number(req.nextUrl.searchParams.get("limit") || 0) || 0;
 
   if (!userId) {
@@ -58,13 +59,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "system unavailable" }, { status: 500 });
   }
 
-  if (limit > 0 || before) {
+  const effectiveAfter =
+    after && clearedAt
+      ? new Date(after).getTime() > new Date(clearedAt).getTime()
+        ? after
+        : clearedAt
+      : after || clearedAt || null;
+
+  if (limit > 0 || before || after) {
     try {
       const page = await getChatMessagesPage({
         roomId: access.roomId,
         before,
         limit: limit || undefined,
-        after: clearedAt,
+        after: effectiveAfter,
         supabase,
       });
 
@@ -83,7 +91,7 @@ export async function GET(req: NextRequest) {
     .from("dmMessage")
     .select("*")
     .eq("roomId", access.roomId)
-    .gt("createdAt", clearedAt || "1970-01-01T00:00:00.000Z")
+    .gt("createdAt", effectiveAfter || "1970-01-01T00:00:00.000Z")
     .order("createdAt", { ascending: true });
 
   if (error) {

@@ -45,7 +45,11 @@ function isStandaloneMode() {
   );
 }
 
-export default function AppInstallButton() {
+export default function AppInstallButton({
+  variant = "dark",
+}: {
+  variant?: "dark" | "light";
+}) {
   const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [installState, setInstallState] = useState<InstallState>("loading");
   const [guideOpen, setGuideOpen] = useState(false);
@@ -161,16 +165,34 @@ export default function AppInstallButton() {
           ? "แตะปุ่มนี้เพื่อดูขั้นตอนเพิ่มลงหน้าจอโฮม"
           : "รองรับ Android, iPhone, iPad และ Desktop";
 
+  const isLight = variant === "light";
+
   return (
     <>
       <button
         type="button"
         onClick={handleInstall}
-        className="group relative flex w-full max-w-[360px] items-center justify-between gap-4 overflow-hidden rounded-[26px] border border-white/12 bg-[#0b0f16]/88 px-4 py-3.5 text-left text-white shadow-[0_24px_60px_rgba(0,0,0,0.38),0_0_30px_rgba(250,204,21,0.12)] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 hover:border-amber-300/40 hover:shadow-[0_30px_70px_rgba(0,0,0,0.42),0_0_40px_rgba(250,204,21,0.18)] sm:px-5 sm:py-4"
+        className={`group relative flex w-full max-w-[360px] items-center justify-between gap-4 overflow-hidden rounded-[26px] px-4 py-3.5 text-left shadow-[0_24px_60px_rgba(0,0,0,0.18),0_0_30px_rgba(250,204,21,0.08)] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 sm:px-5 sm:py-4 ${
+          isLight
+            ? "border border-black/10 bg-white/92 text-black hover:border-amber-500/45 hover:shadow-[0_30px_70px_rgba(0,0,0,0.14),0_0_40px_rgba(250,204,21,0.12)]"
+            : "border border-white/12 bg-[#0b0f16]/88 text-white hover:border-amber-300/40 hover:shadow-[0_30px_70px_rgba(0,0,0,0.42),0_0_40px_rgba(250,204,21,0.18)]"
+        }`}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(250,204,21,0.22),transparent_30%,transparent_72%,rgba(255,255,255,0.08))]" />
+        <div
+          className={`pointer-events-none absolute inset-0 ${
+            isLight
+              ? "bg-[linear-gradient(125deg,rgba(250,204,21,0.16),transparent_34%,transparent_72%,rgba(0,0,0,0.04))]"
+              : "bg-[linear-gradient(125deg,rgba(250,204,21,0.22),transparent_30%,transparent_72%,rgba(255,255,255,0.08))]"
+          }`}
+        />
         <div className="relative flex min-w-0 items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.06] text-amber-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ${
+              isLight
+                ? "border border-black/8 bg-black/[0.03] text-amber-600"
+                : "border border-white/10 bg-white/[0.06] text-amber-200"
+            }`}
+          >
             {installState === "installed" ? (
               <CheckCircle2 className="h-5 w-5" />
             ) : (
@@ -179,16 +201,30 @@ export default function AppInstallButton() {
           </div>
 
           <div className="min-w-0">
-            <div className="truncate text-sm font-black uppercase tracking-[0.12em] text-white sm:text-[15px]">
+            <div
+              className={`truncate text-sm font-black uppercase tracking-[0.12em] sm:text-[15px] ${
+                isLight ? "text-black" : "text-white"
+              }`}
+            >
               {title}
             </div>
-            <div className="mt-1 text-[11px] font-semibold leading-5 text-white/65 sm:text-xs">
+            <div
+              className={`mt-1 text-[11px] font-semibold leading-5 sm:text-xs ${
+                isLight ? "text-black/58" : "text-white/65"
+              }`}
+            >
               {caption}
             </div>
           </div>
         </div>
 
-        <div className="relative flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/82">
+        <div
+          className={`relative flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] ${
+            isLight
+              ? "border border-black/8 bg-black/[0.03] text-black/76"
+              : "border border-white/10 bg-white/[0.04] text-white/82"
+          }`}
+        >
           <Smartphone className="h-3.5 w-3.5" />
           APP
         </div>

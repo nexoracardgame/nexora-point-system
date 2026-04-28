@@ -379,6 +379,50 @@ function DMRoomContent({
     }
   };
 
+  const syncLatestMessages = useEffectEvent(async () => {
+    const targetRoomId = String(activeRoomIdRef.current || roomId).trim();
+    if (!targetRoomId || roomClosed) {
+      return;
+    }
+
+    const latestTimestamp = String(
+      messages[messages.length - 1]?.createdAt || ""
+    ).trim();
+    const query = latestTimestamp
+      ? `after=${encodeURIComponent(latestTimestamp)}&limit=40`
+      : "limit=24";
+
+    const res = await fetch(
+      `/api/dm/messages?roomId=${encodeURIComponent(targetRoomId)}&${query}`,
+      {
+        cache: "no-store",
+      }
+    ).catch(() => null);
+
+    if (activeRoomIdRef.current !== targetRoomId || !res?.ok) {
+      return;
+    }
+
+    const data = (await res.json().catch(() => null)) as DirectChatPage | null;
+    const freshMessages = Array.isArray(data?.messages)
+      ? data.messages.map((message) =>
+          normalizeChatMessage(message, targetRoomId, me, other)
+        )
+      : [];
+
+    if (freshMessages.length === 0) {
+      return;
+    }
+
+    setMessages((prev) =>
+      mergeChatMessages(prev, freshMessages, targetRoomId, me, other)
+    );
+
+    if (document.visibilityState === "visible") {
+      void markLoadedRoomSeen(targetRoomId, freshMessages, me);
+    }
+  });
+
   const scheduleOlderPrefetch = useEffectEvent(() => {
     if (!roomId || roomClosed || !hasMore || !nextCursor || loadingOlderRef.current) {
       return;
@@ -537,6 +581,34 @@ function DMRoomContent({
       cancelOlderPrefetch();
     };
   }, [hasMore, messages.length, nextCursor, roomClosed, roomId]);
+
+  useEffect(() => {
+    if (!roomId || roomClosed) {
+      return;
+    }
+
+    const syncNow = () => {
+      if (document.visibilityState === "visible") {
+        void syncLatestMessages();
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncLatestMessages();
+      }
+    };
+
+    const intervalId = window.setInterval(syncNow, 1500);
+    window.addEventListener("focus", syncNow);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", syncNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [roomClosed, roomId]);
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();

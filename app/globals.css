@@ -225,6 +225,21 @@ body {
   animation: homeMarquee 24s linear infinite;
 }
 
+@keyframes nexora-splash-load {
+  0% {
+    transform: translateX(-55%) scaleX(0.35);
+    opacity: 0.4;
+  }
+  45% {
+    transform: translateX(-8%) scaleX(0.72);
+    opacity: 0.92;
+  }
+  100% {
+    transform: translateX(0) scaleX(1);
+    opacity: 1;
+  }
+}
+
 /* ================== PERFORMANCE (สำคัญมาก) ================== */
 
 /* ลด animation บนมือถือ */

@@ -1,6 +1,7 @@
 import Providers from "./providers";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import FirstOpenSplash from "@/components/FirstOpenSplash";
 import { DEFAULT_LOCALE } from "@/lib/i18n-core";
 import "./globals.css";
 
@@ -70,6 +71,7 @@ export default function RootLayout({
         "
       >
         <Providers>
+          <FirstOpenSplash />
           <GlobalActivityBar />
           <PageTransition>
             <div className="flex min-h-0 flex-1 flex-col">{children}</div>
