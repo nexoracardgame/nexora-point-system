@@ -120,8 +120,27 @@ export default function AppInstallButton({
     };
   }, []);
 
+  useEffect(() => {
+    if (!guideOpen || typeof window === "undefined") return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setGuideOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [guideOpen]);
+
   const handleInstall = async () => {
     if (installState === "installed") {
+      return;
+    }
+
+    if (isIosDevice()) {
+      setInstallState("ios");
+      setGuideOpen(true);
       return;
     }
 
@@ -231,8 +250,15 @@ export default function AppInstallButton({
       </button>
 
       {guideOpen ? (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/55 px-3 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 backdrop-blur-md sm:p-6">
-          <div className="w-full max-w-[420px] self-center overflow-hidden rounded-[28px] border border-white/10 bg-[#0d1118]/98 text-white shadow-[0_28px_90px_rgba(0,0,0,0.48)] max-h-[calc(100dvh-env(safe-area-inset-bottom)-26px)] sm:max-h-[min(86dvh,720px)]">
+        <div
+          className="pointer-events-auto fixed inset-0 z-[1200] flex items-center justify-center bg-black/55 px-3 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 backdrop-blur-md sm:p-6"
+          onClick={() => setGuideOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="max-h-[calc(100dvh-env(safe-area-inset-bottom)-26px)] w-full max-w-[420px] self-center overflow-hidden rounded-[28px] border border-white/10 bg-[#0d1118]/98 text-white shadow-[0_28px_90px_rgba(0,0,0,0.48)] sm:max-h-[min(86dvh,720px)]"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/85">
@@ -246,7 +272,10 @@ export default function AppInstallButton({
               </div>
               <button
                 type="button"
-                onClick={() => setGuideOpen(false)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setGuideOpen(false);
+                }}
                 className="rounded-full border border-white/10 bg-white/[0.05] p-2 text-white/72 transition hover:bg-white/[0.08] hover:text-white"
                 aria-label="Close install guide"
               >
@@ -261,6 +290,10 @@ export default function AppInstallButton({
               </div>
               {isIosDevice() ? (
                 <>
+                  <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4 text-xs font-semibold leading-6 text-white/62">
+                    iPhone และ iPad ยังไม่อนุญาตให้เว็บสั่งติดตั้งแอพเองแบบ
+                    Android ระบบจึงพาไปขั้นตอนติดตั้งที่ iOS รองรับโดยตรง
+                  </div>
                   <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.05] text-amber-200">
