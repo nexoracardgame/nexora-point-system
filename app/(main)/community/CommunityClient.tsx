@@ -559,7 +559,7 @@ export default function CommunityClient({
       return user.relation !== "friends" && !friendIdSet.has(user.id);
     });
   }, [friendIdSet, query, results]);
-  const suggestionCount = Math.max(visibleResults.length - friends.length, 0);
+  const suggestionCount = visibleResults.length;
 
   return (
     <div className="min-h-full overflow-hidden bg-[#f4f0f7] text-[#08080a]">
