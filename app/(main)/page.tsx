@@ -139,10 +139,10 @@ export default function NexoraLuxuryHome() {
         </div>
 
         <div className="mt-1.5 max-w-[330px] text-[0.98rem] font-semibold leading-[1.36] tracking-[0.01em] text-black/58 sm:mt-3 sm:max-w-[560px] sm:text-[1.02rem] sm:leading-6 lg:text-[1.08rem]">
-          แชทเรียลไทม์ การครอบครองที่มีคุณค่า และรางวัลที่ยกระดับทุกคอลเลกชันของคุณ
+          แชทเรียลไทม์ การครอบครองที่มีคุณค่า และรางวัลที่ยกระดับทุกคอลเลกชันของคุณ ซื้อขายลื่นไหลบนมือถือ คอม และเว็บแอพในประสบการณ์เดียวกัน
         </div>
         <div className="mt-1 max-w-[330px] text-[0.96rem] font-semibold leading-[1.36] text-black/54 sm:max-w-[520px] sm:text-[1rem] sm:leading-6">
-          ซื้อขายลื่นไหลบนมือถือ คอม และเว็บแอพในประสบการณ์เดียวกัน
+          
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">
