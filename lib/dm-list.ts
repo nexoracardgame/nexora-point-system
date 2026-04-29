@@ -6,7 +6,7 @@ import {
   getLatestClearTimestamp,
   isRoomActivityVisibleAfterClear,
 } from "@/lib/dm-room-clear-state";
-import { getLocalProfileByUserId } from "@/lib/local-profile-store";
+import { getLocalProfilesByUserIds } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -57,47 +57,6 @@ function compareRoomsByLatest(
   }
 
   return latestTime(b.createdAt) - latestTime(a.createdAt);
-}
-
-async function resolveCanonicalUserId(rawUserId: string) {
-  const value = String(rawUserId || "").trim();
-
-  if (!value) return "";
-
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [{ id: value }, { lineId: value }],
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  return String(user?.id || value).trim();
-}
-
-async function resolveUserAliases(rawUserId: string) {
-  const value = String(rawUserId || "").trim();
-
-  if (!value) return [];
-
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [{ id: value }, { lineId: value }],
-    },
-    select: {
-      id: true,
-      lineId: true,
-    },
-  });
-
-  return Array.from(
-    new Set(
-      [value, user?.id, user?.lineId]
-        .map((item) => String(item || "").trim())
-        .filter(Boolean)
-    )
-  );
 }
 
 export async function getDmRoomsForUser(
@@ -236,34 +195,94 @@ export async function getDmRoomsForUser(
     unreadCountByRoom.set(roomId, (unreadCountByRoom.get(roomId) || 0) + 1);
   }
 
-  const profileRows = await Promise.all(
-    dedupedRooms.map(async (room) => {
-      const roomUserAIsMe =
-        room.usera === myId || (myLineId ? room.usera === myLineId : false);
-      const rawOtherUserId = String(
-        roomUserAIsMe ? room.userb : room.usera || ""
-      ).trim();
-      const otherUserId = await resolveCanonicalUserId(rawOtherUserId);
-      const otherUserAliases = Array.from(
-        new Set([
-          rawOtherUserId,
-          otherUserId,
-          ...(await resolveUserAliases(rawOtherUserId)),
-          ...(await resolveUserAliases(otherUserId || rawOtherUserId)),
-        ].filter(Boolean))
-      );
-      const profile = otherUserId
-        ? await getLocalProfileByUserId(otherUserId)
-        : null;
+  const directPeerRows = dedupedRooms.map((room) => {
+    const roomUserAIsMe =
+      room.usera === myId || (myLineId ? room.usera === myLineId : false);
+    const rawOtherUserId = String(
+      roomUserAIsMe ? room.userb : room.usera || ""
+    ).trim();
 
-      return {
-        roomId: String(room.roomid),
-        otherUserId: otherUserId || rawOtherUserId,
-        otherUserAliases,
-        profile,
-      };
-    })
+    return {
+      roomId: String(room.roomid),
+      rawOtherUserId,
+    };
+  });
+  const peerLookupIds = Array.from(
+    new Set(
+      directPeerRows
+        .map((item) => item.rawOtherUserId)
+        .filter(Boolean)
+    )
   );
+  const peerUsers = peerLookupIds.length
+    ? await prisma.user.findMany({
+        where: {
+          OR: [
+            {
+              id: {
+                in: peerLookupIds,
+              },
+            },
+            {
+              lineId: {
+                in: peerLookupIds,
+              },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          lineId: true,
+        },
+      })
+    : [];
+  const userByLookupId = new Map<
+    string,
+    { id: string; lineId?: string | null }
+  >();
+
+  peerUsers.forEach((user) => {
+    const id = String(user.id || "").trim();
+    const lineId = String(user.lineId || "").trim();
+
+    if (id) {
+      userByLookupId.set(id, { id, lineId: lineId || null });
+    }
+
+    if (lineId) {
+      userByLookupId.set(lineId, { id, lineId });
+    }
+  });
+
+  const canonicalPeerIds = Array.from(
+    new Set(
+      directPeerRows
+        .map((item) => {
+          const user = userByLookupId.get(item.rawOtherUserId);
+          return String(user?.id || item.rawOtherUserId || "").trim();
+        })
+        .filter(Boolean)
+    )
+  );
+  const profileByUserId = await getLocalProfilesByUserIds(canonicalPeerIds);
+  const profileRows = directPeerRows.map((item) => {
+    const user = userByLookupId.get(item.rawOtherUserId);
+    const otherUserId = String(user?.id || item.rawOtherUserId || "").trim();
+    const otherUserAliases = Array.from(
+      new Set(
+        [item.rawOtherUserId, otherUserId, user?.lineId]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      )
+    );
+
+    return {
+      roomId: item.roomId,
+      otherUserId,
+      otherUserAliases,
+      profile: profileByUserId.get(otherUserId) || null,
+    };
+  });
 
   const profileMap = new Map(
     profileRows.map((item) => [item.roomId, item.profile])

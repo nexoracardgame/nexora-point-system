@@ -293,6 +293,7 @@ export default function DMListClient({
   const [clearingRoomId, setClearingRoomId] = useState<string | null>(null);
 
   const hasInit = useRef(false);
+  const loadRoomsInFlightRef = useRef<Promise<void> | null>(null);
   const roomsRef = useRef<DMRoomListItem[]>(rooms);
   const currentMeRef = useRef<SessionUser | null>(currentMe);
 
@@ -449,8 +450,12 @@ export default function DMListClient({
   }, [currentMe]);
 
   const loadRooms = async (meOverride?: SessionUser | null) => {
+    if (loadRoomsInFlightRef.current) {
+      return loadRoomsInFlightRef.current;
+    }
+
     const effectiveMe = meOverride === undefined ? currentMe : meOverride;
-    try {
+    const task = (async () => {
       const res = await fetch("/api/dm/list", {
         cache: "no-store",
       });
@@ -468,7 +473,16 @@ export default function DMListClient({
 
       setRooms(visibleRooms);
       void hydrateUnknownRooms(visibleRooms);
+    })();
+
+    loadRoomsInFlightRef.current = task;
+
+    try {
+      await task;
     } finally {
+      if (loadRoomsInFlightRef.current === task) {
+        loadRoomsInFlightRef.current = null;
+      }
       setLoading(false);
     }
   };
@@ -719,21 +733,22 @@ export default function DMListClient({
     hasInit.current = true;
 
     void (async () => {
-      let effectiveMe = currentMe;
-      if (!effectiveMe) {
-        const sessionRes = await fetch("/api/auth/session", {
-          cache: "no-store",
-        });
-        const sessionData = await sessionRes.json();
-        effectiveMe = (sessionData?.user || null) as SessionUser | null;
-        setCurrentMe(effectiveMe);
-      }
-
       if (initialRooms.length === 0) {
-        await loadRooms(effectiveMe);
+        void loadRooms(currentMe);
       } else {
         setLoading(false);
-        void loadRooms(effectiveMe);
+        void loadRooms(currentMe);
+      }
+
+      if (!currentMe) {
+        const sessionRes = await fetch("/api/auth/session", {
+          cache: "no-store",
+        }).catch(() => null);
+        const sessionData = await sessionRes?.json().catch(() => null);
+        const effectiveMe = (sessionData?.user || null) as SessionUser | null;
+        if (effectiveMe) {
+          setCurrentMe(effectiveMe);
+        }
       }
     })();
   }, [currentMe, initialRooms.length]);
@@ -796,7 +811,7 @@ export default function DMListClient({
       if (document.visibilityState === "visible") {
         void loadRooms(currentMeRef.current);
       }
-    }, 4000);
+    }, 10000);
 
     const onFocus = () => {
       void loadRooms(currentMeRef.current);

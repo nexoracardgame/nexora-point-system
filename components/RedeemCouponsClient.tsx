@@ -68,7 +68,6 @@ export default function RedeemCouponsClient({
   const [selectedCode, setSelectedCode] = useState(
     initialOpenCode || cachedRedeemState?.data?.openCode || ""
   );
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setCoupons((prev) => mergeCoupons(initialCoupons, prev));
@@ -89,13 +88,11 @@ export default function RedeemCouponsClient({
 
   useEffect(() => {
     let disposed = false;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const syncCoupons = async () => {
-      if (disposed || document.visibilityState !== "visible") return;
+      if (disposed) return;
 
       try {
-        setLoading(true);
         const res = await fetch(`/api/coupon/list?ts=${Date.now()}`, {
           cache: "no-store",
         });
@@ -108,33 +105,13 @@ export default function RedeemCouponsClient({
         }
       } catch {
         return;
-      } finally {
-        if (!disposed) {
-          setLoading(false);
-        }
       }
     };
 
-    intervalId = setInterval(syncCoupons, 5000);
-
-    const handleFocus = () => {
-      void syncCoupons();
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void syncCoupons();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
+    void syncCoupons();
 
     return () => {
       disposed = true;
-      if (intervalId) clearInterval(intervalId);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
@@ -227,7 +204,7 @@ export default function RedeemCouponsClient({
               <span className="hidden h-1 w-1 rounded-full bg-black/15 sm:block" />
               <span className="inline-flex items-center gap-2">
                 <Clock3 className="h-4 w-4 text-black/55" />
-                {loading ? "กำลังซิงก์..." : "อัปเดตอัตโนมัติ"}
+                โหลดครั้งเดียวเรียบร้อย
               </span>
             </div>
           </div>
