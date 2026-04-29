@@ -3,6 +3,12 @@
 const MAX_SOURCE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_CHAT_EDGE = 1800;
 
+function isGifImage(file: File) {
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return type === "image/gif" || name.endsWith(".gif");
+}
+
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -38,6 +44,10 @@ export async function prepareChatImageFile(file: File) {
 
   if (file.size > MAX_SOURCE_FILE_SIZE_BYTES) {
     throw new Error("รูปใหญ่เกินไป กรุณาใช้ไฟล์ไม่เกิน 25MB");
+  }
+
+  if (isGifImage(file)) {
+    return file;
   }
 
   const sourceUrl = await readFileAsDataUrl(file);

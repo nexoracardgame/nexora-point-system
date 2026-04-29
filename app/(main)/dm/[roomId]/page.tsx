@@ -12,6 +12,7 @@ import {
   mergeChatMessages,
   mergeSingleChatMessage,
   normalizeChatMessage,
+  reconcileRecentChatMessages,
   removeChatMessage,
   type ChatMessage as DMMessage,
   type ChatUser,
@@ -156,18 +157,18 @@ function DMRoomContent({
     });
   };
 
-  const keepComposerVisible = useEffectEvent(
-    (behavior: ScrollBehavior = "auto") => {
-      requestAnimationFrame(() => {
-        scrollToBottom(behavior);
-        textInputRef.current?.scrollIntoView({
-          block: "nearest",
-          inline: "nearest",
-          behavior,
-        });
+  const keepComposerVisibleNow = (behavior: ScrollBehavior = "auto") => {
+    requestAnimationFrame(() => {
+      scrollToBottom(behavior);
+      textInputRef.current?.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+        behavior,
       });
-    }
-  );
+    });
+  };
+
+  const keepComposerVisible = useEffectEvent(keepComposerVisibleNow);
 
   const getDistanceFromBottom = () => {
     const el = scrollRef.current;
@@ -398,15 +399,8 @@ function DMRoomContent({
       return;
     }
 
-    const latestTimestamp = String(
-      messages[messages.length - 1]?.createdAt || ""
-    ).trim();
-    const query = latestTimestamp
-      ? `after=${encodeURIComponent(latestTimestamp)}&limit=40`
-      : "limit=24";
-
     const res = await fetch(
-      `/api/dm/messages?roomId=${encodeURIComponent(targetRoomId)}&${query}`,
+      `/api/dm/messages?roomId=${encodeURIComponent(targetRoomId)}&limit=${CHAT_HISTORY_PAGE_SIZE}`,
       {
         cache: "no-store",
       }
@@ -423,15 +417,14 @@ function DMRoomContent({
         )
       : [];
 
-    if (freshMessages.length === 0) {
-      return;
-    }
+    setHasMore(Boolean(data?.hasMore));
+    setNextCursor(String(data?.nextCursor || "").trim() || null);
 
     setMessages((prev) =>
-      mergeChatMessages(prev, freshMessages, targetRoomId, me, other)
+      reconcileRecentChatMessages(prev, freshMessages, targetRoomId, me, other)
     );
 
-    if (document.visibilityState === "visible") {
+    if (freshMessages.length > 0 && document.visibilityState === "visible") {
       void markLoadedRoomSeen(targetRoomId, freshMessages, me);
     }
   });
@@ -488,33 +481,35 @@ function DMRoomContent({
         )
       : [];
 
-    if (cachedMessages.length > 0) {
-      setMessages((prev) =>
-        prev.length > 0
-          ? prev
-          : mergeChatMessages(prev, cachedMessages, roomId, cachedMe, cachedOther)
-      );
-    }
+    queueMicrotask(() => {
+      if (cachedMessages.length > 0) {
+        setMessages((prev) =>
+          prev.length > 0
+            ? prev
+            : mergeChatMessages(prev, cachedMessages, roomId, cachedMe, cachedOther)
+        );
+      }
 
-    if (cachedMe) {
-      setMe((prev) => prev || cachedMe);
-    }
+      if (cachedMe) {
+        setMe((prev) => prev || cachedMe);
+      }
 
-    if (cachedOther) {
-      setOther((prev) => prev || cachedOther);
-    }
+      if (cachedOther) {
+        setOther((prev) => prev || cachedOther);
+      }
 
-    if (cached.meta?.hasMore) {
-      setHasMore(true);
-    }
+      if (cached.meta?.hasMore) {
+        setHasMore(true);
+      }
 
-    if (cached.meta?.nextCursor) {
-      setNextCursor((prev) => prev || cached.meta?.nextCursor || null);
-    }
+      if (cached.meta?.nextCursor) {
+        setNextCursor((prev) => prev || cached.meta?.nextCursor || null);
+      }
 
-    if (cachedMessages.length > 0 || cachedMe || cachedOther) {
-      setLoadingRoom(false);
-    }
+      if (cachedMessages.length > 0 || cachedMe || cachedOther) {
+        setLoadingRoom(false);
+      }
+    });
   }, [initialOther, roomId]);
 
   const markSeenNow = async () => {
@@ -694,6 +689,16 @@ function DMRoomContent({
     }
 
     const channel = supabase.channel(`dm-room-${roomId}-${Date.now()}`);
+    const handleDeletedMessage = (payload: { old?: unknown }) => {
+      const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
+      if (!deletedId) {
+        void syncLatestMessages();
+        return;
+      }
+
+      setMessages((prev) => removeChatMessage(prev, deletedId));
+      setMessageMenuId((current) => (current === deletedId ? null : current));
+    };
 
     channel.on(
       "postgres_changes",
@@ -704,11 +709,7 @@ function DMRoomContent({
         }
 
         if (payload.eventType === "DELETE") {
-          const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
-          if (!deletedId) return;
-
-          setMessages((prev) => removeChatMessage(prev, deletedId));
-          setMessageMenuId((current) => (current === deletedId ? null : current));
+          handleDeletedMessage(payload);
           return;
         }
 
@@ -731,6 +732,22 @@ function DMRoomContent({
           document.visibilityState === "visible"
         ) {
           void markLoadedRoomSeen(roomId, [incoming], me);
+        }
+      }
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "DELETE", schema: "public", table: "dmMessage" },
+      handleDeletedMessage
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dm_room", filter: `roomid=eq.${roomId}` },
+      () => {
+        if (activeRoomIdRef.current === roomId) {
+          void syncLatestMessages();
         }
       }
     );
@@ -944,7 +961,9 @@ function DMRoomContent({
     if (!res?.ok) {
       setMessages(snapshot);
       alert("ลบข้อความไม่สำเร็จ กรุณาลองใหม่");
+      return;
     }
+
   };
 
   const startLongPress = (messageId: string) => {
@@ -1140,7 +1159,7 @@ function DMRoomContent({
                               src={message.imageUrl}
                               alt="chat attachment"
                               onClick={() => setPreview(message.imageUrl || null)}
-                              className="mb-2 max-h-[220px] cursor-pointer rounded-xl"
+                              className="mb-2 block h-auto max-h-[220px] max-w-full cursor-pointer rounded-xl object-contain"
                             />
                           ) : null}
 
@@ -1250,12 +1269,12 @@ function DMRoomContent({
                   if (hasMarkedSeenRef.current) return;
                   hasMarkedSeenRef.current = true;
                   await markSeenNow();
-                  keepComposerVisible("smooth");
+                  keepComposerVisibleNow("smooth");
                   setTimeout(() => {
                     hasMarkedSeenRef.current = false;
                   }, 300);
                   window.setTimeout(() => {
-                    keepComposerVisible("auto");
+                    keepComposerVisibleNow("auto");
                   }, 260);
                 }}
                 inputMode="text"
@@ -1280,7 +1299,7 @@ function DMRoomContent({
                     setFile(event.target.files?.[0] || null);
                     requestAnimationFrame(() => {
                       textInputRef.current?.focus();
-                      keepComposerVisible("smooth");
+                      keepComposerVisibleNow("smooth");
                     });
                   }}
                   className="hidden"
@@ -1323,7 +1342,7 @@ function DMRoomContent({
                     }
                     requestAnimationFrame(() => {
                       textInputRef.current?.focus();
-                      keepComposerVisible("smooth");
+                      keepComposerVisibleNow("smooth");
                     });
                   }}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/75 transition hover:bg-white/20 hover:text-white"

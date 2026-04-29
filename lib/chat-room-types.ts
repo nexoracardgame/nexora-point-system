@@ -202,6 +202,58 @@ export function mergeSingleChatMessage<T extends ChatMessage>(
   return mergeChatMessages(prev, [incoming], roomId, me, other);
 }
 
+export function reconcileRecentChatMessages<T extends ChatMessage>(
+  prev: T[],
+  incoming: T[],
+  roomId: string,
+  me?: ChatIdentity,
+  other?: ChatIdentity
+) {
+  const normalizedIncoming = incoming
+    .filter((message) => Boolean(message?.id))
+    .map((message) => normalizeChatMessage(message, roomId, me, other) as T);
+
+  if (normalizedIncoming.length === 0) {
+    return prev.filter(
+      (message) =>
+        Boolean(message.optimistic) || safeText(message.roomId) !== safeText(roomId)
+    );
+  }
+
+  const incomingIds = new Set(normalizedIncoming.map((message) => message.id));
+  const incomingTimes = normalizedIncoming
+    .map((message) => safeTime(message.createdAt))
+    .filter((time) => time > 0);
+  const earliestIncomingTime = incomingTimes.length
+    ? Math.min(...incomingTimes)
+    : 0;
+
+  const base = prev.filter((message) => {
+    if (message.optimistic) return true;
+    if (safeText(message.roomId) !== safeText(roomId)) return true;
+    if (incomingIds.has(message.id)) return true;
+
+    const messageTime = safeTime(message.createdAt);
+    return earliestIncomingTime > 0 && messageTime > 0
+      ? messageTime < earliestIncomingTime
+      : true;
+  });
+
+  return mergeChatMessages(base, normalizedIncoming, roomId, me, other);
+}
+
 export function removeChatMessage<T extends ChatMessage>(prev: T[], messageId: string) {
-  return prev.filter((message) => message.id !== messageId);
+  const safeMessageId = safeText(messageId);
+  if (!safeMessageId) return prev;
+
+  let removed = false;
+  const next = prev.filter((message) => {
+    const keep = message.id !== safeMessageId;
+    if (!keep) {
+      removed = true;
+    }
+    return keep;
+  });
+
+  return removed ? next : prev;
 }

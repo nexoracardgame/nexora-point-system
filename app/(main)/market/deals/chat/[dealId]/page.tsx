@@ -15,6 +15,7 @@ import {
   mergeChatMessages,
   mergeSingleChatMessage,
   normalizeChatMessage,
+  reconcileRecentChatMessages,
   removeChatMessage,
   type ChatMessage as DealMessage,
   type ChatUser,
@@ -151,18 +152,18 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     });
   };
 
-  const keepComposerVisible = useEffectEvent(
-    (behavior: ScrollBehavior = "auto") => {
-      requestAnimationFrame(() => {
-        scrollToBottom(behavior);
-        textInputRef.current?.scrollIntoView({
-          block: "nearest",
-          inline: "nearest",
-          behavior,
-        });
+  const keepComposerVisibleNow = (behavior: ScrollBehavior = "auto") => {
+    requestAnimationFrame(() => {
+      scrollToBottom(behavior);
+      textInputRef.current?.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+        behavior,
       });
-    }
-  );
+    });
+  };
+
+  const keepComposerVisible = useEffectEvent(keepComposerVisibleNow);
 
   const getDistanceFromBottom = () => {
     const el = scrollRef.current;
@@ -362,15 +363,8 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       return;
     }
 
-    const latestTimestamp = String(
-      messages[messages.length - 1]?.createdAt || ""
-    ).trim();
-    const query = latestTimestamp
-      ? `after=${encodeURIComponent(latestTimestamp)}&limit=40`
-      : "limit=24";
-
     const res = await fetch(
-      `/api/dm/messages?roomId=${encodeURIComponent(currentRoomId)}&${query}`,
+      `/api/dm/messages?roomId=${encodeURIComponent(currentRoomId)}&limit=${CHAT_HISTORY_PAGE_SIZE}`,
       {
         cache: "no-store",
       }
@@ -387,15 +381,14 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         )
       : [];
 
-    if (freshMessages.length === 0) {
-      return;
-    }
+    setHasMore(Boolean(data?.hasMore));
+    setNextCursor(String(data?.nextCursor || "").trim() || null);
 
     setMessages((prev) =>
-      mergeChatMessages(prev, freshMessages, currentRoomId, me, other)
+      reconcileRecentChatMessages(prev, freshMessages, currentRoomId, me, other)
     );
 
-    if (document.visibilityState === "visible") {
+    if (freshMessages.length > 0 && document.visibilityState === "visible") {
       void markLoadedRoomSeen(currentRoomId, freshMessages, me);
     }
   });
@@ -456,47 +449,52 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
 
     if (cachedRoomId) {
       activeRoomIdRef.current = cachedRoomId;
-      setRoomId((prev) => prev || cachedRoomId);
     }
 
-    if (cachedMessages.length > 0) {
-      setMessages((prev) =>
-        prev.length > 0
-          ? prev
-          : mergeChatMessages(prev, cachedMessages, cachedRoomId, cachedMe, cachedOther)
-      );
-    }
+    queueMicrotask(() => {
+      if (cachedRoomId) {
+        setRoomId((prev) => prev || cachedRoomId);
+      }
 
-    if (cachedMe) {
-      setMe((prev) => prev || cachedMe);
-    }
+      if (cachedMessages.length > 0) {
+        setMessages((prev) =>
+          prev.length > 0
+            ? prev
+            : mergeChatMessages(prev, cachedMessages, cachedRoomId, cachedMe, cachedOther)
+        );
+      }
 
-    if (cachedOther) {
-      setOther((prev) => prev || cachedOther);
-    }
+      if (cachedMe) {
+        setMe((prev) => prev || cachedMe);
+      }
 
-    if (cached.meta?.card) {
-      setCard((prev) => prev || cached.meta?.card || null);
-    }
+      if (cachedOther) {
+        setOther((prev) => prev || cachedOther);
+      }
 
-    if (cached.meta?.deal) {
-      setDeal((prev) => prev || cached.meta?.deal || null);
-    }
+      if (cached.meta?.card) {
+        setCard((prev) => prev || cached.meta?.card || null);
+      }
 
-    if (cached.meta?.hasMore) {
-      setHasMore(true);
-    }
+      if (cached.meta?.deal) {
+        setDeal((prev) => prev || cached.meta?.deal || null);
+      }
 
-    if (cached.meta?.nextCursor) {
-      setNextCursor((prev) => prev || cached.meta?.nextCursor || null);
-    }
+      if (cached.meta?.hasMore) {
+        setHasMore(true);
+      }
 
-    if (
-      cachedMessages.length > 0 ||
-      (cachedRoomId && cached.meta?.card && cached.meta?.deal && cachedMe && cachedOther)
-    ) {
-      setLoadingRoom(false);
-    }
+      if (cached.meta?.nextCursor) {
+        setNextCursor((prev) => prev || cached.meta?.nextCursor || null);
+      }
+
+      if (
+        cachedMessages.length > 0 ||
+        (cachedRoomId && cached.meta?.card && cached.meta?.deal && cachedMe && cachedOther)
+      ) {
+        setLoadingRoom(false);
+      }
+    });
   }, [dealId]);
 
   const markSeenNow = async () => {
@@ -679,6 +677,16 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     }
 
     const channel = supabase.channel(`deal-room-${dealId}-${Date.now()}`);
+    const handleDeletedMessage = (payload: { old?: unknown }) => {
+      const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
+      if (!deletedId) {
+        void syncLatestMessages();
+        return;
+      }
+
+      setMessages((prev) => removeChatMessage(prev, deletedId));
+      setMessageMenuId((current) => (current === deletedId ? null : current));
+    };
 
     channel.on(
       "postgres_changes",
@@ -689,11 +697,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         }
 
         if (payload.eventType === "DELETE") {
-          const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
-          if (!deletedId) return;
-
-          setMessages((prev) => removeChatMessage(prev, deletedId));
-          setMessageMenuId((current) => (current === deletedId ? null : current));
+          handleDeletedMessage(payload);
           return;
         }
 
@@ -714,6 +718,22 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
           document.visibilityState === "visible"
         ) {
           void markLoadedRoomSeen(currentRoomId, [incoming], me);
+        }
+      }
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "DELETE", schema: "public", table: "dmMessage" },
+      handleDeletedMessage
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dm_room", filter: `roomid=eq.${currentRoomId}` },
+      () => {
+        if (activeRoomIdRef.current === currentRoomId) {
+          void syncLatestMessages();
         }
       }
     );
@@ -952,7 +972,9 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     if (!res?.ok) {
       setMessages(snapshot);
       alert("ลบข้อความไม่สำเร็จ กรุณาลองใหม่");
+      return;
     }
+
   };
 
   const startLongPress = (messageId: string) => {
@@ -1188,7 +1210,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                               src={message.imageUrl}
                               alt="deal chat attachment"
                               onClick={() => setPreview(message.imageUrl || null)}
-                              className="mb-2 max-h-[220px] cursor-pointer rounded-xl"
+                              className="mb-2 block h-auto max-h-[220px] max-w-full cursor-pointer rounded-xl object-contain"
                             />
                           ) : null}
 
@@ -1296,12 +1318,12 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                   if (hasMarkedSeenRef.current) return;
                   hasMarkedSeenRef.current = true;
                   await markSeenNow();
-                  keepComposerVisible("smooth");
+                  keepComposerVisibleNow("smooth");
                   setTimeout(() => {
                     hasMarkedSeenRef.current = false;
                   }, 300);
                   window.setTimeout(() => {
-                    keepComposerVisible("auto");
+                    keepComposerVisibleNow("auto");
                   }, 260);
                 }}
                 inputMode="text"
@@ -1326,7 +1348,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                     setFile(event.target.files?.[0] || null);
                     requestAnimationFrame(() => {
                       textInputRef.current?.focus();
-                      keepComposerVisible("smooth");
+                      keepComposerVisibleNow("smooth");
                     });
                   }}
                   className="hidden"
@@ -1369,7 +1391,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                     }
                     requestAnimationFrame(() => {
                       textInputRef.current?.focus();
-                      keepComposerVisible("smooth");
+                      keepComposerVisibleNow("smooth");
                     });
                   }}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/75 transition hover:bg-white/20 hover:text-white"

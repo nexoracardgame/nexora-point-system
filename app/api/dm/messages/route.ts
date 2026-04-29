@@ -261,9 +261,20 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "delete failed" }, { status: 500 });
   }
 
+  const deletedAt = new Date().toISOString();
+  const { error: touchRoomError } = await supabase
+    .from("dm_room")
+    .update({ updatedat: deletedAt })
+    .eq("roomid", access.roomId);
+
+  if (touchRoomError) {
+    console.error("TOUCH DM ROOM AFTER DELETE ERROR:", touchRoomError);
+  }
+
   return NextResponse.json({
     success: true,
     roomId: access.roomId,
     messageId,
+    deletedAt,
   });
 }
