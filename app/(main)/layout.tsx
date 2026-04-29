@@ -772,13 +772,9 @@ export default function MainLayout({
                   onClick={handleGoBack}
                   aria-label="ย้อนกลับ"
                   title="ย้อนกลับ"
-                  className="group relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-amber-200/35 bg-[linear-gradient(135deg,#fde68a_0%,#f59e0b_54%,#92400e_100%)] text-black shadow-[0_10px_26px_rgba(245,158,11,0.28),inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:scale-[1.03] hover:shadow-[0_12px_30px_rgba(245,158,11,0.38),0_0_22px_rgba(251,191,36,0.22)] active:scale-95 sm:h-12 sm:w-12 xl:h-11 xl:w-11 2xl:w-auto 2xl:gap-2 2xl:px-4"
+                  className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-white/8 bg-white/[0.04] text-white/78 shadow-[0_8px_22px_rgba(0,0,0,0.24)] transition hover:border-violet-300/25 hover:bg-violet-400/10 hover:text-violet-100 active:scale-95 sm:h-11 sm:w-11"
                 >
-                  <span className="pointer-events-none absolute inset-x-2 top-0 h-px bg-white/70" />
-                  <ArrowLeft className="relative h-5 w-5 stroke-[2.8] sm:h-[22px] sm:w-[22px] xl:h-5 xl:w-5" />
-                  <span className="relative hidden text-sm font-black 2xl:inline">
-                    ย้อนกลับ
-                  </span>
+                  <ArrowLeft className="h-5 w-5 stroke-[2.4]" />
                 </button>
 
                 {/* MOBILE LOGO */}
