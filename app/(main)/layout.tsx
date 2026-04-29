@@ -21,6 +21,7 @@ import {
   Wallet,
   ShoppingBag,
   Gift,
+  ArrowLeft,
   FolderKanban,
   Settings,
   LogOut,
@@ -87,10 +88,14 @@ export default function MainLayout({
   }
 
   useEffect(() => {
-    setLiveBalances({
-      nexPoint: Number(session?.user?.nexPoint || 0),
-      coin: Number(session?.user?.coin || 0),
-    });
+    const timeoutId = window.setTimeout(() => {
+      setLiveBalances({
+        nexPoint: Number(session?.user?.nexPoint || 0),
+        coin: Number(session?.user?.coin || 0),
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [session?.user?.coin, session?.user?.nexPoint]);
 
   useEffect(() => {
@@ -640,7 +645,7 @@ export default function MainLayout({
        active: pathname.startsWith("/dm"),
       },
     ],
-    [ownProfileHref, pathname, t]
+    [pathname, t]
   );
 
   const mobileBottomItems = useMemo(
@@ -702,6 +707,18 @@ export default function MainLayout({
     },
   ];
 
+  const handleGoBack = () => {
+    setMenuOpen(false);
+    setMobileNavOpen(false);
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    router.push("/");
+  };
+
   return (
     <div className="min-h-[var(--app-shell-height)] bg-[#050608] text-white">
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.06),transparent_24%)]" />
@@ -750,10 +767,24 @@ export default function MainLayout({
           <header className="sticky top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl">
             <div className="flex h-[74px] items-center justify-between gap-2 px-3 sm:px-5 xl:px-6">
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={handleGoBack}
+                  aria-label="ย้อนกลับ"
+                  title="ย้อนกลับ"
+                  className="group relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-amber-200/35 bg-[linear-gradient(135deg,#fde68a_0%,#f59e0b_54%,#92400e_100%)] text-black shadow-[0_10px_26px_rgba(245,158,11,0.28),inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:scale-[1.03] hover:shadow-[0_12px_30px_rgba(245,158,11,0.38),0_0_22px_rgba(251,191,36,0.22)] active:scale-95 sm:h-12 sm:w-12 xl:h-11 xl:w-11 2xl:w-auto 2xl:gap-2 2xl:px-4"
+                >
+                  <span className="pointer-events-none absolute inset-x-2 top-0 h-px bg-white/70" />
+                  <ArrowLeft className="relative h-5 w-5 stroke-[2.8] sm:h-[22px] sm:w-[22px] xl:h-5 xl:w-5" />
+                  <span className="relative hidden text-sm font-black 2xl:inline">
+                    ย้อนกลับ
+                  </span>
+                </button>
+
                 {/* MOBILE LOGO */}
                 <PrefetchLink
                   href="/"
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/15 bg-[#12141a] text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.16)] xl:hidden"
+                  className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/15 bg-[#12141a] text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.16)] sm:flex xl:hidden"
                 >
                   <Gem className="h-5 w-5" />
                 </PrefetchLink>

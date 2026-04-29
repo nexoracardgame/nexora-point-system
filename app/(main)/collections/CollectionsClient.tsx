@@ -119,13 +119,17 @@ export default function CollectionsClient() {
   const [showAllPreviewCards, setShowAllPreviewCards] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredState();
-    if (stored) {
-      setOwnedCards(stored.ownedCards);
-      setCalculator(stored.calculator);
-      setSelectedSetId(stored.selectedSetId);
-    }
-    setHydrated(true);
+    const timeoutId = window.setTimeout(() => {
+      const stored = readStoredState();
+      if (stored) {
+        setOwnedCards(stored.ownedCards);
+        setCalculator(stored.calculator);
+        setSelectedSetId(stored.selectedSetId);
+      }
+      setHydrated(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
@@ -181,6 +185,7 @@ export default function CollectionsClient() {
           nexoraCollectionSets.some((set) => set.id === remoteSelectedSetId)
         ) {
           setSelectedSetId(remoteSelectedSetId);
+          setShowAllPreviewCards(false);
         }
       } finally {
         if (!cancelled) setRemoteSynced(true);
@@ -216,15 +221,12 @@ export default function CollectionsClient() {
       setOwnedCards(stored.ownedCards);
       setCalculator(stored.calculator);
       setSelectedSetId(stored.selectedSetId);
+      setShowAllPreviewCards(false);
     };
 
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
-
-  useEffect(() => {
-    setShowAllPreviewCards(false);
-  }, [selectedSetId]);
 
   const ownedSet = useMemo(() => new Set(ownedCards), [ownedCards]);
 
@@ -333,6 +335,11 @@ export default function CollectionsClient() {
     setMessage(`ล้างการ์ดของชุด ${activeStat.set.order} แล้ว`);
   };
 
+  const selectSet = (setId: string) => {
+    setSelectedSetId(setId);
+    setShowAllPreviewCards(false);
+  };
+
   const previewCards =
     activeStat?.cardIds.slice(
       0,
@@ -345,10 +352,10 @@ export default function CollectionsClient() {
   return (
     <div className="min-h-screen bg-[#f4f1ea] text-[#080808]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(255,255,255,0.96),transparent_26%),radial-gradient(circle_at_82%_0%,rgba(255,226,126,0.34),transparent_20%),linear-gradient(180deg,#fbfaf6_0%,#ebe6da_100%)]" />
-      <div className="relative mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
+      <div className="relative mx-auto w-full max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:max-w-none xl:px-0">
         <section className="overflow-hidden rounded-[30px] bg-white shadow-[0_28px_90px_rgba(50,43,33,0.16)] ring-1 ring-black/5 sm:rounded-[44px]">
-          <div className="grid gap-0 lg:grid-cols-[1.08fr_0.92fr]">
-            <div className="relative min-h-[420px] overflow-hidden bg-[#080808] px-5 py-6 text-white sm:px-8 sm:py-8 lg:px-10">
+          <div className="grid gap-0 lg:grid-cols-[1.08fr_0.92fr] xl:grid-cols-[minmax(0,1.22fr)_minmax(420px,0.78fr)]">
+            <div className="relative min-h-[420px] overflow-hidden bg-[#080808] px-5 py-6 text-white sm:px-8 sm:py-8 lg:px-10 xl:min-h-[480px] xl:px-12 xl:py-10 2xl:px-14">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_16%,rgba(255,255,255,0.18),transparent_22%),linear-gradient(135deg,rgba(255,212,89,0.18),transparent_34%)]" />
               <div className="relative">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-black shadow-[0_18px_40px_rgba(0,0,0,0.24)]">
@@ -393,8 +400,8 @@ export default function CollectionsClient() {
               </div>
             </div>
 
-            <div className="bg-[#f8f6ef] p-4 sm:p-6 lg:p-7">
-              <div className="rounded-[28px] bg-white p-4 shadow-[0_18px_50px_rgba(20,18,14,0.08)] ring-1 ring-black/5 sm:p-5">
+            <div className="bg-[#f8f6ef] p-4 sm:p-6 lg:p-7 xl:p-8 2xl:p-9">
+              <div className="rounded-[28px] bg-white p-4 shadow-[0_18px_50px_rgba(20,18,14,0.08)] ring-1 ring-black/5 sm:p-5 xl:min-h-full xl:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">
@@ -461,9 +468,9 @@ export default function CollectionsClient() {
           </div>
         </section>
 
-        <section className="mt-5 grid gap-5 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
+        <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(360px,0.78fr)_minmax(0,1.22fr)] xl:items-start 2xl:grid-cols-[minmax(420px,0.72fr)_minmax(0,1.28fr)]">
           <div className="space-y-5 xl:col-start-1 xl:row-start-1">
-            <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5">
+            <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5 xl:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">
@@ -542,7 +549,7 @@ export default function CollectionsClient() {
               </div>
             </div>
 
-            <div className="rounded-[30px] bg-[#080808] p-4 text-white shadow-[0_22px_70px_rgba(0,0,0,0.18)] sm:p-5">
+            <div className="rounded-[30px] bg-[#080808] p-4 text-white shadow-[0_22px_70px_rgba(0,0,0,0.18)] sm:p-5 xl:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35">
@@ -565,7 +572,7 @@ export default function CollectionsClient() {
                     <button
                       key={item.set.id}
                       type="button"
-                      onClick={() => setSelectedSetId(item.set.id)}
+                      onClick={() => selectSet(item.set.id)}
                       className="flex w-full items-center justify-between gap-3 rounded-[22px] bg-white/8 px-4 py-3 text-left transition hover:bg-white/12"
                     >
                       <span className="min-w-0">
@@ -587,7 +594,7 @@ export default function CollectionsClient() {
           </div>
 
           <div className="space-y-5 xl:contents">
-            <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+            <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5 xl:col-start-2 xl:row-start-1 xl:p-6 2xl:p-7">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">
@@ -597,7 +604,7 @@ export default function CollectionsClient() {
                     ชุดสะสมทั้งหมด
                   </h2>
                 </div>
-                <label className="flex h-12 items-center gap-2 rounded-full bg-[#f3f1ea] px-4 ring-1 ring-black/5 sm:w-[280px]">
+                <label className="flex h-12 items-center gap-2 rounded-full bg-[#f3f1ea] px-4 ring-1 ring-black/5 sm:w-[280px] xl:w-[340px]">
                   <Search className="h-4 w-4 shrink-0 text-black/45" />
                   <input
                     value={searchTerm}
@@ -608,20 +615,20 @@ export default function CollectionsClient() {
                 </label>
               </div>
 
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {filteredStats.map((item) => (
                   <button
                     key={item.set.id}
                     type="button"
-                    onClick={() => setSelectedSetId(item.set.id)}
-                    className={`overflow-hidden rounded-[26px] p-3 text-left ring-1 transition ${
+                    onClick={() => selectSet(item.set.id)}
+                    className={`overflow-hidden rounded-[26px] p-3 text-left ring-1 transition xl:p-4 ${
                       item.set.id === activeStat?.set.id
                         ? "bg-black text-white ring-black"
                         : "bg-[#f6f4ee] text-black ring-black/5 hover:bg-[#efebe0]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] bg-white text-black shadow-sm">
+                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] bg-white text-black shadow-sm xl:h-14 xl:w-14">
                         <span className="text-base font-black">
                           {item.set.order}
                         </span>
@@ -685,9 +692,9 @@ export default function CollectionsClient() {
             </div>
 
             {activeStat ? (
-              <section className="overflow-hidden rounded-[30px] bg-[#080808] text-white shadow-[0_26px_90px_rgba(0,0,0,0.24)] xl:col-start-1 xl:row-start-2 xl:self-start">
-                <div className="grid gap-0 2xl:grid-cols-[0.88fr_1.12fr]">
-                  <div className="relative min-h-[320px] overflow-hidden bg-[#121212] p-5">
+              <section className="overflow-hidden rounded-[30px] bg-[#080808] text-white shadow-[0_26px_90px_rgba(0,0,0,0.24)] xl:col-span-2 xl:col-start-1 xl:row-start-2">
+                <div className="grid gap-0 xl:grid-cols-[minmax(420px,0.86fr)_minmax(0,1.14fr)] 2xl:grid-cols-[minmax(520px,0.82fr)_minmax(0,1.18fr)]">
+                  <div className="relative min-h-[320px] overflow-hidden bg-[#121212] p-5 xl:min-h-[520px] xl:p-7 2xl:p-8">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_16%,rgba(245,197,66,0.22),transparent_24%),linear-gradient(180deg,transparent,rgba(0,0,0,0.52))]" />
                     <div className="relative">
                       <div className="flex items-center justify-between gap-3">
@@ -726,8 +733,8 @@ export default function CollectionsClient() {
                         ) : null}
                       </div>
 
-                      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-4">
-                        {previewCards.map((cardId) => {
+                      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-4 xl:gap-3">
+                        {previewCards.map((cardId, index) => {
                           const isOwned = ownedSet.has(cardId);
 
                           return (
@@ -751,13 +758,15 @@ export default function CollectionsClient() {
                                 src={`/cards/${formatCardNo(cardId)}.jpg`}
                                 alt={`Card ${formatCardNo(cardId)}`}
                                 fill
-                                sizes="(max-width: 640px) 22vw, 96px"
+                                sizes="(max-width: 640px) 22vw, (max-width: 1279px) 96px, (max-width: 1535px) 10vw, 148px"
+                                quality={72}
+                                decoding="async"
                                 className={`object-cover transition duration-200 ${
                                   isOwned
                                     ? "brightness-110 saturate-125"
                                     : "group-hover:brightness-110"
                                 }`}
-                                loading="lazy"
+                                loading={index < 4 ? "eager" : "lazy"}
                               />
                               <div
                                 className={`pointer-events-none absolute inset-0 rounded-[16px] transition ${
@@ -778,7 +787,7 @@ export default function CollectionsClient() {
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 text-black sm:p-5">
+                  <div className="bg-white p-4 text-black sm:p-5 xl:p-6 2xl:p-7">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">
@@ -868,7 +877,7 @@ export default function CollectionsClient() {
                           <ListChecks className="h-4 w-4 text-emerald-600" />
                           มีแล้ว
                         </div>
-                        <div className="max-h-[240px] overflow-auto rounded-[22px] bg-[#f3f1ea] p-3 ring-1 ring-black/5">
+                        <div className="max-h-[240px] overflow-auto rounded-[22px] bg-[#f3f1ea] p-3 ring-1 ring-black/5 xl:max-h-[320px]">
                           {activeStat.owned.length === 0 ? (
                             <div className="px-2 py-5 text-sm font-bold text-black/42">
                               ยังไม่มีการ์ดในชุดนี้
@@ -895,7 +904,7 @@ export default function CollectionsClient() {
                           <Gem className="h-4 w-4 text-[#a96d00]" />
                           ขาดอยู่
                         </div>
-                        <div className="max-h-[240px] overflow-auto rounded-[22px] bg-[#f3f1ea] p-3 ring-1 ring-black/5">
+                        <div className="max-h-[240px] overflow-auto rounded-[22px] bg-[#f3f1ea] p-3 ring-1 ring-black/5 xl:max-h-[320px]">
                           {activeStat.missing.length === 0 ? (
                             <div className="px-2 py-5 text-sm font-black text-emerald-700">
                               ครบชุดแล้ว
