@@ -366,10 +366,7 @@ export default async function MarketCardDetailPage({
     : translate(locale, "market.card.currentSeller");
   const rarityStyle = getRarityStyle(listing.rarity || undefined);
 
-  const badgeItems = [
-    listing.serialNo ? "Serial" : null,
-    formatRelativeDays(toDate(listing.createdAt), locale),
-  ].filter(Boolean) as string[];
+  const badgeItems = [formatRelativeDays(toDate(listing.createdAt), locale)];
 
   const marketSnapshots = [...relatedListings]
     .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
@@ -612,11 +609,6 @@ export default async function MarketCardDetailPage({
                   <span className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5">
                     Card #{card.cardNo}
                   </span>
-                  {listing.serialNo ? (
-                    <span className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5">
-                      Serial {listing.serialNo}
-                    </span>
-                  ) : null}
                   <span className="rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5">
                     {formatRelativeDays(toDate(listing.createdAt), locale)}
                   </span>
@@ -650,7 +642,6 @@ export default async function MarketCardDetailPage({
                   cardNo={card.cardNo}
                   cardImage={card.image}
                   listedPrice={Number(listing.price || 0)}
-                  serialNo={listing.serialNo}
                 />
               )}
 

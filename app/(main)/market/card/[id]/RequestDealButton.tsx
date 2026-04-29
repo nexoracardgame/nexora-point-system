@@ -12,7 +12,6 @@ export default function RequestDealButton({
   cardNo,
   cardImage,
   listedPrice,
-  serialNo,
 }: {
   cardId: string;
   sellerId: string;
@@ -22,7 +21,6 @@ export default function RequestDealButton({
   cardNo: string;
   cardImage: string;
   listedPrice: number;
-  serialNo?: string | null;
 }) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
@@ -56,7 +54,6 @@ export default function RequestDealButton({
           cardNo,
           cardImage,
           listedPrice,
-          serialNo,
         }),
       });
 
