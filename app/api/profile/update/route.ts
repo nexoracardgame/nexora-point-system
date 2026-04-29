@@ -88,15 +88,17 @@ export async function POST(req: NextRequest) {
       ).catch(() => undefined);
     }
 
-    const updatedUser = await upsertLocalProfile(userId, fallbackUser).catch(
-      (error) => {
-        console.error("UPSERT PROFILE ERROR:", error);
-        return {
-          ...fallbackUser,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-    );
+    const updatedUser = await upsertLocalProfile(
+      userId,
+      fallbackUser,
+      lineId && lineId !== userId ? [lineId] : []
+    ).catch((error) => {
+      console.error("UPSERT PROFILE ERROR:", error);
+      return {
+        ...fallbackUser,
+        updatedAt: new Date().toISOString(),
+      };
+    });
 
     const syncedName =
       updatedUser.displayName || session?.user?.name || "NEXORA User";

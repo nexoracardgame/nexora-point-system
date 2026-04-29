@@ -8,6 +8,7 @@ import {
   readClientViewCache,
   writeClientViewCache,
 } from "@/lib/client-view-cache";
+import { listenProfileSync, type ProfileSyncDetail } from "@/lib/profile-sync";
 import { trackUiFetch } from "@/lib/ui-activity";
 
 type SearchUser = {
@@ -54,6 +55,76 @@ type CommunitySnapshot = {
   results: SearchUser[];
 };
 
+const relationRank: Record<SearchUser["relation"], number> = {
+  none: 0,
+  outgoing: 1,
+  incoming: 2,
+  friends: 3,
+  self: 4,
+};
+
+function dedupeBy<T>(items: T[], getKey: (item: T) => string) {
+  const next = new Map<string, T>();
+
+  items.forEach((item) => {
+    const key = getKey(item);
+    if (!key || next.has(key)) return;
+    next.set(key, item);
+  });
+
+  return Array.from(next.values());
+}
+
+function normalizeFriends(items: FriendItem[]) {
+  return dedupeBy(items, (item) => String(item.friendId || item.id || "").trim());
+}
+
+function normalizeRequests(items: IncomingRequest[]) {
+  return dedupeBy(items, (item) => String(item.fromUserId || item.id || "").trim());
+}
+
+function normalizeResults(items: SearchUser[]) {
+  const next = new Map<string, SearchUser>();
+
+  items.forEach((item) => {
+    const id = String(item.id || "").trim();
+    if (!id) return;
+
+    const current = next.get(id);
+    if (!current) {
+      next.set(id, item);
+      return;
+    }
+
+    const relation =
+      relationRank[item.relation] >= relationRank[current.relation]
+        ? item.relation
+        : current.relation;
+
+    next.set(id, {
+      ...current,
+      ...item,
+      relation,
+      requestId: item.requestId || current.requestId || null,
+    });
+  });
+
+  return Array.from(next.values());
+}
+
+function patchProfileItem<T extends { displayName: string; image: string; username?: string | null; bio?: string }>(
+  item: T,
+  detail: ProfileSyncDetail
+) {
+  return {
+    ...item,
+    displayName: detail.name?.trim() || item.displayName,
+    username: detail.username ?? item.username ?? null,
+    image: detail.image || item.image,
+    bio: detail.bio ?? item.bio ?? "",
+  };
+}
+
 export default function CommunityClient({
   initialFriends = [],
   initialRequests = [],
@@ -71,13 +142,13 @@ export default function CommunityClient({
     []
   );
   const cachedFriends = Array.isArray(cachedCommunityState?.data?.friends)
-    ? cachedCommunityState.data.friends
+    ? normalizeFriends(cachedCommunityState.data.friends)
     : [];
   const cachedRequests = Array.isArray(cachedCommunityState?.data?.requests)
-    ? cachedCommunityState.data.requests
+    ? normalizeRequests(cachedCommunityState.data.requests)
     : [];
   const cachedResults = Array.isArray(cachedCommunityState?.data?.results)
-    ? cachedCommunityState.data.results
+    ? normalizeResults(cachedCommunityState.data.results)
     : [];
   const cachedHasFriendsSnapshot = Boolean(
     cachedCommunityState?.data &&
@@ -103,10 +174,10 @@ export default function CommunityClient({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>(cachedResults);
   const [friends, setFriends] = useState<FriendItem[]>(
-    initialFriends.length > 0 ? initialFriends : cachedFriends
+    hasInitialCommunityState ? normalizeFriends(initialFriends) : cachedFriends
   );
   const [requests, setRequests] = useState<IncomingRequest[]>(
-    initialRequests.length > 0 ? initialRequests : cachedRequests
+    hasInitialCommunityState ? normalizeRequests(initialRequests) : cachedRequests
   );
   const [loadingResults, setLoadingResults] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(!hasReadyFriendsSnapshot);
@@ -134,8 +205,12 @@ export default function CommunityClient({
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
-      setFriends(Array.isArray(data?.friends) ? data.friends : []);
-      setRequests(Array.isArray(data?.requests) ? data.requests : []);
+      setFriends(
+        Array.isArray(data?.friends) ? normalizeFriends(data.friends) : []
+      );
+      setRequests(
+        Array.isArray(data?.requests) ? normalizeRequests(data.requests) : []
+      );
       setFriendsHydrated(true);
     } catch {
       return;
@@ -159,7 +234,7 @@ export default function CommunityClient({
         }
       );
       const data = await res.json().catch(() => ({}));
-      setResults(Array.isArray(data?.users) ? data.users : []);
+      setResults(Array.isArray(data?.users) ? normalizeResults(data.users) : []);
       setResultsHydrated(true);
     } catch {
       return;
@@ -171,7 +246,9 @@ export default function CommunityClient({
   };
 
   useEffect(() => {
-    void loadFriends(hasReadyFriendsSnapshot);
+    queueMicrotask(() => {
+      void loadFriends(hasReadyFriendsSnapshot);
+    });
   }, [hasReadyFriendsSnapshot]);
 
   useEffect(() => {
@@ -214,25 +291,27 @@ export default function CommunityClient({
       return;
     }
 
-    if (Array.isArray(cached.data.friends)) {
-      setFriends(cached.data.friends);
-    }
+    queueMicrotask(() => {
+      if (Array.isArray(cached.data.friends)) {
+        setFriends(normalizeFriends(cached.data.friends));
+      }
 
-    if (Array.isArray(cached.data.requests)) {
-      setRequests(cached.data.requests);
-    }
+      if (Array.isArray(cached.data.requests)) {
+        setRequests(normalizeRequests(cached.data.requests));
+      }
 
-    if (Array.isArray(cached.data.results) && cached.data.results.length > 0) {
-      setResults(cached.data.results);
-      setBootstrappingSuggestions(false);
-      setResultsHydrated(true);
-    }
+      if (Array.isArray(cached.data.results) && cached.data.results.length > 0) {
+        setResults(normalizeResults(cached.data.results));
+        setBootstrappingSuggestions(false);
+        setResultsHydrated(true);
+      }
 
-    if (typeof cached.data.friendsLoadedAt === "number") {
-      setFriendsHydrated(true);
-    }
+      if (typeof cached.data.friendsLoadedAt === "number") {
+        setFriendsHydrated(true);
+      }
 
-    setLoadingFriends(false);
+      setLoadingFriends(false);
+    });
   }, [
     friendsHydrated,
     initialFriends.length,
@@ -276,8 +355,11 @@ export default function CommunityClient({
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadFriends(true);
+        if (query.trim() || resultsHydrated) {
+          void runSearch(query, true);
+        }
       }
-    }, 15000);
+    }, 5000);
 
     const onFocus = () => {
       void loadFriends(true);
@@ -292,6 +374,41 @@ export default function CommunityClient({
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
     };
+  }, [query, resultsHydrated]);
+
+  useEffect(() => {
+    return listenProfileSync((detail) => {
+      const userId = String(detail.userId || "").trim();
+
+      if (userId) {
+        setFriends((prev) =>
+          normalizeFriends(
+            prev.map((friend) =>
+              friend.friendId === userId ? patchProfileItem(friend, detail) : friend
+            )
+          )
+        );
+        setRequests((prev) =>
+          normalizeRequests(
+            prev.map((request) =>
+              request.fromUserId === userId ? patchProfileItem(request, detail) : request
+            )
+          )
+        );
+        setResults((prev) =>
+          normalizeResults(
+            prev.map((user) =>
+              user.id === userId ? patchProfileItem(user, detail) : user
+            )
+          )
+        );
+      }
+
+      void loadFriends(true);
+      if (query.trim() || resultsHydrated) {
+        void runSearch(query, true);
+      }
+    });
   }, [query, resultsHydrated]);
 
   useEffect(() => {
@@ -314,7 +431,7 @@ export default function CommunityClient({
     }
 
     if (cleanQuery) {
-      setBootstrappingSuggestions(false);
+      queueMicrotask(() => setBootstrappingSuggestions(false));
     }
 
     const debounceId = window.setTimeout(() => {
@@ -429,10 +546,19 @@ export default function CommunityClient({
     })();
   };
 
-  const visibleResults = useMemo(
-    () => results.filter((user) => user.relation !== "self"),
-    [results]
+  const friendIdSet = useMemo(
+    () => new Set(friends.map((friend) => friend.friendId)),
+    [friends]
   );
+  const visibleResults = useMemo(() => {
+    const hasQuery = Boolean(query.trim());
+
+    return normalizeResults(results).filter((user) => {
+      if (user.relation === "self") return false;
+      if (hasQuery) return true;
+      return user.relation !== "friends" && !friendIdSet.has(user.id);
+    });
+  }, [friendIdSet, query, results]);
   const suggestionCount = Math.max(visibleResults.length - friends.length, 0);
 
   return (

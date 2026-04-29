@@ -1,8 +1,11 @@
 export const PROFILE_SYNC_EVENT = "nexora:profile-updated";
 
 export type ProfileSyncDetail = {
+  userId?: string | null;
   image?: string | null;
   name?: string | null;
+  username?: string | null;
+  bio?: string | null;
   timestamp?: number;
 };
 

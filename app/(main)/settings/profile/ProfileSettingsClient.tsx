@@ -310,8 +310,11 @@ export default function ProfileSettingsClient({
       }).catch(() => undefined);
 
       emitProfileSync({
+        userId: String(data?.user?.id || ""),
         name: syncedName,
         image: syncedImage,
+        username: data?.user?.username ?? username,
+        bio: data?.user?.bio ?? bio,
       });
 
       router.refresh();

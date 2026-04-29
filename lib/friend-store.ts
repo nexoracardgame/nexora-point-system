@@ -6,7 +6,6 @@ import {
 } from "@/lib/local-store-dir";
 import {
   getAllLocalProfiles,
-  getLocalProfileByUserId,
   getLocalProfilesByUserIds,
 } from "@/lib/local-profile-store";
 
@@ -35,6 +34,12 @@ type FriendRequestWithNotify = FriendRequestRecord & {
 type FriendRelation = {
   status: "none" | "incoming" | "outgoing" | "friends" | "self";
   requestId: string | null;
+};
+
+type UserIdentity = {
+  canonicalId: string;
+  lineId: string | null;
+  aliases: string[];
 };
 
 let schemaReadyPromise: Promise<void> | null = null;
@@ -113,6 +118,69 @@ function uniqueStrings(values: string[]) {
 
 function buildInClause(values: string[], startIndex = 1) {
   return values.map((_, index) => `$${startIndex + index}`).join(", ");
+}
+
+async function getUserIdentityMap(userIds: string[]) {
+  const safeUserIds = uniqueStrings(userIds);
+  const identityMap = new Map<string, UserIdentity>();
+
+  if (safeUserIds.length === 0) {
+    return identityMap;
+  }
+
+  try {
+    await ensureCommunitySchema();
+    const placeholders = buildInClause(safeUserIds);
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; lineId: string | null }>
+    >(
+      `SELECT "id", "lineId" FROM "User" WHERE "id" IN (${placeholders}) OR "lineId" IN (${placeholders})`,
+      ...safeUserIds
+    );
+
+    rows.forEach((row) => {
+      const canonicalId = String(row.id || "").trim();
+      const lineId = String(row.lineId || "").trim() || null;
+      if (!canonicalId) return;
+
+      const identity: UserIdentity = {
+        canonicalId,
+        lineId,
+        aliases: uniqueStrings([canonicalId, lineId || ""]),
+      };
+
+      identity.aliases.forEach((alias) => {
+        identityMap.set(alias, identity);
+      });
+    });
+  } catch {
+    // Fall back to the provided identifiers as canonical values.
+  }
+
+  safeUserIds.forEach((userId) => {
+    if (identityMap.has(userId)) return;
+
+    identityMap.set(userId, {
+      canonicalId: userId,
+      lineId: null,
+      aliases: [userId],
+    });
+  });
+
+  return identityMap;
+}
+
+function getCanonicalUserId(
+  identityMap: Map<string, UserIdentity>,
+  userId: string
+) {
+  const safeUserId = String(userId || "").trim();
+  return identityMap.get(safeUserId)?.canonicalId || safeUserId;
+}
+
+function getUserAliases(identityMap: Map<string, UserIdentity>, userId: string) {
+  const safeUserId = String(userId || "").trim();
+  return identityMap.get(safeUserId)?.aliases || (safeUserId ? [safeUserId] : []);
 }
 
 async function readDbFriendshipsForUsers(userIds: string[]) {
@@ -271,23 +339,44 @@ export async function areFriends(userId: string, otherUserId: string) {
     return false;
   }
 
-  const key = friendshipKey(userId, otherUserId);
+  const seedIdentityMap = await getUserIdentityMap([userId, otherUserId]);
+  const userAliases = getUserAliases(seedIdentityMap, userId);
+  const otherAliases = getUserAliases(seedIdentityMap, otherUserId);
+  const userCanonicalId = getCanonicalUserId(seedIdentityMap, userId);
+  const otherCanonicalId = getCanonicalUserId(seedIdentityMap, otherUserId);
+
+  if (userCanonicalId === otherCanonicalId) {
+    return true;
+  }
 
   try {
     await ensureCommunitySchema();
-    const [userA, userB] = sortPair(userId, otherUserId);
+    const userClause = buildInClause(userAliases);
+    const otherClause = buildInClause(otherAliases, userAliases.length + 1);
     const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      'SELECT "id" FROM "Friendship" WHERE "userA" = $1 AND "userB" = $2 LIMIT 1',
-      userA,
-      userB
+      `SELECT "id" FROM "Friendship" WHERE (("userA" IN (${userClause}) AND "userB" IN (${otherClause})) OR ("userA" IN (${otherClause}) AND "userB" IN (${userClause}))) LIMIT 1`,
+      ...userAliases,
+      ...otherAliases
     );
     return rows.length > 0;
   } catch {
     // Local fallback below.
   }
 
-  const items = await readFriendshipsForUsers([userId, otherUserId]);
-  return items.some((item) => friendshipKey(item.userA, item.userB) === key);
+  const items = await readFriendshipsForUsers([...userAliases, ...otherAliases]);
+  const allIds = uniqueStrings([
+    ...userAliases,
+    ...otherAliases,
+    ...items.flatMap((item) => [item.userA, item.userB]),
+  ]);
+  const identityMap = await getUserIdentityMap(allIds);
+  const expectedKey = friendshipKey(userCanonicalId, otherCanonicalId);
+
+  return items.some((item) => {
+    const left = getCanonicalUserId(identityMap, item.userA);
+    const right = getCanonicalUserId(identityMap, item.userB);
+    return friendshipKey(left, right) === expectedKey;
+  });
 }
 
 export async function getFriendRelation(userId: string, otherUserId: string) {
@@ -312,28 +401,36 @@ export async function createFriendRequestRecord(
   fromUserId: string,
   toUserId: string
 ): Promise<FriendRequestWithNotify> {
-  if (!fromUserId || !toUserId || fromUserId === toUserId) {
+  const identityMap = await getUserIdentityMap([fromUserId, toUserId]);
+  const fromCanonicalId = getCanonicalUserId(identityMap, fromUserId);
+  const toCanonicalId = getCanonicalUserId(identityMap, toUserId);
+  const fromAliases = getUserAliases(identityMap, fromUserId);
+  const toAliases = getUserAliases(identityMap, toUserId);
+
+  if (!fromCanonicalId || !toCanonicalId || fromCanonicalId === toCanonicalId) {
     throw new Error("ไม่สามารถส่งคำขอเพื่อนรายการนี้ได้");
   }
 
-  if (await areFriends(fromUserId, toUserId)) {
+  if (await areFriends(fromCanonicalId, toCanonicalId)) {
     throw new Error("เป็นเพื่อนกันอยู่แล้ว");
   }
 
   const now = new Date().toISOString();
   try {
     await ensureCommunitySchema();
+    const fromClause = buildInClause(fromAliases);
+    const toClause = buildInClause(toAliases, fromAliases.length + 1);
     const existingRows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      'SELECT * FROM "FriendRequest" WHERE (("fromUserId" = $1 AND "toUserId" = $2) OR ("fromUserId" = $2 AND "toUserId" = $1)) ORDER BY "createdAt" DESC',
-      fromUserId,
-      toUserId
+      `SELECT * FROM "FriendRequest" WHERE (("fromUserId" IN (${fromClause}) AND "toUserId" IN (${toClause})) OR ("fromUserId" IN (${toClause}) AND "toUserId" IN (${fromClause}))) ORDER BY "createdAt" DESC`,
+      ...fromAliases,
+      ...toAliases
     );
     const existing = existingRows.map(normalizeDbRequest);
     const existingIncoming = existing.find(
       (item) =>
         item.status === "pending" &&
-        item.fromUserId === toUserId &&
-        item.toUserId === fromUserId
+        getCanonicalUserId(identityMap, item.fromUserId) === toCanonicalId &&
+        getCanonicalUserId(identityMap, item.toUserId) === fromCanonicalId
     );
 
     if (existingIncoming) {
@@ -341,7 +438,9 @@ export async function createFriendRequestRecord(
     }
 
     const existingOutgoing = existing.find(
-      (item) => item.fromUserId === fromUserId && item.toUserId === toUserId
+      (item) =>
+        getCanonicalUserId(identityMap, item.fromUserId) === fromCanonicalId &&
+        getCanonicalUserId(identityMap, item.toUserId) === toCanonicalId
     );
 
     if (existingOutgoing) {
@@ -360,8 +459,8 @@ export async function createFriendRequestRecord(
     const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
       'INSERT INTO "FriendRequest" ("id", "fromUserId", "toUserId", "status", "createdAt", "updatedAt") VALUES ($1, $2, $3, \'pending\', NOW(), NOW()) RETURNING *',
       requestId,
-      fromUserId,
-      toUserId
+      fromCanonicalId,
+      toCanonicalId
     );
     return { ...normalizeDbRequest(rows[0]), shouldNotify: true };
   } catch {
@@ -376,8 +475,8 @@ export async function createFriendRequestRecord(
   const existingIncoming = requests.find(
     (item) =>
       item.status === "pending" &&
-      item.fromUserId === toUserId &&
-      item.toUserId === fromUserId
+      getCanonicalUserId(identityMap, item.fromUserId) === toCanonicalId &&
+      getCanonicalUserId(identityMap, item.toUserId) === fromCanonicalId
   );
 
   if (existingIncoming) {
@@ -386,8 +485,8 @@ export async function createFriendRequestRecord(
 
   const existingOutgoing = requests.find(
     (item) =>
-      item.fromUserId === fromUserId &&
-      item.toUserId === toUserId
+      getCanonicalUserId(identityMap, item.fromUserId) === fromCanonicalId &&
+      getCanonicalUserId(identityMap, item.toUserId) === toCanonicalId
   );
 
   if (existingOutgoing) {
@@ -402,8 +501,8 @@ export async function createFriendRequestRecord(
 
   const nextRequest: FriendRequestRecord = {
     id: `friend-request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    fromUserId,
-    toUserId,
+    fromUserId: fromCanonicalId,
+    toUserId: toCanonicalId,
     status: "pending",
     createdAt: now,
     updatedAt: now,
@@ -445,7 +544,14 @@ export async function respondToFriendRequest(
     const updatedRequest = normalizeDbRequest(updatedRows[0]);
 
     if (action === "accept") {
-      const [userA, userB] = sortPair(request.fromUserId, request.toUserId);
+      const identityMap = await getUserIdentityMap([
+        request.fromUserId,
+        request.toUserId,
+      ]);
+      const [userA, userB] = sortPair(
+        getCanonicalUserId(identityMap, request.fromUserId),
+        getCanonicalUserId(identityMap, request.toUserId)
+      );
       const friendshipId = `friendship-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const friendshipRows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
         'INSERT INTO "Friendship" ("id", "userA", "userB", "createdAt") VALUES ($1, $2, $3, NOW()) ON CONFLICT ("userA", "userB") DO UPDATE SET "userA" = EXCLUDED."userA" RETURNING *',
@@ -497,7 +603,14 @@ export async function respondToFriendRequest(
 
   if (action === "accept") {
     const friendships = await readFriendships();
-    const [userA, userB] = sortPair(request.fromUserId, request.toUserId);
+    const identityMap = await getUserIdentityMap([
+      request.fromUserId,
+      request.toUserId,
+    ]);
+    const [userA, userB] = sortPair(
+      getCanonicalUserId(identityMap, request.fromUserId),
+      getCanonicalUserId(identityMap, request.toUserId)
+    );
     const key = friendshipKey(userA, userB);
     const exists = friendships.some(
       (item) => friendshipKey(item.userA, item.userB) === key
@@ -519,13 +632,22 @@ export async function respondToFriendRequest(
 }
 
 export async function removeFriendship(userId: string, otherUserId: string) {
+  const identityMap = await getUserIdentityMap([userId, otherUserId]);
+  const userAliases = getUserAliases(identityMap, userId);
+  const otherAliases = getUserAliases(identityMap, otherUserId);
+  const canonicalKey = friendshipKey(
+    getCanonicalUserId(identityMap, userId),
+    getCanonicalUserId(identityMap, otherUserId)
+  );
+
   try {
     await ensureCommunitySchema();
-    const [userA, userB] = sortPair(userId, otherUserId);
+    const userClause = buildInClause(userAliases);
+    const otherClause = buildInClause(otherAliases, userAliases.length + 1);
     await prisma.$executeRawUnsafe(
-      'DELETE FROM "Friendship" WHERE "userA" = $1 AND "userB" = $2',
-      userA,
-      userB
+      `DELETE FROM "Friendship" WHERE ("userA" IN (${userClause}) AND "userB" IN (${otherClause})) OR ("userA" IN (${otherClause}) AND "userB" IN (${userClause}))`,
+      ...userAliases,
+      ...otherAliases
     );
     return;
   } catch {
@@ -533,10 +655,17 @@ export async function removeFriendship(userId: string, otherUserId: string) {
   }
 
   const friendships = await readFriendships();
-  const key = friendshipKey(userId, otherUserId);
-  const next = friendships.filter(
-    (item) => friendshipKey(item.userA, item.userB) !== key
-  );
+  const allIds = uniqueStrings([
+    ...userAliases,
+    ...otherAliases,
+    ...friendships.flatMap((item) => [item.userA, item.userB]),
+  ]);
+  const fallbackIdentityMap = await getUserIdentityMap(allIds);
+  const next = friendships.filter((item) => {
+    const left = getCanonicalUserId(fallbackIdentityMap, item.userA);
+    const right = getCanonicalUserId(fallbackIdentityMap, item.userB);
+    return friendshipKey(left, right) !== canonicalKey;
+  });
   await writeFriendships(next);
 }
 
@@ -544,13 +673,47 @@ export async function listIncomingFriendRequests(
   userId: string,
   aliases: string[] = []
 ) {
-  const userIds = uniqueStrings([userId, ...aliases]);
-  const incoming = await readIncomingRequestsForUsers(userIds);
+  const seedIds = uniqueStrings([userId, ...aliases]);
+  const seedIdentityMap = await getUserIdentityMap(seedIds);
+  const userLookupIds = uniqueStrings(
+    seedIds.flatMap((id) => getUserAliases(seedIdentityMap, id))
+  );
+  const incoming = await readIncomingRequestsForUsers(userLookupIds);
+  const allIds = uniqueStrings([
+    ...userLookupIds,
+    ...incoming.flatMap((request) => [request.fromUserId, request.toUserId]),
+  ]);
+  const identityMap = await getUserIdentityMap(allIds);
+  const selfCanonicalSet = new Set(
+    userLookupIds.map((id) => getCanonicalUserId(identityMap, id))
+  );
+  const requestBySender = new Map<string, FriendRequestRecord>();
+
+  incoming.forEach((request) => {
+    const senderId = getCanonicalUserId(identityMap, request.fromUserId);
+    const receiverId = getCanonicalUserId(identityMap, request.toUserId);
+    if (!senderId || selfCanonicalSet.has(senderId) || !selfCanonicalSet.has(receiverId)) {
+      return;
+    }
+
+    const previous = requestBySender.get(senderId);
+    if (!previous || previous.createdAt < request.createdAt) {
+      requestBySender.set(senderId, request);
+    }
+  });
+
+  const uniqueIncoming = Array.from(requestBySender.entries()).map(
+    ([fromUserId, request]) => ({
+      ...request,
+      fromUserId,
+      toUserId: getCanonicalUserId(identityMap, request.toUserId),
+    })
+  );
   const profileMap = await getLocalProfilesByUserIds(
-    incoming.map((request) => request.fromUserId)
+    uniqueIncoming.map((request) => request.fromUserId)
   );
 
-  return incoming.map((request) => {
+  return uniqueIncoming.map((request) => {
     const profile = profileMap.get(request.fromUserId);
 
     return {
@@ -566,21 +729,47 @@ export async function listIncomingFriendRequests(
 }
 
 export async function listFriendsForUser(userId: string, aliases: string[] = []) {
-  const userIds = uniqueStrings([userId, ...aliases]);
-  const userSet = new Set(userIds);
-  const friendships = await readFriendshipsForUsers(userIds);
-  const mine = friendships
-    .filter((item) => userSet.has(item.userA) || userSet.has(item.userB))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-
-  const friendIds = mine.map((item) =>
-    userSet.has(item.userA) ? item.userB : item.userA
+  const seedIds = uniqueStrings([userId, ...aliases]);
+  const seedIdentityMap = await getUserIdentityMap(seedIds);
+  const userLookupIds = uniqueStrings(
+    seedIds.flatMap((id) => getUserAliases(seedIdentityMap, id))
   );
-  const uniqueFriendIds = Array.from(new Set(friendIds));
+  const friendships = await readFriendshipsForUsers(userLookupIds);
+  const allIds = uniqueStrings([
+    ...userLookupIds,
+    ...friendships.flatMap((item) => [item.userA, item.userB]),
+  ]);
+  const identityMap = await getUserIdentityMap(allIds);
+  const selfCanonicalSet = new Set(
+    userLookupIds.map((id) => getCanonicalUserId(identityMap, id))
+  );
+  const friendById = new Map<string, FriendshipRecord & { friendId: string }>();
+
+  friendships
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .forEach((item) => {
+      const userA = getCanonicalUserId(identityMap, item.userA);
+      const userB = getCanonicalUserId(identityMap, item.userB);
+      const userAIsMe = selfCanonicalSet.has(userA);
+      const userBIsMe = selfCanonicalSet.has(userB);
+      const friendId = userAIsMe ? userB : userBIsMe ? userA : "";
+
+      if (!friendId || selfCanonicalSet.has(friendId) || friendById.has(friendId)) {
+        return;
+      }
+
+      friendById.set(friendId, {
+        ...item,
+        friendId,
+      });
+    });
+
+  const mine = Array.from(friendById.values());
+  const uniqueFriendIds = mine.map((item) => item.friendId);
   const profileMap = await getLocalProfilesByUserIds(uniqueFriendIds);
 
   return mine.map((item) => {
-    const friendId = userSet.has(item.userA) ? item.userB : item.userA;
+    const friendId = item.friendId;
     const profile = profileMap.get(friendId);
     return {
       id: item.id,
@@ -599,20 +788,34 @@ export async function getFriendRelationsForUsers(
   targetUserIds: string[],
   currentUserAliases: string[] = []
 ) {
-  const selfIds = uniqueStrings([currentUserId, ...currentUserAliases]);
+  const seedSelfIds = uniqueStrings([currentUserId, ...currentUserAliases]);
   const targets = uniqueStrings(targetUserIds);
-  const selfSet = new Set(selfIds);
-  const targetSet = new Set(targets);
+  const seedIdentityMap = await getUserIdentityMap([...seedSelfIds, ...targets]);
+  const selfIds = uniqueStrings(
+    seedSelfIds.flatMap((id) => getUserAliases(seedIdentityMap, id))
+  );
+  const targetLookupIds = uniqueStrings(
+    targets.flatMap((id) => getUserAliases(seedIdentityMap, id))
+  );
   const relations = new Map<string, FriendRelation>();
+  const targetByCanonicalId = new Map<string, string>();
+  const selfCanonicalSet = new Set(
+    selfIds.map((id) => getCanonicalUserId(seedIdentityMap, id))
+  );
 
   targets.forEach((targetUserId) => {
+    const canonicalTargetId = getCanonicalUserId(seedIdentityMap, targetUserId);
+    targetByCanonicalId.set(canonicalTargetId, targetUserId);
     relations.set(targetUserId, {
-      status: selfSet.has(targetUserId) ? "self" : "none",
+      status: selfCanonicalSet.has(canonicalTargetId) ? "self" : "none",
       requestId: null,
     });
   });
 
-  const relationTargets = targets.filter((targetUserId) => !selfSet.has(targetUserId));
+  const relationTargets = targetLookupIds.filter((targetUserId) => {
+    const canonicalTargetId = getCanonicalUserId(seedIdentityMap, targetUserId);
+    return !selfCanonicalSet.has(canonicalTargetId);
+  });
 
   if (selfIds.length === 0 || relationTargets.length === 0) {
     return relations;
@@ -622,41 +825,61 @@ export async function getFriendRelationsForUsers(
     readFriendshipsForUsers(selfIds),
     readPendingRequestsBetween(selfIds, relationTargets),
   ]);
+  const allIds = uniqueStrings([
+    ...selfIds,
+    ...relationTargets,
+    ...friendships.flatMap((item) => [item.userA, item.userB]),
+    ...pendingRequests.flatMap((item) => [item.fromUserId, item.toUserId]),
+  ]);
+  const identityMap = await getUserIdentityMap(allIds);
+  const canonicalSelfSet = new Set(
+    selfIds.map((id) => getCanonicalUserId(identityMap, id))
+  );
 
   friendships.forEach((item) => {
-    const friendId = selfSet.has(item.userA)
-      ? item.userB
-      : selfSet.has(item.userB)
-        ? item.userA
+    const userA = getCanonicalUserId(identityMap, item.userA);
+    const userB = getCanonicalUserId(identityMap, item.userB);
+    const friendId = canonicalSelfSet.has(userA)
+      ? userB
+      : canonicalSelfSet.has(userB)
+        ? userA
         : "";
+    const targetId = targetByCanonicalId.get(friendId);
 
-    if (!friendId || !targetSet.has(friendId)) {
+    if (!targetId) {
       return;
     }
 
-    relations.set(friendId, {
+    relations.set(targetId, {
       status: "friends",
       requestId: null,
     });
   });
 
   pendingRequests.forEach((request) => {
-    if (selfSet.has(request.fromUserId) && targetSet.has(request.toUserId)) {
-      const current = relations.get(request.toUserId);
+    const fromUserId = getCanonicalUserId(identityMap, request.fromUserId);
+    const toUserId = getCanonicalUserId(identityMap, request.toUserId);
+
+    if (canonicalSelfSet.has(fromUserId)) {
+      const targetId = targetByCanonicalId.get(toUserId);
+      if (!targetId) return;
+      const current = relations.get(targetId);
 
       if (current?.status !== "friends") {
-        relations.set(request.toUserId, {
+        relations.set(targetId, {
           status: "outgoing",
           requestId: request.id,
         });
       }
     }
 
-    if (targetSet.has(request.fromUserId) && selfSet.has(request.toUserId)) {
-      const current = relations.get(request.fromUserId);
+    if (canonicalSelfSet.has(toUserId)) {
+      const targetId = targetByCanonicalId.get(fromUserId);
+      if (!targetId) return;
+      const current = relations.get(targetId);
 
       if (current?.status !== "friends") {
-        relations.set(request.fromUserId, {
+        relations.set(targetId, {
           status: "incoming",
           requestId: request.id,
         });
@@ -737,8 +960,14 @@ export async function searchCommunityUsers(
   ).catch(() => []);
   const localProfiles = await getAllLocalProfiles();
   const localMap = new Map(localProfiles.map((item) => [item.userId, item]));
+  const dbCanonicalByLookupId = new Map<string, string>();
 
   const dbCandidates = dbUsers.map((user) => {
+      const canonicalId = String(user.id || "").trim();
+      const lineId = String(user.lineId || "").trim();
+      [canonicalId, lineId].filter(Boolean).forEach((lookupId) => {
+        dbCanonicalByLookupId.set(lookupId, canonicalId);
+      });
       const local = localMap.get(user.id);
       const displayName =
         local?.displayName || user.displayName || user.name || "NEXORA User";
@@ -755,12 +984,26 @@ export async function searchCommunityUsers(
   const candidateMap = new Map(dbCandidates.map((user) => [user.id, user]));
 
   localProfiles.forEach((profile) => {
-    if (!profile.userId || candidateMap.has(profile.userId)) {
+    const canonicalId = dbCanonicalByLookupId.get(profile.userId) || profile.userId;
+
+    if (!canonicalId) {
       return;
     }
 
-    candidateMap.set(profile.userId, {
-      id: profile.userId,
+    const existing = candidateMap.get(canonicalId);
+    if (existing) {
+      candidateMap.set(canonicalId, {
+        ...existing,
+        displayName: profile.displayName || existing.displayName,
+        username: profile.username || existing.username,
+        image: profile.image || existing.image,
+        bio: profile.bio || existing.bio,
+      });
+      return;
+    }
+
+    candidateMap.set(canonicalId, {
+      id: canonicalId,
       displayName: profile.displayName || "NEXORA User",
       username: profile.username || null,
       image: profile.image || "/avatar.png",

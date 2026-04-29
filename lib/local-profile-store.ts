@@ -50,6 +50,12 @@ function writeCachedProfile(userId: string, value: LocalProfileRecord | null) {
   });
 }
 
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.map((value) => String(value || "").trim()).filter(Boolean))
+  );
+}
+
 async function ensureUserProfileSchema() {
   if (!userProfileSchemaReadyPromise) {
     userProfileSchemaReadyPromise = prisma
@@ -169,24 +175,24 @@ async function readLocalProfile(userId: string) {
   }
 }
 
-async function writeLocalProfile(record: LocalProfileRecord) {
+async function writeLocalProfile(record: LocalProfileRecord, aliases: string[] = []) {
   try {
     const items = await readStore();
-    const next = items.some((item) => item.userId === record.userId)
-      ? items.map((item) =>
-          item.userId === record.userId
-            ? {
-                ...item,
-                ...record,
-                username: record.username ?? item.username ?? null,
-              }
-            : item
-        )
-      : [record, ...items];
+    const aliasSet = new Set(uniqueStrings([record.userId, ...aliases]));
+    const previous = items.find((item) => aliasSet.has(item.userId)) || null;
+    const mergedRecord = {
+      ...(previous || {}),
+      ...record,
+      username: record.username ?? previous?.username ?? null,
+    };
+    const next = [
+      mergedRecord,
+      ...items.filter((item) => !aliasSet.has(item.userId)),
+    ];
 
     await writeStore(next);
-    writeCachedProfile(record.userId, record);
-    return record;
+    aliasSet.forEach((alias) => writeCachedProfile(alias, mergedRecord));
+    return mergedRecord;
   } catch {
     writeCachedProfile(record.userId, record);
     return record;
@@ -453,9 +459,16 @@ export async function getLocalProfilesByUserIds(userIds: string[]) {
 
 export async function upsertLocalProfile(
   userId: string,
-  input: Omit<LocalProfileRecord, "userId" | "updatedAt">
+  input: Omit<LocalProfileRecord, "userId" | "updatedAt">,
+  aliases: string[] = []
 ) {
-  const currentLocalProfile = await readLocalProfile(userId);
+  const profileAliases = uniqueStrings([userId, ...aliases]);
+  const localProfiles = await Promise.all(
+    profileAliases.map((profileId) => readLocalProfile(profileId))
+  );
+  const currentLocalProfile =
+    localProfiles.find((profile): profile is LocalProfileRecord => Boolean(profile)) ||
+    null;
   const nextRecord: LocalProfileRecord = {
     userId,
     updatedAt: new Date().toISOString(),
@@ -466,7 +479,7 @@ export async function upsertLocalProfile(
   const [prismaProfile, supabaseProfile, localProfile] = await Promise.allSettled([
     writePrismaProfile(userId, input),
     writeSupabaseProfile(userId, input),
-    writeLocalProfile(nextRecord),
+    writeLocalProfile(nextRecord, aliases),
   ]);
 
   if (localProfile.status === "fulfilled" && localProfile.value) {

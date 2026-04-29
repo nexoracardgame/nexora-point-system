@@ -53,7 +53,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  const { userId, lineId, aliases } = getSessionIds(session);
+  const { userId, aliases } = getSessionIds(session);
   const sessionUser = session?.user;
 
   if (!userId) {
