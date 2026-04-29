@@ -91,13 +91,89 @@ function normalizeCardNumber(value?: string | number | null) {
     .replace(/^0+(?=\d)/, "");
 }
 
+const MARKET_SEEN_STORAGE_PREFIX = "nexora:market-seen-listings";
+const MAX_SEEN_LISTING_IDS = 2000;
+
+function buildMarketSeenStorageKey(viewerKey?: string | null) {
+  const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
+  return `${MARKET_SEEN_STORAGE_PREFIX}:${safeViewerKey}`;
+}
+
+function readSeenListingIdArray(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (Array.isArray(parsed)) {
+      return parsed.map(String).filter(Boolean);
+    }
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as { ids?: unknown[] }).ids)
+    ) {
+      return (parsed as { ids: unknown[] }).ids.map(String).filter(Boolean);
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
+function readSeenListingIds(storageKey: string) {
+  return new Set(readSeenListingIdArray(storageKey));
+}
+
+function hasSeenListingSnapshot(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(storageKey) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function rememberSeenListingIds(storageKey: string, ids: string[]) {
+  if (typeof window === "undefined" || !storageKey) {
+    return;
+  }
+
+  const nextIds = Array.from(
+    new Set([
+      ...ids.map(String).filter(Boolean),
+      ...readSeenListingIdArray(storageKey),
+    ])
+  ).slice(0, MAX_SEEN_LISTING_IDS);
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(nextIds));
+  } catch {}
+}
+
+function sortMarketItemsLatest(items: MarketItem[]) {
+  return [...items].sort(compareLatestCards);
+}
+
 function comparePopularCards(a: MarketItem, b: MarketItem) {
   if (b.likes !== a.likes) {
     return b.likes - a.likes;
   }
 
   const createdAtDiff =
-    getCreatedAtValue(a.createdAt) - getCreatedAtValue(b.createdAt);
+    getCreatedAtValue(b.createdAt) - getCreatedAtValue(a.createdAt);
   if (createdAtDiff !== 0) {
     return createdAtDiff;
   }
@@ -159,23 +235,34 @@ function ActionButton({
 export default function MarketDashboardTFT({
   initialItems = [],
   initialItemsLoaded = false,
+  initialViewerKey = "guest",
 }: {
   initialItems?: MarketItem[];
   initialItemsLoaded?: boolean;
+  initialViewerKey?: string;
 }) {
+  const initialMarketItems = useMemo(
+    () => sortMarketItemsLatest(initialItems),
+    [initialItems]
+  );
+  const shouldUseInitialItems = initialItemsLoaded || initialItems.length > 0;
   const cachedMarketItems = useMemo(
     () =>
-      readClientViewCache<MarketItem[]>("market-dashboard", {
-        maxAgeMs: 180000,
-      }),
-    []
+      shouldUseInitialItems
+        ? null
+        : readClientViewCache<MarketItem[]>("market-dashboard", {
+            maxAgeMs: 180000,
+          }),
+    [shouldUseInitialItems]
   );
   const { data: session } = useSession();
-  const [items, setItems] = useState<MarketItem[]>(
-    initialItems.length > 0 ? initialItems : cachedMarketItems?.data || []
+  const [items, setItems] = useState<MarketItem[]>(() =>
+    shouldUseInitialItems
+      ? initialMarketItems
+      : sortMarketItemsLatest(cachedMarketItems?.data || [])
   );
   const [loading, setLoading] = useState(
-    !(initialItemsLoaded || initialItems.length > 0 || cachedMarketItems?.data?.length)
+    !(shouldUseInitialItems || cachedMarketItems?.data?.length)
   );
   const [likedCards, setLikedCards] = useState<string[]>([]);
   const [likesReady, setLikesReady] = useState(false);
@@ -184,36 +271,69 @@ export default function MarketDashboardTFT({
   const [mouse, setMouse] = useState({ x: 50, y: 50 });
   const [freshListingIds, setFreshListingIds] = useState<string[]>([]);
   const itemsRef = useRef(items);
-  const seenListingIdsRef = useRef<Set<string>>(
-    new Set(initialItems.map((item) => item.id))
-  );
+  const seenListingIdsRef = useRef<Set<string>>(new Set());
+  const seenStorageKeyRef = useRef("");
+  const initializedSeenStorageKeyRef = useRef<string | null>(null);
+  const marketSeenBaselineReadyRef = useRef(shouldUseInitialItems);
   const refreshInFlightRef = useRef(false);
+  const viewerSeenStorageKey = useMemo(
+    () => buildMarketSeenStorageKey(session?.user?.id || initialViewerKey),
+    [initialViewerKey, session?.user?.id]
+  );
 
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
 
   useEffect(() => {
-    startTransition(() => {
-      if (initialItems.length > 0) {
-        setItems(initialItems);
-        setLoading(false);
-        seenListingIdsRef.current = new Set(initialItems.map((item) => item.id));
-        setFreshListingIds([]);
-        return;
-      }
-
-      if (initialItemsLoaded) {
-        setItems([]);
-        setLoading(false);
-        seenListingIdsRef.current = new Set();
-        setFreshListingIds([]);
-      }
-    });
-  }, [initialItems, initialItemsLoaded]);
+    seenStorageKeyRef.current = viewerSeenStorageKey;
+  }, [viewerSeenStorageKey]);
 
   useEffect(() => {
-    if (initialItems.length > 0 || initialItemsLoaded || itemsRef.current.length > 0) {
+    if (!viewerSeenStorageKey) {
+      return;
+    }
+
+    if (initializedSeenStorageKeyRef.current === viewerSeenStorageKey) {
+      return;
+    }
+
+    if (items.length === 0 && !shouldUseInitialItems) {
+      return;
+    }
+
+    const currentIds = items.map((item) => item.id);
+    const hadSeenSnapshot = hasSeenListingSnapshot(viewerSeenStorageKey);
+    const storedSeenIds = readSeenListingIds(viewerSeenStorageKey);
+    const unseenIds = hadSeenSnapshot
+      ? currentIds.filter((id) => !storedSeenIds.has(id))
+      : [];
+    const nextSeenIds = new Set(storedSeenIds);
+    currentIds.forEach((id) => nextSeenIds.add(id));
+
+    seenListingIdsRef.current = nextSeenIds;
+    initializedSeenStorageKeyRef.current = viewerSeenStorageKey;
+    marketSeenBaselineReadyRef.current = true;
+    startTransition(() => {
+      setFreshListingIds(unseenIds);
+    });
+
+    window.setTimeout(() => {
+      rememberSeenListingIds(viewerSeenStorageKey, currentIds);
+    }, 0);
+  }, [items, shouldUseInitialItems, viewerSeenStorageKey]);
+
+  useEffect(() => {
+    startTransition(() => {
+      if (shouldUseInitialItems) {
+        setItems(initialMarketItems);
+        setLoading(false);
+      }
+    });
+  }, [initialMarketItems, shouldUseInitialItems]);
+
+  useEffect(() => {
+    if (shouldUseInitialItems || itemsRef.current.length > 0) {
       return;
     }
 
@@ -226,12 +346,10 @@ export default function MarketDashboardTFT({
     }
 
     startTransition(() => {
-      setItems(cached.data);
+      setItems(sortMarketItemsLatest(cached.data));
       setLoading(false);
-      seenListingIdsRef.current = new Set(cached.data.map((item) => item.id));
-      setFreshListingIds([]);
     });
-  }, [initialItems.length, initialItemsLoaded]);
+  }, [shouldUseInitialItems]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -293,8 +411,10 @@ export default function MarketDashboardTFT({
         const res = await fetch("/api/market/listings", { cache: "no-store" });
         const data = await res.json();
         const mapped = Array.isArray(data)
-          ? (data as ListingApiItem[]).map((item) =>
-              normalizeMarketListingView(item)
+          ? sortMarketItemsLatest(
+              (data as ListingApiItem[]).map((item) =>
+                normalizeMarketListingView(item)
+              )
             )
           : [];
 
@@ -306,22 +426,46 @@ export default function MarketDashboardTFT({
         }
 
         const currentIds = mapped.map((item) => item.id);
-        const knownIds = new Set(seenListingIdsRef.current);
-        const newIds = currentIds.filter((id) => !knownIds.has(id));
+        const storageKey = seenStorageKeyRef.current;
+        const hasSeenBaseline =
+          Boolean(storageKey && hasSeenListingSnapshot(storageKey)) ||
+          seenListingIdsRef.current.size > 0 ||
+          marketSeenBaselineReadyRef.current ||
+          itemsRef.current.length > 0;
+        const storedSeenIds = storageKey
+          ? readSeenListingIds(storageKey)
+          : new Set<string>();
+        const knownIds = new Set([
+          ...Array.from(storedSeenIds),
+          ...Array.from(seenListingIdsRef.current),
+        ]);
+        const newIds = hasSeenBaseline
+          ? currentIds.filter((id) => !knownIds.has(id))
+          : [];
         currentIds.forEach((id) => knownIds.add(id));
         seenListingIdsRef.current = knownIds;
+        marketSeenBaselineReadyRef.current = true;
+
+        if (storageKey && currentIds.length > 0) {
+          window.setTimeout(() => {
+            rememberSeenListingIds(storageKey, currentIds);
+          }, 0);
+        }
 
         startTransition(() => {
           setItems(mapped);
           setLoading(false);
-          if (newIds.length > 0 && itemsRef.current.length > 0) {
-            setFreshListingIds((prev) => {
-              const visibleFreshIds = prev.filter((id) => currentIds.includes(id));
-              const nextIds = new Set(visibleFreshIds);
-              newIds.forEach((id) => nextIds.add(id));
-              return Array.from(nextIds);
-            });
-          }
+          setFreshListingIds((prev) => {
+            const visibleFreshIds = prev.filter((id) => currentIds.includes(id));
+
+            if (newIds.length === 0) {
+              return visibleFreshIds.length === prev.length ? prev : visibleFreshIds;
+            }
+
+            const nextIds = new Set(visibleFreshIds);
+            newIds.forEach((id) => nextIds.add(id));
+            return Array.from(nextIds);
+          });
         });
       } catch {
         startTransition(() => {
@@ -423,7 +567,7 @@ export default function MarketDashboardTFT({
       return [];
     }
 
-    return [...items].sort(comparePopularCards);
+    return sortMarketItemsLatest(items);
   }, [items, loading]);
 
   const normalizedCardNoQuery = normalizeCardNumber(cardNoQuery);
@@ -960,7 +1104,7 @@ export default function MarketDashboardTFT({
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-6 xl:grid-cols-8">
-          {visibleItems.map((card) => {
+          {visibleItems.map((card, index) => {
             const rarity = rarityClasses(card.rarity);
             const liked = likesReady && likedCards.includes(card.id);
 
@@ -987,6 +1131,8 @@ export default function MarketDashboardTFT({
                       cardNo={card.cardNo}
                       imageUrl={card.image}
                       alt={card.name}
+                      loading={index < 16 ? "eager" : "lazy"}
+                      fetchPriority={index < 8 ? "high" : "auto"}
                       className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                     />
 

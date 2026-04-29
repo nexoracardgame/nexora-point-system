@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import SafeCardImage from "@/components/SafeCardImage";
+import { emitMarketSync } from "@/lib/market-sync";
 
 type CardData = {
   cardNo: string;
@@ -85,6 +86,10 @@ export default function CreateListingConsole() {
       const data = await res.json();
 
       if (data.success) {
+        emitMarketSync({
+          action: data.deduped ? "updated" : "created",
+          listingId: data.listing?.id,
+        });
         alert(data.deduped ? "มีโพสต์ใบนี้อยู่แล้ว" : "ลงขายสำเร็จ");
         window.location.href = "/market";
         return;
