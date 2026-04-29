@@ -36,6 +36,10 @@ type StoredCollectionsState = {
   selectedSetId: string;
 };
 
+type RemoteCollectionsState = Partial<StoredCollectionsState> & {
+  updatedAt?: string | null;
+};
+
 const STORAGE_KEY = "nexora:collections:v2";
 const emptyCalculator: CalculatorState = { bronze: 0, silver: 0, gold: 0 };
 
@@ -60,6 +64,23 @@ function parseCardNumbers(raw: string) {
   ).sort((a, b) => a - b);
 }
 
+function normalizeCalculatorState(value: unknown): CalculatorState {
+  const source =
+    value && typeof value === "object"
+      ? (value as Partial<Record<keyof CalculatorState, unknown>>)
+      : {};
+
+  return {
+    bronze: Math.max(0, Number(source.bronze || 0)),
+    silver: Math.max(0, Number(source.silver || 0)),
+    gold: Math.max(0, Number(source.gold || 0)),
+  };
+}
+
+function hasCalculatorValue(value: CalculatorState) {
+  return value.bronze > 0 || value.silver > 0 || value.gold > 0;
+}
+
 function readStoredState(): StoredCollectionsState | null {
   if (typeof window === "undefined") return null;
 
@@ -72,11 +93,7 @@ function readStoredState(): StoredCollectionsState | null {
       ownedCards: Array.isArray(parsed.ownedCards)
         ? parseCardNumbers(parsed.ownedCards.join(","))
         : [],
-      calculator: {
-        bronze: Math.max(0, Number(parsed.calculator?.bronze || 0)),
-        silver: Math.max(0, Number(parsed.calculator?.silver || 0)),
-        gold: Math.max(0, Number(parsed.calculator?.gold || 0)),
-      },
+      calculator: normalizeCalculatorState(parsed.calculator),
       selectedSetId:
         String(parsed.selectedSetId || "").trim() ||
         nexoraCollectionSets[0]?.id ||
@@ -97,6 +114,7 @@ export default function CollectionsClient() {
   );
   const [message, setMessage] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const [remoteSynced, setRemoteSynced] = useState(false);
 
   useEffect(() => {
     const stored = readStoredState();
@@ -120,6 +138,73 @@ export default function CollectionsClient() {
       } satisfies StoredCollectionsState)
     );
   }, [calculator, hydrated, ownedCards, selectedSetId]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    let cancelled = false;
+
+    const loadRemoteState = async () => {
+      try {
+        const response = await fetch("/api/collections/state", {
+          cache: "no-store",
+        });
+
+        if (!response.ok || cancelled) return;
+
+        const payload = (await response.json().catch(() => null)) as {
+          state?: RemoteCollectionsState;
+        } | null;
+
+        const state = payload?.state;
+        if (!state || cancelled) return;
+
+        if (Array.isArray(state.ownedCards) && state.ownedCards.length > 0) {
+          const remoteOwned = parseCardNumbers(state.ownedCards.join(","));
+          setOwnedCards((current) =>
+            Array.from(new Set([...current, ...remoteOwned])).sort(
+              (a, b) => a - b
+            )
+          );
+        }
+
+        const remoteCalculator = normalizeCalculatorState(state.calculator);
+        if (hasCalculatorValue(remoteCalculator)) {
+          setCalculator(remoteCalculator);
+        }
+
+        const remoteSelectedSetId = String(state.selectedSetId || "").trim();
+        if (
+          remoteSelectedSetId &&
+          nexoraCollectionSets.some((set) => set.id === remoteSelectedSetId)
+        ) {
+          setSelectedSetId(remoteSelectedSetId);
+        }
+      } finally {
+        if (!cancelled) setRemoteSynced(true);
+      }
+    };
+
+    void loadRemoteState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || !remoteSynced) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void fetch("/api/collections/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ownedCards, calculator, selectedSetId }),
+      }).catch(() => undefined);
+    }, 450);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [calculator, hydrated, ownedCards, remoteSynced, selectedSetId]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {

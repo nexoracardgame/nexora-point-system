@@ -26,10 +26,9 @@ function ensureCollectionStateSchema() {
   return schemaReadyPromise;
 }
 
-function getSessionUserId(session: Awaited<ReturnType<typeof getServerSession>>) {
-  return String(
-    (session?.user as { id?: string } | undefined)?.id || ""
-  ).trim();
+function getSessionUserId(session: unknown) {
+  const user = (session as { user?: { id?: string } } | null)?.user;
+  return String(user?.id || "").trim();
 }
 
 function normalizeOwnedCards(value: unknown) {
