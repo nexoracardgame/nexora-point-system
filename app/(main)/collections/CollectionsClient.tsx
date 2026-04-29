@@ -41,6 +41,7 @@ type RemoteCollectionsState = Partial<StoredCollectionsState> & {
 };
 
 const STORAGE_KEY = "nexora:collections:v2";
+const PREVIEW_CARD_LIMIT = 8;
 const emptyCalculator: CalculatorState = { bronze: 0, silver: 0, gold: 0 };
 
 function formatCardNo(cardId: number) {
@@ -115,6 +116,7 @@ export default function CollectionsClient() {
   const [message, setMessage] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [remoteSynced, setRemoteSynced] = useState(false);
+  const [showAllPreviewCards, setShowAllPreviewCards] = useState(false);
 
   useEffect(() => {
     const stored = readStoredState();
@@ -219,6 +221,10 @@ export default function CollectionsClient() {
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
+
+  useEffect(() => {
+    setShowAllPreviewCards(false);
+  }, [selectedSetId]);
 
   const ownedSet = useMemo(() => new Set(ownedCards), [ownedCards]);
 
@@ -327,7 +333,14 @@ export default function CollectionsClient() {
     setMessage(`ล้างการ์ดของชุด ${activeStat.set.order} แล้ว`);
   };
 
-  const previewCards = activeStat?.cardIds.slice(0, 4) || [];
+  const previewCards =
+    activeStat?.cardIds.slice(
+      0,
+      showAllPreviewCards ? activeStat.cardIds.length : PREVIEW_CARD_LIMIT
+    ) || [];
+  const hiddenPreviewCount = activeStat
+    ? Math.max(activeStat.cardIds.length - previewCards.length, 0)
+    : 0;
 
   return (
     <div className="min-h-screen bg-[#f4f1ea] text-[#080808]">
@@ -448,8 +461,8 @@ export default function CollectionsClient() {
           </div>
         </section>
 
-        <section className="mt-5 grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-          <div className="space-y-5">
+        <section className="mt-5 grid gap-5 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
+          <div className="space-y-5 xl:col-start-1 xl:row-start-1">
             <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -573,8 +586,8 @@ export default function CollectionsClient() {
             </div>
           </div>
 
-          <div className="space-y-5">
-            <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5">
+          <div className="space-y-5 xl:contents">
+            <div className="rounded-[30px] bg-white p-4 shadow-[0_22px_70px_rgba(50,43,33,0.12)] ring-1 ring-black/5 sm:p-5 xl:col-start-2 xl:row-span-2 xl:row-start-1">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">
@@ -672,8 +685,8 @@ export default function CollectionsClient() {
             </div>
 
             {activeStat ? (
-              <section className="overflow-hidden rounded-[30px] bg-[#080808] text-white shadow-[0_26px_90px_rgba(0,0,0,0.24)]">
-                <div className="grid gap-0 lg:grid-cols-[0.88fr_1.12fr]">
+              <section className="overflow-hidden rounded-[30px] bg-[#080808] text-white shadow-[0_26px_90px_rgba(0,0,0,0.24)] xl:col-start-1 xl:row-start-2 xl:self-start">
+                <div className="grid gap-0 2xl:grid-cols-[0.88fr_1.12fr]">
                   <div className="relative min-h-[320px] overflow-hidden bg-[#121212] p-5">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_16%,rgba(245,197,66,0.22),transparent_24%),linear-gradient(180deg,transparent,rgba(0,0,0,0.52))]" />
                     <div className="relative">
@@ -692,7 +705,28 @@ export default function CollectionsClient() {
                         {activeStat.set.story}
                       </p>
 
-                      <div className="mt-5 grid grid-cols-4 gap-2">
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35">
+                          Card Preview
+                        </div>
+                        {activeStat.cardIds.length > PREVIEW_CARD_LIMIT ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowAllPreviewCards((current) => !current)
+                            }
+                            className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-black transition hover:scale-[1.03]"
+                          >
+                            {showAllPreviewCards
+                              ? "ย่อรูปการ์ด"
+                              : `ดูรูปเพิ่ม +${hiddenPreviewCount.toLocaleString(
+                                  "th-TH"
+                                )}`}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-4">
                         {previewCards.map((cardId) => (
                           <div
                             key={cardId}
