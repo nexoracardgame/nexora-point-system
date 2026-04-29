@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getServerSession } from "next-auth";
 import {
   BadgeCheck,
@@ -22,6 +23,8 @@ import {
   buildTopPercent,
   buildTrustScore,
 } from "@/lib/seller-rank";
+import { getSellerRankPresentation } from "@/lib/seller-rank-presentation";
+import SellerRankGuideButton from "./SellerRankGuideButton";
 
 function formatCurrency(value: number) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
@@ -97,73 +100,10 @@ function getSnapshotSellerImage(
   return snapshot?.seller?.image || snapshot?.sellerImage || "/avatar.png";
 }
 
-function getSellerRankPresentation(score: number) {
-  if (score >= 340) {
-    return {
-      label: "ตำนานตลาด",
-      tone: "text-yellow-100",
-      aura:
-        "border-yellow-200/40 bg-[radial-gradient(circle_at_top,rgba(253,224,71,0.28),transparent_46%),linear-gradient(150deg,rgba(120,53,15,0.86),rgba(5,5,7,0.96))] shadow-[0_0_70px_rgba(250,204,21,0.28)]",
-    };
-  }
-
-  if (score >= 265) {
-    return {
-      label: "จอมทัพดีล",
-      tone: "text-amber-100",
-      aura:
-        "border-amber-200/36 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.24),transparent_46%),linear-gradient(150deg,rgba(92,45,9,0.84),rgba(5,5,7,0.96))] shadow-[0_0_64px_rgba(245,158,11,0.25)]",
-    };
-  }
-
-  if (score >= 205) {
-    return {
-      label: "ไดมอนด์พรีเมี่ยม",
-      tone: "text-cyan-100",
-      aura:
-        "border-cyan-200/34 bg-[radial-gradient(circle_at_top,rgba(103,232,249,0.22),transparent_46%),linear-gradient(150deg,rgba(12,74,110,0.74),rgba(5,5,7,0.96))] shadow-[0_0_62px_rgba(34,211,238,0.22)]",
-    };
-  }
-
-  if (score >= 145) {
-    return {
-      label: "แพลทินัมเซลเลอร์",
-      tone: "text-violet-100",
-      aura:
-        "border-violet-200/30 bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.20),transparent_46%),linear-gradient(150deg,rgba(59,7,100,0.72),rgba(5,5,7,0.96))] shadow-[0_0_58px_rgba(167,139,250,0.20)]",
-    };
-  }
-
-  if (score >= 95) {
-    return {
-      label: "โกลด์เทรดเดอร์",
-      tone: "text-amber-100",
-      aura:
-        "border-amber-200/26 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.18),transparent_46%),linear-gradient(150deg,rgba(69,26,3,0.68),rgba(5,5,7,0.96))] shadow-[0_0_48px_rgba(245,158,11,0.18)]",
-    };
-  }
-
-  if (score >= 55) {
-    return {
-      label: "ซิลเวอร์เซลเลอร์",
-      tone: "text-slate-100",
-      aura:
-        "border-slate-200/24 bg-[radial-gradient(circle_at_top,rgba(226,232,240,0.14),transparent_46%),linear-gradient(150deg,rgba(30,41,59,0.68),rgba(5,5,7,0.96))] shadow-[0_0_42px_rgba(226,232,240,0.12)]",
-    };
-  }
-
-  return {
-    label: "ผู้ขายเริ่มต้น",
-    tone: "text-emerald-100",
-    aura:
-      "border-emerald-200/24 bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.14),transparent_46%),linear-gradient(150deg,rgba(6,78,59,0.58),rgba(5,5,7,0.96))] shadow-[0_0_42px_rgba(52,211,153,0.14)]",
-  };
-}
-
-function buildThaiTopPercentLabel(topPercent: number) {
+function buildTopPercentLabel(topPercent: number) {
   return topPercent <= 1
-    ? "อยู่ในกลุ่มท็อป 1% ของผู้ขาย"
-    : `อยู่ในกลุ่มท็อป ${topPercent}% ของผู้ขายในตลาด`;
+    ? "Top 1% Marketplace Seller"
+    : `Top ${topPercent}% Marketplace Seller`;
 }
 
 export default async function SellerProfilePage({
@@ -497,26 +437,6 @@ export default async function SellerProfilePage({
     ])
   );
 
-  const sellerAgeRows =
-    sellerIds.length > 0
-      ? await prisma.user
-          .findMany({
-            where: {
-              id: {
-                in: sellerIds,
-              },
-            },
-            select: {
-              id: true,
-              createdAt: true,
-            },
-          })
-          .catch(() => [])
-      : [];
-
-  const sellerAgeMap = new Map(
-    sellerAgeRows.map((item) => [item.id, item.createdAt])
-  );
   const now = new Date().getTime();
 
   const ranking = sellerIds
@@ -526,7 +446,6 @@ export default async function SellerProfilePage({
       const startedAt =
         listingStats?.startedAt ||
         soldStats?.startedAt ||
-        sellerAgeMap.get(userId) ||
         (userId === seller.id ? seller.createdAt : new Date(now));
 
       const metrics = {
@@ -583,38 +502,42 @@ export default async function SellerProfilePage({
   const isGrowingSeller = completedDeals >= 10;
   const isVerifiedSeller = !isGrowingSeller && trustScore >= 78;
   const sellerStatusLabel = isGrowingSeller
-    ? "ผู้ขายกำลังเติบโต"
+    ? "Growing Seller"
     : isVerifiedSeller
-      ? "ผู้ขายยืนยันแล้ว"
-      : "ผู้ขายใหม่";
+      ? "Verified Seller"
+      : "New Seller";
   const sellerStatusTone = isGrowingSeller
     ? "border-amber-300/24 bg-amber-300/12 text-amber-200"
     : isVerifiedSeller
       ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-300"
       : "border-white/14 bg-white/[0.05] text-white/76";
   const rankExplanation =
-    "แรงค์คำนวณจากดีลสำเร็จ ยอดขาย รีวิว รายการขาย และความต่อเนื่องจริงในตลาด";
+    "Ranked from completed deals, sales volume, reviews, listings, and real marketplace activity.";
   const topPercentMeaning =
-    "TOP คืออันดับโดยประมาณเมื่อเทียบกับผู้ขายทั้งหมดในระบบ ยิ่งเปอร์เซ็นต์น้อยยิ่งอยู่กลุ่มบน";
+    "TOP means this seller's approximate percentile compared with all marketplace sellers. Lower percentage means a stronger position.";
   const trustMeaning =
-    "ความน่าเชื่อถือคำนวณจากรีวิว ดีลที่ปิดสำเร็จ ยอดขาย อายุบัญชี และรายการขายที่ยัง active";
-  const reputationLabel = buildThaiTopPercentLabel(topPercent);
+    "Trust combines reviews, completed deals, sales volume, account age, and active listings into one confidence score.";
+  const reputationLabel = buildTopPercentLabel(topPercent);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#23124d_0%,#0a0b10_40%,#05070d_100%)] text-white lg:bg-[radial-gradient(circle_at_top,#2a1906_0%,#090806_34%,#030304_100%)]">
+    <div className="min-h-screen overflow-hidden bg-[#050507] text-white">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute left-[10%] top-[10%] h-[240px] w-[240px] rounded-full bg-violet-500/10 blur-3xl sm:h-[420px] sm:w-[420px] lg:bg-amber-500/10" />
-        <div className="absolute bottom-[10%] right-[8%] h-[220px] w-[220px] rounded-full bg-amber-400/10 blur-3xl sm:h-[360px] sm:w-[360px] lg:bg-yellow-300/10" />
-        <div className="absolute inset-x-[6%] top-[44%] hidden h-px bg-gradient-to-r from-transparent via-amber-200/18 to-transparent lg:block" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(251,191,36,0.18),transparent_26%),radial-gradient(circle_at_0%_45%,rgba(124,58,237,0.16),transparent_24%),radial-gradient(circle_at_100%_75%,rgba(34,211,238,0.10),transparent_26%),linear-gradient(180deg,#0b0b10_0%,#050507_100%)]" />
       </div>
 
       <div className="relative mx-auto max-w-7xl space-y-5 p-3 sm:space-y-6 sm:p-6">
         <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_30px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-[42px] lg:border-amber-200/16 lg:bg-[linear-gradient(180deg,rgba(22,16,7,0.78)_0%,rgba(5,5,7,0.94)_100%)] lg:shadow-[0_42px_140px_rgba(212,175,55,0.14)]">
           <div className="relative h-[250px] overflow-hidden sm:h-[360px] xl:h-[430px]">
-            <img
+            <Image
               src={seller.coverImage || "/seller-cover.jpg"}
               alt="Seller Cover"
-              className="h-full w-full object-cover"
+              fill
+              sizes="100vw"
+              unoptimized
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              className="object-cover"
               style={{
                 objectPosition: `center ${seller.coverPosition ?? 50}%`,
               }}
@@ -624,7 +547,7 @@ export default async function SellerProfilePage({
 
             <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/30 px-4 py-2 text-[11px] font-black uppercase tracking-[0.28em] text-white/82 shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:left-6 sm:top-6">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              โปรไฟล์พรีเมี่ยม
+              Profile Studio
             </div>
 
             <div className={`absolute left-4 top-16 flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-black tracking-[0.02em] backdrop-blur-xl sm:left-6 sm:top-20 ${sellerStatusTone}`}>
@@ -633,9 +556,9 @@ export default async function SellerProfilePage({
             </div>
 
             <div className="absolute right-4 top-4 max-w-[180px] rounded-[18px] border border-amber-300/24 bg-black/38 px-4 py-2 text-right text-[11px] font-black text-amber-200 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:right-6 sm:top-6 lg:max-w-[240px] lg:border-amber-200/32 lg:bg-amber-300/10">
-              <div>ท็อป {topPercent}% ของตลาด</div>
+              <div>TOP {topPercent}%</div>
               <div className="mt-1 hidden text-[10px] font-semibold text-white/54 lg:block">
-                เทียบกับผู้ขายทั้งหมด
+                Marketplace percentile
               </div>
             </div>
           </div>
@@ -646,11 +569,19 @@ export default async function SellerProfilePage({
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
                   <div className="relative">
                     <div className="absolute inset-[-12px] rounded-full bg-[radial-gradient(circle,rgba(167,139,250,0.14)_0%,transparent_72%)]" />
-                    <img
-                      src={seller.image || "/avatar.png"}
-                      alt={seller.name || "seller"}
-                      className="relative h-24 w-24 rounded-full border-[4px] border-white/14 object-cover shadow-[0_22px_54px_rgba(0,0,0,0.44)] sm:h-32 sm:w-32 sm:border-[5px]"
-                    />
+                    <div className="relative h-24 w-24 overflow-hidden rounded-full border-[4px] border-white/14 shadow-[0_22px_54px_rgba(0,0,0,0.44)] sm:h-32 sm:w-32 sm:border-[5px]">
+                      <Image
+                        src={seller.image || "/avatar.png"}
+                        alt={seller.name || "seller"}
+                        fill
+                        sizes="(max-width: 640px) 96px, 128px"
+                        unoptimized
+                        loading="eager"
+                        fetchPriority="high"
+                        decoding="async"
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-[#090b12] bg-emerald-400 sm:bottom-2 sm:right-2" />
                   </div>
 
@@ -737,7 +668,7 @@ export default async function SellerProfilePage({
                 <div className={`relative overflow-hidden rounded-[30px] border px-5 py-4 backdrop-blur-xl sm:min-w-[260px] sm:px-6 ${sellerRank.aura}`}>
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
                   <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/54">
-                    แรงค์ผู้ขาย
+                    Seller Rank
                   </div>
                   <div className={`mt-2 text-2xl font-black sm:text-4xl ${sellerRank.tone}`}>
                     {sellerRank.label}
@@ -745,6 +676,7 @@ export default async function SellerProfilePage({
                   <div className="mt-2 text-sm leading-6 text-white/64">
                     {rankExplanation}
                   </div>
+                  <SellerRankGuideButton currentRank={sellerRank.label} />
                 </div>
               </div>
 
@@ -769,10 +701,10 @@ export default async function SellerProfilePage({
                     hint: "รวมมูลค่าดีลสำเร็จ",
                   },
                   {
-                    label: "ความน่าเชื่อถือ",
+                    label: "Trust",
                     value: `${trustScore}%`,
                     color: "text-cyan-300",
-                    hint: "รีวิว ดีล และประวัติตลาด",
+                    hint: "Reviews, deals, and market history",
                   },
                 ].map((stat) => (
                   <div
@@ -796,12 +728,12 @@ export default async function SellerProfilePage({
 
               <div className="grid gap-3 rounded-[24px] border border-white/8 bg-black/18 p-4 text-xs leading-6 text-white/58 backdrop-blur-xl sm:grid-cols-2 sm:text-sm lg:border-amber-200/14 lg:bg-[linear-gradient(180deg,rgba(251,191,36,0.07),rgba(0,0,0,0.20))]">
                 <div>
-                  <span className="font-black text-amber-200">TOP หมายถึง:</span>{" "}
+                  <span className="font-black text-amber-200">TOP means:</span>{" "}
                   {topPercentMeaning}
                 </div>
                 <div>
                   <span className="font-black text-cyan-200">
-                    ความน่าเชื่อถือหมายถึง:
+                    Trust means:
                   </span>{" "}
                   {trustMeaning}
                 </div>
