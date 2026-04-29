@@ -235,6 +235,7 @@ export default function CollectionsClient() {
         return {
           set,
           cardIds,
+          displayTotal: set.officialTotal || cardIds.length,
           owned,
           missing,
           progress,
@@ -661,7 +662,7 @@ export default function CollectionsClient() {
                           }`}
                         >
                           มี {item.owned.length.toLocaleString("th-TH")} /{" "}
-                          {item.cardIds.length.toLocaleString("th-TH")} ใบ
+                          {item.displayTotal.toLocaleString("th-TH")} ใบ
                         </div>
                       </div>
                     </div>
@@ -732,7 +733,7 @@ export default function CollectionsClient() {
                           Total
                         </div>
                         <div className="mt-1 text-2xl font-black">
-                          {activeStat.cardIds.length.toLocaleString("th-TH")}
+                          {activeStat.displayTotal.toLocaleString("th-TH")}
                         </div>
                       </div>
                       <div className="rounded-[22px] bg-[#f3f1ea] p-4">
