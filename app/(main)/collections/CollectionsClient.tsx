@@ -727,21 +727,53 @@ export default function CollectionsClient() {
                       </div>
 
                       <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-4">
-                        {previewCards.map((cardId) => (
-                          <div
-                            key={cardId}
-                            className="relative aspect-[5/7] overflow-hidden rounded-[16px] bg-white/10 ring-1 ring-white/10"
-                          >
-                            <Image
-                              src={`/cards/${formatCardNo(cardId)}.jpg`}
-                              alt={`Card ${formatCardNo(cardId)}`}
-                              fill
-                              sizes="(max-width: 640px) 22vw, 96px"
-                              className="object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        ))}
+                        {previewCards.map((cardId) => {
+                          const isOwned = ownedSet.has(cardId);
+
+                          return (
+                            <button
+                              key={cardId}
+                              type="button"
+                              onClick={() => toggleCard(cardId)}
+                              className={`group relative aspect-[5/7] overflow-hidden rounded-[16px] bg-white/10 text-left ring-1 transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f5c542] ${
+                                isOwned
+                                  ? "scale-[1.02] ring-[#f5c542] shadow-[0_0_0_2px_rgba(245,197,66,0.42),0_0_28px_rgba(245,197,66,0.56),0_16px_34px_rgba(0,0,0,0.42)]"
+                                  : "ring-white/10 hover:scale-[1.02] hover:ring-white/40 hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
+                              }`}
+                              aria-pressed={isOwned}
+                              aria-label={
+                                isOwned
+                                  ? `เอาการ์ด ${formatCardNo(cardId)} ออกจากคอลเลกชัน`
+                                  : `เพิ่มการ์ด ${formatCardNo(cardId)} เข้าคอลเลกชัน`
+                              }
+                            >
+                              <Image
+                                src={`/cards/${formatCardNo(cardId)}.jpg`}
+                                alt={`Card ${formatCardNo(cardId)}`}
+                                fill
+                                sizes="(max-width: 640px) 22vw, 96px"
+                                className={`object-cover transition duration-200 ${
+                                  isOwned
+                                    ? "brightness-110 saturate-125"
+                                    : "group-hover:brightness-110"
+                                }`}
+                                loading="lazy"
+                              />
+                              <div
+                                className={`pointer-events-none absolute inset-0 rounded-[16px] transition ${
+                                  isOwned
+                                    ? "bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.34),transparent_24%),linear-gradient(180deg,rgba(245,197,66,0.22),transparent_45%,rgba(245,197,66,0.24))]"
+                                    : "bg-black/0 group-hover:bg-white/5"
+                                }`}
+                              />
+                              {isOwned ? (
+                                <div className="pointer-events-none absolute inset-x-1.5 bottom-1.5 rounded-full bg-[#f5c542] px-2 py-1 text-center text-[9px] font-black text-black shadow-[0_8px_18px_rgba(0,0,0,0.34)]">
+                                  มีแล้ว
+                                </div>
+                              ) : null}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
