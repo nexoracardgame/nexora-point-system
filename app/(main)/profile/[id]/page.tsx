@@ -749,25 +749,25 @@ export default async function SellerProfilePage({
                   {
                     label: "ดีลสำเร็จ",
                     value: completedDeals,
-                    color: "text-emerald-300",
+                    color: "text-white",
                     hint: "จำนวนดีลที่ปิดจบแล้ว",
                   },
                   {
                     label: "กำลังขาย",
                     value: listings.length,
-                    color: "text-violet-300",
+                    color: "text-white",
                     hint: "การ์ดที่ยังลงขายอยู่",
                   },
                   {
                     label: "ยอดขายรวม",
                     value: formatCurrency(totalVolume),
-                    color: "text-violet-300",
+                    color: "text-white",
                     hint: "รวมมูลค่าดีลสำเร็จ",
                   },
                   {
                     label: "ความน่าเชื่อถือ",
                     value: `${trustScore}%`,
-                    color: "text-cyan-300",
+                    color: "text-white",
                     hint: "รีวิว ดีล และประวัติตลาด",
                   },
                 ].map((stat) => (
