@@ -14,3 +14,4 @@
 - Environments: .env
 ✓ Ready in 224ms
 
+ GET /api/live?ts=1 200 in 2.3s (next.js: 1552ms, application-code: 746ms)

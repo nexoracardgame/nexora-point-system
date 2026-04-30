@@ -8,6 +8,7 @@ import { signOut, useSession } from "next-auth/react";
 import { MessageCircle } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
+import LiveFloatingPlayer from "@/components/LiveFloatingPlayer";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -31,6 +32,7 @@ import {
   X,
   ChevronRight,
   User,
+  Radio,
 } from "lucide-react";
 
 function safeProfileSrc(image?: string | null) {
@@ -527,6 +529,7 @@ export default function MainLayout({
       "/redeem",
       "/collections",
       "/community",
+      "/live",
       "/wallet",
       "/dm",
       ownProfileHref,
@@ -598,6 +601,7 @@ export default function MainLayout({
     if (pathname.startsWith("/market")) return t("layout.page.market");
     if (pathname.startsWith("/collections")) return t("layout.page.collections");
     if (pathname.startsWith("/community")) return t("layout.page.community");
+    if (pathname.startsWith("/live")) return "ห้องไลฟ์";
     if (pathname.startsWith("/redeem")) return t("layout.page.redeem");
     if (pathname.startsWith("/rewards")) return t("layout.page.rewards");
     if (pathname.startsWith("/wallet")) return t("layout.page.wallet");
@@ -639,6 +643,12 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
+        href: "/live",
+        label: "ไลฟ์",
+        icon: Radio,
+        active: pathname.startsWith("/live"),
+      },
+      {
        href: "/dm",
        label: t("layout.nav.chat"),
        icon: MessageCircle,
@@ -668,6 +678,12 @@ export default function MainLayout({
         label: t("layout.nav.community"),
         icon: Cat,
         active: pathname.startsWith("/community"),
+      },
+      {
+        href: "/live",
+        label: "ไลฟ์",
+        icon: Radio,
+        active: pathname.startsWith("/live"),
       },
       {
         href: "/dm",
@@ -1002,6 +1018,8 @@ export default function MainLayout({
         </div>
       </div>
 
+      <LiveFloatingPlayer />
+
       {/* MOBILE DRAWER */}
       <div
         className={`fixed inset-0 z-[1200] xl:hidden ${
@@ -1145,9 +1163,9 @@ export default function MainLayout({
 
       {/* MOBILE BOTTOM NAV */}
       {!isChatRoomPage && (
-        <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[640px] overflow-hidden rounded-[26px] border border-white/10 bg-[#0b0c10]/82 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
+        <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[720px] overflow-hidden rounded-[26px] border border-white/10 bg-[#0b0c10]/82 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))]" />
-          <div className="mx-auto grid max-w-[640px] grid-cols-6 gap-1.5 sm:gap-2">
+          <div className="mx-auto grid max-w-[720px] grid-cols-7 gap-1 sm:gap-2">
             {mobileBottomItems.map((item) => {
               const Icon = item.icon;
 

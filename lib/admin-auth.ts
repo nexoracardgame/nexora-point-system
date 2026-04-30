@@ -7,12 +7,13 @@ export type ApiActor = {
   id: string;
   lineId: string;
   role: string;
+  name: string;
 };
 
 export async function getApiActor(): Promise<ApiActor | null> {
   const session = await getServerSession(authOptions);
   const user = session?.user as
-    | { id?: string; lineId?: string; role?: string }
+    | { id?: string; lineId?: string; role?: string; name?: string | null }
     | undefined;
 
   if (!user) {
@@ -22,6 +23,7 @@ export async function getApiActor(): Promise<ApiActor | null> {
   const id = String(user.id || "").trim();
   const lineId = String(user.lineId || id || "").trim();
   const role = String(user.role || "").trim().toLowerCase();
+  const name = String(user.name || "").trim();
 
   if (!id) {
     return null;
@@ -31,6 +33,7 @@ export async function getApiActor(): Promise<ApiActor | null> {
     id,
     lineId,
     role,
+    name,
   };
 }
 
