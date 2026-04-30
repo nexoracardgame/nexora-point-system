@@ -104,7 +104,7 @@ function getSellerRankPresentation(score: number) {
       label: "Market Legend",
       tone: "text-amber-100",
       aura:
-        "border-amber-200/28 bg-black/95 shadow-[0_0_42px_rgba(250,204,21,0.14)]",
+        "border-amber-200/44 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.22),transparent_30%),radial-gradient(circle_at_72%_18%,rgba(250,204,21,0.34),transparent_42%),linear-gradient(145deg,rgba(133,77,14,0.86),rgba(9,9,12,0.97)_58%,rgba(0,0,0,0.99))] shadow-[0_0_46px_rgba(250,204,21,0.22)]",
     };
   }
 
@@ -113,7 +113,7 @@ function getSellerRankPresentation(score: number) {
       label: "Deal Commander",
       tone: "text-fuchsia-100",
       aura:
-        "border-fuchsia-200/24 bg-black/95 shadow-[0_0_38px_rgba(217,70,239,0.14)]",
+        "border-fuchsia-200/38 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.20),transparent_30%),radial-gradient(circle_at_78%_20%,rgba(217,70,239,0.28),transparent_42%),linear-gradient(145deg,rgba(88,28,135,0.82),rgba(8,8,12,0.97)_60%,rgba(0,0,0,0.99))] shadow-[0_0_42px_rgba(217,70,239,0.20)]",
     };
   }
 
@@ -122,7 +122,7 @@ function getSellerRankPresentation(score: number) {
       label: "Diamond Elite",
       tone: "text-cyan-100",
       aura:
-        "border-cyan-200/26 bg-black/95 shadow-[0_0_40px_rgba(34,211,238,0.16)]",
+        "border-cyan-100/40 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.24),transparent_30%),radial-gradient(circle_at_78%_20%,rgba(34,211,238,0.30),transparent_42%),linear-gradient(145deg,rgba(14,116,144,0.78),rgba(8,8,12,0.97)_60%,rgba(0,0,0,0.99))] shadow-[0_0_44px_rgba(34,211,238,0.22)]",
     };
   }
 
@@ -131,7 +131,7 @@ function getSellerRankPresentation(score: number) {
       label: "Platinum Seller",
       tone: "text-violet-100",
       aura:
-        "border-violet-200/24 bg-black/95 shadow-[0_0_38px_rgba(167,139,250,0.14)]",
+        "border-violet-200/38 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.22),transparent_30%),radial-gradient(circle_at_78%_20%,rgba(167,139,250,0.28),transparent_42%),linear-gradient(145deg,rgba(76,29,149,0.78),rgba(8,8,12,0.97)_60%,rgba(0,0,0,0.99))] shadow-[0_0_42px_rgba(167,139,250,0.20)]",
     };
   }
 
@@ -140,7 +140,7 @@ function getSellerRankPresentation(score: number) {
       label: "Premium Trader",
       tone: "text-violet-100",
       aura:
-        "border-violet-200/22 bg-black/95 shadow-[0_0_34px_rgba(139,92,246,0.12)]",
+        "border-violet-200/32 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_78%_20%,rgba(139,92,246,0.22),transparent_42%),linear-gradient(145deg,rgba(46,16,101,0.72),rgba(8,8,12,0.97)_60%,rgba(0,0,0,0.99))] shadow-[0_0_36px_rgba(139,92,246,0.18)]",
     };
   }
 
@@ -149,7 +149,7 @@ function getSellerRankPresentation(score: number) {
       label: "Silver Seller",
       tone: "text-slate-100",
       aura:
-        "border-slate-200/22 bg-black/95 shadow-[0_0_30px_rgba(226,232,240,0.10)]",
+        "border-slate-100/32 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.24),transparent_30%),radial-gradient(circle_at_78%_20%,rgba(226,232,240,0.18),transparent_42%),linear-gradient(145deg,rgba(51,65,85,0.70),rgba(8,8,12,0.97)_60%,rgba(0,0,0,0.99))] shadow-[0_0_34px_rgba(226,232,240,0.14)]",
     };
   }
 
@@ -157,7 +157,7 @@ function getSellerRankPresentation(score: number) {
     label: "New Seller",
     tone: "text-emerald-100",
     aura:
-      "border-emerald-200/22 bg-black/95 shadow-[0_0_30px_rgba(52,211,153,0.10)]",
+      "border-emerald-200/32 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_78%_20%,rgba(52,211,153,0.20),transparent_42%),linear-gradient(145deg,rgba(6,78,59,0.70),rgba(8,8,12,0.97)_60%,rgba(0,0,0,0.99))] shadow-[0_0_34px_rgba(52,211,153,0.14)]",
   };
 }
 
@@ -581,16 +581,17 @@ export default async function SellerProfilePage({
   const reputationLabel = buildThaiTopPercentLabel(topPercent);
 
   return (
-    <div className="min-h-screen overflow-hidden bg-black text-white">
+    <div className="min-h-screen overflow-hidden bg-[#111119] text-white">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,#030303_0%,#000_52%,#000_100%)]" />
-        <div className="absolute inset-0 opacity-[0.18] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.82)_1px,transparent_1px)] [background-size:32px_32px]" />
-        <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/6" />
-        <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/5" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(151,139,255,0.20),transparent_34%),radial-gradient(circle_at_12%_32%,rgba(251,113,133,0.11),transparent_24%),radial-gradient(circle_at_88%_70%,rgba(253,224,71,0.10),transparent_20%),linear-gradient(180deg,#171722_0%,#0d0d12_48%,#08080b_100%)]" />
+        <div className="absolute inset-0 opacity-[0.23] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:34px_34px]" />
+        <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/8" />
+        <div className="absolute -left-20 top-32 h-[430px] w-[430px] rounded-full border border-white/6" />
+        <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/7" />
       </div>
 
       <div className="relative mx-auto max-w-7xl space-y-4 p-3 sm:space-y-5 sm:p-6">
-        <section className="overflow-hidden rounded-[26px] border border-white/10 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.78)] backdrop-blur-2xl sm:rounded-[36px]">
+        <section className="overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_24px_90px_rgba(0,0,0,0.58)] backdrop-blur-2xl sm:rounded-[36px]">
           <div className="relative h-[250px] overflow-hidden sm:h-[360px] xl:h-[430px]">
             <Image
               src={seller.coverImage || "/seller-cover.jpg"}
@@ -772,9 +773,9 @@ export default async function SellerProfilePage({
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-2xl border border-white/10 bg-black/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:p-4"
+                    className="rounded-2xl border border-white/70 bg-white/[0.92] p-3 shadow-[0_18px_45px_rgba(255,255,255,0.10)] backdrop-blur-xl sm:p-4"
                   >
-                    <div className="text-[9px] uppercase tracking-[0.16em] text-white/58 sm:text-[10px]">
+                    <div className="text-[9px] uppercase tracking-[0.16em] text-black/52 sm:text-[10px]">
                       {stat.label}
                     </div>
                     <div
@@ -782,7 +783,7 @@ export default async function SellerProfilePage({
                     >
                       {stat.value}
                     </div>
-                    <div className="mt-2 text-[10px] leading-4 text-white/50 sm:text-[11px]">
+                    <div className="mt-2 text-[10px] leading-4 text-black/52 sm:text-[11px]">
                       {stat.hint}
                     </div>
                   </div>
