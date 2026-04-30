@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { QRCodeCanvas } from "qrcode.react";
 import {
   CheckCircle2,
@@ -41,6 +40,8 @@ function formatDateTime(value?: string | null) {
   return formatThaiDateTime(value);
 }
 
+const REWARD_IMAGE_FALLBACK = "/avatar.png";
+
 export default function CouponDetailCard({
   coupon,
   compact = false,
@@ -76,13 +77,15 @@ export default function CouponDetailCard({
         <div className="mt-4 grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
           <div className="space-y-4">
             <div className="relative min-h-[220px] overflow-hidden rounded-[28px] bg-[#eef2fa] ring-1 ring-black/5 sm:min-h-[280px]">
-              <Image
+              <img
                 src={coupon.rewardImageUrl}
                 alt={coupon.rewardName}
-                fill
-                sizes="(max-width: 1024px) 100vw, 420px"
-                className="object-cover"
-                priority={compact}
+                loading={compact ? "eager" : "lazy"}
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(event) => {
+                  event.currentTarget.src = REWARD_IMAGE_FALLBACK;
+                }}
               />
               <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(9,9,11,0.74))] p-4">
                 <div className="inline-flex rounded-full bg-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white backdrop-blur-md">

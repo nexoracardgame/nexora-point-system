@@ -25,6 +25,8 @@ type Reward = {
   coinCost?: number | null;
 };
 
+const REWARD_IMAGE_FALLBACK = "/avatar.png";
+
 export default function RewardRedeemClient({
   user,
   rewards,
@@ -168,6 +170,9 @@ export default function RewardRedeemClient({
                     }
                     alt={reward.name}
                     className="h-full w-full object-contain p-2 transition duration-700 group-hover:scale-110 md:p-3"
+                    onError={(event) => {
+                      event.currentTarget.src = REWARD_IMAGE_FALLBACK;
+                    }}
                   />
                 </div>
 

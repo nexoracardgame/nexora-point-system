@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -23,6 +22,8 @@ type RedeemCouponsCache = {
   coupons: CouponViewModel[];
   openCode: string;
 };
+
+const REWARD_IMAGE_FALLBACK = "/avatar.png";
 
 function mergeCoupons(
   coupons: CouponViewModel[],
@@ -277,12 +278,15 @@ export default function RedeemCouponsClient({
 
                     <div className="mt-4 flex items-center gap-3">
                       <div className="relative h-20 w-20 overflow-hidden rounded-[22px] bg-[#eef1f7] ring-1 ring-black/5">
-                        <Image
+                        <img
                           src={coupon.rewardImageUrl}
                           alt={coupon.rewardName}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
+                          loading="eager"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.src = REWARD_IMAGE_FALLBACK;
+                          }}
                         />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -347,12 +351,15 @@ export default function RedeemCouponsClient({
 
                     <div className="mt-4 flex items-center gap-3">
                       <div className="relative h-20 w-20 overflow-hidden rounded-[22px] bg-[#eef1f7] ring-1 ring-black/5 grayscale-[0.08]">
-                        <Image
+                        <img
                           src={coupon.rewardImageUrl}
                           alt={coupon.rewardName}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
+                          loading="eager"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.src = REWARD_IMAGE_FALLBACK;
+                          }}
                         />
                       </div>
                       <div className="min-w-0 flex-1">

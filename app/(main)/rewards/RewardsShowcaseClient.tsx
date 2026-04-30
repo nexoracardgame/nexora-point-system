@@ -31,6 +31,8 @@ function normalizeRewardName(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+const REWARD_IMAGE_FALLBACK = "/avatar.png";
+
 export default function RewardsShowcaseClient({
   displayName,
   profileImage,
@@ -344,15 +346,18 @@ export default function RewardsShowcaseClient({
                       Premium
                     </div>
                     <div className="relative aspect-[1.35]">
-                      <Image
+                      <img
                         src={
                           reward.imageUrl ||
                           "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"
                         }
                         alt={reward.name}
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                        className="object-contain p-5 transition duration-500 group-hover:scale-105"
+                        loading="eager"
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full object-contain p-5 transition duration-500 group-hover:scale-105"
+                        onError={(event) => {
+                          event.currentTarget.src = REWARD_IMAGE_FALLBACK;
+                        }}
                       />
                     </div>
                   </div>
