@@ -21,9 +21,9 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-[var(--app-shell-height)] bg-[#050608] text-white">
-      <div className="mx-auto flex min-h-[var(--app-shell-height)] max-w-[1800px] xl:items-stretch">
+      <div className="mx-auto flex min-h-[var(--app-shell-height)] max-w-[1800px] flex-col xl:flex-row xl:items-stretch">
         <AdminSidebar />
-        <main className="min-w-0 flex-1 px-3 pb-6 pt-3 sm:px-4 lg:px-5 xl:p-6">
+        <main className="min-w-0 flex-1 px-3 pb-8 pt-4 sm:px-4 lg:px-5 xl:p-6">
           {children}
         </main>
       </div>

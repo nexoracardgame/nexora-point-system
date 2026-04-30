@@ -21,28 +21,35 @@ export default async function AdminDashboardPage() {
   let totalRewards = 0;
   let totalCoupons = 0;
   let usedCoupons = 0;
-  let users: Array<{ createdAt: Date; nexPoint: number; coin: number }> = [];
+  let balanceTotals: { _sum: { nexPoint: number | null; coin: number | null } } | null = null;
+  let userCreatedRows: Array<{ createdAt: Date }> = [];
   let latestLogs: Array<{ id: string; lineId: string; type: string; amount: number; point: number; createdAt: Date }> = [];
 
   try {
-    [totalUsers, totalRewards, totalCoupons, usedCoupons, users, latestLogs] = await Promise.all([
+    [totalUsers, totalRewards, totalCoupons, usedCoupons, balanceTotals, userCreatedRows, latestLogs] = await Promise.all([
       prisma.user.count(),
       prisma.reward.count(),
       prisma.coupon.count(),
       prisma.coupon.count({ where: { used: true } }),
+      prisma.user.aggregate({
+        _sum: {
+          nexPoint: true,
+          coin: true,
+        },
+      }),
       prisma.user.findMany({
         orderBy: { createdAt: "asc" },
-        select: { createdAt: true, nexPoint: true, coin: true },
+        select: { createdAt: true },
       }),
       prisma.pointLog.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
     ]);
   } catch {}
 
-  const totalNex = users.reduce((sum, user) => sum + Number(user.nexPoint || 0), 0);
-  const totalCoin = users.reduce((sum, user) => sum + Number(user.coin || 0), 0);
+  const totalNex = Number(balanceTotals?._sum.nexPoint || 0);
+  const totalCoin = Number(balanceTotals?._sum.coin || 0);
 
   const groupedMap = new Map<string, number>();
-  for (const user of users) {
+  for (const user of userCreatedRows) {
     const date = formatThaiDate(user.createdAt);
     groupedMap.set(date, (groupedMap.get(date) || 0) + 1);
   }

@@ -6,20 +6,5 @@
 - Local:         http://localhost:3000
 - Network:       http://192.168.1.117:3000
 - Environments: .env
-✓ Ready in 268ms
+✓ Ready in 278ms
 
- GET /login?callbackUrl=%2Fcollections 200 in 1820ms (next.js: 1562ms, application-code: 258ms)
- GET /login?callbackUrl=%2Fcollections 200 in 72ms (next.js: 20ms, application-code: 52ms)
- GET /login?callbackUrl=%2Fcollections 200 in 26ms (next.js: 1469µs, application-code: 25ms)
- GET /login?callbackUrl=%2Fcollections 200 in 17ms (next.js: 1724µs, application-code: 16ms)
- GET /_next/image?url=https%3A%2F%2Fs.imgz.io%2F2026%2F04%2F03%2FNEXORA496971ca3675ceb2ca.png&w=640&q=75 500 in 2.1s (next.js: 2.1s, application-code: 22ms)
- GET /_next/image?url=https%3A%2F%2Fs.imgz.io%2F2026%2F04%2F03%2FNEXORA496971ca3675ceb2ca.png&w=640&q=75 500 in 2.1s (next.js: 2.1s, application-code: 22ms)
- GET /_next/image?url=https%3A%2F%2Fs.imgz.io%2F2026%2F04%2F03%2FNEXORA--2-copyf365bedcef4c8b64.png&w=384&q=75 500 in 2.1s (next.js: 2.1s, application-code: 22ms)
- GET /_next/image?url=https%3A%2F%2Fs.imgz.io%2F2026%2F04%2F03%2FNEXORA--2-copyf365bedcef4c8b64.png&w=384&q=75 500 in 2.1s (next.js: 2.1s, application-code: 22ms)
- GET /api/auth/session 200 in 1814ms (next.js: 1794ms, application-code: 21ms)
- GET /login?callbackUrl=%2Fcollections 200 in 20ms (next.js: 2ms, application-code: 17ms)
- GET /login?callbackUrl=%2Fcollections 200 in 23ms (next.js: 3ms, application-code: 21ms)
- GET /login?callbackUrl=%2Fcollections 200 in 22ms (next.js: 3ms, application-code: 20ms)
- GET /login?callbackUrl=%2Fcollections 200 in 17ms (next.js: 1886µs, application-code: 15ms)
- GET /login?callbackUrl=%2Fcollections 200 in 28ms (next.js: 1973µs, application-code: 26ms)
- GET /login?callbackUrl=%2Fcollections 200 in 17ms (next.js: 1905µs, application-code: 15ms)
