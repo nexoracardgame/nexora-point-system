@@ -658,10 +658,10 @@ export default function MainLayout({
         active: pathname.startsWith("/market"),
       },
       {
-        href: "/wallet",
-        label: t("layout.nav.wallet"),
-        icon: Wallet,
-        active: pathname.startsWith("/wallet"),
+        href: "/collections",
+        label: t("layout.nav.collections"),
+        icon: FolderKanban,
+        active: pathname.startsWith("/collections"),
       },
       {
         href: "/community",
