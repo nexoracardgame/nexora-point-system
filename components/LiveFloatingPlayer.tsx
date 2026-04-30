@@ -49,7 +49,7 @@ export default function LiveFloatingPlayer() {
   const [active, setActive] = useState<ActiveLive | null>(null);
   const [hiddenLiveId, setHiddenLiveId] = useState("");
   const [collapsed, setCollapsed] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const lastActiveIdRef = useRef("");
 
   const loadActive = useCallback(async () => {
@@ -71,14 +71,14 @@ export default function LiveFloatingPlayer() {
         lastActiveIdRef.current = nextActive.id;
         setHiddenLiveId("");
         setCollapsed(false);
-        setMuted(true);
+        setMuted(false);
       }
 
       if (!nextActive) {
         lastActiveIdRef.current = "";
         setHiddenLiveId("");
         setCollapsed(false);
-        setMuted(true);
+        setMuted(false);
       }
     } catch {
       return;

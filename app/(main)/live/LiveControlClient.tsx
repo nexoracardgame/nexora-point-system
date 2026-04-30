@@ -60,6 +60,22 @@ function formatTime(value: string) {
   }
 }
 
+function forceSoundUrl(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname.includes("facebook.com")) {
+      url.searchParams.set("mute", "false");
+    } else {
+      url.searchParams.set("mute", "0");
+    }
+    url.searchParams.set("autoplay", "1");
+    url.searchParams.set("playsinline", "1");
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 export default function LiveControlClient() {
   const { data: session } = useSession();
   const [url, setUrl] = useState("");
@@ -224,7 +240,7 @@ export default function LiveControlClient() {
             </div>
 
             <p className="mt-5 max-w-2xl text-sm font-bold leading-7 text-white/64 sm:text-base">
-              วางลิงก์ไลฟ์จาก YouTube, Facebook หรือ TikTok ระบบจะส่งหน้าจอลอยไปให้ทุกคนในแอพแบบเรียลไทม์ ปิดเสียงไว้ก่อนเสมอ และเปิดเสียงเองได้จาก player
+              วางลิงก์ไลฟ์จาก YouTube, Facebook หรือ TikTok ระบบจะส่งหน้าจอลอยไปให้ทุกคนในแอพแบบเรียลไทม์ และเปิดเสียงไว้ตั้งแต่แรกทุกแพลตฟอร์ม
             </p>
 
             <form onSubmit={startLive} className="mt-7 space-y-4">
@@ -309,7 +325,7 @@ export default function LiveControlClient() {
                 <div className="overflow-hidden rounded-[22px] bg-black">
                   <div className="aspect-video">
                     <iframe
-                      src={active.embedUrl}
+                      src={forceSoundUrl(active.embedUrl)}
                       title={active.title}
                       allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                       allowFullScreen

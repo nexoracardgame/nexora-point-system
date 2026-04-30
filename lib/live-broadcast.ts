@@ -100,7 +100,7 @@ export function buildLiveEmbed(rawUrl: string) {
       sourceUrl: sourceUrl.toString(),
       embedUrl: withEmbedParams(
         new URL(`https://www.youtube.com/embed/${encodeURIComponent(videoId)}`),
-        true
+        false
       ),
       title: "YouTube Live",
     };
@@ -111,7 +111,7 @@ export function buildLiveEmbed(rawUrl: string) {
     embedUrl.searchParams.set("href", sourceUrl.toString());
     embedUrl.searchParams.set("show_text", "false");
     embedUrl.searchParams.set("autoplay", "true");
-    embedUrl.searchParams.set("mute", "true");
+    embedUrl.searchParams.set("mute", "false");
     embedUrl.searchParams.set("width", "560");
 
     return {
