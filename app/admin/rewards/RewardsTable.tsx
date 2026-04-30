@@ -14,6 +14,20 @@ type RewardRow = {
   createdAt: string;
 };
 
+function publishRewardsUpdated() {
+  if (typeof window === "undefined") return;
+
+  const timestamp = String(Date.now());
+  window.dispatchEvent(new CustomEvent("nexora:rewards-updated"));
+
+  try {
+    window.localStorage.setItem("nexora:rewards-updated", timestamp);
+    window.sessionStorage.removeItem("nexora:view:redeem-coupons");
+  } catch {
+    return;
+  }
+}
+
 export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
   const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,6 +65,7 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
     setEditingId(null);
     setName("");
     setImageUrl("");
+    publishRewardsUpdated();
     router.refresh();
   };
 
@@ -63,6 +78,7 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
     });
     const data = await res.json();
     if (!res.ok) return alert(data.error || "ลบไม่สำเร็จ");
+    publishRewardsUpdated();
     router.refresh();
   };
 

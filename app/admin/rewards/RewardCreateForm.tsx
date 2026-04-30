@@ -3,6 +3,20 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+function publishRewardsUpdated() {
+  if (typeof window === "undefined") return;
+
+  const timestamp = String(Date.now());
+  window.dispatchEvent(new CustomEvent("nexora:rewards-updated"));
+
+  try {
+    window.localStorage.setItem("nexora:rewards-updated", timestamp);
+    window.sessionStorage.removeItem("nexora:view:redeem-coupons");
+  } catch {
+    return;
+  }
+}
+
 export default function RewardCreateForm() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -37,6 +51,7 @@ export default function RewardCreateForm() {
       setNexCost("");
       setCoinCost("");
       setStock("");
+      publishRewardsUpdated();
       router.refresh();
     } finally {
       setLoading(false);

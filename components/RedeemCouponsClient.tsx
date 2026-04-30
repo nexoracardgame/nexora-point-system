@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Clock3,
@@ -86,34 +86,57 @@ export default function RedeemCouponsClient({
     } satisfies RedeemCouponsCache);
   }, [coupons, selectedCode]);
 
+  const syncCoupons = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/coupon/list?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (Array.isArray(data?.coupons)) {
+        setCoupons(data.coupons);
+      }
+    } catch {
+      return;
+    }
+  }, []);
+
   useEffect(() => {
-    let disposed = false;
+    void syncCoupons();
 
-    const syncCoupons = async () => {
-      if (disposed) return;
-
-      try {
-        const res = await fetch(`/api/coupon/list?ts=${Date.now()}`, {
-          cache: "no-store",
-        });
-
-        if (!res.ok || disposed) return;
-
-        const data = await res.json();
-        if (!disposed && Array.isArray(data?.coupons)) {
-          setCoupons(data.coupons);
-        }
-      } catch {
-        return;
+    const onFocus = () => void syncCoupons();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void syncCoupons();
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "nexora:rewards-updated") {
+        void syncCoupons();
       }
     };
 
-    void syncCoupons();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("nexora:rewards-updated", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncCoupons();
+      }
+    }, 6000);
 
     return () => {
-      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("nexora:rewards-updated", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [syncCoupons]);
 
   const selectedCoupon =
     coupons.find((coupon) => coupon.code === selectedCode) || null;

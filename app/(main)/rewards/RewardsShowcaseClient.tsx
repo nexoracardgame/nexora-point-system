@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Coins,
   Gem,
@@ -45,10 +45,67 @@ export default function RewardsShowcaseClient({
   rewards: RewardItem[];
 }) {
   const [query, setQuery] = useState("");
+  const [liveRewards, setLiveRewards] = useState(rewards);
   const [balances, setBalances] = useState({
     nexPoint: Number(nexPoint || 0),
     coin: Number(coin || 0),
   });
+
+  useEffect(() => {
+    setLiveRewards(rewards);
+  }, [rewards]);
+
+  const syncRewards = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/reward/list?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (Array.isArray(data?.rewards)) {
+        setLiveRewards(data.rewards);
+      }
+    } catch {
+      return;
+    }
+  }, []);
+
+  useEffect(() => {
+    void syncRewards();
+
+    const onFocus = () => void syncRewards();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void syncRewards();
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "nexora:rewards-updated") {
+        void syncRewards();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("nexora:rewards-updated", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncRewards();
+      }
+    }, 6000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("nexora:rewards-updated", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [syncRewards]);
 
   useEffect(() => {
     setBalances({
@@ -95,10 +152,10 @@ export default function RewardsShowcaseClient({
     const keyword = normalizeRewardName(query);
 
     if (!keyword) {
-      return rewards;
+      return liveRewards;
     }
 
-    const exact = rewards.filter(
+    const exact = liveRewards.filter(
       (reward) => normalizeRewardName(reward.name) === keyword
     );
 
@@ -106,12 +163,12 @@ export default function RewardsShowcaseClient({
       return exact;
     }
 
-    return rewards.filter((reward) =>
+    return liveRewards.filter((reward) =>
       normalizeRewardName(reward.name).includes(keyword)
     );
-  }, [query, rewards]);
+  }, [liveRewards, query]);
 
-  const availableCount = rewards.filter((reward) => reward.stock > 0).length;
+  const availableCount = liveRewards.filter((reward) => reward.stock > 0).length;
 
   return (
     <div className="min-h-screen overflow-hidden bg-[#050507] text-white">
@@ -233,7 +290,7 @@ export default function RewardsShowcaseClient({
               <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm font-bold text-white/46">
                 <span className="inline-flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-orange-300" />
-                  ทั้งหมด {formatNumber(rewards.length)} รายการ
+                  ทั้งหมด {formatNumber(liveRewards.length)} รายการ
                 </span>
                 <span className="hidden h-1 w-1 rounded-full bg-white/25 sm:block" />
                 <span className="inline-flex items-center gap-2">

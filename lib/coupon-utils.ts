@@ -1,3 +1,5 @@
+import { safeRewardImageUrl } from "@/lib/reward-image";
+
 type CouponValueMeta = {
   currency: "NEX" | "COIN" | null;
   amount: number | null;
@@ -67,8 +69,7 @@ export function formatCouponValue(
 }
 
 export function safeRewardImage(image?: string | null) {
-  const raw = String(image || "").trim();
-  return raw || "/avatar.png";
+  return safeRewardImageUrl(image);
 }
 
 export function serializeCouponRecord(coupon: {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { revalidateRewardSurfaces } from "@/lib/reward-cache";
+import { stampRewardImageUrl } from "@/lib/reward-image";
 import {
   requireAdminApi,
   sanitizeNullableUrl,
@@ -14,6 +16,8 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { id, name, imageUrl, nexCost, coinCost, stock } = body;
+    const imageVersion = Date.now();
+    const sanitizedImageUrl = sanitizeNullableUrl(imageUrl);
 
     if (!id) {
       return NextResponse.json(
@@ -28,16 +32,29 @@ export async function POST(req: Request) {
         ...(String(name || "").trim()
           ? { name: String(name || "").trim() }
           : {}),
-        imageUrl: sanitizeNullableUrl(imageUrl),
+        imageUrl: sanitizedImageUrl
+          ? stampRewardImageUrl(sanitizedImageUrl, imageVersion)
+          : null,
         nexCost: toNullableNonNegativeNumber(nexCost),
         coinCost: toNullableNonNegativeNumber(coinCost),
         stock: toNonNegativeInt(stock),
       },
     });
 
+    const affectedCoupons = await prisma.coupon
+      .findMany({
+        where: { rewardId: id },
+        select: { code: true },
+      })
+      .catch(() => []);
+
+    revalidateRewardSurfaces(affectedCoupons.map((coupon) => coupon.code));
+
     return NextResponse.json({
       success: true,
       reward,
+      imageVersion,
+      affectedCoupons: affectedCoupons.length,
     });
   } catch (error) {
     console.error("UPDATE REWARD ERROR:", error);

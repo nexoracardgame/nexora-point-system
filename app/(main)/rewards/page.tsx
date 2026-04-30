@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import RewardsShowcaseClient from "./RewardsShowcaseClient";
 
-export const revalidate = 30;
+export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
 function safeImage(image?: string | null) {

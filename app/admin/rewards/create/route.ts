@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { revalidateRewardSurfaces } from "@/lib/reward-cache";
+import { stampRewardImageUrl } from "@/lib/reward-image";
 
 export async function POST(req: Request) {
   try {
@@ -9,7 +11,7 @@ export async function POST(req: Request) {
     const reward = await prisma.reward.create({
       data: {
         name,
-        imageUrl,
+        imageUrl: imageUrl ? stampRewardImageUrl(imageUrl) : null,
         nexCost:
           nexCost === null || nexCost === ""
             ? null
@@ -21,6 +23,8 @@ export async function POST(req: Request) {
         stock: Number(stock),
       },
     });
+
+    revalidateRewardSurfaces();
 
     return NextResponse.json({
       success: true,

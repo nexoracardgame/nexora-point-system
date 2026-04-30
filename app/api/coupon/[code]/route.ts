@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import { isStaffRole } from "@/lib/staff-auth";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+};
+
 type RouteProps = {
   params: Promise<{
     code: string;
@@ -24,7 +28,10 @@ export async function GET(_req: Request, { params }: RouteProps) {
     const safeCode = decodeURIComponent(String(code || "").trim());
 
     if (!safeCode) {
-      return NextResponse.json({ error: "ไม่พบรหัสคูปอง" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Coupon code is required" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const coupon = await prisma.coupon.findUnique({
@@ -52,24 +59,32 @@ export async function GET(_req: Request, { params }: RouteProps) {
     });
 
     if (!coupon) {
-      return NextResponse.json({ error: "ไม่พบคูปอง" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Coupon not found" },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
     }
 
     if (coupon.userId !== userId && !isStaffRole(role)) {
       return NextResponse.json(
-        { error: "คุณไม่มีสิทธิ์ดูคูปองนี้" },
-        { status: 403 }
+        { error: "You do not have permission to view this coupon" },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
-    return NextResponse.json({
-      coupon: serializeCouponRecord(coupon),
-    });
+    return NextResponse.json(
+      {
+        coupon: serializeCouponRecord(coupon),
+        syncedAt: Date.now(),
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error("COUPON_DETAIL_ERROR", error);
+
     return NextResponse.json(
-      { error: "โหลดคูปองไม่สำเร็จ" },
-      { status: 500 }
+      { error: "Failed to load coupon" },
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

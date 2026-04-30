@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { revalidateRewardSurfaces } from "@/lib/reward-cache";
 
 export async function POST(req: Request) {
   try {
@@ -20,6 +21,8 @@ export async function POST(req: Request) {
         ...(stock !== undefined ? { stock: Number(stock) } : {}),
       },
     });
+
+    revalidateRewardSurfaces();
 
     return NextResponse.json({ success: true, reward });
   } catch (error) {
