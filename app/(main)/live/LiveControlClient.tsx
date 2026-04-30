@@ -26,6 +26,9 @@ type ActiveLive = {
   createdAt: string;
 };
 
+const LIVE_STATUS_EVENT = "nexora:live-status-updated";
+const LIVE_STATUS_STORAGE_KEY = "nexora:live-status-version";
+
 const platformHints = [
   {
     name: "YouTube",
@@ -76,6 +79,18 @@ function forceSoundUrl(rawUrl: string) {
   }
 }
 
+function broadcastLiveStatusChanged() {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(new CustomEvent(LIVE_STATUS_EVENT));
+
+  try {
+    window.localStorage.setItem(LIVE_STATUS_STORAGE_KEY, String(Date.now()));
+  } catch {
+    return;
+  }
+}
+
 export default function LiveControlClient() {
   const { data: session } = useSession();
   const [url, setUrl] = useState("");
@@ -84,6 +99,7 @@ export default function LiveControlClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const hasActiveLive = !!active;
 
   const canStop = useMemo(() => {
     const role = String(session?.user?.role || "").toLowerCase();
@@ -129,20 +145,30 @@ export default function LiveControlClient() {
     };
 
     void loadActive(false);
-    const intervalId = window.setInterval(tick, 1800);
+    const intervalId = window.setInterval(tick, hasActiveLive ? 700 : 1600);
     const handleFocus = () => tick();
     const handleVisibility = () => tick();
+    const handleLiveStatus = () => tick();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === LIVE_STATUS_STORAGE_KEY) {
+        tick();
+      }
+    };
 
     window.addEventListener("focus", handleFocus);
+    window.addEventListener(LIVE_STATUS_EVENT, handleLiveStatus);
+    window.addEventListener("storage", handleStorage);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener(LIVE_STATUS_EVENT, handleLiveStatus);
+      window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [loadActive]);
+  }, [hasActiveLive, loadActive]);
 
   async function startLive(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -178,6 +204,7 @@ export default function LiveControlClient() {
 
       setActive(payload?.active || null);
       setUrl("");
+      broadcastLiveStatusChanged();
       setMessage("เริ่มแชร์ไลฟ์แล้ว ทุกเครื่องจะเห็นหน้าจอลอยอัตโนมัติ");
     } catch {
       setError("เชื่อมต่อไม่สำเร็จ ลองอีกครั้ง");
@@ -207,6 +234,8 @@ export default function LiveControlClient() {
       }
 
       setActive(null);
+      broadcastLiveStatusChanged();
+      void loadActive(true);
       setMessage("ปิดไลฟ์แล้ว หน้าจอลอยจะหายจากทุกเครื่อง");
     } catch {
       setError("เชื่อมต่อไม่สำเร็จ ลองอีกครั้ง");

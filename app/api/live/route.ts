@@ -5,6 +5,7 @@ import {
   createLiveBroadcast,
   getActiveLiveBroadcast,
   stopLiveBroadcast,
+  touchLiveBroadcast,
 } from "@/lib/live-broadcast";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return noStoreJson({ active: result.active });
+    return noStoreJson({ active: null, ended: result.active });
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid_url";
     const status =
@@ -96,5 +97,31 @@ export async function DELETE() {
   } catch (error) {
     console.error("LIVE DELETE ERROR:", error);
     return noStoreJson({ error: "failed_to_stop_live" }, { status: 500 });
+  }
+}
+
+export async function PATCH() {
+  const actor = await getApiActor();
+  if (!actor) {
+    return noStoreJson({ error: "unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const result = await touchLiveBroadcast({
+      actorUserId: actor.id,
+      actorRole: actor.role,
+    });
+
+    if (!result.ok) {
+      return noStoreJson(
+        { error: result.reason, active: result.active },
+        { status: 403 }
+      );
+    }
+
+    return noStoreJson({ active: result.active });
+  } catch (error) {
+    console.error("LIVE PATCH ERROR:", error);
+    return noStoreJson({ error: "failed_to_touch_live" }, { status: 500 });
   }
 }

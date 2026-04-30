@@ -23,6 +23,7 @@ export type LiveBroadcastRecord = {
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
 const ACTIVE_TTL_HOURS = 8;
+const ACTIVE_STALE_SECONDS = 18;
 const ACTIVE_STATUS = "active";
 const ENDED_STATUS = "ended";
 
@@ -189,9 +190,15 @@ export async function ensureLiveBroadcastSchema(db: DbClient = prisma) {
       "ownerName" TEXT NOT NULL DEFAULT 'NEXORA',
       "status" TEXT NOT NULL DEFAULT 'active',
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "lastSeenAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       "endedAt" TIMESTAMPTZ,
       "expiresAt" TIMESTAMPTZ
     )
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
   `);
 
   await db.$executeRawUnsafe(`
@@ -212,11 +219,14 @@ async function expireOldLiveBroadcasts(db: DbClient = prisma) {
       UPDATE "LiveBroadcast"
       SET "status" = $1, "endedAt" = COALESCE("endedAt", NOW())
       WHERE "status" = $2
-        AND "expiresAt" IS NOT NULL
-        AND "expiresAt" < NOW()
+        AND (
+          ("expiresAt" IS NOT NULL AND "expiresAt" < NOW())
+          OR ("lastSeenAt" < NOW() - ($3::text || ' seconds')::interval)
+        )
     `,
     ENDED_STATUS,
-    ACTIVE_STATUS
+    ACTIVE_STATUS,
+    String(ACTIVE_STALE_SECONDS)
   );
 }
 
@@ -263,9 +273,9 @@ export async function createLiveBroadcast(input: {
         `
           INSERT INTO "LiveBroadcast" (
             "id", "platform", "sourceUrl", "embedUrl", "title",
-            "ownerUserId", "ownerName", "status", "expiresAt"
+            "ownerUserId", "ownerName", "status", "lastSeenAt", "expiresAt"
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW() + ($9::text || ' hours')::interval)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW() + ($9::text || ' hours')::interval)
           RETURNING *
         `,
         id,
@@ -295,6 +305,45 @@ export async function createLiveBroadcast(input: {
 
     throw error;
   }
+}
+
+export async function touchLiveBroadcast(input: {
+  actorUserId: string;
+  actorRole?: string | null;
+}) {
+  await ensureLiveBroadcastSchema(prisma);
+  await expireOldLiveBroadcasts(prisma);
+
+  const active = await getActiveLiveBroadcast(prisma);
+  if (!active) {
+    return { ok: true as const, active: null };
+  }
+
+  const role = String(input.actorRole || "").toLowerCase();
+  const canTouch =
+    active.ownerUserId === input.actorUserId ||
+    role === "admin" ||
+    isStaffRole(role);
+
+  if (!canTouch) {
+    return { ok: false as const, reason: "forbidden" as const, active };
+  }
+
+  const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+    `
+      UPDATE "LiveBroadcast"
+      SET "lastSeenAt" = NOW()
+      WHERE "id" = $1 AND "status" = $2
+      RETURNING *
+    `,
+    active.id,
+    ACTIVE_STATUS
+  );
+
+  return {
+    ok: true as const,
+    active: normalizeLiveRow(rows[0]),
+  };
 }
 
 export async function stopLiveBroadcast(input: {

@@ -16,3 +16,5 @@
 
  GET /api/live?ts=1 200 in 2.3s (next.js: 1552ms, application-code: 746ms)
  GET /api/live?ts=2 200 in 279ms (next.js: 58ms, application-code: 221ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+ GET /api/live?ts=3 200 in 854ms (next.js: 257ms, application-code: 597ms)

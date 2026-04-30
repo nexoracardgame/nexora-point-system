@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   ExternalLink,
   Maximize2,
@@ -18,9 +19,13 @@ type ActiveLive = {
   sourceUrl: string;
   embedUrl: string;
   title: string;
+  ownerUserId: string;
   ownerName: string;
   createdAt: string;
 };
+
+const LIVE_STATUS_EVENT = "nexora:live-status-updated";
+const LIVE_STATUS_STORAGE_KEY = "nexora:live-status-version";
 
 function platformLabel(platform: ActiveLive["platform"]) {
   if (platform === "youtube") return "YouTube";
@@ -44,13 +49,33 @@ function setMuteParam(rawUrl: string, muted: boolean) {
   }
 }
 
+function broadcastLiveStatusChanged() {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(new CustomEvent(LIVE_STATUS_EVENT));
+
+  try {
+    window.localStorage.setItem(LIVE_STATUS_STORAGE_KEY, String(Date.now()));
+  } catch {
+    return;
+  }
+}
+
 export default function LiveFloatingPlayer() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [active, setActive] = useState<ActiveLive | null>(null);
   const [hiddenLiveId, setHiddenLiveId] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const lastActiveIdRef = useRef("");
+  const hasActiveLive = !!active;
+  const canStopGlobal =
+    !!active &&
+    (active.ownerUserId === session?.user?.id ||
+      ["admin", "staff", "superadmin"].includes(
+        String(session?.user?.role || "").toLowerCase()
+      ));
 
   const loadActive = useCallback(async () => {
     try {
@@ -95,20 +120,79 @@ export default function LiveFloatingPlayer() {
     };
 
     tick();
-    const intervalId = window.setInterval(tick, 2200);
+    const intervalId = window.setInterval(tick, hasActiveLive ? 650 : 1400);
     const handleFocus = () => tick();
     const handleVisibility = () => tick();
+    const handleLiveStatus = () => tick();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === LIVE_STATUS_STORAGE_KEY) {
+        tick();
+      }
+    };
 
     window.addEventListener("focus", handleFocus);
+    window.addEventListener(LIVE_STATUS_EVENT, handleLiveStatus);
+    window.addEventListener("storage", handleStorage);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener(LIVE_STATUS_EVENT, handleLiveStatus);
+      window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [loadActive]);
+  }, [hasActiveLive, loadActive]);
+
+  useEffect(() => {
+    if (!active || active.ownerUserId !== session?.user?.id) {
+      return;
+    }
+
+    const touchLive = () => {
+      void fetch("/api/live", {
+        method: "PATCH",
+        cache: "no-store",
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+
+    touchLive();
+    const intervalId = window.setInterval(touchLive, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [active?.id, active?.ownerUserId, session?.user?.id]);
+
+  const closeFloatingPlayer = async () => {
+    if (!active) return;
+
+    if (!canStopGlobal) {
+      setHiddenLiveId(active.id);
+      return;
+    }
+
+    const liveId = active.id;
+    setActive(null);
+    setHiddenLiveId("");
+    setCollapsed(false);
+    broadcastLiveStatusChanged();
+
+    try {
+      const res = await fetch("/api/live", {
+        method: "DELETE",
+        cache: "no-store",
+        keepalive: true,
+      });
+
+      if (!res.ok) {
+        setHiddenLiveId(liveId);
+      }
+    } catch {
+      setHiddenLiveId(liveId);
+    } finally {
+      void loadActive();
+    }
+  };
 
   const playerSrc = useMemo(() => {
     if (!active) return "";
@@ -185,7 +269,7 @@ export default function LiveFloatingPlayer() {
           </button>
           <button
             type="button"
-            onClick={() => setHiddenLiveId(active.id)}
+            onClick={closeFloatingPlayer}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white transition hover:bg-red-500/20"
             aria-label="ซ่อน"
           >
