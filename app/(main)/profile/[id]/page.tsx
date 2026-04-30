@@ -101,63 +101,63 @@ function getSnapshotSellerImage(
 function getSellerRankPresentation(score: number) {
   if (score >= 340) {
     return {
-      label: "ตำนานตลาด",
-      tone: "text-violet-100",
+      label: "Market Legend",
+      tone: "text-amber-100",
       aura:
-        "border-violet-200/38 bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.24),transparent_46%),linear-gradient(150deg,rgba(76,29,149,0.78),rgba(5,5,7,0.96))] shadow-[0_0_64px_rgba(139,92,246,0.24)]",
+        "border-amber-200/28 bg-black/95 shadow-[0_0_42px_rgba(250,204,21,0.14)]",
     };
   }
 
   if (score >= 265) {
     return {
-      label: "จอมทัพดีล",
+      label: "Deal Commander",
       tone: "text-fuchsia-100",
       aura:
-        "border-violet-200/30 bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.22),transparent_46%),linear-gradient(150deg,rgba(49,20,88,0.74),rgba(5,5,7,0.96))] shadow-[0_0_58px_rgba(167,139,250,0.20)]",
+        "border-fuchsia-200/24 bg-black/95 shadow-[0_0_38px_rgba(217,70,239,0.14)]",
     };
   }
 
   if (score >= 205) {
     return {
-      label: "ไดมอนด์พรีเมี่ยม",
+      label: "Diamond Elite",
       tone: "text-cyan-100",
       aura:
-        "border-cyan-200/34 bg-[radial-gradient(circle_at_top,rgba(103,232,249,0.22),transparent_46%),linear-gradient(150deg,rgba(12,74,110,0.74),rgba(5,5,7,0.96))] shadow-[0_0_62px_rgba(34,211,238,0.22)]",
+        "border-cyan-200/26 bg-black/95 shadow-[0_0_40px_rgba(34,211,238,0.16)]",
     };
   }
 
   if (score >= 145) {
     return {
-      label: "แพลทินัมเซลเลอร์",
+      label: "Platinum Seller",
       tone: "text-violet-100",
       aura:
-        "border-violet-200/30 bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.20),transparent_46%),linear-gradient(150deg,rgba(59,7,100,0.72),rgba(5,5,7,0.96))] shadow-[0_0_58px_rgba(167,139,250,0.20)]",
+        "border-violet-200/24 bg-black/95 shadow-[0_0_38px_rgba(167,139,250,0.14)]",
     };
   }
 
   if (score >= 95) {
     return {
-      label: "เทรดเดอร์พรีเมี่ยม",
+      label: "Premium Trader",
       tone: "text-violet-100",
       aura:
-        "border-violet-200/26 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.18),transparent_46%),linear-gradient(150deg,rgba(46,16,101,0.64),rgba(5,5,7,0.96))] shadow-[0_0_48px_rgba(139,92,246,0.18)]",
+        "border-violet-200/22 bg-black/95 shadow-[0_0_34px_rgba(139,92,246,0.12)]",
     };
   }
 
   if (score >= 55) {
     return {
-      label: "ซิลเวอร์เซลเลอร์",
+      label: "Silver Seller",
       tone: "text-slate-100",
       aura:
-        "border-slate-200/24 bg-[radial-gradient(circle_at_top,rgba(226,232,240,0.14),transparent_46%),linear-gradient(150deg,rgba(30,41,59,0.68),rgba(5,5,7,0.96))] shadow-[0_0_42px_rgba(226,232,240,0.12)]",
+        "border-slate-200/22 bg-black/95 shadow-[0_0_30px_rgba(226,232,240,0.10)]",
     };
   }
 
   return {
-    label: "ผู้ขายเริ่มต้น",
+    label: "New Seller",
     tone: "text-emerald-100",
     aura:
-      "border-emerald-200/24 bg-[radial-gradient(circle_at_top,rgba(52,211,153,0.14),transparent_46%),linear-gradient(150deg,rgba(6,78,59,0.58),rgba(5,5,7,0.96))] shadow-[0_0_42px_rgba(52,211,153,0.14)]",
+      "border-emerald-200/22 bg-black/95 shadow-[0_0_30px_rgba(52,211,153,0.10)]",
   };
 }
 
@@ -563,15 +563,15 @@ export default async function SellerProfilePage({
   const isGrowingSeller = completedDeals >= 10;
   const isVerifiedSeller = !isGrowingSeller && trustScore >= 78;
   const sellerStatusLabel = isGrowingSeller
-    ? "ผู้ขายกำลังเติบโต"
+    ? "Growing Seller"
     : isVerifiedSeller
-      ? "ผู้ขายยืนยันแล้ว"
-      : "ผู้ขายใหม่";
+      ? "Verified Seller"
+      : "New Seller";
   const sellerStatusTone = isGrowingSeller
-    ? "border-violet-300/24 bg-violet-300/12 text-violet-200"
+    ? "border-violet-300/24 bg-black/70 text-violet-200"
     : isVerifiedSeller
-      ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-300"
-      : "border-white/14 bg-white/[0.05] text-white/76";
+      ? "border-emerald-300/20 bg-black/70 text-emerald-300"
+      : "border-white/16 bg-black/70 text-white/78";
   const rankExplanation =
     "แรงค์คำนวณจากดีลสำเร็จ ยอดขาย รีวิว รายการขาย และความต่อเนื่องจริงในตลาด";
   const topPercentMeaning =
@@ -581,17 +581,16 @@ export default async function SellerProfilePage({
   const reputationLabel = buildThaiTopPercentLabel(topPercent);
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#111119] text-white">
+    <div className="min-h-screen overflow-hidden bg-black text-white">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(151,139,255,0.20),transparent_34%),radial-gradient(circle_at_12%_32%,rgba(251,113,133,0.11),transparent_24%),radial-gradient(circle_at_88%_70%,rgba(253,224,71,0.10),transparent_20%),linear-gradient(180deg,#171722_0%,#0d0d12_48%,#08080b_100%)]" />
-        <div className="absolute inset-0 opacity-[0.23] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:34px_34px]" />
-        <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/8" />
-        <div className="absolute -left-20 top-32 h-[430px] w-[430px] rounded-full border border-white/6" />
-        <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/7" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,#030303_0%,#000_52%,#000_100%)]" />
+        <div className="absolute inset-0 opacity-[0.18] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.82)_1px,transparent_1px)] [background-size:32px_32px]" />
+        <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/6" />
+        <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/5" />
       </div>
 
-      <div className="relative mx-auto max-w-7xl space-y-5 p-3 sm:space-y-6 sm:p-6">
-        <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_30px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-[42px]">
+      <div className="relative mx-auto max-w-7xl space-y-4 p-3 sm:space-y-5 sm:p-6">
+        <section className="overflow-hidden rounded-[26px] border border-white/10 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.78)] backdrop-blur-2xl sm:rounded-[36px]">
           <div className="relative h-[250px] overflow-hidden sm:h-[360px] xl:h-[430px]">
             <Image
               src={seller.coverImage || "/seller-cover.jpg"}
@@ -730,21 +729,21 @@ export default async function SellerProfilePage({
                   </div>
                 </div>
 
-                <div className={`relative overflow-hidden rounded-[30px] border px-5 py-4 backdrop-blur-xl sm:min-w-[260px] sm:px-6 ${sellerRank.aura}`}>
+                <div className={`relative overflow-hidden rounded-2xl border px-4 py-3 backdrop-blur-xl sm:min-w-[220px] sm:max-w-[280px] sm:px-5 ${sellerRank.aura}`}>
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/54">
-                    แรงค์ผู้ขาย
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                    SELLER RANK
                   </div>
-                  <div className={`mt-2 text-2xl font-black sm:text-4xl ${sellerRank.tone}`}>
+                  <div className={`mt-1 text-xl font-black sm:text-2xl ${sellerRank.tone}`}>
                     {sellerRank.label}
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-white/64">
+                  <div className="mt-1 text-xs leading-5 text-white/58">
                     {rankExplanation}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
                 {[
                   {
                     label: "ดีลสำเร็จ",
@@ -773,24 +772,24 @@ export default async function SellerProfilePage({
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] p-4 backdrop-blur-xl sm:rounded-3xl sm:p-5"
+                    className="rounded-2xl border border-white/10 bg-black/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:p-4"
                   >
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/42 sm:text-xs">
+                    <div className="text-[9px] uppercase tracking-[0.16em] text-white/58 sm:text-[10px]">
                       {stat.label}
                     </div>
                     <div
-                      className={`mt-2 text-2xl font-black sm:text-3xl ${stat.color}`}
+                      className={`mt-1 text-2xl font-black leading-none sm:text-[28px] ${stat.color}`}
                     >
                       {stat.value}
                     </div>
-                    <div className="mt-2 text-[11px] leading-5 text-white/42">
+                    <div className="mt-2 text-[10px] leading-4 text-white/50 sm:text-[11px]">
                       {stat.hint}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="grid gap-3 rounded-[24px] border border-white/8 bg-black/18 p-4 text-xs leading-6 text-white/58 backdrop-blur-xl sm:grid-cols-2 sm:text-sm">
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/95 p-3 text-xs leading-5 text-white/58 backdrop-blur-xl sm:grid-cols-2 sm:p-4 sm:text-sm">
                 <div>
                   <span className="font-black text-violet-200">TOP :</span>{" "}
                   {topPercentMeaning}
@@ -806,7 +805,7 @@ export default async function SellerProfilePage({
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 shadow-[0_20px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:rounded-[40px] sm:p-6">
+        <section className="rounded-[24px] border border-white/10 bg-black p-4 shadow-[0_22px_80px_rgba(0,0,0,0.72)] backdrop-blur-2xl sm:rounded-[34px] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-black sm:text-4xl">
@@ -827,7 +826,7 @@ export default async function SellerProfilePage({
               listings.map((item) => (
                 <div
                   key={item.id}
-                  className="group overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] transition duration-500 hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-[0_0_70px_rgba(139,92,246,0.15)]"
+                  className="group overflow-hidden rounded-[24px] border border-white/10 bg-black/95 transition duration-500 hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-[0_0_58px_rgba(139,92,246,0.14)]"
                 >
                   <Link href={`/market/card/${item.id}`}>
                     <div className="relative overflow-hidden">
@@ -884,7 +883,7 @@ export default async function SellerProfilePage({
 
                     <Link
                       href={`/market/card/${item.id}`}
-                      className="rounded-xl bg-white/[0.04] px-3 py-2 text-center text-xs font-black text-white/80 transition hover:bg-white/[0.08]"
+                      className="rounded-xl border border-white/10 bg-black px-3 py-2 text-center text-xs font-black text-white/80 transition hover:bg-white/[0.06]"
                     >
                       ดูการ์ด
                     </Link>
@@ -892,14 +891,14 @@ export default async function SellerProfilePage({
                 </div>
               ))
             ) : (
-              <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-8 text-sm text-zinc-400 sm:rounded-3xl">
+              <div className="rounded-[20px] border border-white/10 bg-black/95 p-8 text-sm text-zinc-400 sm:rounded-2xl">
                 ยังไม่มีการ์ดที่กำลังลงขาย
               </div>
             )}
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 shadow-[0_20px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:rounded-[40px] sm:p-6">
+        <section className="rounded-[24px] border border-white/10 bg-black p-4 shadow-[0_22px_80px_rgba(0,0,0,0.72)] backdrop-blur-2xl sm:rounded-[34px] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-black text-violet-200 sm:text-4xl">
@@ -920,7 +919,7 @@ export default async function SellerProfilePage({
               soldHistory.map((item) => (
                 <div
                   key={item.id}
-                  className="group overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] transition duration-500 hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-[0_0_70px_rgba(139,92,246,0.15)]"
+                  className="group overflow-hidden rounded-[24px] border border-white/10 bg-black/95 transition duration-500 hover:-translate-y-1 hover:border-violet-400/30 hover:shadow-[0_0_58px_rgba(139,92,246,0.14)]"
                 >
                   <div className="relative overflow-hidden">
                     <SafeCardImage
@@ -954,14 +953,14 @@ export default async function SellerProfilePage({
                 </div>
               ))
             ) : (
-              <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-8 text-sm text-zinc-400 sm:rounded-3xl">
+              <div className="rounded-[20px] border border-white/10 bg-black/95 p-8 text-sm text-zinc-400 sm:rounded-2xl">
                 ยังไม่มีดีลที่ปิดสำเร็จ
               </div>
             )}
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-gradient-to-r from-violet-500/10 to-cyan-400/10 p-5 shadow-[0_0_50px_rgba(139,92,246,0.12)] sm:rounded-[36px] sm:p-6">
+        <section className="rounded-[24px] border border-white/10 bg-black p-4 shadow-[0_20px_70px_rgba(0,0,0,0.7)] sm:rounded-[32px] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.24em] text-white/50 sm:text-xs">
