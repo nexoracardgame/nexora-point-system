@@ -749,25 +749,25 @@ export default async function SellerProfilePage({
                   {
                     label: "ดีลสำเร็จ",
                     value: completedDeals,
-                    color: "text-white",
+                    color: "text-emerald-300",
                     hint: "จำนวนดีลที่ปิดจบแล้ว",
                   },
                   {
                     label: "กำลังขาย",
                     value: listings.length,
-                    color: "text-white",
+                    color: "text-violet-300",
                     hint: "การ์ดที่ยังลงขายอยู่",
                   },
                   {
                     label: "ยอดขายรวม",
                     value: formatCurrency(totalVolume),
-                    color: "text-white",
+                    color: "text-violet-300",
                     hint: "รวมมูลค่าดีลสำเร็จ",
                   },
                   {
                     label: "ความน่าเชื่อถือ",
                     value: `${trustScore}%`,
-                    color: "text-white",
+                    color: "text-cyan-300",
                     hint: "รีวิว ดีล และประวัติตลาด",
                   },
                 ].map((stat) => (
@@ -775,7 +775,7 @@ export default async function SellerProfilePage({
                     key={stat.label}
                     className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.15),transparent_40%),linear-gradient(180deg,rgba(0,0,0,0.9)_0%,rgba(5,5,10,1)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-4"
                   >
-                    <div className="text-[9px] uppercase tracking-[0.16em] text-black/52 sm:text-[10px]">
+                    <div className="text-[9px] uppercase tracking-[0.16em] text-white/70 sm:text-[10px]">
                       {stat.label}
                     </div>
                     <div
@@ -783,7 +783,7 @@ export default async function SellerProfilePage({
                     >
                       {stat.value}
                     </div>
-                    <div className="mt-2 text-[10px] leading-4 text-black/52 sm:text-[11px]">
+                    <div className="mt-2 text-[10px] leading-4 text-white/50 sm:text-[11px]">
                       {stat.hint}
                     </div>
                   </div>
