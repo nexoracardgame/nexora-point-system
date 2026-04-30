@@ -773,7 +773,7 @@ export default async function SellerProfilePage({
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-2xl border border-white/70 bg-white/[0.92] p-3 shadow-[0_18px_45px_rgba(255,255,255,0.10)] backdrop-blur-xl sm:p-4"
+                    className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.15),transparent_40%),linear-gradient(180deg,rgba(0,0,0,0.9)_0%,rgba(5,5,10,1)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-4"
                   >
                     <div className="text-[9px] uppercase tracking-[0.16em] text-black/52 sm:text-[10px]">
                       {stat.label}
