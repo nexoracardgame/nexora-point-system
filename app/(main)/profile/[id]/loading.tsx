@@ -1,7 +1,15 @@
 export default function ProfileLoading() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#23124d_0%,#0a0b10_42%,#05070d_100%)] p-3 text-white sm:p-6">
-      <div className="mx-auto max-w-7xl space-y-5">
+    <div className="min-h-screen overflow-hidden bg-[#111119] p-3 text-white sm:p-6">
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(151,139,255,0.20),transparent_34%),radial-gradient(circle_at_12%_32%,rgba(251,113,133,0.11),transparent_24%),radial-gradient(circle_at_88%_70%,rgba(253,224,71,0.10),transparent_20%),linear-gradient(180deg,#171722_0%,#0d0d12_48%,#08080b_100%)]" />
+        <div className="absolute inset-0 opacity-[0.23] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:34px_34px]" />
+        <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/8" />
+        <div className="absolute -left-20 top-32 h-[430px] w-[430px] rounded-full border border-white/6" />
+        <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/7" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl space-y-5">
         <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.035] shadow-[0_30px_120px_rgba(0,0,0,0.5)] sm:rounded-[42px]">
           <div className="h-[250px] animate-pulse bg-white/[0.06] sm:h-[360px] xl:h-[430px]" />
           <div className="space-y-5 px-4 pb-6 sm:px-8 xl:px-10">

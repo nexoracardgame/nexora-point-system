@@ -164,7 +164,7 @@ function getSellerRankPresentation(score: number) {
 function buildThaiTopPercentLabel(topPercent: number) {
   return topPercent <= 1
     ? "อยู่ในกลุ่มท็อป 1% ของผู้ขาย"
-    : `อยู่ในกลุ่มท็อป ${topPercent}% ของผู้ขายในตลาด`;
+    : `TOP ${topPercent}% ของผู้ขายในตลาด`;
 }
 
 export default async function SellerProfilePage({
@@ -575,16 +575,19 @@ export default async function SellerProfilePage({
   const rankExplanation =
     "แรงค์คำนวณจากดีลสำเร็จ ยอดขาย รีวิว รายการขาย และความต่อเนื่องจริงในตลาด";
   const topPercentMeaning =
-    "TOP คืออันดับโดยประมาณเมื่อเทียบกับผู้ขายทั้งหมดในระบบ ยิ่งเปอร์เซ็นต์น้อยยิ่งอยู่กลุ่มบน";
+    "อันดับโดยประมาณเมื่อเทียบกับผู้ขายทั้งหมดในระบบ ยิ่งเปอร์เซ็นต์น้อยยิ่งอยู่กลุ่มบน";
   const trustMeaning =
-    "ความน่าเชื่อถือคำนวณจากรีวิว ดีลที่ปิดสำเร็จ ยอดขาย อายุบัญชี และรายการขายที่ยัง active";
+    "คำนวณจากรีวิว ดีลที่ปิดสำเร็จ ยอดขาย อายุบัญชี และรายการขายที่ยัง active";
   const reputationLabel = buildThaiTopPercentLabel(topPercent);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#23124d_0%,#0a0b10_40%,#05070d_100%)] text-white">
+    <div className="min-h-screen overflow-hidden bg-[#111119] text-white">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute left-[10%] top-[10%] h-[240px] w-[240px] rounded-full bg-violet-500/10 blur-3xl sm:h-[420px] sm:w-[420px]" />
-        <div className="absolute bottom-[10%] right-[8%] h-[220px] w-[220px] rounded-full bg-cyan-400/10 blur-3xl sm:h-[360px] sm:w-[360px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(151,139,255,0.20),transparent_34%),radial-gradient(circle_at_12%_32%,rgba(251,113,133,0.11),transparent_24%),radial-gradient(circle_at_88%_70%,rgba(253,224,71,0.10),transparent_20%),linear-gradient(180deg,#171722_0%,#0d0d12_48%,#08080b_100%)]" />
+        <div className="absolute inset-0 opacity-[0.23] [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:34px_34px]" />
+        <div className="absolute -left-28 top-24 h-[520px] w-[520px] rounded-full border border-white/8" />
+        <div className="absolute -left-20 top-32 h-[430px] w-[430px] rounded-full border border-white/6" />
+        <div className="absolute -right-24 bottom-6 h-[520px] w-[520px] rounded-full border border-white/7" />
       </div>
 
       <div className="relative mx-auto max-w-7xl space-y-5 p-3 sm:space-y-6 sm:p-6">
@@ -618,7 +621,7 @@ export default async function SellerProfilePage({
             </div>
 
             <div className="absolute right-4 top-4 max-w-[180px] rounded-[18px] border border-violet-300/24 bg-black/38 px-4 py-2 text-right text-[11px] font-black text-violet-200 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:right-6 sm:top-6 lg:max-w-[240px]">
-              <div>ท็อป {topPercent}% ของตลาด</div>
+              <div>TOP {topPercent}% ของตลาด</div>
               <div className="mt-1 hidden text-[10px] font-semibold text-white/54 lg:block">
                 เทียบกับผู้ขายทั้งหมด
               </div>
@@ -789,12 +792,12 @@ export default async function SellerProfilePage({
 
               <div className="grid gap-3 rounded-[24px] border border-white/8 bg-black/18 p-4 text-xs leading-6 text-white/58 backdrop-blur-xl sm:grid-cols-2 sm:text-sm">
                 <div>
-                  <span className="font-black text-violet-200">TOP หมายถึง:</span>{" "}
+                  <span className="font-black text-violet-200">TOP :</span>{" "}
                   {topPercentMeaning}
                 </div>
                 <div>
                   <span className="font-black text-cyan-200">
-                    ความน่าเชื่อถือหมายถึง:
+                    ความน่าเชื่อถือ :
                   </span>{" "}
                   {trustMeaning}
                 </div>
@@ -860,7 +863,7 @@ export default async function SellerProfilePage({
                   </Link>
 
                   <div
-                    className={`grid gap-3 p-4 ${
+                    className={`grid gap-2 p-3 ${
                       isOwner ? "grid-cols-3" : "grid-cols-1"
                     }`}
                   >
@@ -868,20 +871,20 @@ export default async function SellerProfilePage({
                       <>
                         <Link
                           href={`/market/edit/${item.id}`}
-                          className="rounded-2xl bg-violet-500/10 px-4 py-3 text-center text-sm font-bold text-violet-300 transition hover:bg-violet-500/20"
+                          className="rounded-xl bg-violet-500/10 px-3 py-2 text-center text-xs font-black text-violet-300 transition hover:bg-violet-500/20"
                         >
                           แก้ไข
                         </Link>
 
-                        <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-1 transition hover:bg-red-500/20">
-                          <DeleteListingButton id={item.id} />
+                        <div className="rounded-xl border border-red-400/20 bg-red-500/10 p-0.5 transition hover:bg-red-500/20">
+                          <DeleteListingButton id={item.id} size="compact" />
                         </div>
                       </>
                     )}
 
                     <Link
                       href={`/market/card/${item.id}`}
-                      className="rounded-2xl bg-white/[0.04] px-4 py-3 text-center text-sm font-bold text-white/80 transition hover:bg-white/[0.08]"
+                      className="rounded-xl bg-white/[0.04] px-3 py-2 text-center text-xs font-black text-white/80 transition hover:bg-white/[0.08]"
                     >
                       ดูการ์ด
                     </Link>
