@@ -1,52 +1,61 @@
 import { prisma } from "@/lib/prisma";
+import { getAllLocalProfiles } from "@/lib/local-profile-store";
 import MembersTable from "./MembersTable";
 
-type PageProps = {
-  searchParams: Promise<{ q?: string }>;
+type AdminMemberRow = {
+  id: string;
+  name: string | null;
+  displayName: string | null;
+  username: string | null;
+  lineId: string;
+  nexPoint: number | null;
+  coin: number | null;
+  createdAt: Date;
 };
 
-export default async function MembersPage({ searchParams }: PageProps) {
-  const { q = "" } = await searchParams;
+export default async function MembersPage() {
+  await prisma
+    .$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT')
+    .catch(() => undefined);
 
-  const users = await prisma.user.findMany({
-    where: q
-      ? {
-          OR: [{ name: { contains: q } }, { lineId: { contains: q } }],
-        }
-      : undefined,
-    orderBy: { createdAt: "desc" },
-  });
+  const [users, localProfiles] = await Promise.all([
+    prisma
+      .$queryRawUnsafe<AdminMemberRow[]>(
+        'SELECT "id", "name", "displayName", "username", "lineId", "nexPoint", "coin", "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 1000'
+      )
+      .catch(() => []),
+    getAllLocalProfiles().catch(() => []),
+  ]);
+  const localProfileMap = new Map(
+    localProfiles.map((profile) => [profile.userId, profile])
+  );
 
   return (
     <div className="space-y-5">
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">Admin Members</div>
-        <h1 className="mt-2 text-3xl font-black sm:text-4xl">สมาชิกทั้งหมด</h1>
+        <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/35">
+          Admin Members
+        </div>
+        <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+          สมาชิกทั้งหมด
+        </h1>
       </div>
-
-      <form method="GET" className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <input
-          type="text"
-          name="q"
-          defaultValue={q}
-          placeholder="ค้นหาชื่อ หรือ Line ID"
-          className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none transition focus:border-amber-300/25"
-        />
-        <button
-          type="submit"
-          className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-5 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.22)]"
-        >
-          ค้นหา
-        </button>
-      </form>
 
       <MembersTable
         users={users.map((user) => ({
           id: user.id,
           name: user.name,
+          displayName:
+            localProfileMap.get(user.id)?.displayName ||
+            localProfileMap.get(user.lineId)?.displayName ||
+            user.displayName,
+          username:
+            localProfileMap.get(user.id)?.username ||
+            localProfileMap.get(user.lineId)?.username ||
+            user.username,
           lineId: user.lineId,
-          nexPoint: user.nexPoint,
-          coin: user.coin,
+          nexPoint: Number(user.nexPoint || 0),
+          coin: Number(user.coin || 0),
           createdAt: user.createdAt.toISOString(),
         }))}
       />
