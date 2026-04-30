@@ -1,9 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { requireStaffActor } from "@/lib/admin-auth";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
+    const { actor, error } = await requireStaffActor();
+    if (error) return error;
+
     const body = await req.json();
     const rawLineId = body.lineId;
     const rawType = body.type;
@@ -20,7 +25,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (isNaN(qty) || qty <= 0) {
+    if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty <= 0) {
       return NextResponse.json(
         { success: false, message: "จำนวนไม่ถูกต้อง" },
         { status: 400 }
@@ -51,8 +56,23 @@ export async function POST(req: Request) {
     if (type === "gold") point = 2 * qty;
 
     const result = await prisma.$transaction(async (tx: any) => {
-      const user = await tx.user.update({
+      const beforeUser = await tx.user.findUnique({
         where: { lineId },
+        select: {
+          id: true,
+          lineId: true,
+          nexPoint: true,
+          coin: true,
+          name: true,
+        },
+      });
+
+      if (!beforeUser) {
+        throw new Error("user_not_found");
+      }
+
+      const user = await tx.user.update({
+        where: { id: beforeUser.id },
         data: {
           nexPoint: {
             increment: point,
@@ -66,6 +86,35 @@ export async function POST(req: Request) {
           type,
           amount: qty,
           point,
+        },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "wallet",
+        action: "point.add",
+        actorUserId: actor?.id,
+        targetUserId: beforeUser.id,
+        entityType: "User",
+        entityId: beforeUser.id,
+        beforeSnapshot: {
+          user: beforeUser,
+        },
+        afterSnapshot: {
+          user: {
+            id: user.id,
+            lineId: user.lineId,
+            nexPoint: user.nexPoint,
+            coin: user.coin,
+            name: user.name,
+          },
+        },
+        meta: {
+          asset: "NEX",
+          lineId,
+          type,
+          amount: qty,
+          point,
+          source: "point-add",
         },
       });
 

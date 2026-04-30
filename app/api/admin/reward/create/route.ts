@@ -3,16 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { revalidateRewardSurfaces } from "@/lib/reward-cache";
 import { stampRewardImageUrl } from "@/lib/reward-image";
 import {
-  requireAdminApi,
+  requireAdminActor,
   sanitizeNullableUrl,
   toNonNegativeInt,
   toNullableNonNegativeNumber,
 } from "@/lib/admin-auth";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
-    const adminError = await requireAdminApi();
-    if (adminError) return adminError;
+    const { actor, error } = await requireAdminActor();
+    if (error) return error;
 
     const body = await req.json();
     const { name, imageUrl, nexCost, coinCost, stock } = body;
@@ -23,16 +24,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "กรุณากรอกชื่อรางวัล" }, { status: 400 });
     }
 
-    const reward = await prisma.reward.create({
-      data: {
-        name: safeName,
-        imageUrl: sanitizedImageUrl
-          ? stampRewardImageUrl(sanitizedImageUrl)
-          : null,
-        nexCost: toNullableNonNegativeNumber(nexCost),
-        coinCost: toNullableNonNegativeNumber(coinCost),
-        stock: toNonNegativeInt(stock),
-      },
+    const reward = await prisma.$transaction(async (tx) => {
+      const createdReward = await tx.reward.create({
+        data: {
+          name: safeName,
+          imageUrl: sanitizedImageUrl
+            ? stampRewardImageUrl(sanitizedImageUrl)
+            : null,
+          nexCost: toNullableNonNegativeNumber(nexCost),
+          coinCost: toNullableNonNegativeNumber(coinCost),
+          stock: toNonNegativeInt(stock),
+        },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "reward",
+        action: "reward.create",
+        actorUserId: actor?.id,
+        entityType: "Reward",
+        entityId: createdReward.id,
+        beforeSnapshot: {},
+        afterSnapshot: {
+          reward: createdReward,
+        },
+        meta: {
+          source: "admin-reward-create",
+        },
+      });
+
+      return createdReward;
     });
 
     revalidateRewardSurfaces();

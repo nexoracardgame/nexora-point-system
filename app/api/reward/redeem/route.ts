@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { buildCouponCode, serializeCouponRecord } from "@/lib/coupon-utils";
 import { prisma } from "@/lib/prisma";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
         throw new Error("เหรียญ COIN ไม่เพียงพอ");
       }
 
-      await tx.user.update({
+      const updatedUser = await tx.user.update({
         where: { id: user.id },
         data:
           currency === "NEX"
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
               },
       });
 
-      await tx.reward.update({
+      const updatedReward = await tx.reward.update({
         where: { id: reward.id },
         data: {
           stock: {
@@ -118,6 +119,45 @@ export async function POST(req: Request) {
         select: {
           id: true,
           code: true,
+          userId: true,
+          rewardId: true,
+          used: true,
+          createdAt: true,
+        },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "reward",
+        action: "reward.redeem",
+        actorUserId: user.id,
+        targetUserId: user.id,
+        entityType: "Coupon",
+        entityId: coupon.id,
+        beforeSnapshot: {
+          user,
+          reward,
+        },
+        afterSnapshot: {
+          user: {
+            id: updatedUser.id,
+            lineId: updatedUser.lineId,
+            nexPoint: updatedUser.nexPoint,
+            coin: updatedUser.coin,
+          },
+          reward: {
+            id: updatedReward.id,
+            name: updatedReward.name,
+            stock: updatedReward.stock,
+            nexCost: updatedReward.nexCost,
+            coinCost: updatedReward.coinCost,
+          },
+          coupon,
+        },
+        meta: {
+          currency,
+          amount,
+          rewardId: reward.id,
+          source: "reward-redeem",
         },
       });
 

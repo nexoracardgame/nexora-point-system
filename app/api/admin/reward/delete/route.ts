@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdminApi } from "@/lib/admin-auth";
+import { requireAdminActor } from "@/lib/admin-auth";
 import { revalidateRewardSurfaces } from "@/lib/reward-cache";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
-    const adminError = await requireAdminApi();
-    if (adminError) return adminError;
+    const { actor, error } = await requireAdminActor();
+    if (error) return error;
 
     const body = await req.json();
     const { id } = body;
@@ -18,15 +19,42 @@ export async function POST(req: Request) {
       );
     }
 
-    const affectedCoupons = await prisma.coupon
-      .findMany({
-        where: { rewardId: id },
-        select: { code: true },
-      })
-      .catch(() => []);
+    const affectedCoupons = await prisma.$transaction(async (tx) => {
+      const beforeReward = await tx.reward.findUnique({
+        where: { id },
+      });
 
-    await prisma.reward.delete({
-      where: { id },
+      if (!beforeReward) {
+        throw new Error("reward_not_found");
+      }
+
+      const coupons = await tx.coupon.findMany({
+        where: { rewardId: id },
+        select: { id: true, code: true, userId: true, used: true, usedAt: true },
+      });
+
+      await tx.reward.delete({
+        where: { id },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "reward",
+        action: "reward.delete",
+        actorUserId: actor?.id,
+        entityType: "Reward",
+        entityId: id,
+        beforeSnapshot: {
+          reward: beforeReward,
+          coupons,
+        },
+        afterSnapshot: {},
+        meta: {
+          affectedCoupons: coupons.length,
+          source: "admin-reward-delete",
+        },
+      });
+
+      return coupons;
     });
 
     revalidateRewardSurfaces(affectedCoupons.map((coupon) => coupon.code));

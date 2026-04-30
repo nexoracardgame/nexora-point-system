@@ -1,24 +1,79 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminActor } from "@/lib/admin-auth";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
-    const { lineId, amount } = await req.json();
+    const { actor, error } = await requireAdminActor();
+    if (error) return error;
 
-    if (!lineId || amount === undefined) {
-      return NextResponse.json(
-        { error: "ข้อมูลไม่ครบ" },
-        { status: 400 }
-      );
+    const { lineId, amount } = await req.json();
+    const nextAmount = Number(amount);
+
+    if (!lineId || amount === undefined || !Number.isFinite(nextAmount)) {
+      return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
 
-    await prisma.user.update({
-      where: { lineId },
-      data: {
-        nexPoint: {
-          increment: Number(amount),
+    await prisma.$transaction(async (tx) => {
+      const beforeUser = await tx.user.findUnique({
+        where: { lineId },
+        select: {
+          id: true,
+          lineId: true,
+          name: true,
+          nexPoint: true,
+          coin: true,
         },
-      },
+      });
+
+      if (!beforeUser) {
+        throw new Error("user_not_found");
+      }
+
+      const updatedUser = await tx.user.update({
+        where: { id: beforeUser.id },
+        data: {
+          nexPoint: {
+            increment: nextAmount,
+          },
+        },
+      });
+
+      await tx.pointLog.create({
+        data: {
+          lineId,
+          type: "admin",
+          amount: Math.trunc(nextAmount),
+          point: nextAmount,
+        },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "wallet",
+        action: "admin.nex.adjust",
+        actorUserId: actor?.id,
+        targetUserId: beforeUser.id,
+        entityType: "User",
+        entityId: beforeUser.id,
+        beforeSnapshot: {
+          user: beforeUser,
+        },
+        afterSnapshot: {
+          user: {
+            id: updatedUser.id,
+            lineId: updatedUser.lineId,
+            nexPoint: updatedUser.nexPoint,
+            coin: updatedUser.coin,
+            name: updatedUser.name,
+          },
+        },
+        meta: {
+          asset: "NEX",
+          amount: nextAmount,
+          source: "admin-members-update-nex",
+        },
+      });
     });
 
     return NextResponse.json({ success: true });
@@ -26,7 +81,7 @@ export async function POST(req: Request) {
     console.error("UPDATE NEX ERROR:", error);
 
     return NextResponse.json(
-      { error: "เพิ่ม NEX ไม่สำเร็จ" },
+      { error: "update NEX failed" },
       { status: 500 }
     );
   }

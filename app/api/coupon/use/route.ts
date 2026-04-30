@@ -5,12 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import { isStaffRole } from "@/lib/staff-auth";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const role = String(
       (session?.user as { role?: string } | undefined)?.role || ""
+    ).trim();
+    const actorUserId = String(
+      (session?.user as { id?: string } | undefined)?.id || ""
     ).trim();
 
     if (!isStaffRole(role)) {
@@ -71,32 +75,88 @@ export async function POST(req: Request) {
       );
     }
 
-    const usedCoupon = await prisma.coupon.update({
-      where: { id: coupon.id },
-      data: {
-        used: true,
-        usedAt: new Date(),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            lineId: true,
-            name: true,
-            displayName: true,
-            image: true,
+    const usedCoupon = await prisma.$transaction(async (tx) => {
+      const beforeCoupon = await tx.coupon.findUnique({
+        where: { id: coupon.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              lineId: true,
+              name: true,
+              displayName: true,
+              image: true,
+            },
+          },
+          reward: {
+            select: {
+              id: true,
+              name: true,
+              imageUrl: true,
+              nexCost: true,
+              coinCost: true,
+            },
           },
         },
-        reward: {
-          select: {
-            id: true,
-            name: true,
-            imageUrl: true,
-            nexCost: true,
-            coinCost: true,
+      });
+
+      if (!beforeCoupon) {
+        throw new Error("coupon_not_found");
+      }
+
+      if (beforeCoupon.used) {
+        throw new Error("coupon_already_used");
+      }
+
+      const nextCoupon = await tx.coupon.update({
+        where: { id: beforeCoupon.id },
+        data: {
+          used: true,
+          usedAt: new Date(),
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              lineId: true,
+              name: true,
+              displayName: true,
+              image: true,
+            },
+          },
+          reward: {
+            select: {
+              id: true,
+              name: true,
+              imageUrl: true,
+              nexCost: true,
+              coinCost: true,
+            },
           },
         },
-      },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "coupon",
+        action: "coupon.use",
+        actorUserId,
+        targetUserId: beforeCoupon.user.id,
+        entityType: "Coupon",
+        entityId: beforeCoupon.id,
+        beforeSnapshot: {
+          coupon: beforeCoupon,
+        },
+        afterSnapshot: {
+          coupon: nextCoupon,
+        },
+        meta: {
+          code: beforeCoupon.code,
+          rewardId: beforeCoupon.reward.id,
+          source: "coupon-use",
+        },
+      });
+
+      return nextCoupon;
     });
 
     await createLocalNotification({

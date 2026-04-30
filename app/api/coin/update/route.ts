@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createLocalNotification } from "@/lib/local-notification-store";
+import { requireAdminActor } from "@/lib/admin-auth";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 
 export async function POST(req: Request) {
   try {
+    const { actor, error } = await requireAdminActor();
+    if (error) return error;
+
     const body = await req.json();
     const { lineId, amount, action } = body;
 
@@ -46,11 +51,62 @@ export async function POST(req: Request) {
       );
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { lineId },
-      data: {
-        coin: action === "add" ? user.coin + amount : user.coin - amount,
-      },
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const beforeUser = await tx.user.findUnique({
+        where: { lineId },
+        select: {
+          id: true,
+          lineId: true,
+          name: true,
+          image: true,
+          nexPoint: true,
+          coin: true,
+        },
+      });
+
+      if (!beforeUser) {
+        throw new Error("user_not_found");
+      }
+
+      if (action === "subtract" && beforeUser.coin < amount) {
+        throw new Error("insufficient_coin");
+      }
+
+      const nextUser = await tx.user.update({
+        where: { id: beforeUser.id },
+        data: {
+          coin: action === "add" ? beforeUser.coin + amount : beforeUser.coin - amount,
+        },
+      });
+
+      await writeCriticalBackup(tx, {
+        scope: "wallet",
+        action: `coin.${action}`,
+        actorUserId: actor?.id,
+        targetUserId: beforeUser.id,
+        entityType: "User",
+        entityId: beforeUser.id,
+        beforeSnapshot: {
+          user: beforeUser,
+        },
+        afterSnapshot: {
+          user: {
+            id: nextUser.id,
+            lineId: nextUser.lineId,
+            nexPoint: nextUser.nexPoint,
+            coin: nextUser.coin,
+            name: nextUser.name,
+          },
+        },
+        meta: {
+          asset: "COIN",
+          amount,
+          action,
+          source: "coin-update",
+        },
+      });
+
+      return nextUser;
     });
 
     await createLocalNotification({
