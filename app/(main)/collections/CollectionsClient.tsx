@@ -294,6 +294,10 @@ export default function CollectionsClient() {
     }));
   };
 
+  const resetCalculator = () => {
+    setCalculator({ ...emptyCalculator });
+  };
+
   const addCards = () => {
     const parsed = parseCardNumbers(cardInput);
     if (parsed.length === 0) {
@@ -411,8 +415,18 @@ export default function CollectionsClient() {
                       คำนวณ NEX
                     </h2>
                   </div>
-                  <div className="grid h-12 w-12 place-items-center rounded-full bg-black text-white">
-                    <Calculator className="h-5 w-5" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={resetCalculator}
+                      className="grid h-12 w-12 place-items-center rounded-full bg-black text-white shadow-[0_12px_28px_rgba(0,0,0,0.18)] transition hover:scale-[1.04] active:scale-95"
+                      aria-label="ล้างค่าเครื่องคิดเลข"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                    <div className="grid h-12 w-12 place-items-center rounded-full bg-black text-white">
+                      <Calculator className="h-5 w-5" />
+                    </div>
                   </div>
                 </div>
 
