@@ -48,7 +48,7 @@ function formatBalance(value?: number | null) {
 const CHAT_UNREAD_FAST_POLL_MS = 700;
 const CHAT_UNREAD_BURST_DELAYS_MS = [120, 360, 760] as const;
 
-function dispatchChatUnreadCount(count: number) {
+function dispatchChatUnreadCount(count: number, source = "layout") {
   if (typeof window === "undefined") {
     return;
   }
@@ -57,6 +57,7 @@ function dispatchChatUnreadCount(count: number) {
     new CustomEvent("nexora:chat-unread-count", {
       detail: {
         count: Math.max(0, Number(count || 0)),
+        source,
         syncedAt: new Date().toISOString(),
       },
     })
@@ -428,6 +429,7 @@ export default function MainLayout({
       : null;
 
     const syncChatUnread = async () => {
+      if (pathname === "/dm") return;
       if (cancelled) return;
       if (inFlight) {
         queued = true;
@@ -601,9 +603,21 @@ export default function MainLayout({
       queueChatUnreadSync();
     };
 
+    const handleChatUnreadCount = (event: Event) => {
+      const nextCount = Math.max(
+        0,
+        Number(
+          (event as CustomEvent<{ count?: number | null }>).detail?.count || 0
+        )
+      );
+
+      setChatUnreadCount(nextCount);
+    };
+
     queueChatUnreadSync();
     window.addEventListener("focus", handleFocus);
     window.addEventListener("nexora:chat-read", handleChatRead);
+    window.addEventListener("nexora:chat-unread-count", handleChatUnreadCount);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
@@ -612,6 +626,7 @@ export default function MainLayout({
       clearBurstTimers();
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("nexora:chat-read", handleChatRead);
+      window.removeEventListener("nexora:chat-unread-count", handleChatUnreadCount);
       document.removeEventListener("visibilitychange", handleVisibility);
       if (supabase && channel) {
         void supabase.removeChannel(channel);

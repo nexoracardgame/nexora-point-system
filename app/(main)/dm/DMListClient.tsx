@@ -65,6 +65,27 @@ const DM_LIST_CACHE_KEY = "dm-list";
 const DM_LIST_FAST_REFRESH_MS = 900;
 const DM_LIST_BURST_DELAYS_MS = [120, 360, 760] as const;
 
+function dispatchDmListUnreadCount(rooms: DMRoomListItem[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const count = rooms.reduce(
+    (total, room) => total + Math.max(0, Number(room.unread || 0)),
+    0
+  );
+
+  window.dispatchEvent(
+    new CustomEvent("nexora:chat-unread-count", {
+      detail: {
+        count,
+        source: "dm-list",
+        syncedAt: new Date().toISOString(),
+      },
+    })
+  );
+}
+
 function buildLocalClearStorageKey(userId?: string | null) {
   return `nexora:dm-cleared:${String(userId || "guest").trim() || "guest"}`;
 }
@@ -350,6 +371,7 @@ export default function DMListClient({
 
   useEffect(() => {
     roomsRef.current = rooms;
+    dispatchDmListUnreadCount(rooms);
   }, [rooms]);
 
   useEffect(() => {
