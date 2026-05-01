@@ -86,6 +86,40 @@ function withEmbedParams(url: URL, muted: boolean) {
   return url.toString();
 }
 
+function getTikTokVideoId(url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const videoIndex = parts.findIndex((part) => part === "video");
+  if (videoIndex >= 0 && parts[videoIndex + 1]) {
+    return parts[videoIndex + 1].replace(/\D/g, "");
+  }
+
+  const numericPart = [...parts]
+    .reverse()
+    .find((part) => /^\d{12,}$/.test(part));
+
+  return numericPart || "";
+}
+
+function getTikTokUsername(url: URL) {
+  const usernamePart = url.pathname
+    .split("/")
+    .filter(Boolean)
+    .find((part) => part.startsWith("@"));
+
+  return usernamePart ? usernamePart.slice(1).trim() : "";
+}
+
+function withTikTokPlayerParams(url: URL) {
+  url.searchParams.set("autoplay", "1");
+  url.searchParams.set("muted", "0");
+  url.searchParams.set("controls", "1");
+  url.searchParams.set("progress_bar", "1");
+  url.searchParams.set("volume_control", "1");
+  url.searchParams.set("fullscreen_button", "1");
+  url.searchParams.set("rel", "0");
+  return url.toString();
+}
+
 export function buildLiveEmbed(rawUrl: string) {
   const sourceUrl = toSafeUrl(rawUrl);
   const host = cleanHost(sourceUrl.hostname);
@@ -124,19 +158,26 @@ export function buildLiveEmbed(rawUrl: string) {
   }
 
   if (host.endsWith("tiktok.com")) {
-    const embedUrl = new URL("https://www.tiktok.com/embed/v2");
-    const videoId = sourceUrl.pathname.split("/").filter(Boolean).pop() || "";
-
-    if (videoId && /^\d+$/.test(videoId)) {
-      embedUrl.pathname = `/embed/v2/${videoId}`;
-    } else {
-      embedUrl.searchParams.set("url", sourceUrl.toString());
-    }
+    const videoId = getTikTokVideoId(sourceUrl);
+    const username = getTikTokUsername(sourceUrl);
+    const isLiveUrl = sourceUrl.pathname
+      .split("/")
+      .filter(Boolean)
+      .includes("live");
+    const embedUrl = videoId
+      ? withTikTokPlayerParams(
+          new URL(
+            `https://www.tiktok.com/player/v1/${encodeURIComponent(videoId)}`
+          )
+        )
+      : username && isLiveUrl
+        ? `https://www.tiktok.com/@${encodeURIComponent(username)}/live`
+        : sourceUrl.toString();
 
     return {
       platform: "tiktok" as const,
       sourceUrl: sourceUrl.toString(),
-      embedUrl: embedUrl.toString(),
+      embedUrl,
       title: "TikTok Live",
     };
   }

@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return noStoreJson({ active: null, ended: result.active });
+    return noStoreJson({ active: result.active });
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid_url";
     const status =

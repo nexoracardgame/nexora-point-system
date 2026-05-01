@@ -198,6 +198,7 @@ export default function LiveFloatingPlayer() {
     if (!active) return "";
     return setMuteParam(active.embedUrl, muted);
   }, [active, muted]);
+  const isTikTok = active?.platform === "tiktok";
 
   if (!active || hiddenLiveId === active.id || pathname.startsWith("/live")) {
     return null;
@@ -278,7 +279,13 @@ export default function LiveFloatingPlayer() {
         </div>
       </div>
 
-      <div className="relative aspect-video w-full bg-[#060608]">
+      <div
+        className={
+          isTikTok
+            ? "relative mx-auto aspect-[9/16] max-h-[72vh] w-full max-w-[360px] bg-[#060608]"
+            : "relative aspect-video w-full bg-[#060608]"
+        }
+      >
         <iframe
           key={`${active.id}-${muted ? "muted" : "sound"}`}
           src={playerSrc}
@@ -287,6 +294,17 @@ export default function LiveFloatingPlayer() {
           allowFullScreen
           className="h-full w-full"
         />
+
+        {isTikTok ? (
+          <a
+            href={active.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/10 bg-black/74 px-3 py-2 text-center text-[11px] font-black text-white shadow-[0_18px_36px_rgba(0,0,0,0.4)] backdrop-blur-xl transition hover:bg-black"
+          >
+            หาก TikTok บล็อก iframe แตะเพื่อเปิดไลฟ์ต้นทาง
+          </a>
+        ) : null}
 
         <div className="pointer-events-none absolute bottom-3 right-3 hidden items-center gap-2 rounded-full border border-white/10 bg-black/52 px-3 py-2 text-[11px] font-bold text-white/80 sm:flex">
           <Maximize2 className="h-3.5 w-3.5" />

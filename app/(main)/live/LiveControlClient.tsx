@@ -100,6 +100,7 @@ export default function LiveControlClient() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const hasActiveLive = !!active;
+  const isTikTokLive = active?.platform === "tiktok";
 
   const canStop = useMemo(() => {
     const role = String(session?.user?.role || "").toLowerCase();
@@ -352,7 +353,13 @@ export default function LiveControlClient() {
             {active ? (
               <div className="space-y-4">
                 <div className="overflow-hidden rounded-[22px] bg-black">
-                  <div className="aspect-video">
+                  <div
+                    className={
+                      isTikTokLive
+                        ? "relative mx-auto aspect-[9/16] max-h-[62vh] w-full max-w-[360px]"
+                        : "relative aspect-video"
+                    }
+                  >
                     <iframe
                       src={forceSoundUrl(active.embedUrl)}
                       title={active.title}
@@ -360,6 +367,16 @@ export default function LiveControlClient() {
                       allowFullScreen
                       className="h-full w-full"
                     />
+                    {isTikTokLive ? (
+                      <a
+                        href={active.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/10 bg-black/74 px-3 py-2 text-center text-[11px] font-black text-white shadow-[0_18px_36px_rgba(0,0,0,0.4)] backdrop-blur-xl transition hover:bg-black"
+                      >
+                        หาก TikTok บล็อก iframe แตะเพื่อเปิดไลฟ์ต้นทาง
+                      </a>
+                    ) : null}
                   </div>
                 </div>
 

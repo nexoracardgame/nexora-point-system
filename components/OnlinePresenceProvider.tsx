@@ -24,9 +24,9 @@ type LivePresenceTab = {
   onlineAtMs: number;
 };
 
-const PRESENCE_HEARTBEAT_MS = 5000;
-const PRESENCE_STALE_MS = 12000;
-const PRESENCE_PRUNE_MS = 2000;
+const PRESENCE_HEARTBEAT_MS = 1500;
+const PRESENCE_STALE_MS = 5500;
+const PRESENCE_PRUNE_MS = 900;
 
 const OnlinePresenceContext = createContext<OnlinePresenceContextValue>({
   onlineIds: new Set(),
@@ -222,6 +222,20 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       publishOnlineIds();
     };
 
+    const requestPresenceSnapshot = () => {
+      void channel
+        .send({
+          type: "broadcast",
+          event: "presence-request",
+          payload: {
+            requesterId: userId,
+            requesterTabId: tabIdRef.current,
+            requestedAt: new Date().toISOString(),
+          },
+        })
+        .catch(() => undefined);
+    };
+
     const markTabOffline = (payload?: Record<string, unknown> | null) => {
       const tabId = normalizeUnknownPresenceValue(payload?.tabId);
       if (!tabId) {
@@ -276,13 +290,23 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       markTabOnline(payload, userId);
       publishOnlineIds();
 
-      try {
-        await channel.track(payload);
-        void channel.send({
+      void channel
+        .send({
           type: "broadcast",
           event: "presence-online",
           payload,
-        });
+        })
+        .catch(() => undefined);
+
+      try {
+        await channel.track(payload);
+        void channel
+          .send({
+            type: "broadcast",
+            event: "presence-online",
+            payload,
+          })
+          .catch(() => undefined);
       } catch {
         // Presence is best-effort; the next heartbeat/resubscribe will repair it.
       }
@@ -301,11 +325,13 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       };
 
       markTabOffline(payload);
-      void channel.send({
-        type: "broadcast",
-        event: "presence-offline",
-        payload,
-      });
+      void channel
+        .send({
+          type: "broadcast",
+          event: "presence-offline",
+          payload,
+        })
+        .catch(() => undefined);
       void channel.untrack();
     };
 
@@ -319,12 +345,18 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
         );
         publishOnlineIds();
       })
+      .on("broadcast", { event: "presence-request" }, () => {
+        if (document.visibilityState === "visible") {
+          void trackOnline();
+        }
+      })
       .on("broadcast", { event: "presence-offline" }, (event) => {
         markTabOffline((event as { payload?: Record<string, unknown> })?.payload || null);
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           void trackOnline();
+          requestPresenceSnapshot();
           readPresenceState();
         }
       });
@@ -332,14 +364,19 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     trackTimer = setInterval(() => {
       void trackOnline();
     }, PRESENCE_HEARTBEAT_MS);
-    pruneTimer = setInterval(publishOnlineIds, PRESENCE_PRUNE_MS);
+    pruneTimer = setInterval(() => {
+      readPresenceState();
+      publishOnlineIds();
+    }, PRESENCE_PRUNE_MS);
 
     const handleFocus = () => {
       void trackOnline();
+      requestPresenceSnapshot();
     };
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         void trackOnline();
+        requestPresenceSnapshot();
         return;
       }
 
