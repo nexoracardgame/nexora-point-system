@@ -194,6 +194,21 @@ function latestTime(value?: string | null) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function buildRealtimeMessageKey(message: DmMessageRealtimeRow) {
+  const id = String(message.id || "").trim();
+  if (id) {
+    return `id:${id}`;
+  }
+
+  return [
+    String(message.roomId || "").trim(),
+    String(message.senderId || "").trim(),
+    String(message.createdAt || "").trim(),
+    String(message.content || "").trim(),
+    String(message.imageUrl || "").trim(),
+  ].join("|");
+}
+
 function sortRoomsByActivity(list: DMRoomListItem[]) {
   return [...list].sort((a, b) => {
     const aLastMessageTime = latestTime(a.lastMessageAt);
@@ -329,6 +344,7 @@ export default function DMListClient({
   const loadRoomsInFlightRef = useRef<Promise<void> | null>(null);
   const loadRoomsQueuedRef = useRef(false);
   const loadRoomsBurstTimersRef = useRef<number[]>([]);
+  const appliedRealtimeMessageKeysRef = useRef<Set<string>>(new Set());
   const roomsRef = useRef<DMRoomListItem[]>(rooms);
   const currentMeRef = useRef<SessionUser | null>(currentMe);
 
@@ -692,9 +708,24 @@ export default function DMListClient({
     const roomId = String(message?.roomId || "").trim();
     const createdAt =
       String(message?.createdAt || "").trim() || new Date().toISOString();
+    const messageKey = buildRealtimeMessageKey(message);
 
     if (!roomId) {
       return;
+    }
+
+    if (messageKey && appliedRealtimeMessageKeysRef.current.has(messageKey)) {
+      return;
+    }
+
+    if (messageKey) {
+      appliedRealtimeMessageKeysRef.current.add(messageKey);
+      if (appliedRealtimeMessageKeysRef.current.size > 360) {
+        const oldestKey = appliedRealtimeMessageKeysRef.current.values().next().value;
+        if (oldestKey) {
+          appliedRealtimeMessageKeysRef.current.delete(oldestKey);
+        }
+      }
     }
 
     const activeMe = currentMeRef.current;
@@ -747,8 +778,11 @@ export default function DMListClient({
         };
       });
 
-      return filterRoomsWithLocalClears(
-        sortRoomsByActivity(nextRooms),
+      return applyClientReadStateToRooms(
+        filterRoomsWithLocalClears(
+          sortRoomsByActivity(nextRooms),
+          activeMe
+        ),
         activeMe
       );
     });
@@ -878,6 +912,14 @@ export default function DMListClient({
 
     channel?.subscribe();
 
+    const onChatMessageReceived = (event: Event) => {
+      const message = (event as CustomEvent<DmMessageRealtimeRow>).detail;
+
+      if (message?.roomId) {
+        applyRealtimeMessage(message);
+      }
+    };
+
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadRooms(currentMeRef.current);
@@ -913,6 +955,10 @@ export default function DMListClient({
     };
 
     window.addEventListener("focus", onFocus);
+    window.addEventListener(
+      "nexora:chat-message-received",
+      onChatMessageReceived as EventListener
+    );
     window.addEventListener("nexora:chat-read", onChatRead as EventListener);
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -920,6 +966,10 @@ export default function DMListClient({
       window.clearInterval(interval);
       clearLoadRoomsBurstTimers();
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener(
+        "nexora:chat-message-received",
+        onChatMessageReceived as EventListener
+      );
       window.removeEventListener("nexora:chat-read", onChatRead as EventListener);
       document.removeEventListener("visibilitychange", onVisibility);
       if (supabase && channel) {

@@ -63,6 +63,18 @@ function dispatchChatUnreadCount(count: number) {
   );
 }
 
+function dispatchChatMessageRealtime(message: Record<string, unknown>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("nexora:chat-message-received", {
+      detail: message,
+    })
+  );
+}
+
 function getOpenChatRoomId(pathname: string) {
   const path = String(pathname || "").split("?")[0].split("#")[0];
   const parts = path.split("/").filter(Boolean);
@@ -477,7 +489,16 @@ export default function MainLayout({
           (payload as { eventType?: string | null }).eventType || ""
         ).toUpperCase();
         const nextMessage = (payload as {
-          new?: { roomId?: string | null; senderId?: string | null };
+          new?: {
+            id?: string | number | null;
+            roomId?: string | null;
+            senderId?: string | null;
+            senderName?: string | null;
+            senderImage?: string | null;
+            content?: string | null;
+            imageUrl?: string | null;
+            createdAt?: string | null;
+          };
         })?.new;
         const roomId = String(nextMessage?.roomId || "").trim();
         const senderId = String(nextMessage?.senderId || "").trim();
@@ -485,6 +506,21 @@ export default function MainLayout({
           senderId &&
           (senderId === currentUserId ||
             (currentLineId ? senderId === currentLineId : false));
+
+        if (eventType === "INSERT" && roomId && nextMessage) {
+          dispatchChatMessageRealtime({
+            id: nextMessage.id,
+            roomId,
+            senderId,
+            senderName: nextMessage.senderName || null,
+            senderImage: nextMessage.senderImage || null,
+            content: nextMessage.content || null,
+            imageUrl: nextMessage.imageUrl || null,
+            createdAt: nextMessage.createdAt || new Date().toISOString(),
+            isMine,
+            isOpenRoom: roomId === openChatRoomId,
+          });
+        }
 
         if (
           eventType === "INSERT" &&
