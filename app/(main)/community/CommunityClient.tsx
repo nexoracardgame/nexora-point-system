@@ -126,6 +126,26 @@ function patchProfileItem<T extends { displayName: string; image: string; userna
   };
 }
 
+function CommunityAvatar({ src, alt }: { src?: string | null; alt: string }) {
+  return (
+    <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white shadow-md ring-4 ring-white">
+      <img
+        src={src || "/avatar.png"}
+        alt={alt}
+        className="absolute inset-0 h-full w-full rounded-full object-cover object-center"
+        loading="lazy"
+        decoding="async"
+        onError={(event) => {
+          if (event.currentTarget.src.endsWith("/avatar.png")) {
+            return;
+          }
+          event.currentTarget.src = "/avatar.png";
+        }}
+      />
+    </span>
+  );
+}
+
 export default function CommunityClient({
   initialFriends = [],
   initialRequests = [],
@@ -639,10 +659,9 @@ export default function CommunityClient({
                         href={`/profile/${friend.friendId}`}
                         className="flex min-w-0 flex-1 items-center gap-3"
                       >
-                        <img
-                          src={friend.image || "/avatar.png"}
+                        <CommunityAvatar
+                          src={friend.image}
                           alt={friend.displayName}
-                          className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                         />
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
@@ -790,10 +809,9 @@ export default function CommunityClient({
                           href={`/profile/${request.fromUserId}`}
                           className="flex min-w-0 items-center gap-3"
                         >
-                          <img
-                            src={request.image || "/avatar.png"}
+                          <CommunityAvatar
+                            src={request.image}
                             alt={request.displayName}
-                            className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                           />
                           <div className="min-w-0">
                             <div className="truncate text-base font-black">{request.displayName}</div>
@@ -937,10 +955,9 @@ export default function CommunityClient({
                     className="flex flex-col gap-4 rounded-[30px] bg-[#f4f3f8] p-3 transition hover:-translate-y-0.5 hover:bg-[#eeedf5] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <PrefetchLink href={`/profile/${user.id}`} className="flex min-w-0 items-center gap-3">
-                      <img
-                        src={user.image || "/avatar.png"}
+                      <CommunityAvatar
+                        src={user.image}
                         alt={user.displayName}
-                        className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                       />
                       <div className="min-w-0">
                         <div className="truncate text-base font-black">{user.displayName}</div>

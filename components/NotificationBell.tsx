@@ -33,8 +33,8 @@ type NotificationResponse = {
 };
 
 const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
-const NOTIFICATION_FAST_POLL_MS = 1200;
-const NOTIFICATION_BURST_DELAYS_MS = [180, 650, 1150] as const;
+const NOTIFICATION_FAST_POLL_MS = 700;
+const NOTIFICATION_BURST_DELAYS_MS = [120, 360, 760] as const;
 
 function isSystemNotificationSupported() {
   return (
@@ -116,6 +116,39 @@ function getNotificationIcon(type: NotificationItem["type"]) {
     default:
       return Heart;
   }
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function isChatNotificationForRoom(item: NotificationItem, roomId: string) {
+  if (item.type !== "chat" || !roomId) {
+    return false;
+  }
+
+  const path = String(item.href || "").split("?")[0].split("#")[0];
+  const segments = path.split("/").filter(Boolean).map(safeDecode);
+
+  if (segments[0] === "dm" && segments[1] === roomId) {
+    return true;
+  }
+
+  if (
+    roomId.startsWith("deal:") &&
+    segments[0] === "market" &&
+    segments[1] === "deals" &&
+    segments[2] === "chat" &&
+    `deal:${segments[3] || ""}` === roomId
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export default function NotificationBell() {
@@ -447,15 +480,40 @@ export default function NotificationBell() {
       }
     };
 
+    const onChatRead = (event: Event) => {
+      const roomId = String(
+        (event as CustomEvent<{ roomId?: string | null }>).detail?.roomId || ""
+      ).trim();
+
+      if (roomId) {
+        setItems((currentItems) => {
+          const nextItems: NotificationItem[] = [];
+
+          for (const item of currentItems) {
+            if (isChatNotificationForRoom(item, roomId)) {
+              hiddenIdsRef.current.add(item.id);
+              continue;
+            }
+
+            nextItems.push(item);
+          }
+
+          return nextItems;
+        });
+      }
+
+      queueFastNotificationSync();
+    };
+
     window.addEventListener("focus", onFocus);
-    window.addEventListener("nexora:chat-read", onFocus);
+    window.addEventListener("nexora:chat-read", onChatRead);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.clearInterval(intervalId);
       clearNotificationBurstTimers();
       window.removeEventListener("focus", onFocus);
-      window.removeEventListener("nexora:chat-read", onFocus);
+      window.removeEventListener("nexora:chat-read", onChatRead);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);

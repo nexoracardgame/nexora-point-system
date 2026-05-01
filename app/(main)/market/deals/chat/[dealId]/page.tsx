@@ -21,6 +21,7 @@ import {
   type ChatMessage as DealMessage,
   type ChatUser,
 } from "@/lib/chat-room-types";
+import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { formatThaiTime } from "@/lib/thai-time";
 
@@ -217,12 +218,16 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     });
   });
 
-  const emitChatRead = useEffectEvent((targetRoomId: string) => {
-    window.dispatchEvent(
-      new CustomEvent("nexora:chat-read", {
-        detail: { roomId: targetRoomId },
-      })
-    );
+  const emitChatRead = useEffectEvent((
+    targetRoomId: string,
+    unreadCount = 1,
+    readAt = new Date().toISOString()
+  ) => {
+    dispatchClientChatRead({
+      roomId: targetRoomId,
+      unreadCount,
+      readAt,
+    });
   });
 
   const markLoadedRoomSeen = useEffectEvent(
@@ -230,10 +235,10 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       const myId = String(meData?.id || "").trim();
       if (!targetRoomId || !myId) return;
 
-      const hasUnread = nextMessages.some(
+      const unreadMessages = nextMessages.filter(
         (message) => message.senderId !== myId && !message.seenAt
       );
-      if (!hasUnread) return;
+      if (unreadMessages.length === 0) return;
 
       const seenAt = new Date().toISOString();
       setMessages((prev) =>
@@ -244,7 +249,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         )
       );
 
-      emitChatRead(targetRoomId);
+      emitChatRead(targetRoomId, unreadMessages.length, seenAt);
 
       const res = await fetch("/api/dm/messages", {
         method: "POST",
@@ -261,7 +266,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         return;
       }
 
-      emitChatRead(targetRoomId);
     }
   );
 
@@ -515,8 +519,18 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   const markSeenNow = async () => {
     if (!roomId || !me?.id) return;
 
-    const hasUnread = messages.some((message) => message.senderId !== me.id && !message.seenAt);
-    if (!hasUnread) return;
+    const unreadMessages = messages.filter((message) => message.senderId !== me.id && !message.seenAt);
+    if (unreadMessages.length === 0) return;
+
+    const optimisticSeenAt = new Date().toISOString();
+    emitChatRead(roomId, unreadMessages.length, optimisticSeenAt);
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.senderId !== me.id && !message.seenAt
+          ? { ...message, seenAt: optimisticSeenAt }
+          : message
+      )
+    );
 
     const res = await fetch("/api/dm/messages", {
       method: "POST",
@@ -527,18 +541,18 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         roomId,
         action: "markSeen",
       }),
-    });
+    }).catch(() => null);
 
-    if (!res.ok) {
+    if (!res?.ok) {
       return;
     }
 
     const payload = await res.json();
-    const seenAt = String(payload?.seenAt || new Date().toISOString());
+    const seenAt = String(payload?.seenAt || optimisticSeenAt);
 
     setMessages((prev) =>
       prev.map((message) =>
-        message.senderId !== me.id && !message.seenAt
+        message.senderId !== me.id && message.seenAt === optimisticSeenAt
           ? { ...message, seenAt }
           : message
       )

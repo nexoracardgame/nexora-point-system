@@ -45,8 +45,8 @@ function formatBalance(value?: number | null) {
   return Number(value || 0).toLocaleString("th-TH");
 }
 
-const CHAT_UNREAD_FAST_POLL_MS = 900;
-const CHAT_UNREAD_BURST_DELAYS_MS = [150, 520, 1100] as const;
+const CHAT_UNREAD_FAST_POLL_MS = 700;
+const CHAT_UNREAD_BURST_DELAYS_MS = [120, 360, 760] as const;
 
 export default function MainLayout({
   children,
@@ -371,6 +371,7 @@ export default function MainLayout({
     let inFlight = false;
     let queued = false;
     const burstTimers: ReturnType<typeof setTimeout>[] = [];
+    const processedChatReadKeys = new Set<string>();
     const supabase = getBrowserSupabaseClient();
     const channel = supabase
       ? supabase.channel(`layout-chat-unread-${Date.now()}`)
@@ -469,7 +470,28 @@ export default function MainLayout({
         queueChatUnreadSync();
       }
     };
-    const handleChatRead = () => {
+    const handleChatRead = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        roomId?: string | null;
+        unreadCount?: number | null;
+        readAt?: string | null;
+      }>).detail;
+      const roomId = String(detail?.roomId || "").trim();
+      const readAt = String(detail?.readAt || "").trim();
+      const readKey = `${roomId}:${readAt || "now"}`;
+
+      if (roomId && !processedChatReadKeys.has(readKey)) {
+        processedChatReadKeys.add(readKey);
+        if (processedChatReadKeys.size > 240) {
+          const oldestReadKey = processedChatReadKeys.values().next().value;
+          if (oldestReadKey) {
+            processedChatReadKeys.delete(oldestReadKey);
+          }
+        }
+        const unreadCount = Math.max(1, Number(detail?.unreadCount || 1));
+        setChatUnreadCount((current) => Math.max(0, current - unreadCount));
+      }
+
       queueChatUnreadSync();
     };
 

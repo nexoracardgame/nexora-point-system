@@ -11,6 +11,7 @@ import {
   readChatHistoryCache,
   writeChatHistoryCache,
 } from "@/lib/chat-history-cache";
+import { dispatchClientChatRead, isClientChatRead } from "@/lib/chat-read-sync";
 import { prefetchDealChatRoom, prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
 import {
   readClientViewCache,
@@ -61,8 +62,8 @@ type DmMessageRealtimeRow = {
 type LocalDmClearMap = Map<string, string>;
 
 const DM_LIST_CACHE_KEY = "dm-list";
-const DM_LIST_FAST_REFRESH_MS = 1200;
-const DM_LIST_BURST_DELAYS_MS = [160, 520, 1100] as const;
+const DM_LIST_FAST_REFRESH_MS = 900;
+const DM_LIST_BURST_DELAYS_MS = [120, 360, 760] as const;
 
 function buildLocalClearStorageKey(userId?: string | null) {
   return `nexora:dm-cleared:${String(userId || "guest").trim() || "guest"}`;
@@ -261,6 +262,31 @@ function filterRoomsWithLocalClears(
   });
 }
 
+function applyClientReadStateToRooms(
+  list: DMRoomListItem[],
+  me?: SessionUser | null
+) {
+  const myId = String(me?.id || "").trim();
+  const myLineId = String(me?.lineId || "").trim();
+
+  return list.map((room) => {
+    const directTargetIds =
+      room.kind === "deal"
+        ? [room.roomId, room.dealId ? `deal:${room.dealId}` : ""]
+        : [
+            room.roomId,
+            myId && room.otherUserId ? buildDirectRoomId(myId, room.otherUserId) : "",
+            myLineId && room.otherUserId ? buildDirectRoomId(myLineId, room.otherUserId) : "",
+          ];
+
+    if (!isClientChatRead(directTargetIds, room.lastMessageAt || room.createdAt)) {
+      return room;
+    }
+
+    return { ...room, unread: 0 };
+  });
+}
+
 export default function DMListClient({
   initialRooms,
   initialMe,
@@ -280,12 +306,15 @@ export default function DMListClient({
   const initialMeCandidate = initialMe || cachedList?.data?.me || null;
   const [currentMe, setCurrentMe] = useState<SessionUser | null>(initialMeCandidate);
   const [rooms, setRooms] = useState<DMRoomListItem[]>(
-    filterRoomsWithLocalClears(
-      sortRoomsByActivity(
-        (initialRooms.length > 0
-          ? initialRooms
-          : cachedList?.data?.rooms || []
-        ).map(normalizeRoom)
+    applyClientReadStateToRooms(
+      filterRoomsWithLocalClears(
+        sortRoomsByActivity(
+          (initialRooms.length > 0
+            ? initialRooms
+            : cachedList?.data?.rooms || []
+          ).map(normalizeRoom)
+        ),
+        initialMeCandidate
       ),
       initialMeCandidate
     )
@@ -452,7 +481,12 @@ export default function DMListClient({
       return;
     }
 
-    setRooms((prev) => filterRoomsWithLocalClears(prev, currentMe));
+    setRooms((prev) =>
+      applyClientReadStateToRooms(
+        filterRoomsWithLocalClears(prev, currentMe),
+        currentMe
+      )
+    );
   }, [currentMe]);
 
   const loadRooms = async (meOverride?: SessionUser | null) => {
@@ -476,7 +510,10 @@ export default function DMListClient({
       const nextRooms: DMRoomListItem[] = Array.isArray(data?.rooms)
         ? sortRoomsByActivity(data.rooms.map(normalizeRoom))
         : [];
-      const visibleRooms = filterRoomsWithLocalClears(nextRooms, effectiveMe);
+      const visibleRooms = applyClientReadStateToRooms(
+        filterRoomsWithLocalClears(nextRooms, effectiveMe),
+        effectiveMe
+      );
 
       setRooms(visibleRooms);
       void hydrateUnknownRooms(visibleRooms);
@@ -518,17 +555,13 @@ export default function DMListClient({
     );
   };
 
-  const markRoomReadLocally = (roomId: string) => {
+  const markRoomReadLocally = (roomId: string, unreadCount = 1) => {
     setRooms((prev) =>
       prev.map((room) =>
         room.roomId === roomId ? { ...room, unread: 0 } : room
       )
     );
-    window.dispatchEvent(
-      new CustomEvent("nexora:chat-read", {
-        detail: { roomId },
-      })
-    );
+    dispatchClientChatRead({ roomId, unreadCount });
   };
 
   const warmDirectRoom = useCallback((room: DMRoomListItem) => {
@@ -749,8 +782,11 @@ export default function DMListClient({
     }
 
     if (Array.isArray(cached.data.rooms) && cached.data.rooms.length > 0) {
-      const nextRooms = filterRoomsWithLocalClears(
-        sortRoomsByActivity(cached.data.rooms.map(normalizeRoom)),
+      const nextRooms = applyClientReadStateToRooms(
+        filterRoomsWithLocalClears(
+          sortRoomsByActivity(cached.data.rooms.map(normalizeRoom)),
+          cached.data.me || currentMe
+        ),
         cached.data.me || currentMe
       );
       setRooms(nextRooms);
@@ -864,8 +900,11 @@ export default function DMListClient({
 
       if (targetRoomId) {
         setRooms((prev) =>
-          prev.map((room) =>
-            room.roomId === targetRoomId ? { ...room, unread: 0 } : room
+          applyClientReadStateToRooms(
+            prev.map((room) =>
+              room.roomId === targetRoomId ? { ...room, unread: 0 } : room
+            ),
+            currentMeRef.current
           )
         );
       }
@@ -956,7 +995,7 @@ export default function DMListClient({
                         onTouchStart={() => warmDirectRoom(room)}
                         onFocus={() => warmDirectRoom(room)}
                         onClick={() => {
-                          markRoomReadLocally(room.roomId);
+                          markRoomReadLocally(room.roomId, room.unread);
                           void openDirectRoom(room);
                         }}
                         className="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-3"
@@ -1060,7 +1099,7 @@ export default function DMListClient({
                       onTouchStart={() => warmDealRoom(room.dealId)}
                       onFocus={() => warmDealRoom(room.dealId)}
                       onClick={() => {
-                        markRoomReadLocally(room.roomId);
+                        markRoomReadLocally(room.roomId, room.unread);
                         warmDealRoom(room.dealId);
                       }}
                       className="group relative block min-w-0 overflow-hidden rounded-[24px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-3 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:rounded-[30px] sm:p-4.5"
