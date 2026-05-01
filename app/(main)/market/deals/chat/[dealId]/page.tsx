@@ -850,18 +850,36 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     const optimisticImageUrl = selectedFile ? selectedImagePreview : null;
     let uploadFile: File | null = null;
 
+    const clearDraft = () => {
+      setText("");
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    };
+
+    const restoreDraft = () => {
+      setText((current) => current || msg);
+      if (selectedFile) {
+        setFile((current) => current || selectedFile);
+      }
+    };
+
+    setSending(true);
+    setShowEmoji(false);
+    clearDraft();
+
     if (selectedFile) {
       try {
         uploadFile = await prepareChatImageFile(selectedFile);
       } catch (error) {
         console.error("DEAL CHAT UPLOAD ERROR:", error);
+        restoreDraft();
+        setSending(false);
         alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
     }
-
-    setSending(true);
-    setShowEmoji(false);
 
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMessage: DealMessage = {
@@ -917,6 +935,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     } catch (error) {
       console.error("SEND DEAL CHAT ERROR:", error);
       setMessages((prev) => removeChatMessage(prev, optimisticId));
+      restoreDraft();
       setSending(false);
       return;
     }
@@ -924,6 +943,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     if (!res.ok) {
       const errorPayload = await res.json().catch(() => null);
       setMessages((prev) => removeChatMessage(prev, optimisticId));
+      restoreDraft();
       if (res.status === 403 || res.status === 404 || res.status === 409) {
         setRoomClosed(true);
       }
@@ -945,11 +965,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       const withoutOptimistic = removeChatMessage(prev, optimisticId);
       return mergeSingleChatMessage(withoutOptimistic, insertedMessage, roomId, me, other);
     });
-    setText("");
-    setFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
     setSending(false);
     scrollToBottom("smooth");
   };

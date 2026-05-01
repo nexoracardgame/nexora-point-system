@@ -12,6 +12,7 @@ import SafeCardImage from "@/components/SafeCardImage";
 import DeleteListingButton from "@/components/DeleteListingButton";
 import ProfileChatButton from "@/components/ProfileChatButton";
 import ProfileFriendButton from "@/components/ProfileFriendButton";
+import ProfilePresenceDot from "@/components/ProfilePresenceDot";
 import ProfileShareButton from "@/components/ProfileShareButton";
 import { authOptions } from "@/lib/auth";
 import { getMarketListingsBySeller } from "@/lib/market-listings";
@@ -647,7 +648,10 @@ export default async function SellerProfilePage({
                         className="object-cover"
                       />
                     </div>
-                    <div className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-[#090b12] bg-emerald-400 sm:bottom-2 sm:right-2" />
+                    <ProfilePresenceDot
+                      userId={seller.id}
+                      className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-[#090b12] sm:bottom-2 sm:right-2"
+                    />
                   </div>
 
                   <div className="min-w-0 pb-1 sm:pb-2">

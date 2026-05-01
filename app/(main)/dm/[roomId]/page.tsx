@@ -839,18 +839,36 @@ function DMRoomContent({
     const optimisticImageUrl = selectedFile ? selectedImagePreview : null;
     let uploadFile: File | null = null;
 
+    const clearDraft = () => {
+      setText("");
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    };
+
+    const restoreDraft = () => {
+      setText((current) => current || msg);
+      if (selectedFile) {
+        setFile((current) => current || selectedFile);
+      }
+    };
+
+    setSending(true);
+    setShowEmoji(false);
+    clearDraft();
+
     if (selectedFile) {
       try {
         uploadFile = await prepareChatImageFile(selectedFile);
       } catch (error) {
         console.error("UPLOAD ERROR:", error);
+        restoreDraft();
+        setSending(false);
         alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
     }
-
-    setSending(true);
-    setShowEmoji(false);
 
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMessage: DMMessage = {
@@ -906,6 +924,7 @@ function DMRoomContent({
     } catch (error) {
       console.error("SEND DM ERROR:", error);
       setMessages((prev) => removeChatMessage(prev, optimisticId));
+      restoreDraft();
       setSending(false);
       return;
     }
@@ -913,6 +932,7 @@ function DMRoomContent({
     if (!res.ok) {
       const errorPayload = await res.json().catch(() => null);
       setMessages((prev) => removeChatMessage(prev, optimisticId));
+      restoreDraft();
       if (res.status === 403 || res.status === 404 || res.status === 409) {
         setRoomClosed(true);
       }
@@ -934,11 +954,6 @@ function DMRoomContent({
       const withoutOptimistic = removeChatMessage(prev, optimisticId);
       return mergeSingleChatMessage(withoutOptimistic, insertedMessage, roomId, me, other);
     });
-    setText("");
-    setFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
     setSending(false);
     scrollToBottom("smooth");
   };

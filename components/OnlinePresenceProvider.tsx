@@ -17,6 +17,10 @@ type OnlinePresenceContextValue = {
   isOnline: (...ids: Array<string | null | undefined>) => boolean;
 };
 
+const PRESENCE_HEARTBEAT_MS = 5000;
+const PRESENCE_STALE_MS = 12000;
+const PRESENCE_PRUNE_MS = 2000;
+
 const OnlinePresenceContext = createContext<OnlinePresenceContextValue>({
   onlineIds: new Set(),
   isOnline: () => false,
@@ -24,6 +28,14 @@ const OnlinePresenceContext = createContext<OnlinePresenceContextValue>({
 
 function normalizePresenceId(value?: string | null) {
   return String(value || "").trim();
+}
+
+function normalizeUnknownPresenceValue(value: unknown) {
+  return normalizePresenceId(typeof value === "string" ? value : "");
+}
+
+function buildOfflineTabKey(id: string, tabId: string) {
+  return `${id}::${tabId}`;
 }
 
 function createTabId() {
@@ -48,6 +60,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const lineId = normalizePresenceId(sessionUser.lineId);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const tabIdRef = useRef("");
+  const offlineTabsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!tabIdRef.current) {
@@ -65,6 +78,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
 
     let closed = false;
     let trackTimer: ReturnType<typeof setInterval> | null = null;
+    let pruneTimer: ReturnType<typeof setInterval> | null = null;
     const channel = supabase.channel("nexora-online-presence", {
       config: {
         presence: {
@@ -76,37 +90,79 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     const readPresenceState = () => {
       const state = channel.presenceState();
       const nextIds = new Set<string>();
+      const now = Date.now();
 
       Object.entries(state).forEach(([key, metas]) => {
-        const normalizedKey = normalizePresenceId(key);
-        if (normalizedKey) {
-          nextIds.add(normalizedKey);
-        }
-
         (Array.isArray(metas) ? metas : []).forEach((meta) => {
           const record = meta as Record<string, unknown>;
-          [
-            record.userId,
-            record.id,
-            record.lineId,
-          ].forEach((value) => {
-            const normalized = normalizePresenceId(
-              typeof value === "string" ? value : ""
+          const tabId = normalizeUnknownPresenceValue(record.tabId);
+          const onlineAt = normalizeUnknownPresenceValue(record.onlineAt);
+          const onlineAtMs = onlineAt ? Date.parse(onlineAt) : 0;
+          const isFresh =
+            !onlineAtMs || !Number.isFinite(onlineAtMs)
+              ? true
+              : now - onlineAtMs <= PRESENCE_STALE_MS;
+
+          if (!isFresh) {
+            return;
+          }
+
+          const ids = Array.from(
+            new Set(
+              [key, record.userId, record.id, record.lineId]
+                .map(normalizeUnknownPresenceValue)
+                .filter(Boolean)
+            )
+          );
+          const isTabOffline =
+            tabId &&
+            ids.some((id) =>
+              offlineTabsRef.current.has(buildOfflineTabKey(id, tabId))
             );
-            if (normalized) {
-              nextIds.add(normalized);
-            }
-          });
+
+          if (isTabOffline) {
+            return;
+          }
+
+          ids.forEach((id) => nextIds.add(id));
         });
       });
 
       setOnlineIds(nextIds);
     };
 
+    const markTabOffline = (payload?: Record<string, unknown> | null) => {
+      const tabId = normalizeUnknownPresenceValue(payload?.tabId);
+      if (!tabId) {
+        return;
+      }
+
+      [
+        payload?.userId,
+        payload?.id,
+        payload?.lineId,
+      ].forEach((value) => {
+        const id = normalizeUnknownPresenceValue(value);
+        if (id) {
+          offlineTabsRef.current.add(buildOfflineTabKey(id, tabId));
+        }
+      });
+
+      readPresenceState();
+    };
+
     const trackOnline = async () => {
       if (closed) {
         return;
       }
+
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
+      [userId, lineId].filter(Boolean).forEach((id) => {
+        offlineTabsRef.current.delete(buildOfflineTabKey(id, tabIdRef.current));
+      });
 
       await channel.track({
         userId,
@@ -118,10 +174,34 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       });
     };
 
+    const announceOffline = () => {
+      if (closed) {
+        return;
+      }
+
+      const payload = {
+        userId,
+        lineId,
+        tabId: tabIdRef.current,
+        offlineAt: new Date().toISOString(),
+      };
+
+      markTabOffline(payload);
+      void channel.send({
+        type: "broadcast",
+        event: "presence-offline",
+        payload,
+      });
+      void channel.untrack();
+    };
+
     channel
       .on("presence", { event: "sync" }, readPresenceState)
       .on("presence", { event: "join" }, readPresenceState)
       .on("presence", { event: "leave" }, readPresenceState)
+      .on("broadcast", { event: "presence-offline" }, (event) => {
+        markTabOffline((event as { payload?: Record<string, unknown> })?.payload || null);
+      })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           void trackOnline();
@@ -131,7 +211,8 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
 
     trackTimer = setInterval(() => {
       void trackOnline();
-    }, 25000);
+    }, PRESENCE_HEARTBEAT_MS);
+    pruneTimer = setInterval(readPresenceState, PRESENCE_PRUNE_MS);
 
     const handleFocus = () => {
       void trackOnline();
@@ -139,25 +220,35 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         void trackOnline();
+        return;
       }
+
+      announceOffline();
     };
     const handlePageHide = () => {
-      void channel.untrack();
+      announceOffline();
     };
 
     window.addEventListener("focus", handleFocus);
+    window.addEventListener("beforeunload", handlePageHide);
     window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("freeze", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      announceOffline();
       closed = true;
       if (trackTimer) {
         clearInterval(trackTimer);
       }
+      if (pruneTimer) {
+        clearInterval(pruneTimer);
+      }
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("beforeunload", handlePageHide);
       window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("freeze", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibility);
-      void channel.untrack();
       void supabase.removeChannel(channel);
     };
   }, [lineId, userId, userImage, userName]);
