@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import MarketFeatureNav from "@/components/MarketFeatureNav";
 import SellerCenterClient from "./SellerCenterClient";
 
 export default function SellerCenterPage() {
@@ -29,6 +30,8 @@ export default function SellerCenterPage() {
             ดูโปรไฟล์ฉัน
           </Link>
         </div>
+
+        <MarketFeatureNav className="mb-6 sm:mb-10" />
 
         <SellerCenterClient initialListings={[]} />
       </section>

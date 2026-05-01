@@ -7,11 +7,8 @@ import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
   Clock3,
-  Heart,
   Handshake,
-  Plus,
   Shield,
-  ShieldCheck,
   Store,
   User,
   Wallet,
@@ -28,6 +25,7 @@ import {
   readClientViewCache,
   writeClientViewCache,
 } from "@/lib/client-view-cache";
+import MarketFeatureNav from "@/components/MarketFeatureNav";
 import { prefetchDealChatRoom } from "@/lib/chat-room-prefetch";
 import type { DealCard } from "@/lib/market-deals";
 import CancelDealButton from "./CancelDealButton";
@@ -51,50 +49,23 @@ function getStatusUI(
     case "accepted":
       return {
         label: t("deals.status.ready"),
-        className: "border-cyan-300/20 bg-cyan-400/10 text-cyan-300",
+        className: "border-black bg-black text-white shadow-[0_10px_28px_rgba(0,0,0,0.18)]",
         icon: BadgeCheck,
       };
     case "rejected":
       return {
         label: t("deals.status.rejected"),
-        className: "border-red-300/20 bg-red-400/10 text-red-300",
+        className: "border-red-500/20 bg-red-100 text-red-950",
         icon: XCircle,
       };
     default:
       return {
         label: t("deals.status.pending"),
-        className: "border-amber-300/20 bg-amber-300/10 text-amber-300",
+        className: "border-amber-500/25 bg-amber-100 text-amber-950",
         icon: Clock3,
       };
   }
 }
-
-const MARKET_ACTIONS = [
-  {
-    href: "/market/create",
-    title: "Create Listing",
-    subtitle: "สร้างโพสต์ขายการ์ด",
-    Icon: Plus,
-  },
-  {
-    href: "/market/deals",
-    title: "Deal Requests",
-    subtitle: "รับข้อเสนอและคุยดีล",
-    Icon: Handshake,
-  },
-  {
-    href: "/market/wishlist",
-    title: "Wishlist",
-    subtitle: "การ์ดที่ติดตามไว้",
-    Icon: Heart,
-  },
-  {
-    href: "/market/seller-center",
-    title: "Seller Center",
-    subtitle: "จัดการโพสต์ขาย",
-    Icon: ShieldCheck,
-  },
-] as const;
 
 export default function DealsClient({
   initialDeals,
@@ -415,7 +386,7 @@ export default function DealsClient({
             </div>
 
             <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-black/38">
+              <div className="text-[12px] font-black uppercase tracking-[0.12em] text-black/62">
                 {deal.status === "accepted"
                   ? deal.isSeller
                     ? t("deals.role.waitBuyer")
@@ -424,14 +395,14 @@ export default function DealsClient({
                     ? t("deals.role.ownerAction")
                     : t("deals.role.yourRequest")}
               </div>
-              <div className="text-sm font-bold text-black/76">
+              <div className="text-base font-black text-black">
                 #{String(index + 1).padStart(3, "0")}
               </div>
             </div>
           </div>
 
           <div
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] ${statusUI.className}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] sm:text-xs ${statusUI.className}`}
           >
             <StatusIcon className="h-4 w-4" />
             {statusUI.label}
@@ -439,7 +410,7 @@ export default function DealsClient({
         </div>
 
         <div className="mt-4 rounded-[24px] border border-black/6 bg-[#f3eee9] p-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-black/42">
+          <div className="flex items-center gap-2 text-sm font-black text-black/68">
             <Wallet className="h-4 w-4" />
             {t("deals.offerPrice")}
           </div>
@@ -463,7 +434,7 @@ export default function DealsClient({
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-[24px] bg-[#f7f4f0] p-4 ring-1 ring-black/5">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-black/34">
+            <div className="text-[12px] font-black uppercase tracking-[0.12em] text-black/58">
               {t("deals.card")}
             </div>
 
@@ -492,7 +463,7 @@ export default function DealsClient({
           </div>
 
           <div className="rounded-[24px] bg-[#f7f4f0] p-4 ring-1 ring-black/5">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-black/34">
+            <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.12em] text-black/58">
               <User className="h-3.5 w-3.5" />
               {deal.isSeller ? t("deals.buyer") : t("deals.seller")}
             </div>
@@ -519,17 +490,17 @@ export default function DealsClient({
         </div>
 
         <div
-          className={`mt-4 rounded-2xl border p-3 ${
+          className={`mt-4 rounded-[22px] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] ${
             deal.status === "accepted"
-              ? "border-cyan-400/20 bg-cyan-50"
+              ? "border-black/8 bg-[#edf8fb]"
               : deal.isSeller
-                ? "border-violet-400/20 bg-violet-50"
-                : "border-red-400/20 bg-red-50"
+                ? "border-black/8 bg-[#f4effc]"
+                : "border-black/8 bg-[#fff1f2]"
           }`}
         >
           {deal.status === "pending" && deal.isSeller && (
             <>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-violet-300">
+              <div className="mb-3 text-[15px] font-black uppercase tracking-[0.08em] text-black drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]">
                 {t("deals.ownerAction")}
               </div>
               <DealActionButtons
@@ -546,7 +517,7 @@ export default function DealsClient({
 
           {deal.status === "pending" && !deal.isSeller && (
             <>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-red-300">
+              <div className="mb-3 text-[15px] font-black uppercase tracking-[0.08em] text-black drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]">
                 {t("deals.activeRequest")}
               </div>
               <CancelDealButton
@@ -559,10 +530,10 @@ export default function DealsClient({
 
           {deal.status === "accepted" && deal.isSeller && (
             <>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">
+              <div className="mb-3 text-[15px] font-black uppercase tracking-[0.08em] text-black drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]">
                 {t("deals.acceptedWait")}
               </div>
-              <div className="rounded-xl border border-cyan-300/20 bg-white px-4 py-3 text-sm font-semibold text-black/64">
+              <div className="rounded-xl border border-black/8 bg-white px-4 py-3 text-sm font-bold leading-6 text-black/72 shadow-[0_8px_22px_rgba(0,0,0,0.06)]">
                 {t("deals.acceptedDesc")}
               </div>
               <div className="mt-3">
@@ -577,7 +548,7 @@ export default function DealsClient({
 
           {deal.status === "accepted" && !deal.isSeller && (
             <>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">
+              <div className="mb-3 text-[15px] font-black uppercase tracking-[0.08em] text-black drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]">
                 {t("deals.closeReady")}
               </div>
               <div className="space-y-3">
@@ -641,48 +612,12 @@ export default function DealsClient({
             </div>
           </div>
 
-          <div className="relative mt-4 text-xs text-white/35">
+          <div className="relative mt-4 text-sm font-bold text-white/48">
             {refreshing ? t("deals.refreshing") : t("deals.autoRefresh")}
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-          {MARKET_ACTIONS.map(({ href, title, subtitle, Icon }) => {
-            const active = href === "/market/deals";
-
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`group rounded-[24px] border p-4 shadow-[0_18px_54px_rgba(0,0,0,0.20)] transition duration-300 hover:-translate-y-1 md:rounded-[30px] md:p-5 ${
-                  active
-                    ? "border-black bg-black text-white ring-1 ring-white/14"
-                    : "border-black/8 bg-white text-black ring-1 ring-white/70 hover:shadow-[0_26px_70px_rgba(255,255,255,0.08)]"
-                }`}
-              >
-                <div
-                  className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${
-                    active
-                      ? "bg-white text-black"
-                      : "bg-black text-amber-200 group-hover:scale-105"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="text-sm font-black leading-tight md:text-base">
-                  {title}
-                </div>
-                <div
-                  className={`mt-1 text-[11px] font-bold leading-4 md:text-xs ${
-                    active ? "text-white/54" : "text-black/45"
-                  }`}
-                >
-                  {subtitle}
-                </div>
-              </Link>
-            );
-          })}
-        </section>
+        <MarketFeatureNav />
 
         {acceptedDeals.length > 0 && (
           <section>

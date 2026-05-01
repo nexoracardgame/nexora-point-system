@@ -57,7 +57,7 @@ export default function DealActionButtons({
       <button
         onClick={() => handleAction("accept")}
         disabled={loading}
-        className="rounded-xl bg-emerald-500 px-4 py-2 font-bold text-black transition hover:scale-105 disabled:opacity-60"
+        className="min-h-[44px] flex-1 rounded-2xl bg-emerald-500 px-4 py-2 text-base font-black text-black transition hover:scale-105 disabled:opacity-60"
       >
         {t("deals.accept")}
       </button>
@@ -65,7 +65,7 @@ export default function DealActionButtons({
       <button
         onClick={() => handleAction("reject")}
         disabled={loading}
-        className="rounded-xl bg-red-500 px-4 py-2 font-bold text-white transition hover:scale-105 disabled:opacity-60"
+        className="min-h-[44px] flex-1 rounded-2xl bg-red-500 px-4 py-2 text-base font-black text-white transition hover:scale-105 disabled:opacity-60"
       >
         {t("deals.reject")}
       </button>

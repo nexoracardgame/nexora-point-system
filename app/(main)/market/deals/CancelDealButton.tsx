@@ -61,7 +61,7 @@ export default function CancelDealButton({
     <button
       onClick={handleCancel}
       disabled={loading}
-      className={`flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-bold text-white shadow-lg transition ${
+      className={`flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-base font-black text-white shadow-lg transition ${
         loading
           ? "cursor-not-allowed bg-zinc-600"
           : "bg-gradient-to-r from-red-500 to-rose-600 hover:scale-[1.02] shadow-red-500/20"

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import SafeCardImage from "@/components/SafeCardImage";
+import MarketFeatureNav from "@/components/MarketFeatureNav";
 import { emitMarketSync } from "@/lib/market-sync";
 
 type CardData = {
@@ -120,6 +121,8 @@ export default function CreateListingConsole() {
             ค้นหาการ์ดจากระบบหลัก ใส่ซีเรียล ตั้งราคา แล้วลงขายได้ทันที
           </p>
         </section>
+
+        <MarketFeatureNav className="mt-6" />
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5 text-center backdrop-blur-2xl">

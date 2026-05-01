@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Heart, Trash2 } from "lucide-react";
+import MarketFeatureNav from "@/components/MarketFeatureNav";
 
 type WishlistCard = {
   id: string;
@@ -67,6 +68,8 @@ export default function WishlistPage() {
             My Wishlist
           </div>
         </div>
+
+        <MarketFeatureNav className="mb-6 md:mb-10" />
 
         {items.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/50 md:rounded-3xl md:p-8">
