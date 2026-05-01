@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ShieldAlert, Trash2, X } from "lucide-react";
 import { emitMarketSync } from "@/lib/market-sync";
 
@@ -14,6 +15,7 @@ export default function DeleteListingButton({
   description = "การ์ดใบนี้จะถูกลบออกจากตลาดและระบบดีลที่เกี่ยวข้องทันที การลบนี้ไม่สามารถย้อนกลับได้",
   redirectHref,
   adminMode = false,
+  fitContent = false,
 }: {
   id: string;
   onDeleted?: () => void;
@@ -23,17 +25,50 @@ export default function DeleteListingButton({
   description?: string;
   redirectHref?: string;
   adminMode?: boolean;
+  fitContent?: boolean;
 }) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const sizeClass =
     size === "compact"
       ? "min-h-[34px] rounded-xl px-3 py-2 text-xs"
       : "min-h-[44px] rounded-2xl px-4 py-3 text-sm";
+  const widthClass = fitContent
+    ? "w-full sm:w-auto sm:min-w-[118px] sm:flex-none"
+    : "w-full";
   const toneClass = adminMode
     ? "border border-red-300/24 bg-[linear-gradient(180deg,rgba(239,68,68,0.18),rgba(127,29,29,0.22))] text-red-100 shadow-[0_14px_34px_rgba(239,68,68,0.16)] hover:bg-red-500/24"
     : "bg-red-500/10 text-red-300 hover:bg-red-500/20";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || loading) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [loading, open]);
 
   const deleteListing = async () => {
     if (loading) return;
@@ -51,37 +86,27 @@ export default function DeleteListingButton({
         return;
       }
 
-      setOpen(false);
       onDeleted?.();
       emitMarketSync({
         listingId: id,
         action: "deleted",
       });
+      setOpen(false);
 
-      if (redirectHref) {
-        router.push(redirectHref);
-      } else {
-        router.refresh();
-      }
+      window.setTimeout(() => {
+        if (redirectHref) {
+          router.push(redirectHref);
+        } else {
+          router.refresh();
+        }
+      }, 40);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={loading}
-        className={`inline-flex w-full items-center justify-center gap-2 text-center font-black transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 ${toneClass} ${sizeClass}`}
-      >
-        <Trash2 className={size === "compact" ? "h-3.5 w-3.5" : "h-4 w-4"} />
-        {loading ? "กำลังลบ..." : label}
-      </button>
-
-      {open ? (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-6">
+  const modal = open ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-5 sm:py-6">
           <button
             type="button"
             aria-label="ยกเลิก"
@@ -90,19 +115,19 @@ export default function DeleteListingButton({
               if (!loading) setOpen(false);
             }}
           />
-          <div className="relative w-full max-w-[460px] overflow-hidden rounded-[30px] border border-white/12 bg-[#08080b] p-5 text-white shadow-[0_34px_120px_rgba(0,0,0,0.7)] sm:p-6">
+          <div className="relative max-h-[calc(100dvh-32px)] w-full max-w-[460px] overflow-y-auto rounded-[26px] border border-white/12 bg-[#08080b] p-4 text-white shadow-[0_34px_120px_rgba(0,0,0,0.72)] sm:rounded-[30px] sm:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(248,113,113,0.22),transparent_34%),radial-gradient(circle_at_88%_16%,rgba(251,191,36,0.16),transparent_30%)]" />
             <div className="relative">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-red-300/20 bg-red-500/14 text-red-200 shadow-[0_0_34px_rgba(248,113,113,0.18)]">
-                    <ShieldAlert className="h-6 w-6" />
+              <div className="flex items-start justify-between gap-3 sm:gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-300/20 bg-red-500/14 text-red-200 shadow-[0_0_34px_rgba(248,113,113,0.18)] sm:h-12 sm:w-12">
+                    <ShieldAlert className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-[10px] font-black uppercase tracking-[0.28em] text-red-200/70">
                       DELETE CARD
                     </div>
-                    <div className="mt-1 text-xl font-black leading-tight">
+                    <div className="mt-1 text-lg font-black leading-tight sm:text-xl">
                       {title}
                     </div>
                   </div>
@@ -119,15 +144,15 @@ export default function DeleteListingButton({
                 </button>
               </div>
 
-              <p className="mt-5 text-sm font-semibold leading-6 text-white/64">
+              <p className="mt-4 text-sm font-semibold leading-6 text-white/64 sm:mt-5">
                 {description}
               </p>
 
-              <div className="mt-5 rounded-2xl border border-amber-200/12 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/82">
+              <div className="mt-4 rounded-2xl border border-amber-200/12 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/82 sm:mt-5">
                 ระบบจะลบห้องดีล ข้อความดีล การแจ้งเตือนดีล และซิงก์สถิติที่เกี่ยวข้องหลังลบทันที
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-5 grid gap-3 sm:mt-6 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
@@ -148,7 +173,21 @@ export default function DeleteListingButton({
             </div>
           </div>
         </div>
-      ) : null}
+      ) : null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={loading}
+        className={`inline-flex items-center justify-center gap-2 text-center font-black transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60 ${widthClass} ${toneClass} ${sizeClass}`}
+      >
+        <Trash2 className={size === "compact" ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        {loading ? "กำลังลบ..." : label}
+      </button>
+
+      {mounted && modal ? createPortal(modal, document.body) : null}
     </>
   );
 }

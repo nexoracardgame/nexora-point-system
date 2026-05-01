@@ -663,7 +663,8 @@ export default async function MarketCardDetailPage({
                 <DeleteListingButton
                   id={listing.id}
                   adminMode
-                  label="ลบการ์ด"
+                  fitContent
+                  label="GM ลบ"
                   title="GM ลบการ์ดใบนี้ถาวร"
                   description="เฉพาะแอดมินเท่านั้น การ์ดใบนี้จะถูกลบจากตลาด พร้อมลบดีลและห้องแชทดีลที่ผูกกับการ์ดใบนี้ทั้งหมด"
                   redirectHref="/market"
