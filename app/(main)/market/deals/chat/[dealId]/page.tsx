@@ -65,6 +65,16 @@ type DealChatPage = {
   nextCursor: string | null;
 };
 
+function getDealReadRoomIds(targetRoomId: string, dealId: string) {
+  return Array.from(
+    new Set(
+      [targetRoomId, getDealChatRoomId(dealId), dealId ? `deal:${dealId}` : ""]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 function formatPrice(value?: number | null) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
 }
@@ -225,6 +235,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   ) => {
     dispatchClientChatRead({
       roomId: targetRoomId,
+      roomIds: getDealReadRoomIds(targetRoomId, dealId),
       unreadCount,
       readAt,
     });

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { getLocaleTag, useLanguage } from "@/lib/i18n";
 import { formatThaiShortDate } from "@/lib/thai-time";
 import {
@@ -126,29 +127,61 @@ function safeDecode(value: string) {
   }
 }
 
-function isChatNotificationForRoom(item: NotificationItem, roomId: string) {
-  if (item.type !== "chat" || !roomId) {
-    return false;
+function getChatNotificationRoomId(item: NotificationItem) {
+  if (item.type !== "chat") {
+    return "";
   }
 
   const path = String(item.href || "").split("?")[0].split("#")[0];
   const segments = path.split("/").filter(Boolean).map(safeDecode);
 
-  if (segments[0] === "dm" && segments[1] === roomId) {
-    return true;
+  if (segments[0] === "dm" && segments[1]) {
+    return segments[1];
   }
 
   if (
-    roomId.startsWith("deal:") &&
     segments[0] === "market" &&
     segments[1] === "deals" &&
     segments[2] === "chat" &&
-    `deal:${segments[3] || ""}` === roomId
+    segments[3]
   ) {
-    return true;
+    return `deal:${segments[3]}`;
   }
 
-  return false;
+  return "";
+}
+
+function isChatNotificationForRooms(item: NotificationItem, roomIds: Set<string>) {
+  if (item.type !== "chat" || roomIds.size === 0) {
+    return false;
+  }
+
+  return roomIds.has(getChatNotificationRoomId(item));
+}
+
+function safeTime(value?: string | null) {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function isChatNotificationReadByRoom(
+  item: NotificationItem,
+  readRoomAt: Map<string, string>
+) {
+  if (item.type !== "chat" || readRoomAt.size === 0) {
+    return false;
+  }
+
+  const roomId = getChatNotificationRoomId(item);
+  const readAt = roomId ? readRoomAt.get(roomId) : "";
+  if (!readAt) {
+    return false;
+  }
+
+  const itemTime = safeTime(item.createdAt);
+  const readTime = safeTime(readAt);
+
+  return readTime > 0 && (!itemTime || itemTime <= readTime + 1000);
 }
 
 export default function NotificationBell() {
@@ -162,6 +195,8 @@ export default function NotificationBell() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const hiddenIdsRef = useRef<Set<string>>(new Set());
+  const readRoomAtRef = useRef<Map<string, string>>(new Map());
+  const recentReadRoomAtRef = useRef<Map<string, number>>(new Map());
   const deliveredIdsRef = useRef<Set<string>>(new Set());
   const knownIdsRef = useRef<Set<string>>(new Set());
   const hasInitialSyncRef = useRef(false);
@@ -263,7 +298,12 @@ export default function NotificationBell() {
 
       const nextItems = Array.isArray(data?.items) ? data.items : [];
       const hiddenIds = hiddenIdsRef.current;
-      const visibleItems = nextItems.filter((item) => !hiddenIds.has(item.id));
+      const readRoomAt = readRoomAtRef.current;
+      const visibleItems = nextItems.filter(
+        (item) =>
+          !hiddenIds.has(item.id) &&
+          !isChatNotificationReadByRoom(item, readRoomAt)
+      );
       setItems(visibleItems);
 
       if (!hasInitialSyncRef.current) {
@@ -485,16 +525,52 @@ export default function NotificationBell() {
     const onChatRead = (event: Event) => {
       const detail = (event as CustomEvent<{
         roomId?: string | null;
+        roomIds?: Array<string | null | undefined> | null;
         unreadCount?: number | null;
+        readAt?: string | null;
       }>).detail;
-      const roomId = String(detail?.roomId || "").trim();
+      const roomIds = new Set(
+        [detail?.roomId, ...(detail?.roomIds || [])]
+          .map((roomId) => String(roomId || "").trim())
+          .filter(Boolean)
+      );
+      const readAt = String(detail?.readAt || new Date().toISOString()).trim();
+      const now = Date.now();
+      const shouldCountRead =
+        roomIds.size > 0 &&
+        !Array.from(roomIds).some((roomId) => {
+          const lastReadAt = recentReadRoomAtRef.current.get(roomId) || 0;
+          return lastReadAt > 0 && now - lastReadAt < 3500;
+        });
 
-      if (roomId) {
+      if (roomIds.size > 0) {
+        if (shouldCountRead) {
+          for (const roomId of roomIds) {
+            recentReadRoomAtRef.current.set(roomId, now);
+          }
+
+          if (recentReadRoomAtRef.current.size > 480) {
+            for (const [roomId, lastReadAt] of recentReadRoomAtRef.current) {
+              if (now - lastReadAt > 10000) {
+                recentReadRoomAtRef.current.delete(roomId);
+              }
+            }
+          }
+        }
+
+        for (const roomId of roomIds) {
+          const currentTime = safeTime(readRoomAtRef.current.get(roomId));
+          const nextTime = safeTime(readAt);
+          if (!currentTime || nextTime >= currentTime) {
+            readRoomAtRef.current.set(roomId, readAt);
+          }
+        }
+
         setItems((currentItems) => {
           const nextItems: NotificationItem[] = [];
 
           for (const item of currentItems) {
-            if (isChatNotificationForRoom(item, roomId)) {
+            if (isChatNotificationForRooms(item, roomIds)) {
               hiddenIdsRef.current.add(item.id);
               continue;
             }
@@ -507,11 +583,13 @@ export default function NotificationBell() {
       }
 
       const unreadCount = Math.max(1, Number(detail?.unreadCount || 1));
-      setFastChatUnreadCount((current) => {
-        const nextCount = Math.max(0, current - unreadCount);
-        fastChatUnreadCountRef.current = nextCount;
-        return nextCount;
-      });
+      if (shouldCountRead) {
+        setFastChatUnreadCount((current) => {
+          const nextCount = Math.max(0, current - unreadCount);
+          fastChatUnreadCountRef.current = nextCount;
+          return nextCount;
+        });
+      }
       queueFastNotificationSync();
     };
 
@@ -754,7 +832,27 @@ export default function NotificationBell() {
                             <Link
                               href={item.href}
                               onClick={() => {
-                                markNotificationRead(item.id);
+                                const roomId = getChatNotificationRoomId(item);
+                                if (roomId) {
+                                  const roomIds = new Set([roomId]);
+                                  const relatedChatItems = items.filter((candidate) =>
+                                    isChatNotificationForRooms(candidate, roomIds)
+                                  );
+                                  const readAt = new Date().toISOString();
+                                  dispatchClientChatRead({
+                                    roomId,
+                                    roomIds: [roomId],
+                                    unreadCount: Math.max(1, relatedChatItems.length),
+                                    readAt,
+                                  });
+                                  markNotificationsRead(
+                                    relatedChatItems.length > 0
+                                      ? relatedChatItems.map((candidate) => candidate.id)
+                                      : [item.id]
+                                  );
+                                } else {
+                                  markNotificationRead(item.id);
+                                }
                                 setOpen(false);
                               }}
                               className="inline-flex min-h-[38px] items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-white/78 transition hover:bg-white/[0.06]"

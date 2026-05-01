@@ -269,6 +269,35 @@ function getDirectRoomLocalClearKeys(
   );
 }
 
+function getRoomReadIds(room: DMRoomListItem, me?: SessionUser | null) {
+  if (room.kind === "deal") {
+    return Array.from(
+      new Set(
+        [
+          room.roomId,
+          room.dealId ? `deal:${room.dealId}` : "",
+        ]
+          .map((item) => String(item || "").trim())
+          .filter(Boolean)
+      )
+    );
+  }
+
+  return getDirectRoomLocalClearKeys(room, me);
+}
+
+function roomMatchesReadIds(
+  room: DMRoomListItem,
+  roomIds: Set<string>,
+  me?: SessionUser | null
+) {
+  if (roomIds.size === 0) {
+    return false;
+  }
+
+  return getRoomReadIds(room, me).some((roomId) => roomIds.has(roomId));
+}
+
 function getLocalClearedAtForRoom(
   room: DMRoomListItem,
   me: SessionUser | null | undefined,
@@ -306,14 +335,10 @@ function applyClientReadStateToRooms(
   const myLineId = String(me?.lineId || "").trim();
 
   return list.map((room) => {
-    const directTargetIds =
-      room.kind === "deal"
-        ? [room.roomId, room.dealId ? `deal:${room.dealId}` : ""]
-        : [
-            room.roomId,
-            myId && room.otherUserId ? buildDirectRoomId(myId, room.otherUserId) : "",
-            myLineId && room.otherUserId ? buildDirectRoomId(myLineId, room.otherUserId) : "",
-          ];
+    const directTargetIds = getRoomReadIds(room, {
+      id: myId,
+      lineId: myLineId,
+    });
 
     if (!isClientChatRead(directTargetIds, room.lastMessageAt || room.createdAt)) {
       return room;
@@ -593,13 +618,49 @@ export default function DMListClient({
     );
   };
 
-  const markRoomReadLocally = (roomId: string, unreadCount = 1) => {
+  const markRoomReadLocally = (room: DMRoomListItem) => {
+    const activeMe = currentMeRef.current || currentMe;
+    const roomIds = getRoomReadIds(room, activeMe);
+    const roomIdSet = new Set(roomIds);
+    const unreadCount = Math.max(1, Number(room.unread || 1));
+    const serverRoomId =
+      room.kind === "deal" ? room.roomId : getTargetDirectRoomId(room);
+
+    if (roomIds.length === 0) {
+      return;
+    }
+
     setRooms((prev) =>
-      prev.map((room) =>
-        room.roomId === roomId ? { ...room, unread: 0 } : room
+      applyClientReadStateToRooms(
+        prev.map((item) =>
+          roomMatchesReadIds(item, roomIdSet, activeMe)
+            ? { ...item, unread: 0 }
+            : item
+        ),
+        activeMe
       )
     );
-    dispatchClientChatRead({ roomId, unreadCount });
+
+    dispatchClientChatRead({
+      roomId: roomIds[0],
+      roomIds,
+      unreadCount,
+      readAt: new Date().toISOString(),
+    });
+
+    if (room.unread > 0 && serverRoomId) {
+      void fetch("/api/dm/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomId: serverRoomId,
+          action: "markSeen",
+        }),
+        keepalive: true,
+      }).catch(() => null);
+    }
   };
 
   const warmDirectRoom = useCallback((room: DMRoomListItem) => {
@@ -958,15 +1019,23 @@ export default function DMListClient({
       }
     };
     const onChatRead = (event: Event) => {
-      const targetRoomId = String(
-        (event as CustomEvent<{ roomId?: string | null }>).detail?.roomId || ""
-      ).trim();
+      const detail = (event as CustomEvent<{
+        roomId?: string | null;
+        roomIds?: Array<string | null | undefined> | null;
+      }>).detail;
+      const targetRoomIds = new Set(
+        [detail?.roomId, ...(detail?.roomIds || [])]
+          .map((roomId) => String(roomId || "").trim())
+          .filter(Boolean)
+      );
 
-      if (targetRoomId) {
+      if (targetRoomIds.size > 0) {
         setRooms((prev) =>
           applyClientReadStateToRooms(
             prev.map((room) =>
-              room.roomId === targetRoomId ? { ...room, unread: 0 } : room
+              roomMatchesReadIds(room, targetRoomIds, currentMeRef.current)
+                ? { ...room, unread: 0 }
+                : room
             ),
             currentMeRef.current
           )
@@ -1067,7 +1136,7 @@ export default function DMListClient({
                         onTouchStart={() => warmDirectRoom(room)}
                         onFocus={() => warmDirectRoom(room)}
                         onClick={() => {
-                          markRoomReadLocally(room.roomId, room.unread);
+                          markRoomReadLocally(room);
                           void openDirectRoom(room);
                         }}
                         className="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:gap-3"
@@ -1171,7 +1240,7 @@ export default function DMListClient({
                       onTouchStart={() => warmDealRoom(room.dealId)}
                       onFocus={() => warmDealRoom(room.dealId)}
                       onClick={() => {
-                        markRoomReadLocally(room.roomId, room.unread);
+                        markRoomReadLocally(room);
                         warmDealRoom(room.dealId);
                       }}
                       className="group relative block min-w-0 overflow-hidden rounded-[24px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-3 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:rounded-[30px] sm:p-4.5"

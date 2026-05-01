@@ -418,8 +418,11 @@ export default function MainLayout({
     let cancelled = false;
     let inFlight = false;
     let queued = false;
+    let unreadSyncPauseUntil = 0;
+    let latestChatUnreadCount = chatUnreadCount;
     const burstTimers: ReturnType<typeof setTimeout>[] = [];
     const processedChatReadKeys = new Set<string>();
+    const recentChatReadRooms = new Map<string, number>();
     const currentUserId = String(session?.user?.id || "").trim();
     const currentLineId = String(session?.user?.lineId || "").trim();
     const openChatRoomId = getOpenChatRoomId(pathname);
@@ -448,6 +451,11 @@ export default function MainLayout({
         if (cancelled) return;
 
         const nextCount = Math.max(0, Number(data?.count || 0));
+        if (Date.now() < unreadSyncPauseUntil && nextCount > latestChatUnreadCount) {
+          return;
+        }
+
+        latestChatUnreadCount = nextCount;
         setChatUnreadCount(nextCount);
         dispatchChatUnreadCount(nextCount);
       } catch {
@@ -532,6 +540,7 @@ export default function MainLayout({
         ) {
           setChatUnreadCount((current) => {
             const nextCount = Math.max(0, current + 1);
+            latestChatUnreadCount = nextCount;
             dispatchChatUnreadCount(nextCount);
             return nextCount;
           });
@@ -577,15 +586,41 @@ export default function MainLayout({
     const handleChatRead = (event: Event) => {
       const detail = (event as CustomEvent<{
         roomId?: string | null;
+        roomIds?: Array<string | null | undefined> | null;
         unreadCount?: number | null;
         readAt?: string | null;
       }>).detail;
-      const roomId = String(detail?.roomId || "").trim();
+      const roomIds = Array.from(
+        new Set(
+          [detail?.roomId, ...(detail?.roomIds || [])]
+            .map((roomId) => String(roomId || "").trim())
+            .filter(Boolean)
+        )
+      );
       const readAt = String(detail?.readAt || "").trim();
-      const readKey = `${roomId}:${readAt || "now"}`;
+      const readKey = `${roomIds.sort().join("|")}:${readAt || "now"}`;
+      const now = Date.now();
+      const hasRecentRoomRead = roomIds.some((roomId) => {
+        const lastReadAt = recentChatReadRooms.get(roomId) || 0;
+        return lastReadAt > 0 && now - lastReadAt < 3500;
+      });
 
-      if (roomId && !processedChatReadKeys.has(readKey)) {
+      if (
+        roomIds.length > 0 &&
+        !hasRecentRoomRead &&
+        !processedChatReadKeys.has(readKey)
+      ) {
         processedChatReadKeys.add(readKey);
+        for (const roomId of roomIds) {
+          recentChatReadRooms.set(roomId, now);
+        }
+        if (recentChatReadRooms.size > 480) {
+          for (const [roomId, lastReadAt] of recentChatReadRooms) {
+            if (now - lastReadAt > 10000) {
+              recentChatReadRooms.delete(roomId);
+            }
+          }
+        }
         if (processedChatReadKeys.size > 240) {
           const oldestReadKey = processedChatReadKeys.values().next().value;
           if (oldestReadKey) {
@@ -593,8 +628,10 @@ export default function MainLayout({
           }
         }
         const unreadCount = Math.max(1, Number(detail?.unreadCount || 1));
+        unreadSyncPauseUntil = Date.now() + 2500;
         setChatUnreadCount((current) => {
           const nextCount = Math.max(0, current - unreadCount);
+          latestChatUnreadCount = nextCount;
           dispatchChatUnreadCount(nextCount);
           return nextCount;
         });
@@ -612,6 +649,7 @@ export default function MainLayout({
       );
 
       setChatUnreadCount(nextCount);
+      latestChatUnreadCount = nextCount;
     };
 
     queueChatUnreadSync();

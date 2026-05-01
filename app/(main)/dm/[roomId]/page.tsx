@@ -46,6 +46,30 @@ type DirectChatPage = {
   nextCursor: string | null;
 };
 
+function buildDirectReadRoomId(userA?: string | null, userB?: string | null) {
+  return [String(userA || "").trim(), String(userB || "").trim()]
+    .filter(Boolean)
+    .sort()
+    .join("__");
+}
+
+function getDirectReadRoomIds(
+  targetRoomId: string,
+  me?: ChatUser | null,
+  other?: ChatUser | null
+) {
+  return Array.from(
+    new Set(
+      [
+        targetRoomId,
+        me?.id && other?.id ? buildDirectReadRoomId(me.id, other.id) : "",
+      ]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 export default function DMPage() {
   const params = useParams();
   const roomId = typeof params?.roomId === "string" ? params.roomId : "";
@@ -227,6 +251,7 @@ function DMRoomContent({
   ) => {
     dispatchClientChatRead({
       roomId: targetRoomId,
+      roomIds: getDirectReadRoomIds(targetRoomId, me, other),
       unreadCount,
       readAt,
     });

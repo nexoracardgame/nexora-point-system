@@ -1,5 +1,6 @@
 export type ChatReadDetail = {
   roomId?: string | null;
+  roomIds?: Array<string | null | undefined> | null;
   unreadCount?: number | null;
   readAt?: string | null;
 };
@@ -8,6 +9,16 @@ const CHAT_READ_STORAGE_KEY = "nexora:chat-read-state";
 
 function normalizeRoomId(roomId?: string | null) {
   return String(roomId || "").trim();
+}
+
+function normalizeRoomIds(detail: ChatReadDetail) {
+  return Array.from(
+    new Set(
+      [detail.roomId, ...(detail.roomIds || [])]
+        .map((roomId) => normalizeRoomId(roomId))
+        .filter(Boolean)
+    )
+  );
 }
 
 function safeTime(value?: string | null) {
@@ -44,26 +55,31 @@ function writeStoredChatReads(value: Record<string, string>) {
 }
 
 export function rememberClientChatRead(detail: ChatReadDetail) {
-  const roomId = normalizeRoomId(detail.roomId);
+  const roomIds = normalizeRoomIds(detail);
+  const roomId = roomIds[0] || "";
   const readAt = String(detail.readAt || new Date().toISOString()).trim();
 
-  if (!roomId || !readAt) {
+  if (roomIds.length === 0 || !readAt) {
     return null;
   }
 
   const stored = readStoredChatReads();
-  const currentTime = safeTime(stored[roomId]);
   const nextTime = safeTime(readAt);
 
-  if (!currentTime || nextTime >= currentTime) {
-    stored[roomId] = readAt;
-    writeStoredChatReads(stored);
+  for (const nextRoomId of roomIds) {
+    const currentTime = safeTime(stored[nextRoomId]);
+    if (!currentTime || nextTime >= currentTime) {
+      stored[nextRoomId] = readAt;
+    }
   }
+
+  writeStoredChatReads(stored);
 
   return {
     ...detail,
     roomId,
-    readAt: stored[roomId] || readAt,
+    roomIds,
+    readAt,
     unreadCount: Math.max(1, Number(detail.unreadCount || 1)),
   } satisfies ChatReadDetail;
 }
