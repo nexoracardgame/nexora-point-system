@@ -17,6 +17,13 @@ type OnlinePresenceContextValue = {
   isOnline: (...ids: Array<string | null | undefined>) => boolean;
 };
 
+type LivePresenceTab = {
+  ids: string[];
+  tabId: string;
+  lastSeenMs: number;
+  onlineAtMs: number;
+};
+
 const PRESENCE_HEARTBEAT_MS = 5000;
 const PRESENCE_STALE_MS = 12000;
 const PRESENCE_PRUNE_MS = 2000;
@@ -36,6 +43,42 @@ function normalizeUnknownPresenceValue(value: unknown) {
 
 function buildOfflineTabKey(id: string, tabId: string) {
   return `${id}::${tabId}`;
+}
+
+function buildLiveTabKey(primaryId: string, tabId: string) {
+  return `${primaryId}::${tabId}`;
+}
+
+function parsePresenceTime(value: unknown) {
+  const parsed = Date.parse(typeof value === "string" ? value : "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getUniquePresenceIds(
+  values: Array<unknown>,
+  fallbackKey?: string | null
+) {
+  return Array.from(
+    new Set(
+      [fallbackKey, ...values]
+        .map((value) => normalizeUnknownPresenceValue(value))
+        .filter(Boolean)
+    )
+  );
+}
+
+function arePresenceSetsEqual(first: Set<string>, second: Set<string>) {
+  if (first.size !== second.size) {
+    return false;
+  }
+
+  for (const value of first) {
+    if (!second.has(value)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function createTabId() {
@@ -60,7 +103,8 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const lineId = normalizePresenceId(sessionUser.lineId);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const tabIdRef = useRef("");
-  const offlineTabsRef = useRef<Set<string>>(new Set());
+  const liveTabsRef = useRef<Map<string, LivePresenceTab>>(new Map());
+  const offlineTabsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!tabIdRef.current) {
@@ -87,48 +131,95 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    const readPresenceState = () => {
-      const state = channel.presenceState();
+    const publishOnlineIds = () => {
       const nextIds = new Set<string>();
       const now = Date.now();
 
+      liveTabsRef.current.forEach((tab, key) => {
+        const isFresh = now - tab.lastSeenMs <= PRESENCE_STALE_MS;
+        if (!isFresh) {
+          liveTabsRef.current.delete(key);
+          return;
+        }
+
+        const hasNewerOffline = tab.ids.some((id) => {
+          const offlineAtMs = offlineTabsRef.current.get(
+            buildOfflineTabKey(id, tab.tabId)
+          );
+          return !!offlineAtMs && offlineAtMs > tab.onlineAtMs;
+        });
+
+        if (hasNewerOffline) {
+          liveTabsRef.current.delete(key);
+          return;
+        }
+
+        tab.ids.forEach((id) => nextIds.add(id));
+      });
+
+      setOnlineIds((prev) =>
+        arePresenceSetsEqual(prev, nextIds) ? prev : nextIds
+      );
+    };
+
+    const markTabOnline = (
+      payload?: Record<string, unknown> | null,
+      fallbackKey?: string | null
+    ) => {
+      if (!payload) {
+        return;
+      }
+
+      const tabId = normalizeUnknownPresenceValue(payload.tabId);
+      const ids = getUniquePresenceIds(
+        [payload.userId, payload.id, payload.lineId],
+        fallbackKey
+      );
+
+      if (!tabId || ids.length === 0) {
+        return;
+      }
+
+      const onlineAtMs = parsePresenceTime(payload.onlineAt) || Date.now();
+
+      ids.forEach((id) => {
+        const offlineKey = buildOfflineTabKey(id, tabId);
+        const offlineAtMs = offlineTabsRef.current.get(offlineKey);
+
+        if (!offlineAtMs || onlineAtMs >= offlineAtMs) {
+          offlineTabsRef.current.delete(offlineKey);
+        }
+      });
+
+      const isStillOffline = ids.some((id) => {
+        const offlineAtMs = offlineTabsRef.current.get(
+          buildOfflineTabKey(id, tabId)
+        );
+        return !!offlineAtMs && offlineAtMs > onlineAtMs;
+      });
+
+      if (isStillOffline) {
+        return;
+      }
+
+      liveTabsRef.current.set(buildLiveTabKey(ids[0], tabId), {
+        ids,
+        tabId,
+        lastSeenMs: Date.now(),
+        onlineAtMs,
+      });
+    };
+
+    const readPresenceState = () => {
+      const state = channel.presenceState();
+
       Object.entries(state).forEach(([key, metas]) => {
         (Array.isArray(metas) ? metas : []).forEach((meta) => {
-          const record = meta as Record<string, unknown>;
-          const tabId = normalizeUnknownPresenceValue(record.tabId);
-          const onlineAt = normalizeUnknownPresenceValue(record.onlineAt);
-          const onlineAtMs = onlineAt ? Date.parse(onlineAt) : 0;
-          const isFresh =
-            !onlineAtMs || !Number.isFinite(onlineAtMs)
-              ? true
-              : now - onlineAtMs <= PRESENCE_STALE_MS;
-
-          if (!isFresh) {
-            return;
-          }
-
-          const ids = Array.from(
-            new Set(
-              [key, record.userId, record.id, record.lineId]
-                .map(normalizeUnknownPresenceValue)
-                .filter(Boolean)
-            )
-          );
-          const isTabOffline =
-            tabId &&
-            ids.some((id) =>
-              offlineTabsRef.current.has(buildOfflineTabKey(id, tabId))
-            );
-
-          if (isTabOffline) {
-            return;
-          }
-
-          ids.forEach((id) => nextIds.add(id));
+          markTabOnline(meta as Record<string, unknown>, key);
         });
       });
 
-      setOnlineIds(nextIds);
+      publishOnlineIds();
     };
 
     const markTabOffline = (payload?: Record<string, unknown> | null) => {
@@ -137,18 +228,27 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      [
+      const offlineAtMs = parsePresenceTime(payload?.offlineAt) || Date.now();
+      const ids = getUniquePresenceIds([
         payload?.userId,
         payload?.id,
         payload?.lineId,
-      ].forEach((value) => {
-        const id = normalizeUnknownPresenceValue(value);
-        if (id) {
-          offlineTabsRef.current.add(buildOfflineTabKey(id, tabId));
+      ]);
+
+      ids.forEach((id) => {
+        offlineTabsRef.current.set(buildOfflineTabKey(id, tabId), offlineAtMs);
+      });
+
+      liveTabsRef.current.forEach((tab, key) => {
+        if (
+          tab.tabId === tabId &&
+          tab.ids.some((id) => ids.length === 0 || ids.includes(id))
+        ) {
+          liveTabsRef.current.delete(key);
         }
       });
 
-      readPresenceState();
+      publishOnlineIds();
     };
 
     const trackOnline = async () => {
@@ -164,14 +264,28 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
         offlineTabsRef.current.delete(buildOfflineTabKey(id, tabIdRef.current));
       });
 
-      await channel.track({
+      const payload = {
         userId,
         lineId,
         name: userName,
         image: userImage,
         tabId: tabIdRef.current,
         onlineAt: new Date().toISOString(),
-      });
+      };
+
+      markTabOnline(payload, userId);
+      publishOnlineIds();
+
+      try {
+        await channel.track(payload);
+        void channel.send({
+          type: "broadcast",
+          event: "presence-online",
+          payload,
+        });
+      } catch {
+        // Presence is best-effort; the next heartbeat/resubscribe will repair it.
+      }
     };
 
     const announceOffline = () => {
@@ -199,6 +313,12 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       .on("presence", { event: "sync" }, readPresenceState)
       .on("presence", { event: "join" }, readPresenceState)
       .on("presence", { event: "leave" }, readPresenceState)
+      .on("broadcast", { event: "presence-online" }, (event) => {
+        markTabOnline(
+          (event as { payload?: Record<string, unknown> })?.payload || null
+        );
+        publishOnlineIds();
+      })
       .on("broadcast", { event: "presence-offline" }, (event) => {
         markTabOffline((event as { payload?: Record<string, unknown> })?.payload || null);
       })
@@ -212,7 +332,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     trackTimer = setInterval(() => {
       void trackOnline();
     }, PRESENCE_HEARTBEAT_MS);
-    pruneTimer = setInterval(readPresenceState, PRESENCE_PRUNE_MS);
+    pruneTimer = setInterval(publishOnlineIds, PRESENCE_PRUNE_MS);
 
     const handleFocus = () => {
       void trackOnline();
