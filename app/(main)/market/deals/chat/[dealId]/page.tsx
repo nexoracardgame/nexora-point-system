@@ -615,7 +615,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       }
     };
 
-    const intervalId = window.setInterval(syncNow, 1500);
+    const intervalId = window.setInterval(syncNow, 900);
     window.addEventListener("focus", syncNow);
     document.addEventListener("visibilitychange", onVisibility);
 

@@ -33,6 +33,8 @@ type NotificationResponse = {
 };
 
 const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
+const NOTIFICATION_FAST_POLL_MS = 1200;
+const NOTIFICATION_BURST_DELAYS_MS = [180, 650, 1150] as const;
 
 function isSystemNotificationSupported() {
   return (
@@ -133,6 +135,7 @@ export default function NotificationBell() {
   const requestIdRef = useRef(0);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
+  const burstTimeoutsRef = useRef<number[]>([]);
   const localeTag = getLocaleTag(locale);
 
   const rememberDeliveredNotification = (notificationId: string) => {
@@ -236,6 +239,7 @@ export default function NotificationBell() {
         return;
       }
 
+      deliveredIdsRef.current = readDeliveredNotificationIds();
       const newItems = visibleItems.filter(
         (item) =>
           !knownIdsRef.current.has(item.id) &&
@@ -263,6 +267,27 @@ export default function NotificationBell() {
       }
     }
   };
+
+  const clearNotificationBurstTimers = () => {
+    for (const timeoutId of burstTimeoutsRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+    burstTimeoutsRef.current = [];
+  };
+
+  const queueFastNotificationSync = () => {
+    void loadNotifications();
+    clearNotificationBurstTimers();
+    burstTimeoutsRef.current = NOTIFICATION_BURST_DELAYS_MS.map((delay) =>
+      window.setTimeout(() => {
+        void loadNotifications();
+      }, delay)
+    );
+  };
+
+  const shouldRunBackgroundNotificationSync = () =>
+    document.visibilityState === "visible" ||
+    (isSystemNotificationSupported() && Notification.permission === "granted");
 
   const markNotificationRead = (notificationId: string) => {
     if (!notificationId) {
@@ -399,7 +424,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void loadNotifications();
+      queueFastNotificationSync();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -407,18 +432,18 @@ export default function NotificationBell() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
+      if (shouldRunBackgroundNotificationSync()) {
         void loadNotifications();
       }
-    }, 15000);
+    }, NOTIFICATION_FAST_POLL_MS);
 
     const onFocus = () => {
-      void loadNotifications();
+      queueFastNotificationSync();
     };
 
     const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void loadNotifications();
+      if (shouldRunBackgroundNotificationSync()) {
+        queueFastNotificationSync();
       }
     };
 
@@ -428,6 +453,7 @@ export default function NotificationBell() {
 
     return () => {
       window.clearInterval(intervalId);
+      clearNotificationBurstTimers();
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("nexora:chat-read", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -451,7 +477,7 @@ export default function NotificationBell() {
       "postgres_changes",
       { event: "*", schema: "public", table: "dmMessage" },
       () => {
-        void loadNotifications();
+        queueFastNotificationSync();
       }
     );
 
@@ -459,7 +485,7 @@ export default function NotificationBell() {
       "postgres_changes",
       { event: "*", schema: "public", table: "dm_room" },
       () => {
-        void loadNotifications();
+        queueFastNotificationSync();
       }
     );
 
@@ -467,7 +493,7 @@ export default function NotificationBell() {
       "postgres_changes",
       { event: "*", schema: "public", table: "AppNotification" },
       () => {
-        void loadNotifications();
+        queueFastNotificationSync();
       }
     );
 
@@ -475,7 +501,7 @@ export default function NotificationBell() {
       "postgres_changes",
       { event: "*", schema: "public", table: "FriendRequest" },
       () => {
-        void loadNotifications();
+        queueFastNotificationSync();
       }
     );
 

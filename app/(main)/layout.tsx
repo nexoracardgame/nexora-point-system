@@ -45,6 +45,9 @@ function formatBalance(value?: number | null) {
   return Number(value || 0).toLocaleString("th-TH");
 }
 
+const CHAT_UNREAD_FAST_POLL_MS = 900;
+const CHAT_UNREAD_BURST_DELAYS_MS = [150, 520, 1100] as const;
+
 export default function MainLayout({
   children,
 }: {
@@ -365,6 +368,9 @@ export default function MainLayout({
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
+    let queued = false;
+    const burstTimers: ReturnType<typeof setTimeout>[] = [];
     const supabase = getBrowserSupabaseClient();
     const channel = supabase
       ? supabase.channel(`layout-chat-unread-${Date.now()}`)
@@ -372,7 +378,12 @@ export default function MainLayout({
 
     const syncChatUnread = async () => {
       if (cancelled) return;
+      if (inFlight) {
+        queued = true;
+        return;
+      }
 
+      inFlight = true;
       try {
         const res = await fetch(`/api/dm/unread?ts=${Date.now()}`, {
           cache: "no-store",
@@ -386,6 +397,34 @@ export default function MainLayout({
         setChatUnreadCount(Math.max(0, Number(data?.count || 0)));
       } catch {
         return;
+      } finally {
+        inFlight = false;
+
+        if (queued && !cancelled) {
+          queued = false;
+          void syncChatUnread();
+        }
+      }
+    };
+
+    const clearBurstTimers = () => {
+      while (burstTimers.length) {
+        const timeoutId = burstTimers.pop();
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }
+    };
+
+    const queueChatUnreadSync = () => {
+      void syncChatUnread();
+      clearBurstTimers();
+      for (const delay of CHAT_UNREAD_BURST_DELAYS_MS) {
+        burstTimers.push(
+          setTimeout(() => {
+            void syncChatUnread();
+          }, delay)
+        );
       }
     };
 
@@ -393,7 +432,7 @@ export default function MainLayout({
       "postgres_changes",
       { event: "*", schema: "public", table: "dmMessage" },
       () => {
-        void syncChatUnread();
+        queueChatUnreadSync();
       }
     );
 
@@ -401,7 +440,7 @@ export default function MainLayout({
       "postgres_changes",
       { event: "*", schema: "public", table: "dm_room" },
       () => {
-        void syncChatUnread();
+        queueChatUnreadSync();
       }
     );
 
@@ -409,7 +448,7 @@ export default function MainLayout({
       "postgres_changes",
       { event: "*", schema: "public", table: "DealRequest" },
       () => {
-        void syncChatUnread();
+        queueChatUnreadSync();
       }
     );
 
@@ -419,22 +458,22 @@ export default function MainLayout({
       if (document.visibilityState === "visible") {
         void syncChatUnread();
       }
-    }, 15000);
+    }, CHAT_UNREAD_FAST_POLL_MS);
 
     const handleFocus = () => {
-      void syncChatUnread();
+      queueChatUnreadSync();
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        void syncChatUnread();
+        queueChatUnreadSync();
       }
     };
     const handleChatRead = () => {
-      void syncChatUnread();
+      queueChatUnreadSync();
     };
 
-    void syncChatUnread();
+    queueChatUnreadSync();
     window.addEventListener("focus", handleFocus);
     window.addEventListener("nexora:chat-read", handleChatRead);
     document.addEventListener("visibilitychange", handleVisibility);
@@ -442,6 +481,7 @@ export default function MainLayout({
     return () => {
       cancelled = true;
       clearInterval(intervalId);
+      clearBurstTimers();
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("nexora:chat-read", handleChatRead);
       document.removeEventListener("visibilitychange", handleVisibility);

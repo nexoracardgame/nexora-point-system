@@ -61,6 +61,8 @@ type DmMessageRealtimeRow = {
 type LocalDmClearMap = Map<string, string>;
 
 const DM_LIST_CACHE_KEY = "dm-list";
+const DM_LIST_FAST_REFRESH_MS = 1200;
+const DM_LIST_BURST_DELAYS_MS = [160, 520, 1100] as const;
 
 function buildLocalClearStorageKey(userId?: string | null) {
   return `nexora:dm-cleared:${String(userId || "guest").trim() || "guest"}`;
@@ -296,6 +298,8 @@ export default function DMListClient({
 
   const hasInit = useRef(false);
   const loadRoomsInFlightRef = useRef<Promise<void> | null>(null);
+  const loadRoomsQueuedRef = useRef(false);
+  const loadRoomsBurstTimersRef = useRef<number[]>([]);
   const roomsRef = useRef<DMRoomListItem[]>(rooms);
   const currentMeRef = useRef<SessionUser | null>(currentMe);
 
@@ -453,6 +457,7 @@ export default function DMListClient({
 
   const loadRooms = async (meOverride?: SessionUser | null) => {
     if (loadRoomsInFlightRef.current) {
+      loadRoomsQueuedRef.current = true;
       return loadRoomsInFlightRef.current;
     }
 
@@ -486,7 +491,31 @@ export default function DMListClient({
         loadRoomsInFlightRef.current = null;
       }
       setLoading(false);
+
+      if (loadRoomsQueuedRef.current) {
+        loadRoomsQueuedRef.current = false;
+        void loadRooms(currentMeRef.current);
+      }
     }
+  };
+
+  const clearLoadRoomsBurstTimers = () => {
+    for (const timeoutId of loadRoomsBurstTimersRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+    loadRoomsBurstTimersRef.current = [];
+  };
+
+  const queueLoadRooms = (meOverride?: SessionUser | null) => {
+    const activeMe = meOverride === undefined ? currentMeRef.current : meOverride;
+
+    void loadRooms(activeMe);
+    clearLoadRoomsBurstTimers();
+    loadRoomsBurstTimersRef.current = DM_LIST_BURST_DELAYS_MS.map((delay) =>
+      window.setTimeout(() => {
+        void loadRooms(currentMeRef.current);
+      }, delay)
+    );
   };
 
   const markRoomReadLocally = (roomId: string) => {
@@ -771,10 +800,11 @@ export default function DMListClient({
         const nextMessage = (payload as { new?: DmMessageRealtimeRow })?.new;
         if (eventType === "INSERT" && nextMessage?.roomId) {
           applyRealtimeMessage(nextMessage);
+          queueLoadRooms(currentMeRef.current);
           return;
         }
 
-        void loadRooms(currentMeRef.current);
+        queueLoadRooms(currentMeRef.current);
       }
     );
 
@@ -782,7 +812,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dm_room" },
       () => {
-        void loadRooms(currentMeRef.current);
+        queueLoadRooms(currentMeRef.current);
       }
     );
 
@@ -790,7 +820,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "DealRequest" },
       () => {
-        void loadRooms(currentMeRef.current);
+        queueLoadRooms(currentMeRef.current);
       }
     );
 
@@ -798,7 +828,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dmRoomClearState" },
       () => {
-        void loadRooms(currentMeRef.current);
+        queueLoadRooms(currentMeRef.current);
       }
     );
 
@@ -806,7 +836,7 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dmConversationClearState" },
       () => {
-        void loadRooms(currentMeRef.current);
+        queueLoadRooms(currentMeRef.current);
       }
     );
 
@@ -816,15 +846,15 @@ export default function DMListClient({
       if (document.visibilityState === "visible") {
         void loadRooms(currentMeRef.current);
       }
-    }, 3000);
+    }, DM_LIST_FAST_REFRESH_MS);
 
     const onFocus = () => {
-      void loadRooms(currentMeRef.current);
+      queueLoadRooms(currentMeRef.current);
     };
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        void loadRooms(currentMeRef.current);
+        queueLoadRooms(currentMeRef.current);
       }
     };
     const onChatRead = (event: Event) => {
@@ -840,7 +870,7 @@ export default function DMListClient({
         );
       }
 
-      void loadRooms(currentMeRef.current);
+      queueLoadRooms(currentMeRef.current);
     };
 
     window.addEventListener("focus", onFocus);
@@ -849,6 +879,7 @@ export default function DMListClient({
 
     return () => {
       window.clearInterval(interval);
+      clearLoadRoomsBurstTimers();
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("nexora:chat-read", onChatRead as EventListener);
       document.removeEventListener("visibilitychange", onVisibility);
