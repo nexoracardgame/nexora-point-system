@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
 import {
   clearChatHistoryCache,
@@ -273,6 +274,7 @@ export default function DMListClient({
     []
   );
   const router = useRouter();
+  const { isOnline } = useOnlinePresence();
   const initialMeCandidate = initialMe || cachedList?.data?.me || null;
   const [currentMe, setCurrentMe] = useState<SessionUser | null>(initialMeCandidate);
   const [rooms, setRooms] = useState<DMRoomListItem[]>(
@@ -889,7 +891,10 @@ export default function DMListClient({
                     ยังไม่มีแชทส่วนตัว
                   </div>
                 ) : (
-                  directRooms.map((room) => (
+                  directRooms.map((room) => {
+                    const roomOnline = isOnline(room.otherUserId);
+
+                    return (
                     <div
                       key={room.roomId}
                       className="group flex min-w-0 items-center gap-2 rounded-[24px] bg-[#f4f3f8] p-2.5 shadow-[0_18px_40px_rgba(20,20,30,0.06)] transition hover:-translate-y-0.5 hover:bg-[#eeedf5] sm:rounded-[30px] sm:p-3"
@@ -920,8 +925,17 @@ export default function DMListClient({
 
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                            <div className="truncate text-[15px] font-black leading-5 text-black sm:text-base">
-                              {room.otherName}
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span
+                                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                                  roomOnline
+                                    ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.68)]"
+                                    : "bg-zinc-300"
+                                }`}
+                              />
+                              <div className="truncate text-[15px] font-black leading-5 text-black sm:text-base">
+                                {room.otherName}
+                              </div>
                             </div>
                             <div className="shrink-0 text-[10px] font-bold leading-none text-black/35 sm:pt-0.5 sm:text-[11px]">
                               {room.lastMessageAt
@@ -935,6 +949,13 @@ export default function DMListClient({
                             }`}
                           >
                             {room.lastMessage || "เริ่มบทสนทนา"}
+                          </div>
+                          <div
+                            className={`mt-1 text-[11px] font-black ${
+                              roomOnline ? "text-emerald-600" : "text-black/35"
+                            }`}
+                          >
+                            {roomOnline ? "ออนไลน์" : "ออฟไลน์"}
                           </div>
                         </div>
                       </button>
@@ -953,7 +974,8 @@ export default function DMListClient({
                         <Trash2 className="h-[18px] w-[18px]" />
                       </button>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>
@@ -975,7 +997,10 @@ export default function DMListClient({
                     ยังไม่มีห้องดีล
                   </div>
                 ) : (
-                  dealRooms.map((room) => (
+                  dealRooms.map((room) => {
+                    const roomOnline = isOnline(room.otherUserId);
+
+                    return (
                     <Link
                       key={room.roomId}
                       href={buildDealRoomHref(String(room.dealId || ""))}
@@ -1016,6 +1041,20 @@ export default function DMListClient({
                               <div className="mt-1 line-clamp-1 text-[11px] font-semibold text-white/62 sm:text-xs">
                                 ผู้ขาย: {room.sellerName || room.otherName}
                               </div>
+                              <div
+                                className={`mt-1 flex items-center gap-1.5 text-[11px] font-black ${
+                                  roomOnline ? "text-emerald-300" : "text-white/38"
+                                }`}
+                              >
+                                <span
+                                  className={`h-2 w-2 rounded-full ${
+                                    roomOnline
+                                      ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.72)]"
+                                      : "bg-zinc-500"
+                                  }`}
+                                />
+                                {roomOnline ? "ออนไลน์" : "ออฟไลน์"}
+                              </div>
                             </div>
                             <div className="shrink-0 text-[10px] font-semibold leading-none text-white/40">
                               {formatThaiChatActivityTime(
@@ -1048,7 +1087,8 @@ export default function DMListClient({
                         </div>
                       </div>
                     </Link>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>

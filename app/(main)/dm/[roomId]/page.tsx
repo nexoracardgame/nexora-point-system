@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState }
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import {
   CHAT_HISTORY_PAGE_SIZE,
@@ -69,6 +70,7 @@ function DMRoomContent({
   backHref: string;
 }) {
   const router = useRouter();
+  const { isOnline } = useOnlinePresence();
   const seededRoom = useMemo(() => readDmRoomSeed(roomId), [roomId]);
   const cachedRoom = useMemo(
     () =>
@@ -137,6 +139,7 @@ function DMRoomContent({
     () => (file ? URL.createObjectURL(file) : null),
     [file]
   );
+  const otherOnline = isOnline(other?.id);
 
   const cancelOlderPrefetch = () => {
     if (olderTimerRef.current) {
@@ -1066,9 +1069,19 @@ function DMRoomContent({
                   <div className="h-4 w-28 animate-pulse rounded-full bg-white/10 sm:h-5 sm:w-36" />
                 )}
 
-                <div className="flex items-center gap-2 text-xs text-white/45">
-                  <span className="h-2 w-2 rounded-full bg-green-400" />
-                  <span>Private Chat</span>
+                <div
+                  className={`flex items-center gap-2 text-xs ${
+                    otherOnline ? "text-emerald-300/90" : "text-white/45"
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      otherOnline
+                        ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.72)]"
+                        : "bg-zinc-500"
+                    }`}
+                  />
+                  <span>{otherOnline ? "ออนไลน์" : "ออฟไลน์"}</span>
                 </div>
               </div>
             </button>

@@ -9,6 +9,7 @@ import { MessageCircle } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
 import LiveFloatingPlayer from "@/components/LiveFloatingPlayer";
+import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -736,6 +737,7 @@ export default function MainLayout({
   };
 
   return (
+    <OnlinePresenceProvider>
     <div className="min-h-[var(--app-shell-height)] bg-[#050608] text-white">
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.06),transparent_24%)]" />
 
@@ -1199,5 +1201,6 @@ export default function MainLayout({
         </nav>
       )}
     </div>
+    </OnlinePresenceProvider>
   );
 }

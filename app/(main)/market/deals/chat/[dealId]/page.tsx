@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState }
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
@@ -84,6 +85,7 @@ export default function DealChatPage() {
 
 function DealChatRoomContent({ dealId }: { dealId: string }) {
   const router = useRouter();
+  const { isOnline } = useOnlinePresence();
   const cachedRoom = useMemo(
     () =>
       readChatHistoryCache<DealMessage, DealRoomCacheMeta>("deal-room", dealId),
@@ -132,6 +134,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     () => (file ? URL.createObjectURL(file) : null),
     [file]
   );
+  const otherOnline = isOnline(other?.id);
 
   const cancelOlderPrefetch = () => {
     if (olderTimerRef.current) {
@@ -1095,9 +1098,19 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                   </div>
                 </div>
 
-                <div className="mt-1 flex items-center gap-2 text-xs text-white/45">
-                  <span className="h-2 w-2 rounded-full bg-cyan-400" />
-                  <span>ห้องนัดสถานที่ของดีลนี้</span>
+                <div
+                  className={`mt-1 flex items-center gap-2 text-xs ${
+                    otherOnline ? "text-emerald-300/90" : "text-white/45"
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      otherOnline
+                        ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.72)]"
+                        : "bg-zinc-500"
+                    }`}
+                  />
+                  <span>{otherOnline ? "ออนไลน์" : "ออฟไลน์"}</span>
                 </div>
               </div>
 

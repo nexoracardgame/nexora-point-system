@@ -406,6 +406,7 @@ export async function getDmRoomsForUser(
       kind: "deal",
       roomId,
       dealId: deal.id,
+      otherUserId: String(other.id || "").trim(),
       createdAt,
       lastMessageAt,
       lastMessage: latestMessage

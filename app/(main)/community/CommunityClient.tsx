@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, LoaderCircle, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
+import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import {
   readClientViewCache,
   writeClientViewCache,
@@ -171,6 +172,7 @@ export default function CommunityClient({
   );
   const previousQueryRef = useRef("");
   const router = useRouter();
+  const { isOnline } = useOnlinePresence();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>(cachedResults);
   const [friends, setFriends] = useState<FriendItem[]>(
@@ -625,7 +627,10 @@ export default function CommunityClient({
                     ยังไม่มีเพื่อนในระบบ ลองค้นหาชื่อหรือ username แล้วกดเพิ่มเพื่อนได้เลย
                   </div>
                 ) : (
-                  friends.map((friend) => (
+                  friends.map((friend) => {
+                    const friendOnline = isOnline(friend.friendId);
+
+                    return (
                     <div
                       key={friend.id}
                       className="flex items-center gap-3 rounded-[30px] bg-[#f4f3f8] p-3 transition hover:-translate-y-0.5 hover:bg-[#eeedf5]"
@@ -640,8 +645,28 @@ export default function CommunityClient({
                           className="h-14 w-14 rounded-full object-cover shadow-md ring-4 ring-white"
                         />
                         <div className="min-w-0">
-                          <div className="truncate text-base font-black">{friend.displayName}</div>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span
+                              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                                friendOnline
+                                  ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.68)]"
+                                  : "bg-zinc-300"
+                              }`}
+                            />
+                            <div className="truncate text-base font-black">
+                              {friend.displayName}
+                            </div>
+                          </div>
                           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-black/42 sm:text-sm">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-black ${
+                                friendOnline
+                                  ? "bg-emerald-500/10 text-emerald-600"
+                                  : "bg-black/5 text-black/35"
+                              }`}
+                            >
+                              {friendOnline ? "ออนไลน์" : "ออฟไลน์"}
+                            </span>
                             {friend.username ? <span>@{friend.username}</span> : null}
                             {friend.bio ? <span className="line-clamp-1">{friend.bio}</span> : null}
                           </div>
@@ -684,7 +709,8 @@ export default function CommunityClient({
                         );
                       })()}
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>
