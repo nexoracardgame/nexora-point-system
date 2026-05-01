@@ -7,8 +7,12 @@ import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
   Clock3,
+  Heart,
   Handshake,
+  Plus,
   Shield,
+  ShieldCheck,
+  Store,
   User,
   Wallet,
   XCircle,
@@ -64,6 +68,33 @@ function getStatusUI(
       };
   }
 }
+
+const MARKET_ACTIONS = [
+  {
+    href: "/market/create",
+    title: "Create Listing",
+    subtitle: "สร้างโพสต์ขายการ์ด",
+    Icon: Plus,
+  },
+  {
+    href: "/market/deals",
+    title: "Deal Requests",
+    subtitle: "รับข้อเสนอและคุยดีล",
+    Icon: Handshake,
+  },
+  {
+    href: "/market/wishlist",
+    title: "Wishlist",
+    subtitle: "การ์ดที่ติดตามไว้",
+    Icon: Heart,
+  },
+  {
+    href: "/market/seller-center",
+    title: "Seller Center",
+    subtitle: "จัดการโพสต์ขาย",
+    Icon: ShieldCheck,
+  },
+] as const;
 
 export default function DealsClient({
   initialDeals,
@@ -365,15 +396,15 @@ export default function DealsClient({
     return (
       <div
         key={deal.id}
-        className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:p-5"
+        className="rounded-[30px] border border-black/8 bg-white p-4 text-black shadow-[0_22px_70px_rgba(10,10,14,0.12)] ring-1 ring-white/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_86px_rgba(10,10,14,0.16)] sm:p-5"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
               className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
                 deal.isSeller
-                  ? "bg-violet-500/10 text-violet-300"
-                  : "bg-red-500/10 text-red-300"
+                  ? "bg-black text-amber-200"
+                  : "bg-[#f3eee9] text-black"
               }`}
             >
               {deal.isSeller ? (
@@ -384,7 +415,7 @@ export default function DealsClient({
             </div>
 
             <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-black/38">
                 {deal.status === "accepted"
                   ? deal.isSeller
                     ? t("deals.role.waitBuyer")
@@ -393,7 +424,7 @@ export default function DealsClient({
                     ? t("deals.role.ownerAction")
                     : t("deals.role.yourRequest")}
               </div>
-              <div className="text-sm font-bold text-white/85">
+              <div className="text-sm font-bold text-black/76">
                 #{String(index + 1).padStart(3, "0")}
               </div>
             </div>
@@ -407,12 +438,12 @@ export default function DealsClient({
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-4">
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
+        <div className="mt-4 rounded-[24px] border border-black/6 bg-[#f3eee9] p-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-black/42">
             <Wallet className="h-4 w-4" />
             {t("deals.offerPrice")}
           </div>
-          <div className="mt-2 text-2xl font-black text-amber-300 sm:text-3xl">
+          <div className="mt-2 text-2xl font-black text-black sm:text-3xl">
             ฿{Number(deal.offeredPrice).toLocaleString("th-TH")}
           </div>
         </div>
@@ -424,20 +455,20 @@ export default function DealsClient({
             onTouchStart={() => warmDealChat(deal.id)}
             onFocus={() => warmDealChat(deal.id)}
             disabled={isOpeningChat}
-            className="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-yellow-500 py-3 text-sm font-black text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-3 w-full rounded-2xl bg-black py-3 text-sm font-black text-white shadow-[0_18px_42px_rgba(0,0,0,0.20)] transition hover:-translate-y-0.5 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isOpeningChat ? t("deals.chatOpening") : t("deals.chat")}
           </button>
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-2xl bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+          <div className="rounded-[24px] bg-[#f7f4f0] p-4 ring-1 ring-black/5">
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-black/34">
               {t("deals.card")}
             </div>
 
             <div className="mt-3 flex items-center gap-4">
-              <div className="relative aspect-[2/3] w-20 overflow-hidden rounded-2xl border border-white/10 shadow-xl sm:w-24">
+              <div className="relative aspect-[2/3] w-20 overflow-hidden rounded-2xl border border-black/8 bg-black shadow-xl sm:w-24">
                 <SafeCardImage
                   cardNo={deal.cardNo}
                   imageUrl={deal.cardImage}
@@ -449,28 +480,28 @@ export default function DealsClient({
               </div>
 
               <div className="min-w-0">
-                <div className="truncate text-base font-black text-white/90 sm:text-lg">
+                <div className="truncate text-base font-black text-black sm:text-lg">
                   {deal.cardName}
                 </div>
 
-                <div className="mt-2 text-sm text-amber-300">
+                <div className="mt-2 text-sm font-black text-amber-600">
                   #{String(deal.cardNo).padStart(3, "0")}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white/[0.03] p-4">
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+          <div className="rounded-[24px] bg-[#f7f4f0] p-4 ring-1 ring-black/5">
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-black/34">
               <User className="h-3.5 w-3.5" />
               {deal.isSeller ? t("deals.buyer") : t("deals.seller")}
             </div>
 
             <Link
               href={`/profile/${member.id}`}
-              className="mt-3 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]"
+              className="mt-3 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-black/[0.04]"
             >
-              <div className="relative h-12 w-12 overflow-hidden rounded-full border border-white/10">
+              <div className="relative h-12 w-12 overflow-hidden rounded-full border border-black/8 bg-white">
                 <Image
                   src={safeImage(member.image, "/avatar.png")}
                   alt={member.name}
@@ -480,7 +511,7 @@ export default function DealsClient({
                 />
               </div>
 
-              <div className="truncate text-sm font-bold text-white/85">
+              <div className="truncate text-sm font-black text-black/80">
                 {member.name}
               </div>
             </Link>
@@ -490,10 +521,10 @@ export default function DealsClient({
         <div
           className={`mt-4 rounded-2xl border p-3 ${
             deal.status === "accepted"
-              ? "border-cyan-400/15 bg-cyan-500/5"
+              ? "border-cyan-400/20 bg-cyan-50"
               : deal.isSeller
-                ? "border-violet-400/15 bg-violet-500/5"
-                : "border-red-400/15 bg-red-500/5"
+                ? "border-violet-400/20 bg-violet-50"
+                : "border-red-400/20 bg-red-50"
           }`}
         >
           {deal.status === "pending" && deal.isSeller && (
@@ -531,7 +562,7 @@ export default function DealsClient({
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-cyan-300">
                 {t("deals.acceptedWait")}
               </div>
-              <div className="rounded-xl border border-cyan-300/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
+              <div className="rounded-xl border border-cyan-300/20 bg-white px-4 py-3 text-sm font-semibold text-black/64">
                 {t("deals.acceptedDesc")}
               </div>
               <div className="mt-3">
@@ -565,9 +596,11 @@ export default function DealsClient({
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#22114a_0%,#090b12_40%,#05070d_100%)] text-white">
+    <div className="min-h-screen overflow-hidden bg-[#050507] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(251,191,36,0.13),transparent_26%),radial-gradient(circle_at_0%_42%,rgba(124,58,237,0.13),transparent_24%),radial-gradient(circle_at_100%_74%,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,#0b0b10_0%,#050507_100%)]" />
+
       <div className="relative mx-auto max-w-7xl space-y-5 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6">
-        <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(26,18,48,0.98),rgba(11,12,18,0.92))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-[36px] sm:p-6 xl:p-7">
+        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(26,18,48,0.98),rgba(11,12,18,0.92))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:rounded-[36px] sm:p-6 xl:p-7">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_35%),radial-gradient(circle_at_top_left,rgba(168,85,247,0.2),transparent_32%)]" />
 
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -613,10 +646,53 @@ export default function DealsClient({
           </div>
         </section>
 
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+          {MARKET_ACTIONS.map(({ href, title, subtitle, Icon }) => {
+            const active = href === "/market/deals";
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`group rounded-[24px] border p-4 shadow-[0_18px_54px_rgba(0,0,0,0.20)] transition duration-300 hover:-translate-y-1 md:rounded-[30px] md:p-5 ${
+                  active
+                    ? "border-black bg-black text-white ring-1 ring-white/14"
+                    : "border-black/8 bg-white text-black ring-1 ring-white/70 hover:shadow-[0_26px_70px_rgba(255,255,255,0.08)]"
+                }`}
+              >
+                <div
+                  className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${
+                    active
+                      ? "bg-white text-black"
+                      : "bg-black text-amber-200 group-hover:scale-105"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="text-sm font-black leading-tight md:text-base">
+                  {title}
+                </div>
+                <div
+                  className={`mt-1 text-[11px] font-bold leading-4 md:text-xs ${
+                    active ? "text-white/54" : "text-black/45"
+                  }`}
+                >
+                  {subtitle}
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+
         {acceptedDeals.length > 0 && (
           <section>
-            <div className="mb-4 text-2xl font-black text-cyan-300">
-              {t("deals.section.ready")}
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-black">
+                <Store className="h-5 w-5" />
+              </div>
+              <div className="text-2xl font-black text-white">
+                {t("deals.section.ready")}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -626,15 +702,20 @@ export default function DealsClient({
         )}
 
         <section>
-          <div className="mb-4 text-2xl font-black text-amber-300">
-            {t("deals.section.pending")}
+          <div className="mb-4 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-black">
+              <Clock3 className="h-5 w-5" />
+            </div>
+            <div className="text-2xl font-black text-white">
+              {t("deals.section.pending")}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {pendingDeals.length > 0 ? (
               pendingDeals.map((deal, index) => renderDealCard(deal, index))
             ) : (
-              <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center text-zinc-400 lg:col-span-2">
+              <div className="rounded-[30px] border border-white/10 bg-white p-10 text-center text-sm font-black text-black/45 shadow-[0_22px_70px_rgba(10,10,14,0.12)] lg:col-span-2">
                 {t("deals.empty")}
               </div>
             )}
