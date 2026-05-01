@@ -125,6 +125,10 @@ function DMRoomContent({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const draftTextRef = useRef(text);
+  const draftFileRef = useRef<File | null>(file);
+  const sendInFlightRef = useRef(false);
+  const isComposingRef = useRef(false);
   const hasInitialScrolledRef = useRef(false);
   const hasMarkedSeenRef = useRef(false);
   const isNearBottomRef = useRef(true);
@@ -140,6 +144,14 @@ function DMRoomContent({
     [file]
   );
   const otherOnline = isOnline(other?.id);
+
+  useEffect(() => {
+    draftTextRef.current = text;
+  }, [text]);
+
+  useEffect(() => {
+    draftFileRef.current = file;
+  }, [file]);
 
   const cancelOlderPrefetch = () => {
     if (olderTimerRef.current) {
@@ -568,6 +580,7 @@ function DMRoomContent({
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
+    setNewMessageCount(0);
     loadingOlderRef.current = false;
     cancelOlderPrefetch();
 
@@ -600,12 +613,18 @@ function DMRoomContent({
 
     const syncNow = () => {
       if (document.visibilityState === "visible") {
+        if (checkIsNearBottom()) {
+          setNewMessageCount(0);
+        }
         void syncLatestMessages();
       }
     };
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
+        if (checkIsNearBottom()) {
+          setNewMessageCount(0);
+        }
         void syncLatestMessages();
       }
     };
@@ -832,14 +851,19 @@ function DMRoomContent({
   }, [messages, me?.id]);
 
   const send = async () => {
-    if (sending || (!text.trim() && !file) || !me?.id || !roomId || roomClosed) return;
+    if (sendInFlightRef.current || sending || !me?.id || !roomId || roomClosed) return;
 
-    const msg = text.trim();
-    const selectedFile = file;
+    const draftText = draftTextRef.current;
+    const msg = draftText.trim();
+    const selectedFile = draftFileRef.current;
+    if (!msg && !selectedFile) return;
+
     const optimisticImageUrl = selectedFile ? selectedImagePreview : null;
     let uploadFile: File | null = null;
 
     const clearDraft = () => {
+      draftTextRef.current = "";
+      draftFileRef.current = null;
       setText("");
       setFile(null);
       if (fileInputRef.current) {
@@ -848,12 +872,18 @@ function DMRoomContent({
     };
 
     const restoreDraft = () => {
-      setText((current) => current || msg);
-      if (selectedFile) {
-        setFile((current) => current || selectedFile);
+      if (!draftTextRef.current) {
+        draftTextRef.current = draftText;
+        setText(draftText);
+      }
+
+      if (selectedFile && !draftFileRef.current) {
+        draftFileRef.current = selectedFile;
+        setFile(selectedFile);
       }
     };
 
+    sendInFlightRef.current = true;
     setSending(true);
     setShowEmoji(false);
     clearDraft();
@@ -865,6 +895,7 @@ function DMRoomContent({
         console.error("UPLOAD ERROR:", error);
         restoreDraft();
         setSending(false);
+        sendInFlightRef.current = false;
         alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
@@ -926,6 +957,7 @@ function DMRoomContent({
       setMessages((prev) => removeChatMessage(prev, optimisticId));
       restoreDraft();
       setSending(false);
+      sendInFlightRef.current = false;
       return;
     }
 
@@ -941,6 +973,7 @@ function DMRoomContent({
           "ส่งข้อความไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
       );
       setSending(false);
+      sendInFlightRef.current = false;
       return;
     }
 
@@ -955,6 +988,7 @@ function DMRoomContent({
       return mergeSingleChatMessage(withoutOptimistic, insertedMessage, roomId, me, other);
     });
     setSending(false);
+    sendInFlightRef.current = false;
     scrollToBottom("smooth");
   };
 
@@ -1276,7 +1310,11 @@ function DMRoomContent({
 
                 <EmojiPicker
                   onEmojiClick={(emojiData) => {
-                    setText((prev) => prev + emojiData.emoji);
+                    setText((prev) => {
+                      const nextText = prev + emojiData.emoji;
+                      draftTextRef.current = nextText;
+                      return nextText;
+                    });
                     setShowEmoji(false);
                   }}
                   theme={Theme.DARK}
@@ -1291,7 +1329,16 @@ function DMRoomContent({
                 ref={textInputRef}
                 value={text}
                 onChange={(event) => {
-                  setText(event.target.value);
+                  const nextText = event.target.value;
+                  draftTextRef.current = nextText;
+                  setText(nextText);
+                }}
+                onCompositionStart={() => {
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={(event) => {
+                  isComposingRef.current = false;
+                  draftTextRef.current = event.currentTarget.value;
                 }}
                 onFocus={async () => {
                   if (hasMarkedSeenRef.current) return;
@@ -1311,6 +1358,13 @@ function DMRoomContent({
                 placeholder="พิมพ์ข้อความ..."
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
+                    if (
+                      isComposingRef.current ||
+                      (event.nativeEvent as KeyboardEvent).isComposing
+                    ) {
+                      return;
+                    }
+
                     event.preventDefault();
                     void send();
                   }
@@ -1324,7 +1378,9 @@ function DMRoomContent({
                   type="file"
                   accept="image/*"
                   onChange={(event) => {
-                    setFile(event.target.files?.[0] || null);
+                    const nextFile = event.target.files?.[0] || null;
+                    draftFileRef.current = nextFile;
+                    setFile(nextFile);
                     requestAnimationFrame(() => {
                       textInputRef.current?.focus();
                       keepComposerVisibleNow("smooth");
@@ -1364,6 +1420,7 @@ function DMRoomContent({
                 <button
                   type="button"
                   onClick={() => {
+                    draftFileRef.current = null;
                     setFile(null);
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";

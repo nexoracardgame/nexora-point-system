@@ -765,8 +765,11 @@ export default function DMListClient({
       "postgres_changes",
       { event: "*", schema: "public", table: "dmMessage" },
       (payload) => {
+        const eventType = String(
+          (payload as { eventType?: string | null }).eventType || ""
+        ).toUpperCase();
         const nextMessage = (payload as { new?: DmMessageRealtimeRow })?.new;
-        if (nextMessage?.roomId) {
+        if (eventType === "INSERT" && nextMessage?.roomId) {
           applyRealtimeMessage(nextMessage);
           return;
         }
@@ -813,7 +816,7 @@ export default function DMListClient({
       if (document.visibilityState === "visible") {
         void loadRooms(currentMeRef.current);
       }
-    }, 10000);
+    }, 3000);
 
     const onFocus = () => {
       void loadRooms(currentMeRef.current);
@@ -824,13 +827,30 @@ export default function DMListClient({
         void loadRooms(currentMeRef.current);
       }
     };
+    const onChatRead = (event: Event) => {
+      const targetRoomId = String(
+        (event as CustomEvent<{ roomId?: string | null }>).detail?.roomId || ""
+      ).trim();
+
+      if (targetRoomId) {
+        setRooms((prev) =>
+          prev.map((room) =>
+            room.roomId === targetRoomId ? { ...room, unread: 0 } : room
+          )
+        );
+      }
+
+      void loadRooms(currentMeRef.current);
+    };
 
     window.addEventListener("focus", onFocus);
+    window.addEventListener("nexora:chat-read", onChatRead as EventListener);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("nexora:chat-read", onChatRead as EventListener);
       document.removeEventListener("visibilitychange", onVisibility);
       if (supabase && channel) {
         void supabase.removeChannel(channel);
