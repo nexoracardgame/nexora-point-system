@@ -156,6 +156,7 @@ export default function NotificationBell() {
   const { locale, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [fastChatUnreadCount, setFastChatUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -169,6 +170,7 @@ export default function NotificationBell() {
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
   const burstTimeoutsRef = useRef<number[]>([]);
+  const fastChatUnreadCountRef = useRef(0);
   const localeTag = getLocaleTag(locale);
 
   const rememberDeliveredNotification = (notificationId: string) => {
@@ -481,9 +483,11 @@ export default function NotificationBell() {
     };
 
     const onChatRead = (event: Event) => {
-      const roomId = String(
-        (event as CustomEvent<{ roomId?: string | null }>).detail?.roomId || ""
-      ).trim();
+      const detail = (event as CustomEvent<{
+        roomId?: string | null;
+        unreadCount?: number | null;
+      }>).detail;
+      const roomId = String(detail?.roomId || "").trim();
 
       if (roomId) {
         setItems((currentItems) => {
@@ -502,11 +506,35 @@ export default function NotificationBell() {
         });
       }
 
+      const unreadCount = Math.max(1, Number(detail?.unreadCount || 1));
+      setFastChatUnreadCount((current) => {
+        const nextCount = Math.max(0, current - unreadCount);
+        fastChatUnreadCountRef.current = nextCount;
+        return nextCount;
+      });
       queueFastNotificationSync();
+    };
+
+    const onChatUnreadCount = (event: Event) => {
+      const nextCount = Math.max(
+        0,
+        Number(
+          (event as CustomEvent<{ count?: number | null }>).detail?.count || 0
+        )
+      );
+      const previousCount = fastChatUnreadCountRef.current;
+
+      fastChatUnreadCountRef.current = nextCount;
+      setFastChatUnreadCount(nextCount);
+
+      if (nextCount > previousCount) {
+        queueFastNotificationSync();
+      }
     };
 
     window.addEventListener("focus", onFocus);
     window.addEventListener("nexora:chat-read", onChatRead);
+    window.addEventListener("nexora:chat-unread-count", onChatUnreadCount);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
@@ -514,6 +542,7 @@ export default function NotificationBell() {
       clearNotificationBurstTimers();
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("nexora:chat-read", onChatRead);
+      window.removeEventListener("nexora:chat-unread-count", onChatUnreadCount);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
@@ -586,7 +615,12 @@ export default function NotificationBell() {
   }, []);
 
   const unreadItems = useMemo(() => items, [items]);
-  const totalUnreadCount = unreadItems.length;
+  const totalUnreadCount = useMemo(() => {
+    const chatItemCount = unreadItems.filter((item) => item.type === "chat").length;
+    const nonChatItemCount = unreadItems.length - chatItemCount;
+
+    return nonChatItemCount + Math.max(chatItemCount, fastChatUnreadCount);
+  }, [fastChatUnreadCount, unreadItems]);
 
   return (
     <div className="relative z-[700]" ref={wrapRef}>

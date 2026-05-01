@@ -1373,12 +1373,18 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
               >
                 <EmojiPicker
                   onEmojiClick={(emojiData) => {
-                    setText((prev) => {
-                      const nextText = prev + emojiData.emoji;
-                      draftTextRef.current = nextText;
-                      return nextText;
-                    });
+                    const nextText = `${draftTextRef.current}${emojiData.emoji}`;
+                    draftTextRef.current = nextText;
+                    setText(nextText);
                     setShowEmoji(false);
+                    requestAnimationFrame(() => {
+                      textInputRef.current?.focus();
+                      textInputRef.current?.setSelectionRange(
+                        nextText.length,
+                        nextText.length
+                      );
+                      keepComposerVisibleNow("smooth");
+                    });
                   }}
                   theme={Theme.DARK}
                   width={300}

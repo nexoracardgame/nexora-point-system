@@ -48,6 +48,41 @@ function formatBalance(value?: number | null) {
 const CHAT_UNREAD_FAST_POLL_MS = 700;
 const CHAT_UNREAD_BURST_DELAYS_MS = [120, 360, 760] as const;
 
+function dispatchChatUnreadCount(count: number) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("nexora:chat-unread-count", {
+      detail: {
+        count: Math.max(0, Number(count || 0)),
+        syncedAt: new Date().toISOString(),
+      },
+    })
+  );
+}
+
+function getOpenChatRoomId(pathname: string) {
+  const path = String(pathname || "").split("?")[0].split("#")[0];
+  const parts = path.split("/").filter(Boolean);
+
+  if (parts[0] === "dm" && parts[1]) {
+    return decodeURIComponent(parts[1]);
+  }
+
+  if (
+    parts[0] === "market" &&
+    parts[1] === "deals" &&
+    parts[2] === "chat" &&
+    parts[3]
+  ) {
+    return `deal:${decodeURIComponent(parts[3])}`;
+  }
+
+  return "";
+}
+
 export default function MainLayout({
   children,
 }: {
@@ -372,6 +407,9 @@ export default function MainLayout({
     let queued = false;
     const burstTimers: ReturnType<typeof setTimeout>[] = [];
     const processedChatReadKeys = new Set<string>();
+    const currentUserId = String(session?.user?.id || "").trim();
+    const currentLineId = String(session?.user?.lineId || "").trim();
+    const openChatRoomId = getOpenChatRoomId(pathname);
     const supabase = getBrowserSupabaseClient();
     const channel = supabase
       ? supabase.channel(`layout-chat-unread-${Date.now()}`)
@@ -395,7 +433,9 @@ export default function MainLayout({
         const data = await res.json();
         if (cancelled) return;
 
-        setChatUnreadCount(Math.max(0, Number(data?.count || 0)));
+        const nextCount = Math.max(0, Number(data?.count || 0));
+        setChatUnreadCount(nextCount);
+        dispatchChatUnreadCount(nextCount);
       } catch {
         return;
       } finally {
@@ -432,7 +472,33 @@ export default function MainLayout({
     channel?.on(
       "postgres_changes",
       { event: "*", schema: "public", table: "dmMessage" },
-      () => {
+      (payload) => {
+        const eventType = String(
+          (payload as { eventType?: string | null }).eventType || ""
+        ).toUpperCase();
+        const nextMessage = (payload as {
+          new?: { roomId?: string | null; senderId?: string | null };
+        })?.new;
+        const roomId = String(nextMessage?.roomId || "").trim();
+        const senderId = String(nextMessage?.senderId || "").trim();
+        const isMine =
+          senderId &&
+          (senderId === currentUserId ||
+            (currentLineId ? senderId === currentLineId : false));
+
+        if (
+          eventType === "INSERT" &&
+          roomId &&
+          !isMine &&
+          roomId !== openChatRoomId
+        ) {
+          setChatUnreadCount((current) => {
+            const nextCount = Math.max(0, current + 1);
+            dispatchChatUnreadCount(nextCount);
+            return nextCount;
+          });
+        }
+
         queueChatUnreadSync();
       }
     );
@@ -489,7 +555,11 @@ export default function MainLayout({
           }
         }
         const unreadCount = Math.max(1, Number(detail?.unreadCount || 1));
-        setChatUnreadCount((current) => Math.max(0, current - unreadCount));
+        setChatUnreadCount((current) => {
+          const nextCount = Math.max(0, current - unreadCount);
+          dispatchChatUnreadCount(nextCount);
+          return nextCount;
+        });
       }
 
       queueChatUnreadSync();
@@ -511,7 +581,7 @@ export default function MainLayout({
         void supabase.removeChannel(channel);
       }
     };
-  }, [pathname]);
+  }, [pathname, session?.user?.id, session?.user?.lineId]);
 
   useEffect(() => {
     let cancelled = false;
