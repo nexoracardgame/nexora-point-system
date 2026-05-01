@@ -42,6 +42,7 @@ type SoldHistoryItem = {
   createdAt: string | Date;
   price: number | null;
   listing: {
+    id?: string | null;
     cardNo: number | string | null;
     cardName: string | null;
     imageUrl: string | null;
@@ -59,6 +60,7 @@ type SellerProfileFallback = {
   name: string | null;
   displayName: string | null;
   image: string | null;
+  role?: string | null;
   coverImage: string | null;
   coverPosition: number | null;
   bio: string | null;
@@ -181,7 +183,10 @@ export default async function SellerProfilePage({
     id?: string;
     name?: string | null;
     image?: string | null;
+    role?: string | null;
   };
+  const isAdminViewer =
+    String(sessionUser.role || "").trim().toLowerCase() === "admin";
 
   const [
     localProfile,
@@ -204,6 +209,7 @@ export default async function SellerProfilePage({
           name: true,
           displayName: true,
           image: true,
+          role: true,
           coverImage: true,
           coverPosition: true,
           bio: true,
@@ -345,6 +351,7 @@ export default async function SellerProfilePage({
         sellerFromDb.name ||
         "NEXORA User",
       image: localProfile?.image || sellerFromDb.image || "/avatar.png",
+      role: sellerFromDb.role || null,
       coverImage: localProfile?.coverImage || sellerFromDb.coverImage || null,
       coverPosition:
         localProfile?.coverPosition ?? sellerFromDb.coverPosition ?? 50,
@@ -362,6 +369,7 @@ export default async function SellerProfilePage({
       displayName:
         localProfile?.displayName || sessionUser.name || "NEXORA User",
       image: localProfile?.image || sessionUser.image || "/avatar.png",
+      role: sessionUser.role || null,
       coverImage: localProfile?.coverImage || null,
       coverPosition: localProfile?.coverPosition ?? 50,
       bio: localProfile?.bio || null,
@@ -377,6 +385,7 @@ export default async function SellerProfilePage({
       name: localProfile.displayName || "NEXORA User",
       displayName: localProfile.displayName || "NEXORA User",
       image: localProfile.image || "/avatar.png",
+      role: null,
       coverImage: localProfile.coverImage || null,
       coverPosition: localProfile.coverPosition ?? 50,
       bio: localProfile.bio || null,
@@ -393,6 +402,7 @@ export default async function SellerProfilePage({
       displayName:
         localProfile?.displayName || getSnapshotSellerName(sellerSnapshot),
       image: localProfile?.image || getSnapshotSellerImage(sellerSnapshot),
+      role: null,
       coverImage: localProfile?.coverImage || null,
       coverPosition: localProfile?.coverPosition ?? 50,
       bio: localProfile?.bio || null,
@@ -455,6 +465,7 @@ export default async function SellerProfilePage({
       createdAt: item.createdAt,
       price: Number(item.offeredPrice || 0),
       listing: {
+        id: soldListingById.get(item.cardId)?.id || item.cardId || null,
         cardNo: soldListingById.get(item.cardId)?.cardNo || null,
         cardName: soldListingById.get(item.cardId)?.cardName || null,
         imageUrl: soldListingById.get(item.cardId)?.imageUrl || null,
@@ -553,7 +564,15 @@ export default async function SellerProfilePage({
   const totalVolume = metrics.totalVolume;
   const trustScore = buildTrustScore(metrics);
   const sellerScore = buildSellerScore(metrics);
-  const sellerRank = getSellerRankPresentation(sellerScore);
+  const isSellerAdmin = String(seller.role || "").trim().toLowerCase() === "admin";
+  const sellerRank = isSellerAdmin
+    ? {
+        label: "GM",
+        tone: "text-amber-100 drop-shadow-[0_0_18px_rgba(251,191,36,0.75)]",
+        aura:
+          "border-amber-200/55 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.28),transparent_30%),radial-gradient(circle_at_75%_20%,rgba(251,191,36,0.46),transparent_42%),linear-gradient(145deg,rgba(161,98,7,0.90),rgba(8,8,10,0.98)_56%,rgba(0,0,0,1))] shadow-[0_0_60px_rgba(251,191,36,0.34)]",
+      }
+    : getSellerRankPresentation(sellerScore);
 
   const sellerRankIndex = ranking.findIndex((item) => item.userId === seller.id);
   const topPercent = buildTopPercent(
@@ -563,16 +582,20 @@ export default async function SellerProfilePage({
 
   const isGrowingSeller = completedDeals >= 10;
   const isVerifiedSeller = !isGrowingSeller && trustScore >= 78;
-  const sellerStatusLabel = isGrowingSeller
-    ? "Growing Seller"
-    : isVerifiedSeller
-      ? "Verified Seller"
-      : "New Seller";
-  const sellerStatusTone = isGrowingSeller
-    ? "border-violet-300/24 bg-black/70 text-violet-200"
-    : isVerifiedSeller
-      ? "border-emerald-300/20 bg-black/70 text-emerald-300"
-      : "border-white/16 bg-black/70 text-white/78";
+  const sellerStatusLabel = isSellerAdmin
+    ? "GM"
+    : isGrowingSeller
+      ? "Growing Seller"
+      : isVerifiedSeller
+        ? "Verified Seller"
+        : "New Seller";
+  const sellerStatusTone = isSellerAdmin
+    ? "border-amber-200/50 bg-[linear-gradient(135deg,rgba(0,0,0,0.88),rgba(120,72,10,0.72),rgba(0,0,0,0.92))] text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.34)]"
+    : isGrowingSeller
+      ? "border-violet-300/24 bg-black/70 text-violet-200"
+      : isVerifiedSeller
+        ? "border-emerald-300/20 bg-black/70 text-emerald-300"
+        : "border-white/16 bg-black/70 text-white/78";
   const rankExplanation =
     "แรงค์คำนวณจากดีลสำเร็จ ยอดขาย รีวิว รายการขาย และความต่อเนื่องจริงในตลาด";
   const topPercentMeaning =
@@ -715,6 +738,9 @@ export default async function SellerProfilePage({
                         </Link>
                       ) : (
                         <ProfileChatButton
+                          currentUserId={sessionUser.id || currentUserId || ""}
+                          currentUserName={sessionUser.name || "You"}
+                          currentUserImage={sessionUser.image || "/avatar.png"}
                           targetUserId={seller.id}
                           targetUserName={
                             seller.displayName || seller.name || "User"
@@ -868,23 +894,43 @@ export default async function SellerProfilePage({
 
                   <div
                     className={`grid gap-2 p-3 ${
-                      isOwner ? "grid-cols-3" : "grid-cols-1"
+                      isOwner
+                        ? "grid-cols-3"
+                        : isAdminViewer
+                          ? "grid-cols-2"
+                          : "grid-cols-1"
                     }`}
                   >
                     {isOwner && (
-                      <>
-                        <Link
-                          href={`/market/edit/${item.id}`}
-                          className="rounded-xl bg-violet-500/10 px-3 py-2 text-center text-xs font-black text-violet-300 transition hover:bg-violet-500/20"
-                        >
-                          แก้ไข
-                        </Link>
-
-                        <div className="rounded-xl border border-red-400/20 bg-red-500/10 p-0.5 transition hover:bg-red-500/20">
-                          <DeleteListingButton id={item.id} size="compact" />
-                        </div>
-                      </>
+                      <Link
+                        href={`/market/edit/${item.id}`}
+                        className="rounded-xl bg-violet-500/10 px-3 py-2 text-center text-xs font-black text-violet-300 transition hover:bg-violet-500/20"
+                      >
+                        แก้ไขราคา
+                      </Link>
                     )}
+
+                    {(isOwner || isAdminViewer) && (
+                      <div className="rounded-xl border border-red-400/20 bg-red-500/10 p-0.5 transition hover:bg-red-500/20">
+                        <DeleteListingButton
+                          id={item.id}
+                          size="compact"
+                          adminMode={isAdminViewer}
+                          label={isAdminViewer ? "GM ลบ" : "ลบ"}
+                          title={
+                            isAdminViewer
+                              ? "GM ลบการ์ดใบนี้ถาวร"
+                              : "ยืนยันการลบการ์ด"
+                          }
+                          description={
+                            isAdminViewer
+                              ? "การ์ดใบนี้จะถูกลบจากตลาด พร้อมลบดีลและห้องแชทดีลที่ผูกกับการ์ดใบนี้ทั้งหมด"
+                              : "การ์ดใบนี้จะถูกลบออกจากตลาดของคุณทันที"
+                          }
+                        />
+                      </div>
+                    )}
+
 
                     <Link
                       href={`/market/card/${item.id}`}
@@ -955,6 +1001,24 @@ export default async function SellerProfilePage({
                       <div className="mt-2 text-xs text-white/55">{formatThaiDate(item.createdAt)}</div>
                     </div>
                   </div>
+                  {isAdminViewer && item.listing?.id ? (
+                    <div className="grid grid-cols-2 gap-2 p-3">
+                      <Link
+                        href={`/market/card/${item.listing.id}`}
+                        className="rounded-xl border border-white/10 bg-black px-3 py-2 text-center text-xs font-black text-white/80 transition hover:bg-white/[0.06]"
+                      >
+                        ดูการ์ด
+                      </Link>
+                      <DeleteListingButton
+                        id={item.listing.id}
+                        size="compact"
+                        adminMode
+                        label="GM ลบ"
+                        title="GM ลบการ์ดที่ขายสำเร็จ"
+                        description="การลบนี้จะลบการ์ดและดีล completed ที่ผูกอยู่ ทำให้ยอดขายรวม ดีลสำเร็จ ความน่าเชื่อถือ และ TOP% ถูกคำนวณใหม่ทันที"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ))
             ) : (

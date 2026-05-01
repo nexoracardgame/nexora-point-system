@@ -1,11 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { getServerSession } from "next-auth";
 import type { ReactNode } from "react";
+import DeleteListingButton from "@/components/DeleteListingButton";
 import {
   buildLocalCardImage,
   sanitizeCardImageUrl,
 } from "@/lib/card-image";
+import { authOptions } from "@/lib/auth";
 import {
   getLocaleTag,
   resolveLocale,
@@ -212,8 +215,12 @@ export default async function MarketCardDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const cookieStore = await cookies();
+  const [cookieStore, session] = await Promise.all([
+    cookies(),
+    getServerSession(authOptions),
+  ]);
   const locale = resolveLocale(cookieStore.get("nexora_locale")?.value);
+  const isAdmin = String(session?.user?.role || "").trim().toLowerCase() === "admin";
   const [baseListing, allListings] = await Promise.all([
     getMarketListingById(id),
     getMarketListings(),
@@ -651,6 +658,17 @@ export default async function MarketCardDetailPage({
                 cardName={card.name}
                 sellerName={sellerProfileName}
               />
+
+              {isAdmin ? (
+                <DeleteListingButton
+                  id={listing.id}
+                  adminMode
+                  label="ลบการ์ด"
+                  title="GM ลบการ์ดใบนี้ถาวร"
+                  description="เฉพาะแอดมินเท่านั้น การ์ดใบนี้จะถูกลบจากตลาด พร้อมลบดีลและห้องแชทดีลที่ผูกกับการ์ดใบนี้ทั้งหมด"
+                  redirectHref="/market"
+                />
+              ) : null}
             </div>
           </div>
 

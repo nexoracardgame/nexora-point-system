@@ -15,6 +15,8 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = String(session?.user?.id || "").trim();
+    const currentRole = String(session?.user?.role || "").trim().toLowerCase();
+    const isAdmin = currentRole === "admin";
 
     if (!currentUserId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,21 +32,66 @@ export async function DELETE(
         select: {
           id: true,
           sellerId: true,
+          status: true,
         },
       }),
       getMarketListingById(id),
       getAllLocalDeals(),
     ]);
 
-    if (dbListing && dbListing.sellerId !== currentUserId) {
+    const dbStatus = String(dbListing?.status || "").trim().toLowerCase();
+    const localStatus = String(localListing?.status || "").trim().toLowerCase();
+    const isSoldListing =
+      dbStatus === "sold" ||
+      dbStatus === "completed" ||
+      localStatus === "sold" ||
+      localStatus === "completed";
+
+    if (dbListing && dbListing.sellerId !== currentUserId && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (localListing && localListing.sellerId !== currentUserId) {
+    if (localListing && localListing.sellerId !== currentUserId && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (isSoldListing && !isAdmin) {
+      return NextResponse.json(
+        { error: "Only admins can delete completed sold cards" },
+        { status: 403 }
+      );
+    }
+
+    const dbDeals = await prisma.dealRequest.findMany({
+      where: {
+        cardId: id,
+      },
+      select: {
+        id: true,
+        buyerId: true,
+        sellerId: true,
+        status: true,
+      },
+    });
+
+    if (!dbListing && !localListing && dbDeals.length === 0) {
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    }
+
+    if (!dbListing && !localListing && !isAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const relatedLocalDeals = localDeals.filter((deal) => deal.cardId === id);
+    const relatedDealIds = Array.from(
+      new Set(
+        [
+          ...dbDeals.map((deal) => deal.id),
+          ...relatedLocalDeals.map((deal) => deal.id),
+        ]
+          .map((dealId) => String(dealId || "").trim())
+          .filter(Boolean)
+      )
+    );
 
     await Promise.all([
       deleteMarketListing(id),
@@ -58,17 +105,14 @@ export async function DELETE(
           ]
         : []),
       ...relatedLocalDeals.map(async (deal) => {
-        if (deal.status === "accepted") {
-          await cleanupDealChat(deal.id);
-        }
-
         await deleteLocalDeal(deal.id);
       }),
+      ...relatedDealIds.map((dealId) => cleanupDealChat(dealId)),
     ]);
 
-    for (const deal of relatedLocalDeals) {
+    for (const dealId of relatedDealIds) {
       publishDealEvent({
-        dealId: deal.id,
+        dealId,
         action: "cancelled",
         changedAt: new Date().toISOString(),
       });
@@ -78,6 +122,13 @@ export async function DELETE(
     revalidatePath("/market/seller-center");
     revalidatePath("/market/deals");
     revalidatePath(`/market/card/${id}`);
+    if (dbListing?.sellerId || localListing?.sellerId) {
+      revalidatePath(`/profile/${dbListing?.sellerId || localListing?.sellerId}`);
+    }
+    for (const deal of dbDeals) {
+      revalidatePath(`/profile/${deal.buyerId}`);
+      revalidatePath(`/profile/${deal.sellerId}`);
+    }
 
     return NextResponse.json({ success: true, id });
   } catch (error) {
