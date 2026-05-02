@@ -1,9 +1,21 @@
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 import { Sparkles } from "lucide-react";
 import MarketFeatureNav from "@/components/MarketFeatureNav";
+import { authOptions } from "@/lib/auth";
+import { getMarketListingsBySeller } from "@/lib/market-listings";
 import SellerCenterClient from "./SellerCenterClient";
 
-export default function SellerCenterPage() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+export default async function SellerCenterPage() {
+  const session = await getServerSession(authOptions);
+  const sellerId = String(session?.user?.id || "").trim();
+  const initialListings = sellerId
+    ? await getMarketListingsBySeller(sellerId).catch(() => [])
+    : [];
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1b1830_0%,#090a10_55%,#05060a_100%)] px-3 py-4 text-white sm:px-6 sm:py-10">
       <section className="mx-auto max-w-7xl">
@@ -33,7 +45,7 @@ export default function SellerCenterPage() {
 
         <MarketFeatureNav className="mb-6 sm:mb-10" />
 
-        <SellerCenterClient initialListings={[]} />
+        <SellerCenterClient initialListings={initialListings} />
       </section>
     </div>
   );

@@ -31,19 +31,6 @@ function normalizeListing(item: Partial<SellerListing>): SellerListing {
   };
 }
 
-function ListingSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-[28px] border border-black/8 bg-white p-3 shadow-[0_22px_70px_rgba(10,10,14,0.12)] ring-1 ring-white/70">
-      <div className="aspect-[3/4] animate-pulse rounded-[22px] bg-[#ece8e3]" />
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <div className="h-10 animate-pulse rounded-2xl bg-[#ece8e3]" />
-        <div className="h-10 animate-pulse rounded-2xl bg-[#ece8e3]" />
-        <div className="h-10 animate-pulse rounded-2xl bg-[#ece8e3]" />
-      </div>
-    </div>
-  );
-}
-
 export default function SellerCenterClient({
   initialListings,
 }: {
@@ -96,7 +83,6 @@ export default function SellerCenterClient({
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      setLoading(false);
       return;
     }
 
@@ -108,7 +94,11 @@ export default function SellerCenterClient({
       writeClientViewCache("seller-center-listings", initialListings);
     }
 
-    void syncListings();
+    const timeoutId = window.setTimeout(() => {
+      void syncListings();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [initialListings, status, syncListings]);
 
   useEffect(() => {
@@ -140,14 +130,8 @@ export default function SellerCenterClient({
     );
   }
 
-  if (loading && listings.length === 0) {
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <ListingSkeleton key={index} />
-        ))}
-      </div>
-    );
+  if ((loading || status === "loading") && listings.length === 0) {
+    return <div className="min-h-[220px]" aria-busy="true" />;
   }
 
   if (listings.length === 0) {

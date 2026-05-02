@@ -17,7 +17,8 @@ import {
 } from "@/lib/i18n-core";
 import {
   getMarketListingById,
-  getMarketListings,
+  getMarketListingStatsForRarity,
+  getMarketListingsByCardNo,
 } from "@/lib/market-listings";
 import { prisma } from "@/lib/prisma";
 import { formatThaiDateTime } from "@/lib/thai-time";
@@ -74,6 +75,15 @@ type OfferRow = {
   status: string;
   offeredPrice: number;
   buyer: {
+    id: string;
+    displayName: string | null;
+    name: string | null;
+    image: string | null;
+  } | null;
+};
+
+type DealRow = OfferRow & {
+  seller: {
     id: string;
     displayName: string | null;
     name: string | null;
@@ -215,16 +225,13 @@ export default async function MarketCardDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [cookieStore, session] = await Promise.all([
+  const [cookieStore, session, baseListing] = await Promise.all([
     cookies(),
     getServerSession(authOptions),
+    getMarketListingById(id),
   ]);
   const locale = resolveLocale(cookieStore.get("nexora_locale")?.value);
   const isAdmin = String(session?.user?.role || "").trim().toLowerCase() === "admin";
-  const [baseListing, allListings] = await Promise.all([
-    getMarketListingById(id),
-    getMarketListings(),
-  ]);
 
   const listing: DetailListing | null = baseListing
     ? {
@@ -246,7 +253,19 @@ export default async function MarketCardDetailPage({
     );
   }
 
-  const relatedListings: RelatedListing[] = allListings
+  const [relatedListingRecords, listingStats] = await Promise.all([
+    getMarketListingsByCardNo(String(listing.cardNo)),
+    getMarketListingStatsForRarity(listing.rarity),
+  ]);
+  const relatedListingSource = relatedListingRecords.some(
+    (item) => item.id === listing.id
+  )
+    ? relatedListingRecords
+    : [baseListing, ...relatedListingRecords].filter(
+        (item): item is NonNullable<typeof baseListing> => Boolean(item)
+      );
+
+  const relatedListings: RelatedListing[] = relatedListingSource
     .filter((item) => item.cardNo === String(listing.cardNo))
     .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
     .map((item) => ({
@@ -265,14 +284,24 @@ export default async function MarketCardDetailPage({
     }));
 
   const relatedListingIds = relatedListings.map((item) => item.id);
-  const allDeals = relatedListingIds.length
+  const allDeals: DealRow[] = relatedListingIds.length
     ? await prisma.dealRequest.findMany({
         where: {
           cardId: {
             in: relatedListingIds,
           },
+          status: {
+            in: ["pending", "accepted", "completed"],
+          },
         },
-        include: {
+        select: {
+          id: true,
+          createdAt: true,
+          sellerId: true,
+          buyerId: true,
+          cardId: true,
+          status: true,
+          offeredPrice: true,
           buyer: {
             select: {
               id: true,
@@ -293,7 +322,8 @@ export default async function MarketCardDetailPage({
         orderBy: {
           createdAt: "desc",
         },
-      })
+        take: 80,
+      }).catch(() => [])
     : [];
 
   const offerRows: OfferRow[] = allDeals
@@ -314,19 +344,14 @@ export default async function MarketCardDetailPage({
       offeredPrice: Number(item.offeredPrice || 0),
       buyer: {
         id: item.buyerId,
-        displayName: item.buyer.displayName,
-        name: item.buyer.name,
-        image: item.buyer.image,
+        displayName: item.buyer?.displayName || null,
+        name: item.buyer?.name || null,
+        image: item.buyer?.image || null,
       },
     }));
 
-  const activeListings = allListings.filter(
-    (item) => String(item.status || "").toLowerCase() !== "sold"
-  );
-  const sameRarityActiveCount = activeListings.filter(
-    (item) => String(item.rarity || "") === String(listing.rarity || "")
-  ).length;
-  const totalActiveListings = activeListings.length;
+  const sameRarityActiveCount = listingStats.sameRarityActiveCount;
+  const totalActiveListings = listingStats.totalActiveListings;
   const latestCompletedDeal: OfferRow | null =
     allDeals
       .filter((item) => item.cardId === listing.id && item.status === "completed")
@@ -341,9 +366,9 @@ export default async function MarketCardDetailPage({
         offeredPrice: Number(item.offeredPrice || 0),
         buyer: {
           id: item.buyerId,
-          displayName: item.buyer.displayName,
-          name: item.buyer.name,
-          image: item.buyer.image,
+          displayName: item.buyer?.displayName || null,
+          name: item.buyer?.name || null,
+          image: item.buyer?.image || null,
         },
       }))[0] || null;
 

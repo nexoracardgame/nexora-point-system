@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Noto_Sans_Thai, Sora } from "next/font/google";
 import { useSession } from "next-auth/react";
 import {
   startTransition,
+  useCallback,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -255,6 +257,7 @@ export default function MarketDashboardTFT({
           }),
     [shouldUseInitialItems]
   );
+  const router = useRouter();
   const { data: session } = useSession();
   const [items, setItems] = useState<MarketItem[]>(() =>
     shouldUseInitialItems
@@ -276,9 +279,33 @@ export default function MarketDashboardTFT({
   const initializedSeenStorageKeyRef = useRef<string | null>(null);
   const marketSeenBaselineReadyRef = useRef(shouldUseInitialItems);
   const refreshInFlightRef = useRef(false);
+  const prefetchedCardRoutesRef = useRef<Set<string>>(new Set());
   const viewerSeenStorageKey = useMemo(
     () => buildMarketSeenStorageKey(session?.user?.id || initialViewerKey),
     [initialViewerKey, session?.user?.id]
+  );
+
+  const prefetchCardDetail = useCallback(
+    (cardId?: string | null) => {
+      const safeCardId = String(cardId || "").trim();
+
+      if (!safeCardId || prefetchedCardRoutesRef.current.has(safeCardId)) {
+        return;
+      }
+
+      prefetchedCardRoutesRef.current.add(safeCardId);
+      router.prefetch(`/market/card/${safeCardId}`);
+    },
+    [router]
+  );
+
+  const getWarmCardRouteProps = useCallback(
+    (cardId: string) => ({
+      onMouseEnter: () => prefetchCardDetail(cardId),
+      onFocus: () => prefetchCardDetail(cardId),
+      onTouchStart: () => prefetchCardDetail(cardId),
+    }),
+    [prefetchCardDetail]
   );
 
   useEffect(() => {
@@ -599,6 +626,42 @@ export default function MarketDashboardTFT({
   const centerHero = heroTop3[0];
   const rightHero = heroTop3[2];
 
+  useEffect(() => {
+    const cardIds = Array.from(
+      new Set(
+        [...heroTop3, ...visibleItems.slice(0, 18)]
+          .map((item) => item?.id)
+          .filter(Boolean)
+      )
+    );
+
+    if (cardIds.length === 0) {
+      return;
+    }
+
+    const warmVisibleRoutes = () => {
+      cardIds.forEach((cardId) => prefetchCardDetail(cardId));
+    };
+    const idleWindow = window as typeof window & {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout?: number }
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      const idleId = idleWindow.requestIdleCallback(warmVisibleRoutes, {
+        timeout: 800,
+      });
+
+      return () => idleWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = window.setTimeout(warmVisibleRoutes, 120);
+    return () => window.clearTimeout(timeoutId);
+  }, [heroTop3, visibleItems, prefetchCardDetail]);
+
   return (
     <div
       className={`${thaiSans.variable} ${sora.variable} space-y-6 lg:space-y-8`}
@@ -652,6 +715,7 @@ export default function MarketDashboardTFT({
         {centerHero && (
           <Link
             href={`/market/card/${centerHero.id}`}
+            {...getWarmCardRouteProps(centerHero.id)}
             className="relative mt-5 block overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.06] shadow-[0_25px_80px_rgba(168,85,247,0.20)] backdrop-blur-xl"
           >
             <div className="relative">
@@ -728,6 +792,7 @@ export default function MarketDashboardTFT({
                 <Link
                   key={card.id}
                   href={`/market/card/${card.id}`}
+                  {...getWarmCardRouteProps(card.id)}
                   className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04]"
                 >
                   <SafeCardImage
@@ -838,6 +903,7 @@ export default function MarketDashboardTFT({
           {leftHero && (
             <Link
               href={`/market/card/${leftHero.id}`}
+              {...getWarmCardRouteProps(leftHero.id)}
               className="absolute left-10 bottom-0 hidden lg:block"
             >
               <div className="group relative">
@@ -902,6 +968,7 @@ export default function MarketDashboardTFT({
           {centerHero && (
             <Link
               href={`/market/card/${centerHero.id}`}
+              {...getWarmCardRouteProps(centerHero.id)}
               className="relative z-20 w-full max-w-[400px] overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.06] shadow-[0_30px_120px_rgba(168,85,247,0.20)] backdrop-blur-xl transition duration-500 hover:-translate-y-2"
               style={{
                 transform: `translate(${(mouse.x - 50) * 0.06}px, ${
@@ -975,6 +1042,7 @@ export default function MarketDashboardTFT({
           {rightHero && (
             <Link
               href={`/market/card/${rightHero.id}`}
+              {...getWarmCardRouteProps(rightHero.id)}
               className="absolute right-10 bottom-0 hidden lg:block"
             >
               <div className="group relative">
@@ -1112,6 +1180,7 @@ export default function MarketDashboardTFT({
               <Link
                 key={card.id}
                 href={`/market/card/${card.id}`}
+                {...getWarmCardRouteProps(card.id)}
                 className={`group relative transition-all duration-500 hover:-translate-y-2 ${rarity.ring} ${
                   freshListingIds.includes(card.id)
                     ? "animate-[pulse_1.4s_ease-in-out_3]"

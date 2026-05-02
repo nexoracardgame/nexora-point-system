@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sanitizeCardImageUrl } from "@/lib/card-image";
 import {
@@ -29,6 +30,10 @@ export type MarketListingRecord = {
 
 function hasDatabaseConfig() {
   return Boolean(String(process.env.DATABASE_URL || "").trim());
+}
+
+function isActiveListing(item: { status?: string | null }) {
+  return String(item.status || "").toLowerCase() !== "sold";
 }
 
 function toMarketListingRecord(item: {
@@ -70,11 +75,7 @@ function toMarketListingRecord(item: {
   };
 }
 
-async function getDbListings(where?: {
-  id?: string;
-  sellerId?: string;
-  cardNo?: string;
-}) {
+async function getDbListings(where?: Prisma.MarketListingWhereInput) {
   const rows = await prisma.marketListing.findMany({
     where,
     include: {
@@ -132,6 +133,94 @@ export async function getMarketListingById(id: string) {
     return process.env.NODE_ENV === "production"
       ? null
       : getLocalMarketListingById(id);
+  }
+}
+
+export async function getMarketListingsByCardNo(cardNo: string) {
+  const normalizedCardNo = String(cardNo || "").trim();
+
+  if (!normalizedCardNo) {
+    return [];
+  }
+
+  if (!hasDatabaseConfig()) {
+    const listings = await getLocalMarketListings();
+    return listings.filter((item) => String(item.cardNo || "") === normalizedCardNo);
+  }
+
+  try {
+    return await getDbListings({
+      cardNo: normalizedCardNo,
+    });
+  } catch {
+    return process.env.NODE_ENV === "production"
+      ? []
+      : (await getLocalMarketListings()).filter(
+          (item) => String(item.cardNo || "") === normalizedCardNo
+        );
+  }
+}
+
+export async function getMarketListingStatsForRarity(rarity?: string | null) {
+  const normalizedRarity = String(rarity || "").trim();
+
+  if (!hasDatabaseConfig()) {
+    const listings = await getLocalMarketListings();
+    const activeListings = listings.filter(isActiveListing);
+
+    return {
+      totalActiveListings: activeListings.length,
+      sameRarityActiveCount: activeListings.filter(
+        (item) => String(item.rarity || "").trim() === normalizedRarity
+      ).length,
+    };
+  }
+
+  const activeWhere: Prisma.MarketListingWhereInput = {
+    NOT: {
+      status: {
+        equals: "sold",
+        mode: "insensitive",
+      },
+    },
+  };
+  const rarityWhere: Prisma.MarketListingWhereInput = normalizedRarity
+    ? {
+        ...activeWhere,
+        rarity: normalizedRarity,
+      }
+    : {
+        ...activeWhere,
+        OR: [{ rarity: null }, { rarity: "" }],
+      };
+
+  try {
+    const [totalActiveListings, sameRarityActiveCount] = await Promise.all([
+      prisma.marketListing.count({ where: activeWhere }),
+      prisma.marketListing.count({ where: rarityWhere }),
+    ]);
+
+    return {
+      totalActiveListings,
+      sameRarityActiveCount,
+    };
+  } catch {
+    if (process.env.NODE_ENV === "production") {
+      return {
+        totalActiveListings: 0,
+        sameRarityActiveCount: 0,
+      };
+    }
+
+    const listings = await getLocalMarketListings();
+    const activeListings = listings.filter(isActiveListing);
+
+    return {
+      totalActiveListings: activeListings.length,
+      sameRarityActiveCount: activeListings.filter(
+        (item) => String(item.rarity || "").trim() === normalizedRarity
+      ).length,
+    };
   }
 }
 
