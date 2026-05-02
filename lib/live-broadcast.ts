@@ -46,6 +46,26 @@ class LiveBusyError extends Error {
   }
 }
 
+function isLiveSchemaError(error: unknown) {
+  const source = error as {
+    code?: string;
+    meta?: { code?: string; message?: string };
+    message?: string;
+  } | null;
+  const code = String(source?.code || source?.meta?.code || "").trim();
+  const message = String(source?.message || source?.meta?.message || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    code === "42P01" ||
+    code === "42703" ||
+    message.includes("does not exist") ||
+    message.includes("column") ||
+    message.includes("relation")
+  );
+}
+
 function cleanHost(hostname: string) {
   return hostname.toLowerCase().replace(/^www\./, "");
 }
@@ -618,11 +638,8 @@ export async function createLiveBroadcast(input: {
 }) {
   const embed = buildLiveEmbed(input.sourceUrl);
 
-  try {
-    await ensureLiveBroadcastSchema(prisma);
-    await expireOldLiveBroadcasts(prisma);
-
-    return await prisma.$transaction(async (tx) => {
+  const createInCurrentSchema = () =>
+    prisma.$transaction(async (tx) => {
       await expireOldLiveBroadcasts(tx);
 
       const ban = await getActiveLiveBroadcastBan(input.ownerUserId, tx, {
@@ -674,6 +691,9 @@ export async function createLiveBroadcast(input: {
         active: normalizeLiveRow(rows[0]),
       };
     });
+
+  try {
+    return await createInCurrentSchema();
   } catch (error) {
     if (error instanceof LiveBusyError) {
       return {
@@ -681,6 +701,11 @@ export async function createLiveBroadcast(input: {
         reason: "busy" as const,
         active: error.active,
       };
+    }
+
+    if (isLiveSchemaError(error)) {
+      await ensureLiveBroadcastSchema(prisma);
+      return await createInCurrentSchema();
     }
 
     throw error;

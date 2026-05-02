@@ -21,11 +21,23 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 export async function GET() {
   try {
     const actor = await getApiActor().catch(() => null);
-    const active = await getActiveLiveBroadcast();
+    const active = await getActiveLiveBroadcast(undefined, {
+      ensureSchema: false,
+      expireOld: false,
+    }).catch((error) => {
+      console.error("LIVE GET ACTIVE ERROR:", error);
+      return null;
+    });
     const [viewerBan, activeOwnerBan] = await Promise.all([
-      actor ? getActiveLiveBroadcastBan(actor.id) : Promise.resolve(null),
+      actor
+        ? getActiveLiveBroadcastBan(actor.id, undefined, {
+            ensureSchema: false,
+          }).catch(() => null)
+        : Promise.resolve(null),
       active?.ownerUserId
-        ? getActiveLiveBroadcastBan(active.ownerUserId)
+        ? getActiveLiveBroadcastBan(active.ownerUserId, undefined, {
+            ensureSchema: false,
+          }).catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -56,14 +68,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existingBan = await getActiveLiveBroadcastBan(actor.id);
-    if (existingBan) {
-      return noStoreJson(
-        { error: "live_banned", ban: existingBan },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json().catch(() => ({}));
     const sourceUrl = String(body?.url || body?.sourceUrl || "").trim();
 

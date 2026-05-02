@@ -246,11 +246,14 @@ export default function LiveControlClient() {
     setMessage("");
 
     try {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 12000);
       const res = await fetch("/api/live", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
-      });
+        signal: controller.signal,
+      }).finally(() => window.clearTimeout(timeoutId));
       const payload = (await res.json().catch(() => null)) as {
         active?: ActiveLive | null;
         ban?: LiveBan | null;
@@ -278,8 +281,12 @@ export default function LiveControlClient() {
       setUrl("");
       broadcastLiveStatusChanged();
       setMessage("เริ่มแชร์ไลฟ์แล้ว ทุกเครื่องจะเห็นหน้าจอลอยอัตโนมัติ");
-    } catch {
-      setError("เชื่อมต่อไม่สำเร็จ ลองอีกครั้ง");
+    } catch (error) {
+      setError(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "เซิร์ฟเวอร์ไลฟ์ตอบช้าเกินไป ลองกดเริ่มแชร์อีกครั้ง"
+          : "เชื่อมต่อไม่สำเร็จ ลองอีกครั้ง"
+      );
     } finally {
       setSaving(false);
     }
