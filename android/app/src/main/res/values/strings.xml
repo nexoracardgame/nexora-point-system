@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NEXORA POINT</string>
+    <string name="title_activity_main">NEXORA POINT</string>
+    <string name="package_name">com.nexora.point</string>
+    <string name="custom_url_scheme">com.nexora.point</string>
+</resources>

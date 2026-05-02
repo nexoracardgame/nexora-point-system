@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Noto_Sans_Thai } from "next/font/google";
 import { useEffect, useState } from "react";
 import AppInstallButton from "@/components/AppInstallButton";
+import GooglePlayButton from "@/components/GooglePlayButton";
 import PrefetchLink from "@/components/PrefetchLink";
 import WindowsDownloadButton from "@/components/WindowsDownloadButton";
 
@@ -77,8 +78,9 @@ export default function NexoraLuxuryHome() {
           <AppInstallButton variant="dark" />
         </div>
 
-        <div className="mt-3 flex justify-center">
+        <div className="mt-3 flex flex-wrap justify-center gap-3">
           <WindowsDownloadButton />
+          <GooglePlayButton />
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -115,6 +117,7 @@ export default function NexoraLuxuryHome() {
       <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center gap-3 sm:flex">
         <AppInstallButton variant="dark" />
         <WindowsDownloadButton />
+        <GooglePlayButton />
       </div>
 
       <div
