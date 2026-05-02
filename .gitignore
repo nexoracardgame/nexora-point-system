@@ -4,6 +4,7 @@ nexora_saved_model/
 *.keras
 __pycache__/
 .next/
+dist/
 node_modules/
 .env
 .env.local.venv-ai/

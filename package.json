@@ -2,13 +2,21 @@
   "name": "nexora-point",
   "version": "0.1.0",
   "private": true,
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "next dev --webpack",
     "build:card-index": "node scripts/build-card-index.mjs",
     "prebuild": "npm run build:card-index",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "desktop:dev": "electron .",
+    "desktop:icon": "node scripts/generate-electron-assets.mjs",
+    "desktop:sync": "node scripts/sync-electron-package.mjs",
+    "desktop:deps": "npm install --prefix desktop --omit=dev --no-audit --fund=false",
+    "desktop:dist": "npm run desktop:icon && npm run desktop:sync && npm run desktop:deps && electron-builder --win --x64",
+    "desktop:release": "npm run build && npm run desktop:dist && npm run desktop:stage",
+    "desktop:stage": "node scripts/stage-electron-release.mjs"
   },
   "dependencies": {
     "@line/liff": "^2.28.0",
@@ -19,6 +27,7 @@
     "@tensorflow/tfjs-converter": "^4.22.0",
     "canvas": "^3.2.3",
     "dotenv": "^17.4.0",
+    "electron-updater": "^6.8.3",
     "emoji-picker-react": "^4.18.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
@@ -37,9 +46,64 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.nexora.point",
+    "productName": "NEXORA POINT",
+    "copyright": "Copyright (c) 2026 NEXORA",
+    "compression": "maximum",
+    "npmRebuild": false,
+    "toolsets": {
+      "winCodeSign": "1.1.0"
+    },
+    "directories": {
+      "app": "desktop",
+      "output": "dist/desktop",
+      "buildResources": "desktop/assets"
+    },
+    "files": [
+      "**/*"
+    ],
+    "asar": false,
+    "artifactName": "NEXORA-Point-Setup-${version}.${ext}",
+    "win": {
+      "icon": "desktop/assets/icon.ico",
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false,
+      "signExts": [
+        "!.exe",
+        "!.dll"
+      ],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "packElevateHelper": false,
+      "shortcutName": "NEXORA POINT",
+      "uninstallDisplayName": "NEXORA POINT"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://nexora-point-system.vercel.app/downloads/windows/"
+      }
+    ]
   }
 }

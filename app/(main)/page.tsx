@@ -5,6 +5,7 @@ import { Noto_Sans_Thai } from "next/font/google";
 import { useEffect, useState } from "react";
 import AppInstallButton from "@/components/AppInstallButton";
 import PrefetchLink from "@/components/PrefetchLink";
+import WindowsDownloadButton from "@/components/WindowsDownloadButton";
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -76,6 +77,10 @@ export default function NexoraLuxuryHome() {
           <AppInstallButton variant="dark" />
         </div>
 
+        <div className="mt-3 flex justify-center">
+          <WindowsDownloadButton />
+        </div>
+
         <div className="mt-3 flex flex-wrap gap-2">
           {heroPills.map((item) => (
             <span
@@ -107,8 +112,9 @@ export default function NexoraLuxuryHome() {
         ))}
       </div>
 
-      <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center sm:flex">
+      <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center gap-3 sm:flex">
         <AppInstallButton variant="dark" />
+        <WindowsDownloadButton />
       </div>
 
       <div

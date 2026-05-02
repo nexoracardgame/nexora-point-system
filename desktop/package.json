@@ -1,0 +1,11 @@
+{
+  "name": "nexora-point-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "author": "NEXORA",
+  "description": "NEXORA POINT Windows desktop shell",
+  "main": "main.cjs",
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  }
+}
