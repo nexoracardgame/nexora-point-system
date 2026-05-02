@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   AlertCircle,
+  Ban,
   CheckCircle2,
   ExternalLink,
   Loader2,
@@ -11,8 +12,11 @@ import {
   Radio,
   Send,
   ShieldCheck,
+  ShieldOff,
   Square,
   Tv2,
+  Undo2,
+  X,
 } from "lucide-react";
 
 type ActiveLive = {
@@ -26,8 +30,19 @@ type ActiveLive = {
   createdAt: string;
 };
 
+type LiveBan = {
+  userId: string;
+  reason: string;
+  bannedByUserId: string;
+  bannedByName: string;
+  createdAt: string;
+  liftedAt: string | null;
+};
+
 const LIVE_STATUS_EVENT = "nexora:live-status-updated";
 const LIVE_STATUS_STORAGE_KEY = "nexora:live-status-version";
+const DEFAULT_LIVE_BAN_REASON =
+  "บัญชีนี้ถูกระงับสิทธิ์การไลฟ์เนื่องจากละเมิดข้อบังคับและกฎชุมชนของ NEXORA";
 
 const platformHints = [
   {
@@ -95,6 +110,18 @@ export default function LiveControlClient() {
   const { data: session } = useSession();
   const [url, setUrl] = useState("");
   const [active, setActive] = useState<ActiveLive | null>(null);
+  const [viewerBan, setViewerBan] = useState<LiveBan | null>(null);
+  const [activeOwnerBan, setActiveOwnerBan] = useState<LiveBan | null>(null);
+  const [canModerateLive, setCanModerateLive] = useState(false);
+  const [moderationDialog, setModerationDialog] = useState<
+    "ban" | "unban" | null
+  >(null);
+  const [moderationTarget, setModerationTarget] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
+  const [moderationBan, setModerationBan] = useState<LiveBan | null>(null);
+  const [moderating, setModerating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -103,15 +130,11 @@ export default function LiveControlClient() {
   const isTikTokLive = active?.platform === "tiktok";
 
   const canStop = useMemo(() => {
-    const role = String(session?.user?.role || "").toLowerCase();
     return (
       !!active &&
-      (active.ownerUserId === session?.user?.id ||
-        role === "admin" ||
-        role === "staff" ||
-        role === "superadmin")
+      (active.ownerUserId === session?.user?.id || canModerateLive)
     );
-  }, [active, session?.user?.id, session?.user?.role]);
+  }, [active, canModerateLive, session?.user?.id]);
 
   const loadActive = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -122,10 +145,16 @@ export default function LiveControlClient() {
       });
       const payload = (await res.json().catch(() => null)) as {
         active?: ActiveLive | null;
+        viewerBan?: LiveBan | null;
+        activeOwnerBan?: LiveBan | null;
+        canModerate?: boolean;
       } | null;
 
       if (res.ok) {
         setActive(payload?.active || null);
+        setViewerBan(payload?.viewerBan || null);
+        setActiveOwnerBan(payload?.activeOwnerBan || null);
+        setCanModerateLive(Boolean(payload?.canModerate));
       }
     } catch {
       if (!silent) {
@@ -145,7 +174,11 @@ export default function LiveControlClient() {
       }
     };
 
-    void loadActive(false);
+    const initialSyncId = window.setTimeout(() => {
+      if (!cancelled) {
+        void loadActive(false);
+      }
+    }, 0);
     const intervalId = window.setInterval(tick, hasActiveLive ? 700 : 1600);
     const handleFocus = () => tick();
     const handleVisibility = () => tick();
@@ -163,6 +196,7 @@ export default function LiveControlClient() {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(initialSyncId);
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener(LIVE_STATUS_EVENT, handleLiveStatus);
@@ -173,6 +207,11 @@ export default function LiveControlClient() {
 
   async function startLive(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (viewerBan) {
+      setError(viewerBan.reason || DEFAULT_LIVE_BAN_REASON);
+      return;
+    }
+
     setSaving(true);
     setError("");
     setMessage("");
@@ -185,6 +224,7 @@ export default function LiveControlClient() {
       });
       const payload = (await res.json().catch(() => null)) as {
         active?: ActiveLive | null;
+        ban?: LiveBan | null;
         error?: string;
       } | null;
 
@@ -195,6 +235,12 @@ export default function LiveControlClient() {
       }
 
       if (!res.ok) {
+        if (payload?.error === "live_banned") {
+          setViewerBan(payload.ban || null);
+          setError(payload.ban?.reason || DEFAULT_LIVE_BAN_REASON);
+          return;
+        }
+
         setError(
           payload?.error === "unsupported_platform"
             ? "รองรับเฉพาะลิงก์ไลฟ์จาก YouTube, Facebook และ TikTok"
@@ -245,6 +291,77 @@ export default function LiveControlClient() {
     }
   }
 
+  function openModerationDialog(action: "ban" | "unban") {
+    const target = active
+      ? { userId: active.ownerUserId, name: active.ownerName }
+      : moderationTarget;
+
+    if (!target?.userId) {
+      return;
+    }
+
+    setModerationTarget(target);
+    setModerationDialog(action);
+    setError("");
+    setMessage("");
+  }
+
+  async function confirmModeration() {
+    if (!moderationDialog || !moderationTarget?.userId) {
+      return;
+    }
+
+    setModerating(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const isBan = moderationDialog === "ban";
+      const res = await fetch("/api/live/ban", {
+        method: isBan ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: moderationTarget.userId,
+          reason: DEFAULT_LIVE_BAN_REASON,
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        active?: ActiveLive | null;
+        ban?: LiveBan | null;
+        error?: string;
+      } | null;
+
+      if (!res.ok) {
+        const nextError =
+          payload?.error === "cannot_ban_self"
+            ? "ไม่สามารถแบนสิทธิ์ไลฟ์ของบัญชีตัวเองได้"
+            : payload?.error === "protected_user"
+              ? "ไม่สามารถแบนบัญชีแอดมินหรือทีมงานได้"
+              : payload?.error === "forbidden"
+                ? "เฉพาะแอดมินเท่านั้นที่จัดการสิทธิ์ไลฟ์ได้"
+                : "จัดการสิทธิ์ไลฟ์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+        setError(nextError);
+        return;
+      }
+
+      setActive(payload?.active || null);
+      setActiveOwnerBan(isBan ? payload?.ban || null : null);
+      setModerationBan(isBan ? payload?.ban || null : null);
+      setModerationDialog(null);
+      broadcastLiveStatusChanged();
+      void loadActive(true);
+      setMessage(
+        isBan
+          ? `แบนการไลฟ์ของ ${moderationTarget.name || "ผู้ใช้คนนี้"} แล้ว`
+          : `ปลดแบนการไลฟ์ของ ${moderationTarget.name || "ผู้ใช้คนนี้"} แล้ว`
+      );
+    } catch {
+      setError("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setModerating(false);
+    }
+  }
+
   return (
     <main className="min-h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] overflow-hidden rounded-[28px] bg-[#f5f1eb] text-black shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
       <div className="relative isolate overflow-hidden">
@@ -282,13 +399,13 @@ export default function LiveControlClient() {
                   <input
                     value={url}
                     onChange={(event) => setUrl(event.target.value)}
-                    disabled={!!active || saving}
+                    disabled={!!active || saving || !!viewerBan}
                     placeholder="วางลิงก์ไลฟ์สดที่นี่"
                     className="min-h-[52px] min-w-0 flex-1 rounded-[18px] border border-white/10 bg-black px-4 text-base font-bold text-white outline-none transition placeholder:text-white/28 focus:border-amber-300/40 focus:ring-4 focus:ring-amber-300/10 disabled:cursor-not-allowed disabled:opacity-45"
                   />
                   <button
                     type="submit"
-                    disabled={!url.trim() || !!active || saving}
+                    disabled={!url.trim() || !!active || saving || !!viewerBan}
                     className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] bg-white px-5 text-sm font-black text-black shadow-[0_14px_34px_rgba(255,255,255,0.12)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {saving ? (
@@ -300,6 +417,18 @@ export default function LiveControlClient() {
                   </button>
                 </div>
               </div>
+
+              {viewerBan && (
+                <div className="flex items-start gap-3 rounded-[22px] border border-red-300/25 bg-red-500/12 p-4 text-red-50 shadow-[0_18px_42px_rgba(239,68,68,0.12)]">
+                  <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-red-200" />
+                  <div className="min-w-0">
+                    <div className="font-black">บัญชีนี้ถูกแบนการไลฟ์อยู่</div>
+                    <div className="mt-1 text-sm font-bold leading-6 text-red-50/72">
+                      {viewerBan.reason || DEFAULT_LIVE_BAN_REASON}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {active && (
                 <div className="flex items-start gap-3 rounded-[22px] border border-amber-300/22 bg-amber-300/12 p-4 text-amber-50">
@@ -412,6 +541,29 @@ export default function LiveControlClient() {
                         ปิดไลฟ์
                       </button>
                     )}
+                    {canModerateLive && active.ownerUserId !== session?.user?.id && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openModerationDialog(activeOwnerBan ? "unban" : "ban")
+                        }
+                        disabled={saving || moderating}
+                        className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black transition disabled:opacity-50 ${
+                          activeOwnerBan
+                            ? "bg-white text-black hover:bg-amber-100"
+                            : "bg-black text-red-200 ring-1 ring-red-300/35 hover:bg-red-950"
+                        }`}
+                      >
+                        {moderating ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : activeOwnerBan ? (
+                          <Undo2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Ban className="h-3.5 w-3.5" />
+                        )}
+                        {activeOwnerBan ? "ปลดแบน" : "แบนการไลฟ์"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -425,6 +577,30 @@ export default function LiveControlClient() {
                   <p className="mt-2 max-w-sm text-sm font-bold leading-6 text-black/48">
                     เมื่อเริ่มแชร์ หน้าจอลอยจะขึ้นมุมขวาล่างบนคอม และลอยเหนือเมนูในมือถือทันที
                   </p>
+                  {canModerateLive && moderationTarget && moderationBan ? (
+                    <div className="mt-5 rounded-[20px] border border-red-300/20 bg-black p-4 text-left text-white shadow-[0_18px_44px_rgba(0,0,0,0.24)]">
+                      <div className="flex items-start gap-3">
+                        <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
+                        <div className="min-w-0">
+                          <div className="font-black">
+                            {moderationTarget.name || "ผู้ใช้คนนี้"} ถูกแบนการไลฟ์อยู่
+                          </div>
+                          <div className="mt-1 text-xs font-bold leading-5 text-white/55">
+                            สามารถปลดแบนได้ทันทีเมื่ออนุมัติให้กลับมาไลฟ์อีกครั้ง
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openModerationDialog("unban")}
+                        disabled={moderating}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-black text-black transition hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        <Undo2 className="h-4 w-4" />
+                        ปลดแบน
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -447,6 +623,82 @@ export default function LiveControlClient() {
             </div>
           ))}
         </section>
+
+        {moderationDialog && moderationTarget ? (
+          <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/72 p-4 backdrop-blur-xl">
+            <div className="w-full max-w-[440px] overflow-hidden rounded-[30px] border border-white/12 bg-[#060607] text-white shadow-[0_32px_120px_rgba(0,0,0,0.72)]">
+              <div className="relative p-5 sm:p-6">
+                <button
+                  type="button"
+                  onClick={() => setModerationDialog(null)}
+                  disabled={moderating}
+                  className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 transition hover:bg-white/[0.1] hover:text-white disabled:opacity-40"
+                  aria-label="ปิดหน้าต่าง"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500 text-white shadow-[0_0_42px_rgba(239,68,68,0.38)]">
+                  {moderationDialog === "ban" ? (
+                    <Ban className="h-6 w-6" />
+                  ) : (
+                    <Undo2 className="h-6 w-6" />
+                  )}
+                </div>
+
+                <div className="mt-5 text-[11px] font-black uppercase tracking-[0.26em] text-amber-300">
+                  Live Moderation
+                </div>
+                <h3 className="mt-2 pr-10 text-2xl font-black leading-tight">
+                  {moderationDialog === "ban"
+                    ? "ยืนยันแบนการไลฟ์"
+                    : "ยืนยันปลดแบน"}
+                </h3>
+                <p className="mt-3 text-sm font-bold leading-6 text-white/62">
+                  {moderationDialog === "ban"
+                    ? `บัญชี ${moderationTarget.name || "ผู้ใช้คนนี้"} จะไม่สามารถวางลิงก์หรือเริ่มแชร์ไลฟ์ได้อีก และไลฟ์ที่กำลังเปิดอยู่จะถูกปิดทันที`
+                    : `บัญชี ${moderationTarget.name || "ผู้ใช้คนนี้"} จะกลับมาเริ่มแชร์ไลฟ์ได้อีกครั้ง`}
+                </p>
+
+                {moderationDialog === "ban" ? (
+                  <div className="mt-4 rounded-2xl border border-red-300/18 bg-red-500/10 p-4 text-sm font-bold leading-6 text-red-50/82">
+                    {DEFAULT_LIVE_BAN_REASON}
+                  </div>
+                ) : null}
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setModerationDialog(null)}
+                    disabled={moderating}
+                    className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:bg-white/[0.1] disabled:opacity-40"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmModeration()}
+                    disabled={moderating}
+                    className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black transition disabled:opacity-50 ${
+                      moderationDialog === "ban"
+                        ? "bg-red-500 text-white hover:bg-red-600"
+                        : "bg-white text-black hover:bg-amber-100"
+                    }`}
+                  >
+                    {moderating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : moderationDialog === "ban" ? (
+                      <Ban className="h-4 w-4" />
+                    ) : (
+                      <Undo2 className="h-4 w-4" />
+                    )}
+                    {moderationDialog === "ban" ? "ยืนยันแบน" : "ยืนยันปลดแบน"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );

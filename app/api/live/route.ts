@@ -3,7 +3,9 @@ import { getApiActor } from "@/lib/admin-auth";
 import {
   buildLiveEmbed,
   createLiveBroadcast,
+  getActiveLiveBroadcastBan,
   getActiveLiveBroadcast,
+  isLiveModeratorRole,
   stopLiveBroadcast,
   touchLiveBroadcast,
 } from "@/lib/live-broadcast";
@@ -18,11 +20,32 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 export async function GET() {
   try {
+    const actor = await getApiActor().catch(() => null);
     const active = await getActiveLiveBroadcast();
-    return noStoreJson({ active });
+    const [viewerBan, activeOwnerBan] = await Promise.all([
+      actor ? getActiveLiveBroadcastBan(actor.id) : Promise.resolve(null),
+      active?.ownerUserId
+        ? getActiveLiveBroadcastBan(active.ownerUserId)
+        : Promise.resolve(null),
+    ]);
+
+    return noStoreJson({
+      active,
+      viewerBan,
+      activeOwnerBan,
+      canModerate: actor ? isLiveModeratorRole(actor.role) : false,
+    });
   } catch (error) {
     console.error("LIVE GET ERROR:", error);
-    return noStoreJson({ active: null }, { status: 500 });
+    return noStoreJson(
+      {
+        active: null,
+        viewerBan: null,
+        activeOwnerBan: null,
+        canModerate: false,
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -33,6 +56,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const existingBan = await getActiveLiveBroadcastBan(actor.id);
+    if (existingBan) {
+      return noStoreJson(
+        { error: "live_banned", ban: existingBan },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const sourceUrl = String(body?.url || body?.sourceUrl || "").trim();
 
@@ -49,6 +80,13 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
+      if (result.reason === "banned") {
+        return noStoreJson(
+          { error: "live_banned", ban: result.ban },
+          { status: 403 }
+        );
+      }
+
       return noStoreJson(
         { error: "busy", active: result.active },
         { status: 409 }

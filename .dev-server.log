@@ -15,3 +15,4 @@
  GET /login?callbackUrl=%2Fmarket%2Fseller-center 200 in 44ms (next.js: 2ms, application-code: 42ms)
  GET /api/market/listings 200 in 138ms (next.js: 3ms, application-code: 135ms)
  GET /login?callbackUrl=%2Fmarket%2Fcard%2Fcmon573fn0002l404rkmo2rns 200 in 23ms (next.js: 1414µs, application-code: 22ms)
+ GET /login?callbackUrl=%2Fdm 200 in 46ms (next.js: 2ms, application-code: 44ms)
