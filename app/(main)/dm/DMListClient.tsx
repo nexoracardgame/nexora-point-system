@@ -62,8 +62,10 @@ type DmMessageRealtimeRow = {
 type LocalDmClearMap = Map<string, string>;
 
 const DM_LIST_CACHE_KEY = "dm-list";
-const DM_LIST_FAST_REFRESH_MS = 900;
-const DM_LIST_BURST_DELAYS_MS = [120, 360, 760] as const;
+const DM_LIST_POLL_TICK_MS = 1000;
+const DM_LIST_REALTIME_FALLBACK_MS = 15000;
+const DM_LIST_CONNECTING_FALLBACK_MS = 1800;
+const DM_LIST_CONFIRM_REFRESH_MS = 550;
 
 function dispatchDmListUnreadCount(rooms: DMRoomListItem[]) {
   if (typeof window === "undefined") {
@@ -390,6 +392,8 @@ export default function DMListClient({
   const loadRoomsInFlightRef = useRef<Promise<void> | null>(null);
   const loadRoomsQueuedRef = useRef(false);
   const loadRoomsBurstTimersRef = useRef<number[]>([]);
+  const lastLoadRoomsAtRef = useRef(0);
+  const realtimeConnectedRef = useRef(false);
   const appliedRealtimeMessageKeysRef = useRef<Set<string>>(new Set());
   const roomsRef = useRef<DMRoomListItem[]>(rooms);
   const currentMeRef = useRef<SessionUser | null>(currentMe);
@@ -559,6 +563,7 @@ export default function DMListClient({
     }
 
     const effectiveMe = meOverride === undefined ? currentMe : meOverride;
+    lastLoadRoomsAtRef.current = Date.now();
     const task = (async () => {
       const res = await fetch("/api/dm/list", {
         cache: "no-store",
@@ -611,11 +616,11 @@ export default function DMListClient({
 
     void loadRooms(activeMe);
     clearLoadRoomsBurstTimers();
-    loadRoomsBurstTimersRef.current = DM_LIST_BURST_DELAYS_MS.map((delay) =>
+    loadRoomsBurstTimersRef.current = [
       window.setTimeout(() => {
         void loadRooms(currentMeRef.current);
-      }, delay)
-    );
+      }, DM_LIST_CONFIRM_REFRESH_MS),
+    ];
   };
 
   const markRoomReadLocally = (room: DMRoomListItem) => {
@@ -953,7 +958,12 @@ export default function DMListClient({
         const nextMessage = (payload as { new?: DmMessageRealtimeRow })?.new;
         if (eventType === "INSERT" && nextMessage?.roomId) {
           applyRealtimeMessage(nextMessage);
-          queueLoadRooms(currentMeRef.current);
+          clearLoadRoomsBurstTimers();
+          loadRoomsBurstTimersRef.current = [
+            window.setTimeout(() => {
+              void loadRooms(currentMeRef.current);
+            }, DM_LIST_CONFIRM_REFRESH_MS),
+          ];
           return;
         }
 
@@ -993,7 +1003,12 @@ export default function DMListClient({
       }
     );
 
-    channel?.subscribe();
+    channel?.subscribe((status) => {
+      realtimeConnectedRef.current = status === "SUBSCRIBED";
+      if (status === "SUBSCRIBED") {
+        queueLoadRooms(currentMeRef.current);
+      }
+    });
 
     const onChatMessageReceived = (event: Event) => {
       const message = (event as CustomEvent<DmMessageRealtimeRow>).detail;
@@ -1004,10 +1019,17 @@ export default function DMListClient({
     };
 
     const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
+      const fallbackMs = realtimeConnectedRef.current
+        ? DM_LIST_REALTIME_FALLBACK_MS
+        : DM_LIST_CONNECTING_FALLBACK_MS;
+
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - lastLoadRoomsAtRef.current >= fallbackMs
+      ) {
         void loadRooms(currentMeRef.current);
       }
-    }, DM_LIST_FAST_REFRESH_MS);
+    }, DM_LIST_POLL_TICK_MS);
 
     const onFocus = () => {
       queueLoadRooms(currentMeRef.current);
@@ -1063,6 +1085,7 @@ export default function DMListClient({
       );
       window.removeEventListener("nexora:chat-read", onChatRead as EventListener);
       document.removeEventListener("visibilitychange", onVisibility);
+      realtimeConnectedRef.current = false;
       if (supabase && channel) {
         void supabase.removeChannel(channel);
       }

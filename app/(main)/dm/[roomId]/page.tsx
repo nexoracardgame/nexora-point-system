@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState }
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import ChatMessageText from "@/components/ChatMessageText";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import {
@@ -45,6 +46,10 @@ type DirectChatPage = {
   hasMore: boolean;
   nextCursor: string | null;
 };
+
+const CHAT_SYNC_POLL_TICK_MS = 1000;
+const CHAT_SYNC_REALTIME_FALLBACK_MS = 15000;
+const CHAT_SYNC_CONNECTING_FALLBACK_MS = 1800;
 
 function buildDirectReadRoomId(userA?: string | null, userB?: string | null) {
   return [String(userA || "").trim(), String(userB || "").trim()]
@@ -160,6 +165,8 @@ function DMRoomContent({
   const lastMessageIdRef = useRef<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRoomIdRef = useRef(roomId);
+  const lastSyncAtRef = useRef(0);
+  const realtimeConnectedRef = useRef(false);
   const loadingOlderRef = useRef(false);
   const olderTimerRef = useRef<number | null>(null);
   const olderIdleRef = useRef<number | null>(null);
@@ -443,6 +450,7 @@ function DMRoomContent({
       return;
     }
 
+    lastSyncAtRef.current = Date.now();
     const res = await fetch(
       `/api/dm/messages?roomId=${encodeURIComponent(targetRoomId)}&limit=${CHAT_HISTORY_PAGE_SIZE}`,
       {
@@ -668,7 +676,15 @@ function DMRoomContent({
       }
     };
 
-    const intervalId = window.setInterval(syncNow, 900);
+    const intervalId = window.setInterval(() => {
+      const fallbackMs = realtimeConnectedRef.current
+        ? CHAT_SYNC_REALTIME_FALLBACK_MS
+        : CHAT_SYNC_CONNECTING_FALLBACK_MS;
+
+      if (Date.now() - lastSyncAtRef.current >= fallbackMs) {
+        syncNow();
+      }
+    }, CHAT_SYNC_POLL_TICK_MS);
     window.addEventListener("focus", syncNow);
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -781,6 +797,14 @@ function DMRoomContent({
           other
         );
 
+        if (payload.eventType === "INSERT") {
+          window.dispatchEvent(
+            new CustomEvent("nexora:chat-message-received", {
+              detail: incoming,
+            })
+          );
+        }
+
         setMessages((prev) =>
           payload.eventType === "UPDATE"
             ? mergeSingleChatMessage(prev, incoming, roomId, me, other)
@@ -813,9 +837,15 @@ function DMRoomContent({
       }
     );
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      realtimeConnectedRef.current = status === "SUBSCRIBED";
+      if (status === "SUBSCRIBED") {
+        void syncLatestMessages();
+      }
+    });
 
     return () => {
+      realtimeConnectedRef.current = false;
       void supabase.removeChannel(channel);
     };
   }, [me, other, roomClosed, roomId]);
@@ -1026,6 +1056,11 @@ function DMRoomContent({
       const withoutOptimistic = removeChatMessage(prev, optimisticId);
       return mergeSingleChatMessage(withoutOptimistic, insertedMessage, roomId, me, other);
     });
+    window.dispatchEvent(
+      new CustomEvent("nexora:chat-message-received", {
+        detail: insertedMessage,
+      })
+    );
     setSending(false);
     sendInFlightRef.current = false;
     scrollToBottom("smooth");
@@ -1264,7 +1299,7 @@ function DMRoomContent({
                             />
                           ) : null}
 
-                          {message.content}
+                          <ChatMessageText text={message.content} mine={mine} />
                         </div>
 
                         {mine && !message.optimistic ? (

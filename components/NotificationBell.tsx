@@ -34,8 +34,10 @@ type NotificationResponse = {
 };
 
 const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
-const NOTIFICATION_FAST_POLL_MS = 700;
-const NOTIFICATION_BURST_DELAYS_MS = [120, 360, 760] as const;
+const NOTIFICATION_POLL_TICK_MS = 1000;
+const NOTIFICATION_REALTIME_FALLBACK_MS = 15000;
+const NOTIFICATION_CONNECTING_FALLBACK_MS = 1800;
+const NOTIFICATION_CONFIRM_REFRESH_MS = 550;
 
 function isSystemNotificationSupported() {
   return (
@@ -43,6 +45,10 @@ function isSystemNotificationSupported() {
     "Notification" in window &&
     "serviceWorker" in navigator
   );
+}
+
+function getBrowserClockMs() {
+  return typeof performance === "undefined" ? 0 : performance.now();
 }
 
 function readDeliveredNotificationIds() {
@@ -205,6 +211,8 @@ export default function NotificationBell() {
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
   const burstTimeoutsRef = useRef<number[]>([]);
+  const lastNotificationLoadAtRef = useRef(0);
+  const realtimeConnectedRef = useRef(false);
   const fastChatUnreadCountRef = useRef(0);
   const localeTag = getLocaleTag(locale);
 
@@ -285,6 +293,7 @@ export default function NotificationBell() {
 
     inFlightRef.current = true;
     const requestId = ++requestIdRef.current;
+    lastNotificationLoadAtRef.current = getBrowserClockMs();
 
     try {
       const res = await fetch("/api/notifications", {
@@ -353,11 +362,11 @@ export default function NotificationBell() {
   const queueFastNotificationSync = () => {
     void loadNotifications();
     clearNotificationBurstTimers();
-    burstTimeoutsRef.current = NOTIFICATION_BURST_DELAYS_MS.map((delay) =>
+    burstTimeoutsRef.current = [
       window.setTimeout(() => {
         void loadNotifications();
-      }, delay)
-    );
+      }, NOTIFICATION_CONFIRM_REFRESH_MS),
+    ];
   };
 
   const shouldRunBackgroundNotificationSync = () =>
@@ -507,10 +516,17 @@ export default function NotificationBell() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      if (shouldRunBackgroundNotificationSync()) {
+      const fallbackMs = realtimeConnectedRef.current
+        ? NOTIFICATION_REALTIME_FALLBACK_MS
+        : NOTIFICATION_CONNECTING_FALLBACK_MS;
+
+      if (
+        shouldRunBackgroundNotificationSync() &&
+        getBrowserClockMs() - lastNotificationLoadAtRef.current >= fallbackMs
+      ) {
         void loadNotifications();
       }
-    }, NOTIFICATION_FAST_POLL_MS);
+    }, NOTIFICATION_POLL_TICK_MS);
 
     const onFocus = () => {
       queueFastNotificationSync();
@@ -610,8 +626,13 @@ export default function NotificationBell() {
       }
     };
 
+    const onChatMessageReceived = () => {
+      queueFastNotificationSync();
+    };
+
     window.addEventListener("focus", onFocus);
     window.addEventListener("nexora:chat-read", onChatRead);
+    window.addEventListener("nexora:chat-message-received", onChatMessageReceived);
     window.addEventListener("nexora:chat-unread-count", onChatUnreadCount);
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -620,6 +641,7 @@ export default function NotificationBell() {
       clearNotificationBurstTimers();
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("nexora:chat-read", onChatRead);
+      window.removeEventListener("nexora:chat-message-received", onChatMessageReceived);
       window.removeEventListener("nexora:chat-unread-count", onChatUnreadCount);
       document.removeEventListener("visibilitychange", onVisibility);
     };
@@ -670,10 +692,16 @@ export default function NotificationBell() {
       }
     );
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      realtimeConnectedRef.current = status === "SUBSCRIBED";
+      if (status === "SUBSCRIBED") {
+        queueFastNotificationSync();
+      }
+    });
     channelRef.current = channel;
 
     return () => {
+      realtimeConnectedRef.current = false;
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
         channelRef.current = null;

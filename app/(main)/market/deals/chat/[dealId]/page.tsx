@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState }
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import ChatMessageText from "@/components/ChatMessageText";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
@@ -64,6 +65,10 @@ type DealChatPage = {
   hasMore: boolean;
   nextCursor: string | null;
 };
+
+const CHAT_SYNC_POLL_TICK_MS = 1000;
+const CHAT_SYNC_REALTIME_FALLBACK_MS = 15000;
+const CHAT_SYNC_CONNECTING_FALLBACK_MS = 1800;
 
 function getDealReadRoomIds(targetRoomId: string, dealId: string) {
   return Array.from(
@@ -141,6 +146,8 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDealIdRef = useRef(dealId);
   const activeRoomIdRef = useRef(String(cachedRoom?.meta?.roomId || ""));
+  const lastSyncAtRef = useRef(0);
+  const realtimeConnectedRef = useRef(false);
   const loadingOlderRef = useRef(false);
   const olderTimerRef = useRef<number | null>(null);
   const olderIdleRef = useRef<number | null>(null);
@@ -393,6 +400,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       return;
     }
 
+    lastSyncAtRef.current = Date.now();
     const res = await fetch(
       `/api/dm/messages?roomId=${encodeURIComponent(currentRoomId)}&limit=${CHAT_HISTORY_PAGE_SIZE}`,
       {
@@ -640,7 +648,15 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       }
     };
 
-    const intervalId = window.setInterval(syncNow, 900);
+    const intervalId = window.setInterval(() => {
+      const fallbackMs = realtimeConnectedRef.current
+        ? CHAT_SYNC_REALTIME_FALLBACK_MS
+        : CHAT_SYNC_CONNECTING_FALLBACK_MS;
+
+      if (Date.now() - lastSyncAtRef.current >= fallbackMs) {
+        syncNow();
+      }
+    }, CHAT_SYNC_POLL_TICK_MS);
     window.addEventListener("focus", syncNow);
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -755,6 +771,14 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
           other
         );
 
+        if (payload.eventType === "INSERT") {
+          window.dispatchEvent(
+            new CustomEvent("nexora:chat-message-received", {
+              detail: incoming,
+            })
+          );
+        }
+
         setMessages((prev) =>
           mergeSingleChatMessage(prev, incoming, currentRoomId, me, other)
         );
@@ -793,9 +817,15 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       }
     );
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      realtimeConnectedRef.current = status === "SUBSCRIBED";
+      if (status === "SUBSCRIBED") {
+        void syncLatestMessages();
+      }
+    });
 
     return () => {
+      realtimeConnectedRef.current = false;
       void supabase.removeChannel(channel);
     };
   }, [dealId, me, other, roomClosed, roomId]);
@@ -1023,6 +1053,11 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       const withoutOptimistic = removeChatMessage(prev, optimisticId);
       return mergeSingleChatMessage(withoutOptimistic, insertedMessage, roomId, me, other);
     });
+    window.dispatchEvent(
+      new CustomEvent("nexora:chat-message-received", {
+        detail: insertedMessage,
+      })
+    );
     setSending(false);
     sendInFlightRef.current = false;
     scrollToBottom("smooth");
@@ -1301,7 +1336,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                             />
                           ) : null}
 
-                          {message.content}
+                          <ChatMessageText text={message.content} mine={mine} />
                         </div>
 
                         {mine && !message.optimistic ? (

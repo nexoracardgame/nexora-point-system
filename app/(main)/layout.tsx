@@ -45,8 +45,13 @@ function formatBalance(value?: number | null) {
   return Number(value || 0).toLocaleString("th-TH");
 }
 
-const CHAT_UNREAD_FAST_POLL_MS = 700;
-const CHAT_UNREAD_BURST_DELAYS_MS = [120, 360, 760] as const;
+const CHAT_UNREAD_POLL_TICK_MS = 1000;
+const CHAT_UNREAD_REALTIME_FALLBACK_MS = 15000;
+const CHAT_UNREAD_CONNECTING_FALLBACK_MS = 1800;
+const CHAT_UNREAD_CONFIRM_REFRESH_MS = 550;
+const WALLET_UNREAD_POLL_TICK_MS = 1000;
+const WALLET_UNREAD_REALTIME_FALLBACK_MS = 15000;
+const WALLET_UNREAD_CONNECTING_FALLBACK_MS = 2500;
 
 function dispatchChatUnreadCount(count: number, source = "layout") {
   if (typeof window === "undefined") {
@@ -420,6 +425,8 @@ export default function MainLayout({
     let queued = false;
     let unreadSyncPauseUntil = 0;
     let latestChatUnreadCount = chatUnreadCount;
+    let lastUnreadSyncAt = 0;
+    let realtimeConnected = false;
     const burstTimers: ReturnType<typeof setTimeout>[] = [];
     const processedChatReadKeys = new Set<string>();
     const recentChatReadRooms = new Map<string, number>();
@@ -440,6 +447,7 @@ export default function MainLayout({
       }
 
       inFlight = true;
+      lastUnreadSyncAt = Date.now();
       try {
         const res = await fetch(`/api/dm/unread?ts=${Date.now()}`, {
           cache: "no-store",
@@ -482,13 +490,11 @@ export default function MainLayout({
     const queueChatUnreadSync = () => {
       void syncChatUnread();
       clearBurstTimers();
-      for (const delay of CHAT_UNREAD_BURST_DELAYS_MS) {
-        burstTimers.push(
-          setTimeout(() => {
-            void syncChatUnread();
-          }, delay)
-        );
-      }
+      burstTimers.push(
+        setTimeout(() => {
+          void syncChatUnread();
+        }, CHAT_UNREAD_CONFIRM_REFRESH_MS)
+      );
     };
 
     channel?.on(
@@ -566,13 +572,25 @@ export default function MainLayout({
       }
     );
 
-    channel?.subscribe();
+    channel?.subscribe((status) => {
+      realtimeConnected = status === "SUBSCRIBED";
+      if (status === "SUBSCRIBED") {
+        queueChatUnreadSync();
+      }
+    });
 
     const intervalId = setInterval(() => {
-      if (document.visibilityState === "visible") {
+      const fallbackMs = realtimeConnected
+        ? CHAT_UNREAD_REALTIME_FALLBACK_MS
+        : CHAT_UNREAD_CONNECTING_FALLBACK_MS;
+
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - lastUnreadSyncAt >= fallbackMs
+      ) {
         void syncChatUnread();
       }
-    }, CHAT_UNREAD_FAST_POLL_MS);
+    }, CHAT_UNREAD_POLL_TICK_MS);
 
     const handleFocus = () => {
       queueChatUnreadSync();
@@ -660,6 +678,7 @@ export default function MainLayout({
 
     return () => {
       cancelled = true;
+      realtimeConnected = false;
       clearInterval(intervalId);
       clearBurstTimers();
       window.removeEventListener("focus", handleFocus);
@@ -675,10 +694,17 @@ export default function MainLayout({
   useEffect(() => {
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let lastWalletSyncAt = 0;
+    let realtimeConnected = false;
+    const supabase = getBrowserSupabaseClient();
+    const channel = supabase
+      ? supabase.channel(`layout-wallet-unread-${Date.now()}`)
+      : null;
 
     const syncWalletUnread = async () => {
       if (cancelled) return;
 
+      lastWalletSyncAt = Date.now();
       try {
         const res = await fetch(`/api/wallet/notifications?ts=${Date.now()}`, {
           cache: "no-store",
@@ -695,11 +721,33 @@ export default function MainLayout({
       }
     };
 
-    intervalId = setInterval(() => {
-      if (document.visibilityState === "visible") {
+    channel?.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "AppNotification" },
+      () => {
         void syncWalletUnread();
       }
-    }, 900);
+    );
+
+    channel?.subscribe((status) => {
+      realtimeConnected = status === "SUBSCRIBED";
+      if (status === "SUBSCRIBED") {
+        void syncWalletUnread();
+      }
+    });
+
+    intervalId = setInterval(() => {
+      const fallbackMs = realtimeConnected
+        ? WALLET_UNREAD_REALTIME_FALLBACK_MS
+        : WALLET_UNREAD_CONNECTING_FALLBACK_MS;
+
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - lastWalletSyncAt >= fallbackMs
+      ) {
+        void syncWalletUnread();
+      }
+    }, WALLET_UNREAD_POLL_TICK_MS);
 
     const handleFocus = () => void syncWalletUnread();
     const handleVisibility = () => {
@@ -714,9 +762,13 @@ export default function MainLayout({
 
     return () => {
       cancelled = true;
+      realtimeConnected = false;
       if (intervalId) clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
+      if (supabase && channel) {
+        void supabase.removeChannel(channel);
+      }
     };
   }, [pathname]);
 

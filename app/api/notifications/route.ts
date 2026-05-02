@@ -128,11 +128,13 @@ export async function GET() {
     }
 
     const directRoomIds = allowedRoomIds.filter((roomId) => !roomId.startsWith("deal:"));
-    const [roomResult, unreadResult, acceptedDeals] = await Promise.all([
-      supabase
-        .from("dm_room")
-        .select("roomid,usera,userb,useraname,useraimage,userbname,userbimage")
-        .in("roomid", directRoomIds),
+    const [roomResult, unreadResult] = await Promise.all([
+      directRoomIds.length > 0
+        ? supabase
+            .from("dm_room")
+            .select("roomid,usera,userb,useraname,useraimage,userbname,userbimage")
+            .in("roomid", directRoomIds)
+        : Promise.resolve({ data: [], error: null }),
       supabase
         .from("dmMessage")
         .select("id,roomId,senderId,senderName,senderImage,content,imageUrl,createdAt")
@@ -142,30 +144,6 @@ export async function GET() {
         .is("seenAt", null)
         .order("createdAt", { ascending: false })
         .limit(60),
-      prisma.dealRequest.findMany({
-        where: {
-          status: "accepted",
-          OR: [{ buyerId: currentUserId }, { sellerId: currentUserId }],
-        },
-        include: {
-          buyer: {
-            select: {
-              id: true,
-              displayName: true,
-              name: true,
-              image: true,
-            },
-          },
-          seller: {
-            select: {
-              id: true,
-              displayName: true,
-              name: true,
-              image: true,
-            },
-          },
-        },
-      }),
     ]);
     const directRoomClearAtByRoomId = await getDmRoomClearedAtMap(
       currentUserId,
@@ -220,13 +198,50 @@ export async function GET() {
           .filter(Boolean)
       )
     );
-
-    const profileEntries = await Promise.all(
-      unreadSenderIds.map(async (senderId) => [
-        senderId,
-        await getLocalProfileByUserId(senderId),
-      ] as const)
+    const unreadDealIds = uniqueStrings(
+      relevantUnreadRows.map((row) => {
+        const roomId = String(row.roomId || "").trim();
+        return roomId.startsWith("deal:") ? roomId.replace(/^deal:/, "") : "";
+      })
     );
+
+    const [profileEntries, acceptedDeals] = await Promise.all([
+      Promise.all(
+        unreadSenderIds.map(async (senderId) => [
+          senderId,
+          await getLocalProfileByUserId(senderId),
+        ] as const)
+      ),
+      unreadDealIds.length > 0
+        ? prisma.dealRequest.findMany({
+            where: {
+              id: {
+                in: unreadDealIds,
+              },
+              status: "accepted",
+              OR: [{ buyerId: currentUserId }, { sellerId: currentUserId }],
+            },
+            include: {
+              buyer: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  name: true,
+                  image: true,
+                },
+              },
+              seller: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
 
     const profileByUserId = new Map(profileEntries);
     const dealById = new Map(acceptedDeals.map((deal) => [deal.id, deal]));
