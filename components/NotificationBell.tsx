@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { cacheRealtimeDmMessage } from "@/lib/dm-room-fast-cache";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { getLocaleTag, useLanguage } from "@/lib/i18n";
 import { formatThaiShortDate } from "@/lib/thai-time";
@@ -157,6 +158,55 @@ function getChatNotificationRoomId(item: NotificationItem) {
   return "";
 }
 
+function getChatNotificationMessageId(item: NotificationItem) {
+  if (item.type !== "chat") {
+    return "";
+  }
+
+  return String(item.id || "")
+    .replace(/^(?:deal-chat|chat)-/, "")
+    .trim();
+}
+
+function primeChatNotificationCache(item: NotificationItem) {
+  if (item.type !== "chat") {
+    return;
+  }
+
+  const roomId = getChatNotificationRoomId(item);
+  const messageId = getChatNotificationMessageId(item);
+  if (!roomId || !messageId || roomId.startsWith("deal:")) {
+    return;
+  }
+
+  cacheRealtimeDmMessage([roomId], {
+    id: messageId,
+    roomId,
+    senderName: item.title,
+    senderImage: item.image,
+    content: item.body,
+    imageUrl: null,
+    createdAt: item.createdAt,
+    seenAt: null,
+  });
+
+  window.dispatchEvent(
+    new CustomEvent("nexora:chat-message-received", {
+      detail: {
+        id: messageId,
+        roomId,
+        senderName: item.title,
+        senderImage: item.image,
+        content: item.body,
+        imageUrl: null,
+        createdAt: item.createdAt,
+        seenAt: null,
+        source: "notification-cache",
+      },
+    })
+  );
+}
+
 function isChatNotificationForRooms(item: NotificationItem, roomIds: Set<string>) {
   if (item.type !== "chat" || roomIds.size === 0) {
     return false;
@@ -306,6 +356,7 @@ export default function NotificationBell() {
       }
 
       const nextItems = Array.isArray(data?.items) ? data.items : [];
+      nextItems.forEach(primeChatNotificationCache);
       const hiddenIds = hiddenIdsRef.current;
       const readRoomAt = readRoomAtRef.current;
       const visibleItems = nextItems.filter(
@@ -626,7 +677,14 @@ export default function NotificationBell() {
       }
     };
 
-    const onChatMessageReceived = () => {
+    const onChatMessageReceived = (event: Event) => {
+      const source = String(
+        (event as CustomEvent<{ source?: string | null }>).detail?.source || ""
+      );
+      if (source === "notification-cache") {
+        return;
+      }
+
       queueFastNotificationSync();
     };
 

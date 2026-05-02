@@ -167,6 +167,8 @@ function DMRoomContent({
   const activeRoomIdRef = useRef(roomId);
   const lastSyncAtRef = useRef(0);
   const realtimeConnectedRef = useRef(false);
+  const meRef = useRef<ChatUser | null>(me);
+  const otherRef = useRef<ChatUser | null>(other);
   const loadingOlderRef = useRef(false);
   const olderTimerRef = useRef<number | null>(null);
   const olderIdleRef = useRef<number | null>(null);
@@ -184,6 +186,14 @@ function DMRoomContent({
   useEffect(() => {
     draftFileRef.current = file;
   }, [file]);
+
+  useEffect(() => {
+    meRef.current = me;
+  }, [me]);
+
+  useEffect(() => {
+    otherRef.current = other;
+  }, [other]);
 
   const cancelOlderPrefetch = () => {
     if (olderTimerRef.current) {
@@ -251,18 +261,21 @@ function DMRoomContent({
     });
   });
 
-  const emitChatRead = useEffectEvent((
+  const emitChatRead = (
     targetRoomId: string,
     unreadCount = 1,
     readAt = new Date().toISOString()
   ) => {
+    const activeMe = meRef.current || me;
+    const activeOther = otherRef.current || other;
+
     dispatchClientChatRead({
       roomId: targetRoomId,
-      roomIds: getDirectReadRoomIds(targetRoomId, me, other),
+      roomIds: getDirectReadRoomIds(targetRoomId, activeMe, activeOther),
       unreadCount,
       readAt,
     });
-  });
+  };
 
   const markLoadedRoomSeen = useEffectEvent(
     async (targetRoomId: string, nextMessages: DMMessage[], meData?: ChatUser | null) => {
@@ -683,9 +696,11 @@ function DMRoomContent({
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    setNewMessageCount(0);
     loadingOlderRef.current = false;
     cancelOlderPrefetch();
+    const resetCountTimer = window.setTimeout(() => {
+      setNewMessageCount(0);
+    }, 0);
     const quickSyncTimerA = window.setTimeout(() => {
       void syncLatestMessages();
     }, 140);
@@ -699,6 +714,7 @@ function DMRoomContent({
     });
 
     return () => {
+      window.clearTimeout(resetCountTimer);
       window.clearTimeout(quickSyncTimerA);
       window.clearTimeout(quickSyncTimerB);
       cancelOlderPrefetch();
@@ -882,11 +898,13 @@ function DMRoomContent({
           return;
         }
 
+        const activeMe = meRef.current;
+        const activeOther = otherRef.current;
         const incoming = normalizeChatMessage(
           payload.new as DMMessage,
           roomId,
-          me,
-          other
+          activeMe,
+          activeOther
         );
 
         if (payload.eventType === "INSERT") {
@@ -899,16 +917,16 @@ function DMRoomContent({
 
         setMessages((prev) =>
           payload.eventType === "UPDATE"
-            ? mergeSingleChatMessage(prev, incoming, roomId, me, other)
-            : mergeSingleChatMessage(prev, incoming, roomId, me, other)
+            ? mergeSingleChatMessage(prev, incoming, roomId, activeMe, activeOther)
+            : mergeSingleChatMessage(prev, incoming, roomId, activeMe, activeOther)
         );
 
         if (
           payload.eventType === "INSERT" &&
-          incoming.senderId !== me?.id &&
+          incoming.senderId !== activeMe?.id &&
           document.visibilityState === "visible"
         ) {
-          void markLoadedRoomSeen(roomId, [incoming], me);
+          void markLoadedRoomSeen(roomId, [incoming], activeMe);
         }
       }
     );
@@ -940,7 +958,7 @@ function DMRoomContent({
       realtimeConnectedRef.current = false;
       void supabase.removeChannel(channel);
     };
-  }, [me, other, roomClosed, roomId]);
+  }, [roomClosed, roomId]);
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {

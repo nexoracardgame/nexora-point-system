@@ -208,8 +208,10 @@ export async function getDmRoomAccess(input: {
     room.userb === userId ||
     (lineId ? room.usera === lineId || room.userb === lineId : false);
 
-  const canonicalUserA = await resolveCanonicalUserId(String(room.usera || ""));
-  const canonicalUserB = await resolveCanonicalUserId(String(room.userb || ""));
+  const [canonicalUserA, canonicalUserB] = await Promise.all([
+    resolveCanonicalUserId(String(room.usera || "")),
+    resolveCanonicalUserId(String(room.userb || "")),
+  ]);
   const allowedByCanonical =
     canonicalUserA === userId ||
     canonicalUserB === userId ||
