@@ -807,9 +807,7 @@ export async function banLiveBroadcaster(input: {
     return { ok: false as const, reason: "cannot_ban_self" as const };
   }
 
-  return prisma.$transaction(async (tx) => {
-    await ensureLiveBroadcastSchema(tx);
-
+  const banInCurrentSchema = () => prisma.$transaction(async (tx) => {
     const actorRole = String(input.actorRole || "").trim().toLowerCase();
     const targetRole = await getUserRoleForLiveModeration(targetUserId, tx);
     if (isLiveModeratorRole(targetRole) && actorRole !== "superadmin") {
@@ -855,9 +853,23 @@ export async function banLiveBroadcaster(input: {
     return {
       ok: true as const,
       ban: normalizeLiveBanRow(rows[0]),
-      active: await getActiveLiveBroadcast(tx),
+      active: await getActiveLiveBroadcast(tx, {
+        ensureSchema: false,
+        expireOld: false,
+      }),
     };
   });
+
+  try {
+    return await banInCurrentSchema();
+  } catch (error) {
+    if (isLiveSchemaError(error)) {
+      await ensureLiveBroadcastSchema(prisma);
+      return await banInCurrentSchema();
+    }
+
+    throw error;
+  }
 }
 
 export async function unbanLiveBroadcaster(input: {
@@ -873,20 +885,35 @@ export async function unbanLiveBroadcaster(input: {
     return { ok: false as const, reason: "forbidden" as const };
   }
 
-  await ensureLiveBroadcastSchema(prisma);
-  const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-    `
-      UPDATE "LiveBroadcastBan"
-      SET "liftedAt" = NOW()
-      WHERE "userId" = $1 AND "liftedAt" IS NULL
-      RETURNING *
-    `,
-    targetUserId
-  );
+  const unbanInCurrentSchema = async () => {
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `
+        UPDATE "LiveBroadcastBan"
+        SET "liftedAt" = NOW()
+        WHERE "userId" = $1 AND "liftedAt" IS NULL
+        RETURNING *
+      `,
+      targetUserId
+    );
 
-  return {
-    ok: true as const,
-    ban: normalizeLiveBanRow(rows[0]),
-    active: await getActiveLiveBroadcast(prisma),
+    return {
+      ok: true as const,
+      ban: normalizeLiveBanRow(rows[0]),
+      active: await getActiveLiveBroadcast(prisma, {
+        ensureSchema: false,
+        expireOld: false,
+      }),
+    };
   };
+
+  try {
+    return await unbanInCurrentSchema();
+  } catch (error) {
+    if (isLiveSchemaError(error)) {
+      await ensureLiveBroadcastSchema(prisma);
+      return await unbanInCurrentSchema();
+    }
+
+    throw error;
+  }
 }

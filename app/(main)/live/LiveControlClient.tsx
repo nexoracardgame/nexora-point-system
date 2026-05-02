@@ -343,20 +343,49 @@ export default function LiveControlClient() {
       return;
     }
 
+    const isBan = moderationDialog === "ban";
+    const target = moderationTarget;
+    const previousActive = active;
+    const previousActiveOwnerBan = activeOwnerBan;
+    const previousModerationBan = moderationBan;
+    const optimisticBan: LiveBan = {
+      userId: target.userId,
+      reason: DEFAULT_LIVE_BAN_REASON,
+      bannedByUserId: String(session?.user?.id || ""),
+      bannedByName: String(session?.user?.name || "NEXORA Admin"),
+      createdAt: new Date().toISOString(),
+      liftedAt: null,
+    };
+
     setModerating(true);
     setError("");
     setMessage("");
+    setModerationDialog(null);
+
+    if (isBan) {
+      setActive((current) =>
+        current?.ownerUserId === target.userId ? null : current
+      );
+      setActiveOwnerBan(optimisticBan);
+      setModerationBan(optimisticBan);
+    } else {
+      setActiveOwnerBan(null);
+      setModerationBan(null);
+    }
+    broadcastLiveStatusChanged();
 
     try {
-      const isBan = moderationDialog === "ban";
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 10000);
       const res = await fetch("/api/live/ban", {
         method: isBan ? "POST" : "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: moderationTarget.userId,
+          userId: target.userId,
           reason: DEFAULT_LIVE_BAN_REASON,
         }),
-      });
+        signal: controller.signal,
+      }).finally(() => window.clearTimeout(timeoutId));
       const payload = (await res.json().catch(() => null)) as {
         active?: ActiveLive | null;
         ban?: LiveBan | null;
@@ -372,6 +401,9 @@ export default function LiveControlClient() {
               : payload?.error === "forbidden"
                 ? "เฉพาะแอดมินเท่านั้นที่จัดการสิทธิ์ไลฟ์ได้"
                 : "จัดการสิทธิ์ไลฟ์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+        setActive(previousActive);
+        setActiveOwnerBan(previousActiveOwnerBan);
+        setModerationBan(previousModerationBan);
         setError(nextError);
         return;
       }
@@ -388,6 +420,9 @@ export default function LiveControlClient() {
           : `ปลดแบนการไลฟ์ของ ${moderationTarget.name || "ผู้ใช้คนนี้"} แล้ว`
       );
     } catch {
+      setActive(previousActive);
+      setActiveOwnerBan(previousActiveOwnerBan);
+      setModerationBan(previousModerationBan);
       setError("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setModerating(false);
