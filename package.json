@@ -20,12 +20,16 @@
     "android:assets": "node scripts/generate-android-assets.mjs",
     "android:sync": "npm run android:assets && cap sync android",
     "android:open": "cap open android",
-    "android:build:aab": "cd android && gradlew.bat bundleRelease"
+    "android:build:aab": "cd android && gradlew.bat bundleRelease",
+    "ios:assets": "node scripts/generate-ios-assets.mjs",
+    "ios:sync": "npm run ios:assets && cap sync ios",
+    "ios:open": "cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1",
+    "@capacitor/ios": "^8.3.1",
     "@line/liff": "^2.28.0",
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "^6.9.0",
