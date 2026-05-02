@@ -13,6 +13,7 @@ import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { cacheRealtimeDmMessage } from "@/lib/dm-room-fast-cache";
 import {
   readClientViewCache,
   writeClientViewCache,
@@ -74,11 +75,30 @@ function dispatchChatMessageRealtime(message: Record<string, unknown>) {
     return;
   }
 
+  const roomIds = Array.from(
+    new Set(
+      [
+        message.roomId,
+        ...(Array.isArray(message.roomIds) ? message.roomIds : []),
+      ]
+        .map((roomId) => String(roomId || "").trim())
+        .filter(Boolean)
+    )
+  );
+  cacheRealtimeDmMessage(roomIds, message as Parameters<typeof cacheRealtimeDmMessage>[1]);
+
   window.dispatchEvent(
     new CustomEvent("nexora:chat-message-received", {
       detail: message,
     })
   );
+}
+
+function buildDirectRealtimeRoomId(userA?: string | null, userB?: string | null) {
+  return [String(userA || "").trim(), String(userB || "").trim()]
+    .filter(Boolean)
+    .sort()
+    .join("__");
 }
 
 function getOpenChatRoomId(pathname: string) {
@@ -524,9 +544,20 @@ export default function MainLayout({
             (currentLineId ? senderId === currentLineId : false));
 
         if (eventType === "INSERT" && roomId && nextMessage) {
+          const fastRoomIds = [roomId];
+          const directRoomId =
+            !isMine && currentUserId && senderId
+              ? buildDirectRealtimeRoomId(currentUserId, senderId)
+              : "";
+
+          if (directRoomId) {
+            fastRoomIds.push(directRoomId);
+          }
+
           dispatchChatMessageRealtime({
             id: nextMessage.id,
             roomId,
+            roomIds: fastRoomIds,
             senderId,
             senderName: nextMessage.senderName || null,
             senderImage: nextMessage.senderImage || null,

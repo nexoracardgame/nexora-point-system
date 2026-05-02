@@ -481,6 +481,64 @@ function DMRoomContent({
     }
   });
 
+  const applyRealtimeEventMessage = useEffectEvent((detail?: Partial<DMMessage> & {
+    isMine?: boolean | null;
+    roomIds?: Array<string | null | undefined> | null;
+  }) => {
+    const messageId = String(detail?.id || "").trim();
+    if (!messageId || !roomId || roomClosed) {
+      return;
+    }
+
+    const eventRoomIds = Array.from(
+      new Set(
+        [
+          detail?.roomId,
+          ...(Array.isArray(detail?.roomIds) ? detail.roomIds : []),
+        ]
+          .map((item) => String(item || "").trim())
+          .filter(Boolean)
+      )
+    );
+    const acceptedRoomIds = new Set(getDirectReadRoomIds(roomId, me, other));
+    const senderId = String(detail?.senderId || "").trim();
+    const eventIsMine = Boolean(detail?.isMine) || senderId === me?.id;
+    const matchesRoom = eventRoomIds.some((item) => acceptedRoomIds.has(item));
+    const matchesKnownDirectPeer = Boolean(!eventIsMine && other?.id && senderId === other.id);
+
+    if (!matchesRoom && !matchesKnownDirectPeer) {
+      return;
+    }
+
+    const incoming = normalizeChatMessage(
+      {
+        id: messageId,
+        roomId,
+        senderId,
+        content: detail?.content || null,
+        imageUrl: detail?.imageUrl || null,
+        createdAt: detail?.createdAt || new Date().toISOString(),
+        seenAt: detail?.seenAt || null,
+        senderName: detail?.senderName || null,
+        senderImage: detail?.senderImage || null,
+        sender: detail?.sender,
+        optimistic: Boolean(detail?.optimistic),
+      },
+      roomId,
+      me,
+      other
+    );
+
+    setMessages((prev) => mergeSingleChatMessage(prev, incoming, roomId, me, other));
+
+    if (
+      !eventIsMine &&
+      document.visibilityState === "visible"
+    ) {
+      void markLoadedRoomSeen(roomId, [incoming], me);
+    }
+  });
+
   const scheduleOlderPrefetch = useEffectEvent(() => {
     if (!roomId || roomClosed || !hasMore || !nextCursor || loadingOlderRef.current) {
       return;
@@ -536,9 +594,7 @@ function DMRoomContent({
     queueMicrotask(() => {
       if (cachedMessages.length > 0) {
         setMessages((prev) =>
-          prev.length > 0
-            ? prev
-            : mergeChatMessages(prev, cachedMessages, roomId, cachedMe, cachedOther)
+          mergeChatMessages(prev, cachedMessages, roomId, cachedMe, cachedOther)
         );
       }
 
@@ -630,12 +686,21 @@ function DMRoomContent({
     setNewMessageCount(0);
     loadingOlderRef.current = false;
     cancelOlderPrefetch();
+    const quickSyncTimerA = window.setTimeout(() => {
+      void syncLatestMessages();
+    }, 140);
+    const quickSyncTimerB = window.setTimeout(() => {
+      void syncLatestMessages();
+    }, 520);
 
     queueMicrotask(() => {
       void loadBootstrap();
+      void syncLatestMessages();
     });
 
     return () => {
+      window.clearTimeout(quickSyncTimerA);
+      window.clearTimeout(quickSyncTimerB);
       cancelOlderPrefetch();
     };
   }, [roomId]);
@@ -692,6 +757,33 @@ function DMRoomContent({
       window.clearInterval(intervalId);
       window.removeEventListener("focus", syncNow);
       document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [roomClosed, roomId]);
+
+  useEffect(() => {
+    if (!roomId || roomClosed) {
+      return;
+    }
+
+    const onChatMessageReceived = (event: Event) => {
+      applyRealtimeEventMessage(
+        (event as CustomEvent<Partial<DMMessage> & {
+          isMine?: boolean | null;
+          roomIds?: Array<string | null | undefined> | null;
+        }>).detail
+      );
+    };
+
+    window.addEventListener(
+      "nexora:chat-message-received",
+      onChatMessageReceived as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "nexora:chat-message-received",
+        onChatMessageReceived as EventListener
+      );
     };
   }, [roomClosed, roomId]);
 

@@ -68,7 +68,7 @@ export async function prefetchDirectChatRoom(roomId: string) {
     return null;
   }
 
-  writeChatHistoryCache<ChatMessage, DirectRoomMeta>("dm-room", payload.roomId, {
+  const cachePayload = {
     messages: Array.isArray(payload.messages) ? payload.messages : [],
     meta: {
       me: payload.me || null,
@@ -77,7 +77,21 @@ export async function prefetchDirectChatRoom(roomId: string) {
       nextCursor: String(payload.nextCursor || "").trim() || null,
     },
     cachedAt: Date.now(),
-  });
+  };
+
+  writeChatHistoryCache<ChatMessage, DirectRoomMeta>(
+    "dm-room",
+    payload.roomId,
+    cachePayload
+  );
+
+  if (payload.roomId !== safeRoomId) {
+    writeChatHistoryCache<ChatMessage, DirectRoomMeta>(
+      "dm-room",
+      safeRoomId,
+      cachePayload
+    );
+  }
 
   return payload;
 }

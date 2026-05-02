@@ -6,11 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
-import {
-  clearChatHistoryCache,
-  readChatHistoryCache,
-  writeChatHistoryCache,
-} from "@/lib/chat-history-cache";
+import { clearChatHistoryCache } from "@/lib/chat-history-cache";
 import { dispatchClientChatRead, isClientChatRead } from "@/lib/chat-read-sync";
 import { prefetchDealChatRoom, prefetchDirectChatRoom } from "@/lib/chat-room-prefetch";
 import {
@@ -18,6 +14,10 @@ import {
   writeClientViewCache,
 } from "@/lib/client-view-cache";
 import type { DMRoomListItem } from "@/lib/dm-list";
+import {
+  cacheRealtimeDmMessage,
+  primeDmRoomFastCache,
+} from "@/lib/dm-room-fast-cache";
 import { saveDmRoomSeed } from "@/lib/dm-room-seed";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { formatThaiChatActivityTime } from "@/lib/thai-time";
@@ -32,20 +32,6 @@ type SessionUser = {
 type DmListCache = {
   rooms: DMRoomListItem[];
   me: SessionUser | null;
-};
-
-type DmRoomFastCacheMeta = {
-  me?: {
-    id: string;
-    name: string;
-    image: string;
-  } | null;
-  other?: {
-    id: string;
-    name: string;
-    image: string;
-  } | null;
-  [key: string]: unknown;
 };
 
 type DmMessageRealtimeRow = {
@@ -422,28 +408,21 @@ export default function DMListClient({
     const safeRoomId = String(roomId || "").trim();
     if (!safeRoomId) return;
 
-    const existing = readChatHistoryCache<unknown, DmRoomFastCacheMeta>(
-      "dm-room",
-      safeRoomId
-    );
-    writeChatHistoryCache("dm-room", safeRoomId, {
-      messages: Array.isArray(existing?.messages) ? existing.messages : [],
-      meta: {
-        ...(existing?.meta || {}),
-        me: currentMe
-          ? {
+    primeDmRoomFastCache(safeRoomId, {
+      ...(currentMe
+        ? {
+            me: {
               id: String(currentMe.id || "").trim(),
               name: String(currentMe.name || "").trim() || "You",
               image: String(currentMe.image || "").trim() || "/avatar.png",
-            }
-          : existing?.meta?.me || null,
-        other: {
-          id: String(room.otherUserId || "").trim(),
-          name: String(room.otherName || "").trim() || "User",
-          image: String(room.otherImage || "").trim() || "/avatar.png",
-        },
+            },
+          }
+        : {}),
+      other: {
+        id: String(room.otherUserId || "").trim(),
+        name: String(room.otherName || "").trim() || "User",
+        image: String(room.otherImage || "").trim() || "/avatar.png",
       },
-      cachedAt: Date.now(),
     });
   }, [currentMe]);
 
@@ -673,9 +652,10 @@ export default function DMListClient({
     seedDirectRoom(room.roomId, room);
     seedDirectRoom(targetRoomId, room);
     router.prefetch(buildDirectRoomHref(targetRoomId));
+    void prefetchDirectChatRoom(targetRoomId).catch(() => null);
 
-    if (targetRoomId === room.roomId) {
-      void prefetchDirectChatRoom(targetRoomId).catch(() => null);
+    if (room.roomId && targetRoomId !== room.roomId) {
+      void prefetchDirectChatRoom(room.roomId).catch(() => null);
     }
   }, [getTargetDirectRoomId, router, seedDirectRoom]);
 
@@ -691,6 +671,7 @@ export default function DMListClient({
     seedDirectRoom(room.roomId, room);
     seedDirectRoom(targetRoomId, room);
     setOpeningRoomId(targetRoomId);
+    void prefetchDirectChatRoom(targetRoomId).catch(() => null);
     router.push(targetHref);
 
     void (async () => {
@@ -841,6 +822,46 @@ export default function DMListClient({
         (room.kind === "deal" && room.dealId && roomId === `deal:${room.dealId}`)
       );
     });
+    const matchingDirectRooms = roomsRef.current.filter((room) => {
+      if (room.kind === "deal") {
+        return false;
+      }
+
+      const targetRoomId = getTargetRoomId(room);
+      return room.roomId === roomId || targetRoomId === roomId;
+    });
+    const fastMessage = {
+      ...message,
+      createdAt,
+    };
+
+    if (matchingDirectRooms.length > 0) {
+      for (const room of matchingDirectRooms) {
+        const targetRoomId = getTargetRoomId(room);
+        cacheRealtimeDmMessage(
+          [room.roomId, targetRoomId, roomId],
+          fastMessage,
+          {
+            ...(activeMe
+              ? {
+                  me: {
+                    id: String(activeMe.id || "").trim(),
+                    name: String(activeMe.name || "").trim() || "You",
+                    image: String(activeMe.image || "").trim() || "/avatar.png",
+                  },
+                }
+              : {}),
+            other: {
+              id: String(room.otherUserId || "").trim(),
+              name: String(room.otherName || "").trim() || "User",
+              image: String(room.otherImage || "").trim() || "/avatar.png",
+            },
+          }
+        );
+      }
+    } else {
+      cacheRealtimeDmMessage([roomId], fastMessage);
+    }
 
     setRooms((prev) => {
       const nextRooms = prev.map((room) => {
