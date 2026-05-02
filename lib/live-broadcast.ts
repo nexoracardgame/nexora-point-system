@@ -61,7 +61,7 @@ function toSafeUrl(rawUrl: string) {
     throw new Error("invalid_protocol");
   }
 
-  return url;
+  return unwrapSharedUrl(url);
 }
 
 function decodeHtmlEntities(value: string) {
@@ -79,26 +79,58 @@ function cleanSharedUrlCandidate(value: string) {
     .replace(/[),.。]+$/g, "");
 }
 
+function cleanLiveUrlCandidate(value: string) {
+  return cleanSharedUrlCandidate(value).replace(/[\s;]+$/g, "");
+}
+
 function extractFirstLiveUrl(rawValue: string) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
 
   const iframeSrc = raw.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
   if (iframeSrc) {
-    return cleanSharedUrlCandidate(iframeSrc);
+    return cleanLiveUrlCandidate(iframeSrc);
   }
 
   const direct = raw.match(/https?:\/\/[^\s<>"']+/i)?.[0];
   if (direct) {
-    return cleanSharedUrlCandidate(direct);
+    return cleanLiveUrlCandidate(direct);
   }
 
   const www = raw.match(/\bwww\.[^\s<>"']+/i)?.[0];
   if (www) {
-    return `https://${cleanSharedUrlCandidate(www)}`;
+    return `https://${cleanLiveUrlCandidate(www)}`;
   }
 
-  return cleanSharedUrlCandidate(raw);
+  return cleanLiveUrlCandidate(raw);
+}
+
+function unwrapSharedUrl(url: URL) {
+  const host = cleanHost(url.hostname);
+  const redirectParamNames = ["u", "url", "q", "target", "redirect", "redirect_url"];
+
+  if (
+    host.endsWith("facebook.com") ||
+    host.endsWith("youtube.com") ||
+    host.endsWith("google.com") ||
+    host.endsWith("tiktok.com")
+  ) {
+    for (const paramName of redirectParamNames) {
+      const value = url.searchParams.get(paramName);
+      if (!value) continue;
+
+      try {
+        const nested = new URL(decodeHtmlEntities(value));
+        if (nested.protocol === "https:" || nested.protocol === "http:") {
+          return nested;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return url;
 }
 
 function getYoutubeId(url: URL) {
@@ -108,7 +140,7 @@ function getYoutubeId(url: URL) {
     return url.pathname.split("/").filter(Boolean)[0] || "";
   }
 
-  if (!host.endsWith("youtube.com")) {
+  if (!host.endsWith("youtube.com") && !host.endsWith("youtube-nocookie.com")) {
     return "";
   }
 
@@ -117,7 +149,7 @@ function getYoutubeId(url: URL) {
   }
 
   const parts = url.pathname.split("/").filter(Boolean);
-  const embedLike = ["embed", "shorts", "live"];
+  const embedLike = ["embed", "shorts", "live", "v", "e"];
   if (parts.length >= 2 && embedLike.includes(parts[0])) {
     return parts[1] || "";
   }
@@ -171,12 +203,18 @@ export function buildLiveEmbed(rawUrl: string) {
   const sourceUrl = toSafeUrl(rawUrl);
   const host = cleanHost(sourceUrl.hostname);
 
-  if (host === "youtu.be" || host.endsWith("youtube.com")) {
+  if (
+    host === "youtu.be" ||
+    host.endsWith("youtube.com") ||
+    host.endsWith("youtube-nocookie.com")
+  ) {
     const videoId = getYoutubeId(sourceUrl).trim();
     const parts = sourceUrl.pathname.split("/").filter(Boolean);
     const channelId =
       parts[0] === "channel" && parts[1] && parts.includes("live")
         ? parts[1]
+        : sourceUrl.pathname === "/embed/live_stream"
+          ? sourceUrl.searchParams.get("channel") || ""
         : "";
 
     return {
@@ -331,7 +369,57 @@ export async function ensureLiveBroadcastSchema(db: DbClient = prisma) {
 
   await db.$executeRawUnsafe(`
     ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "platform" TEXT NOT NULL DEFAULT 'youtube'
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "sourceUrl" TEXT NOT NULL DEFAULT ''
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "embedUrl" TEXT NOT NULL DEFAULT ''
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "title" TEXT NOT NULL DEFAULT 'Live'
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "ownerUserId" TEXT NOT NULL DEFAULT ''
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "ownerName" TEXT NOT NULL DEFAULT 'NEXORA'
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'active'
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
     ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "endedAt" TIMESTAMPTZ
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMPTZ
   `);
 
   await db.$executeRawUnsafe(`
@@ -344,6 +432,48 @@ export async function ensureLiveBroadcastSchema(db: DbClient = prisma) {
       "liftedAt" TIMESTAMPTZ
     )
   `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcastBan"
+    ADD COLUMN IF NOT EXISTS "reason" TEXT NOT NULL DEFAULT '${DEFAULT_LIVE_BAN_REASON.replace(/'/g, "''")}'
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcastBan"
+    ADD COLUMN IF NOT EXISTS "bannedByUserId" TEXT NOT NULL DEFAULT ''
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcastBan"
+    ADD COLUMN IF NOT EXISTS "bannedByName" TEXT NOT NULL DEFAULT 'NEXORA Admin'
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcastBan"
+    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcastBan"
+    ADD COLUMN IF NOT EXISTS "liftedAt" TIMESTAMPTZ
+  `);
+
+  await db.$executeRawUnsafe(
+    `
+      UPDATE "LiveBroadcast"
+      SET "status" = $1, "endedAt" = COALESCE("endedAt", NOW())
+      WHERE "status" = $2
+        AND "id" NOT IN (
+          SELECT "id"
+          FROM "LiveBroadcast"
+          WHERE "status" = $2
+          ORDER BY "createdAt" DESC
+          LIMIT 1
+        )
+    `,
+    ENDED_STATUS,
+    ACTIVE_STATUS
+  );
 
   await db.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "LiveBroadcast_one_active_idx"
