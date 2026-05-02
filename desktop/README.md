@@ -42,7 +42,9 @@ Deploy the web app after staging so `/downloads/windows/latest.yml` and the inst
 
 The app package intentionally ships without `asar` so Windows release builds do not depend on the extra asar-integrity signing toolchain. The desktop shell is small and still loads the live web app from the production URL.
 
-This local installer build is unsigned and disables update signature verification so auto-update works with the staged generic feed. For a public production release, add a Windows code-signing certificate and turn signature verification back on to avoid SmartScreen warnings.
+The installer is configured as a one-click per-user install, so users do not see the all-users/current-user chooser and do not need admin rights for a normal install.
+
+This local installer build is unsigned and disables update signature verification so auto-update works with the staged generic feed. For a public production release, add a Windows code-signing certificate, remove the signing skips in `build.win.signExts`, set `build.win.signAndEditExecutable` and `build.win.verifyUpdateCodeSignature` back to `true`, then rebuild to avoid SmartScreen warnings.
 
 ## Production URL
 

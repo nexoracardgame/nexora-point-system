@@ -90,12 +90,18 @@
       ]
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
+      "installerIcon": "desktop/assets/icon.ico",
+      "uninstallerIcon": "desktop/assets/icon.ico",
+      "installerHeaderIcon": "desktop/assets/icon.ico",
+      "include": "desktop/assets/installer.nsh",
       "packElevateHelper": false,
+      "runAfterFinish": true,
       "shortcutName": "NEXORA POINT",
       "uninstallDisplayName": "NEXORA POINT"
     },
