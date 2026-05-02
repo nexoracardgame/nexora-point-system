@@ -1,0 +1,50 @@
+workflows:
+  ios-testflight:
+    name: NEXORA POINT iOS TestFlight
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.nexora.point
+      vars:
+        APP_STORE_APPLE_ID: "REPLACE_WITH_APP_STORE_APPLE_ID"
+        XCODE_WORKSPACE: "ios/App/App.xcodeproj/project.xcworkspace"
+        XCODE_SCHEME: "App"
+      xcode: latest
+      cocoapods: default
+      node: latest
+    scripts:
+      - name: Install npm dependencies
+        script: npm ci
+      - name: Sync iOS Capacitor project
+        script: npm run ios:sync
+      - name: Set up iOS signing
+        script: xcode-project use-profiles
+      - name: Increment iOS build number
+        script: |
+          cd "$CM_BUILD_DIR/ios/App"
+          if [ "$APP_STORE_APPLE_ID" = "REPLACE_WITH_APP_STORE_APPLE_ID" ]; then
+            agvtool new-version -all "$BUILD_NUMBER"
+          else
+            LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
+            agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+          fi
+      - name: Build iOS IPA
+        script: |
+          cd "$CM_BUILD_DIR/ios/App"
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

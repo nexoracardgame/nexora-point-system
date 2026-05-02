@@ -14,7 +14,7 @@
 You need:
 
 - Apple Developer Program membership.
-- A Mac with Xcode installed.
+- Either a Mac with Xcode installed, or a cloud Mac builder such as Codemagic.
 - App Store Connect access with permission to create app records and upload builds.
 
 Starting April 28, 2026, iOS and iPadOS uploads to App Store Connect must be built with the iOS and iPadOS 26 SDK or later. Use Xcode 26 or newer for release uploads.
@@ -52,6 +52,21 @@ In Xcode:
 5. Choose Any iOS Device.
 6. Product > Archive.
 7. Distribute App > TestFlight & App Store.
+
+## No Mac: Codemagic Path
+
+This repo includes `codemagic.yaml` for a cloud Mac build.
+
+1. Push the repo to GitHub.
+2. Create or open a Codemagic account.
+3. Add this repository as an app.
+4. In App Store Connect, create an API key with App Manager access.
+5. Add that API key to Codemagic with the integration name `codemagic`.
+6. Create the App Store Connect app record for bundle ID `com.nexora.point`.
+7. Replace `REPLACE_WITH_APP_STORE_APPLE_ID` in `codemagic.yaml` after App Store Connect gives the app an Apple ID.
+8. Start the `NEXORA POINT iOS TestFlight` workflow.
+
+Codemagic will use a Mac machine in the cloud, sign the app, build an `.ipa`, and upload it to TestFlight.
 
 ## Universal Links
 

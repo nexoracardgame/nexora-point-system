@@ -1,6 +1,6 @@
 {
   "name": "nexora-point",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "desktop/main.cjs",
   "scripts": {
@@ -78,6 +78,7 @@
       "output": "dist/desktop",
       "buildResources": "desktop/assets"
     },
+    "afterPack": "scripts/after-electron-pack.cjs",
     "files": [
       "**/*"
     ],
