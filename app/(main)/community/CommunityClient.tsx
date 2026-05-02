@@ -63,6 +63,7 @@ const relationRank: Record<SearchUser["relation"], number> = {
   friends: 3,
   self: 4,
 };
+const COMMUNITY_SYNC_INTERVAL_MS = 1600;
 
 function dedupeBy<T>(items: T[], getKey: (item: T) => string) {
   const next = new Map<string, T>();
@@ -213,6 +214,7 @@ export default function CommunityClient({
     !(cachedHasResultsSnapshot || cachedResults.length > 0)
   );
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {}
   );
@@ -374,6 +376,18 @@ export default function CommunityClient({
   ]);
 
   useEffect(() => {
+    if (!notice) return;
+
+    const noticeId = window.setTimeout(() => {
+      setNotice("");
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(noticeId);
+    };
+  }, [notice]);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadFriends(true);
@@ -381,7 +395,7 @@ export default function CommunityClient({
           void runSearch(query, true);
         }
       }
-    }, 5000);
+    }, COMMUNITY_SYNC_INTERVAL_MS);
 
     const onFocus = () => {
       void loadFriends(true);
@@ -531,11 +545,13 @@ export default function CommunityClient({
     payload,
     optimisticUpdate,
     onDone,
+    successMessage,
   }: {
     actionKey: string;
     payload: Record<string, unknown>;
     optimisticUpdate?: () => void;
     onDone?: (data: Record<string, unknown>) => void;
+    successMessage?: string;
   }) => {
     const snapshot = createSnapshot();
 
@@ -545,6 +561,7 @@ export default function CommunityClient({
     void (async () => {
       try {
         setError("");
+        setNotice("");
         const res = await trackUiFetch("/api/community/friends", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -557,10 +574,20 @@ export default function CommunityClient({
           return;
         }
         onDone?.(data as Record<string, unknown>);
+        if (Array.isArray(data?.friends)) {
+          setFriends(normalizeFriends(data.friends as FriendItem[]));
+        }
+        if (Array.isArray(data?.requests)) {
+          setRequests(normalizeRequests(data.requests as IncomingRequest[]));
+        }
+        if (successMessage) {
+          setNotice(successMessage);
+        }
         void loadFriends(true);
         void runSearch(query, true);
       } catch {
         restoreSnapshot(snapshot);
+        setNotice("");
         setError("ดำเนินการไม่สำเร็จ");
       } finally {
         setPendingAction(actionKey, false);
@@ -714,6 +741,7 @@ export default function CommunityClient({
                                   );
                                   applyRelation(friend.friendId, "none", null);
                                 },
+                                successMessage: "ลบเพื่อนแล้ว",
                               })
                             }
                             className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-red-500 shadow-sm ring-1 ring-black/5 transition hover:scale-[1.04] hover:bg-red-50 disabled:opacity-60"
@@ -783,6 +811,12 @@ export default function CommunityClient({
                   </button>
                 </form>
               </section>
+
+              {notice ? (
+                <div className="rounded-[28px] bg-emerald-50 px-5 py-4 text-sm font-black text-emerald-700 ring-1 ring-emerald-100">
+                  {notice}
+                </div>
+              ) : null}
 
               {error ? (
                 <div className="rounded-[28px] bg-red-50 px-5 py-4 text-sm font-black text-red-600 ring-1 ring-red-100">
@@ -866,6 +900,7 @@ export default function CommunityClient({
                                           null
                                         );
                                       },
+                                      successMessage: "รับเพื่อนสำเร็จ",
                                     })
                                   }
                                   className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-4 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
@@ -900,6 +935,7 @@ export default function CommunityClient({
                                           null
                                         );
                                       },
+                                      successMessage: "ปฏิเสธคำขอแล้ว",
                                     })
                                   }
                                   className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
@@ -1023,6 +1059,7 @@ export default function CommunityClient({
                                         );
                                         applyRelation(user.id, "friends");
                                       },
+                                      successMessage: "รับเพื่อนสำเร็จ",
                                     })
                                   }
                                   className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white transition hover:scale-[1.02] disabled:opacity-60"
@@ -1055,6 +1092,7 @@ export default function CommunityClient({
                                         );
                                         applyRelation(user.id, "none", null);
                                       },
+                                      successMessage: "ปฏิเสธคำขอแล้ว",
                                     })
                                   }
                                   className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-black text-red-500 ring-1 ring-black/5 transition hover:scale-[1.02] disabled:opacity-60"
@@ -1099,6 +1137,7 @@ export default function CommunityClient({
                                           | undefined)?.requestId || ""
                                       )
                                     ),
+                                  successMessage: "ส่งคำขอเป็นเพื่อนแล้ว",
                                 })
                               }
                               className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-black text-white shadow-[0_16px_34px_rgba(0,0,0,0.16)] transition hover:scale-[1.02] disabled:opacity-60"

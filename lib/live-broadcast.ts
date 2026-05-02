@@ -51,7 +51,7 @@ function cleanHost(hostname: string) {
 }
 
 function toSafeUrl(rawUrl: string) {
-  const trimmed = rawUrl.trim();
+  const trimmed = extractFirstLiveUrl(rawUrl);
   if (!trimmed) {
     throw new Error("empty_url");
   }
@@ -62,6 +62,43 @@ function toSafeUrl(rawUrl: string) {
   }
 
   return url;
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function cleanSharedUrlCandidate(value: string) {
+  return decodeHtmlEntities(value)
+    .trim()
+    .replace(/[),.。]+$/g, "");
+}
+
+function extractFirstLiveUrl(rawValue: string) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return "";
+
+  const iframeSrc = raw.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+  if (iframeSrc) {
+    return cleanSharedUrlCandidate(iframeSrc);
+  }
+
+  const direct = raw.match(/https?:\/\/[^\s<>"']+/i)?.[0];
+  if (direct) {
+    return cleanSharedUrlCandidate(direct);
+  }
+
+  const www = raw.match(/\bwww\.[^\s<>"']+/i)?.[0];
+  if (www) {
+    return `https://${cleanSharedUrlCandidate(www)}`;
+  }
+
+  return cleanSharedUrlCandidate(raw);
 }
 
 function getYoutubeId(url: URL) {
@@ -136,17 +173,32 @@ export function buildLiveEmbed(rawUrl: string) {
 
   if (host === "youtu.be" || host.endsWith("youtube.com")) {
     const videoId = getYoutubeId(sourceUrl).trim();
-    if (!videoId) {
-      throw new Error("unsupported_youtube_url");
-    }
+    const parts = sourceUrl.pathname.split("/").filter(Boolean);
+    const channelId =
+      parts[0] === "channel" && parts[1] && parts.includes("live")
+        ? parts[1]
+        : "";
 
     return {
       platform: "youtube" as const,
       sourceUrl: sourceUrl.toString(),
-      embedUrl: withEmbedParams(
-        new URL(`https://www.youtube.com/embed/${encodeURIComponent(videoId)}`),
-        false
-      ),
+      embedUrl: videoId
+        ? withEmbedParams(
+            new URL(
+              `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`
+            ),
+            false
+          )
+        : channelId
+          ? withEmbedParams(
+              new URL(
+                `https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(
+                  channelId
+                )}`
+              ),
+              false
+            )
+          : sourceUrl.toString(),
       title: "YouTube Live",
     };
   }

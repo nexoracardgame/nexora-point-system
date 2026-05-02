@@ -533,6 +533,34 @@ export async function respondToFriendRequest(
     }
 
     if (request.status !== "pending") {
+      if (request.status === "accepted" && action === "accept") {
+        const identityMap = await getUserIdentityMap([
+          request.fromUserId,
+          request.toUserId,
+        ]);
+        const [userA, userB] = sortPair(
+          getCanonicalUserId(identityMap, request.fromUserId),
+          getCanonicalUserId(identityMap, request.toUserId)
+        );
+        const friendshipId = `friendship-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const friendshipRows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+          'INSERT INTO "Friendship" ("id", "userA", "userB", "createdAt") VALUES ($1, $2, $3, NOW()) ON CONFLICT ("userA", "userB") DO UPDATE SET "userA" = EXCLUDED."userA" RETURNING *',
+          friendshipId,
+          userA,
+          userB
+        );
+        return {
+          request,
+          friendship: friendshipRows[0]
+            ? normalizeDbFriendship(friendshipRows[0])
+            : null,
+        };
+      }
+
+      if (request.status === "rejected" && action === "reject") {
+        return { request, friendship: null };
+      }
+
       throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
     }
 
@@ -585,6 +613,39 @@ export async function respondToFriendRequest(
   }
 
   if (request.status !== "pending") {
+    if (request.status === "accepted" && action === "accept") {
+      const friendships = await readFriendships();
+      const identityMap = await getUserIdentityMap([
+        request.fromUserId,
+        request.toUserId,
+      ]);
+      const [userA, userB] = sortPair(
+        getCanonicalUserId(identityMap, request.fromUserId),
+        getCanonicalUserId(identityMap, request.toUserId)
+      );
+      const key = friendshipKey(userA, userB);
+      const existing = friendships.find(
+        (item) => friendshipKey(item.userA, item.userB) === key
+      );
+
+      if (existing) {
+        return { request, friendship: existing };
+      }
+
+      const nextFriendship: FriendshipRecord = {
+        id: `friendship-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        userA,
+        userB,
+        createdAt: new Date().toISOString(),
+      };
+      await writeFriendships([nextFriendship, ...friendships]);
+      return { request, friendship: nextFriendship };
+    }
+
+    if (request.status === "rejected" && action === "reject") {
+      return { request, friendship: null };
+    }
+
     throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
   }
 

@@ -88,7 +88,7 @@ export async function POST(req: Request) {
           fromUserId: userId,
           action: "request",
         },
-      });
+      }).catch(() => undefined);
     }
 
     const relation = await getFriendRelation(userId, targetUserId);
@@ -107,7 +107,20 @@ export async function POST(req: Request) {
     const requestId = String(body?.requestId || "").trim();
     const decision =
       String(body?.decision || "").trim() === "accept" ? "accept" : "reject";
-    const result = await respondToFriendRequest(requestId, aliases, decision);
+    let result: Awaited<ReturnType<typeof respondToFriendRequest>>;
+    try {
+      result = await respondToFriendRequest(requestId, aliases, decision);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "ดำเนินการคำขอเป็นเพื่อนไม่สำเร็จ",
+        },
+        { status: 400, headers: { "Cache-Control": "no-store" } }
+      );
+    }
 
     await markLocalFriendRequestNotificationsRead(aliases, requestId).catch(
       () => undefined
@@ -128,11 +141,16 @@ export async function POST(req: Request) {
           fromUserId: userId,
           action: "accepted",
         },
-      });
+      }).catch(() => undefined);
     }
 
+    const [friends, requests] = await Promise.all([
+      listFriendsForUser(userId, aliases),
+      listIncomingFriendRequests(userId, aliases),
+    ]).catch(() => [null, null] as const);
+
     return NextResponse.json(
-      { success: true, status: result.request.status },
+      { success: true, status: result.request.status, friends, requests },
       { headers: { "Cache-Control": "no-store" } }
     );
   }
