@@ -123,6 +123,11 @@ export default function AppInstallButton({
   useEffect(() => {
     if (!guideOpen || typeof window === "undefined") return;
 
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setGuideOpen(false);
@@ -130,7 +135,11 @@ export default function AppInstallButton({
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
   }, [guideOpen]);
 
   const handleInstall = async () => {
@@ -251,20 +260,20 @@ export default function AppInstallButton({
 
       {guideOpen ? (
         <div
-          className="pointer-events-auto fixed inset-0 z-[1200] flex items-center justify-center bg-black/55 px-3 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 backdrop-blur-md sm:p-6"
+          className="pointer-events-auto fixed inset-0 z-[2400] flex items-center justify-center overflow-hidden bg-black/82 px-3 py-[max(14px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))] backdrop-blur-xl sm:p-6"
           onClick={() => setGuideOpen(false)}
           role="presentation"
         >
           <div
-            className="max-h-[calc(100dvh-env(safe-area-inset-bottom)-26px)] w-full max-w-[420px] self-center overflow-hidden rounded-[28px] border border-white/10 bg-[#0d1118]/98 text-white shadow-[0_28px_90px_rgba(0,0,0,0.48)] sm:max-h-[min(86dvh,720px)]"
+            className="flex max-h-[min(720px,calc(100svh-32px))] w-full max-w-[430px] flex-col overflow-hidden rounded-[28px] border border-white/12 bg-[#070a10] text-white shadow-[0_32px_120px_rgba(0,0,0,0.72)] ring-1 ring-amber-200/8 sm:max-h-[min(86dvh,720px)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/8 px-4 py-4 sm:px-5">
               <div>
-                <div className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/85">
+                <div className="text-[11px] font-black uppercase tracking-[0.22em] text-amber-300/85 sm:text-xs">
                   ติดตั้งแอพ
                 </div>
-                <div className="mt-1 text-xl font-black">
+                <div className="mt-1 text-[clamp(1.25rem,6vw,1.85rem)] font-black leading-tight">
                   {isIosDevice()
                     ? "เพิ่ม NEXORA ลงหน้าจอโฮม"
                     : "ติดตั้งแอพจากเบราว์เซอร์"}
@@ -276,30 +285,30 @@ export default function AppInstallButton({
                   event.stopPropagation();
                   setGuideOpen(false);
                 }}
-                className="rounded-full border border-white/10 bg-white/[0.05] p-2 text-white/72 transition hover:bg-white/[0.08] hover:text-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/72 transition hover:bg-white/[0.1] hover:text-white"
                 aria-label="Close install guide"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="max-h-[calc(100dvh-env(safe-area-inset-bottom)-120px)] space-y-3 overflow-y-auto overscroll-contain px-5 py-5 text-sm text-white/78 sm:max-h-[min(70dvh,560px)]">
-              <div className="rounded-[22px] border border-amber-300/12 bg-amber-300/8 px-4 py-3 text-xs font-semibold leading-6 text-amber-100/88">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 text-sm text-white/78 sm:px-5 sm:py-5">
+              <div className="rounded-[20px] border border-amber-300/14 bg-amber-300/10 px-4 py-3 text-[13px] font-semibold leading-6 text-amber-100/88">
                 ถ้าอุปกรณ์รองรับ ระบบจะเปิดหน้าต่างติดตั้งให้อัตโนมัติทันที
                 หากเบราว์เซอร์ยังไม่แสดง prompt ให้ทำตามขั้นตอนด้านล่างได้เลย
               </div>
               {isIosDevice() ? (
                 <>
-                  <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4 text-xs font-semibold leading-6 text-white/62">
+                  <div className="rounded-[20px] border border-white/8 bg-white/[0.045] p-4 text-[13px] font-semibold leading-6 text-white/66">
                     iPhone และ iPad ยังไม่อนุญาตให้เว็บสั่งติดตั้งแอพเองแบบ
                     Android ระบบจึงพาไปขั้นตอนติดตั้งที่ iOS รองรับโดยตรง
                   </div>
-                  <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <div className="rounded-[20px] border border-white/8 bg-white/[0.045] p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.05] text-amber-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-amber-200">
                         <ArrowUpFromLine className="h-4.5 w-4.5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="font-black text-white">
                           1. แตะปุ่ม Share ใน Safari
                         </div>
@@ -309,12 +318,12 @@ export default function AppInstallButton({
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <div className="rounded-[20px] border border-white/8 bg-white/[0.045] p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.05] text-amber-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-amber-200">
                         <Plus className="h-4.5 w-4.5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="font-black text-white">
                           2. เลือก Add to Home Screen
                         </div>
@@ -327,12 +336,12 @@ export default function AppInstallButton({
                 </>
               ) : (
                 <>
-                  <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <div className="rounded-[20px] border border-white/8 bg-white/[0.045] p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.05] text-amber-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-amber-200">
                         <ArrowDownToLine className="h-4.5 w-4.5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="font-black text-white">
                           กดเมนู Install app ของเบราว์เซอร์
                         </div>
@@ -342,7 +351,7 @@ export default function AppInstallButton({
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4 text-xs text-white/58">
+                  <div className="rounded-[20px] border border-white/8 bg-white/[0.045] p-4 text-xs leading-5 text-white/62">
                     ถ้ายังไม่เห็น prompt ให้รีเฟรชหนึ่งครั้งหลังหน้าโหลดครบ แล้วแตะปุ่มนี้อีกที
                   </div>
                 </>

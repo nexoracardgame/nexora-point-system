@@ -64,7 +64,7 @@ export default function NexoraLuxuryHome() {
       <div className="absolute inset-x-0 bottom-0 h-[42%] bg-[linear-gradient(180deg,rgba(247,244,238,0)_0%,rgba(0,0,0,0.06)_68%,rgba(0,0,0,0.14)_100%)]" />
       <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,rgba(255,255,255,0.96)_0%,rgba(255,255,255,0.86)_32%,rgba(255,255,255,0.32)_56%,rgba(255,255,255,0.06)_76%,rgba(255,255,255,0)_100%)]" />
 
-      <div className="absolute inset-x-4 top-5 z-30 sm:hidden">
+      <div className="relative z-30 px-4 pt-5 sm:hidden">
         <div className="flex justify-end">
           <div className="max-w-[118px] text-right text-[0.8rem] font-bold leading-[1.1] tracking-[0.02em] text-black/56">
             ประสบการณ์ระดับเวิลด์คลาส
@@ -97,6 +97,46 @@ export default function NexoraLuxuryHome() {
         </div>
       </div>
 
+      <div className="relative z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+112px)] sm:hidden">
+        <div className="relative mt-1 flex min-h-[210px] items-end justify-center overflow-hidden">
+          <Image
+            src="https://s.imgz.io/2026/03/24/033-97ca7d23f8ddf07a.png"
+            alt="Nexora hero"
+            width={820}
+            height={1093}
+            priority
+            sizes="90vw"
+            className="h-[31svh] max-h-[300px] min-h-[205px] w-auto translate-x-[5%] object-contain drop-shadow-[0_18px_44px_rgba(0,0,0,0.18)]"
+          />
+        </div>
+
+        <div className="relative z-10 -mt-2 rounded-[26px] border border-black/8 bg-white/86 p-4 shadow-[0_22px_52px_rgba(0,0,0,0.12)] backdrop-blur-xl">
+          <div className="text-[12px] font-extrabold leading-5 tracking-[0.06em] text-amber-800">
+            สะสม ต่อสู้ แลกเปลี่ยน และรับรางวัลในจักรวาล NEXORA
+          </div>
+          <div className="mt-2 text-[clamp(1.05rem,5.3vw,1.38rem)] font-extrabold leading-[1.2] tracking-[-0.03em] text-black/84">
+            ก้าวเข้าสู่ยุคใหม่ของการ์ดสะสมระดับพรีเมียม ด้วยตลาดที่ไวระดับโลก
+          </div>
+          <div className="mt-2 text-[0.92rem] font-semibold leading-6 text-black/58">
+            แชทเรียลไทม์ ซื้อขายลื่นไหลบนมือถือ คอม และเว็บแอพในประสบการณ์เดียวกัน
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <PrefetchLink
+              href="/market"
+              className="rounded-2xl bg-black px-5 py-3 text-sm font-black text-white shadow-[0_18px_32px_rgba(0,0,0,0.16)] transition active:scale-[0.98]"
+            >
+              เข้าสู่ตลาด
+            </PrefetchLink>
+            <PrefetchLink
+              href="/community"
+              className="rounded-2xl border border-black/12 bg-white/74 px-5 py-3 text-sm font-black text-black backdrop-blur-xl transition active:scale-[0.98]"
+            >
+              คอมมูนิตี้
+            </PrefetchLink>
+          </div>
+        </div>
+      </div>
+
       <div className="pointer-events-none absolute left-4 top-3 z-10 hidden text-[22vw] font-black uppercase leading-none tracking-[-0.065em] text-black/[0.96] sm:left-8 sm:top-5 sm:block lg:text-[18vw]">
         NEXORA
       </div>
@@ -124,7 +164,7 @@ export default function NexoraLuxuryHome() {
       </div>
 
       <div
-        className="absolute inset-x-0 bottom-0 z-20 flex justify-center transition-transform duration-300"
+        className="absolute inset-x-0 bottom-0 z-20 hidden justify-center transition-transform duration-300 sm:flex"
         style={{ transform: `translate(${mouse.x}px, ${mouse.y}px)` }}
       >
         <Image
@@ -138,7 +178,7 @@ export default function NexoraLuxuryHome() {
         />
       </div>
 
-      <div className="absolute bottom-6 left-4 z-30 max-w-[calc(100%-2rem)] pr-2 sm:bottom-10 sm:left-8 sm:max-w-[560px] sm:pr-0">
+      <div className="hidden sm:absolute sm:bottom-10 sm:left-8 sm:z-30 sm:block sm:max-w-[560px] sm:pr-0">
         <div className="max-w-[330px] text-[13px] font-extrabold tracking-[0.06em] text-amber-800 sm:max-w-[520px] sm:text-lg">
           สะสม ต่อสู้ แลกเปลี่ยน และรับรางวัลในจักรวาล NEXORA
         </div>
