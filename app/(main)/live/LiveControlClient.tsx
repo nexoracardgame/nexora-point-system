@@ -44,6 +44,35 @@ const LIVE_STATUS_STORAGE_KEY = "nexora:live-status-version";
 const DEFAULT_LIVE_BAN_REASON =
   "บัญชีนี้ถูกระงับสิทธิ์การไลฟ์เนื่องจากละเมิดข้อบังคับและกฎชุมชนของ NEXORA";
 
+function liveStartErrorMessage(error?: string | null, status?: number) {
+  const code = String(error || "").trim();
+
+  if (status === 401 || code === "unauthorized") {
+    return "กรุณาเข้าสู่ระบบก่อนเริ่มแชร์ไลฟ์";
+  }
+
+  if (code === "unsupported_platform") {
+    return "รองรับเฉพาะลิงก์ไลฟ์จาก YouTube, Facebook และ TikTok";
+  }
+
+  if (
+    code === "empty_url" ||
+    code === "invalid_url" ||
+    code === "invalid_protocol" ||
+    code === "unsupported_youtube_url"
+  ) {
+    return "ลิงก์ไลฟ์ไม่ถูกต้อง ลองคัดลอกลิงก์จากปุ่ม Share แล้ววางใหม่";
+  }
+
+  if (code === "system unavailable") {
+    return "ระบบเชื่อมต่อเซิร์ฟเวอร์ไลฟ์ไม่ได้ ลองรีเฟรชแล้วกดใหม่";
+  }
+
+  return code
+    ? `เริ่มแชร์ไลฟ์ไม่สำเร็จ (${code})`
+    : "เริ่มแชร์ไลฟ์ไม่สำเร็จ ตรวจลิงก์แล้วลองอีกครั้ง";
+}
+
 const platformHints = [
   {
     name: "YouTube",
@@ -241,11 +270,7 @@ export default function LiveControlClient() {
           return;
         }
 
-        setError(
-          payload?.error === "unsupported_platform"
-            ? "รองรับเฉพาะลิงก์ไลฟ์จาก YouTube, Facebook และ TikTok"
-            : "เริ่มแชร์ไลฟ์ไม่สำเร็จ ตรวจลิงก์แล้วลองอีกครั้ง"
-        );
+        setError(liveStartErrorMessage(payload?.error, res.status));
         return;
       }
 

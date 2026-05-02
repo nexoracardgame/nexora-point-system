@@ -51,12 +51,22 @@ function cleanHost(hostname: string) {
 }
 
 function toSafeUrl(rawUrl: string) {
-  const trimmed = extractFirstLiveUrl(rawUrl);
+  let trimmed = extractFirstLiveUrl(rawUrl);
   if (!trimmed) {
     throw new Error("empty_url");
   }
 
-  const url = new URL(trimmed);
+  if (!/^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)) {
+    trimmed = `https://${trimmed.replace(/^\/+/, "")}`;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error("invalid_url");
+  }
+
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("invalid_protocol");
   }
@@ -100,6 +110,13 @@ function extractFirstLiveUrl(rawValue: string) {
   const www = raw.match(/\bwww\.[^\s<>"']+/i)?.[0];
   if (www) {
     return `https://${cleanLiveUrlCandidate(www)}`;
+  }
+
+  const bare = raw.match(
+    /\b(?:youtu\.be|youtube\.com|m\.youtube\.com|facebook\.com|m\.facebook\.com|fb\.watch|tiktok\.com|m\.tiktok\.com)[^\s<>"']*/i
+  )?.[0];
+  if (bare) {
+    return cleanLiveUrlCandidate(bare);
   }
 
   return cleanLiveUrlCandidate(raw);
@@ -369,6 +386,22 @@ export async function ensureLiveBroadcastSchema(db: DbClient = prisma) {
 
   await db.$executeRawUnsafe(`
     ALTER TABLE "LiveBroadcast"
+    ADD COLUMN IF NOT EXISTS "id" TEXT
+  `);
+
+  await db.$executeRawUnsafe(`
+    UPDATE "LiveBroadcast"
+    SET "id" = 'live-' || md5(random()::text || clock_timestamp()::text)
+    WHERE "id" IS NULL OR "id" = ''
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
+    ALTER COLUMN "id" SET NOT NULL
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcast"
     ADD COLUMN IF NOT EXISTS "platform" TEXT NOT NULL DEFAULT 'youtube'
   `);
 
@@ -435,6 +468,11 @@ export async function ensureLiveBroadcastSchema(db: DbClient = prisma) {
 
   await db.$executeRawUnsafe(`
     ALTER TABLE "LiveBroadcastBan"
+    ADD COLUMN IF NOT EXISTS "userId" TEXT NOT NULL DEFAULT ''
+  `);
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE "LiveBroadcastBan"
     ADD COLUMN IF NOT EXISTS "reason" TEXT NOT NULL DEFAULT '${DEFAULT_LIVE_BAN_REASON.replace(/'/g, "''")}'
   `);
 
@@ -463,8 +501,8 @@ export async function ensureLiveBroadcastSchema(db: DbClient = prisma) {
       UPDATE "LiveBroadcast"
       SET "status" = $1, "endedAt" = COALESCE("endedAt", NOW())
       WHERE "status" = $2
-        AND "id" NOT IN (
-          SELECT "id"
+        AND ctid NOT IN (
+          SELECT ctid
           FROM "LiveBroadcast"
           WHERE "status" = $2
           ORDER BY "createdAt" DESC
@@ -509,14 +547,17 @@ async function expireOldLiveBroadcasts(db: DbClient = prisma) {
 
 export async function getActiveLiveBroadcastBan(
   userId: string,
-  db: DbClient = prisma
+  db: DbClient = prisma,
+  options?: { ensureSchema?: boolean }
 ) {
   const safeUserId = String(userId || "").trim();
   if (!safeUserId) {
     return null;
   }
 
-  await ensureLiveBroadcastSchema(db);
+  if (options?.ensureSchema !== false) {
+    await ensureLiveBroadcastSchema(db);
+  }
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
     `
       SELECT *
@@ -544,9 +585,17 @@ async function getUserRoleForLiveModeration(userId: string, db: DbClient) {
   return String(rows[0]?.role || "").trim().toLowerCase();
 }
 
-export async function getActiveLiveBroadcast(db: DbClient = prisma) {
-  await ensureLiveBroadcastSchema(db);
-  await expireOldLiveBroadcasts(db);
+export async function getActiveLiveBroadcast(
+  db: DbClient = prisma,
+  options?: { ensureSchema?: boolean; expireOld?: boolean }
+) {
+  if (options?.ensureSchema !== false) {
+    await ensureLiveBroadcastSchema(db);
+  }
+
+  if (options?.expireOld !== false) {
+    await expireOldLiveBroadcasts(db);
+  }
 
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
     `
@@ -570,11 +619,15 @@ export async function createLiveBroadcast(input: {
   const embed = buildLiveEmbed(input.sourceUrl);
 
   try {
+    await ensureLiveBroadcastSchema(prisma);
+    await expireOldLiveBroadcasts(prisma);
+
     return await prisma.$transaction(async (tx) => {
-      await ensureLiveBroadcastSchema(tx);
       await expireOldLiveBroadcasts(tx);
 
-      const ban = await getActiveLiveBroadcastBan(input.ownerUserId, tx);
+      const ban = await getActiveLiveBroadcastBan(input.ownerUserId, tx, {
+        ensureSchema: false,
+      });
       if (ban) {
         return {
           ok: false as const,
@@ -584,7 +637,10 @@ export async function createLiveBroadcast(input: {
         };
       }
 
-      const existing = await getActiveLiveBroadcast(tx);
+      const existing = await getActiveLiveBroadcast(tx, {
+        ensureSchema: false,
+        expireOld: false,
+      });
       if (existing) {
         throw new LiveBusyError(existing);
       }

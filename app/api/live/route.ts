@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       message === "unsupported_platform" ||
       message === "unsupported_youtube_url" ||
       message === "invalid_protocol" ||
+      message === "invalid_url" ||
       message === "empty_url"
         ? 400
         : 500;
