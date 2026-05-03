@@ -3,6 +3,12 @@ import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
+import {
+  createLineProfileImageSnapshot,
+  isDefaultProfileImageUrl,
+  isLineProfileImageUrl,
+} from "@/lib/profile-image-snapshot";
+import { syncUserIdentityEverywhere } from "@/lib/user-identity-sync";
 
 type LineProfile = {
   sub?: string;
@@ -27,6 +33,7 @@ type DbUserSnapshot = {
   id: string;
   lineId: string;
   name: string | null;
+  displayName?: string | null;
   image: string | null;
   role: string;
   nexPoint: number;
@@ -45,6 +52,62 @@ function getSafeSessionImage(image?: string | null) {
   return raw;
 }
 
+function getProviderImage(appToken: AppToken, lineProfile: LineProfile) {
+  return getSafeSessionImage(
+    lineProfile.picture ||
+      (typeof appToken.picture === "string" ? appToken.picture : null)
+  );
+}
+
+function shouldRepairStoredProfileImage(image?: string | null) {
+  const safeImage = getSafeSessionImage(image);
+  return (
+    isDefaultProfileImageUrl(image) ||
+    isDefaultProfileImageUrl(safeImage) ||
+    isLineProfileImageUrl(safeImage)
+  );
+}
+
+async function getStableInitialProfileImage(
+  image: string,
+  lineId: string,
+  userId?: string | null
+) {
+  const safeImage = getSafeSessionImage(image);
+
+  if (!isLineProfileImageUrl(safeImage)) {
+    return safeImage;
+  }
+
+  const snapshotImage = await createLineProfileImageSnapshot(safeImage, {
+    userId,
+    lineId,
+  });
+
+  return snapshotImage || safeImage;
+}
+
+function resolveSessionProfileImage(
+  localImage?: string | null,
+  tokenImage?: string | null
+) {
+  const safeLocalImage = getSafeSessionImage(localImage);
+  const safeTokenImage = getSafeSessionImage(tokenImage);
+  const tokenHasStableImage =
+    !isDefaultProfileImageUrl(safeTokenImage) &&
+    !isLineProfileImageUrl(safeTokenImage);
+
+  if (
+    tokenHasStableImage &&
+    (isDefaultProfileImageUrl(safeLocalImage) ||
+      isLineProfileImageUrl(safeLocalImage))
+  ) {
+    return safeTokenImage;
+  }
+
+  return safeLocalImage;
+}
+
 async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
   const lineId = String(appToken.lineId || lineProfile.sub || "").trim();
 
@@ -53,9 +116,7 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
   }
 
   const safeName = String(appToken.name || lineProfile.name || "NEXORA User").trim();
-  const safeImage = getSafeSessionImage(
-    typeof appToken.picture === "string" ? appToken.picture : lineProfile.picture
-  );
+  const providerImage = getProviderImage(appToken, lineProfile);
 
   try {
     const existingUser = await prisma.user.findUnique({
@@ -73,10 +134,26 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
     });
 
     if (existingUser) {
+      const existingImage = String(existingUser.image || "").trim();
+      const stableImage = shouldRepairStoredProfileImage(existingUser.image)
+        ? await getStableInitialProfileImage(
+            providerImage,
+            lineId,
+            existingUser.id
+          )
+        : undefined;
+      const nextImage =
+        stableImage &&
+        stableImage !== existingImage &&
+        !isDefaultProfileImageUrl(stableImage) &&
+        !(isLineProfileImageUrl(existingImage) && isLineProfileImageUrl(stableImage))
+          ? stableImage
+          : undefined;
       const needsPatch =
         !String(existingUser.name || "").trim() ||
         !String(existingUser.image || "").trim() ||
-        !String(existingUser.displayName || "").trim();
+        !String(existingUser.displayName || "").trim() ||
+        Boolean(nextImage);
 
       if (needsPatch) {
         const patchedUser = await prisma.user.update({
@@ -86,12 +163,13 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
             displayName: String(existingUser.displayName || "").trim()
               ? undefined
               : safeName,
-            image: String(existingUser.image || "").trim() ? undefined : safeImage,
+            image: nextImage,
           },
           select: {
             id: true,
             lineId: true,
             name: true,
+            displayName: true,
             image: true,
             role: true,
             nexPoint: true,
@@ -99,7 +177,19 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
           },
         });
 
-        return patchedUser satisfies DbUserSnapshot;
+        if (nextImage) {
+          await syncUserIdentityEverywhere({
+            userId: patchedUser.id,
+            lineId: patchedUser.lineId,
+            name: patchedUser.displayName || patchedUser.name || safeName,
+            image: patchedUser.image,
+          }).catch(() => undefined);
+        }
+
+        return {
+          ...patchedUser,
+          name: patchedUser.displayName || patchedUser.name,
+        } satisfies DbUserSnapshot;
       }
 
       return {
@@ -113,18 +203,25 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
       } satisfies DbUserSnapshot;
     }
 
+    const initialImage = await getStableInitialProfileImage(
+      providerImage,
+      lineId,
+      lineId
+    );
+
     const createdUser = await prisma.user.create({
       data: {
         lineId,
         name: safeName,
         displayName: safeName,
-        image: safeImage,
+        image: initialImage,
         role: "USER",
       },
       select: {
         id: true,
         lineId: true,
         name: true,
+        displayName: true,
         image: true,
         role: true,
         nexPoint: true,
@@ -232,8 +329,9 @@ export const authOptions: NextAuthOptions = {
       }
       const resolvedName =
         localProfile?.displayName || appToken.name || "NEXORA User";
-      const resolvedImage = getSafeSessionImage(
-        localProfile?.image || appToken.picture || "/avatar.png"
+      const resolvedImage = resolveSessionProfileImage(
+        localProfile?.image,
+        typeof appToken.picture === "string" ? appToken.picture : null
       );
 
       if (session.user) {
