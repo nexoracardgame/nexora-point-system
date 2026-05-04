@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
-import EmojiPicker, { Theme } from "emoji-picker-react";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
@@ -1488,13 +1488,12 @@ function DMRoomContent({
             {showEmoji ? (
               <div
                 ref={emojiRef}
-                className="absolute bottom-[calc(100%+12px)] right-0 z-[9999] overflow-hidden rounded-2xl border border-white/10 bg-[#111318] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+                className="absolute bottom-[calc(100%+12px)] right-0 z-[9999]"
               >
-                <div className="mb-2 text-xs font-bold text-white/50">เลือกอีโมจิ</div>
-
-                <EmojiPicker
-                  onEmojiClick={(emojiData) => {
-                    const nextText = `${draftTextRef.current}${emojiData.emoji}`;
+                <ChatEmojiPicker
+                  onClose={() => setShowEmoji(false)}
+                  onSelect={(emoji) => {
+                    const nextText = `${draftTextRef.current}${emoji}`;
                     draftTextRef.current = nextText;
                     setText(nextText);
                     setShowEmoji(false);
@@ -1507,9 +1506,6 @@ function DMRoomContent({
                       keepComposerVisibleNow("smooth");
                     });
                   }}
-                  theme={Theme.DARK}
-                  width={300}
-                  height={400}
                 />
               </div>
             ) : null}

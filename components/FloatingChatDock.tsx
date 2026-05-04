@@ -10,10 +10,13 @@ import {
   Minimize2,
   Search,
   Send,
+  Smile,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
@@ -175,6 +178,7 @@ export default function FloatingChatDock({
   unreadCount?: number;
 }) {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<RoomFilter>("all");
   const [query, setQuery] = useState("");
@@ -184,6 +188,7 @@ export default function FloatingChatDock({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [localUnreadCount, setLocalUnreadCount] = useState(0);
@@ -193,6 +198,7 @@ export default function FloatingChatDock({
   const loadingRoomKeyRef = useRef("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emojiRootRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
 
@@ -212,6 +218,11 @@ export default function FloatingChatDock({
   );
   const filePreview = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
   const canSend = Boolean(safeText(draft) || file) && !sending && !!activeRoom?.actualRoomId;
+  const activeProfileHref = activeRoom?.other?.id
+    ? `/profile/${encodeURIComponent(activeRoom.other.id)}`
+    : activeRoom?.otherUserId
+      ? `/profile/${encodeURIComponent(activeRoom.otherUserId)}`
+      : "";
 
   useEffect(() => {
     activeRoomRef.current = activeRoom;
@@ -486,6 +497,7 @@ export default function FloatingChatDock({
 
     setSending(true);
     setError("");
+    setShowEmoji(false);
     setDraft("");
     setFile(null);
     if (fileInputRef.current) {
@@ -671,6 +683,17 @@ export default function FloatingChatDock({
       scrollToBottom("auto");
     }
   }, [messages.length, open, scrollToBottom]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!emojiRootRef.current?.contains(event.target as Node)) {
+        setShowEmoji(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
 
   if (status !== "authenticated") {
     return null;
@@ -902,25 +925,37 @@ export default function FloatingChatDock({
                     <ArrowLeft className="h-4 w-4" />
                   </button>
 
-                  <img
-                    src={activeRoom.other?.image || activeRoom.otherImage || "/avatar.png"}
-                    alt={activeRoom.other?.name || activeRoom.otherName || "profile"}
-                    className="h-11 w-11 shrink-0 rounded-2xl border border-white/10 object-cover"
-                    onError={(event) => {
-                      event.currentTarget.src = "/avatar.png";
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!activeProfileHref) return;
+                      setOpen(false);
+                      router.push(activeProfileHref);
                     }}
-                  />
+                    disabled={!activeProfileHref}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-1.5 py-1 text-left transition hover:bg-white/[0.06] disabled:cursor-default disabled:hover:bg-transparent"
+                    aria-label="เปิดโปรไฟล์คู่สนทนา"
+                  >
+                    <img
+                      src={activeRoom.other?.image || activeRoom.otherImage || "/avatar.png"}
+                      alt={activeRoom.other?.name || activeRoom.otherName || "profile"}
+                      className="h-11 w-11 shrink-0 rounded-2xl border border-white/10 object-cover"
+                      onError={(event) => {
+                        event.currentTarget.src = "/avatar.png";
+                      }}
+                    />
 
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-black sm:text-base">
-                      {activeRoom.other?.name || activeRoom.otherName}
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-white/42">
-                      {activeRoom.kind === "deal"
-                        ? activeRoom.card?.name || activeRoom.dealCardName || "แชทดีล"
-                        : "แชทส่วนตัว"}
-                    </div>
-                  </div>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-black sm:text-base">
+                        {activeRoom.other?.name || activeRoom.otherName}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-white/42">
+                        {activeRoom.kind === "deal"
+                          ? activeRoom.card?.name || activeRoom.dealCardName || "แชทดีล"
+                          : "แชทส่วนตัว"}
+                      </span>
+                    </span>
+                  </button>
 
                   {activeRoom.kind === "deal" ? (
                     <div className="hidden max-w-[124px] shrink-0 rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-right sm:block">
@@ -1012,10 +1047,29 @@ export default function FloatingChatDock({
                   )}
                 </div>
 
-                <div className="shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.24),rgba(5,6,8,0.96))] p-3">
+                <div
+                  ref={emojiRootRef}
+                  className="relative shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.24),rgba(5,6,8,0.96))] p-3"
+                >
                   {error ? (
                     <div className="mb-2 rounded-2xl border border-red-300/15 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200">
                       {error}
+                    </div>
+                  ) : null}
+
+                  {showEmoji ? (
+                    <div
+                      className="absolute bottom-[calc(100%+10px)] right-3 z-[70]"
+                    >
+                      <ChatEmojiPicker
+                        onClose={() => setShowEmoji(false)}
+                        onSelect={(emoji) => {
+                          const nextText = `${draftRef.current}${emoji}`;
+                          draftRef.current = nextText;
+                          setDraft(nextText);
+                          setShowEmoji(false);
+                        }}
+                      />
                     </div>
                   ) : null}
 
@@ -1060,6 +1114,15 @@ export default function FloatingChatDock({
                         }}
                       />
                     </label>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowEmoji((current) => !current)}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/70 transition hover:bg-white/[0.13] hover:text-white"
+                      aria-label="เลือกอีโมจิ"
+                    >
+                      <Smile className="h-4 w-4" />
+                    </button>
 
                     <input
                       value={draft}

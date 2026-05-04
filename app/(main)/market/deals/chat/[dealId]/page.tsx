@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
-import EmojiPicker, { Theme } from "emoji-picker-react";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
@@ -235,7 +235,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     });
   });
 
-  const emitChatRead = useEffectEvent((
+  const emitChatRead = (
     targetRoomId: string,
     unreadCount = 1,
     readAt = new Date().toISOString()
@@ -246,7 +246,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       unreadCount,
       readAt,
     });
-  });
+  };
 
   const markLoadedRoomSeen = useEffectEvent(
     async (targetRoomId: string, nextMessages: DealMessage[], meData?: ChatUser | null) => {
@@ -599,7 +599,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     hasMarkedSeenRef.current = false;
     isNearBottomRef.current = true;
     lastMessageIdRef.current = null;
-    setNewMessageCount(0);
+    queueMicrotask(() => setNewMessageCount(0));
     loadingOlderRef.current = false;
     cancelOlderPrefetch();
 
@@ -1415,11 +1415,12 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
             {showEmoji ? (
               <div
                 ref={emojiRef}
-                className="absolute bottom-[calc(100%+12px)] right-0 z-[9999] overflow-hidden rounded-2xl border border-white/10 bg-[#111318] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+                className="absolute bottom-[calc(100%+12px)] right-0 z-[9999]"
               >
-                <EmojiPicker
-                  onEmojiClick={(emojiData) => {
-                    const nextText = `${draftTextRef.current}${emojiData.emoji}`;
+                <ChatEmojiPicker
+                  onClose={() => setShowEmoji(false)}
+                  onSelect={(emoji) => {
+                    const nextText = `${draftTextRef.current}${emoji}`;
                     draftTextRef.current = nextText;
                     setText(nextText);
                     setShowEmoji(false);
@@ -1432,9 +1433,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                       keepComposerVisibleNow("smooth");
                     });
                   }}
-                  theme={Theme.DARK}
-                  width={300}
-                  height={400}
                 />
               </div>
             ) : null}
