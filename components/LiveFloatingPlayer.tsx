@@ -209,7 +209,7 @@ export default function LiveFloatingPlayer() {
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+104px)] right-3 z-[1090] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border border-white/12 bg-black/88 px-4 py-3 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-2xl xl:bottom-6 xl:right-6"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+104px)] right-[150px] z-[1090] flex max-w-[calc(100vw-162px)] items-center gap-2 rounded-full border border-white/12 bg-black/88 px-4 py-3 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-2xl xl:bottom-6 xl:right-[178px] xl:max-w-[360px]"
       >
         <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white shadow-[0_0_24px_rgba(239,68,68,0.45)]">
           <Radio className="h-4 w-4" />

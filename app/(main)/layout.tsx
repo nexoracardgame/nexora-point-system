@@ -9,6 +9,7 @@ import { MessageCircle } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
 import LiveFloatingPlayer from "@/components/LiveFloatingPlayer";
+import FloatingChatDock from "@/components/FloatingChatDock";
 import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
@@ -1326,6 +1327,7 @@ export default function MainLayout({
       </div>
 
       <LiveFloatingPlayer />
+      <FloatingChatDock unreadCount={chatUnreadCount} />
 
       {/* MOBILE DRAWER */}
       <div
