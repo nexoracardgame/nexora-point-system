@@ -77,21 +77,35 @@ function dispatchChatMessageRealtime(message: Record<string, unknown>) {
     return;
   }
 
+  const primaryRoomId = String(message.roomId || "").trim();
+  const isDealMessage = primaryRoomId.startsWith("deal:");
   const roomIds = Array.from(
     new Set(
       [
-        message.roomId,
+        primaryRoomId,
         ...(Array.isArray(message.roomIds) ? message.roomIds : []),
       ]
         .map((roomId) => String(roomId || "").trim())
         .filter(Boolean)
+        .filter((roomId) =>
+          isDealMessage ? roomId.startsWith("deal:") : !roomId.startsWith("deal:")
+        )
     )
   );
-  cacheRealtimeDmMessage(roomIds, message as Parameters<typeof cacheRealtimeDmMessage>[1]);
+  const sanitizedMessage = {
+    ...message,
+    roomId: primaryRoomId,
+    roomIds,
+  };
+
+  cacheRealtimeDmMessage(
+    roomIds,
+    sanitizedMessage as Parameters<typeof cacheRealtimeDmMessage>[1]
+  );
 
   window.dispatchEvent(
     new CustomEvent("nexora:chat-message-received", {
-      detail: message,
+      detail: sanitizedMessage,
     })
   );
 }
@@ -546,9 +560,10 @@ export default function MainLayout({
             (currentLineId ? senderId === currentLineId : false));
 
         if (eventType === "INSERT" && roomId && nextMessage) {
+          const isDealRoom = roomId.startsWith("deal:");
           const fastRoomIds = [roomId];
           const directRoomId =
-            !isMine && currentUserId && senderId
+            !isDealRoom && !isMine && currentUserId && senderId
               ? buildDirectRealtimeRoomId(currentUserId, senderId)
               : "";
 

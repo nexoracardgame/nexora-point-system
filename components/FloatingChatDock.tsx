@@ -213,12 +213,24 @@ function getReadRoomIds(room: ActiveFloatingRoom | FloatingRoom, actualRoomId: s
 }
 
 function sameRoomEvent(active: ActiveFloatingRoom, detail: RealtimeChatDetail) {
+  const primaryRoomId = safeText(detail.roomId);
+  const primaryIsDeal = primaryRoomId.startsWith("deal:");
+  const activeRoomIds = getReadRoomIds(active, active.actualRoomId);
+
+  if (primaryIsDeal) {
+    return active.kind === "deal" && activeRoomIds.includes(primaryRoomId);
+  }
+
+  if (active.kind === "deal") {
+    return false;
+  }
+
   const incomingRoomIds = new Set(
     [detail.roomId, ...(detail.roomIds || [])]
       .map((item) => safeText(item))
+      .filter((item) => !item.startsWith("deal:"))
       .filter(Boolean)
   );
-  const activeRoomIds = getReadRoomIds(active, active.actualRoomId);
 
   return activeRoomIds.some((item) => incomingRoomIds.has(item));
 }
@@ -231,18 +243,32 @@ function getRealtimeRoomIds(detail: RealtimeChatDetail) {
   );
 }
 
-function roomMatchesRealtimeIds(room: FloatingRoom, roomIds: Set<string>) {
-  if (roomIds.size === 0) {
-    return false;
-  }
-
-  return [
+function roomMatchesRealtimeDetail(room: FloatingRoom, detail: RealtimeChatDetail) {
+  const primaryRoomId = safeText(detail.roomId);
+  const primaryIsDeal = primaryRoomId.startsWith("deal:");
+  const roomCandidates = [
     room.key,
     room.roomId,
     room.kind === "deal" && room.dealId ? `deal:${room.dealId}` : "",
   ]
     .map((item) => safeText(item))
-    .filter(Boolean)
+    .filter(Boolean);
+
+  if (primaryIsDeal) {
+    return room.kind === "deal" && roomCandidates.includes(primaryRoomId);
+  }
+
+  if (room.kind === "deal") {
+    return false;
+  }
+
+  const roomIds = getRealtimeRoomIds(detail);
+  if (roomIds.size === 0) {
+    return false;
+  }
+
+  return roomCandidates
+    .filter((item) => !item.startsWith("deal:"))
     .some((item) => roomIds.has(item));
 }
 
@@ -576,9 +602,8 @@ export default function FloatingChatDock({
       active: ActiveFloatingRoom | null,
       isOpen: boolean
     ) => {
-      const roomIds = getRealtimeRoomIds(detail);
       const room = roomsRef.current.find((item) =>
-        roomMatchesRealtimeIds(item, roomIds)
+        roomMatchesRealtimeDetail(item, detail)
       );
 
       if (!room) {

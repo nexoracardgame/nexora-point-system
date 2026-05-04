@@ -160,7 +160,14 @@ export function cacheRealtimeDmMessage(
   message: DmRealtimeCacheMessage,
   meta?: DmRoomFastCacheMeta | null
 ) {
-  const safeRoomIds = uniqueRoomIds([message?.roomId, ...roomIds]);
+  const primaryRoomId = safeText(message?.roomId);
+  const allRoomIds = uniqueRoomIds([primaryRoomId, ...roomIds]);
+  const primaryIsDeal = primaryRoomId
+    ? primaryRoomId.startsWith("deal:")
+    : allRoomIds.some((roomId) => roomId.startsWith("deal:"));
+  const safeRoomIds = allRoomIds.filter((roomId) =>
+    primaryIsDeal ? roomId.startsWith("deal:") : !roomId.startsWith("deal:")
+  );
   if (safeRoomIds.length === 0) {
     return;
   }
