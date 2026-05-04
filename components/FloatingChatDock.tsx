@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
+import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
+import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import {
@@ -218,6 +220,7 @@ export default function FloatingChatDock({
   unreadCount?: number;
 }) {
   const { data: session, status } = useSession();
+  const { isOnline } = useOnlinePresence();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<RoomFilter>("all");
@@ -265,6 +268,19 @@ export default function FloatingChatDock({
     : activeRoom?.otherUserId
       ? `/profile/${encodeURIComponent(activeRoom.otherUserId)}`
       : "";
+  const activeOtherOnline = activeRoom
+    ? isOnline(activeRoom.other?.id, activeRoom.otherUserId)
+    : false;
+  const activeDealCardNo = activeRoom
+    ? safeText(activeRoom.card?.no || activeRoom.dealCardNo) || "001"
+    : "001";
+  const activeDealCardName = activeRoom
+    ? safeText(activeRoom.card?.name || activeRoom.dealCardName) ||
+      `Card #${activeDealCardNo}`
+    : "";
+  const activeDealCardImage = activeRoom
+    ? safeText(activeRoom.card?.image || activeRoom.dealCardImage)
+    : "";
 
   useEffect(() => {
     activeRoomRef.current = activeRoom;
@@ -1058,6 +1074,7 @@ export default function FloatingChatDock({
                 <div className="space-y-1.5">
                   {visibleRooms.map((room) => {
                     const active = activeRoom?.key === room.key;
+                    const roomOnline = isOnline(room.otherUserId);
                     return (
                       <button
                         key={room.key}
@@ -1071,19 +1088,21 @@ export default function FloatingChatDock({
                             : "border-transparent hover:border-white/10 hover:bg-white/[0.055]"
                         }`}
                       >
-                        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-white/10">
-                          <img
-                            src={room.otherImage || "/avatar.png"}
-                            alt={room.otherName || "profile"}
-                            className="h-full w-full object-cover"
-                            onError={(event) => {
-                              event.currentTarget.src = "/avatar.png";
-                            }}
-                          />
+                        <span className="relative h-11 w-11 shrink-0">
+                          <span className="block h-11 w-11 overflow-hidden rounded-2xl bg-white/10">
+                            <img
+                              src={room.otherImage || "/avatar.png"}
+                              alt={room.otherName || "profile"}
+                              className="h-full w-full object-cover"
+                              onError={(event) => {
+                                event.currentTarget.src = "/avatar.png";
+                              }}
+                            />
+                          </span>
                           <span
-                            className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
+                            className={`absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
                               room.kind === "deal"
-                                ? "bg-cyan-400 text-black"
+                                ? "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
                                 : "bg-white text-black"
                             }`}
                           >
@@ -1093,6 +1112,13 @@ export default function FloatingChatDock({
                               <MessageCircle className="h-3 w-3" />
                             )}
                           </span>
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#08090d] ${
+                              roomOnline
+                                ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.72)]"
+                                : "bg-zinc-500"
+                            }`}
+                          />
                         </span>
 
                         <span className="min-w-0 flex-1">
@@ -1100,12 +1126,13 @@ export default function FloatingChatDock({
                             <span className="truncate text-sm font-black text-white">
                               {room.otherName}
                             </span>
-                            <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-white/30">
+                            <span className="shrink-0 text-[10px] font-black uppercase text-white/30">
                               {room.kind === "deal" ? "DEAL" : "DM"}
                             </span>
                           </span>
                           {room.kind === "deal" ? (
                             <span className="mt-0.5 block truncate text-[11px] font-bold text-cyan-200/70">
+                              #{safeText(room.dealCardNo) || "001"}{" "}
                               {room.dealCardName || "ดีลการ์ด"}{" "}
                               {formatPrice(room.dealPrice)}
                             </span>
@@ -1163,34 +1190,87 @@ export default function FloatingChatDock({
                     className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-1.5 py-1 text-left transition hover:bg-white/[0.06] disabled:cursor-default disabled:hover:bg-transparent"
                     aria-label="เปิดโปรไฟล์คู่สนทนา"
                   >
-                    <img
-                      src={activeRoom.other?.image || activeRoom.otherImage || "/avatar.png"}
-                      alt={activeRoom.other?.name || activeRoom.otherName || "profile"}
-                      className="h-11 w-11 shrink-0 rounded-2xl border border-white/10 object-cover"
-                      onError={(event) => {
-                        event.currentTarget.src = "/avatar.png";
-                      }}
-                    />
+                    <span className="relative h-11 w-11 shrink-0">
+                      <span className="block h-11 w-11 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
+                        <img
+                          src={activeRoom.other?.image || activeRoom.otherImage || "/avatar.png"}
+                          alt={activeRoom.other?.name || activeRoom.otherName || "profile"}
+                          className="h-full w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.src = "/avatar.png";
+                          }}
+                        />
+                      </span>
+                      <span
+                        className={`absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
+                          activeRoom.kind === "deal"
+                            ? "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
+                            : "bg-white text-black"
+                        }`}
+                      >
+                        {activeRoom.kind === "deal" ? (
+                          <Handshake className="h-3 w-3" />
+                        ) : (
+                          <MessageCircle className="h-3 w-3" />
+                        )}
+                      </span>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#08090d] ${
+                          activeOtherOnline
+                            ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.72)]"
+                            : "bg-zinc-500"
+                        }`}
+                      />
+                    </span>
 
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-black sm:text-base">
                         {activeRoom.other?.name || activeRoom.otherName}
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-white/42">
-                        {activeRoom.kind === "deal"
-                          ? activeRoom.card?.name || activeRoom.dealCardName || "แชทดีล"
-                          : "แชทส่วนตัว"}
+                      <span
+                        className={`mt-0.5 flex min-w-0 items-center gap-1.5 text-xs ${
+                          activeOtherOnline ? "text-emerald-300/90" : "text-white/45"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            activeOtherOnline
+                              ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.72)]"
+                              : "bg-zinc-500"
+                          }`}
+                        />
+                        <span className="shrink-0">
+                          {activeOtherOnline ? "ออนไลน์" : "ออฟไลน์"}
+                        </span>
+                        <span className="text-white/22">·</span>
+                        <span className="truncate text-white/42">
+                          {activeRoom.kind === "deal"
+                            ? `ดีลการ์ด #${activeDealCardNo}`
+                            : "แชทส่วนตัว"}
+                        </span>
                       </span>
                     </span>
                   </button>
 
                   {activeRoom.kind === "deal" ? (
-                    <div className="hidden max-w-[124px] shrink-0 rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-right sm:block">
-                      <div className="truncate text-[10px] font-bold text-cyan-100/60">
-                        ราคาดีล
+                    <div className="flex max-w-[118px] shrink-0 items-center gap-1.5 rounded-2xl border border-cyan-300/15 bg-cyan-400/10 p-1 pr-2 sm:max-w-[168px]">
+                      <div className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
+                        <SafeCardImage
+                          cardNo={activeDealCardNo}
+                          imageUrl={activeDealCardImage}
+                          alt={activeDealCardName}
+                          className="aspect-[2/3] h-9 w-auto object-cover sm:h-11"
+                          loading="eager"
+                          fetchPriority="high"
+                        />
                       </div>
-                      <div className="truncate text-sm font-black text-cyan-100">
-                        {formatPrice(activeRoom.deal?.offeredPrice || activeRoom.dealPrice)}
+                      <div className="min-w-0 text-left">
+                        <div className="truncate text-[9px] font-black text-cyan-100/65 sm:text-[10px]">
+                          #{activeDealCardNo}
+                        </div>
+                        <div className="truncate text-[11px] font-black text-cyan-100 sm:text-sm">
+                          {formatPrice(activeRoom.deal?.offeredPrice || activeRoom.dealPrice)}
+                        </div>
                       </div>
                     </div>
                   ) : null}
