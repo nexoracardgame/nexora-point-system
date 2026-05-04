@@ -44,8 +44,14 @@ export default function LoginClient({
     "https://s.imgz.io/2026/04/03/NEXORA496971ca3675ceb2ca.png";
   const callbackUrl = resolveCallbackUrl(rawCallbackUrl);
 
-  const handleLogin = () =>
+  const handleLineLogin = () =>
     signIn("line", {
+      redirect: true,
+      callbackUrl,
+    });
+
+  const handleGoogleLogin = () =>
+    signIn("google", {
       redirect: true,
       callbackUrl,
     });
@@ -153,7 +159,7 @@ export default function LoginClient({
         </div>
 
         <button
-          onClick={() => void handleLogin()}
+          onClick={() => void handleLineLogin()}
           className="rounded-2xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-bold backdrop-blur-xl"
         >
           SIGN IN
@@ -196,14 +202,28 @@ export default function LoginClient({
           Wallet • Marketplace • Rewards • Competitive Card Ecosystem
         </motion.p>
 
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => void handleLogin()}
-          className="mt-8 w-full max-w-[320px] rounded-[22px] bg-[#06C755] px-6 py-4 text-base font-black text-white shadow-[0_0_40px_rgba(6,199,85,0.45)] md:mt-10 md:max-w-[340px] md:rounded-[24px] md:px-8 md:py-5 md:text-xl"
-        >
-          LOGIN WITH LINE
-        </motion.button>
+        <div className="mt-8 grid w-full max-w-[680px] gap-3 sm:grid-cols-2 md:mt-10">
+          <motion.button
+            whileHover={{ scale: 1.035 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => void handleLineLogin()}
+            className="min-h-[58px] rounded-[22px] bg-[#06C755] px-6 py-4 text-base font-black text-white shadow-[0_0_40px_rgba(6,199,85,0.45)] md:min-h-[68px] md:rounded-[24px] md:px-8 md:py-5 md:text-xl"
+          >
+            LOGIN WITH LINE
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.035 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => void handleGoogleLogin()}
+            className="flex min-h-[58px] items-center justify-center gap-3 rounded-[22px] bg-white px-6 py-4 text-base font-black text-black shadow-[0_0_40px_rgba(255,255,255,0.16)] ring-1 ring-white/15 md:min-h-[68px] md:rounded-[24px] md:px-8 md:py-5 md:text-xl"
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-full border border-black/10 bg-white text-lg font-black text-[#4285F4]">
+              G
+            </span>
+            LOGIN WITH GOOGLE
+          </motion.button>
+        </div>
 
         <div className="mt-4 text-[10px] text-zinc-400 md:mt-5 md:text-sm">
           Protected by NEXORA Secure Authentication

@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const DEFAULT_PROFILE_IMAGE = "/avatar.png";
 const MAX_PROFILE_IMAGE_BYTES = 6 * 1024 * 1024;
 const SNAPSHOT_BUCKET = "chat-images";
-const SNAPSHOT_PREFIX = "profile-assets/line-initial";
+const SNAPSHOT_PREFIX = "profile-assets/oauth-initial";
 const FETCH_TIMEOUT_MS = 5000;
 
 let supabaseClient: SupabaseClient | null | undefined;
@@ -14,6 +14,7 @@ let supabaseClient: SupabaseClient | null | undefined;
 type SnapshotTarget = {
   userId?: string | null;
   lineId?: string | null;
+  provider?: string | null;
 };
 
 type DownloadedImage = {
@@ -77,6 +78,29 @@ export function isLineProfileImageUrl(value?: string | null) {
   }
 }
 
+export function isGoogleProfileImageUrl(value?: string | null) {
+  const image = String(value || "").trim();
+
+  if (!image) {
+    return false;
+  }
+
+  try {
+    const url = new URL(image);
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "googleusercontent.com" ||
+        url.hostname.endsWith(".googleusercontent.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isProviderProfileImageUrl(value?: string | null) {
+  return isLineProfileImageUrl(value) || isGoogleProfileImageUrl(value);
+}
+
 function normalizeContentType(value?: string | null) {
   const contentType = String(value || "")
     .split(";")[0]
@@ -122,7 +146,7 @@ function safeFileSegment(value?: string | null, fallback = "user") {
   return segment || fallback;
 }
 
-async function downloadLineProfileImage(sourceUrl: string) {
+async function downloadProfileImage(sourceUrl: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -213,34 +237,45 @@ async function writeSnapshotLocally(fileName: string, image: DownloadedImage) {
   }
 }
 
-export async function createLineProfileImageSnapshot(
+export async function createProviderProfileImageSnapshot(
   sourceUrl: string,
   target: SnapshotTarget = {}
 ) {
   const safeSourceUrl = String(sourceUrl || "").trim();
 
-  if (!isLineProfileImageUrl(safeSourceUrl)) {
+  if (!isProviderProfileImageUrl(safeSourceUrl)) {
     return null;
   }
 
-  const image = await downloadLineProfileImage(safeSourceUrl);
+  const image = await downloadProfileImage(safeSourceUrl);
 
   if (!image) {
     return null;
   }
 
   const owner = safeFileSegment(target.userId || target.lineId);
-  const line = safeFileSegment(target.lineId, "line");
+  const provider = safeFileSegment(target.provider, "oauth");
+  const externalId = safeFileSegment(target.lineId, provider);
   const digest = crypto
     .createHash("sha256")
     .update(safeSourceUrl)
     .digest("hex")
     .slice(0, 12);
   const ext = extensionForImage(image.contentType, safeSourceUrl);
-  const fileName = `${SNAPSHOT_PREFIX}/${owner}-${line}-${digest}-${Date.now()}-${crypto.randomUUID()}${ext}`;
+  const fileName = `${SNAPSHOT_PREFIX}/${provider}-${owner}-${externalId}-${digest}-${Date.now()}-${crypto.randomUUID()}${ext}`;
 
   return (
     (await uploadSnapshotToSupabase(fileName, image)) ||
     (await writeSnapshotLocally(fileName, image))
   );
+}
+
+export async function createLineProfileImageSnapshot(
+  sourceUrl: string,
+  target: SnapshotTarget = {}
+) {
+  return createProviderProfileImageSnapshot(sourceUrl, {
+    ...target,
+    provider: target.provider || "line",
+  });
 }

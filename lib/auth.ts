@@ -1,19 +1,23 @@
 import { NextAuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
 import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
 import {
-  createLineProfileImageSnapshot,
+  createProviderProfileImageSnapshot,
   isDefaultProfileImageUrl,
-  isLineProfileImageUrl,
+  isProviderProfileImageUrl,
 } from "@/lib/profile-image-snapshot";
 import { syncUserIdentityEverywhere } from "@/lib/user-identity-sync";
 
-type LineProfile = {
+type AuthProvider = "line" | "google";
+
+type OAuthProfile = {
   sub?: string;
   name?: string;
   picture?: string;
+  email?: string;
 };
 
 type SessionUpdatePayload = {
@@ -24,6 +28,7 @@ type SessionUpdatePayload = {
 type AppToken = JWT & {
   id?: string;
   lineId?: string;
+  authProvider?: AuthProvider;
   role?: string;
   nexPoint?: number;
   coin?: number;
@@ -52,9 +57,31 @@ function getSafeSessionImage(image?: string | null) {
   return raw;
 }
 
-function getProviderImage(appToken: AppToken, lineProfile: LineProfile) {
+function isAuthProvider(value?: string | null): value is AuthProvider {
+  return value === "line" || value === "google";
+}
+
+function getAuthProvider(value?: string | null): AuthProvider {
+  return isAuthProvider(value) ? value : "line";
+}
+
+function getProviderIdentity(
+  provider: AuthProvider,
+  profile: OAuthProfile,
+  fallbackSubject?: string | null
+) {
+  const subject = String(profile.sub || fallbackSubject || "").trim();
+
+  if (!subject) {
+    return "";
+  }
+
+  return provider === "google" ? `google:${subject}` : subject;
+}
+
+function getProviderImage(appToken: AppToken, profile: OAuthProfile) {
   return getSafeSessionImage(
-    lineProfile.picture ||
+    profile.picture ||
       (typeof appToken.picture === "string" ? appToken.picture : null)
   );
 }
@@ -64,24 +91,26 @@ function shouldRepairStoredProfileImage(image?: string | null) {
   return (
     isDefaultProfileImageUrl(image) ||
     isDefaultProfileImageUrl(safeImage) ||
-    isLineProfileImageUrl(safeImage)
+    isProviderProfileImageUrl(safeImage)
   );
 }
 
 async function getStableInitialProfileImage(
   image: string,
   lineId: string,
+  provider: AuthProvider,
   userId?: string | null
 ) {
   const safeImage = getSafeSessionImage(image);
 
-  if (!isLineProfileImageUrl(safeImage)) {
+  if (!isProviderProfileImageUrl(safeImage)) {
     return safeImage;
   }
 
-  const snapshotImage = await createLineProfileImageSnapshot(safeImage, {
+  const snapshotImage = await createProviderProfileImageSnapshot(safeImage, {
     userId,
     lineId,
+    provider,
   });
 
   return snapshotImage || safeImage;
@@ -95,12 +124,12 @@ function resolveSessionProfileImage(
   const safeTokenImage = getSafeSessionImage(tokenImage);
   const tokenHasStableImage =
     !isDefaultProfileImageUrl(safeTokenImage) &&
-    !isLineProfileImageUrl(safeTokenImage);
+    !isProviderProfileImageUrl(safeTokenImage);
 
   if (
     tokenHasStableImage &&
     (isDefaultProfileImageUrl(safeLocalImage) ||
-      isLineProfileImageUrl(safeLocalImage))
+      isProviderProfileImageUrl(safeLocalImage))
   ) {
     return safeTokenImage;
   }
@@ -108,15 +137,20 @@ function resolveSessionProfileImage(
   return safeLocalImage;
 }
 
-async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
-  const lineId = String(appToken.lineId || lineProfile.sub || "").trim();
+async function ensureDbUser(
+  appToken: AppToken,
+  profile: OAuthProfile,
+  provider: AuthProvider
+) {
+  const providerLineId = getProviderIdentity(provider, profile);
+  const lineId = String(appToken.lineId || providerLineId).trim();
 
   if (!lineId) {
     return null;
   }
 
-  const safeName = String(appToken.name || lineProfile.name || "NEXORA User").trim();
-  const providerImage = getProviderImage(appToken, lineProfile);
+  const safeName = String(appToken.name || profile.name || "NEXORA User").trim();
+  const providerImage = getProviderImage(appToken, profile);
 
   try {
     const existingUser = await prisma.user.findUnique({
@@ -139,6 +173,7 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
         ? await getStableInitialProfileImage(
             providerImage,
             lineId,
+            provider,
             existingUser.id
           )
         : undefined;
@@ -146,7 +181,10 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
         stableImage &&
         stableImage !== existingImage &&
         !isDefaultProfileImageUrl(stableImage) &&
-        !(isLineProfileImageUrl(existingImage) && isLineProfileImageUrl(stableImage))
+        !(
+          isProviderProfileImageUrl(existingImage) &&
+          isProviderProfileImageUrl(stableImage)
+        )
           ? stableImage
           : undefined;
       const needsPatch =
@@ -206,6 +244,7 @@ async function ensureDbUser(appToken: AppToken, lineProfile: LineProfile) {
     const initialImage = await getStableInitialProfileImage(
       providerImage,
       lineId,
+      provider,
       lineId
     );
 
@@ -242,6 +281,10 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.LINE_CLIENT_ID!,
       clientSecret: process.env.LINE_CLIENT_SECRET!,
     }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
   ],
 
   secret: process.env.NEXTAUTH_SECRET,
@@ -251,16 +294,21 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    async signIn({ profile }) {
-      const lineProfile = (profile || {}) as LineProfile;
-      const lineId = lineProfile.sub;
+    async signIn({ account, profile }) {
+      const provider = getAuthProvider(account?.provider);
+      const oauthProfile = (profile || {}) as OAuthProfile;
+      const lineId = getProviderIdentity(
+        provider,
+        oauthProfile,
+        account?.providerAccountId
+      );
 
       if (!lineId) return false;
 
       return true;
     },
 
-    async jwt({ token, profile, trigger, session }) {
+    async jwt({ token, account, profile, trigger, session }) {
       const appToken = token as AppToken;
 
       if (trigger === "update") {
@@ -275,21 +323,31 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      const lineProfile = (profile || {}) as LineProfile;
+      const oauthProfile = (profile || {}) as OAuthProfile;
+      const provider = getAuthProvider(account?.provider || appToken.authProvider);
+      const providerAccountId = account?.providerAccountId;
 
-      if (lineProfile.sub) {
-        appToken.lineId = lineProfile.sub;
-        appToken.id = appToken.id || lineProfile.sub;
-        appToken.name = appToken.name || lineProfile.name || "NEXORA User";
+      if (oauthProfile.sub || providerAccountId) {
+        const providerLineId = getProviderIdentity(
+          provider,
+          oauthProfile,
+          providerAccountId
+        );
+
+        appToken.authProvider = provider;
+        appToken.lineId = providerLineId;
+        appToken.id = appToken.id || providerLineId;
+        appToken.name = appToken.name || oauthProfile.name || "NEXORA User";
         appToken.picture = getSafeSessionImage(
           typeof appToken.picture === "string"
             ? appToken.picture
-            : lineProfile.picture
+            : oauthProfile.picture
         );
       }
 
-      const lineId = appToken.lineId || lineProfile.sub;
+      const lineId = appToken.lineId || getProviderIdentity(provider, oauthProfile);
       appToken.id = appToken.id || lineId || "";
+      appToken.authProvider = getAuthProvider(appToken.authProvider || provider);
       appToken.role = appToken.role || "USER";
       appToken.nexPoint = appToken.nexPoint || 0;
       appToken.coin = appToken.coin || 0;
@@ -298,7 +356,11 @@ export const authOptions: NextAuthOptions = {
         typeof appToken.picture === "string" ? appToken.picture : null
       );
 
-      const dbUser = await ensureDbUser(appToken, lineProfile);
+      const dbUser = await ensureDbUser(
+        appToken,
+        oauthProfile,
+        appToken.authProvider
+      );
 
       if (dbUser) {
         appToken.id = dbUser.id;
