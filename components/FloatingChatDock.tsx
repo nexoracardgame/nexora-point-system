@@ -57,19 +57,6 @@ type ActiveFloatingRoom = FloatingRoom & {
   } | null;
 };
 
-type BootstrapPayload = {
-  ok?: boolean;
-  roomId?: string;
-  me?: ChatUser | null;
-  other?: ChatUser | null;
-  card?: ActiveFloatingRoom["card"];
-  deal?: ActiveFloatingRoom["deal"];
-  messages?: ChatMessage[];
-  hasMore?: boolean;
-  nextCursor?: string | null;
-  error?: string;
-};
-
 type RealtimeChatDetail = Partial<ChatMessage> & {
   isMine?: boolean | null;
   roomIds?: Array<string | null | undefined> | null;
@@ -77,6 +64,26 @@ type RealtimeChatDetail = Partial<ChatMessage> & {
 
 const LIST_REFRESH_MS = 8500;
 const ROOM_SYNC_MS = 14000;
+const ROOM_CACHE_TTL_MS = 90000;
+const ROOM_PREFETCH_COUNT = 8;
+const ROOM_PREFETCH_LIMIT = 28;
+const ROOM_OPEN_LIMIT = 42;
+
+type RoomLoadResult = {
+  active: ActiveFloatingRoom;
+  messages: ChatMessage[];
+};
+
+type RoomCacheEntry = RoomLoadResult & {
+  fetchedAt: number;
+};
+
+type MessagePagePayload = {
+  messages?: ChatMessage[];
+  hasMore?: boolean;
+  nextCursor?: string | null;
+  error?: string;
+};
 
 function safeText(value?: string | number | null) {
   return String(value || "").trim();
@@ -147,6 +154,39 @@ function formatPrice(value?: number | null) {
   return `฿${price.toLocaleString("th-TH")}`;
 }
 
+function FloatingChatMessageSkeleton() {
+  return (
+    <div className="mx-auto flex min-h-full w-full max-w-[560px] flex-col justify-end gap-4 py-1">
+      {[0, 1, 2, 3].map((item) => {
+        const mine = item % 2 === 1;
+        return (
+          <div
+            key={item}
+            className={`flex ${mine ? "justify-end" : "justify-start"}`}
+          >
+            <div className={`flex max-w-[78%] items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+              {!mine ? (
+                <div className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-white/[0.08]" />
+              ) : null}
+              <div
+                className={`h-11 animate-pulse rounded-[20px] bg-white/[0.075] ${
+                  item === 0
+                    ? "w-28"
+                    : item === 1
+                      ? "w-44"
+                      : item === 2
+                        ? "w-36"
+                        : "w-52"
+                }`}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function getReadRoomIds(room: ActiveFloatingRoom | FloatingRoom, actualRoomId: string) {
   return Array.from(
     new Set(
@@ -196,6 +236,8 @@ export default function FloatingChatDock({
 
   const activeRoomRef = useRef<ActiveFloatingRoom | null>(activeRoom);
   const loadingRoomKeyRef = useRef("");
+  const roomCacheRef = useRef<Map<string, RoomCacheEntry>>(new Map());
+  const roomLoadPromisesRef = useRef<Map<string, Promise<RoomLoadResult>>>(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRootRef = useRef<HTMLDivElement>(null);
@@ -334,71 +376,199 @@ export default function FloatingChatDock({
     [currentUserId]
   );
 
+  const buildRoomShell = useCallback(
+    (
+      room: FloatingRoom,
+      loading: boolean,
+      cachedActive?: ActiveFloatingRoom | null
+    ): ActiveFloatingRoom => {
+      const safeDealId = safeText(room.dealId || room.roomId);
+      const dealCardNo = safeText(room.dealCardNo) || "001";
+      const fallbackCard =
+        room.kind === "deal"
+          ? {
+              id: safeText(room.dealId || room.roomId),
+              no: dealCardNo,
+              name: safeText(room.dealCardName) || `Card #${dealCardNo}`,
+              image: safeText(room.dealCardImage) || "/cards/001.jpg",
+              listedPrice: Number(room.dealPrice || 0),
+            }
+          : null;
+      const fallbackDeal =
+        room.kind === "deal"
+          ? {
+              id: safeDealId,
+              offeredPrice: Number(room.dealPrice || 0),
+            }
+          : null;
+
+      return {
+        ...room,
+        actualRoomId: safeText(cachedActive?.actualRoomId) || room.roomId,
+        me:
+          cachedActive?.me ||
+          buildChatUser(
+            currentUserId,
+            session?.user?.name,
+            session?.user?.image,
+            "You"
+          ),
+        other:
+          cachedActive?.other ||
+          buildChatUser(room.otherUserId, room.otherName, room.otherImage),
+        loading,
+        hasMore: Boolean(cachedActive?.hasMore),
+        nextCursor: safeText(cachedActive?.nextCursor) || null,
+        card: cachedActive?.card || fallbackCard,
+        deal: cachedActive?.deal || fallbackDeal,
+      };
+    },
+    [currentUserId, session?.user?.image, session?.user?.name]
+  );
+
+  const updateRoomCache = useCallback(
+    (key: string, active: ActiveFloatingRoom, nextMessages: ChatMessage[]) => {
+      const safeKey = safeText(key);
+      if (!safeKey) {
+        return;
+      }
+
+      roomCacheRef.current.set(safeKey, {
+        active: {
+          ...active,
+          loading: false,
+        },
+        messages: nextMessages,
+        fetchedAt: Date.now(),
+      });
+    },
+    []
+  );
+
+  const fetchRoomMessagesPage = useCallback(
+    async (room: FloatingRoom, limit: number): Promise<RoomLoadResult> => {
+      const shell = buildRoomShell(room, false);
+      const res = await fetch(
+        `/api/dm/messages?roomId=${encodeURIComponent(room.roomId)}&limit=${limit}&ts=${Date.now()}`,
+        {
+          cache: "no-store",
+        }
+      );
+      const payload = (await res.json().catch(() => null)) as MessagePagePayload | null;
+
+      if (!res.ok) {
+        throw new Error(payload?.error || "open chat failed");
+      }
+
+      const messages = (Array.isArray(payload?.messages) ? payload.messages : []).map(
+        (message) =>
+          normalizeChatMessage(message, shell.actualRoomId, shell.me, shell.other)
+      );
+      const active: ActiveFloatingRoom = {
+        ...shell,
+        loading: false,
+        hasMore: Boolean(payload?.hasMore),
+        nextCursor: safeText(payload?.nextCursor) || null,
+      };
+
+      return {
+        active,
+        messages,
+      };
+    },
+    [buildRoomShell]
+  );
+
+  const loadRoomFast = useCallback(
+    (room: FloatingRoom, limit: number) => {
+      const existing = roomLoadPromisesRef.current.get(room.key);
+      if (existing) {
+        return existing;
+      }
+
+      const promise = fetchRoomMessagesPage(room, limit)
+        .then((result) => {
+          updateRoomCache(room.key, result.active, result.messages);
+          return result;
+        })
+        .finally(() => {
+          roomLoadPromisesRef.current.delete(room.key);
+        });
+
+      roomLoadPromisesRef.current.set(room.key, promise);
+      return promise;
+    },
+    [fetchRoomMessagesPage, updateRoomCache]
+  );
+
+  const prefetchRoom = useCallback(
+    (room: FloatingRoom) => {
+      if (status !== "authenticated") {
+        return;
+      }
+
+      const cached = roomCacheRef.current.get(room.key);
+      if (cached && Date.now() - cached.fetchedAt < ROOM_CACHE_TTL_MS) {
+        return;
+      }
+
+      void loadRoomFast(room, ROOM_PREFETCH_LIMIT).catch(() => undefined);
+    },
+    [loadRoomFast, status]
+  );
+
   const openRoom = useCallback(
     async (room: FloatingRoom) => {
       const key = room.key;
+      const cached = roomCacheRef.current.get(key);
+      const cachedMessages = cached?.messages || [];
+      const shell = buildRoomShell(room, !cached, cached?.active);
+
       loadingRoomKeyRef.current = key;
       setError("");
       setMobileListVisible(false);
-      setActiveRoom({
-        ...room,
-        actualRoomId: room.roomId,
-        me: null,
-        other: buildChatUser(room.otherUserId, room.otherName, room.otherImage),
-        loading: true,
-        hasMore: false,
-        nextCursor: null,
-      });
-      setMessages([]);
+      setShowEmoji(false);
+      setActiveRoom(shell);
+      setMessages(cachedMessages);
 
-      const url =
-        room.kind === "deal"
-          ? `/api/market/deal-chat/bootstrap?dealId=${encodeURIComponent(
-              safeText(room.dealId)
-            )}`
-          : `/api/dm/bootstrap?roomId=${encodeURIComponent(room.roomId)}`;
+      if (cachedMessages.length > 0) {
+        scrollToBottom("auto");
+        void markRoomSeen(shell, shell.actualRoomId, cachedMessages, shell.me);
+      }
 
       try {
-        const res = await fetch(url, {
-          cache: "no-store",
-        });
-        const payload = (await res.json().catch(() => null)) as BootstrapPayload | null;
+        const { active: nextActive, messages: nextMessages } = await loadRoomFast(
+          room,
+          ROOM_OPEN_LIMIT
+        );
 
         if (loadingRoomKeyRef.current !== key) {
           return;
         }
 
-        if (!res.ok || payload?.ok === false || !payload?.roomId) {
-          throw new Error(payload?.error || "เปิดแชทไม่สำเร็จ");
-        }
-
-        const me = payload.me
-          ? buildChatUser(payload.me.id, payload.me.name, payload.me.image, "You")
-          : null;
-        const other = payload.other
-          ? buildChatUser(payload.other.id, payload.other.name, payload.other.image)
-          : buildChatUser(room.otherUserId, room.otherName, room.otherImage);
-        const actualRoomId = safeText(payload.roomId);
-        const nextMessages = (Array.isArray(payload.messages)
-          ? payload.messages
-          : []
-        ).map((message) => normalizeChatMessage(message, actualRoomId, me, other));
-        const nextActive: ActiveFloatingRoom = {
-          ...room,
-          actualRoomId,
-          me,
-          other,
-          card: payload.card || null,
-          deal: payload.deal || null,
-          loading: false,
-          hasMore: Boolean(payload.hasMore),
-          nextCursor: safeText(payload.nextCursor) || null,
+        const activeWithoutUnread: ActiveFloatingRoom = {
+          ...nextActive,
           unread: 0,
         };
 
-        setActiveRoom(nextActive);
-        setMessages(nextMessages);
-        void markRoomSeen(nextActive, actualRoomId, nextMessages, me);
+        setActiveRoom(activeWithoutUnread);
+        setMessages((current) => {
+          const mergedMessages = mergeChatMessages(
+            current,
+            nextMessages,
+            activeWithoutUnread.actualRoomId,
+            activeWithoutUnread.me,
+            activeWithoutUnread.other
+          );
+          updateRoomCache(key, activeWithoutUnread, mergedMessages);
+          return mergedMessages;
+        });
+        void markRoomSeen(
+          activeWithoutUnread,
+          activeWithoutUnread.actualRoomId,
+          nextMessages,
+          activeWithoutUnread.me
+        );
         scrollToBottom("auto");
       } catch (err) {
         if (loadingRoomKeyRef.current !== key) {
@@ -415,7 +585,7 @@ export default function FloatingChatDock({
         );
       }
     },
-    [markRoomSeen, scrollToBottom]
+    [buildRoomShell, loadRoomFast, markRoomSeen, scrollToBottom, updateRoomCache]
   );
 
   const syncActiveRoom = useCallback(async () => {
@@ -447,27 +617,32 @@ export default function FloatingChatDock({
       normalizeChatMessage(message, active.actualRoomId, active.me, active.other)
     );
 
-    setMessages((current) =>
-      reconcileRecentChatMessages(
+    const activeAfterSync: ActiveFloatingRoom = {
+      ...active,
+      loading: false,
+      hasMore: Boolean(payload?.hasMore),
+      nextCursor: safeText(payload?.nextCursor) || null,
+    };
+
+    setMessages((current) => {
+      const nextMessages = reconcileRecentChatMessages(
         current,
         freshMessages,
         active.actualRoomId,
         active.me,
         active.other
-      )
-    );
+      );
+      updateRoomCache(active.key, activeAfterSync, nextMessages);
+      return nextMessages;
+    });
     setActiveRoom((current) =>
       current?.actualRoomId === active.actualRoomId
-        ? {
-            ...current,
-            hasMore: Boolean(payload?.hasMore),
-            nextCursor: safeText(payload?.nextCursor) || null,
-          }
+        ? activeAfterSync
         : current
     );
 
     void markRoomSeen(active, active.actualRoomId, freshMessages, active.me);
-  }, [markRoomSeen]);
+  }, [markRoomSeen, updateRoomCache]);
 
   const sendMessage = useCallback(async () => {
     const active = activeRoomRef.current;
@@ -503,9 +678,17 @@ export default function FloatingChatDock({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    setMessages((current) =>
-      mergeSingleChatMessage(current, optimistic, active.actualRoomId, active.me, active.other)
-    );
+    setMessages((current) => {
+      const nextMessages = mergeSingleChatMessage(
+        current,
+        optimistic,
+        active.actualRoomId,
+        active.me,
+        active.other
+      );
+      updateRoomCache(active.key, active, nextMessages);
+      return nextMessages;
+    });
     scrollToBottom("smooth");
 
     try {
@@ -545,9 +728,17 @@ export default function FloatingChatDock({
         active.me,
         active.other
       );
-      setMessages((current) =>
-        mergeChatMessages(current, [sentMessage], active.actualRoomId, active.me, active.other)
-      );
+      setMessages((current) => {
+        const nextMessages = mergeChatMessages(
+          current,
+          [sentMessage],
+          active.actualRoomId,
+          active.me,
+          active.other
+        );
+        updateRoomCache(active.key, active, nextMessages);
+        return nextMessages;
+      });
       setRooms((current) =>
         current
           .map((room) =>
@@ -578,7 +769,15 @@ export default function FloatingChatDock({
     } finally {
       setSending(false);
     }
-  }, [currentUserId, loadRooms, scrollToBottom, sending, session?.user?.image, session?.user?.name]);
+  }, [
+    currentUserId,
+    loadRooms,
+    scrollToBottom,
+    sending,
+    session?.user?.image,
+    session?.user?.name,
+    updateRoomCache,
+  ]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -613,6 +812,24 @@ export default function FloatingChatDock({
 
     return () => window.clearTimeout(timerId);
   }, [activeRoom, open, openRoom, visibleRooms]);
+
+  useEffect(() => {
+    if (!open || visibleRooms.length === 0) {
+      return;
+    }
+
+    const timers = visibleRooms
+      .slice(0, ROOM_PREFETCH_COUNT)
+      .map((room, index) =>
+        window.setTimeout(() => {
+          prefetchRoom(room);
+        }, 180 + index * 120)
+      );
+
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, [open, prefetchRoom, visibleRooms]);
 
   useEffect(() => {
     if (!open || !activeRoom) {
@@ -659,9 +876,17 @@ export default function FloatingChatDock({
         active.other
       );
 
-      setMessages((current) =>
-        mergeSingleChatMessage(current, incoming, active.actualRoomId, active.me, active.other)
-      );
+      setMessages((current) => {
+        const nextMessages = mergeSingleChatMessage(
+          current,
+          incoming,
+          active.actualRoomId,
+          active.me,
+          active.other
+        );
+        updateRoomCache(active.key, active, nextMessages);
+        return nextMessages;
+      });
       scrollToBottom("smooth");
 
       if (!detail.isMine && open) {
@@ -676,7 +901,7 @@ export default function FloatingChatDock({
       window.removeEventListener("nexora:chat-unread-count", handleUnread);
       window.removeEventListener("nexora:chat-message-received", handleRealtime);
     };
-  }, [loadRooms, markRoomSeen, open, scrollToBottom]);
+  }, [loadRooms, markRoomSeen, open, scrollToBottom, updateRoomCache]);
 
   useEffect(() => {
     if (open) {
@@ -837,6 +1062,8 @@ export default function FloatingChatDock({
                       <button
                         key={room.key}
                         type="button"
+                        onPointerEnter={() => prefetchRoom(room)}
+                        onFocus={() => prefetchRoom(room)}
                         onClick={() => void openRoom(room)}
                         className={`group flex w-full items-center gap-3 rounded-[20px] border p-2.5 text-left transition active:scale-[0.99] ${
                           active
@@ -970,10 +1197,8 @@ export default function FloatingChatDock({
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-                  {activeRoom.loading ? (
-                    <div className="flex h-full min-h-[260px] items-center justify-center">
-                      <Loader2 className="h-7 w-7 animate-spin text-white/45" />
-                    </div>
+                  {messages.length === 0 && activeRoom.loading ? (
+                    <FloatingChatMessageSkeleton />
                   ) : messages.length === 0 ? (
                     <div className="flex h-full min-h-[260px] flex-col items-center justify-center text-center">
                       <MessagesSquare className="h-9 w-9 text-white/16" />
