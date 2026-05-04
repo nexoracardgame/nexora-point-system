@@ -55,6 +55,12 @@ type ReviewAggregate = {
   _count: { rating: number };
 };
 
+type ReviewStatsRow = {
+  sellerId: string;
+  _avg: { rating: number | null };
+  _count: { rating: number };
+};
+
 type SellerProfileFallback = {
   id: string;
   name: string | null;
@@ -102,7 +108,7 @@ function getSnapshotSellerImage(
 }
 
 function getSellerRankPresentation(score: number) {
-  if (score >= 340) {
+  if (score >= 820) {
     return {
       label: "Market Legend",
       tone: "text-amber-100",
@@ -111,7 +117,7 @@ function getSellerRankPresentation(score: number) {
     };
   }
 
-  if (score >= 265) {
+  if (score >= 670) {
     return {
       label: "Deal Commander",
       tone: "text-fuchsia-100",
@@ -120,7 +126,7 @@ function getSellerRankPresentation(score: number) {
     };
   }
 
-  if (score >= 205) {
+  if (score >= 530) {
     return {
       label: "Diamond Elite",
       tone: "text-cyan-100",
@@ -129,7 +135,7 @@ function getSellerRankPresentation(score: number) {
     };
   }
 
-  if (score >= 145) {
+  if (score >= 390) {
     return {
       label: "Platinum Seller",
       tone: "text-violet-100",
@@ -138,7 +144,7 @@ function getSellerRankPresentation(score: number) {
     };
   }
 
-  if (score >= 95) {
+  if (score >= 270) {
     return {
       label: "Premium Trader",
       tone: "text-violet-100",
@@ -147,7 +153,7 @@ function getSellerRankPresentation(score: number) {
     };
   }
 
-  if (score >= 55) {
+  if (score >= 150) {
     return {
       label: "Silver Seller",
       tone: "text-slate-100",
@@ -197,6 +203,7 @@ export default async function SellerProfilePage({
     listingStatsRows,
     soldStatsRows,
     reviewAggregate,
+    reviewStatsRows,
   ] = await Promise.all([
     getLocalProfileByUserId(id),
     prisma.user
@@ -330,6 +337,17 @@ export default async function SellerProfilePage({
             _count: { rating: 0 },
           }) as ReviewAggregate
       ),
+    prisma.sellerReview
+      .groupBy({
+        by: ["sellerId"],
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      })
+      .catch(() => [] as ReviewStatsRow[]),
   ]);
 
   const sellerSnapshot =
@@ -502,12 +520,46 @@ export default async function SellerProfilePage({
     ])
   );
 
+  const reviewStatMap = new Map<
+    string,
+    { avgRating: number; reviewCount: number }
+  >(
+    reviewStatsRows.map((row) => [
+      row.sellerId,
+      {
+        avgRating: Number(row._avg.rating || 0),
+        reviewCount: row._count.rating || 0,
+      },
+    ])
+  );
+
   const sellerIds = Array.from(
     new Set([
       ...listingStatsRows.map((row) => row.sellerId),
       ...soldStatsRows.map((row) => row.sellerId),
+      ...reviewStatsRows.map((row) => row.sellerId),
       seller.id,
     ])
+  );
+
+  const sellerCreatedRows =
+    sellerIds.length > 0
+      ? await prisma.user
+          .findMany({
+            where: {
+              id: {
+                in: sellerIds,
+              },
+            },
+            select: {
+              id: true,
+              createdAt: true,
+            },
+          })
+          .catch(() => [])
+      : [];
+  const sellerCreatedAtMap = new Map(
+    sellerCreatedRows.map((row) => [row.id, row.createdAt])
   );
 
   const now = new Date().getTime();
@@ -516,7 +568,9 @@ export default async function SellerProfilePage({
     .map((userId) => {
       const listingStats = listingStatMap.get(userId);
       const soldStats = soldStatMap.get(userId);
+      const reviewStats = reviewStatMap.get(userId);
       const startedAt =
+        sellerCreatedAtMap.get(userId) ||
         listingStats?.startedAt ||
         soldStats?.startedAt ||
         (userId === seller.id ? seller.createdAt : new Date(now));
@@ -526,22 +580,29 @@ export default async function SellerProfilePage({
         totalVolume: soldStats?.totalVolume || 0,
         activeListings: listingStats?.activeListings || 0,
         totalLikes: listingStats?.totalLikes || 0,
-        avgRating: 0,
-        reviewCount: 0,
+        avgRating: reviewStats?.avgRating || 0,
+        reviewCount: reviewStats?.reviewCount || 0,
         accountAgeDays: Math.max(
           1,
           Math.floor((now - startedAt.getTime()) / 86400000)
         ),
       };
+      const trust = buildTrustScore(metrics);
 
       return {
         userId,
         score: buildSellerScore(metrics),
+        trust,
+        soldCount: metrics.soldCount,
+        totalVolume: metrics.totalVolume,
       };
     })
     .filter((item) => item.score > 0 || item.userId === seller.id)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      if (b.trust !== a.trust) return b.trust - a.trust;
+      if (b.soldCount !== a.soldCount) return b.soldCount - a.soldCount;
+      if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
       return a.userId.localeCompare(b.userId);
     });
 
@@ -577,7 +638,9 @@ export default async function SellerProfilePage({
   const sellerRankIndex = ranking.findIndex((item) => item.userId === seller.id);
   const topPercent = buildTopPercent(
     sellerRankIndex >= 0 ? sellerRankIndex + 1 : ranking.length || 1,
-    Math.max(ranking.length, 1)
+    Math.max(ranking.length, 1),
+    sellerScore,
+    trustScore
   );
 
   const isGrowingSeller = completedDeals >= 10;
