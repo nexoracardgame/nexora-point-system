@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import ProfileSettingsClient from "@/app/(main)/settings/profile/ProfileSettingsClient";
 import { authOptions } from "@/lib/auth";
+import { getLinkedAuthProviders } from "@/lib/auth-identities";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,14 @@ export default async function ProfileSettingsPage() {
     {}) as {
     name?: string | null;
     image?: string | null;
+    lineId?: string | null;
+    authProvider?: "line" | "google";
   };
 
-  const profile = userId ? await getLocalProfileByUserId(userId) : null;
+  const [profile, linkedAccounts] = await Promise.all([
+    userId ? getLocalProfileByUserId(userId) : null,
+    getLinkedAuthProviders(userId, sessionUser.lineId),
+  ]);
 
   const initialProfile =
     profile ||
@@ -31,5 +37,11 @@ export default async function ProfileSettingsPage() {
       facebookUrl: "",
     };
 
-  return <ProfileSettingsClient initialProfile={initialProfile} />;
+  return (
+    <ProfileSettingsClient
+      initialProfile={initialProfile}
+      linkedAccounts={linkedAccounts}
+      currentAuthProvider={sessionUser.authProvider || null}
+    />
+  );
 }

@@ -7,6 +7,7 @@ declare module "next-auth" {
       id: string;
       role: string;
       lineId: string;
+      authProvider?: "line" | "google";
       nexPoint?: number;
       coin?: number;
       name?: string | null;
@@ -19,6 +20,7 @@ declare module "next-auth" {
     id: string;
     role: string;
     lineId: string;
+    authProvider?: "line" | "google";
     nexPoint?: number;
     coin?: number;
   }
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: string;
     lineId: string;
+    authProvider?: "line" | "google";
     nexPoint?: number;
     coin?: number;
   }

@@ -1,17 +1,28 @@
 import { NextAuthOptions } from "next-auth";
+import { cookies } from "next/headers";
 import GoogleProvider from "next-auth/providers/google";
 import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
 import {
+  getAuthIdentity,
+  getAuthProvider,
+  getProviderIdentity,
+  mergeUserAccounts,
+  upsertAuthIdentity,
+  type AuthProvider,
+} from "@/lib/auth-identities";
+import {
+  AUTH_LINK_COOKIE_NAME,
+  verifyAuthLinkCookieValue,
+} from "@/lib/auth-link-cookie";
+import {
   createProviderProfileImageSnapshot,
   isDefaultProfileImageUrl,
   isProviderProfileImageUrl,
 } from "@/lib/profile-image-snapshot";
 import { syncUserIdentityEverywhere } from "@/lib/user-identity-sync";
-
-type AuthProvider = "line" | "google";
 
 type OAuthProfile = {
   sub?: string;
@@ -55,28 +66,6 @@ function getSafeSessionImage(image?: string | null) {
   }
 
   return raw;
-}
-
-function isAuthProvider(value?: string | null): value is AuthProvider {
-  return value === "line" || value === "google";
-}
-
-function getAuthProvider(value?: string | null): AuthProvider {
-  return isAuthProvider(value) ? value : "line";
-}
-
-function getProviderIdentity(
-  provider: AuthProvider,
-  profile: OAuthProfile,
-  fallbackSubject?: string | null
-) {
-  const subject = String(profile.sub || fallbackSubject || "").trim();
-
-  if (!subject) {
-    return "";
-  }
-
-  return provider === "google" ? `google:${subject}` : subject;
 }
 
 function getProviderImage(appToken: AppToken, profile: OAuthProfile) {
@@ -137,138 +126,302 @@ function resolveSessionProfileImage(
   return safeLocalImage;
 }
 
-async function ensureDbUser(
-  appToken: AppToken,
+function getProviderSubject(
   profile: OAuthProfile,
-  provider: AuthProvider
+  fallbackSubject?: string | null
 ) {
-  const providerLineId = getProviderIdentity(provider, profile);
-  const lineId = String(appToken.lineId || providerLineId).trim();
+  return String(profile.sub || fallbackSubject || "").trim();
+}
 
-  if (!lineId) {
+async function getPendingAuthLinkUserId(provider: AuthProvider) {
+  try {
+    const cookieStore = await cookies();
+    const pendingLink = verifyAuthLinkCookieValue(
+      cookieStore.get(AUTH_LINK_COOKIE_NAME)?.value,
+      provider
+    );
+
+    return pendingLink?.userId || "";
+  } catch {
+    return "";
+  }
+}
+
+const dbUserSelect = {
+  id: true,
+  lineId: true,
+  name: true,
+  image: true,
+  displayName: true,
+  role: true,
+  nexPoint: true,
+  coin: true,
+} as const;
+
+type DbUserRecord = {
+  id: string;
+  lineId: string;
+  name: string | null;
+  displayName: string | null;
+  image: string | null;
+  role: string;
+  nexPoint: number;
+  coin: number;
+};
+
+function toDbUserSnapshot(user: DbUserRecord): DbUserSnapshot {
+  return {
+    id: user.id,
+    lineId: user.lineId,
+    name: user.displayName || user.name,
+    image: user.image,
+    role: user.role,
+    nexPoint: user.nexPoint,
+    coin: user.coin,
+  };
+}
+
+async function findDbUserById(userId?: string | null) {
+  const safeUserId = String(userId || "").trim();
+
+  if (!safeUserId) {
     return null;
   }
 
+  return prisma.user.findUnique({
+    where: { id: safeUserId },
+    select: dbUserSelect,
+  });
+}
+
+async function findDbUserByLineId(lineId?: string | null) {
+  const safeLineId = String(lineId || "").trim();
+
+  if (!safeLineId) {
+    return null;
+  }
+
+  return prisma.user.findUnique({
+    where: { lineId: safeLineId },
+    select: dbUserSelect,
+  });
+}
+
+async function patchDbUserProfile(
+  existingUser: DbUserRecord,
+  safeName: string,
+  providerImage: string,
+  provider: AuthProvider
+) {
+  const existingImage = String(existingUser.image || "").trim();
+  const stableImage = shouldRepairStoredProfileImage(existingUser.image)
+    ? await getStableInitialProfileImage(
+        providerImage,
+        existingUser.lineId,
+        provider,
+        existingUser.id
+      )
+    : undefined;
+  const nextImage =
+    stableImage &&
+    stableImage !== existingImage &&
+    !isDefaultProfileImageUrl(stableImage) &&
+    !(
+      isProviderProfileImageUrl(existingImage) &&
+      isProviderProfileImageUrl(stableImage)
+    )
+      ? stableImage
+      : undefined;
+  const needsPatch =
+    !String(existingUser.name || "").trim() ||
+    !String(existingUser.image || "").trim() ||
+    !String(existingUser.displayName || "").trim() ||
+    Boolean(nextImage);
+
+  if (!needsPatch) {
+    return toDbUserSnapshot(existingUser);
+  }
+
+  const patchedUser = await prisma.user.update({
+    where: { id: existingUser.id },
+    data: {
+      name: String(existingUser.name || "").trim() ? undefined : safeName,
+      displayName: String(existingUser.displayName || "").trim()
+        ? undefined
+        : safeName,
+      image: nextImage,
+    },
+    select: dbUserSelect,
+  });
+
+  if (nextImage) {
+    await syncUserIdentityEverywhere({
+      userId: patchedUser.id,
+      lineId: patchedUser.lineId,
+      name: patchedUser.displayName || patchedUser.name || safeName,
+      image: patchedUser.image,
+    }).catch(() => undefined);
+  }
+
+  return toDbUserSnapshot(patchedUser);
+}
+
+async function createDbUser(
+  lineId: string,
+  safeName: string,
+  providerImage: string,
+  provider: AuthProvider
+) {
+  const initialImage = await getStableInitialProfileImage(
+    providerImage,
+    lineId,
+    provider,
+    lineId
+  );
+
+  const createdUser = await prisma.user.create({
+    data: {
+      lineId,
+      name: safeName,
+      displayName: safeName,
+      image: initialImage,
+      role: "USER",
+    },
+    select: dbUserSelect,
+  });
+
+  return toDbUserSnapshot(createdUser);
+}
+
+async function ensureDbUser(
+  appToken: AppToken,
+  profile: OAuthProfile,
+  provider: AuthProvider,
+  fallbackSubject?: string | null
+) {
+  const providerSubject = getProviderSubject(profile, fallbackSubject);
+  const providerLineId = getProviderIdentity(provider, providerSubject);
+  const pendingLinkUserId = providerSubject
+    ? await getPendingAuthLinkUserId(provider)
+    : "";
+  const currentUserId =
+    pendingLinkUserId || String(appToken.id || "").trim();
   const safeName = String(appToken.name || profile.name || "NEXORA User").trim();
   const providerImage = getProviderImage(appToken, profile);
 
   try {
-    const existingUser = await prisma.user.findUnique({
-      where: { lineId },
-      select: {
-        id: true,
-        lineId: true,
-        name: true,
-        image: true,
-        displayName: true,
-        role: true,
-        nexPoint: true,
-        coin: true,
-      },
-    });
+    if (!providerSubject) {
+      const sessionUser =
+        (await findDbUserById(currentUserId)) ||
+        (await findDbUserByLineId(appToken.lineId));
 
-    if (existingUser) {
-      const existingImage = String(existingUser.image || "").trim();
-      const stableImage = shouldRepairStoredProfileImage(existingUser.image)
-        ? await getStableInitialProfileImage(
-            providerImage,
-            lineId,
-            provider,
-            existingUser.id
-          )
-        : undefined;
-      const nextImage =
-        stableImage &&
-        stableImage !== existingImage &&
-        !isDefaultProfileImageUrl(stableImage) &&
-        !(
-          isProviderProfileImageUrl(existingImage) &&
-          isProviderProfileImageUrl(stableImage)
-        )
-          ? stableImage
-          : undefined;
-      const needsPatch =
-        !String(existingUser.name || "").trim() ||
-        !String(existingUser.image || "").trim() ||
-        !String(existingUser.displayName || "").trim() ||
-        Boolean(nextImage);
-
-      if (needsPatch) {
-        const patchedUser = await prisma.user.update({
-          where: { id: existingUser.id },
-          data: {
-            name: String(existingUser.name || "").trim() ? undefined : safeName,
-            displayName: String(existingUser.displayName || "").trim()
-              ? undefined
-              : safeName,
-            image: nextImage,
-          },
-          select: {
-            id: true,
-            lineId: true,
-            name: true,
-            displayName: true,
-            image: true,
-            role: true,
-            nexPoint: true,
-            coin: true,
-          },
-        });
-
-        if (nextImage) {
-          await syncUserIdentityEverywhere({
-            userId: patchedUser.id,
-            lineId: patchedUser.lineId,
-            name: patchedUser.displayName || patchedUser.name || safeName,
-            image: patchedUser.image,
-          }).catch(() => undefined);
-        }
-
-        return {
-          ...patchedUser,
-          name: patchedUser.displayName || patchedUser.name,
-        } satisfies DbUserSnapshot;
-      }
-
-      return {
-        id: existingUser.id,
-        lineId: existingUser.lineId,
-        name: existingUser.displayName || existingUser.name,
-        image: existingUser.image,
-        role: existingUser.role,
-        nexPoint: existingUser.nexPoint,
-        coin: existingUser.coin,
-      } satisfies DbUserSnapshot;
+      return sessionUser ? toDbUserSnapshot(sessionUser) : null;
     }
 
-    const initialImage = await getStableInitialProfileImage(
+    const [currentUser, identity, legacyUser] = await Promise.all([
+      findDbUserById(currentUserId),
+      getAuthIdentity(provider, providerSubject),
+      findDbUserByLineId(providerLineId),
+    ]);
+    const identityUser = identity?.userId
+      ? await findDbUserById(identity.userId)
+      : null;
+    const identityProfile = {
+      email: profile.email,
+      name: profile.name,
+      image: providerImage,
+    };
+
+    if (currentUser) {
+      const mergeTargetIds = Array.from(
+        new Set(
+          [identityUser?.id, legacyUser?.id].filter(
+            (id): id is string => Boolean(id && id !== currentUser.id)
+          )
+        )
+      );
+
+      for (const mergeTargetId of mergeTargetIds) {
+        await mergeUserAccounts(currentUser.id, mergeTargetId);
+      }
+
+      const refreshedUser = await findDbUserById(currentUser.id);
+
+      if (!refreshedUser) {
+        return null;
+      }
+
+      await upsertAuthIdentity(
+        refreshedUser.id,
+        provider,
+        providerSubject,
+        identityProfile
+      );
+
+      return patchDbUserProfile(
+        refreshedUser,
+        safeName,
+        providerImage,
+        provider
+      );
+    }
+
+    if (identityUser) {
+      if (legacyUser && legacyUser.id !== identityUser.id) {
+        await mergeUserAccounts(identityUser.id, legacyUser.id);
+      }
+
+      const refreshedUser = await findDbUserById(identityUser.id);
+
+      if (!refreshedUser) {
+        return null;
+      }
+
+      await upsertAuthIdentity(
+        refreshedUser.id,
+        provider,
+        providerSubject,
+        identityProfile
+      );
+
+      return patchDbUserProfile(
+        refreshedUser,
+        safeName,
+        providerImage,
+        provider
+      );
+    }
+
+    if (legacyUser) {
+      await upsertAuthIdentity(
+        legacyUser.id,
+        provider,
+        providerSubject,
+        identityProfile
+      );
+
+      return patchDbUserProfile(legacyUser, safeName, providerImage, provider);
+    }
+
+    if (!providerLineId) {
+      return null;
+    }
+
+    const createdUser = await createDbUser(
+      providerLineId,
+      safeName,
       providerImage,
-      lineId,
-      provider,
-      lineId
+      provider
     );
 
-    const createdUser = await prisma.user.create({
-      data: {
-        lineId,
-        name: safeName,
-        displayName: safeName,
-        image: initialImage,
-        role: "USER",
-      },
-      select: {
-        id: true,
-        lineId: true,
-        name: true,
-        displayName: true,
-        image: true,
-        role: true,
-        nexPoint: true,
-        coin: true,
-      },
-    });
+    await upsertAuthIdentity(
+      createdUser.id,
+      provider,
+      providerSubject,
+      identityProfile
+    );
 
-    return createdUser satisfies DbUserSnapshot;
+    return createdUser;
   } catch (error) {
     console.error("AUTH USER UPSERT ERROR:", error);
     return null;
@@ -287,7 +440,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
 
   pages: {
     signIn: "/login",
@@ -302,11 +455,11 @@ export const authOptions: NextAuthOptions = {
     async signIn({ account, profile }) {
       const provider = getAuthProvider(account?.provider);
       const oauthProfile = (profile || {}) as OAuthProfile;
-      const lineId = getProviderIdentity(
-        provider,
+      const providerSubject = getProviderSubject(
         oauthProfile,
         account?.providerAccountId
       );
+      const lineId = getProviderIdentity(provider, providerSubject);
 
       if (!lineId) return false;
 
@@ -331,17 +484,10 @@ export const authOptions: NextAuthOptions = {
       const oauthProfile = (profile || {}) as OAuthProfile;
       const provider = getAuthProvider(account?.provider || appToken.authProvider);
       const providerAccountId = account?.providerAccountId;
+      const providerSubject = getProviderSubject(oauthProfile, providerAccountId);
 
-      if (oauthProfile.sub || providerAccountId) {
-        const providerLineId = getProviderIdentity(
-          provider,
-          oauthProfile,
-          providerAccountId
-        );
-
+      if (providerSubject) {
         appToken.authProvider = provider;
-        appToken.lineId = providerLineId;
-        appToken.id = appToken.id || providerLineId;
         appToken.name = appToken.name || oauthProfile.name || "NEXORA User";
         appToken.picture = getSafeSessionImage(
           typeof appToken.picture === "string"
@@ -350,8 +496,6 @@ export const authOptions: NextAuthOptions = {
         );
       }
 
-      const lineId = appToken.lineId || getProviderIdentity(provider, oauthProfile);
-      appToken.id = appToken.id || lineId || "";
       appToken.authProvider = getAuthProvider(appToken.authProvider || provider);
       appToken.role = appToken.role || "USER";
       appToken.nexPoint = appToken.nexPoint || 0;
@@ -364,7 +508,8 @@ export const authOptions: NextAuthOptions = {
       const dbUser = await ensureDbUser(
         appToken,
         oauthProfile,
-        appToken.authProvider
+        appToken.authProvider,
+        providerAccountId
       );
 
       if (dbUser) {
@@ -405,6 +550,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = userId;
         session.user.lineId = appToken.lineId || userId;
         session.user.role = appToken.role || "USER";
+        session.user.authProvider = appToken.authProvider || "line";
         session.user.nexPoint = appToken.nexPoint || 0;
         session.user.coin = appToken.coin || 0;
         session.user.name = resolvedName;

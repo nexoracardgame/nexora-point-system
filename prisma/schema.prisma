@@ -30,9 +30,27 @@ model User {
   marketListings MarketListing[] @relation("UserListings")
   sellerReviews  SellerReview[]  @relation("SellerReviews")
   buyerReviews   SellerReview[]  @relation("BuyerReviews")
+  authIdentities AuthIdentity[]
 
   dealRequestsSent     DealRequest[] @relation("DealBuyer")
   dealRequestsReceived DealRequest[] @relation("DealSeller")
+}
+
+model AuthIdentity {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  email             String?
+  name              String?
+  image             String?
+  linkedAt          DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model MarketPost {

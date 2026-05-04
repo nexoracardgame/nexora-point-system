@@ -2,12 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn, useSession } from "next-auth/react";
+import { useEffect, useRef, useState } from "react";
 import {
   Camera,
+  CheckCircle2,
   ImagePlus,
+  Link2,
+  Loader2,
   MessageCircle,
   MoveVertical,
   Save,
@@ -25,6 +28,8 @@ function isInlineDataImage(value?: string | null) {
 }
 
 type ImageKind = "profile" | "cover";
+type AuthProvider = "line" | "google";
+type LinkedAccounts = Record<AuthProvider, boolean>;
 
 type ProfileData = {
   coverImage?: string | null;
@@ -42,14 +47,39 @@ type ProfileData = {
   profileImage?: string | null;
 };
 
+const authProviderCards: Array<{
+  provider: AuthProvider;
+  label: string;
+  badgeClassName: string;
+}> = [
+  {
+    provider: "line",
+    label: "LINE",
+    badgeClassName: "bg-[#06C755] text-white",
+  },
+  {
+    provider: "google",
+    label: "Google",
+    badgeClassName: "bg-white text-[#4285F4]",
+  },
+];
+
 export default function ProfileSettingsClient({
   initialProfile,
+  linkedAccounts,
+  currentAuthProvider,
 }: {
   initialProfile: ProfileData;
+  linkedAccounts: LinkedAccounts;
+  currentAuthProvider?: AuthProvider | null;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { update } = useSession();
   const [saving, setSaving] = useState(false);
+  const [linkingProvider, setLinkingProvider] = useState<AuthProvider | null>(
+    null
+  );
   const [processingImage, setProcessingImage] = useState<ImageKind | null>(
     null
   );
@@ -104,6 +134,51 @@ export default function ProfileSettingsClient({
   function openCoverPicker() {
     coverInputRef.current?.click();
   }
+
+  async function linkAuthProvider(provider: AuthProvider) {
+    if (linkedAccounts[provider] || linkingProvider) {
+      return;
+    }
+
+    try {
+      setLinkingProvider(provider);
+      const startRes = await fetch("/api/auth/link/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ provider }),
+      });
+
+      if (!startRes.ok) {
+        throw new Error("Unable to start account linking");
+      }
+
+      const callbackUrl =
+        typeof window === "undefined"
+          ? "/settings/profile"
+          : `${window.location.origin}/settings/profile?linked=${provider}`;
+
+      await signIn(provider, {
+        redirect: true,
+        callbackUrl,
+      });
+    } catch (error) {
+      console.error("LINK AUTH PROVIDER ERROR:", error);
+      setLinkingProvider(null);
+      alert("เชื่อมบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง");
+    }
+  }
+
+  useEffect(() => {
+    if (!searchParams.get("linked")) {
+      return;
+    }
+
+    void fetch("/api/auth/link/finish", {
+      method: "POST",
+    }).catch(() => undefined);
+  }, [searchParams]);
 
   function stopCoverDragging() {
     isDragging.current = false;
@@ -578,6 +653,79 @@ export default function ProfileSettingsClient({
           </div>
 
           <div className="order-first space-y-4 xl:order-none">
+            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.024)_100%)] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.16)]">
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/18 bg-cyan-400/10 text-cyan-100">
+                  <Link2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/38">
+                    Account Link
+                  </div>
+                  <div className="mt-1 text-lg font-black text-white">
+                    ผูกบัญชีล็อกอิน
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {authProviderCards.map((item) => {
+                  const connected = linkedAccounts[item.provider];
+                  const isCurrentProvider = currentAuthProvider === item.provider;
+                  const isLinking = linkingProvider === item.provider;
+
+                  return (
+                    <div
+                      key={item.provider}
+                      className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-black/28 p-3"
+                    >
+                      <div
+                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${item.badgeClassName}`}
+                      >
+                        {item.provider === "google" ? "G" : "LINE"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="truncate text-sm font-black text-white">
+                            {item.label}
+                          </div>
+                          {isCurrentProvider ? (
+                            <span className="rounded-full border border-amber-300/18 bg-amber-300/10 px-2 py-0.5 text-[10px] font-black text-amber-100">
+                              ตอนนี้
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-white/46">
+                          {connected ? "เชื่อมบัญชีแล้ว" : "ยังไม่ได้เชื่อม"}
+                        </div>
+                      </div>
+
+                      {connected ? (
+                        <div className="inline-flex h-10 items-center gap-2 rounded-[15px] border border-emerald-300/20 bg-emerald-400/10 px-3 text-xs font-black text-emerald-100">
+                          <CheckCircle2 className="h-4 w-4" />
+                          เชื่อมแล้ว
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void linkAuthProvider(item.provider)}
+                          disabled={linkingProvider !== null}
+                          className="inline-flex h-10 items-center gap-2 rounded-[15px] border border-white/14 bg-white px-3 text-xs font-black text-black transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {isLinking ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link2 className="h-4 w-4" />
+                          )}
+                          เชื่อม
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.18)] sm:rounded-[30px]">
               <div className="relative h-32">
                 <Image
