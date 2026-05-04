@@ -404,6 +404,85 @@ export default function ProfileSettingsClient({
     }
   }
 
+  function renderAccountLinkCard(className = "") {
+    return (
+      <div
+        className={`rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.024)_100%)] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.16)] ${className}`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/18 bg-cyan-400/10 text-cyan-100">
+            <Link2 className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/38">
+              Account Link
+            </div>
+            <div className="mt-1 text-lg font-black text-white">
+              ผูกบัญชีล็อกอิน
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {authProviderCards.map((item) => {
+            const connected = linkedAccounts[item.provider];
+            const isCurrentProvider = currentAuthProvider === item.provider;
+            const isLinking = linkingProvider === item.provider;
+
+            return (
+              <div
+                key={item.provider}
+                className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-black/28 p-3"
+              >
+                <div
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${item.badgeClassName}`}
+                >
+                  {item.provider === "google" ? "G" : "LINE"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="truncate text-sm font-black text-white">
+                      {item.label}
+                    </div>
+                    {isCurrentProvider ? (
+                      <span className="rounded-full border border-amber-300/18 bg-amber-300/10 px-2 py-0.5 text-[10px] font-black text-amber-100">
+                        ตอนนี้
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-white/46">
+                    {connected ? "เชื่อมบัญชีแล้ว" : "ยังไม่ได้เชื่อม"}
+                  </div>
+                </div>
+
+                {connected ? (
+                  <div className="inline-flex h-10 items-center gap-2 rounded-[15px] border border-emerald-300/20 bg-emerald-400/10 px-3 text-xs font-black text-emerald-100">
+                    <CheckCircle2 className="h-4 w-4" />
+                    เชื่อมแล้ว
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void linkAuthProvider(item.provider)}
+                    disabled={linkingProvider !== null}
+                    className="inline-flex h-10 items-center gap-2 rounded-[15px] border border-white/14 bg-white px-3 text-xs font-black text-black transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {isLinking ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Link2 className="h-4 w-4" />
+                    )}
+                    เชื่อม
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#281255_0%,#0b0d14_42%,#05070d_100%)] p-3 text-white sm:p-6">
       <div className="mx-auto max-w-[1280px] space-y-5 sm:space-y-6">
@@ -636,6 +715,8 @@ export default function ProfileSettingsClient({
               </div>
             )}
 
+            {renderAccountLinkCard("mt-6 xl:hidden")}
+
             <div className="mt-6">
               <button
                 onClick={saveProfile}
@@ -653,78 +734,7 @@ export default function ProfileSettingsClient({
           </div>
 
           <div className="order-first space-y-4 xl:order-none">
-            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.024)_100%)] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.16)]">
-              <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/18 bg-cyan-400/10 text-cyan-100">
-                  <Link2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/38">
-                    Account Link
-                  </div>
-                  <div className="mt-1 text-lg font-black text-white">
-                    ผูกบัญชีล็อกอิน
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {authProviderCards.map((item) => {
-                  const connected = linkedAccounts[item.provider];
-                  const isCurrentProvider = currentAuthProvider === item.provider;
-                  const isLinking = linkingProvider === item.provider;
-
-                  return (
-                    <div
-                      key={item.provider}
-                      className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-black/28 p-3"
-                    >
-                      <div
-                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${item.badgeClassName}`}
-                      >
-                        {item.provider === "google" ? "G" : "LINE"}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="truncate text-sm font-black text-white">
-                            {item.label}
-                          </div>
-                          {isCurrentProvider ? (
-                            <span className="rounded-full border border-amber-300/18 bg-amber-300/10 px-2 py-0.5 text-[10px] font-black text-amber-100">
-                              ตอนนี้
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 text-xs font-semibold text-white/46">
-                          {connected ? "เชื่อมบัญชีแล้ว" : "ยังไม่ได้เชื่อม"}
-                        </div>
-                      </div>
-
-                      {connected ? (
-                        <div className="inline-flex h-10 items-center gap-2 rounded-[15px] border border-emerald-300/20 bg-emerald-400/10 px-3 text-xs font-black text-emerald-100">
-                          <CheckCircle2 className="h-4 w-4" />
-                          เชื่อมแล้ว
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void linkAuthProvider(item.provider)}
-                          disabled={linkingProvider !== null}
-                          className="inline-flex h-10 items-center gap-2 rounded-[15px] border border-white/14 bg-white px-3 text-xs font-black text-black transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
-                        >
-                          {isLinking ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Link2 className="h-4 w-4" />
-                          )}
-                          เชื่อม
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {renderAccountLinkCard("hidden xl:block")}
 
             <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.18)] sm:rounded-[30px]">
               <div className="relative h-32">
