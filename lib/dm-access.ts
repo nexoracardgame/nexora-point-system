@@ -69,6 +69,7 @@ export async function getAccessibleDirectRoomIds(
     new Set(
       (data || [])
         .map((room) => String(room.roomid || "").trim())
+        .filter((roomId) => !isDealChatRoomId(roomId))
         .filter(Boolean)
     )
   );

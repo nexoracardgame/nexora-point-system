@@ -169,6 +169,10 @@ function buildDirectRoomId(userA?: string | null, userB?: string | null) {
     .join("__");
 }
 
+function isDealRoomId(roomId?: string | null) {
+  return String(roomId || "").trim().startsWith("deal:");
+}
+
 function buildDirectRoomHref(roomId: string) {
   return `/dm/${encodeURIComponent(roomId)}?back=${encodeURIComponent("/dm")}`;
 }
@@ -177,10 +181,17 @@ function buildDealRoomHref(dealId: string) {
   return `/market/deals/chat/${encodeURIComponent(dealId)}`;
 }
 
-function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
+function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem | null {
+  const roomId = String(room.roomId || "").trim();
+  const kind = room.kind === "deal" ? "deal" : "direct";
+
+  if (!roomId || (kind === "direct" && isDealRoomId(roomId))) {
+    return null;
+  }
+
   return {
-    kind: room.kind === "deal" ? "deal" : "direct",
-    roomId: String(room.roomId || ""),
+    kind,
+    roomId,
     otherUserId: room.otherUserId ? String(room.otherUserId) : undefined,
     dealId: room.dealId ? String(room.dealId) : undefined,
     otherName: String(room.otherName || "User"),
@@ -196,6 +207,12 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem {
     sellerName: room.sellerName ? String(room.sellerName) : undefined,
     sellerImage: room.sellerImage ? String(room.sellerImage) : undefined,
   };
+}
+
+function normalizeRooms(rooms: Partial<DMRoomListItem>[]) {
+  return rooms
+    .map((room) => normalizeRoom(room))
+    .filter((room): room is DMRoomListItem => Boolean(room));
 }
 
 function latestTime(value?: string | null) {
@@ -358,10 +375,11 @@ export default function DMListClient({
     applyClientReadStateToRooms(
       filterRoomsWithLocalClears(
         sortRoomsByActivity(
-          (initialRooms.length > 0
-            ? initialRooms
-            : cachedList?.data?.rooms || []
-          ).map(normalizeRoom)
+          normalizeRooms(
+            initialRooms.length > 0
+              ? initialRooms
+              : cachedList?.data?.rooms || []
+          )
         ),
         initialMeCandidate
       ),
@@ -555,7 +573,7 @@ export default function DMListClient({
 
       const data = await res.json();
       const nextRooms: DMRoomListItem[] = Array.isArray(data?.rooms)
-        ? sortRoomsByActivity(data.rooms.map(normalizeRoom))
+        ? sortRoomsByActivity(normalizeRooms(data.rooms))
         : [];
       const visibleRooms = applyClientReadStateToRooms(
         filterRoomsWithLocalClears(nextRooms, effectiveMe),
@@ -903,7 +921,7 @@ export default function DMListClient({
 
   useEffect(() => {
     if (initialRooms.length > 0) {
-      void hydrateUnknownRooms(initialRooms.map(normalizeRoom));
+      void hydrateUnknownRooms(normalizeRooms(initialRooms));
     }
   }, [initialRooms]);
 
@@ -927,7 +945,7 @@ export default function DMListClient({
     if (Array.isArray(cached.data.rooms) && cached.data.rooms.length > 0) {
       const nextRooms = applyClientReadStateToRooms(
         filterRoomsWithLocalClears(
-          sortRoomsByActivity(cached.data.rooms.map(normalizeRoom)),
+          sortRoomsByActivity(normalizeRooms(cached.data.rooms)),
           cached.data.me || currentMe
         ),
         cached.data.me || currentMe

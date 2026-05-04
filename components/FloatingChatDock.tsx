@@ -107,6 +107,10 @@ function normalizeRoom(room: DMRoomListItem): FloatingRoom | null {
     return null;
   }
 
+  if (room.kind !== "deal" && safeRoomId.startsWith("deal:")) {
+    return null;
+  }
+
   return {
     ...room,
     key,

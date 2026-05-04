@@ -1,4 +1,4 @@
-import { getDealChatRoomId } from "@/lib/deal-chat";
+import { getDealChatRoomId, isDealChatRoomId } from "@/lib/deal-chat";
 import { resolveCardDisplayImage } from "@/lib/card-image";
 import {
   getDmConversationClearedAtMap,
@@ -117,7 +117,9 @@ export async function getDmRoomsForUser(
 
   const dedupedRooms = Array.from(
     new Map(
-      (directRoomsResult.data || []).map((room) => [room.roomid, room])
+      (directRoomsResult.data || [])
+        .filter((room) => !isDealChatRoomId(room.roomid))
+        .map((room) => [room.roomid, room])
     ).values()
   );
 
