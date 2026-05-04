@@ -110,6 +110,42 @@ function dispatchChatMessageRealtime(message: Record<string, unknown>) {
   );
 }
 
+function dispatchChatMessageSeen(message: Record<string, unknown>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const primaryRoomId = String(message.roomId || "").trim();
+  if (!primaryRoomId) {
+    return;
+  }
+
+  const isDealMessage = primaryRoomId.startsWith("deal:");
+  const roomIds = Array.from(
+    new Set(
+      [
+        primaryRoomId,
+        ...(Array.isArray(message.roomIds) ? message.roomIds : []),
+      ]
+        .map((roomId) => String(roomId || "").trim())
+        .filter(Boolean)
+        .filter((roomId) =>
+          isDealMessage ? roomId.startsWith("deal:") : !roomId.startsWith("deal:")
+        )
+    )
+  );
+
+  window.dispatchEvent(
+    new CustomEvent("nexora:chat-message-seen", {
+      detail: {
+        ...message,
+        roomId: primaryRoomId,
+        roomIds,
+      },
+    })
+  );
+}
+
 function buildDirectRealtimeRoomId(userA?: string | null, userB?: string | null) {
   return [String(userA || "").trim(), String(userB || "").trim()]
     .filter(Boolean)
@@ -550,6 +586,7 @@ export default function MainLayout({
             content?: string | null;
             imageUrl?: string | null;
             createdAt?: string | null;
+            seenAt?: string | null;
           };
         })?.new;
         const roomId = String(nextMessage?.roomId || "").trim();
@@ -583,6 +620,18 @@ export default function MainLayout({
             createdAt: nextMessage.createdAt || new Date().toISOString(),
             isMine,
             isOpenRoom: roomId === openChatRoomId,
+          });
+        }
+
+        if (eventType === "UPDATE" && roomId && nextMessage?.seenAt && isMine) {
+          dispatchChatMessageSeen({
+            id: nextMessage.id,
+            messageId: nextMessage.id,
+            roomId,
+            roomIds: [roomId],
+            senderId,
+            readAt: nextMessage.seenAt,
+            seenAt: nextMessage.seenAt,
           });
         }
 

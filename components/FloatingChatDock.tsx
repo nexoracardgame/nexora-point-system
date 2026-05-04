@@ -64,6 +64,16 @@ type RealtimeChatDetail = Partial<ChatMessage> & {
   roomIds?: Array<string | null | undefined> | null;
 };
 
+type ChatSeenDetail = {
+  id?: string | number | null;
+  messageId?: string | number | null;
+  roomId?: string | null;
+  roomIds?: Array<string | null | undefined> | null;
+  readAt?: string | null;
+  seenAt?: string | null;
+  senderId?: string | null;
+};
+
 const LIST_REFRESH_MS = 8500;
 const ROOM_SYNC_MS = 2500;
 const ROOM_CACHE_TTL_MS = 90000;
@@ -309,6 +319,10 @@ export default function FloatingChatDock({
   const emojiRootRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
+  const lastComposerSeenRef = useRef<{ roomKey: string; markedAt: number }>({
+    roomKey: "",
+    markedAt: 0,
+  });
 
   const currentUserId = safeText(session?.user?.id);
   const badgeCount = Math.max(
@@ -344,6 +358,18 @@ export default function FloatingChatDock({
   const activeDealCardImage = activeRoom
     ? safeText(activeRoom.card?.image || activeRoom.dealCardImage)
     : "";
+  const lastSeenMineId = useMemo(() => {
+    const myId = safeText(activeRoom?.me?.id || currentUserId);
+    if (!myId) {
+      return null;
+    }
+
+    const mineSeen = messages.filter(
+      (message) => safeText(message.senderId) === myId && Boolean(message.seenAt)
+    );
+
+    return mineSeen[mineSeen.length - 1]?.id || null;
+  }, [activeRoom?.me?.id, currentUserId, messages]);
 
   useEffect(() => {
     activeRoomRef.current = activeRoom;
@@ -431,6 +457,13 @@ export default function FloatingChatDock({
       }
 
       const readAt = new Date().toISOString();
+      setMessages((current) =>
+        current.map((message) =>
+          safeText(message.senderId) !== meId && !message.seenAt
+            ? { ...message, seenAt: readAt }
+            : message
+        )
+      );
       dispatchClientChatRead({
         roomId: safeRoomId,
         roomIds: getReadRoomIds(room, safeRoomId),
@@ -458,6 +491,38 @@ export default function FloatingChatDock({
     },
     [currentUserId]
   );
+
+  const markActiveRoomSeenNow = useCallback(() => {
+    const active = activeRoomRef.current;
+    const myId = safeText(active?.me?.id || currentUserId);
+
+    if (!active?.actualRoomId || !myId) {
+      return;
+    }
+
+    const hasUnreadIncoming = messages.some(
+      (message) => safeText(message.senderId) !== myId && !message.seenAt
+    );
+
+    if (!hasUnreadIncoming && Number(active.unread || 0) <= 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastComposerSeen = lastComposerSeenRef.current;
+    if (
+      lastComposerSeen.roomKey === active.key &&
+      now - lastComposerSeen.markedAt < 500
+    ) {
+      return;
+    }
+
+    lastComposerSeenRef.current = {
+      roomKey: active.key,
+      markedAt: now,
+    };
+    void markRoomSeen(active, active.actualRoomId, messages, active.me);
+  }, [currentUserId, markRoomSeen, messages]);
 
   const buildRoomShell = useCallback(
     (
@@ -1085,15 +1150,60 @@ export default function FloatingChatDock({
         void markRoomSeen(active, active.actualRoomId, [incoming], active.me);
       }
     };
+    const handleSeen = (event: Event) => {
+      const detail = (event as CustomEvent<ChatSeenDetail>).detail;
+      const active = activeRoomRef.current;
+
+      if (!active || !sameRoomEvent(active, detail as RealtimeChatDetail)) {
+        return;
+      }
+
+      const messageId = safeText(detail?.messageId || detail?.id);
+      const readAt = safeText(detail?.seenAt || detail?.readAt) || new Date().toISOString();
+      const myId = safeText(active.me?.id || currentUserId);
+
+      if (!readAt || !myId) {
+        return;
+      }
+
+      setMessages((current) => {
+        let changed = false;
+        const nextMessages = current.map((message) => {
+          const isMine = safeText(message.senderId) === myId;
+          const matchesMessage = messageId
+            ? safeText(message.id) === messageId
+            : isMine;
+
+          if (!isMine || !matchesMessage || message.seenAt) {
+            return message;
+          }
+
+          changed = true;
+          return {
+            ...message,
+            seenAt: readAt,
+          };
+        });
+
+        if (changed) {
+          updateRoomCache(active.key, active, nextMessages);
+        }
+
+        return changed ? nextMessages : current;
+      });
+    };
 
     window.addEventListener("nexora:chat-unread-count", handleUnread);
     window.addEventListener("nexora:chat-message-received", handleRealtime);
+    window.addEventListener("nexora:chat-message-seen", handleSeen);
 
     return () => {
       window.removeEventListener("nexora:chat-unread-count", handleUnread);
       window.removeEventListener("nexora:chat-message-received", handleRealtime);
+      window.removeEventListener("nexora:chat-message-seen", handleSeen);
     };
   }, [
+    currentUserId,
     markRoomSeen,
     open,
     scrollToBottom,
@@ -1524,6 +1634,11 @@ export default function FloatingChatDock({
                                 >
                                   {message.optimistic ? "กำลังส่ง..." : formatActivityTime(message.createdAt)}
                                 </div>
+                                {mine && lastSeenMineId === message.id && message.seenAt ? (
+                                  <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
+                                    อ่านแล้ว
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -1614,6 +1729,8 @@ export default function FloatingChatDock({
                     <input
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
+                      onFocus={markActiveRoomSeenNow}
+                      onPointerDown={markActiveRoomSeenNow}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" && !event.shiftKey) {
                           event.preventDefault();
