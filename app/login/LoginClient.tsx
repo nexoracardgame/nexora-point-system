@@ -35,14 +35,33 @@ function resolveCallbackUrl(rawCallbackUrl?: string | null) {
   return fallback;
 }
 
+function getAuthErrorMessage(error?: string | null) {
+  if (!error) {
+    return "";
+  }
+
+  if (error === "OAuthAccountNotLinked") {
+    return "บัญชีนี้เคยล็อกอินด้วยวิธีอื่นไว้แล้ว กรุณาใช้วิธีเดิมก่อน";
+  }
+
+  if (error === "AccessDenied") {
+    return "ระบบยังไม่อนุญาตให้เข้าสู่ระบบด้วยบัญชีนี้";
+  }
+
+  return "ล็อกอินไม่สำเร็จ กรุณาลองอีกครั้ง";
+}
+
 export default function LoginClient({
   rawCallbackUrl,
+  authError,
 }: {
   rawCallbackUrl?: string | null;
+  authError?: string | null;
 }) {
   const BG_IMAGE =
     "https://s.imgz.io/2026/04/03/NEXORA496971ca3675ceb2ca.png";
   const callbackUrl = resolveCallbackUrl(rawCallbackUrl);
+  const authErrorMessage = getAuthErrorMessage(authError);
 
   const handleLineLogin = () =>
     signIn("line", {
@@ -224,6 +243,12 @@ export default function LoginClient({
             LOGIN WITH GOOGLE
           </motion.button>
         </div>
+
+        {authErrorMessage ? (
+          <div className="mt-4 rounded-2xl border border-red-300/30 bg-red-500/12 px-4 py-3 text-sm font-bold text-red-100 shadow-[0_18px_38px_rgba(220,38,38,0.16)] backdrop-blur-xl">
+            {authErrorMessage}
+          </div>
+        ) : null}
 
         <div className="mt-4 text-[10px] text-zinc-400 md:mt-5 md:text-sm">
           Protected by NEXORA Secure Authentication
