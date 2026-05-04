@@ -65,7 +65,7 @@ type RealtimeChatDetail = Partial<ChatMessage> & {
 };
 
 const LIST_REFRESH_MS = 8500;
-const ROOM_SYNC_MS = 14000;
+const ROOM_SYNC_MS = 2500;
 const ROOM_CACHE_TTL_MS = 90000;
 const ROOM_PREFETCH_COUNT = 8;
 const ROOM_PREFETCH_LIMIT = 28;
@@ -156,6 +156,15 @@ function formatPrice(value?: number | null) {
   return `฿${price.toLocaleString("th-TH")}`;
 }
 
+function buildMessagePreview(content?: string | null, imageUrl?: string | null) {
+  const text = safeText(content);
+  if (text) {
+    return text;
+  }
+
+  return safeText(imageUrl) ? "รูปภาพ" : "ข้อความใหม่";
+}
+
 function FloatingChatMessageSkeleton() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-[560px] flex-col justify-end gap-4 py-1">
@@ -214,6 +223,29 @@ function sameRoomEvent(active: ActiveFloatingRoom, detail: RealtimeChatDetail) {
   return activeRoomIds.some((item) => incomingRoomIds.has(item));
 }
 
+function getRealtimeRoomIds(detail: RealtimeChatDetail) {
+  return new Set(
+    [detail.roomId, ...(detail.roomIds || [])]
+      .map((item) => safeText(item))
+      .filter(Boolean)
+  );
+}
+
+function roomMatchesRealtimeIds(room: FloatingRoom, roomIds: Set<string>) {
+  if (roomIds.size === 0) {
+    return false;
+  }
+
+  return [
+    room.key,
+    room.roomId,
+    room.kind === "deal" && room.dealId ? `deal:${room.dealId}` : "",
+  ]
+    .map((item) => safeText(item))
+    .filter(Boolean)
+    .some((item) => roomIds.has(item));
+}
+
 export default function FloatingChatDock({
   unreadCount = 0,
 }: {
@@ -238,6 +270,7 @@ export default function FloatingChatDock({
   const [mobileListVisible, setMobileListVisible] = useState(true);
 
   const activeRoomRef = useRef<ActiveFloatingRoom | null>(activeRoom);
+  const roomsRef = useRef<FloatingRoom[]>(rooms);
   const loadingRoomKeyRef = useRef("");
   const roomCacheRef = useRef<Map<string, RoomCacheEntry>>(new Map());
   const roomLoadPromisesRef = useRef<Map<string, Promise<RoomLoadResult>>>(new Map());
@@ -285,6 +318,10 @@ export default function FloatingChatDock({
   useEffect(() => {
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -533,6 +570,90 @@ export default function FloatingChatDock({
     [loadRoomFast, status]
   );
 
+  const updateRoomListFromMessage = useCallback(
+    (
+      detail: RealtimeChatDetail,
+      active: ActiveFloatingRoom | null,
+      isOpen: boolean
+    ) => {
+      const roomIds = getRealtimeRoomIds(detail);
+      const room = roomsRef.current.find((item) =>
+        roomMatchesRealtimeIds(item, roomIds)
+      );
+
+      if (!room) {
+        void loadRooms();
+        return;
+      }
+
+      const activeMatches = active ? sameRoomEvent(active, detail) : false;
+      const shouldIncrementUnread =
+        !detail.isMine && !(isOpen && activeMatches);
+      const messageCreatedAt = safeText(detail.createdAt) || new Date().toISOString();
+      const preview = buildMessagePreview(detail.content, detail.imageUrl);
+
+      setRooms((current) =>
+        current
+          .map((item) =>
+            item.key === room.key
+              ? {
+                  ...item,
+                  lastMessage: preview,
+                  lastMessageAt: messageCreatedAt,
+                  createdAt: messageCreatedAt || item.createdAt,
+                  unread: detail.isMine
+                    ? 0
+                    : shouldIncrementUnread
+                      ? Math.max(0, Number(item.unread || 0)) + 1
+                      : activeMatches
+                        ? 0
+                        : item.unread,
+                }
+              : item
+          )
+          .sort((a, b) => {
+            const aTime = new Date(a.lastMessageAt || a.createdAt || 0).getTime();
+            const bTime = new Date(b.lastMessageAt || b.createdAt || 0).getTime();
+            return bTime - aTime;
+          })
+      );
+
+      if (shouldIncrementUnread) {
+        setLocalUnreadCount((current) => Math.max(0, current + 1));
+      }
+
+      const cached = roomCacheRef.current.get(room.key);
+      const shell = cached?.active || buildRoomShell(room, false);
+      const incoming = normalizeChatMessage(
+        {
+          id: safeText(detail.id),
+          roomId: shell.actualRoomId,
+          senderId: safeText(detail.senderId),
+          senderName: detail.senderName || null,
+          senderImage: detail.senderImage || null,
+          content: detail.content || null,
+          imageUrl: detail.imageUrl || null,
+          createdAt: messageCreatedAt,
+          seenAt: detail.seenAt || null,
+          optimistic: Boolean(detail.optimistic),
+        },
+        shell.actualRoomId,
+        shell.me,
+        shell.other
+      );
+      const cachedMessages = cached?.messages || [];
+      const nextCachedMessages = mergeSingleChatMessage(
+        cachedMessages,
+        incoming,
+        shell.actualRoomId,
+        shell.me,
+        shell.other
+      );
+      updateRoomCache(room.key, shell, nextCachedMessages);
+    },
+    [buildRoomShell, loadRooms, updateRoomCache]
+  );
+
   const openRoom = useCallback(
     async (room: FloatingRoom) => {
       const key = room.key;
@@ -705,6 +826,28 @@ export default function FloatingChatDock({
       updateRoomCache(active.key, active, nextMessages);
       return nextMessages;
     });
+    setRooms((current) =>
+      current
+        .map((room) =>
+          room.key === active.key
+            ? {
+                ...room,
+                lastMessage: buildMessagePreview(
+                  text,
+                  selectedFile ? "local-image" : optimistic.imageUrl
+                ),
+                lastMessageAt: optimistic.createdAt || new Date().toISOString(),
+                createdAt: optimistic.createdAt || room.createdAt,
+                unread: 0,
+              }
+            : room
+        )
+        .sort((a, b) => {
+          const aTime = new Date(a.lastMessageAt || a.createdAt || 0).getTime();
+          const bTime = new Date(b.lastMessageAt || b.createdAt || 0).getTime();
+          return bTime - aTime;
+        })
+    );
     scrollToBottom("smooth");
 
     try {
@@ -868,9 +1011,13 @@ export default function FloatingChatDock({
       const detail = (event as CustomEvent<RealtimeChatDetail>).detail;
       const active = activeRoomRef.current;
 
-      void loadRooms();
+      if (!detail?.id) {
+        return;
+      }
 
-      if (!active || !detail?.id || !sameRoomEvent(active, detail)) {
+      updateRoomListFromMessage(detail, active, open);
+
+      if (!active || !sameRoomEvent(active, detail)) {
         return;
       }
 
@@ -917,7 +1064,13 @@ export default function FloatingChatDock({
       window.removeEventListener("nexora:chat-unread-count", handleUnread);
       window.removeEventListener("nexora:chat-message-received", handleRealtime);
     };
-  }, [loadRooms, markRoomSeen, open, scrollToBottom, updateRoomCache]);
+  }, [
+    markRoomSeen,
+    open,
+    scrollToBottom,
+    updateRoomCache,
+    updateRoomListFromMessage,
+  ]);
 
   useEffect(() => {
     if (open) {

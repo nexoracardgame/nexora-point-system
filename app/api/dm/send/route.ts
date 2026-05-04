@@ -185,10 +185,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "send failed" }, { status: 500 });
   }
 
-  await supabase
+  void supabase
     .from("dm_room")
     .update({ updatedat: new Date().toISOString() })
-    .eq("roomid", access.roomId);
+    .eq("roomid", access.roomId)
+    .then(({ error: touchRoomError }) => {
+      if (touchRoomError) {
+        console.error("TOUCH DM ROOM AFTER SEND ERROR:", touchRoomError);
+      }
+    });
 
   return NextResponse.json({
     ...data,
