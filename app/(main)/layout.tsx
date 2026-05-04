@@ -4,7 +4,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { MessageCircle } from "lucide-react";
 import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
@@ -18,6 +18,7 @@ import {
   readClientViewCache,
   writeClientViewCache,
 } from "@/lib/client-view-cache";
+import { performSecureLogout } from "@/lib/secure-logout";
 import {
   Gem,
   Coins,
@@ -1289,7 +1290,7 @@ export default function MainLayout({
                         type="button"
                         onClick={() => {
                           setMenuOpen(false);
-                          signOut({ callbackUrl: "/login" });
+                          void performSecureLogout();
                         }}
                         className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-300 transition hover:bg-red-500/10"
                       >
@@ -1452,7 +1453,7 @@ export default function MainLayout({
           <div className="mt-5 border-t border-white/5 pt-5">
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => void performSecureLogout()}
               className="flex w-full items-center justify-between rounded-2xl border border-red-500/15 bg-red-500/10 px-4 py-4 text-left text-red-300 transition hover:bg-red-500/15"
             >
               <div className="flex items-center gap-3">

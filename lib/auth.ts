@@ -18,6 +18,11 @@ import {
   verifyAuthLinkCookieValue,
 } from "@/lib/auth-link-cookie";
 import {
+  ensureUserSessionSchema,
+  getUserSessionState,
+  revokeUserSessions,
+} from "@/lib/auth-session-control";
+import {
   createProviderProfileImageSnapshot,
   isDefaultProfileImageUrl,
   isProviderProfileImageUrl,
@@ -43,6 +48,9 @@ type AppToken = JWT & {
   role?: string;
   nexPoint?: number;
   coin?: number;
+  sessionVersion?: number;
+  sessionIssuedAt?: number;
+  sessionRevoked?: boolean;
 };
 
 type DbUserSnapshot = {
@@ -54,6 +62,8 @@ type DbUserSnapshot = {
   role: string;
   nexPoint: number;
   coin: number;
+  sessionVersion: number;
+  sessionsRevokedAt: Date | null;
 };
 
 function getSafeSessionImage(image?: string | null) {
@@ -156,6 +166,8 @@ const dbUserSelect = {
   role: true,
   nexPoint: true,
   coin: true,
+  sessionVersion: true,
+  sessionsRevokedAt: true,
 } as const;
 
 type DbUserRecord = {
@@ -167,6 +179,8 @@ type DbUserRecord = {
   role: string;
   nexPoint: number;
   coin: number;
+  sessionVersion: number;
+  sessionsRevokedAt: Date | null;
 };
 
 function toDbUserSnapshot(user: DbUserRecord): DbUserSnapshot {
@@ -178,6 +192,8 @@ function toDbUserSnapshot(user: DbUserRecord): DbUserSnapshot {
     role: user.role,
     nexPoint: user.nexPoint,
     coin: user.coin,
+    sessionVersion: Math.max(1, Number(user.sessionVersion || 1)),
+    sessionsRevokedAt: user.sessionsRevokedAt || null,
   };
 }
 
@@ -187,6 +203,8 @@ async function findDbUserById(userId?: string | null) {
   if (!safeUserId) {
     return null;
   }
+
+  await ensureUserSessionSchema();
 
   return prisma.user.findUnique({
     where: { id: safeUserId },
@@ -200,6 +218,8 @@ async function findDbUserByLineId(lineId?: string | null) {
   if (!safeLineId) {
     return null;
   }
+
+  await ensureUserSessionSchema();
 
   return prisma.user.findUnique({
     where: { lineId: safeLineId },
@@ -272,6 +292,8 @@ async function createDbUser(
   providerImage: string,
   provider: AuthProvider
 ) {
+  await ensureUserSessionSchema();
+
   const initialImage = await getStableInitialProfileImage(
     providerImage,
     lineId,
@@ -291,6 +313,44 @@ async function createDbUser(
   });
 
   return toDbUserSnapshot(createdUser);
+}
+
+function isTokenSessionRevoked(
+  appToken: AppToken,
+  dbSession: {
+    sessionVersion?: number | null;
+    sessionsRevokedAt?: Date | null;
+  } | null
+) {
+  if (!dbSession) {
+    return true;
+  }
+
+  const tokenVersion = Math.max(0, Number(appToken.sessionVersion || 0));
+  const dbVersion = Math.max(1, Number(dbSession.sessionVersion || 1));
+  const issuedAt = Math.max(
+    0,
+    Number(
+      appToken.sessionIssuedAt ||
+        (typeof appToken.iat === "number" ? appToken.iat * 1000 : 0)
+    )
+  );
+  const revokedAt = dbSession.sessionsRevokedAt?.getTime() || 0;
+
+  return (
+    (tokenVersion > 0 && tokenVersion < dbVersion) ||
+    (issuedAt > 0 && revokedAt > 0 && issuedAt <= revokedAt)
+  );
+}
+
+function markTokenRevoked(appToken: AppToken) {
+  appToken.sessionRevoked = true;
+  appToken.id = "";
+  appToken.lineId = "";
+  appToken.role = "USER";
+  appToken.nexPoint = 0;
+  appToken.coin = 0;
+  return appToken;
 }
 
 async function ensureDbUser(
@@ -488,6 +548,8 @@ export const authOptions: NextAuthOptions = {
 
       if (providerSubject) {
         appToken.authProvider = provider;
+        appToken.sessionIssuedAt = Date.now();
+        appToken.sessionRevoked = false;
         appToken.name = appToken.name || oauthProfile.name || "NEXORA User";
         appToken.picture = getSafeSessionImage(
           typeof appToken.picture === "string"
@@ -513,15 +575,38 @@ export const authOptions: NextAuthOptions = {
       );
 
       if (dbUser) {
+        if (isTokenSessionRevoked(appToken, dbUser)) {
+          return markTokenRevoked(appToken);
+        }
+
         appToken.id = dbUser.id;
         appToken.lineId = dbUser.lineId;
         appToken.role = dbUser.role || appToken.role || "USER";
         appToken.nexPoint = Number(dbUser.nexPoint || 0);
         appToken.coin = Number(dbUser.coin || 0);
+        appToken.sessionVersion = Math.max(
+          1,
+          Number(dbUser.sessionVersion || 1)
+        );
+        appToken.sessionIssuedAt = Math.max(
+          0,
+          Number(
+            appToken.sessionIssuedAt ||
+              (typeof appToken.iat === "number" ? appToken.iat * 1000 : 0) ||
+              Date.now()
+          )
+        );
+        appToken.sessionRevoked = false;
         appToken.name = dbUser.name || appToken.name || "NEXORA User";
         appToken.picture = getSafeSessionImage(
           dbUser.image || (typeof appToken.picture === "string" ? appToken.picture : null)
         );
+      } else if (appToken.id || appToken.lineId || providerSubject) {
+        const sessionState = await getUserSessionState(appToken.id || "");
+
+        if (isTokenSessionRevoked(appToken, sessionState)) {
+          return markTokenRevoked(appToken);
+        }
       }
 
       return appToken;
@@ -531,6 +616,22 @@ export const authOptions: NextAuthOptions = {
       const appToken = token as AppToken;
       const userId = String(appToken.id || "").trim();
       let localProfile = null;
+
+      if (appToken.sessionRevoked) {
+        if (session.user) {
+          session.user.id = "";
+          session.user.lineId = "";
+          session.user.role = "USER";
+          session.user.authProvider = appToken.authProvider || "line";
+          session.user.sessionRevoked = true;
+          session.user.nexPoint = 0;
+          session.user.coin = 0;
+          session.user.name = null;
+          session.user.image = "/avatar.png";
+        }
+
+        return session;
+      }
 
       if (userId) {
         try {
@@ -551,6 +652,7 @@ export const authOptions: NextAuthOptions = {
         session.user.lineId = appToken.lineId || userId;
         session.user.role = appToken.role || "USER";
         session.user.authProvider = appToken.authProvider || "line";
+        session.user.sessionRevoked = false;
         session.user.nexPoint = appToken.nexPoint || 0;
         session.user.coin = appToken.coin || 0;
         session.user.name = resolvedName;
@@ -558,6 +660,17 @@ export const authOptions: NextAuthOptions = {
       }
 
       return session;
+    },
+  },
+
+  events: {
+    async signOut(message) {
+      const token = ("token" in message ? message.token : null) as AppToken | null;
+      const userId = String(token?.id || "").trim();
+
+      if (userId) {
+        await revokeUserSessions(userId).catch(() => undefined);
+      }
     },
   },
 };

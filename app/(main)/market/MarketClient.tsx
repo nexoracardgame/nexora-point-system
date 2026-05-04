@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState, useEffect } from "react";
-import { signOut } from "next-auth/react";
+import { performSecureLogout } from "@/lib/secure-logout";
 
 type MarketPost = {
   id: string;
@@ -81,7 +81,7 @@ export default function NexoraMarketPageClient({
                   <button className="w-full rounded-2xl px-3 py-3 text-left hover:bg-white/5">🛡️ Admin Panel</button>
                   <div className="my-2 border-t border-white/10" />
                   <button
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={() => void performSecureLogout()}
                     className="w-full rounded-2xl px-3 py-3 text-left font-semibold text-red-400 hover:bg-red-500/10"
                   >
                     🚪 ออกจากระบบ
@@ -120,7 +120,7 @@ export default function NexoraMarketPageClient({
           ))}
         </div>
 
-        /* discover */
+        {/* discover */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h3 className="text-3xl font-semibold">Discover</h3>

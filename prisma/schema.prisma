@@ -25,6 +25,8 @@ model User {
   lineUrl     String?
 
   createdAt DateTime @default(now())
+  sessionVersion   Int       @default(1)
+  sessionsRevokedAt DateTime?
 
   coupons        Coupon[]
   marketListings MarketListing[] @relation("UserListings")
