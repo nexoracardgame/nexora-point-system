@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import {
-  getBoxMarketSessionUser,
+  getBoxMarketRequestUser,
   resolveBoxMarketUserId,
-  type BoxMarketSessionUser,
 } from "@/lib/box-market-auth";
 import {
   getDealerVerificationStatus,
   upsertDealerVerification,
 } from "@/lib/box-market-store";
 import { verifyDealerAgainstSheet } from "@/lib/dealer-sheet";
-import { resolveUserIdentity } from "@/lib/user-identity";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
-
-type BoxMarketSession = {
-  user?: BoxMarketSessionUser;
-};
 
 function jsonNoStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
@@ -34,19 +26,18 @@ function clean(value: unknown) {
   return String(value || "").trim();
 }
 
-async function getCurrentUserId() {
-  const session = (await getServerSession(authOptions)) as BoxMarketSession | null;
-  const sessionUser = getBoxMarketSessionUser(session);
-  const identity = await resolveUserIdentity({
-    id: sessionUser.id || undefined,
-    name: sessionUser.name,
-    image: sessionUser.image,
-  });
+async function getCurrentUserId(req: NextRequest) {
+  const sessionUser = await getBoxMarketRequestUser(req);
+  const identity = {
+    userId: String(sessionUser.id || "").trim(),
+    name: String(sessionUser.name || "NEXORA User").trim(),
+    image: String(sessionUser.image || "/avatar.png").trim(),
+  };
   return resolveBoxMarketUserId(sessionUser, identity);
 }
 
-export async function GET() {
-  const userId = await getCurrentUserId();
+export async function GET(req: NextRequest) {
+  const userId = await getCurrentUserId(req);
 
   if (!userId) {
     return jsonNoStore({ verified: false, status: "none", verifiedAt: null });
@@ -57,7 +48,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(req);
 
     if (!userId) {
       return jsonNoStore({ error: "กรุณาเข้าสู่ระบบก่อนยืนยันตัวแทน" }, { status: 401 });

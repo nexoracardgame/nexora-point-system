@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import {
-  getBoxMarketSessionUser,
+  getBoxMarketRequestUser,
   resolveBoxMarketUserId,
-  type BoxMarketSessionUser,
 } from "@/lib/box-market-auth";
 import {
   createBoxMarketListing,
   getBoxMarketListings,
 } from "@/lib/box-market-store";
-import { resolveUserIdentity } from "@/lib/user-identity";
 import type { BoxProductType } from "@/lib/box-market-types";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
-
-type BoxMarketSession = {
-  user?: BoxMarketSessionUser;
-};
 
 function jsonNoStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
@@ -41,13 +33,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = (await getServerSession(authOptions)) as BoxMarketSession | null;
-    const sessionUser = getBoxMarketSessionUser(session);
-    const identity = await resolveUserIdentity({
-      id: sessionUser.id || undefined,
-      name: sessionUser.name,
-      image: sessionUser.image,
-    });
+    const sessionUser = await getBoxMarketRequestUser(req);
+    const identity = {
+      userId: String(sessionUser.id || "").trim(),
+      name: String(sessionUser.name || "NEXORA User").trim(),
+      image: String(sessionUser.image || "/avatar.png").trim(),
+    };
     const sellerId = await resolveBoxMarketUserId(sessionUser, identity);
 
     if (!sellerId) {

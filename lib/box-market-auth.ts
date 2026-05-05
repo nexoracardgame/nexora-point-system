@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getToken } from "next-auth/jwt";
+import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export type BoxMarketSessionUser = {
@@ -19,6 +21,29 @@ export function getBoxMarketSessionUser(
   session: { user?: BoxMarketSessionUser } | null | undefined
 ) {
   return session?.user || ({} as BoxMarketSessionUser);
+}
+
+export async function getBoxMarketRequestUser(req: NextRequest) {
+  const token = (await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
+  })) as
+    | {
+        id?: string | null;
+        lineId?: string | null;
+        name?: string | null;
+        picture?: string | null;
+        image?: string | null;
+      }
+    | null;
+
+  return {
+    id: String(token?.id || "").trim() || null,
+    lineId: String(token?.lineId || "").trim() || null,
+    name: String(token?.name || "").trim() || "NEXORA User",
+    image:
+      String(token?.picture || token?.image || "").trim() || "/avatar.png",
+  } satisfies BoxMarketSessionUser;
 }
 
 export async function resolveBoxMarketUserId(
