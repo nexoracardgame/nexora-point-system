@@ -9,6 +9,7 @@ export type BoxMarketSessionUser = {
   lineId?: string | null;
   name?: string | null;
   image?: string | null;
+  role?: string | null;
 };
 
 export type BoxMarketIdentity = {
@@ -34,6 +35,7 @@ export async function getBoxMarketRequestUser(req: NextRequest) {
         name?: string | null;
         picture?: string | null;
         image?: string | null;
+        role?: string | null;
       }
     | null;
 
@@ -43,6 +45,7 @@ export async function getBoxMarketRequestUser(req: NextRequest) {
     name: String(token?.name || "").trim() || "NEXORA User",
     image:
       String(token?.picture || token?.image || "").trim() || "/avatar.png",
+    role: String(token?.role || "").trim() || null,
   } satisfies BoxMarketSessionUser;
 }
 

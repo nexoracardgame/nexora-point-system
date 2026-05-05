@@ -1024,6 +1024,12 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
+        href: "/live",
+        label: "ไลฟ์",
+        icon: Radio,
+        active: pathname.startsWith("/live"),
+      },
+      {
        href: "/dm",
        label: t("layout.nav.chat"),
        icon: MessageCircle,
@@ -1055,10 +1061,10 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
-        href: "/live",
-        label: "ไลฟ์",
-        icon: Radio,
-        active: pathname.startsWith("/live"),
+        href: "/box-market",
+        label: "ซอง/กล่อง",
+        icon: PackageOpen,
+        active: pathname.startsWith("/box-market"),
       },
       {
         href: "/dm",

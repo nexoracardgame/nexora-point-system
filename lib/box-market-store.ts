@@ -28,6 +28,18 @@ export type CreateBoxMarketListingInput = {
   imageUrl: string | null;
 };
 
+export type UpdateBoxMarketListingPriceInput = {
+  listingId: string;
+  actorId: string;
+  price: number;
+};
+
+export type DeleteBoxMarketListingInput = {
+  listingId: string;
+  actorId: string;
+  isAdmin: boolean;
+};
+
 export type DealerVerificationInput = {
   userId: string;
   fullName: string;
@@ -183,7 +195,7 @@ async function writeLocalVerifications(items: LocalDealerVerification[]) {
 export async function getBoxMarketListings(limit = 120) {
   if (!hasDatabaseConfig()) {
     return (await readLocalListings())
-      .filter((item) => String(item.status || "").toLowerCase() !== "sold")
+      .filter((item) => String(item.status || "active").toLowerCase() === "active")
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
   }
@@ -191,14 +203,16 @@ export async function getBoxMarketListings(limit = 120) {
   try {
     await ensureBoxMarketSchema();
     const rows = await prisma.$queryRawUnsafe<DbRow[]>(
-      'SELECT * FROM "BoxMarketListing" WHERE LOWER("status") <> \'sold\' ORDER BY "createdAt" DESC, "id" ASC LIMIT $1',
+      'SELECT * FROM "BoxMarketListing" WHERE LOWER("status") = \'active\' ORDER BY "createdAt" DESC, "id" ASC LIMIT $1',
       limit
     );
     return rows.map(toListingRecord);
   } catch {
     return process.env.NODE_ENV === "production"
       ? []
-      : (await readLocalListings()).slice(0, limit);
+      : (await readLocalListings())
+          .filter((item) => String(item.status || "active").toLowerCase() === "active")
+          .slice(0, limit);
   }
 }
 
@@ -361,5 +375,142 @@ export async function createBoxMarketListing(
 
     await writeLocalListings([listing, ...(await readLocalListings())]);
     return listing;
+  }
+}
+
+export async function updateBoxMarketListingPrice(
+  input: UpdateBoxMarketListingPriceInput
+) {
+  const listingId = String(input.listingId || "").trim();
+  const actorId = String(input.actorId || "").trim();
+  const price = Number(input.price || 0);
+  const now = new Date().toISOString();
+
+  if (!listingId || !actorId) {
+    throw new Error("missing-actor-or-listing");
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("invalid-price");
+  }
+
+  if (!hasDatabaseConfig()) {
+    const items = await readLocalListings();
+    const existing = items.find((item) => item.id === listingId);
+    if (!existing) {
+      throw new Error("listing-not-found");
+    }
+    if (existing.sellerId !== actorId) {
+      throw new Error("forbidden");
+    }
+
+    const updated: BoxMarketListing = {
+      ...existing,
+      price,
+      updatedAt: now,
+    };
+    await writeLocalListings(
+      items.map((item) => (item.id === listingId ? updated : item))
+    );
+    return updated;
+  }
+
+  try {
+    await ensureBoxMarketSchema();
+    const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+      'UPDATE "BoxMarketListing" SET "price" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "sellerId" = $3 AND LOWER("status") = \'active\' RETURNING *',
+      price,
+      listingId,
+      actorId
+    );
+    const updated = rows[0];
+    if (!updated) {
+      throw new Error("listing-not-found-or-forbidden");
+    }
+    return toListingRecord(updated);
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      throw error;
+    }
+
+    const items = await readLocalListings();
+    const existing = items.find((item) => item.id === listingId);
+    if (!existing || existing.sellerId !== actorId) {
+      throw new Error("listing-not-found-or-forbidden");
+    }
+    const updated: BoxMarketListing = {
+      ...existing,
+      price,
+      updatedAt: now,
+    };
+    await writeLocalListings(
+      items.map((item) => (item.id === listingId ? updated : item))
+    );
+    return updated;
+  }
+}
+
+export async function deleteBoxMarketListing(
+  input: DeleteBoxMarketListingInput
+) {
+  const listingId = String(input.listingId || "").trim();
+  const actorId = String(input.actorId || "").trim();
+  const isAdmin = Boolean(input.isAdmin);
+  const now = new Date().toISOString();
+
+  if (!listingId || !actorId) {
+    throw new Error("missing-actor-or-listing");
+  }
+
+  if (!hasDatabaseConfig()) {
+    const items = await readLocalListings();
+    const existing = items.find((item) => item.id === listingId);
+    if (!existing) {
+      throw new Error("listing-not-found");
+    }
+    if (existing.sellerId !== actorId && !isAdmin) {
+      throw new Error("forbidden");
+    }
+
+    await writeLocalListings(
+      items.map((item) =>
+        item.id === listingId
+          ? { ...item, status: "deleted", updatedAt: now }
+          : item
+      )
+    );
+    return { success: true };
+  }
+
+  try {
+    await ensureBoxMarketSchema();
+    const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+      isAdmin
+        ? 'UPDATE "BoxMarketListing" SET "status" = \'deleted\', "updatedAt" = NOW() WHERE "id" = $1 AND LOWER("status") = \'active\' RETURNING "id"'
+        : 'UPDATE "BoxMarketListing" SET "status" = \'deleted\', "updatedAt" = NOW() WHERE "id" = $1 AND "sellerId" = $2 AND LOWER("status") = \'active\' RETURNING "id"',
+      ...(isAdmin ? [listingId] : [listingId, actorId])
+    );
+    if (!rows[0]) {
+      throw new Error("listing-not-found-or-forbidden");
+    }
+    return { success: true };
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      throw error;
+    }
+
+    const items = await readLocalListings();
+    const existing = items.find((item) => item.id === listingId);
+    if (!existing || (existing.sellerId !== actorId && !isAdmin)) {
+      throw new Error("listing-not-found-or-forbidden");
+    }
+    await writeLocalListings(
+      items.map((item) =>
+        item.id === listingId
+          ? { ...item, status: "deleted", updatedAt: now }
+          : item
+      )
+    );
+    return { success: true };
   }
 }

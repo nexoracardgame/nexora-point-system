@@ -74,6 +74,14 @@ type ChatSeenDetail = {
   senderId?: string | null;
 };
 
+type OpenFloatingChatDetail = {
+  roomId?: string | null;
+  userId?: string | null;
+  userName?: string | null;
+  userImage?: string | null;
+  legacyRoomId?: string | null;
+};
+
 const LIST_REFRESH_MS = 8500;
 const ROOM_SYNC_MS = 2500;
 const ROOM_CACHE_TTL_MS = 90000;
@@ -99,6 +107,10 @@ type MessagePagePayload = {
 
 function safeText(value?: string | number | null) {
   return String(value || "").trim();
+}
+
+function buildDirectRoomId(userA?: string | null, userB?: string | null) {
+  return [safeText(userA), safeText(userB)].filter(Boolean).sort().join("__");
 }
 
 function roomKey(room: Pick<DMRoomListItem, "kind" | "roomId" | "dealId">) {
@@ -819,6 +831,98 @@ export default function FloatingChatDock({
     [buildRoomShell, loadRoomFast, markRoomSeen, scrollToBottom, updateRoomCache]
   );
 
+  const openFloatingDirectChat = useCallback(
+    async (detail: OpenFloatingChatDetail) => {
+      if (status !== "authenticated") {
+        return;
+      }
+
+      const targetUserId = safeText(detail.userId);
+      if (!targetUserId || !currentUserId || targetUserId === currentUserId) {
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const optimisticRoomId =
+        safeText(detail.roomId) || buildDirectRoomId(currentUserId, targetUserId);
+      const optimisticRoom = normalizeRoom({
+        kind: "direct",
+        roomId: optimisticRoomId,
+        otherUserId: targetUserId,
+        otherName: safeText(detail.userName) || "Seller",
+        otherImage: safeText(detail.userImage) || "/avatar.png",
+        lastMessage: "เริ่มแชท",
+        createdAt: now,
+        lastMessageAt: now,
+        unread: 0,
+      });
+
+      if (!optimisticRoom) {
+        return;
+      }
+
+      setOpen(true);
+      setFilter("direct");
+      setMobileListVisible(false);
+      setError("");
+      setRooms((current) => {
+        const withoutDuplicate = current.filter(
+          (room) =>
+            room.roomId !== optimisticRoom.roomId &&
+            room.otherUserId !== optimisticRoom.otherUserId
+        );
+        return [optimisticRoom, ...withoutDuplicate];
+      });
+
+      const shell = buildRoomShell(optimisticRoom, true);
+      setActiveRoom(shell);
+      setMessages([]);
+      updateRoomCache(optimisticRoom.key, { ...shell, loading: false }, []);
+
+      const res = await fetch("/api/dm/create-room", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user2: targetUserId,
+          user2Name: safeText(detail.userName),
+          user2Image: safeText(detail.userImage),
+          legacyRoomId: safeText(detail.legacyRoomId) || optimisticRoomId,
+        }),
+      }).catch(() => null);
+      const payload = (await res?.json().catch(() => null)) as {
+        roomId?: string | null;
+      } | null;
+      const roomId = safeText(payload?.roomId) || optimisticRoomId;
+      const actualRoom = normalizeRoom({
+        kind: "direct",
+        roomId,
+        otherUserId: targetUserId,
+        otherName: optimisticRoom.otherName,
+        otherImage: optimisticRoom.otherImage,
+        lastMessage: optimisticRoom.lastMessage,
+        createdAt: optimisticRoom.createdAt,
+        lastMessageAt: optimisticRoom.lastMessageAt,
+        unread: 0,
+      });
+
+      if (actualRoom) {
+        setRooms((current) => {
+          const withoutDuplicate = current.filter(
+            (room) =>
+              room.roomId !== optimisticRoom.roomId &&
+              room.roomId !== actualRoom.roomId &&
+              room.otherUserId !== actualRoom.otherUserId
+          );
+          return [actualRoom, ...withoutDuplicate];
+        });
+        await openRoom(actualRoom);
+      }
+    },
+    [buildRoomShell, currentUserId, openRoom, status, updateRoomCache]
+  );
+
   const syncActiveRoom = useCallback(async () => {
     const active = activeRoomRef.current;
     if (!active?.actualRoomId || active.loading) {
@@ -1210,6 +1314,21 @@ export default function FloatingChatDock({
     updateRoomCache,
     updateRoomListFromMessage,
   ]);
+
+  useEffect(() => {
+    const handleOpenFloatingChat = (event: Event) => {
+      const detail = (event as CustomEvent<OpenFloatingChatDetail>).detail;
+      void openFloatingDirectChat(detail || {});
+    };
+
+    window.addEventListener("nexora:open-floating-chat", handleOpenFloatingChat);
+    return () => {
+      window.removeEventListener(
+        "nexora:open-floating-chat",
+        handleOpenFloatingChat
+      );
+    };
+  }, [openFloatingDirectChat]);
 
   useEffect(() => {
     if (open) {

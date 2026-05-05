@@ -1,16 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Boxes,
   Check,
+  Loader2,
+  MessageCircle,
+  Pencil,
   PackageOpen,
   Plus,
   RefreshCw,
   ShieldCheck,
   Tag,
+  Trash2,
+  X,
 } from "lucide-react";
 import type {
   BoxMarketListing,
@@ -24,6 +30,18 @@ type FormState = {
   price: string;
   quantity: string;
 };
+
+type CurrentBoxMarketUser = {
+  id: string;
+  name: string;
+  image: string;
+  isAdmin: boolean;
+};
+
+type ListingDialog =
+  | { type: "edit"; listing: BoxMarketListing }
+  | { type: "delete"; listing: BoxMarketListing }
+  | null;
 
 type SealedProductOption = {
   id: string;
@@ -120,6 +138,13 @@ function productLabel(value: BoxProductType) {
   return value === "pack" ? "ซองการ์ด" : "กล่องการ์ด";
 }
 
+function buildDirectRoomId(userA?: string | null, userB?: string | null) {
+  return [String(userA || "").trim(), String(userB || "").trim()]
+    .filter(Boolean)
+    .sort()
+    .join("__");
+}
+
 function ProductVisual({
   imageUrl,
   title,
@@ -153,10 +178,13 @@ function ProductVisual({
 export default function BoxMarketClient({
   initialListings,
   productAssets,
+  currentUser,
 }: {
   initialListings: BoxMarketListing[];
   productAssets: BoxProductAsset[];
+  currentUser: CurrentBoxMarketUser;
 }) {
+  const router = useRouter();
   const [listings, setListings] = useState(initialListings);
   const [assets] = useState(productAssets);
   const [form, setForm] = useState<FormState>(() => buildInitialForm());
@@ -166,6 +194,11 @@ export default function BoxMarketClient({
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [dialog, setDialog] = useState<ListingDialog>(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [contactingSellerId, setContactingSellerId] = useState("");
 
   const verifiedListings = useMemo(
     () => listings.filter((item) => item.isDealerVerified).length,
@@ -181,6 +214,13 @@ export default function BoxMarketClient({
       imageUrl: getProductAssetUrl(assets, option.assetName),
     };
   }, [assets, form.productId]);
+  const myListings = useMemo(
+    () =>
+      currentUser.id
+        ? listings.filter((item) => item.sellerId === currentUser.id)
+        : [],
+    [currentUser.id, listings]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -231,18 +271,25 @@ export default function BoxMarketClient({
     const handleFocus = () => {
       void refreshListings(true);
     };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshListings(true);
+      }
+    };
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void refreshListings(true);
       }
-    }, 10000);
+    }, 2000);
 
     window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
@@ -304,6 +351,124 @@ export default function BoxMarketClient({
     }
   }
 
+  function openEditDialog(listing: BoxMarketListing) {
+    setDialog({ type: "edit", listing });
+    setEditPrice(String(listing.price || ""));
+    setActionError("");
+  }
+
+  function openDeleteDialog(listing: BoxMarketListing) {
+    setDialog({ type: "delete", listing });
+    setActionError("");
+  }
+
+  function closeDialog() {
+    if (actionLoading) return;
+    setDialog(null);
+    setEditPrice("");
+    setActionError("");
+  }
+
+  async function confirmEditPrice() {
+    if (!dialog || dialog.type !== "edit" || actionLoading) return;
+
+    const price = Number(editPrice);
+    if (!Number.isFinite(price) || price <= 0) {
+      setActionError("กรอกราคาใหม่ให้ถูกต้อง");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setActionError("");
+      const res = await fetch("/api/box-market", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: dialog.listing.id,
+          price,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data?.success || !data?.listing) {
+        setActionError(data?.error || "แก้ไขราคาไม่สำเร็จ");
+        return;
+      }
+
+      setListings((current) =>
+        current.map((item) => (item.id === data.listing.id ? data.listing : item))
+      );
+      closeDialog();
+    } catch {
+      setActionError("เกิดข้อผิดพลาดระหว่างแก้ไขราคา");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function confirmDeleteListing() {
+    if (!dialog || dialog.type !== "delete" || actionLoading) return;
+
+    try {
+      setActionLoading(true);
+      setActionError("");
+      const res = await fetch("/api/box-market", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: dialog.listing.id,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        setActionError(data?.error || "ลบสินค้าไม่สำเร็จ");
+        return;
+      }
+
+      setListings((current) =>
+        current.filter((item) => item.id !== dialog.listing.id)
+      );
+      closeDialog();
+    } catch {
+      setActionError("เกิดข้อผิดพลาดระหว่างลบสินค้า");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  function contactSeller(listing: BoxMarketListing) {
+    if (!currentUser.id) {
+      router.push("/login?callbackUrl=%2Fbox-market");
+      return;
+    }
+
+    if (listing.sellerId === currentUser.id) {
+      return;
+    }
+
+    setContactingSellerId(listing.sellerId);
+    const roomId = buildDirectRoomId(currentUser.id, listing.sellerId);
+
+    window.dispatchEvent(
+      new CustomEvent("nexora:open-floating-chat", {
+        detail: {
+          roomId,
+          userId: listing.sellerId,
+          userName: listing.sellerName,
+          userImage: listing.sellerImage || "/avatar.png",
+        },
+      })
+    );
+
+    window.setTimeout(() => setContactingSellerId(""), 700);
+  }
+
   return (
     <div className="min-h-full text-black">
       <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 pb-4">
@@ -351,6 +516,73 @@ export default function BoxMarketClient({
                       assets
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-5 rounded-[22px] border border-white/8 bg-white/[0.045] p-3 sm:max-w-3xl sm:p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">
+                        My Listings
+                      </div>
+                      <div className="mt-1 text-sm font-black text-white">
+                        สินค้าที่ฉันวางขาย
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-white/[0.08] px-3 py-1 text-xs font-black text-white/62">
+                      {myListings.length}
+                    </div>
+                  </div>
+
+                  {myListings.length > 0 ? (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {myListings.slice(0, 4).map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex min-w-0 items-center gap-3 rounded-[18px] border border-white/8 bg-black/24 p-2"
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[14px] bg-white/[0.08]">
+                            <ProductVisual
+                              imageUrl={item.imageUrl}
+                              title={item.title}
+                              compact
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-black text-white">
+                              {item.title}
+                            </div>
+                            <div className="mt-0.5 text-[11px] font-bold text-white/48">
+                              {formatPrice(item.price)} บาท · x{item.quantity}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openEditDialog(item)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black transition hover:bg-amber-100"
+                              aria-label="แก้ไขราคา"
+                              title="แก้ไขราคา"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openDeleteDialog(item)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white transition hover:bg-red-400"
+                              aria-label="ลบสินค้า"
+                              title="ลบสินค้า"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-[18px] border border-dashed border-white/10 bg-black/18 px-3 py-4 text-sm font-medium text-white/42">
+                      รายการที่คุณลงขายจะแสดงตรงนี้ เพื่อแก้ราคาและลบได้ไว
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -559,7 +791,12 @@ export default function BoxMarketClient({
             </div>
           ) : (
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {listings.map((listing) => (
+              {listings.map((listing) => {
+                const isOwnListing = currentUser.id === listing.sellerId;
+                const canDeleteListing = isOwnListing || currentUser.isAdmin;
+                const canEditPrice = isOwnListing;
+
+                return (
                 <article
                   key={listing.id}
                   className="group overflow-hidden rounded-[24px] border border-black/8 bg-white shadow-[0_16px_45px_rgba(0,0,0,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_26px_70px_rgba(0,0,0,0.16)]"
@@ -614,7 +851,10 @@ export default function BoxMarketClient({
                           {formatPrice(listing.price)} บาท
                         </div>
                       </div>
-                      <div className="flex min-w-0 items-center gap-2">
+                      <Link
+                        href={`/profile/${encodeURIComponent(listing.sellerId)}`}
+                        className="flex min-w-0 items-center gap-2 rounded-[16px] px-1.5 py-1 transition hover:bg-black/[0.04]"
+                      >
                         <img
                           src={listing.sellerImage || "/avatar.png"}
                           alt={listing.sellerName}
@@ -629,15 +869,158 @@ export default function BoxMarketClient({
                             seller
                           </div>
                         </div>
-                      </div>
+                      </Link>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 border-t border-black/8 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => contactSeller(listing)}
+                        disabled={isOwnListing || contactingSellerId === listing.sellerId}
+                        className="inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[16px] bg-black px-4 py-2.5 text-sm font-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-black/18 disabled:text-black/42"
+                      >
+                        {contactingSellerId === listing.sellerId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MessageCircle className="h-4 w-4" />
+                        )}
+                        {isOwnListing ? "สินค้าของฉัน" : "ติดต่อซื้อ"}
+                      </button>
+
+                      {(canEditPrice || canDeleteListing) && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {canEditPrice && (
+                            <button
+                              type="button"
+                              onClick={() => openEditDialog(listing)}
+                              className="inline-flex items-center justify-center gap-2 rounded-[14px] border border-black/10 px-3 py-2 text-xs font-black text-black transition hover:border-black/30"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              แก้ราคา
+                            </button>
+                          )}
+                          {canDeleteListing && (
+                            <button
+                              type="button"
+                              onClick={() => openDeleteDialog(listing)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-[14px] border px-3 py-2 text-xs font-black transition ${
+                                canEditPrice
+                                  ? "border-red-500/20 text-red-700 hover:border-red-500/45"
+                                  : "col-span-2 border-red-500/20 text-red-700 hover:border-red-500/45"
+                              }`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {currentUser.isAdmin && !isOwnListing ? "GM ลบ" : "ลบ"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
       </div>
+
+      {dialog && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-[440px] overflow-hidden rounded-[28px] bg-white text-black shadow-[0_28px_100px_rgba(0,0,0,0.38)]">
+            <div className="flex items-start justify-between gap-3 border-b border-black/8 p-5">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-black/38">
+                  {dialog.type === "edit" ? "Edit Price" : "Delete Listing"}
+                </div>
+                <h3 className="mt-1 text-2xl font-black leading-tight">
+                  {dialog.type === "edit" ? "แก้ไขราคา" : "ลบสินค้า"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeDialog}
+                disabled={actionLoading}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/[0.05] text-black transition hover:bg-black/10 disabled:opacity-50"
+                aria-label="ปิด"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="flex items-center gap-3 rounded-[20px] bg-black/[0.035] p-3">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] bg-white">
+                  <ProductVisual
+                    imageUrl={dialog.listing.imageUrl}
+                    title={dialog.listing.title}
+                    compact
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="line-clamp-2 text-sm font-black leading-tight">
+                    {dialog.listing.title}
+                  </div>
+                  <div className="mt-1 text-xs font-bold text-black/45">
+                    ราคาปัจจุบัน {formatPrice(dialog.listing.price)} บาท
+                  </div>
+                </div>
+              </div>
+
+              {dialog.type === "edit" ? (
+                <label className="mt-4 block">
+                  <span className="mb-2 block text-xs font-black text-black/58">
+                    ราคาใหม่
+                  </span>
+                  <input
+                    value={editPrice}
+                    onChange={(event) => setEditPrice(event.target.value)}
+                    inputMode="decimal"
+                    className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-black outline-none transition focus:border-black/35"
+                    autoFocus
+                  />
+                </label>
+              ) : (
+                <div className="mt-4 rounded-[18px] border border-red-500/15 bg-red-500/10 px-4 py-3 text-sm font-bold leading-6 text-red-700">
+                  ยืนยันลบรายการนี้ออกจากหน้าร้านขายซอง/กล่องการ์ดแท้
+                </div>
+              )}
+
+              {actionError && (
+                <div className="mt-4 rounded-[16px] bg-red-500/10 px-4 py-3 text-sm font-bold text-red-700">
+                  {actionError}
+                </div>
+              )}
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={closeDialog}
+                  disabled={actionLoading}
+                  className="rounded-[18px] border border-black/10 px-4 py-3 text-sm font-black text-black transition hover:border-black/30 disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={
+                    dialog.type === "edit" ? confirmEditPrice : confirmDeleteListing
+                  }
+                  disabled={actionLoading}
+                  className={`inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-3 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    dialog.type === "edit"
+                      ? "bg-black hover:bg-zinc-800"
+                      : "bg-red-600 hover:bg-red-500"
+                  }`}
+                >
+                  {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {dialog.type === "edit" ? "ยืนยันราคาใหม่" : "ยืนยันลบ"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

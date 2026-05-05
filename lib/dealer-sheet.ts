@@ -165,6 +165,12 @@ function normalizeText(value: string) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function normalizeFullName(value: string) {
+  return normalizeText(value)
+    .replace(/^(นาย|นางสาว|น\.ส\.|นส\.|นาง|เด็กชาย|ด\.ช\.|เด็กหญิง|ด\.ญ\.)\s*/u, "")
+    .trim();
+}
+
 function normalizeCode(value: string) {
   return String(value || "").trim().toLowerCase().replace(/[\s\-_./]+/g, "");
 }
@@ -240,14 +246,14 @@ export async function verifyDealerAgainstSheet(
   const headers = Object.keys(rows[0] || {});
   const headerMap = getHeaderMap(headers);
   const expected = {
-    fullName: normalizeText(input.fullName),
+    fullName: normalizeFullName(input.fullName),
     memberId: normalizeCode(input.memberId),
     phone: normalizeDigits(input.phone),
     nationalId: normalizeDigits(input.nationalId),
   };
 
   return rows.some((row) => {
-    const fullName = normalizeText(
+    const fullName = normalizeFullName(
       getComparableRowValue(row, headerMap.fullName, 0)
     );
     const memberId = normalizeCode(
