@@ -860,7 +860,7 @@ export default async function SellerProfilePage({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:items-start sm:gap-3">
                 {[
                   {
                     label: "ดีลสำเร็จ",
@@ -881,7 +881,7 @@ export default async function SellerProfilePage({
                     hint: "รวมยอดขายจากทุกสินค้า",
                     breakdown: [
                       {
-                        label: "การ์ดใบ",
+                        label: "การ์ดใบเดียว",
                         value: formatCurrency(totalVolume),
                       },
                       {
@@ -899,25 +899,25 @@ export default async function SellerProfilePage({
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.15),transparent_40%),linear-gradient(180deg,rgba(0,0,0,0.9)_0%,rgba(5,5,10,1)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-4"
+                    className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.15),transparent_40%),linear-gradient(180deg,rgba(0,0,0,0.9)_0%,rgba(5,5,10,1)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:rounded-[18px] sm:px-4 sm:py-3 sm:shadow-[0_14px_42px_rgba(0,0,0,0.55)]"
                   >
                     <div className="text-[9px] uppercase tracking-[0.16em] text-white/70 sm:text-[10px]">
                       {stat.label}
                     </div>
                     <div
-                      className={`mt-1 text-2xl font-black leading-none sm:text-[28px] ${stat.color}`}
+                      className={`mt-1 text-2xl font-black leading-none sm:text-2xl ${stat.color}`}
                     >
                       {stat.value}
                     </div>
-                    <div className="mt-2 text-[10px] leading-4 text-white/50 sm:text-[11px]">
+                    <div className="mt-2 text-[10px] leading-4 text-white/50 sm:mt-1.5 sm:text-[11px]">
                       {stat.hint}
                     </div>
                     {"breakdown" in stat && Array.isArray(stat.breakdown) ? (
-                      <div className="mt-3 grid gap-1.5">
+                      <div className="mt-3 grid gap-1.5 sm:mt-2 sm:gap-1">
                         {stat.breakdown.map((item) => (
                           <div
                             key={item.label}
-                            className="flex items-center justify-between gap-2 rounded-xl border border-white/8 bg-white/[0.045] px-2.5 py-2"
+                            className="flex items-center justify-between gap-2 rounded-xl border border-white/8 bg-white/[0.045] px-2.5 py-2 sm:px-2 sm:py-1.5"
                           >
                             <span className="text-[10px] font-bold text-white/52">
                               {item.label}
