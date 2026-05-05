@@ -26,6 +26,7 @@ const HEADER_ALIASES = {
     "รหัสสมาชิก",
     "รหัสตัวแทนจำหน่าย",
     "รหัสตัวแทน",
+    "member",
     "memberid",
     "member id",
     "dealerid",
@@ -172,6 +173,9 @@ function normalizeDigits(value: string) {
   const digits = String(value || "").replace(/[^\d]/g, "");
   if (digits.startsWith("66") && digits.length === 11) {
     return `0${digits.slice(2)}`;
+  }
+  if (digits.length === 9) {
+    return `0${digits}`;
   }
   return digits;
 }
