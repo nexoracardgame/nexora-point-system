@@ -50,7 +50,7 @@ export async function getLocalMarketListingById(id: string) {
 export async function getLocalMarketListingsBySeller(sellerId: string) {
   const items = await readStore();
   return items.filter(
-    (item) => item.sellerId === sellerId && String(item.status || "").toLowerCase() !== "sold"
+    (item) => item.sellerId === sellerId && String(item.status || "").toLowerCase() === "active"
   );
 }
 

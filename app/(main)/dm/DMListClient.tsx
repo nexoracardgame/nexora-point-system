@@ -177,8 +177,9 @@ function buildDirectRoomHref(roomId: string) {
   return `/dm/${encodeURIComponent(roomId)}?back=${encodeURIComponent("/dm")}`;
 }
 
-function buildDealRoomHref(dealId: string) {
-  return `/market/deals/chat/${encodeURIComponent(dealId)}`;
+function buildDealRoomHref(dealId: string, mode?: string | null) {
+  const basePath = mode === "buy" ? "/buy-market/deals/chat" : "/market/deals/chat";
+  return `${basePath}/${encodeURIComponent(dealId)}`;
 }
 
 function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem | null {
@@ -204,6 +205,7 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem | null {
     dealCardImage: room.dealCardImage ? String(room.dealCardImage) : undefined,
     dealCardNo: room.dealCardNo ? String(room.dealCardNo) : undefined,
     dealPrice: Number(room.dealPrice || 0),
+    dealMode: room.dealMode === "buy" ? "buy" : "sell",
     sellerName: room.sellerName ? String(room.sellerName) : undefined,
     sellerImage: room.sellerImage ? String(room.sellerImage) : undefined,
   };
@@ -453,11 +455,11 @@ export default function DMListClient({
     primeDirectRoomCache(roomId, room);
   }, [primeDirectRoomCache]);
 
-  const warmDealRoom = useCallback((dealId?: string) => {
+  const warmDealRoom = useCallback((dealId?: string, mode?: string | null) => {
     const safeDealId = String(dealId || "").trim();
     if (!safeDealId) return;
 
-    router.prefetch(buildDealRoomHref(safeDealId));
+    router.prefetch(buildDealRoomHref(safeDealId, mode));
     void prefetchDealChatRoom(safeDealId).catch(() => null);
   }, [router]);
 
@@ -1296,14 +1298,14 @@ export default function DMListClient({
                     return (
                     <Link
                       key={room.roomId}
-                      href={buildDealRoomHref(String(room.dealId || ""))}
+                      href={buildDealRoomHref(String(room.dealId || ""), room.dealMode)}
                       prefetch
-                      onMouseEnter={() => warmDealRoom(room.dealId)}
-                      onTouchStart={() => warmDealRoom(room.dealId)}
-                      onFocus={() => warmDealRoom(room.dealId)}
+                      onMouseEnter={() => warmDealRoom(room.dealId, room.dealMode)}
+                      onTouchStart={() => warmDealRoom(room.dealId, room.dealMode)}
+                      onFocus={() => warmDealRoom(room.dealId, room.dealMode)}
                       onClick={() => {
                         markRoomReadLocally(room);
-                        warmDealRoom(room.dealId);
+                        warmDealRoom(room.dealId, room.dealMode);
                       }}
                       className="group relative block min-w-0 overflow-hidden rounded-[24px] border border-[#1f2230] bg-[linear-gradient(145deg,#0f1016_0%,#1a1d29_58%,#11131c_100%)] p-3 text-white shadow-[0_18px_40px_rgba(15,15,20,0.22)] ring-1 ring-white/5 transition hover:-translate-y-0.5 hover:border-amber-300/30 hover:shadow-[0_28px_56px_rgba(15,15,20,0.26)] sm:rounded-[30px] sm:p-4.5"
                     >
@@ -1326,13 +1328,14 @@ export default function DMListClient({
                           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <div className="line-clamp-1 text-sm font-black text-white sm:text-base">
+                                {room.dealMode === "buy" ? "รับซื้อ: " : ""}
                                 {room.dealCardName || "Deal chat"}
                               </div>
                               <div className="mt-1 text-sm font-black text-[#ffe27a] sm:text-base">
                                 {formatDealPriceLabel(room.dealPrice)}
                               </div>
                               <div className="mt-1 line-clamp-1 text-[11px] font-semibold text-white/62 sm:text-xs">
-                                ผู้ขาย: {room.sellerName || room.otherName}
+                                {room.dealMode === "buy" ? "ผู้เสนอขาย" : "ผู้ขาย"}: {room.sellerName || room.otherName}
                               </div>
                               <div
                                 className={`mt-1 flex items-center gap-1.5 text-[11px] font-black ${
@@ -1369,7 +1372,11 @@ export default function DMListClient({
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="max-w-full truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#ffe27a] sm:max-w-[110px]">
-                                  {room.dealCardNo ? `CARD ${room.dealCardNo}` : "DEAL CARD"}
+                                  {room.dealMode === "buy"
+                                    ? "BUY DEAL"
+                                    : room.dealCardNo
+                                      ? `CARD ${room.dealCardNo}`
+                                      : "DEAL CARD"}
                                 </div>
                                 <div className="mt-0.5 max-w-full truncate text-[11px] font-semibold text-white/78 sm:max-w-[110px]">
                                   {room.dealCardName || "Unknown card"}

@@ -33,7 +33,7 @@ function hasDatabaseConfig() {
 }
 
 function isActiveListing(item: { status?: string | null }) {
-  return String(item.status || "").toLowerCase() !== "sold";
+  return String(item.status || "").toLowerCase() === "active";
 }
 
 function toMarketListingRecord(item: {
@@ -97,15 +97,20 @@ async function getDbListings(where?: Prisma.MarketListingWhereInput) {
 
 export async function getMarketListings() {
   if (!hasDatabaseConfig()) {
-    return getLocalMarketListings();
+    return (await getLocalMarketListings()).filter(isActiveListing);
   }
 
   try {
-    return await getDbListings();
+    return await getDbListings({
+      status: {
+        equals: "active",
+        mode: "insensitive",
+      },
+    });
   } catch {
     return process.env.NODE_ENV === "production"
       ? []
-      : getLocalMarketListings();
+      : (await getLocalMarketListings()).filter(isActiveListing);
   }
 }
 
@@ -128,7 +133,7 @@ export async function getMarketListingById(id: string) {
       },
     });
 
-    return listing ? toMarketListingRecord(listing) : null;
+    return listing && isActiveListing(listing) ? toMarketListingRecord(listing) : null;
   } catch {
     return process.env.NODE_ENV === "production"
       ? null
@@ -145,18 +150,25 @@ export async function getMarketListingsByCardNo(cardNo: string) {
 
   if (!hasDatabaseConfig()) {
     const listings = await getLocalMarketListings();
-    return listings.filter((item) => String(item.cardNo || "") === normalizedCardNo);
+    return listings.filter(
+      (item) => String(item.cardNo || "") === normalizedCardNo && isActiveListing(item)
+    );
   }
 
   try {
     return await getDbListings({
       cardNo: normalizedCardNo,
+      status: {
+        equals: "active",
+        mode: "insensitive",
+      },
     });
   } catch {
     return process.env.NODE_ENV === "production"
       ? []
       : (await getLocalMarketListings()).filter(
-          (item) => String(item.cardNo || "") === normalizedCardNo
+          (item) =>
+            String(item.cardNo || "") === normalizedCardNo && isActiveListing(item)
         );
   }
 }
@@ -177,11 +189,9 @@ export async function getMarketListingStatsForRarity(rarity?: string | null) {
   }
 
   const activeWhere: Prisma.MarketListingWhereInput = {
-    NOT: {
-      status: {
-        equals: "sold",
-        mode: "insensitive",
-      },
+    status: {
+      equals: "active",
+      mode: "insensitive",
     },
   };
   const rarityWhere: Prisma.MarketListingWhereInput = normalizedRarity
@@ -233,11 +243,9 @@ export async function getMarketListingsBySeller(sellerId: string) {
     const rows = await prisma.marketListing.findMany({
       where: {
         sellerId,
-        NOT: {
-          status: {
-            equals: "sold",
-            mode: "insensitive",
-          },
+        status: {
+          equals: "active",
+          mode: "insensitive",
         },
       },
       include: {

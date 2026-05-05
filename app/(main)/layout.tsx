@@ -38,6 +38,7 @@ import {
   User,
   Radio,
   PackageOpen,
+  BadgeDollarSign,
 } from "lucide-react";
 
 function safeProfileSrc(image?: string | null) {
@@ -171,6 +172,15 @@ function getOpenChatRoomId(pathname: string) {
     return `deal:${decodeURIComponent(parts[3])}`;
   }
 
+  if (
+    parts[0] === "buy-market" &&
+    parts[1] === "deals" &&
+    parts[2] === "chat" &&
+    parts[3]
+  ) {
+    return `deal:${decodeURIComponent(parts[3])}`;
+  }
+
   return "";
 }
 
@@ -184,7 +194,9 @@ export default function MainLayout({
   const { data: session } = useSession();
   const { t } = useLanguage();
   const isChatRoomPage =
-    pathname.startsWith("/dm/") || pathname.startsWith("/market/deals/chat/");
+    pathname.startsWith("/dm/") ||
+    pathname.startsWith("/market/deals/chat/") ||
+    pathname.startsWith("/buy-market/deals/chat/");
   const hideFloatingChatOnMobile = pathname === "/dm" || isChatRoomPage;
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -897,6 +909,7 @@ export default function MainLayout({
     const importantRoutes = [
       "/",
       "/market",
+      "/buy-market",
       "/box-market",
       "/market/deals",
       "/rewards",
@@ -972,6 +985,7 @@ export default function MainLayout({
   }, [mobileNavOpen]);
 
   const pageContext = useMemo(() => {
+    if (pathname.startsWith("/buy-market")) return "ตลาดรับซื้อการ์ดใบเดียว";
     if (pathname.startsWith("/box-market")) return "ร้านขายซอง/กล่องการ์ดแท้";
     if (pathname.startsWith("/market")) return t("layout.page.market");
     if (pathname.startsWith("/collections")) return t("layout.page.collections");
@@ -992,6 +1006,12 @@ export default function MainLayout({
         label: t("layout.nav.market"),
         icon: ShoppingBag,
         active: pathname.startsWith("/market"),
+      },
+      {
+        href: "/buy-market",
+        label: "รับซื้อการ์ด",
+        icon: BadgeDollarSign,
+        active: pathname.startsWith("/buy-market"),
       },
       {
         href: "/box-market",

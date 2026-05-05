@@ -24,6 +24,7 @@ export type DealChatCard = {
 export type DealChatDeal = {
   id: string;
   offeredPrice: number;
+  mode: "sell" | "buy";
 };
 
 export type DealChatBootstrap =
@@ -147,8 +148,13 @@ export async function getDealChatBootstrap(input: {
       cardName: true,
       imageUrl: true,
       price: true,
+      status: true,
     },
   });
+  const dealMode =
+    String(listing?.status || "").trim().toLowerCase() === "wanted"
+      ? "buy"
+      : "sell";
 
   const roomId = getDealChatRoomId(deal.id);
 
@@ -188,6 +194,7 @@ export async function getDealChatBootstrap(input: {
     deal: {
       id: deal.id,
       offeredPrice: Number(deal.offeredPrice || 0),
+      mode: dealMode,
     },
     card: {
       id: deal.cardId,

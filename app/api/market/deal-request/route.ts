@@ -69,9 +69,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (String(listing.status || "").toLowerCase() === "sold") {
+    const listingStatus = String(listing.status || "").toLowerCase();
+
+    if (listingStatus === "wanted") {
       return NextResponse.json(
-        { error: "การ์ดใบนี้ขายไปแล้ว" },
+        { error: "โพสต์นี้เป็นโหมดรับซื้อ ให้ส่งข้อเสนอผ่านหน้ารับซื้อ" },
+        { status: 400 }
+      );
+    }
+
+    if (listingStatus !== "active") {
+      return NextResponse.json(
+        { error: "การ์ดใบนี้ไม่พร้อมขายแล้ว" },
         { status: 400 }
       );
     }

@@ -25,6 +25,7 @@ export type DMRoomListItem = {
   dealCardImage?: string;
   dealCardNo?: string;
   dealPrice?: number;
+  dealMode?: "sell" | "buy";
   sellerName?: string;
   sellerImage?: string;
 };
@@ -316,6 +317,7 @@ export async function getDmRoomsForUser(
         cardNo: true,
         imageUrl: true,
         price: true,
+        status: true,
       },
     })
     : [];
@@ -398,6 +400,10 @@ export async function getDmRoomsForUser(
     const other = isBuyer ? deal.seller : deal.buyer;
     const seller = deal.seller;
     const card = dealCardById.get(deal.cardId);
+    const dealMode =
+      String(card?.status || "").trim().toLowerCase() === "wanted"
+        ? "buy"
+        : "sell";
     const cardName =
       String(card?.cardName || "").trim() ||
       `Card #${String(card?.cardNo || "").padStart(3, "0")}`;
@@ -421,6 +427,7 @@ export async function getDmRoomsForUser(
       dealCardImage: resolveCardDisplayImage(card?.cardNo || "001", card?.imageUrl),
       dealCardNo: String(card?.cardNo || "001").padStart(3, "0"),
       dealPrice: Number(deal.offeredPrice || card?.price || 0),
+      dealMode,
       sellerName: seller.displayName || seller.name || "Seller",
       sellerImage: safeImage(seller.image),
     };

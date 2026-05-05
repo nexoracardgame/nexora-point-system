@@ -66,6 +66,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const listing = await prisma.marketListing.findUnique({
+      where: {
+        id: deal.cardId,
+      },
+      select: {
+        status: true,
+      },
+    });
+
+    if (String(listing?.status || "").trim().toLowerCase() === "wanted") {
+      return NextResponse.json(
+        { error: "ดีลนี้เป็นโหมดรับซื้อ ให้จัดการจากหน้ารับซื้อ" },
+        { status: 400 }
+      );
+    }
+
     if (action === "reject") {
       await cleanupDealChat(deal.id).catch(() => undefined);
 

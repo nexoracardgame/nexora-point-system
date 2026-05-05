@@ -155,6 +155,15 @@ function getChatNotificationRoomId(item: NotificationItem) {
     return `deal:${segments[3]}`;
   }
 
+  if (
+    segments[0] === "buy-market" &&
+    segments[1] === "deals" &&
+    segments[2] === "chat" &&
+    segments[3]
+  ) {
+    return `deal:${segments[3]}`;
+  }
+
   return "";
 }
 

@@ -20,6 +20,7 @@ type DealRoomMeta = DirectRoomMeta & {
   deal?: {
     id: string;
     offeredPrice: number;
+    mode?: "sell" | "buy";
   } | null;
 };
 

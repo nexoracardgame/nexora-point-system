@@ -56,6 +56,7 @@ type ActiveFloatingRoom = FloatingRoom & {
   deal?: {
     id: string;
     offeredPrice: number;
+    mode?: "sell" | "buy";
   } | null;
 };
 
@@ -544,6 +545,8 @@ export default function FloatingChatDock({
     ): ActiveFloatingRoom => {
       const safeDealId = safeText(room.dealId || room.roomId);
       const dealCardNo = safeText(room.dealCardNo) || "001";
+      const dealMode: "buy" | "sell" =
+        room.dealMode === "buy" ? "buy" : "sell";
       const fallbackCard =
         room.kind === "deal"
           ? {
@@ -559,6 +562,7 @@ export default function FloatingChatDock({
           ? {
               id: safeDealId,
               offeredPrice: Number(room.dealPrice || 0),
+              mode: dealMode,
             }
           : null;
 
@@ -1513,7 +1517,9 @@ export default function FloatingChatDock({
                           <span
                             className={`absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
                               room.kind === "deal"
-                                ? "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
+                                ? room.dealMode === "buy"
+                                  ? "bg-white text-black shadow-[0_0_12px_rgba(255,255,255,0.28)]"
+                                  : "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
                                 : "bg-white text-black"
                             }`}
                           >
@@ -1543,6 +1549,7 @@ export default function FloatingChatDock({
                           </span>
                           {room.kind === "deal" ? (
                             <span className="mt-0.5 block truncate text-[11px] font-bold text-cyan-200/70">
+                              {room.dealMode === "buy" ? "รับซื้อ · " : ""}
                               #{safeText(room.dealCardNo) || "001"}{" "}
                               {room.dealCardName || "ดีลการ์ด"}{" "}
                               {formatPrice(room.dealPrice)}
@@ -1615,7 +1622,9 @@ export default function FloatingChatDock({
                       <span
                         className={`absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
                           activeRoom.kind === "deal"
-                            ? "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
+                            ? activeRoom.dealMode === "buy"
+                              ? "bg-white text-black shadow-[0_0_12px_rgba(255,255,255,0.28)]"
+                              : "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
                             : "bg-white text-black"
                         }`}
                       >
@@ -1656,7 +1665,9 @@ export default function FloatingChatDock({
                         <span className="text-white/22">·</span>
                         <span className="truncate text-white/42">
                           {activeRoom.kind === "deal"
-                            ? `ดีลการ์ด #${activeDealCardNo}`
+                            ? activeRoom.dealMode === "buy"
+                              ? `ดีลรับซื้อ #${activeDealCardNo}`
+                              : `ดีลการ์ด #${activeDealCardNo}`
                             : "แชทส่วนตัว"}
                         </span>
                       </span>
@@ -1677,7 +1688,7 @@ export default function FloatingChatDock({
                       </div>
                       <div className="min-w-0 text-left">
                         <div className="truncate text-[9px] font-black text-cyan-100/65 sm:text-[10px]">
-                          #{activeDealCardNo}
+                          {activeRoom.dealMode === "buy" ? "BUY" : `#${activeDealCardNo}`}
                         </div>
                         <div className="truncate text-[11px] font-black text-cyan-100 sm:text-sm">
                           {formatPrice(activeRoom.deal?.offeredPrice || activeRoom.dealPrice)}

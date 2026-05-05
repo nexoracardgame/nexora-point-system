@@ -37,6 +37,7 @@ type DealCardInfo = {
 type DealInfo = {
   id: string;
   offeredPrice: number;
+  mode?: "sell" | "buy";
 };
 
 type DealRoomCacheMeta = {
@@ -157,6 +158,8 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     [file]
   );
   const otherOnline = isOnline(other?.id);
+  const isBuyDeal = deal?.mode === "buy";
+  const dealListHref = isBuyDeal ? "/buy-market/deals" : "/market/deals";
 
   useEffect(() => {
     draftTextRef.current = text;
@@ -1170,7 +1173,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         <div className="sticky top-0 z-20 border-b border-white/10 bg-black/75 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-[980px] items-center gap-3 px-3 py-3 sm:px-4">
             <button
-              onClick={() => router.push("/market/deals")}
+              onClick={() => router.push(dealListHref)}
               className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
             >
               <ArrowLeft size={20} />
@@ -1195,15 +1198,21 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                 </div>
 
                 <div className="truncate text-xs text-white/45">
-                  ดีลการ์ด {card.name} #{card.no}
+                  {isBuyDeal ? "ดีลรับซื้อ" : "ดีลการ์ด"} {card.name} #{card.no}
                 </div>
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-bold text-amber-200 sm:px-3 sm:text-[11px]">
-                    ราคาตั้งขาย {formatPrice(card.listedPrice)}
+                  <div
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-bold sm:px-3 sm:text-[11px] ${
+                      isBuyDeal
+                        ? "border-white/20 bg-white/10 text-white"
+                        : "border-amber-300/20 bg-amber-300/10 text-amber-200"
+                    }`}
+                  >
+                    {isBuyDeal ? "โหมดรับซื้อ" : `ราคาตั้งขาย ${formatPrice(card.listedPrice)}`}
                   </div>
                   <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-bold text-cyan-200 sm:px-3 sm:text-[11px]">
-                    ราคาดีล {formatPrice(deal.offeredPrice)}
+                    {isBuyDeal ? "ราคาเสนอขาย" : "ราคาดีล"} {formatPrice(deal.offeredPrice)}
                   </div>
                 </div>
 
@@ -1259,23 +1268,25 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                   <div className="truncate text-sm font-black text-white">
                     {card.name}
                   </div>
-                  <div className="text-xs text-cyan-300">ห้องดีลของการ์ดใบนี้เท่านั้น</div>
+                  <div className="text-xs text-cyan-300">
+                    {isBuyDeal ? "ห้องดีลรับซื้อ แยกจากดีลขายการ์ดใบเดียว" : "ห้องดีลของการ์ดใบนี้เท่านั้น"}
+                  </div>
                 </div>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3">
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                    ราคาตั้งขาย
+                    {isBuyDeal ? "โหมด" : "ราคาตั้งขาย"}
                   </div>
                   <div className="mt-1 text-sm font-black text-amber-300 sm:text-base">
-                    {formatPrice(card.listedPrice)}
+                    {isBuyDeal ? "รับซื้อ" : formatPrice(card.listedPrice)}
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/10 p-3">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/70">
-                    ราคาขอดีล
+                    {isBuyDeal ? "ราคาเสนอขาย" : "ราคาขอดีล"}
                   </div>
                   <div className="mt-1 text-sm font-black text-cyan-200 sm:text-base">
                     {formatPrice(deal.offeredPrice)}

@@ -97,6 +97,9 @@ export async function getMarketDealsForUser(
 
   return deals.map((deal) => {
     const listing = listingMap.get(deal.cardId);
+    if (String(listing?.status || "").trim().toLowerCase() === "wanted") {
+      return null;
+    }
     const cardNo = String(listing?.cardNo || "001");
 
     return {
@@ -126,5 +129,5 @@ export async function getMarketDealsForUser(
       cardImage: resolveCardDisplayImage(cardNo, listing?.imageUrl),
       listingStatus: String(listing?.status || "active"),
     };
-  });
+  }).filter((deal): deal is DealCard => Boolean(deal));
 }
