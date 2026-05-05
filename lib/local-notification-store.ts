@@ -4,6 +4,7 @@ import {
   writeLocalStoreJson,
 } from "@/lib/local-store-dir";
 import { prisma } from "@/lib/prisma";
+import { sendPushNotificationToUser } from "@/lib/push-notification-store";
 
 export type LocalNotificationType = "deal" | "wishlist" | "friend" | "wallet";
 
@@ -83,6 +84,18 @@ async function writeStore(items: LocalNotificationRecord[]) {
   );
 }
 
+async function deliverLocalNotificationPush(notification: LocalNotificationRecord) {
+  await sendPushNotificationToUser(notification.userId, {
+    id: notification.id,
+    title: notification.title,
+    body: notification.body,
+    href: notification.href,
+    icon: notification.image,
+    tag: notification.id,
+    type: notification.type,
+  }).catch(() => undefined);
+}
+
 export async function getLocalNotificationsForUser(
   userId: string,
   options?: {
@@ -132,7 +145,9 @@ export async function createLocalNotification(
       input.image || "/avatar.png",
       JSON.stringify(input.meta || null)
     );
-    return normalizeDbNotification(rows[0]);
+    const notification = normalizeDbNotification(rows[0]);
+    await deliverLocalNotificationPush(notification);
+    return notification;
   } catch {
     // Local fallback below.
   }
@@ -148,6 +163,7 @@ export async function createLocalNotification(
 
   items.unshift(notification);
   await writeStore(items);
+  await deliverLocalNotificationPush(notification);
   return notification;
 }
 

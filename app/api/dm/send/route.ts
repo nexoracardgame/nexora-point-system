@@ -6,6 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDmRoomAccess } from "@/lib/dm-access";
+import type { DmAccessResult } from "@/lib/dm-access";
+import { prisma } from "@/lib/prisma";
+import { sendPushNotificationToUser } from "@/lib/push-notification-store";
 import { resolveUserIdentity } from "@/lib/user-identity";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -21,6 +24,47 @@ function getImageExtension(contentType: string) {
   if (contentType === "image/webp") return ".webp";
   if (contentType === "image/gif") return ".gif";
   return ".jpg";
+}
+
+function buildMessagePreview(content?: string | null, imageUrl?: string | null) {
+  const text = String(content || "").trim();
+  if (text) return text;
+  if (imageUrl) return "ส่งรูปภาพ";
+  return "ส่งข้อความ";
+}
+
+async function getChatPushHref(access: Extract<DmAccessResult, { ok: true }>) {
+  if (access.kind === "direct") {
+    return `/dm/${encodeURIComponent(access.roomId)}`;
+  }
+
+  try {
+    const deal = await prisma.dealRequest.findUnique({
+      where: {
+        id: access.dealId,
+      },
+      select: {
+        cardId: true,
+      },
+    });
+    const listing = deal?.cardId
+      ? await prisma.marketListing.findUnique({
+          where: {
+            id: deal.cardId,
+          },
+          select: {
+            status: true,
+          },
+        })
+      : null;
+    const isBuyDeal =
+      String(listing?.status || "").trim().toLowerCase() === "wanted";
+    const basePath = isBuyDeal ? "/buy-market/deals/chat" : "/market/deals/chat";
+
+    return `${basePath}/${encodeURIComponent(access.dealId)}`;
+  } catch {
+    return `/market/deals/chat/${encodeURIComponent(access.dealId)}`;
+  }
 }
 
 async function readPayload(req: NextRequest): Promise<SendPayload> {
@@ -184,6 +228,18 @@ export async function POST(req: NextRequest) {
     console.error("SEND DM API ERROR:", error);
     return NextResponse.json({ error: "send failed" }, { status: 500 });
   }
+
+  await sendPushNotificationToUser(access.otherUserId, {
+    id: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
+    title: identity.name,
+    body: buildMessagePreview(content, imageUrl),
+    href: await getChatPushHref(access),
+    icon: identity.image,
+    tag: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
+    type: "chat",
+  }).catch((pushError) => {
+    console.error("SEND DM PUSH NOTIFICATION ERROR:", pushError);
+  });
 
   void supabase
     .from("dm_room")

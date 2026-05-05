@@ -6,28 +6,48 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("push", (event) => {
+async function readPushPayload(event) {
   if (!event.data) {
-    return;
+    return {};
   }
 
   try {
-    const payload = event.data.json();
-
-    event.waitUntil(
-      self.registration.showNotification(payload.title || "NEXORA", {
-        body: payload.body || "",
-        icon: payload.icon || "/icon-192.png",
-        badge: "/icon-192.png",
-        data: {
-          href: payload.href || "/",
-          id: payload.id || "",
-        },
-      })
-    );
+    return event.data.json();
   } catch {
-    return;
+    try {
+      return JSON.parse(event.data.text());
+    } catch {
+      return {};
+    }
   }
+}
+
+async function showPushNotification(payload) {
+  const title = String(payload.title || "NEXORA").trim() || "NEXORA";
+  const body = String(payload.body || "").trim();
+  const id = String(payload.id || "").trim();
+  const href = String(payload.href || "/").trim() || "/";
+  const icon = String(payload.icon || payload.image || "/icon-192.png").trim();
+  const tag = String(payload.tag || id || href || "nexora-push").trim();
+
+  await self.registration.showNotification(title, {
+    body,
+    icon: icon || "/icon-192.png",
+    badge: "/icon-192.png",
+    tag,
+    renotify: true,
+    timestamp: Date.now(),
+    data: {
+      href,
+      id,
+    },
+  });
+}
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    readPushPayload(event).then((payload) => showPushNotification(payload || {}))
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

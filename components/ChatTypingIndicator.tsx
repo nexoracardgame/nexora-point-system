@@ -29,11 +29,11 @@ export default function ChatTypingIndicator({
           />
         ) : null}
         <div className="flex flex-col items-start gap-1">
-          <div className="flex items-center gap-1 rounded-[20px] border border-white/10 bg-white/[0.10] px-3.5 py-2.5 shadow-lg">
-            <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-white/92 [animation-delay:-240ms]" />
-            <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-white/78 [animation-delay:-120ms]" />
-            <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-white/64" />
-            <span className="h-2.5 w-3.5 animate-pulse rounded-full bg-white/42" />
+          <div className="flex items-center gap-0.5 rounded-[16px] border border-white/10 bg-white/[0.10] px-2.5 py-1.5 shadow-lg">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/92 [animation-delay:-240ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/78 [animation-delay:-120ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/64" />
+            <span className="h-1.5 w-2 animate-pulse rounded-full bg-white/42" />
           </div>
           <div className="px-1 text-[10px] font-bold text-white/38">
             อีกฝ่ายกำลังพิมพ์

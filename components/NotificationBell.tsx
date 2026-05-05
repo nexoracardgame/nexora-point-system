@@ -34,6 +34,15 @@ type NotificationResponse = {
   items: NotificationItem[];
 };
 
+type BrowserPushSubscriptionJson = {
+  endpoint?: string;
+  expirationTime?: number | null;
+  keys?: {
+    p256dh?: string;
+    auth?: string;
+  };
+};
+
 const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
 const NOTIFICATION_POLL_TICK_MS = 1000;
 const NOTIFICATION_REALTIME_FALLBACK_MS = 15000;
@@ -46,6 +55,34 @@ function isSystemNotificationSupported() {
     "Notification" in window &&
     "serviceWorker" in navigator
   );
+}
+
+function isPushSubscriptionSupported() {
+  return (
+    isSystemNotificationSupported() &&
+    "PushManager" in window &&
+    "ServiceWorkerRegistration" in window &&
+    "pushManager" in ServiceWorkerRegistration.prototype
+  );
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+}
+
+function serializePushSubscription(subscription: PushSubscription) {
+  return subscription.toJSON() as BrowserPushSubscriptionJson;
 }
 
 function getBrowserClockMs() {
@@ -269,6 +306,8 @@ export default function NotificationBell() {
   const requestIdRef = useRef(0);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
+  const pushSubscriptionSyncRef = useRef<Promise<void> | null>(null);
+  const pushSubscriptionReadyRef = useRef(false);
   const burstTimeoutsRef = useRef<number[]>([]);
   const lastNotificationLoadAtRef = useRef(0);
   const realtimeConnectedRef = useRef(false);
@@ -325,6 +364,95 @@ export default function NotificationBell() {
     }
   };
 
+  const syncPushSubscription = async (
+    registrationInput?: ServiceWorkerRegistration | null
+  ) => {
+    if (!isPushSubscriptionSupported()) {
+      return;
+    }
+
+    if (Notification.permission !== "granted") {
+      return;
+    }
+
+    if (pushSubscriptionReadyRef.current) {
+      return;
+    }
+
+    if (pushSubscriptionSyncRef.current) {
+      await pushSubscriptionSyncRef.current;
+      return;
+    }
+
+    pushSubscriptionSyncRef.current = (async () => {
+      const registration =
+        registrationInput ||
+        swRegistrationRef.current ||
+        (await navigator.serviceWorker.ready);
+      swRegistrationRef.current = registration;
+
+      const keyRes = await fetch("/api/push/public-key", {
+        cache: "no-store",
+      });
+      const keyData = await keyRes.json().catch(() => ({}));
+      const publicKey = String(keyData?.publicKey || "").trim();
+
+      if (!keyRes.ok || !publicKey) {
+        return;
+      }
+
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      const serialized = serializePushSubscription(subscription);
+
+      if (
+        !serialized.endpoint ||
+        !serialized.keys?.p256dh ||
+        !serialized.keys?.auth
+      ) {
+        return;
+      }
+
+      const saveRes = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subscription: serialized,
+        }),
+        cache: "no-store",
+      });
+
+      if (saveRes.ok) {
+        pushSubscriptionReadyRef.current = true;
+      }
+    })()
+      .catch(async (error) => {
+        if (
+          error instanceof DOMException &&
+          error.name === "InvalidStateError" &&
+          registrationInput?.pushManager
+        ) {
+          const staleSubscription =
+            await registrationInput.pushManager.getSubscription();
+          await staleSubscription?.unsubscribe().catch(() => false);
+        }
+      })
+      .finally(() => {
+        pushSubscriptionSyncRef.current = null;
+      });
+
+    await pushSubscriptionSyncRef.current;
+  };
+
   const requestSystemNotificationPermission = async () => {
     if (!isSystemNotificationSupported()) {
       return;
@@ -337,6 +465,7 @@ export default function NotificationBell() {
     try {
       const result = await Notification.requestPermission();
       if (result === "granted") {
+        await syncPushSubscription();
         void loadNotifications();
       }
     } catch {
@@ -525,6 +654,9 @@ export default function NotificationBell() {
         }
 
         swRegistrationRef.current = registration;
+        if (Notification.permission === "granted") {
+          void syncPushSubscription(registration);
+        }
       })
       .catch(() => undefined);
 
