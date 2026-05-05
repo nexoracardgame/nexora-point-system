@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingExcludes: {
+    "/box-market": ["./public/**/*"],
+    "/api/box-market": ["./public/**/*"],
+    "/api/box-market/verify": ["./public/**/*"],
+  },
   images: {
     remotePatterns: [
       {

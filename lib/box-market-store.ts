@@ -1,13 +1,10 @@
 import "server-only";
 
 import { createHash } from "crypto";
-import { promises as fs } from "fs";
-import path from "path";
 import { prisma } from "@/lib/prisma";
 import {
   BOX_PRODUCT_PUBLIC_DIR,
   type BoxMarketListing,
-  type BoxProductAsset,
   type BoxProductType,
   type DealerVerificationStatus,
 } from "@/lib/box-market-types";
@@ -365,21 +362,4 @@ export async function createBoxMarketListing(
     await writeLocalListings([listing, ...(await readLocalListings())]);
     return listing;
   }
-}
-
-export async function getBoxProductAssets(): Promise<BoxProductAsset[]> {
-  const dir = path.join(process.cwd(), "public", BOX_PRODUCT_PUBLIC_DIR);
-  const entries = await fs
-    .readdir(dir, { withFileTypes: true })
-    .catch(() => []);
-
-  return entries
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((name) => /\.(png|jpe?g|webp)$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, "th"))
-    .map((name) => ({
-      name,
-      url: `/${BOX_PRODUCT_PUBLIC_DIR}/${encodeURIComponent(name)}`,
-    }));
 }
