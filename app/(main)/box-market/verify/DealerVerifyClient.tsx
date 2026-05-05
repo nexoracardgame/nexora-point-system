@@ -181,6 +181,19 @@ export default function DealerVerifyClient() {
                 Dealer Form
               </div>
               <h2 className="mt-1 text-2xl font-black">ข้อมูลตัวแทน</h2>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <p className="max-w-xl text-sm font-bold leading-6 text-black/50">
+                  ต้องเป็นข้อมูลจริงที่ได้รับการลงทะเบียนกับบริษัทเป็นทางการเท่านั้น
+                </p>
+                <a
+                  href="https://www.nexoracardgame.com/contact"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-fit items-center justify-center rounded-full bg-black px-4 py-2 text-xs font-black text-white transition hover:bg-zinc-800"
+                >
+                  ดูรายละเอียด
+                </a>
+              </div>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-black text-white">
               <IdCard className="h-5 w-5" />
@@ -214,7 +227,7 @@ export default function DealerVerifyClient() {
             <label className="block">
               <span className="mb-2 flex items-center gap-2 text-xs font-black text-black/62">
                 <Phone className="h-3.5 w-3.5" />
-                เบอร์โทรที่ลงทะเบียน
+                เบอร์มือถือ
               </span>
               <input
                 value={form.phone}
@@ -252,7 +265,7 @@ export default function DealerVerifyClient() {
 
             <label className="block">
               <span className="mb-2 block text-xs font-black text-black/62">
-                อีเมล
+                E-mail
               </span>
               <input
                 value={form.email}
