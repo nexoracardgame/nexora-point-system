@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeDollarSign,
   Heart,
@@ -16,9 +16,98 @@ import SafeCardImage from "@/components/SafeCardImage";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
 
 const BUY_WISHLIST_KEY = "nexora_buy_wishlist";
+const BUY_SEEN_STORAGE_PREFIX = "nexora:buy-market-seen-listings";
+const MAX_SEEN_BUY_LISTING_IDS = 2000;
 
 function formatPrice(value?: number | null) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
+}
+
+function formatBuyPostedAt(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${new Intl.DateTimeFormat("th-TH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Bangkok",
+  }).format(date)} น.`;
+}
+
+function getBuyListingIds(items: BuyMarketListing[]) {
+  return items
+    .map((item) => String(item.id || "").trim())
+    .filter(Boolean);
+}
+
+function buildBuySeenStorageKey(viewerKey?: string | null) {
+  const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
+  return `${BUY_SEEN_STORAGE_PREFIX}:${safeViewerKey}`;
+}
+
+function readSeenBuyListingIdArray(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) return [];
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as { ids?: unknown[] }).ids)
+    ) {
+      return (parsed as { ids: unknown[] }).ids.map(String).filter(Boolean);
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
+function readSeenBuyListingIds(storageKey: string) {
+  return new Set(readSeenBuyListingIdArray(storageKey));
+}
+
+function hasSeenBuyListingSnapshot(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) return false;
+
+  try {
+    return window.localStorage.getItem(storageKey) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function rememberSeenBuyListingIds(storageKey: string, ids: string[]) {
+  if (typeof window === "undefined" || !storageKey) return;
+
+  const nextIds = Array.from(
+    new Set([
+      ...ids.map(String).filter(Boolean),
+      ...readSeenBuyListingIdArray(storageKey),
+    ])
+  ).slice(0, MAX_SEEN_BUY_LISTING_IDS);
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(nextIds));
+  } catch {}
 }
 
 function readFollowedIds() {
@@ -74,12 +163,97 @@ export default function BuyMarketClient({
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [followedIds, setFollowedIds] = useState<Set<string>>(() => new Set());
+  const [freshListingIds, setFreshListingIds] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<BuyMarketListing | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const listingIdsRef = useRef(new Set(getBuyListingIds(initialListings)));
+  const seenListingIdsRef = useRef<Set<string>>(new Set());
+  const seenStorageKeyRef = useRef("");
+  const initializedSeenStorageKeyRef = useRef<string | null>(null);
+  const buySeenBaselineReadyRef = useRef(initialListings.length > 0);
+  const viewerSeenStorageKey = useMemo(
+    () => buildBuySeenStorageKey(currentUser.id),
+    [currentUser.id]
+  );
 
   useEffect(() => {
     setFollowedIds(readFollowedIds());
+  }, []);
+
+  useEffect(() => {
+    seenStorageKeyRef.current = viewerSeenStorageKey;
+  }, [viewerSeenStorageKey]);
+
+  useEffect(() => {
+    if (!viewerSeenStorageKey) return;
+    if (initializedSeenStorageKeyRef.current === viewerSeenStorageKey) return;
+
+    const currentIds = getBuyListingIds(listings);
+    const hadSeenSnapshot = hasSeenBuyListingSnapshot(viewerSeenStorageKey);
+    const storedSeenIds = readSeenBuyListingIds(viewerSeenStorageKey);
+    const unseenIds = hadSeenSnapshot
+      ? currentIds.filter((id) => !storedSeenIds.has(id))
+      : [];
+    const nextSeenIds = new Set(storedSeenIds);
+    currentIds.forEach((id) => nextSeenIds.add(id));
+
+    listingIdsRef.current = new Set(currentIds);
+    seenListingIdsRef.current = nextSeenIds;
+    initializedSeenStorageKeyRef.current = viewerSeenStorageKey;
+    buySeenBaselineReadyRef.current = true;
+    setFreshListingIds(unseenIds);
+
+    window.setTimeout(() => {
+      rememberSeenBuyListingIds(viewerSeenStorageKey, currentIds);
+    }, 0);
+  }, [listings, viewerSeenStorageKey]);
+
+  const absorbListings = useCallback((nextListings: BuyMarketListing[]) => {
+    const currentIds = getBuyListingIds(nextListings);
+    const storageKey = seenStorageKeyRef.current;
+    const hasSeenBaseline =
+      Boolean(storageKey && hasSeenBuyListingSnapshot(storageKey)) ||
+      seenListingIdsRef.current.size > 0 ||
+      buySeenBaselineReadyRef.current ||
+      listingIdsRef.current.size > 0;
+    const storedSeenIds = storageKey
+      ? readSeenBuyListingIds(storageKey)
+      : new Set<string>();
+    const knownIds = new Set([
+      ...Array.from(storedSeenIds),
+      ...Array.from(seenListingIdsRef.current),
+      ...Array.from(listingIdsRef.current),
+    ]);
+    const newIds = hasSeenBaseline
+      ? currentIds.filter((id) => !knownIds.has(id))
+      : [];
+
+    currentIds.forEach((id) => knownIds.add(id));
+    seenListingIdsRef.current = knownIds;
+    listingIdsRef.current = new Set(currentIds);
+    buySeenBaselineReadyRef.current = true;
+
+    if (storageKey) {
+      window.setTimeout(() => {
+        rememberSeenBuyListingIds(storageKey, currentIds);
+      }, 0);
+    }
+
+    setListings(nextListings);
+    setFreshListingIds((previousIds) => {
+      const visibleFreshIds = previousIds.filter((id) => currentIds.includes(id));
+
+      if (newIds.length === 0) {
+        return visibleFreshIds.length === previousIds.length
+          ? previousIds
+          : visibleFreshIds;
+      }
+
+      const nextFreshIds = new Set(visibleFreshIds);
+      newIds.forEach((id) => nextFreshIds.add(id));
+      return Array.from(nextFreshIds);
+    });
   }, []);
 
   useEffect(() => {
@@ -95,7 +269,7 @@ export default function BuyMarketClient({
         const data = await res.json();
 
         if (!cancelled && Array.isArray(data?.listings)) {
-          setListings(data.listings);
+          absorbListings(data.listings);
         }
       } catch {
         return;
@@ -123,7 +297,7 @@ export default function BuyMarketClient({
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [absorbListings]);
 
   const filteredListings = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -174,6 +348,10 @@ export default function BuyMarketClient({
 
       setListings((current) =>
         current.filter((item) => item.id !== deleteTarget.id)
+      );
+      listingIdsRef.current.delete(deleteTarget.id);
+      setFreshListingIds((current) =>
+        current.filter((id) => id !== deleteTarget.id)
       );
       setFollowedIds((current) => {
         const next = new Set(current);
@@ -277,12 +455,15 @@ export default function BuyMarketClient({
                 type="button"
                 onClick={async () => {
                   setRefreshing(true);
-                  const res = await fetch(`/api/buy-market/listings?ts=${Date.now()}`, {
-                    cache: "no-store",
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (Array.isArray(data?.listings)) setListings(data.listings);
-                  setRefreshing(false);
+                  try {
+                    const res = await fetch(`/api/buy-market/listings?ts=${Date.now()}`, {
+                      cache: "no-store",
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (Array.isArray(data?.listings)) absorbListings(data.listings);
+                  } finally {
+                    setRefreshing(false);
+                  }
                 }}
                 className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-black text-white"
                 aria-label="Refresh buy posts"
@@ -301,11 +482,17 @@ export default function BuyMarketClient({
               {filteredListings.map((listing) => {
                 const followed = followedIds.has(listing.id);
                 const canAdminDelete = currentUser.isAdmin;
+                const isFreshListing = freshListingIds.includes(listing.id);
+                const postedAt = formatBuyPostedAt(listing.createdAt);
 
                 return (
                   <article
                     key={listing.id}
-                    className="group overflow-hidden rounded-[24px] border border-black/8 bg-[#f5f5f6] transition duration-300 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_24px_60px_rgba(0,0,0,0.16)]"
+                    className={`group overflow-hidden rounded-[24px] border border-black/8 bg-[#f5f5f6] transition duration-300 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_24px_60px_rgba(0,0,0,0.16)] ${
+                      isFreshListing
+                        ? "animate-[pulse_1.4s_ease-in-out_3] ring-2 ring-emerald-300/50"
+                        : ""
+                    }`}
                   >
                     <Link href={`/buy-market/card/${listing.id}`} className="block">
                       <div className="relative aspect-[2.5/3.35] overflow-hidden bg-white">
@@ -316,8 +503,15 @@ export default function BuyMarketClient({
                           className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/10 to-transparent" />
-                        <div className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-[10px] font-black text-black">
-                          BUY MODE
+                        <div className="absolute left-2 top-2 flex flex-col items-start gap-1 sm:left-3 sm:top-3">
+                          {isFreshListing ? (
+                            <span className="rounded-full border border-emerald-200/50 bg-emerald-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(110,231,183,0.45)]">
+                              NEW
+                            </span>
+                          ) : null}
+                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-black shadow-[0_10px_26px_rgba(0,0,0,0.18)]">
+                            BUY MODE
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -358,12 +552,17 @@ export default function BuyMarketClient({
                           className="h-7 w-7 shrink-0 rounded-xl object-cover sm:h-9 sm:w-9 sm:rounded-2xl"
                         />
                         <div className="min-w-0">
-                        <div className="truncate text-[11px] font-black text-black/70 sm:text-xs">
-                          ผู้รับซื้อ: {listing.buyerName}
-                        </div>
-                        <div className="mt-0.5 text-[11px] font-bold text-black/40">
-                          Card #{listing.cardNo}
-                        </div>
+                          <div className="truncate text-[11px] font-black text-black/70 sm:text-xs">
+                            ผู้รับซื้อ: {listing.buyerName}
+                          </div>
+                          <div className="mt-0.5 text-[11px] font-bold text-black/40">
+                            Card #{listing.cardNo}
+                          </div>
+                          {postedAt ? (
+                            <div className="mt-0.5 truncate text-[10px] font-black text-black/34">
+                              ลงรับซื้อ {postedAt}
+                            </div>
+                          ) : null}
                         </div>
                       </Link>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -392,12 +591,12 @@ export default function BuyMarketClient({
                           <Heart className={`h-3.5 w-3.5 ${followed ? "fill-white" : ""}`} />
                           {followed ? "ติดตามแล้ว" : "ติดตาม"}
                         </button>
-                      <Link
-                        href={`/buy-market/card/${listing.id}`}
-                        className="shrink-0 rounded-full bg-black px-3 py-2 text-center text-[11px] font-black text-white"
-                      >
-                        เสนอขาย
-                      </Link>
+                        <Link
+                          href={`/buy-market/card/${listing.id}`}
+                          className="shrink-0 rounded-full bg-black px-3 py-2 text-center text-[11px] font-black text-white"
+                        >
+                          เสนอขาย
+                        </Link>
                       </div>
                     </div>
                   </article>
