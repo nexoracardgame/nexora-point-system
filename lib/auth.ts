@@ -353,6 +353,30 @@ function markTokenRevoked(appToken: AppToken) {
   return appToken;
 }
 
+function hydrateTokenFromDbUser(appToken: AppToken, dbUser: DbUserSnapshot) {
+  appToken.id = dbUser.id;
+  appToken.lineId = dbUser.lineId;
+  appToken.role = dbUser.role || appToken.role || "USER";
+  appToken.nexPoint = Number(dbUser.nexPoint || 0);
+  appToken.coin = Number(dbUser.coin || 0);
+  appToken.sessionVersion = Math.max(1, Number(dbUser.sessionVersion || 1));
+  appToken.sessionIssuedAt = Math.max(
+    0,
+    Number(
+      appToken.sessionIssuedAt ||
+        (typeof appToken.iat === "number" ? appToken.iat * 1000 : 0) ||
+        Date.now()
+    )
+  );
+  appToken.sessionRevoked = false;
+  appToken.name = dbUser.name || appToken.name || "NEXORA User";
+  appToken.picture = getSafeSessionImage(
+    dbUser.image || (typeof appToken.picture === "string" ? appToken.picture : null)
+  );
+
+  return appToken;
+}
+
 async function ensureDbUser(
   appToken: AppToken,
   profile: OAuthProfile,
@@ -579,28 +603,15 @@ export const authOptions: NextAuthOptions = {
           return markTokenRevoked(appToken);
         }
 
-        appToken.id = dbUser.id;
-        appToken.lineId = dbUser.lineId;
-        appToken.role = dbUser.role || appToken.role || "USER";
-        appToken.nexPoint = Number(dbUser.nexPoint || 0);
-        appToken.coin = Number(dbUser.coin || 0);
-        appToken.sessionVersion = Math.max(
-          1,
-          Number(dbUser.sessionVersion || 1)
-        );
-        appToken.sessionIssuedAt = Math.max(
-          0,
-          Number(
-            appToken.sessionIssuedAt ||
-              (typeof appToken.iat === "number" ? appToken.iat * 1000 : 0) ||
-              Date.now()
-          )
-        );
-        appToken.sessionRevoked = false;
-        appToken.name = dbUser.name || appToken.name || "NEXORA User";
-        appToken.picture = getSafeSessionImage(
-          dbUser.image || (typeof appToken.picture === "string" ? appToken.picture : null)
-        );
+        hydrateTokenFromDbUser(appToken, dbUser);
+      } else if (providerSubject && (appToken.id || appToken.lineId)) {
+        const fallbackUser =
+          (await findDbUserById(appToken.id)) ||
+          (await findDbUserByLineId(appToken.lineId));
+
+        if (fallbackUser && !isTokenSessionRevoked(appToken, fallbackUser)) {
+          return hydrateTokenFromDbUser(appToken, toDbUserSnapshot(fallbackUser));
+        }
       } else if (appToken.id || appToken.lineId || providerSubject) {
         const sessionState = await getUserSessionState(appToken.id || "");
 

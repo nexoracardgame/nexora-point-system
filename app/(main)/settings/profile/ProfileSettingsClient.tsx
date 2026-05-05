@@ -144,6 +144,7 @@ export default function ProfileSettingsClient({
       setLinkingProvider(provider);
       const startRes = await fetch("/api/auth/link/start", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -154,10 +155,7 @@ export default function ProfileSettingsClient({
         throw new Error("Unable to start account linking");
       }
 
-      const callbackUrl =
-        typeof window === "undefined"
-          ? "/settings/profile"
-          : `${window.location.origin}/settings/profile?linked=${provider}`;
+      const callbackUrl = `/settings/profile?linked=${provider}`;
 
       await signIn(provider, {
         redirect: true,
@@ -175,10 +173,26 @@ export default function ProfileSettingsClient({
       return;
     }
 
+    let isMounted = true;
+
     void fetch("/api/auth/link/finish", {
       method: "POST",
-    }).catch(() => undefined);
-  }, [searchParams]);
+      credentials: "include",
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        router.replace("/settings/profile", { scroll: false });
+        router.refresh();
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router, searchParams]);
 
   function stopCoverDragging() {
     isDragging.current = false;

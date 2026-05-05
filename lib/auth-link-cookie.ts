@@ -2,6 +2,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { getAuthProvider, type AuthProvider } from "@/lib/auth-identities";
 
 export const AUTH_LINK_COOKIE_NAME = "nexora_auth_link";
+export const AUTH_LINK_TTL_SECONDS = 10 * 60;
+
+const AUTH_LINK_TTL_MS = AUTH_LINK_TTL_SECONDS * 1000;
 
 type AuthLinkPayload = {
   userId: string;
@@ -44,7 +47,7 @@ export function createAuthLinkCookieValue(
   const payload: AuthLinkPayload = {
     userId,
     provider,
-    exp: Date.now() + 5 * 60 * 1000,
+    exp: Date.now() + AUTH_LINK_TTL_MS,
     nonce: randomBytes(12).toString("base64url"),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");

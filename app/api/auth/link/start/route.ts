@@ -4,16 +4,27 @@ import { authOptions } from "@/lib/auth";
 import { isAuthProvider } from "@/lib/auth-identities";
 import {
   AUTH_LINK_COOKIE_NAME,
+  AUTH_LINK_TTL_SECONDS,
   createAuthLinkCookieValue,
 } from "@/lib/auth-link-cookie";
 
-function cookieOptions() {
+function isSecureRequest(req: NextRequest) {
+  const forwardedProto = String(req.headers.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  const protocol = String(req.nextUrl.protocol || "").replace(":", "");
+
+  return forwardedProto === "https" || protocol === "https";
+}
+
+function cookieOptions(req: NextRequest) {
   return {
     httpOnly: true,
-    maxAge: 5 * 60,
+    maxAge: AUTH_LINK_TTL_SECONDS,
     path: "/",
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureRequest(req),
   };
 }
 
@@ -41,7 +52,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set(
       AUTH_LINK_COOKIE_NAME,
       createAuthLinkCookieValue(userId, provider),
-      cookieOptions()
+      cookieOptions(req)
     );
 
     return response;

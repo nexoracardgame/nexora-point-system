@@ -247,7 +247,6 @@ export default function DealerVerifyClient() {
                 onChange={(event) => updateField("nationalId", event.target.value)}
                 inputMode="text"
                 autoComplete="off"
-                placeholder="ใส่ได้ทั้ง 1-2345-67890-12-3 หรือ 1234567890123"
                 className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-black/35"
               />
             </label>
