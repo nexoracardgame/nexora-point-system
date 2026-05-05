@@ -76,11 +76,18 @@ type ChatSeenDetail = {
 };
 
 type OpenFloatingChatDetail = {
+  kind?: "direct" | "deal" | null;
   roomId?: string | null;
   userId?: string | null;
   userName?: string | null;
   userImage?: string | null;
   legacyRoomId?: string | null;
+  dealId?: string | null;
+  dealCardName?: string | null;
+  dealCardImage?: string | null;
+  dealCardNo?: string | null;
+  dealPrice?: number | string | null;
+  dealMode?: "sell" | "buy" | null;
 };
 
 const LIST_REFRESH_MS = 8500;
@@ -927,6 +934,69 @@ export default function FloatingChatDock({
     [buildRoomShell, currentUserId, openRoom, status, updateRoomCache]
   );
 
+  const openFloatingDealChat = useCallback(
+    async (detail: OpenFloatingChatDetail) => {
+      if (status !== "authenticated") {
+        return;
+      }
+
+      const rawRoomId = safeText(detail.roomId);
+      const dealId =
+        safeText(detail.dealId) ||
+        (rawRoomId.startsWith("deal:") ? rawRoomId.slice(5) : rawRoomId);
+
+      if (!dealId) {
+        return;
+      }
+
+      const roomId = rawRoomId.startsWith("deal:") ? rawRoomId : `deal:${dealId}`;
+      const now = new Date().toISOString();
+      const dealMode: "sell" | "buy" =
+        detail.dealMode === "buy" ? "buy" : "sell";
+      const cardNo = safeText(detail.dealCardNo) || "001";
+      const optimisticRoom = normalizeRoom({
+        kind: "deal",
+        roomId,
+        dealId,
+        otherUserId: safeText(detail.userId),
+        otherName: safeText(detail.userName) || "Deal Partner",
+        otherImage: safeText(detail.userImage) || "/avatar.png",
+        lastMessage:
+          dealMode === "buy"
+            ? "เริ่มคุยห้องดีลรับซื้อ"
+            : "เริ่มคุยห้องดีล",
+        createdAt: now,
+        lastMessageAt: now,
+        unread: 0,
+        dealCardName: safeText(detail.dealCardName) || `Card #${cardNo}`,
+        dealCardImage: safeText(detail.dealCardImage) || `/cards/${cardNo}.jpg`,
+        dealCardNo: cardNo,
+        dealPrice: Number(detail.dealPrice || 0),
+        dealMode,
+      });
+
+      if (!optimisticRoom) {
+        return;
+      }
+
+      setOpen(true);
+      setFilter("deal");
+      setMobileListVisible(false);
+      setError("");
+      setRooms((current) => {
+        const withoutDuplicate = current.filter(
+          (room) =>
+            room.key !== optimisticRoom.key &&
+            room.roomId !== optimisticRoom.roomId
+        );
+        return [optimisticRoom, ...withoutDuplicate];
+      });
+
+      await openRoom(optimisticRoom);
+    },
+    [openRoom, status]
+  );
+
   const syncActiveRoom = useCallback(async () => {
     const active = activeRoomRef.current;
     if (!active?.actualRoomId || active.loading) {
@@ -1322,6 +1392,13 @@ export default function FloatingChatDock({
   useEffect(() => {
     const handleOpenFloatingChat = (event: Event) => {
       const detail = (event as CustomEvent<OpenFloatingChatDetail>).detail;
+      const roomId = safeText(detail?.roomId);
+
+      if (detail?.kind === "deal" || detail?.dealId || roomId.startsWith("deal:")) {
+        void openFloatingDealChat(detail || {});
+        return;
+      }
+
       void openFloatingDirectChat(detail || {});
     };
 
@@ -1332,7 +1409,7 @@ export default function FloatingChatDock({
         handleOpenFloatingChat
       );
     };
-  }, [openFloatingDirectChat]);
+  }, [openFloatingDealChat, openFloatingDirectChat]);
 
   useEffect(() => {
     if (open) {

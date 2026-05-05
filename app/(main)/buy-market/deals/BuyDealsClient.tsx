@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Clock3, MessageCircle, XCircle } from "lucide-react";
+import { BadgeCheck, Clock3, Loader2, MessageCircle, XCircle } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
 import type { BuyDealCard } from "@/lib/buy-market-types";
@@ -21,6 +20,7 @@ export default function BuyDealsClient({
   initialDeals: BuyDealCard[];
 }) {
   const [deals, setDeals] = useState(initialDeals);
+  const [bootstrapped, setBootstrapped] = useState(initialDeals.length > 0);
   const [loadingId, setLoadingId] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -35,28 +35,31 @@ export default function BuyDealsClient({
     [deals]
   );
 
-  const refreshDeals = useCallback(async () => {
+  const refreshDeals = useCallback(async (silent = false) => {
     try {
-      setRefreshing(true);
+      if (!silent) setRefreshing(true);
       const res = await fetch(`/api/buy-market/deals?ts=${Date.now()}`, {
         cache: "no-store",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => []);
       if (Array.isArray(data)) {
         setDeals(data);
       }
     } catch {
       return;
     } finally {
-      setRefreshing(false);
+      setBootstrapped(true);
+      if (!silent) setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
+    void refreshDeals(true);
+
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refreshDeals();
-    }, 5000);
-    const onFocus = () => void refreshDeals();
+      if (document.visibilityState === "visible") void refreshDeals(true);
+    }, 3500);
+    const onFocus = () => void refreshDeals(true);
     window.addEventListener("focus", onFocus);
     return () => {
       window.clearInterval(intervalId);
@@ -86,13 +89,35 @@ export default function BuyDealsClient({
       if (data.removedDealId) {
         setDeals((current) => current.filter((item) => item.id !== data.removedDealId));
       } else {
-        await refreshDeals();
+        await refreshDeals(true);
       }
     } catch {
       alert("จัดการดีลรับซื้อไม่สำเร็จ");
     } finally {
       setLoadingId("");
     }
+  }
+
+  function openDealChat(deal: BuyDealCard) {
+    const other = deal.isBuyer ? deal.seller : deal.buyer;
+
+    window.dispatchEvent(
+      new CustomEvent("nexora:open-floating-chat", {
+        detail: {
+          kind: "deal",
+          roomId: `deal:${deal.id}`,
+          dealId: deal.id,
+          userId: other.id,
+          userName: other.name,
+          userImage: other.image || "/avatar.png",
+          dealCardName: deal.cardName,
+          dealCardImage: deal.cardImage,
+          dealCardNo: deal.cardNo,
+          dealPrice: deal.offeredPrice,
+          dealMode: "buy",
+        },
+      })
+    );
   }
 
   return (
@@ -107,22 +132,27 @@ export default function BuyDealsClient({
               ดีลรับซื้อการ์ด
             </h1>
             <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-black/52">
-              ห้องนี้แยกดีลรับซื้อออกจากดีลขายการ์ดใบเดียว เพื่อดูง่ายและตอบรับข้อเสนอขายได้ชัดเจน
+              หน้านี้แยกดีลรับซื้อออกจากดีลขายการ์ดใบเดียว เปิดไวและอัปเดตถี่ขึ้นเพื่อให้ตอบรับข้อเสนอขายได้ทันที
             </p>
           </div>
           <button
             type="button"
-            onClick={() => void refreshDeals()}
+            onClick={() => void refreshDeals(false)}
             className="w-fit rounded-full bg-black px-4 py-2 text-xs font-black text-white"
           >
-            {refreshing ? "กำลังอัพเดท..." : "อัพเดทดีล"}
+            {refreshing ? "กำลังอัปเดต..." : "อัปเดตดีล"}
           </button>
         </div>
       </section>
 
       <BuyMarketFeatureNav />
 
-      {sortedDeals.length === 0 ? (
+      {!bootstrapped ? (
+        <div className="flex items-center justify-center rounded-[28px] bg-white p-8 text-sm font-black text-black/45 shadow-[0_20px_60px_rgba(0,0,0,0.14)]">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          กำลังโหลดดีลรับซื้อ...
+        </div>
+      ) : sortedDeals.length === 0 ? (
         <div className="rounded-[28px] border border-dashed border-white/10 bg-white p-8 text-center text-sm font-bold text-black/45 shadow-[0_20px_60px_rgba(0,0,0,0.14)]">
           ยังไม่มีดีลรับซื้อ
         </div>
@@ -194,13 +224,14 @@ export default function BuyDealsClient({
 
                     <div className="flex flex-wrap gap-2">
                       {accepted ? (
-                        <Link
-                          href={`/buy-market/deals/chat/${deal.id}`}
+                        <button
+                          type="button"
+                          onClick={() => openDealChat(deal)}
                           className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-black text-white"
                         >
                           <MessageCircle className="h-4 w-4" />
                           เปิดแชทดีลรับซื้อ
-                        </Link>
+                        </button>
                       ) : deal.isBuyer ? (
                         <>
                           <button

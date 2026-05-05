@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createBuyMarketListing,
   getBuyMarketListings,
+  getBuyMarketListingsByBuyer,
 } from "@/lib/buy-market";
 import { getBuyMarketCurrentUser } from "@/lib/buy-market-auth";
 import { resolveCardDisplayImage } from "@/lib/card-image";
@@ -24,7 +25,29 @@ function normalizeCardNo(value: unknown) {
   return digits ? String(Number(digits)).padStart(3, "0") : "";
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const scope = String(req.nextUrl.searchParams.get("scope") || "").trim();
+
+  if (scope === "manage") {
+    const user = await getBuyMarketCurrentUser();
+
+    if (!user.id) {
+      return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const listings = user.isAdmin
+      ? await getBuyMarketListings()
+      : await getBuyMarketListingsByBuyer(user.id);
+
+    return jsonNoStore({
+      listings,
+      currentUser: {
+        id: user.id,
+        isAdmin: user.isAdmin,
+      },
+    });
+  }
+
   const listings = await getBuyMarketListings();
   return jsonNoStore({ listings });
 }

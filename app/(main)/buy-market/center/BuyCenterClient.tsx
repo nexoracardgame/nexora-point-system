@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
@@ -18,14 +18,53 @@ function formatPrice(value?: number | null) {
 
 export default function BuyCenterClient({
   initialListings,
+  currentUserId,
+  isAdmin,
 }: {
   initialListings: BuyMarketListing[];
+  currentUserId: string;
+  isAdmin: boolean;
 }) {
   const [listings, setListings] = useState(initialListings);
+  const [bootstrapped, setBootstrapped] = useState(initialListings.length > 0);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const refreshListings = useCallback(async (silent = true) => {
+    if (!silent) setLoading(true);
+
+    try {
+      const res = await fetch(
+        `/api/buy-market/listings?scope=manage&ts=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && Array.isArray(data?.listings)) {
+        setListings(data.listings);
+      }
+    } finally {
+      setBootstrapped(true);
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshListings(true);
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshListings(true);
+    }, 4000);
+    const onFocus = () => void refreshListings(true);
+
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshListings]);
 
   function openEdit(listing: BuyMarketListing) {
     setDialog({ type: "edit", listing });
@@ -96,69 +135,115 @@ export default function BuyCenterClient({
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 text-black">
       <section className="rounded-[28px] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ring-1 ring-black/5 sm:p-6">
-        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-black/42">
-          Buy Post Center
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-black/42">
+              Buy Post Center
+            </div>
+            <h1 className="mt-1 text-3xl font-black sm:text-5xl">
+              จัดการโพสต์รับซื้อ
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-black/52">
+              {isAdmin
+                ? "GM สามารถลบโพสต์รับซื้อของทุกคนได้ ส่วนการแก้ราคาเปิดให้เจ้าของโพสต์เท่านั้น"
+                : "แก้ไขราคารับซื้อหรือลบโพสต์รับซื้อของคุณได้จากหน้านี้"}
+            </p>
+          </div>
+          {isAdmin ? (
+            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-black px-3 py-2 text-xs font-black text-white">
+              <ShieldCheck className="h-4 w-4" />
+              GM delete enabled
+            </div>
+          ) : null}
         </div>
-        <h1 className="mt-1 text-3xl font-black sm:text-5xl">
-          จัดการโพสต์รับซื้อ
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-black/52">
-          แก้ไขราคารับซื้อหรือลบโพสต์รับซื้อของคุณได้จากหน้านี้
-        </p>
       </section>
 
       <BuyMarketFeatureNav />
 
-      {listings.length === 0 ? (
+      {!bootstrapped ? (
+        <div className="flex items-center justify-center rounded-[28px] bg-white p-8 text-sm font-black text-black/45 shadow-[0_20px_60px_rgba(0,0,0,0.14)]">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          กำลังโหลดโพสต์รับซื้อ...
+        </div>
+      ) : listings.length === 0 ? (
         <div className="rounded-[28px] border border-dashed border-black/10 bg-white p-8 text-center text-sm font-bold text-black/45">
           คุณยังไม่มีโพสต์รับซื้อ
         </div>
       ) : (
         <div className="grid gap-3">
-          {listings.map((listing) => (
-            <article
-              key={listing.id}
-              className="flex flex-col gap-3 rounded-[24px] bg-white p-3 shadow-[0_18px_54px_rgba(0,0,0,0.14)] ring-1 ring-black/5 sm:flex-row sm:items-center"
-            >
-              <Link
-                href={`/buy-market/card/${listing.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3"
+          {listings.map((listing) => {
+            const canEdit = listing.buyerId === currentUserId;
+            const canDelete = canEdit || isAdmin;
+
+            return (
+              <article
+                key={listing.id}
+                className="flex flex-col gap-3 rounded-[24px] bg-white p-3 shadow-[0_18px_54px_rgba(0,0,0,0.14)] ring-1 ring-black/5 sm:flex-row sm:items-center"
               >
-                <SafeCardImage
-                  cardNo={listing.cardNo}
-                  imageUrl={listing.imageUrl || undefined}
-                  alt={listing.cardName || `Card #${listing.cardNo}`}
-                  className="h-20 w-14 shrink-0 rounded-[16px] object-cover"
-                />
-                <div className="min-w-0">
-                  <div className="truncate text-lg font-black">
-                    {listing.cardName || `Card #${listing.cardNo}`}
+                <Link
+                  href={`/buy-market/card/${listing.id}`}
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                >
+                  <SafeCardImage
+                    cardNo={listing.cardNo}
+                    imageUrl={listing.imageUrl || undefined}
+                    alt={listing.cardName || `Card #${listing.cardNo}`}
+                    className="h-20 w-14 shrink-0 rounded-[16px] object-cover"
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-black">
+                      {listing.cardName || `Card #${listing.cardNo}`}
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-black/45">
+                      รับซื้อ {formatPrice(listing.offerPrice)} · Card #{listing.cardNo}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm font-bold text-black/45">
-                    รับซื้อ {formatPrice(listing.offerPrice)} · Card #{listing.cardNo}
+                </Link>
+
+                <Link
+                  href={`/profile/${listing.buyerId}`}
+                  className="flex min-w-0 items-center gap-2 rounded-[18px] bg-[#f4f4f5] px-3 py-2"
+                >
+                  <img
+                    src={listing.buyerImage || "/avatar.png"}
+                    alt={listing.buyerName}
+                    className="h-9 w-9 shrink-0 rounded-2xl object-cover"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-[0.14em] text-black/35">
+                      Buyer
+                    </div>
+                    <div className="truncate text-xs font-black text-black/70">
+                      {listing.buyerName}
+                    </div>
                   </div>
+                </Link>
+
+                <div className="flex flex-wrap gap-2">
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(listing)}
+                      className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-black text-white"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      แก้ราคา
+                    </button>
+                  ) : null}
+                  {canDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => openDelete(listing)}
+                      className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      ลบ
+                    </button>
+                  ) : null}
                 </div>
-              </Link>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEdit(listing)}
-                  className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-black text-white"
-                >
-                  <Pencil className="h-4 w-4" />
-                  แก้ราคา
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openDelete(listing)}
-                  className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  ลบ
-                </button>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 

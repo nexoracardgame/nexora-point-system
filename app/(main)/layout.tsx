@@ -1081,10 +1081,10 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
-        href: "/box-market",
-        label: "ซอง/กล่อง",
-        icon: PackageOpen,
-        active: pathname.startsWith("/box-market"),
+        href: "/buy-market",
+        label: "รับซื้อการ์ด",
+        icon: BadgeDollarSign,
+        active: pathname.startsWith("/buy-market"),
       },
       {
         href: "/dm",

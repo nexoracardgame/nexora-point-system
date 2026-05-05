@@ -15,7 +15,6 @@ export default function BuyMarketCreateClient() {
   const router = useRouter();
   const [cardNo, setCardNo] = useState("");
   const [cardName, setCardName] = useState("");
-  const [rarity, setRarity] = useState("");
   const [offerPrice, setOfferPrice] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -49,7 +48,7 @@ export default function BuyMarketCreateClient() {
         body: JSON.stringify({
           cardNo: normalizedCardNo,
           cardName,
-          rarity,
+          rarity: null,
           offerPrice: price,
         }),
       });
@@ -121,24 +120,12 @@ export default function BuyMarketCreateClient() {
 
           <label className="block">
             <span className="mb-2 block text-xs font-black text-black/62">
-              ชื่อการ์ด
+              คำประกาศซื้อ
             </span>
             <input
               value={cardName}
               onChange={(event) => setCardName(event.target.value)}
-              placeholder="เว้นว่างได้ ระบบจะแสดง Card #เลขการ์ด"
-              className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-black/35"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-black text-black/62">
-              ระดับ / rarity
-            </span>
-            <input
-              value={rarity}
-              onChange={(event) => setRarity(event.target.value)}
-              placeholder="เช่น Rare, SR, Legendary"
+              placeholder="บอกอะไรบางอย่างกับคนที่ต้องการขายการ์ดให้กับคุณ"
               className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-black/35"
             />
           </label>

@@ -4,6 +4,7 @@ import { ArrowLeft, BadgeDollarSign, UserRound } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import { getBuyMarketListingById } from "@/lib/buy-market";
+import BuyMarketFollowButton from "./BuyMarketFollowButton";
 import SellToBuyerButton from "./SellToBuyerButton";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +63,7 @@ export default async function BuyMarketCardPage({
                 ผู้รับซื้อต้องการการ์ดใบนี้ หากคุณมีการ์ด สามารถเสนอขายเข้าดีลรับซื้อได้จากหน้านี้
               </p>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[22px] bg-black p-4 text-white">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/44">
                     ราคารับซื้อ
@@ -77,19 +78,14 @@ export default async function BuyMarketCardPage({
                   </div>
                   <div className="mt-2 text-2xl font-black">#{listing.cardNo}</div>
                 </div>
-                <div className="rounded-[22px] border border-black/8 bg-[#f4f4f5] p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-black/34">
-                    Rarity
-                  </div>
-                  <div className="mt-2 text-2xl font-black">
-                    {listing.rarity || "-"}
-                  </div>
-                </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 rounded-[24px] border border-black/8 bg-[#f4f4f5] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
+              <Link
+                href={`/profile/${listing.buyerId}`}
+                className="flex min-w-0 items-center gap-3 rounded-[20px] p-1 transition hover:bg-white"
+              >
                 <img
                   src={listing.buyerImage || "/avatar.png"}
                   alt={listing.buyerName}
@@ -104,11 +100,14 @@ export default async function BuyMarketCardPage({
                     {listing.buyerName}
                   </div>
                 </div>
+              </Link>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <BuyMarketFollowButton listing={listing} />
+                <SellToBuyerButton
+                  listingId={listing.id}
+                  defaultPrice={listing.offerPrice}
+                />
               </div>
-              <SellToBuyerButton
-                listingId={listing.id}
-                defaultPrice={listing.offerPrice}
-              />
             </div>
           </div>
         </div>

@@ -296,21 +296,45 @@ export default function BuyMarketClient({
                         </div>
                       </div>
                     </Link>
-                    <div className="flex items-center justify-between gap-3 p-3">
-                      <div className="min-w-0">
+                    <div className="flex flex-col gap-3 p-3">
+                      <Link
+                        href={`/profile/${listing.buyerId}`}
+                        className="flex min-w-0 items-center gap-2 rounded-[18px] bg-white px-2.5 py-2 transition hover:bg-zinc-100"
+                      >
+                        <img
+                          src={listing.buyerImage || "/avatar.png"}
+                          alt={listing.buyerName}
+                          className="h-9 w-9 shrink-0 rounded-2xl object-cover"
+                        />
+                        <div className="min-w-0">
                         <div className="truncate text-xs font-black text-black/70">
                           ผู้รับซื้อ: {listing.buyerName}
                         </div>
                         <div className="mt-0.5 text-[11px] font-bold text-black/40">
                           Card #{listing.cardNo}
                         </div>
-                      </div>
+                        </div>
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleFollow(listing)}
+                          className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-black ${
+                            followed
+                              ? "bg-black text-white"
+                              : "bg-white text-black ring-1 ring-black/10"
+                          }`}
+                        >
+                          <Heart className={`h-3.5 w-3.5 ${followed ? "fill-white" : ""}`} />
+                          {followed ? "ติดตามแล้ว" : "ติดตาม"}
+                        </button>
                       <Link
                         href={`/buy-market/card/${listing.id}`}
                         className="shrink-0 rounded-full bg-black px-3 py-2 text-[11px] font-black text-white"
                       >
                         เสนอขาย
                       </Link>
+                      </div>
                     </div>
                   </article>
                 );

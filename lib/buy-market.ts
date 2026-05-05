@@ -301,6 +301,7 @@ export async function updateBuyMarketListing(input: {
 export async function deleteBuyMarketListing(input: {
   id: string;
   buyerId: string;
+  isAdmin?: boolean;
 }) {
   const id = String(input.id || "").trim();
   const buyerId = String(input.buyerId || "").trim();
@@ -312,7 +313,7 @@ export async function deleteBuyMarketListing(input: {
   const updated = await prisma.marketListing.updateMany({
     where: {
       id,
-      sellerId: buyerId,
+      ...(input.isAdmin ? {} : { sellerId: buyerId }),
       status: {
         equals: "wanted",
         mode: "insensitive",

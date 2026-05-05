@@ -82,6 +82,7 @@ export async function DELETE(
     await deleteBuyMarketListing({
       id,
       buyerId: user.id,
+      isAdmin: user.isAdmin,
     });
 
     return jsonNoStore({ success: true, id });
