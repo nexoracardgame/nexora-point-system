@@ -15,6 +15,8 @@ import ProfileFriendButton from "@/components/ProfileFriendButton";
 import ProfilePresenceDot from "@/components/ProfilePresenceDot";
 import ProfileShareButton from "@/components/ProfileShareButton";
 import { authOptions } from "@/lib/auth";
+import { getDealerVerificationProfile } from "@/lib/box-market-store";
+import { getDealerSheetSalesByMemberId } from "@/lib/dealer-sheet";
 import { getMarketListingsBySeller } from "@/lib/market-listings";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
@@ -204,6 +206,7 @@ export default async function SellerProfilePage({
     soldStatsRows,
     reviewAggregate,
     reviewStatsRows,
+    dealerVerification,
   ] = await Promise.all([
     getLocalProfileByUserId(id),
     prisma.user
@@ -348,6 +351,13 @@ export default async function SellerProfilePage({
         },
       })
       .catch(() => [] as ReviewStatsRow[]),
+    getDealerVerificationProfile(id).catch(() => ({
+      verified: false,
+      status: "none" as const,
+      verifiedAt: null,
+      fullName: "",
+      memberId: "",
+    })),
   ]);
 
   const sellerSnapshot =
@@ -623,6 +633,12 @@ export default async function SellerProfilePage({
 
   const completedDeals = metrics.soldCount;
   const totalVolume = metrics.totalVolume;
+  const boxProductSalesVolume = dealerVerification.verified
+    ? await getDealerSheetSalesByMemberId(dealerVerification.memberId).catch(
+        () => 0
+      )
+    : 0;
+  const combinedSalesVolume = totalVolume + boxProductSalesVolume;
   const trustScore = buildTrustScore(metrics);
   const sellerScore = buildSellerScore(metrics);
   const isSellerAdmin = String(seller.role || "").trim().toLowerCase() === "admin";
@@ -706,6 +722,13 @@ export default async function SellerProfilePage({
               <ShieldCheck className="h-4 w-4" />
               {sellerStatusLabel}
             </div>
+
+            {dealerVerification.verified && (
+              <div className="absolute left-4 top-[112px] flex items-center gap-2 rounded-full border border-amber-200/45 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.42),transparent_32%),linear-gradient(135deg,rgba(251,191,36,0.28),rgba(0,0,0,0.72))] px-4 py-2 text-[11px] font-black text-amber-100 shadow-[0_0_36px_rgba(251,191,36,0.34)] backdrop-blur-xl sm:left-6 sm:top-32">
+                <BadgeCheck className="h-4 w-4 drop-shadow-[0_0_12px_rgba(251,191,36,0.9)]" />
+                ตัวแทนจำหน่ายจริง
+              </div>
+            )}
 
             <div className="absolute right-4 top-4 max-w-[180px] rounded-[18px] border border-violet-300/24 bg-black/38 px-4 py-2 text-right text-[11px] font-black text-violet-200 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:right-6 sm:top-6 lg:max-w-[240px]">
               <div>TOP {topPercent}% ของตลาด</div>
@@ -853,9 +876,19 @@ export default async function SellerProfilePage({
                   },
                   {
                     label: "ยอดขายรวม",
-                    value: formatCurrency(totalVolume),
+                    value: formatCurrency(combinedSalesVolume),
                     color: "text-violet-300",
-                    hint: "รวมมูลค่าดีลสำเร็จ",
+                    hint: "รวมยอดขายจากทุกสินค้า",
+                    breakdown: [
+                      {
+                        label: "การ์ดใบ",
+                        value: formatCurrency(totalVolume),
+                      },
+                      {
+                        label: "ซอง/กล่อง",
+                        value: formatCurrency(boxProductSalesVolume),
+                      },
+                    ],
                   },
                   {
                     label: "ความน่าเชื่อถือ",
@@ -879,6 +912,23 @@ export default async function SellerProfilePage({
                     <div className="mt-2 text-[10px] leading-4 text-white/50 sm:text-[11px]">
                       {stat.hint}
                     </div>
+                    {"breakdown" in stat && Array.isArray(stat.breakdown) ? (
+                      <div className="mt-3 grid gap-1.5">
+                        {stat.breakdown.map((item) => (
+                          <div
+                            key={item.label}
+                            className="flex items-center justify-between gap-2 rounded-xl border border-white/8 bg-white/[0.045] px-2.5 py-2"
+                          >
+                            <span className="text-[10px] font-bold text-white/52">
+                              {item.label}
+                            </span>
+                            <span className="text-[11px] font-black text-white">
+                              {item.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

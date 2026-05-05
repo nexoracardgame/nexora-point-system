@@ -50,6 +50,11 @@ export type DealerVerificationInput = {
   email: string | null;
 };
 
+export type DealerVerificationProfile = DealerVerificationStatus & {
+  fullName: string;
+  memberId: string;
+};
+
 type LocalDealerVerification = {
   id: string;
   userId: string;
@@ -261,6 +266,73 @@ export async function getDealerVerificationStatus(
       verified: Boolean(local),
       status: local ? "verified" : "none",
       verifiedAt: local?.verifiedAt || null,
+    };
+  }
+}
+
+export async function getDealerVerificationProfile(
+  userId: string
+): Promise<DealerVerificationProfile> {
+  const safeUserId = String(userId || "").trim();
+  if (!safeUserId) {
+    return {
+      verified: false,
+      status: "none",
+      verifiedAt: null,
+      fullName: "",
+      memberId: "",
+    };
+  }
+
+  if (!hasDatabaseConfig()) {
+    const local = (await readLocalVerifications()).find(
+      (item) => item.userId === safeUserId && item.status === "verified"
+    );
+    return {
+      verified: Boolean(local),
+      status: local ? "verified" : "none",
+      verifiedAt: local?.verifiedAt || null,
+      fullName: local?.fullName || "",
+      memberId: local?.memberId || "",
+    };
+  }
+
+  try {
+    await ensureBoxMarketSchema();
+    const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+      'SELECT "status", "verifiedAt", "fullName", "memberId" FROM "DealerVerification" WHERE "userId" = $1 LIMIT 1',
+      safeUserId
+    );
+    const row = rows[0];
+    const status = String(row?.status || "").toLowerCase();
+    const verifiedAt = row ? rowValue(row, "verifiedAt", "verifiedat") : null;
+    return {
+      verified: status === "verified",
+      status: status === "verified" ? "verified" : "none",
+      verifiedAt: verifiedAt ? normalizeDate(verifiedAt) : null,
+      fullName: String(rowValue(row || {}, "fullName", "fullname") || "").trim(),
+      memberId: String(rowValue(row || {}, "memberId", "memberid") || "").trim(),
+    };
+  } catch {
+    if (process.env.NODE_ENV === "production") {
+      return {
+        verified: false,
+        status: "none",
+        verifiedAt: null,
+        fullName: "",
+        memberId: "",
+      };
+    }
+
+    const local = (await readLocalVerifications()).find(
+      (item) => item.userId === safeUserId && item.status === "verified"
+    );
+    return {
+      verified: Boolean(local),
+      status: local ? "verified" : "none",
+      verifiedAt: local?.verifiedAt || null,
+      fullName: local?.fullName || "",
+      memberId: local?.memberId || "",
     };
   }
 }

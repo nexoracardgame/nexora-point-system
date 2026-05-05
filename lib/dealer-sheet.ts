@@ -54,6 +54,16 @@ const HEADER_ALIASES = {
     "idcard",
     "id card",
   ],
+  sales: [
+    "sales",
+    "sale",
+    "ยอดขาย",
+    "ยอดขายรวม",
+    "ยอดขายซองกล่อง",
+    "ยอดขายซอง/กล่อง",
+    "boxsales",
+    "box sales",
+  ],
 } as const;
 
 function getDealerSheetCsvUrl() {
@@ -186,6 +196,12 @@ function normalizeDigits(value: string) {
   return digits;
 }
 
+function parseSalesValue(value: string) {
+  const normalized = String(value || "").replace(/[^\d.-]/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 function getHeaderMap(headers: string[]) {
   const normalizedHeaders = headers.map((header) => ({
     raw: header,
@@ -206,6 +222,7 @@ function getHeaderMap(headers: string[]) {
     memberId: findHeader(HEADER_ALIASES.memberId),
     phone: findHeader(HEADER_ALIASES.phone),
     nationalId: findHeader(HEADER_ALIASES.nationalId),
+    sales: findHeader(HEADER_ALIASES.sales),
   };
 }
 
@@ -271,4 +288,44 @@ export async function verifyDealerAgainstSheet(
       nationalId === expected.nationalId
     );
   });
+}
+
+export async function getDealerSheetSalesByMemberId(memberId: string) {
+  const expectedMemberId = normalizeCode(memberId);
+  if (!expectedMemberId) {
+    return 0;
+  }
+
+  const response = await fetch(getDealerSheetCsvUrl(), {
+    cache: "no-store",
+    headers: {
+      Accept: "text/csv,text/plain,*/*",
+    },
+  });
+
+  if (!response.ok) {
+    return 0;
+  }
+
+  const csv = await response.text();
+  const rows = parseCsv(csv);
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const headers = Object.keys(rows[0] || {});
+  const headerMap = getHeaderMap(headers);
+
+  const match = rows.find((row) => {
+    const rowMemberId = normalizeCode(
+      getComparableRowValue(row, headerMap.memberId, 1)
+    );
+    return rowMemberId === expectedMemberId;
+  });
+
+  if (!match) {
+    return 0;
+  }
+
+  return parseSalesValue(getComparableRowValue(match, headerMap.sales, 0));
 }
