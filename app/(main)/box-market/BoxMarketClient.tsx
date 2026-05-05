@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Boxes,
-  Image as ImageIcon,
+  Check,
   PackageOpen,
   Plus,
   RefreshCw,
@@ -20,32 +20,84 @@ import type {
 } from "@/lib/box-market-types";
 
 type FormState = {
-  title: string;
-  productType: BoxProductType;
-  description: string;
+  productId: string;
   price: string;
   quantity: string;
-  imageUrl: string;
 };
 
-const PRODUCT_TYPES: Array<{
-  value: BoxProductType;
-  label: string;
-  subtitle: string;
-}> = [
-  { value: "box", label: "กล่อง", subtitle: "sealed box" },
-  { value: "pack", label: "ซอง", subtitle: "sealed pack" },
+type SealedProductOption = {
+  id: string;
+  title: string;
+  thaiName: string;
+  productType: BoxProductType;
+  description: string;
+  assetName: string;
+};
+
+const SEALED_PRODUCT_OPTIONS: SealedProductOption[] = [
+  {
+    id: "bronze-pack",
+    title: "NEXORA Bronze Pack",
+    thaiName: "ซองบรอนซ์",
+    productType: "pack",
+    description: "ซองการ์ดแท้ NEXORA Bronze Pack (ซองบรอนซ์)",
+    assetName: "Bronze-Pack.png",
+  },
+  {
+    id: "silver-pack",
+    title: "NEXORA Silver Pack",
+    thaiName: "ซองซิลเวอร์",
+    productType: "pack",
+    description: "ซองการ์ดแท้ NEXORA Silver Pack (ซองซิลเวอร์)",
+    assetName: "Silver-Pack.png",
+  },
+  {
+    id: "gold-pack",
+    title: "NEXORA Gold Pack",
+    thaiName: "ซองโกลด์",
+    productType: "pack",
+    description: "ซองการ์ดแท้ NEXORA Gold Pack (ซองโกลด์)",
+    assetName: "Gold-Pack.png",
+  },
+  {
+    id: "bronze-box",
+    title: "NEXORA Bronze Box",
+    thaiName: "กล่องบรอนซ์",
+    productType: "box",
+    description: "กล่องการ์ดแท้ NEXORA Bronze Box (กล่องบรอนซ์)",
+    assetName: "Bronze-Box.png",
+  },
+  {
+    id: "silver-box",
+    title: "NEXORA Silver Box",
+    thaiName: "กล่องซิลเวอร์",
+    productType: "box",
+    description: "กล่องการ์ดแท้ NEXORA Silver Box (กล่องซิลเวอร์)",
+    assetName: "Silver-Box.png",
+  },
+  {
+    id: "gold-box",
+    title: "NEXORA Gold Box",
+    thaiName: "กล่องโกลด์",
+    productType: "box",
+    description: "กล่องการ์ดแท้ NEXORA Gold Box (กล่องโกลด์)",
+    assetName: "Glod-Box.png",
+  },
 ];
 
-function buildInitialForm(assets: BoxProductAsset[]): FormState {
+function buildInitialForm(): FormState {
   return {
-    title: "",
-    productType: "box",
-    description: "",
+    productId: SEALED_PRODUCT_OPTIONS[0].id,
     price: "",
     quantity: "1",
-    imageUrl: assets[0]?.url || "",
   };
+}
+
+function getProductAssetUrl(assets: BoxProductAsset[], assetName: string) {
+  return (
+    assets.find((asset) => asset.name === assetName)?.url ||
+    `/box-products/${encodeURIComponent(assetName)}`
+  );
 }
 
 function formatPrice(value: number) {
@@ -83,7 +135,7 @@ function ProductVisual({
         src={imageUrl}
         alt={title}
         loading="lazy"
-        className="h-full w-full object-cover"
+        className={`h-full w-full object-contain ${compact ? "p-2 sm:p-3" : "p-3 sm:p-4"}`}
       />
     );
   }
@@ -107,7 +159,7 @@ export default function BoxMarketClient({
 }) {
   const [listings, setListings] = useState(initialListings);
   const [assets] = useState(productAssets);
-  const [form, setForm] = useState<FormState>(() => buildInitialForm(productAssets));
+  const [form, setForm] = useState<FormState>(() => buildInitialForm());
   const [dealerStatus, setDealerStatus] =
     useState<DealerVerificationStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -119,7 +171,16 @@ export default function BoxMarketClient({
     () => listings.filter((item) => item.isDealerVerified).length,
     [listings]
   );
-  const selectedAsset = assets.find((asset) => asset.url === form.imageUrl);
+  const selectedProduct = useMemo(() => {
+    const option =
+      SEALED_PRODUCT_OPTIONS.find((item) => item.id === form.productId) ||
+      SEALED_PRODUCT_OPTIONS[0];
+
+    return {
+      ...option,
+      imageUrl: getProductAssetUrl(assets, option.assetName),
+    };
+  }, [assets, form.productId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,13 +251,15 @@ export default function BoxMarketClient({
     if (loading) return;
 
     const price = Number(form.price);
-    const quantity = Math.max(1, Math.floor(Number(form.quantity || 1)));
+    const parsedQuantity = Math.floor(Number(form.quantity || 1));
+    const quantity =
+      Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
 
     setError("");
     setNotice("");
 
-    if (form.title.trim().length < 2) {
-      setError("กรอกชื่อสินค้าให้ครบก่อนลงขาย");
+    if (!selectedProduct) {
+      setError("เลือกสินค้าที่ต้องการลงขายก่อน");
       return;
     }
 
@@ -213,12 +276,12 @@ export default function BoxMarketClient({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: form.title,
-          productType: form.productType,
-          description: form.description,
+          title: selectedProduct.title,
+          productType: selectedProduct.productType,
+          description: selectedProduct.description,
           price,
           quantity,
-          imageUrl: form.imageUrl || null,
+          imageUrl: selectedProduct.imageUrl || null,
         }),
       });
       const data = await res.json();
@@ -232,7 +295,7 @@ export default function BoxMarketClient({
         data.listing,
         ...current.filter((item) => item.id !== data.listing.id),
       ]);
-      setForm(buildInitialForm(assets));
+      setForm(buildInitialForm());
       setNotice("ลงขายสำเร็จ รายการใหม่ขึ้นบนสุดแล้ว");
     } catch {
       setError("เกิดข้อผิดพลาดระหว่างลงขาย");
@@ -262,7 +325,7 @@ export default function BoxMarketClient({
                 </div>
 
                 <h1 className="mt-5 max-w-3xl text-[34px] font-black leading-[0.98] text-white sm:text-5xl lg:text-6xl">
-                  ตลาดกล่องสุ่มการ์ดของแท้
+                  ตลาดขายซอง/กล่องการ์ดแท้ NEXORA
                 </h1>
                 <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-white/62 sm:text-base">
                   ลงขายกล่องและซองการ์ดปิดผนึก ราคาอิสระ ใครลงล่าสุดขึ้นก่อน
@@ -333,55 +396,68 @@ export default function BoxMarketClient({
             </div>
 
             <div className="mt-5 overflow-hidden rounded-[24px] border border-black/8 bg-[#f4f4f5]">
-              <div className="aspect-[16/10]">
-                <ProductVisual imageUrl={form.imageUrl || null} title={form.title || "preview"} />
+              <div className="aspect-[4/3]">
+                <ProductVisual
+                  imageUrl={selectedProduct.imageUrl}
+                  title={selectedProduct.title}
+                />
               </div>
             </div>
 
             <div className="mt-5 grid gap-3">
               <div>
-                <label className="mb-2 block text-xs font-black text-black/62">
-                  ชื่อสินค้า
-                </label>
-                <input
-                  value={form.title}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, title: event.target.value }))
-                  }
-                  placeholder="เช่น NEXORA Booster Box"
-                  className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-black/35"
-                />
-              </div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <label className="block text-xs font-black text-black/62">
+                    เลือกสินค้า
+                  </label>
+                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-black/34">
+                    select one
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {SEALED_PRODUCT_OPTIONS.map((item) => {
+                    const active = form.productId === item.id;
+                    const imageUrl = getProductAssetUrl(assets, item.assetName);
 
-              <div className="grid grid-cols-2 gap-2">
-                {PRODUCT_TYPES.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() =>
-                      setForm((current) => ({
-                        ...current,
-                        productType: item.value,
-                      }))
-                    }
-                    className={`rounded-[18px] border px-3 py-3 text-left transition ${
-                      form.productType === item.value
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black hover:border-black/24"
-                    }`}
-                  >
-                    <div className="text-sm font-black">{item.label}</div>
-                    <div
-                      className={`mt-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
-                        form.productType === item.value
-                          ? "text-white/52"
-                          : "text-black/38"
-                      }`}
-                    >
-                      {item.subtitle}
-                    </div>
-                  </button>
-                ))}
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            productId: item.id,
+                          }))
+                        }
+                        aria-pressed={active}
+                        className={`rounded-[18px] border p-2 text-left transition ${
+                          active
+                            ? "border-black bg-black text-white shadow-[0_14px_36px_rgba(0,0,0,0.22)]"
+                            : "border-black/10 bg-white text-black hover:border-black/24"
+                        }`}
+                      >
+                        <span className="relative block aspect-[4/3] overflow-hidden rounded-[14px] bg-[#f5f5f6]">
+                          <ProductVisual imageUrl={imageUrl} title={item.title} compact />
+                          {active && (
+                            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black text-white shadow-[0_8px_18px_rgba(0,0,0,0.22)] ring-2 ring-white">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-2 block text-[12px] font-black leading-tight">
+                          {item.title}
+                        </span>
+                        <span
+                          className={`mt-1 block text-[11px] font-bold leading-tight ${
+                            active ? "text-white/62" : "text-black/48"
+                          }`}
+                        >
+                          ({item.thaiName})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -416,71 +492,6 @@ export default function BoxMarketClient({
                     className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-black/35"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-xs font-black text-black/62">
-                  รายละเอียด
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  placeholder="รุ่นสินค้า สภาพซีล จุดนัดรับ หรือรายละเอียดที่ผู้ซื้อควรรู้"
-                  rows={4}
-                  className="w-full resize-none rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold leading-6 outline-none transition focus:border-black/35"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-xs font-black text-black/62">
-                  รูปสินค้า
-                </label>
-                {assets.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {assets.slice(0, 6).map((asset) => (
-                      <button
-                        key={asset.url}
-                        type="button"
-                        onClick={() =>
-                          setForm((current) => ({
-                            ...current,
-                            imageUrl: asset.url,
-                          }))
-                        }
-                        className={`overflow-hidden rounded-[18px] border bg-[#f4f4f5] transition ${
-                          form.imageUrl === asset.url
-                            ? "border-black ring-2 ring-black/16"
-                            : "border-black/8 hover:border-black/24"
-                        }`}
-                        aria-label={asset.name}
-                      >
-                        <span className="block aspect-square">
-                          <img
-                            src={asset.url}
-                            alt={asset.name}
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 rounded-[18px] border border-dashed border-black/16 bg-black/[0.03] px-4 py-4 text-sm font-bold text-black/48">
-                    <ImageIcon className="h-5 w-5" />
-                    ยังไม่มีรูปสินค้าในระบบ
-                  </div>
-                )}
-                {selectedAsset && (
-                  <div className="mt-2 truncate text-[11px] font-bold text-black/42">
-                    {selectedAsset.name}
-                  </div>
-                )}
               </div>
             </div>
 

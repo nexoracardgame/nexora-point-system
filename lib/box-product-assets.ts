@@ -6,12 +6,12 @@ import {
 } from "@/lib/box-market-types";
 
 const BOX_PRODUCT_ASSET_NAMES = [
-  "Bronze-Box.png",
   "Bronze-Pack.png",
-  "Glod-Box.png",
-  "Gold-Pack.png",
-  "Silver-Box.png",
   "Silver-Pack.png",
+  "Gold-Pack.png",
+  "Bronze-Box.png",
+  "Silver-Box.png",
+  "Glod-Box.png",
 ] as const;
 
 export function getBoxProductAssets(): BoxProductAsset[] {
