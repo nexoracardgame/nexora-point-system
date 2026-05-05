@@ -381,9 +381,9 @@ export async function sendPushNotificationToUser(
     subscriptions.map(async (subscription) => {
       try {
         await webpush.sendNotification(toWebPushSubscription(subscription), body, {
-          TTL: 120,
+          TTL: 60 * 60 * 24,
           urgency: "high",
-          timeout: 3500,
+          timeout: 5000,
           topic: topic || undefined,
           vapidDetails: {
             subject: getVapidSubject(),

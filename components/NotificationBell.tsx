@@ -10,6 +10,13 @@ import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { getLocaleTag, useLanguage } from "@/lib/i18n";
 import { formatThaiShortDate } from "@/lib/thai-time";
 import {
+  isPushSubscriptionSupported,
+  isSystemNotificationSupported,
+  registerNexoraServiceWorker,
+  requestSystemNotificationPermissionAndSync,
+  syncBrowserPushSubscription,
+} from "@/lib/push-subscription-client";
+import {
   Bell,
   Heart,
   Handshake,
@@ -34,56 +41,11 @@ type NotificationResponse = {
   items: NotificationItem[];
 };
 
-type BrowserPushSubscriptionJson = {
-  endpoint?: string;
-  expirationTime?: number | null;
-  keys?: {
-    p256dh?: string;
-    auth?: string;
-  };
-};
-
 const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
 const NOTIFICATION_POLL_TICK_MS = 1000;
 const NOTIFICATION_REALTIME_FALLBACK_MS = 15000;
 const NOTIFICATION_CONNECTING_FALLBACK_MS = 1800;
 const NOTIFICATION_CONFIRM_REFRESH_MS = 550;
-
-function isSystemNotificationSupported() {
-  return (
-    typeof window !== "undefined" &&
-    "Notification" in window &&
-    "serviceWorker" in navigator
-  );
-}
-
-function isPushSubscriptionSupported() {
-  return (
-    isSystemNotificationSupported() &&
-    "PushManager" in window &&
-    "ServiceWorkerRegistration" in window &&
-    "pushManager" in ServiceWorkerRegistration.prototype
-  );
-}
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = `${base64String}${padding}`
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; i += 1) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
-}
-
-function serializePushSubscription(subscription: PushSubscription) {
-  return subscription.toJSON() as BrowserPushSubscriptionJson;
-}
 
 function getBrowserClockMs() {
   return typeof performance === "undefined" ? 0 : performance.now();
@@ -385,70 +347,17 @@ export default function NotificationBell() {
     }
 
     pushSubscriptionSyncRef.current = (async () => {
-      const registration =
-        registrationInput ||
-        swRegistrationRef.current ||
-        (await navigator.serviceWorker.ready);
-      swRegistrationRef.current = registration;
-
-      const keyRes = await fetch("/api/push/public-key", {
-        cache: "no-store",
-      });
-      const keyData = await keyRes.json().catch(() => ({}));
-      const publicKey = String(keyData?.publicKey || "").trim();
-
-      if (!keyRes.ok || !publicKey) {
-        return;
-      }
-
-      let subscription = await registration.pushManager.getSubscription();
-
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
-      }
-
-      const serialized = serializePushSubscription(subscription);
-
-      if (
-        !serialized.endpoint ||
-        !serialized.keys?.p256dh ||
-        !serialized.keys?.auth
-      ) {
-        return;
-      }
-
-      const saveRes = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          subscription: serialized,
-        }),
-        cache: "no-store",
+      const registration = registrationInput || swRegistrationRef.current;
+      const status = await syncBrowserPushSubscription(registration, {
+        force: true,
       });
 
-      if (saveRes.ok) {
+      if (status === "synced") {
         pushSubscriptionReadyRef.current = true;
       }
-    })()
-      .catch(async (error) => {
-        if (
-          error instanceof DOMException &&
-          error.name === "InvalidStateError" &&
-          registrationInput?.pushManager
-        ) {
-          const staleSubscription =
-            await registrationInput.pushManager.getSubscription();
-          await staleSubscription?.unsubscribe().catch(() => false);
-        }
-      })
-      .finally(() => {
-        pushSubscriptionSyncRef.current = null;
-      });
+    })().finally(() => {
+      pushSubscriptionSyncRef.current = null;
+    });
 
     await pushSubscriptionSyncRef.current;
   };
@@ -463,9 +372,11 @@ export default function NotificationBell() {
     }
 
     try {
-      const result = await Notification.requestPermission();
-      if (result === "granted") {
-        await syncPushSubscription();
+      const result = await requestSystemNotificationPermissionAndSync(
+        swRegistrationRef.current
+      );
+      if (result === "synced") {
+        pushSubscriptionReadyRef.current = true;
         void loadNotifications();
       }
     } catch {
@@ -643,13 +554,9 @@ export default function NotificationBell() {
 
     let mounted = true;
 
-    void navigator.serviceWorker
-      .register("/sw.js", {
-        scope: "/",
-        updateViaCache: "none",
-      })
+    void registerNexoraServiceWorker()
       .then((registration) => {
-        if (!mounted) {
+        if (!mounted || !registration) {
           return;
         }
 

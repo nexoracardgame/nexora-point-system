@@ -235,6 +235,7 @@ export async function POST(req: NextRequest) {
     body: buildMessagePreview(content, imageUrl),
     href: await getChatPushHref(access),
     icon: identity.image,
+    image: identity.image,
     tag: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
     type: "chat",
   }).catch((pushError) => {

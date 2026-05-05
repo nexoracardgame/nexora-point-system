@@ -7,6 +7,7 @@ import "./globals.css";
 
 import GlobalActivityBar from "@/components/GlobalActivityBar";
 import PageTransition from "@/components/PageTransition";
+import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,6 +72,7 @@ export default function RootLayout({
         "
       >
         <Providers>
+          <PushNotificationBootstrap />
           <FirstOpenSplash />
           <GlobalActivityBar />
           <PageTransition>

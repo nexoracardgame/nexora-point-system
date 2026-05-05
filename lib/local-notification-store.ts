@@ -91,6 +91,7 @@ async function deliverLocalNotificationPush(notification: LocalNotificationRecor
     body: notification.body,
     href: notification.href,
     icon: notification.image,
+    image: notification.image,
     tag: notification.id,
     type: notification.type,
   }).catch(() => undefined);
