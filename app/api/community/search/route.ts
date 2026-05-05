@@ -18,9 +18,13 @@ export async function GET(req: NextRequest) {
   }
 
   const q = req.nextUrl.searchParams.get("q") || "";
-  const users = await searchCommunityUsers(userId, q, lineId ? [lineId] : []);
+  const { users, resultCount, totalUsers } = await searchCommunityUsers(
+    userId,
+    q,
+    lineId ? [lineId] : []
+  );
   return NextResponse.json(
-    { users },
+    { users, resultCount, totalUsers },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

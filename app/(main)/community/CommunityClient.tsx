@@ -10,6 +10,7 @@ import {
   writeClientViewCache,
 } from "@/lib/client-view-cache";
 import { listenProfileSync, type ProfileSyncDetail } from "@/lib/profile-sync";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { trackUiFetch } from "@/lib/ui-activity";
 
 type SearchUser = {
@@ -46,6 +47,8 @@ type CommunityCache = {
   friends: FriendItem[];
   requests: IncomingRequest[];
   results: SearchUser[];
+  resultCount?: number;
+  totalUsers?: number;
   friendsLoadedAt?: number;
   resultsLoadedAt?: number;
 };
@@ -114,6 +117,11 @@ function normalizeResults(items: SearchUser[]) {
   return Array.from(next.values());
 }
 
+function normalizeCount(value: unknown, fallback = 0) {
+  const next = Number(value);
+  return Number.isFinite(next) && next >= 0 ? next : fallback;
+}
+
 function patchProfileItem<T extends { displayName: string; image: string; username?: string | null; bio?: string }>(
   item: T,
   detail: ProfileSyncDetail
@@ -172,6 +180,14 @@ export default function CommunityClient({
   const cachedResults = Array.isArray(cachedCommunityState?.data?.results)
     ? normalizeResults(cachedCommunityState.data.results)
     : [];
+  const cachedResultCount = normalizeCount(
+    cachedCommunityState?.data?.resultCount,
+    cachedResults.length
+  );
+  const cachedTotalUsers = normalizeCount(
+    cachedCommunityState?.data?.totalUsers,
+    cachedResults.length
+  );
   const cachedHasFriendsSnapshot = Boolean(
     cachedCommunityState?.data &&
       (typeof cachedCommunityState.data.friendsLoadedAt === "number" ||
@@ -183,19 +199,27 @@ export default function CommunityClient({
       (typeof cachedCommunityState.data.resultsLoadedAt === "number" ||
         cachedResults.length > 0)
   );
+  const cachedHasSearchCounts = Boolean(
+    cachedCommunityState?.data &&
+      typeof cachedCommunityState.data.resultCount === "number" &&
+      typeof cachedCommunityState.data.totalUsers === "number"
+  );
   const hasReadyFriendsSnapshot =
     hasInitialCommunityState ||
     initialFriends.length > 0 ||
     initialRequests.length > 0 ||
     cachedHasFriendsSnapshot;
   const didBootstrapSuggestionsRef = useRef(
-    cachedHasResultsSnapshot || cachedResults.length > 0
+    cachedHasSearchCounts &&
+      (cachedHasResultsSnapshot || cachedResults.length > 0)
   );
   const previousQueryRef = useRef("");
   const router = useRouter();
   const { isOnline } = useOnlinePresence();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>(cachedResults);
+  const [resultCount, setResultCount] = useState(cachedResultCount);
+  const [totalUsers, setTotalUsers] = useState(cachedTotalUsers);
   const [friends, setFriends] = useState<FriendItem[]>(
     hasInitialCommunityState ? normalizeFriends(initialFriends) : cachedFriends
   );
@@ -258,7 +282,12 @@ export default function CommunityClient({
         }
       );
       const data = await res.json().catch(() => ({}));
-      setResults(Array.isArray(data?.users) ? normalizeResults(data.users) : []);
+      const nextResults = Array.isArray(data?.users)
+        ? normalizeResults(data.users)
+        : [];
+      setResults(nextResults);
+      setResultCount(normalizeCount(data?.resultCount, nextResults.length));
+      setTotalUsers(normalizeCount(data?.totalUsers, nextResults.length));
       setResultsHydrated(true);
     } catch {
       return;
@@ -326,6 +355,12 @@ export default function CommunityClient({
 
       if (Array.isArray(cached.data.results) && cached.data.results.length > 0) {
         setResults(normalizeResults(cached.data.results));
+        setResultCount(
+          normalizeCount(cached.data.resultCount, cached.data.results.length)
+        );
+        setTotalUsers(
+          normalizeCount(cached.data.totalUsers, cached.data.results.length)
+        );
         setBootstrappingSuggestions(false);
         setResultsHydrated(true);
       }
@@ -358,6 +393,8 @@ export default function CommunityClient({
       friends,
       requests,
       results,
+      resultCount,
+      totalUsers,
       friendsLoadedAt: friendsHydrated
         ? Date.now()
         : cachedCommunityState?.data?.friendsLoadedAt,
@@ -371,8 +408,10 @@ export default function CommunityClient({
     friends,
     friendsHydrated,
     requests,
+    resultCount,
     results,
     resultsHydrated,
+    totalUsers,
   ]);
 
   useEffect(() => {
@@ -411,6 +450,49 @@ export default function CommunityClient({
       window.removeEventListener("focus", onFocus);
     };
   }, [query, resultsHydrated]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) return;
+
+    let refreshTimeout: number | null = null;
+    const queueCommunityRefresh = () => {
+      if (refreshTimeout) {
+        window.clearTimeout(refreshTimeout);
+      }
+
+      refreshTimeout = window.setTimeout(() => {
+        void loadFriends(true);
+        void runSearch(query, true);
+      }, 180);
+    };
+
+    const channel = supabase
+      .channel(`community-users-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "User" },
+        queueCommunityRefresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "FriendRequest" },
+        queueCommunityRefresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "Friendship" },
+        queueCommunityRefresh
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimeout) {
+        window.clearTimeout(refreshTimeout);
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [query]);
 
   useEffect(() => {
     return listenProfileSync((detail) => {
@@ -595,20 +677,11 @@ export default function CommunityClient({
     })();
   };
 
-  const friendIdSet = useMemo(
-    () => new Set(friends.map((friend) => friend.friendId)),
-    [friends]
-  );
-  const visibleResults = useMemo(() => {
-    const hasQuery = Boolean(query.trim());
-
-    return normalizeResults(results).filter((user) => {
-      if (user.relation === "self") return false;
-      if (hasQuery) return true;
-      return user.relation !== "friends" && !friendIdSet.has(user.id);
-    });
-  }, [friendIdSet, query, results]);
-  const suggestionCount = visibleResults.length;
+  const visibleResults = useMemo(() => normalizeResults(results), [results]);
+  const foundUserCount = resultsHydrated
+    ? resultCount
+    : visibleResults.length;
+  const totalUserCount = Math.max(totalUsers, visibleResults.length);
 
   return (
     <div className="min-h-full overflow-hidden bg-[#f4f0f7] text-[#08080a]">
@@ -779,9 +852,9 @@ export default function CommunityClient({
                   </div>
                   <div className="rounded-[22px] bg-black p-3 text-white sm:rounded-[28px] sm:p-4">
                     <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45 sm:text-xs sm:tracking-[0.18em]">
-                      Suggestions
+                      Users
                     </div>
-                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">{suggestionCount}</div>
+                    <div className="mt-2 text-2xl font-black tracking-[-0.08em] sm:text-4xl">{totalUserCount}</div>
                   </div>
                 </div>
 
@@ -971,7 +1044,7 @@ export default function CommunityClient({
                 </div>
               </div>
               <div className="shrink-0 rounded-full bg-[#eef0fb] px-3 py-2 text-xs font-black sm:px-4 sm:text-sm">
-                {visibleResults.length} คน
+                {foundUserCount} คน
               </div>
             </div>
 

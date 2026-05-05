@@ -1004,7 +1004,6 @@ export async function searchCommunityUsers(
   currentUserAliases: string[] = []
 ) {
   const term = String(query || "").trim().toLowerCase();
-  const normalizedTerm = normalizeSearchValue(query);
   await ensureCommunitySchema().catch(() => undefined);
   const dbUsers = await prisma.$queryRawUnsafe<
     Array<{
@@ -1017,7 +1016,7 @@ export async function searchCommunityUsers(
       createdAt: Date | string;
     }>
   >(
-    'SELECT "id", "lineId", "name", "displayName", "username", "image", "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 500'
+    'SELECT "id", "lineId", "name", "displayName", "username", "image", "createdAt" FROM "User" ORDER BY "createdAt" DESC, "id" ASC'
   ).catch(() => []);
   const localProfiles = await getAllLocalProfiles();
   const localMap = new Map(localProfiles.map((item) => [item.userId, item]));
@@ -1078,9 +1077,8 @@ export async function searchCommunityUsers(
       .filter(Boolean)
   );
 
-  const candidates = Array.from(candidateMap.values()).filter(
-    (user) => !selfIds.has(user.id)
-  );
+  const candidates = Array.from(candidateMap.values());
+  const totalUsers = candidates.length;
 
   const scored = candidates
     .map((user) => ({
@@ -1089,38 +1087,33 @@ export async function searchCommunityUsers(
     }))
     .filter((item) => !term || item.score > 0);
 
-  const exactMatches = normalizedTerm
-    ? scored.filter((item) => {
-        const username = normalizeSearchValue(item.user.username);
-        const displayName = normalizeSearchValue(item.user.displayName);
-        return username === normalizedTerm || displayName === normalizedTerm;
-      })
-    : [];
-
-  const filtered = (exactMatches.length === 1 ? exactMatches : scored)
+  const filtered = scored
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return a.user.displayName.localeCompare(b.user.displayName);
     })
     .map((item) => item.user);
 
-  const limitedUsers = filtered.slice(0, term ? 50 : 28);
   const relationMap = await getFriendRelationsForUsers(
     currentUserId,
-    limitedUsers.map((user) => user.id),
+    filtered.map((user) => user.id),
     currentUserAliases
   );
 
-  return limitedUsers.map((user) => {
-    const relation = relationMap.get(user.id) || {
-      status: "none" as const,
-      requestId: null as string | null,
-    };
+  return {
+    users: filtered.map((user) => {
+      const relation = relationMap.get(user.id) || {
+        status: selfIds.has(user.id) ? ("self" as const) : ("none" as const),
+        requestId: null as string | null,
+      };
 
-    return {
-    ...user,
-    relation: relation.status,
-    requestId: relation.requestId,
-    };
-  });
+      return {
+        ...user,
+        relation: relation.status,
+        requestId: relation.requestId,
+      };
+    }),
+    resultCount: filtered.length,
+    totalUsers,
+  };
 }
