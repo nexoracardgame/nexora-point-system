@@ -2,7 +2,7 @@ import { Apple, BadgeCheck } from "lucide-react";
 
 const APP_STORE_URL =
   process.env.NEXT_PUBLIC_APP_STORE_URL ||
-  "https://apps.apple.com/search?term=NEXORA%20POINT";
+  "https://apps.apple.com/search?term=NEX%20POINT";
 
 export default function AppStoreButton() {
   return (
@@ -11,7 +11,7 @@ export default function AppStoreButton() {
       target="_blank"
       rel="noreferrer"
       className="pointer-events-auto group inline-flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[22px] border border-black/12 bg-[linear-gradient(180deg,#fdfdfd_0%,#e8e8e8_100%)] px-5 py-3 text-sm font-black text-black shadow-[0_20px_46px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 hover:shadow-[0_26px_62px_rgba(0,0,0,0.22)]"
-      aria-label="Open NEXORA POINT on the App Store"
+      aria-label="Open NEX POINT on the App Store"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-[16px] border border-black/10 bg-black text-white">
         <Apple className="h-5 w-5 fill-current" />

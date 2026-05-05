@@ -19,14 +19,14 @@ export default function AppSplash() {
       <div className="relative flex flex-col items-center">
         <div className="mb-5 h-24 w-24 rounded-[28px] border border-amber-300/30 bg-black/60 p-3 shadow-[0_0_80px_rgba(251,191,36,0.35)]">
           <img
-            src="/icon-512.png"
-            alt="NEXORA"
+            src="/icon-512-nex-point.png"
+            alt="NEX POINT"
             className="h-full w-full rounded-[20px] object-cover"
           />
         </div>
 
         <div className="text-2xl font-black tracking-[0.35em] text-amber-200">
-          NEXORA
+          NEX POINT
         </div>
 
         <div className="mt-3 text-[10px] uppercase tracking-[0.4em] text-white/45">

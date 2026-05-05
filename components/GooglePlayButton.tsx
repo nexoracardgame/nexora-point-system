@@ -10,7 +10,7 @@ export default function GooglePlayButton() {
       target="_blank"
       rel="noreferrer"
       className="pointer-events-auto group inline-flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[22px] border border-amber-300/28 bg-[linear-gradient(180deg,#fffdf7_0%,#f4ddb2_100%)] px-5 py-3 text-sm font-black text-black shadow-[0_20px_46px_rgba(120,82,20,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_26px_62px_rgba(120,82,20,0.26)]"
-      aria-label="Open NEXORA POINT on Google Play"
+      aria-label="Open NEX POINT on Google Play"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-[16px] border border-black/10 bg-black text-amber-200">
         <Play className="h-5 w-5 fill-current" />

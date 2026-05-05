@@ -23,17 +23,17 @@ async function readPushPayload(event) {
 }
 
 async function showPushNotification(payload) {
-  const title = String(payload.title || "NEXORA").trim() || "NEXORA";
+  const title = String(payload.title || "NEX POINT").trim() || "NEX POINT";
   const body = String(payload.body || "").trim();
   const id = String(payload.id || "").trim();
   const href = String(payload.href || "/").trim() || "/";
-  const icon = String(payload.icon || payload.image || "/icon-192.png").trim();
+  const icon = String(payload.icon || payload.image || "/icon-192-nex-point.png").trim();
   const tag = String(payload.tag || id || href || "nexora-push").trim();
 
   await self.registration.showNotification(title, {
     body,
-    icon: icon || "/icon-192.png",
-    badge: "/icon-192.png",
+    icon: icon || "/icon-192-nex-point.png",
+    badge: "/icon-192-nex-point.png",
     tag,
     renotify: true,
     timestamp: Date.now(),

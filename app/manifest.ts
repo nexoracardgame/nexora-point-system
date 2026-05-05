@@ -2,21 +2,21 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "NEXORA CARDGAME",
-    short_name: "NEXORA POINT",
-    description: "NEXORA Point System",
+    name: "NEX POINT",
+    short_name: "NEX POINT",
+    description: "NEX POINT",
     start_url: "/",
     display: "standalone",
     background_color: "#050507",
     theme_color: "#050507",
     icons: [
       {
-        src: "/icon-192.png",
+        src: "/icon-192-nex-point.png",
         sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-512-nex-point.png",
         sizes: "512x512",
         type: "image/png",
       },

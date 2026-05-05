@@ -349,8 +349,8 @@ export default function NotificationBell() {
 
       await registration.showNotification(item.title, {
         body: item.body,
-        icon: item.image || "/icon-192.png",
-        badge: "/icon-192.png",
+        icon: item.image || "/icon-192-nex-point.png",
+        badge: "/icon-192-nex-point.png",
         tag: item.id,
         data: {
           href: item.href || "/",
