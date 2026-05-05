@@ -184,6 +184,7 @@ export default function MainLayout({
   const { t } = useLanguage();
   const isChatRoomPage =
     pathname.startsWith("/dm/") || pathname.startsWith("/market/deals/chat/");
+  const hideFloatingChatOnMobile = pathname === "/dm" || isChatRoomPage;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1391,7 +1392,7 @@ export default function MainLayout({
       </div>
 
       <LiveFloatingPlayer />
-      <div className={pathname === "/dm" ? "hidden xl:block" : undefined}>
+      <div className={hideFloatingChatOnMobile ? "hidden xl:block" : undefined}>
         <FloatingChatDock unreadCount={chatUnreadCount} />
       </div>
 
