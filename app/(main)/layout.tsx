@@ -37,6 +37,7 @@ import {
   ChevronRight,
   User,
   Radio,
+  PackageOpen,
 } from "lucide-react";
 
 function safeProfileSrc(image?: string | null) {
@@ -896,6 +897,7 @@ export default function MainLayout({
     const importantRoutes = [
       "/",
       "/market",
+      "/box-market",
       "/market/deals",
       "/rewards",
       "/redeem",
@@ -970,6 +972,7 @@ export default function MainLayout({
   }, [mobileNavOpen]);
 
   const pageContext = useMemo(() => {
+    if (pathname.startsWith("/box-market")) return "กล่องสุ่ม";
     if (pathname.startsWith("/market")) return t("layout.page.market");
     if (pathname.startsWith("/collections")) return t("layout.page.collections");
     if (pathname.startsWith("/community")) return t("layout.page.community");
@@ -989,6 +992,12 @@ export default function MainLayout({
         label: t("layout.nav.market"),
         icon: ShoppingBag,
         active: pathname.startsWith("/market"),
+      },
+      {
+        href: "/box-market",
+        label: "กล่องสุ่ม",
+        icon: PackageOpen,
+        active: pathname.startsWith("/box-market"),
       },
       {
         href: "/rewards",
@@ -1015,10 +1024,10 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
-        href: "/live",
-        label: "ไลฟ์",
-        icon: Radio,
-        active: pathname.startsWith("/live"),
+        href: "/box-market",
+        label: "กล่องสุ่ม",
+        icon: PackageOpen,
+        active: pathname.startsWith("/box-market"),
       },
       {
        href: "/dm",
