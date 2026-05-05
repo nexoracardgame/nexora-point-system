@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
@@ -19,11 +19,9 @@ function formatPrice(value?: number | null) {
 export default function BuyCenterClient({
   initialListings,
   currentUserId,
-  isAdmin,
 }: {
   initialListings: BuyMarketListing[];
   currentUserId: string;
-  isAdmin: boolean;
 }) {
   const [listings, setListings] = useState(initialListings);
   const [bootstrapped, setBootstrapped] = useState(initialListings.length > 0);
@@ -144,17 +142,9 @@ export default function BuyCenterClient({
               จัดการโพสต์รับซื้อ
             </h1>
             <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-black/52">
-              {isAdmin
-                ? "GM สามารถลบโพสต์รับซื้อของทุกคนได้ ส่วนการแก้ราคาเปิดให้เจ้าของโพสต์เท่านั้น"
-                : "แก้ไขราคารับซื้อหรือลบโพสต์รับซื้อของคุณได้จากหน้านี้"}
+              แก้ไขราคารับซื้อหรือลบโพสต์รับซื้อของคุณได้จากหน้านี้
             </p>
           </div>
-          {isAdmin ? (
-            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-black px-3 py-2 text-xs font-black text-white">
-              <ShieldCheck className="h-4 w-4" />
-              GM delete enabled
-            </div>
-          ) : null}
         </div>
       </section>
 
@@ -173,7 +163,7 @@ export default function BuyCenterClient({
         <div className="grid gap-3">
           {listings.map((listing) => {
             const canEdit = listing.buyerId === currentUserId;
-            const canDelete = canEdit || isAdmin;
+            const canDelete = canEdit;
 
             return (
               <article

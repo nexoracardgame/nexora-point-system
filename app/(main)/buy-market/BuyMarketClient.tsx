@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BadgeDollarSign, Heart, RefreshCw, Search, Store } from "lucide-react";
+import {
+  BadgeDollarSign,
+  Heart,
+  Loader2,
+  RefreshCw,
+  Search,
+  Store,
+  Trash2,
+} from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
@@ -54,13 +62,21 @@ function removeFollowedListing(id: string) {
 
 export default function BuyMarketClient({
   initialListings,
+  currentUser,
 }: {
   initialListings: BuyMarketListing[];
+  currentUser: {
+    id: string;
+    isAdmin: boolean;
+  };
 }) {
   const [listings, setListings] = useState(initialListings);
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [followedIds, setFollowedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState<BuyMarketListing | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deletingId, setDeletingId] = useState("");
 
   useEffect(() => {
     setFollowedIds(readFollowedIds());
@@ -138,6 +154,40 @@ export default function BuyMarketClient({
       return next;
     });
   };
+
+  async function confirmAdminDelete() {
+    if (!deleteTarget || deletingId) return;
+
+    try {
+      setDeletingId(deleteTarget.id);
+      setDeleteError("");
+
+      const res = await fetch(`/api/buy-market/listings/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.success) {
+        setDeleteError(data?.error || "ลบโพสต์รับซื้อไม่สำเร็จ");
+        return;
+      }
+
+      setListings((current) =>
+        current.filter((item) => item.id !== deleteTarget.id)
+      );
+      setFollowedIds((current) => {
+        const next = new Set(current);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      removeFollowedListing(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch {
+      setDeleteError("ลบโพสต์รับซื้อไม่สำเร็จ");
+    } finally {
+      setDeletingId("");
+    }
+  }
 
   return (
     <div className="min-h-full text-black">
@@ -247,9 +297,10 @@ export default function BuyMarketClient({
               ยังไม่มีโพสต์รับซื้อที่ตรงกับเงื่อนไข
             </div>
           ) : (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
               {filteredListings.map((listing) => {
                 const followed = followedIds.has(listing.id);
+                const canAdminDelete = currentUser.isAdmin;
 
                 return (
                   <article
@@ -283,31 +334,31 @@ export default function BuyMarketClient({
                         >
                           <Heart className={`h-4 w-4 ${followed ? "fill-black" : ""}`} />
                         </button>
-                        <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                        <div className="absolute bottom-0 left-0 right-0 p-3 text-white sm:p-4">
                           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-white/50">
                             ต้องการรับซื้อ
                           </div>
-                          <h3 className="mt-1 line-clamp-2 text-lg font-black leading-tight">
+                          <h3 className="mt-1 line-clamp-2 text-sm font-black leading-tight sm:text-lg">
                             {listing.cardName || `Card #${listing.cardNo}`}
                           </h3>
-                          <div className="mt-2 text-2xl font-black text-white">
+                          <div className="mt-2 text-lg font-black text-white sm:text-2xl">
                             {formatPrice(listing.offerPrice)}
                           </div>
                         </div>
                       </div>
                     </Link>
-                    <div className="flex flex-col gap-3 p-3">
+                    <div className="flex flex-col gap-2 p-2.5 sm:gap-3 sm:p-3">
                       <Link
                         href={`/profile/${listing.buyerId}`}
-                        className="flex min-w-0 items-center gap-2 rounded-[18px] bg-white px-2.5 py-2 transition hover:bg-zinc-100"
+                        className="flex min-w-0 items-center gap-2 rounded-[16px] bg-white px-2 py-2 transition hover:bg-zinc-100 sm:rounded-[18px] sm:px-2.5"
                       >
                         <img
                           src={listing.buyerImage || "/avatar.png"}
                           alt={listing.buyerName}
-                          className="h-9 w-9 shrink-0 rounded-2xl object-cover"
+                          className="h-7 w-7 shrink-0 rounded-xl object-cover sm:h-9 sm:w-9 sm:rounded-2xl"
                         />
                         <div className="min-w-0">
-                        <div className="truncate text-xs font-black text-black/70">
+                        <div className="truncate text-[11px] font-black text-black/70 sm:text-xs">
                           ผู้รับซื้อ: {listing.buyerName}
                         </div>
                         <div className="mt-0.5 text-[11px] font-bold text-black/40">
@@ -315,7 +366,20 @@ export default function BuyMarketClient({
                         </div>
                         </div>
                       </Link>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        {canAdminDelete ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteTarget(listing);
+                              setDeleteError("");
+                            }}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-red-50 px-3 py-2 text-[11px] font-black text-red-700 ring-1 ring-red-100 transition hover:bg-red-100"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            GM ลบ
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => toggleFollow(listing)}
@@ -330,7 +394,7 @@ export default function BuyMarketClient({
                         </button>
                       <Link
                         href={`/buy-market/card/${listing.id}`}
-                        className="shrink-0 rounded-full bg-black px-3 py-2 text-[11px] font-black text-white"
+                        className="shrink-0 rounded-full bg-black px-3 py-2 text-center text-[11px] font-black text-white"
                       >
                         เสนอขาย
                       </Link>
@@ -343,6 +407,59 @@ export default function BuyMarketClient({
           )}
         </section>
       </div>
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-5 text-black shadow-[0_34px_120px_rgba(0,0,0,0.42)]">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-700">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-black/42">
+                  GM Delete
+                </div>
+                <h2 className="mt-1 text-2xl font-black">ลบโพสต์รับซื้อ</h2>
+                <p className="mt-2 text-sm font-medium leading-6 text-black/52">
+                  ยืนยันการลบโพสต์รับซื้อ{" "}
+                  {deleteTarget.cardName || `Card #${deleteTarget.cardNo}`}{" "}
+                  ออกจากตลาดรับซื้อการ์ดใบเดียว
+                </p>
+              </div>
+            </div>
+
+            {deleteError ? (
+              <div className="mt-4 rounded-[16px] bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+                {deleteError}
+              </div>
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (deletingId) return;
+                  setDeleteTarget(null);
+                  setDeleteError("");
+                }}
+                disabled={Boolean(deletingId)}
+                className="rounded-full bg-[#f4f4f5] px-4 py-3 text-xs font-black text-black transition hover:bg-zinc-200 disabled:opacity-60"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmAdminDelete()}
+                disabled={Boolean(deletingId)}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-black px-4 py-3 text-xs font-black text-white transition hover:bg-zinc-900 disabled:opacity-60"
+              >
+                {deletingId ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                ยืนยันลบ
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

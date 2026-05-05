@@ -35,9 +35,7 @@ export async function GET(req: NextRequest) {
       return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const listings = user.isAdmin
-      ? await getBuyMarketListings()
-      : await getBuyMarketListingsByBuyer(user.id);
+    const listings = await getBuyMarketListingsByBuyer(user.id);
 
     return jsonNoStore({
       listings,

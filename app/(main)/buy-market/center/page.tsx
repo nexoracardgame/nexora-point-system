@@ -11,7 +11,6 @@ export default async function BuyCenterPage() {
     <BuyCenterClient
       initialListings={[]}
       currentUserId={user.id}
-      isAdmin={user.isAdmin}
     />
   );
 }
