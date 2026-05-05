@@ -7,6 +7,7 @@ import {
   createBoxMarketListing,
   deleteBoxMarketListing,
   getBoxMarketListings,
+  getBoxMarketListingsBySeller,
   updateBoxMarketListingPrice,
 } from "@/lib/box-market-store";
 import type { BoxProductType } from "@/lib/box-market-types";
@@ -50,9 +51,23 @@ async function getBoxMarketActor(req: NextRequest) {
   };
 }
 
-export async function GET() {
-  const listings = await getBoxMarketListings();
-  return jsonNoStore({ listings });
+async function getOptionalBoxMarketUserId(req: NextRequest) {
+  try {
+    const { userId } = await getBoxMarketActor(req);
+    return userId;
+  } catch {
+    return "";
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const userId = await getOptionalBoxMarketUserId(req);
+  const [listings, myListings] = await Promise.all([
+    getBoxMarketListings(),
+    userId ? getBoxMarketListingsBySeller(userId) : Promise.resolve([]),
+  ]);
+
+  return jsonNoStore({ listings, myListings });
 }
 
 export async function POST(req: NextRequest) {

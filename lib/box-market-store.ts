@@ -221,6 +221,42 @@ export async function getBoxMarketListings(limit = 120) {
   }
 }
 
+export async function getBoxMarketListingsBySeller(sellerId: string) {
+  const safeSellerId = String(sellerId || "").trim();
+  if (!safeSellerId) {
+    return [];
+  }
+
+  if (!hasDatabaseConfig()) {
+    return (await readLocalListings())
+      .filter(
+        (item) =>
+          item.sellerId === safeSellerId &&
+          String(item.status || "active").toLowerCase() === "active"
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  try {
+    await ensureBoxMarketSchema();
+    const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+      'SELECT * FROM "BoxMarketListing" WHERE "sellerId" = $1 AND LOWER("status") = \'active\' ORDER BY "createdAt" DESC, "id" ASC',
+      safeSellerId
+    );
+    return rows.map(toListingRecord);
+  } catch {
+    return process.env.NODE_ENV === "production"
+      ? []
+      : (await readLocalListings())
+          .filter(
+            (item) =>
+              item.sellerId === safeSellerId &&
+              String(item.status || "active").toLowerCase() === "active"
+          )
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+}
+
 export async function getDealerVerificationStatus(
   userId: string
 ): Promise<DealerVerificationStatus> {

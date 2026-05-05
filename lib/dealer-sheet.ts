@@ -196,6 +196,10 @@ function normalizeDigits(value: string) {
   return digits;
 }
 
+export function normalizeDealerNationalId(value: string) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
 function parseSalesValue(value: string) {
   const normalized = String(value || "").replace(/[^\d.-]/g, "");
   const parsed = Number(normalized);
@@ -266,7 +270,7 @@ export async function verifyDealerAgainstSheet(
     fullName: normalizeFullName(input.fullName),
     memberId: normalizeCode(input.memberId),
     phone: normalizeDigits(input.phone),
-    nationalId: normalizeDigits(input.nationalId),
+    nationalId: normalizeDealerNationalId(input.nationalId),
   };
 
   return rows.some((row) => {
@@ -277,7 +281,7 @@ export async function verifyDealerAgainstSheet(
       getComparableRowValue(row, headerMap.memberId, 1)
     );
     const phone = normalizeDigits(getComparableRowValue(row, headerMap.phone, 2));
-    const nationalId = normalizeDigits(
+    const nationalId = normalizeDealerNationalId(
       getComparableRowValue(row, headerMap.nationalId, 3)
     );
 

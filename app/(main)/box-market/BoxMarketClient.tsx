@@ -177,15 +177,18 @@ function ProductVisual({
 
 export default function BoxMarketClient({
   initialListings,
+  initialMyListings,
   productAssets,
   currentUser,
 }: {
   initialListings: BoxMarketListing[];
+  initialMyListings: BoxMarketListing[];
   productAssets: BoxProductAsset[];
   currentUser: CurrentBoxMarketUser;
 }) {
   const router = useRouter();
   const [listings, setListings] = useState(initialListings);
+  const [ownedListings, setOwnedListings] = useState(initialMyListings);
   const [assets] = useState(productAssets);
   const [form, setForm] = useState<FormState>(() => buildInitialForm());
   const [dealerStatus, setDealerStatus] =
@@ -215,11 +218,22 @@ export default function BoxMarketClient({
     };
   }, [assets, form.productId]);
   const myListings = useMemo(
-    () =>
-      currentUser.id
-        ? listings.filter((item) => item.sellerId === currentUser.id)
-        : [],
-    [currentUser.id, listings]
+    () => {
+      if (!currentUser.id) {
+        return [];
+      }
+
+      const merged = new Map<string, BoxMarketListing>();
+      listings
+        .filter((item) => item.sellerId === currentUser.id)
+        .forEach((item) => merged.set(item.id, item));
+      ownedListings.forEach((item) => merged.set(item.id, item));
+
+      return Array.from(merged.values()).sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt)
+      );
+    },
+    [currentUser.id, listings, ownedListings]
   );
 
   useEffect(() => {
@@ -258,8 +272,13 @@ export default function BoxMarketClient({
           cache: "no-store",
         });
         const data = await res.json();
-        if (!cancelled && Array.isArray(data?.listings)) {
-          setListings(data.listings);
+        if (!cancelled) {
+          if (Array.isArray(data?.listings)) {
+            setListings(data.listings);
+          }
+          if (Array.isArray(data?.myListings)) {
+            setOwnedListings(data.myListings);
+          }
         }
       } catch {
         return;
@@ -342,6 +361,10 @@ export default function BoxMarketClient({
         data.listing,
         ...current.filter((item) => item.id !== data.listing.id),
       ]);
+      setOwnedListings((current) => [
+        data.listing,
+        ...current.filter((item) => item.id !== data.listing.id),
+      ]);
       setForm(buildInitialForm());
       setNotice("ลงขายสำเร็จ รายการใหม่ขึ้นบนสุดแล้ว");
     } catch {
@@ -401,6 +424,9 @@ export default function BoxMarketClient({
       setListings((current) =>
         current.map((item) => (item.id === data.listing.id ? data.listing : item))
       );
+      setOwnedListings((current) =>
+        current.map((item) => (item.id === data.listing.id ? data.listing : item))
+      );
       closeDialog();
     } catch {
       setActionError("เกิดข้อผิดพลาดระหว่างแก้ไขราคา");
@@ -432,6 +458,9 @@ export default function BoxMarketClient({
       }
 
       setListings((current) =>
+        current.filter((item) => item.id !== dialog.listing.id)
+      );
+      setOwnedListings((current) =>
         current.filter((item) => item.id !== dialog.listing.id)
       );
       closeDialog();
@@ -535,7 +564,7 @@ export default function BoxMarketClient({
 
                   {myListings.length > 0 ? (
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {myListings.slice(0, 4).map((item) => (
+                      {myListings.map((item) => (
                         <div
                           key={item.id}
                           className="flex min-w-0 items-center gap-3 rounded-[18px] border border-white/8 bg-black/24 p-2"

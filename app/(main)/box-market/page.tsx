@@ -6,7 +6,10 @@ import {
   resolveBoxMarketUserId,
 } from "@/lib/box-market-auth";
 import { getBoxProductAssets } from "@/lib/box-product-assets";
-import { getBoxMarketListings } from "@/lib/box-market-store";
+import {
+  getBoxMarketListings,
+  getBoxMarketListingsBySeller,
+} from "@/lib/box-market-store";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +25,20 @@ export default async function BoxMarketPage() {
   )
     .trim()
     .toLowerCase();
-  const [initialListings, productAssets] = await Promise.all([
+  const initialMyListingsPromise = currentUserId
+    ? getBoxMarketListingsBySeller(currentUserId).catch(() => [])
+    : Promise.resolve([]);
+
+  const [initialListings, initialMyListings, productAssets] = await Promise.all([
     getBoxMarketListings().catch(() => []),
+    initialMyListingsPromise,
     getBoxProductAssets(),
   ]);
 
   return (
     <BoxMarketClient
       initialListings={initialListings}
+      initialMyListings={initialMyListings}
       productAssets={productAssets}
       currentUser={{
         id: currentUserId,

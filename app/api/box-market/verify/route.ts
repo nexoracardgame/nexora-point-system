@@ -7,7 +7,10 @@ import {
   getDealerVerificationStatus,
   upsertDealerVerification,
 } from "@/lib/box-market-store";
-import { verifyDealerAgainstSheet } from "@/lib/dealer-sheet";
+import {
+  normalizeDealerNationalId,
+  verifyDealerAgainstSheet,
+} from "@/lib/dealer-sheet";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -58,13 +61,20 @@ export async function POST(req: NextRequest) {
     const fullName = clean(body?.fullName);
     const memberId = clean(body?.memberId);
     const phone = clean(body?.phone);
-    const nationalId = clean(body?.nationalId);
+    const nationalId = normalizeDealerNationalId(clean(body?.nationalId));
     const lineContactId = clean(body?.lineContactId) || null;
     const email = clean(body?.email) || null;
 
     if (!fullName || !memberId || !phone || !nationalId) {
       return jsonNoStore(
         { error: "กรอกข้อมูลจำเป็นให้ครบก่อนยืนยัน" },
+        { status: 400 }
+      );
+    }
+
+    if (nationalId.length !== 13) {
+      return jsonNoStore(
+        { error: "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก จะใส่ขีดหรือไม่ใส่ก็ได้" },
         { status: 400 }
       );
     }
