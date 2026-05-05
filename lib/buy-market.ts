@@ -527,7 +527,12 @@ export async function actOnBuyDeal(input: {
   }
 
   if (input.action === "cancel") {
-    if (deal.sellerId !== actorId || normalizeStatus(deal.status) !== "pending") {
+    const status = normalizeStatus(deal.status);
+    const isParticipant = deal.buyerId === actorId || deal.sellerId === actorId;
+    const canCancelPending = status === "pending" && deal.sellerId === actorId;
+    const canCancelAccepted = status === "accepted" && isParticipant;
+
+    if (!canCancelPending && !canCancelAccepted) {
       throw new Error("forbidden");
     }
 
@@ -538,13 +543,16 @@ export async function actOnBuyDeal(input: {
       },
     });
 
+    const actor = deal.buyerId === actorId ? deal.buyer : deal.seller;
+    const targetUserId = deal.buyerId === actorId ? deal.sellerId : deal.buyerId;
+
     await createLocalNotification({
-      userId: deal.buyerId,
+      userId: targetUserId,
       type: "deal",
-      title: `${safeName(deal.seller, "ผู้เสนอขาย")} ยกเลิกข้อเสนอขาย`,
+      title: `${safeName(actor, "ผู้ใช้งาน")} ยกเลิกดีลรับซื้อ`,
       body: String(listing.cardName || "").trim() || `Card #${normalizeCardNo(listing.cardNo)}`,
       href: "/buy-market/deals",
-      image: safeImage(deal.seller),
+      image: safeImage(actor),
     }).catch(() => undefined);
 
     return { success: true, action: "cancel" as const, removedDealId: deal.id };

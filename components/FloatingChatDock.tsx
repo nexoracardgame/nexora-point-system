@@ -18,10 +18,12 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
+import ChatTypingIndicator from "@/components/ChatTypingIndicator";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
+import { useChatTyping } from "@/lib/chat-typing-client";
 import {
   buildChatUser,
   mergeChatMessages,
@@ -390,6 +392,12 @@ export default function FloatingChatDock({
 
     return mineSeen[mineSeen.length - 1]?.id || null;
   }, [activeRoom?.me?.id, currentUserId, messages]);
+  const otherTyping = useChatTyping({
+    roomId: activeRoom?.actualRoomId || "",
+    me: activeRoom?.me || null,
+    other: activeRoom?.other || null,
+    isTyping: Boolean(safeText(draft)) && open && Boolean(activeRoom?.actualRoomId),
+  });
 
   useEffect(() => {
     activeRoomRef.current = activeRoom;
@@ -1418,6 +1426,12 @@ export default function FloatingChatDock({
   }, [messages.length, open, scrollToBottom]);
 
   useEffect(() => {
+    if (open && otherTyping && activeRoom) {
+      scrollToBottom("smooth");
+    }
+  }, [activeRoom, open, otherTyping, scrollToBottom]);
+
+  useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
       if (!emojiRootRef.current?.contains(event.target as Node)) {
         setShowEmoji(false);
@@ -1778,7 +1792,7 @@ export default function FloatingChatDock({
                 <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
                   {messages.length === 0 && activeRoom.loading ? (
                     <FloatingChatMessageSkeleton />
-                  ) : messages.length === 0 ? (
+                  ) : messages.length === 0 && !otherTyping ? (
                     <div className="flex h-full min-h-[260px] flex-col items-center justify-center text-center">
                       <MessagesSquare className="h-9 w-9 text-white/16" />
                       <div className="mt-3 text-sm font-black text-white/70">
@@ -1851,6 +1865,12 @@ export default function FloatingChatDock({
                           </div>
                         );
                       })}
+                      <ChatTypingIndicator
+                        visible={otherTyping}
+                        avatar={activeRoom.other?.image || activeRoom.otherImage}
+                        name={activeRoom.other?.name || activeRoom.otherName}
+                        compact
+                      />
                       <div ref={bottomRef} className="h-1 w-full" />
                     </div>
                   )}

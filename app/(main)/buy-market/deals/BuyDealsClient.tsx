@@ -70,6 +70,10 @@ export default function BuyDealsClient({
   async function act(dealId: string, action: "accept" | "reject" | "cancel") {
     if (loadingId) return;
 
+    if (action === "cancel" && !confirm("ยืนยันยกเลิกดีลรับซื้อนี้?")) {
+      return;
+    }
+
     try {
       setLoadingId(`${dealId}:${action}`);
       const res = await fetch("/api/buy-market/deal-action", {
@@ -224,14 +228,29 @@ export default function BuyDealsClient({
 
                     <div className="flex flex-wrap gap-2">
                       {accepted ? (
-                        <button
-                          type="button"
-                          onClick={() => openDealChat(deal)}
-                          className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-black text-white"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          เปิดแชทดีลรับซื้อ
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openDealChat(deal)}
+                            className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-black text-white"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            เปิดแชทดีลรับซื้อ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void act(deal.id, "cancel")}
+                            disabled={loadingId === `${deal.id}:cancel`}
+                            className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-700 disabled:opacity-60"
+                          >
+                            {loadingId === `${deal.id}:cancel` ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="h-4 w-4" />
+                            )}
+                            ยกเลิกดีลนี้
+                          </button>
+                        </>
                       ) : deal.isBuyer ? (
                         <>
                           <button

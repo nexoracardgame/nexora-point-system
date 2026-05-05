@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
+import ChatTypingIndicator from "@/components/ChatTypingIndicator";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
@@ -23,6 +24,7 @@ import {
   type ChatUser,
 } from "@/lib/chat-room-types";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
+import { useChatTyping } from "@/lib/chat-typing-client";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { formatThaiTime } from "@/lib/thai-time";
 
@@ -187,6 +189,21 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       behavior,
     });
   };
+
+  const otherTyping = useChatTyping({
+    roomId,
+    me,
+    other,
+    isTyping: Boolean(text.trim()) && !roomClosed,
+  });
+
+  useEffect(() => {
+    if (!otherTyping || !isNearBottomRef.current) {
+      return;
+    }
+
+    requestAnimationFrame(() => scrollToBottom("smooth"));
+  }, [otherTyping]);
 
   const keepComposerVisibleNow = (behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
@@ -1401,6 +1418,11 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
                 </div>
               );
             })}
+            <ChatTypingIndicator
+              visible={otherTyping}
+              avatar={other?.image}
+              name={other?.name}
+            />
             <div ref={bottomRef} className="h-1 w-full" />
           </div>
         </div>

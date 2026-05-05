@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
+import ChatTypingIndicator from "@/components/ChatTypingIndicator";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
 import {
@@ -22,6 +23,7 @@ import {
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
+import { useChatTyping } from "@/lib/chat-typing-client";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { formatThaiTime } from "@/lib/thai-time";
 
@@ -213,6 +215,21 @@ function DMRoomContent({
       behavior,
     });
   };
+
+  const otherTyping = useChatTyping({
+    roomId,
+    me,
+    other,
+    isTyping: Boolean(text.trim()) && !roomClosed,
+  });
+
+  useEffect(() => {
+    if (!otherTyping || !isNearBottomRef.current) {
+      return;
+    }
+
+    requestAnimationFrame(() => scrollToBottom("smooth"));
+  }, [otherTyping]);
 
   const keepComposerVisibleNow = (behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
@@ -1463,6 +1480,11 @@ function DMRoomContent({
                 </div>
               );
             })}
+            <ChatTypingIndicator
+              visible={otherTyping}
+              avatar={other?.image}
+              name={other?.name}
+            />
             <div ref={bottomRef} className="h-1 w-full" />
           </div>
         </div>
