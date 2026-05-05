@@ -972,7 +972,7 @@ export default function MainLayout({
   }, [mobileNavOpen]);
 
   const pageContext = useMemo(() => {
-    if (pathname.startsWith("/box-market")) return "กล่องสุ่ม";
+    if (pathname.startsWith("/box-market")) return "ร้านขายซอง/กล่องการ์ดแท้";
     if (pathname.startsWith("/market")) return t("layout.page.market");
     if (pathname.startsWith("/collections")) return t("layout.page.collections");
     if (pathname.startsWith("/community")) return t("layout.page.community");
@@ -995,7 +995,7 @@ export default function MainLayout({
       },
       {
         href: "/box-market",
-        label: "กล่องสุ่ม",
+        label: "ซอง/กล่องแท้",
         icon: PackageOpen,
         active: pathname.startsWith("/box-market"),
       },
@@ -1022,12 +1022,6 @@ export default function MainLayout({
         label: t("layout.nav.community"),
         icon: Cat,
         active: pathname.startsWith("/community"),
-      },
-      {
-        href: "/box-market",
-        label: "กล่องสุ่ม",
-        icon: PackageOpen,
-        active: pathname.startsWith("/box-market"),
       },
       {
        href: "/dm",

@@ -138,8 +138,8 @@ export default function DealerVerifyClient() {
             ยืนยันตัวแทนจำหน่าย
           </h1>
           <p className="mt-4 text-sm font-medium leading-7 text-white/62 sm:text-base">
-            ระบบจะเทียบข้อมูลกับ Google Sheet ตัวแทนจำหน่ายแบบตรงรายการ
-            เมื่อผ่านแล้วสินค้าที่ลงขายใหม่ในตลาดกล่องสุ่มจะมีเครื่องหมายยืนยัน
+            ระบบจะเทียบข้อมูลกับฐานข้อมูลตัวแทนจำหน่ายในบริษัทจริง
+            เมื่อผ่านแล้วสินค้าที่ลงขายใหม่ในร้านขายซอง/กล่องการ์ดแท้จะมีเครื่องหมายยืนยัน
           </p>
 
           <div className="mt-8 rounded-[24px] border border-white/8 bg-white/[0.055] p-4">
