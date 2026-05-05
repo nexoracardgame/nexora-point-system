@@ -1,17 +1,18 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BadgeCheck, Clock3, Loader2, MessageCircle, XCircle } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
 import type { BuyDealCard } from "@/lib/buy-market-types";
+import { nexoraConfirm } from "@/lib/nexora-dialog";
 
 function formatPrice(value?: number | null) {
-  return `฿${Number(value || 0).toLocaleString("th-TH")}`;
+  return `เธฟ${Number(value || 0).toLocaleString("th-TH")}`;
 }
 
 function statusLabel(status: string) {
-  return status === "accepted" ? "เปิดห้องแชทแล้ว" : "รอตอบรับ";
+  return status === "accepted" ? "เน€เธเธดเธ”เธซเนเธญเธเนเธเธ—เนเธฅเนเธง" : "เธฃเธญเธ•เธญเธเธฃเธฑเธ";
 }
 
 export default function BuyDealsClient({
@@ -70,7 +71,15 @@ export default function BuyDealsClient({
   async function act(dealId: string, action: "accept" | "reject" | "cancel") {
     if (loadingId) return;
 
-    if (action === "cancel" && !confirm("ยืนยันยกเลิกดีลรับซื้อนี้?")) {
+    if (
+      action === "cancel" &&
+      !(await nexoraConfirm({
+        title: "ยกเลิกดีลรับซื้อ",
+        message: "ยืนยันยกเลิกดีลรับซื้อนี้? หลังยกเลิกแล้วคู่ดีลสามารถส่งคำขอใหม่ได้",
+        tone: "danger",
+        confirmText: "ยืนยันยกเลิก",
+      }))
+    ) {
       return;
     }
 
@@ -86,7 +95,7 @@ export default function BuyDealsClient({
       const data = await res.json();
 
       if (!res.ok || !data?.success) {
-        alert(data?.error || "จัดการดีลรับซื้อไม่สำเร็จ");
+        alert(data?.error || "เธเธฑเธ”เธเธฒเธฃเธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญเนเธกเนเธชเธณเน€เธฃเนเธ");
         return;
       }
 
@@ -96,7 +105,7 @@ export default function BuyDealsClient({
         await refreshDeals(true);
       }
     } catch {
-      alert("จัดการดีลรับซื้อไม่สำเร็จ");
+      alert("เธเธฑเธ”เธเธฒเธฃเธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญเนเธกเนเธชเธณเน€เธฃเนเธ");
     } finally {
       setLoadingId("");
     }
@@ -133,10 +142,10 @@ export default function BuyDealsClient({
               Buy Deal Requests
             </div>
             <h1 className="mt-1 text-3xl font-black sm:text-5xl">
-              ดีลรับซื้อการ์ด
+              เธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญเธเธฒเธฃเนเธ”
             </h1>
             <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-black/52">
-              หน้านี้แยกดีลรับซื้อออกจากดีลขายการ์ดใบเดียว เปิดไวและอัปเดตถี่ขึ้นเพื่อให้ตอบรับข้อเสนอขายได้ทันที
+              เธซเธเนเธฒเธเธตเนเนเธขเธเธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญเธญเธญเธเธเธฒเธเธ”เธตเธฅเธเธฒเธขเธเธฒเธฃเนเธ”เนเธเน€เธ”เธตเธขเธง เน€เธเธดเธ”เนเธงเนเธฅเธฐเธญเธฑเธเน€เธ”เธ•เธ–เธตเนเธเธถเนเธเน€เธเธทเนเธญเนเธซเนเธ•เธญเธเธฃเธฑเธเธเนเธญเน€เธชเธเธญเธเธฒเธขเนเธ”เนเธ—เธฑเธเธ—เธต
             </p>
           </div>
           <button
@@ -144,7 +153,7 @@ export default function BuyDealsClient({
             onClick={() => void refreshDeals(false)}
             className="w-fit rounded-full bg-black px-4 py-2 text-xs font-black text-white"
           >
-            {refreshing ? "กำลังอัปเดต..." : "อัปเดตดีล"}
+            {refreshing ? "เธเธณเธฅเธฑเธเธญเธฑเธเน€เธ”เธ•..." : "เธญเธฑเธเน€เธ”เธ•เธ”เธตเธฅ"}
           </button>
         </div>
       </section>
@@ -154,11 +163,11 @@ export default function BuyDealsClient({
       {!bootstrapped ? (
         <div className="flex items-center justify-center rounded-[28px] bg-white p-8 text-sm font-black text-black/45 shadow-[0_20px_60px_rgba(0,0,0,0.14)]">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          กำลังโหลดดีลรับซื้อ...
+          เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญ...
         </div>
       ) : sortedDeals.length === 0 ? (
         <div className="rounded-[28px] border border-dashed border-white/10 bg-white p-8 text-center text-sm font-bold text-black/45 shadow-[0_20px_60px_rgba(0,0,0,0.14)]">
-          ยังไม่มีดีลรับซื้อ
+          เธขเธฑเธเนเธกเนเธกเธตเธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญ
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -201,7 +210,7 @@ export default function BuyDealsClient({
                           {statusLabel(deal.status)}
                         </span>
                         <span className="rounded-full bg-[#f4f4f5] px-3 py-1 text-[11px] font-black text-black/50">
-                          {deal.isBuyer ? "คุณเป็นผู้รับซื้อ" : "คุณเป็นผู้เสนอขาย"}
+                          {deal.isBuyer ? "เธเธธเธ“เน€เธเนเธเธเธนเนเธฃเธฑเธเธเธทเนเธญ" : "เธเธธเธ“เน€เธเนเธเธเธนเนเน€เธชเธเธญเธเธฒเธข"}
                         </span>
                       </div>
 
@@ -209,7 +218,7 @@ export default function BuyDealsClient({
                         {deal.cardName}
                       </h2>
                       <div className="mt-2 text-sm font-bold text-black/48">
-                        Card #{deal.cardNo} · ราคาเสนอ {formatPrice(deal.offeredPrice)}
+                        Card #{deal.cardNo} ยท เธฃเธฒเธเธฒเน€เธชเธเธญ {formatPrice(deal.offeredPrice)}
                       </div>
                       <div className="mt-3 flex items-center gap-2 rounded-[18px] bg-[#f4f4f5] p-2">
                         <img
@@ -219,7 +228,7 @@ export default function BuyDealsClient({
                         />
                         <div className="min-w-0">
                           <div className="truncate text-xs font-black text-black/40">
-                            คู่ดีล
+                            เธเธนเนเธ”เธตเธฅ
                           </div>
                           <div className="truncate text-sm font-black">{other.name}</div>
                         </div>
@@ -235,7 +244,7 @@ export default function BuyDealsClient({
                             className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-black text-white"
                           >
                             <MessageCircle className="h-4 w-4" />
-                            เปิดแชทดีลรับซื้อ
+                            เน€เธเธดเธ”เนเธเธ—เธ”เธตเธฅเธฃเธฑเธเธเธทเนเธญ
                           </button>
                           <button
                             type="button"
@@ -248,7 +257,7 @@ export default function BuyDealsClient({
                             ) : (
                               <XCircle className="h-4 w-4" />
                             )}
-                            ยกเลิกดีลนี้
+                            เธขเธเน€เธฅเธดเธเธ”เธตเธฅเธเธตเน
                           </button>
                         </>
                       ) : deal.isBuyer ? (
@@ -258,7 +267,7 @@ export default function BuyDealsClient({
                             onClick={() => void act(deal.id, "accept")}
                             className="rounded-full bg-black px-4 py-2 text-xs font-black text-white"
                           >
-                            ตอบรับข้อเสนอ
+                            เธ•เธญเธเธฃเธฑเธเธเนเธญเน€เธชเธเธญ
                           </button>
                           <button
                             type="button"
@@ -266,7 +275,7 @@ export default function BuyDealsClient({
                             className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-700"
                           >
                             <XCircle className="h-4 w-4" />
-                            ปฏิเสธ
+                            เธเธเธดเน€เธชเธ
                           </button>
                         </>
                       ) : (
@@ -275,7 +284,7 @@ export default function BuyDealsClient({
                           onClick={() => void act(deal.id, "cancel")}
                           className="rounded-full bg-black px-4 py-2 text-xs font-black text-white"
                         >
-                          ยกเลิกข้อเสนอขาย
+                          เธขเธเน€เธฅเธดเธเธเนเธญเน€เธชเธเธญเธเธฒเธข
                         </button>
                       )}
                     </div>

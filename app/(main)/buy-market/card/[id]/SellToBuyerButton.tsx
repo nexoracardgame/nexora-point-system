@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { nexoraAlert, nexoraPrompt } from "@/lib/nexora-dialog";
 
 export default function SellToBuyerButton({
   listingId,
@@ -14,10 +15,15 @@ export default function SellToBuyerButton({
   const [loading, setLoading] = useState(false);
 
   async function submitOffer() {
-    const raw = prompt(
-      "กรอกราคาที่คุณต้องการเสนอขายให้ผู้รับซื้อ",
-      String(defaultPrice || "")
-    );
+    const raw = await nexoraPrompt({
+      title: "ราคาที่ต้องการเสนอขาย",
+      message:
+        "กรอกราคาที่คุณต้องการเสนอขายให้ผู้รับซื้อ ระบบจะส่งคำขอไปยังเจ้าของประกาศทันที",
+      defaultValue: String(defaultPrice || ""),
+      placeholder: "เช่น 1500",
+      inputMode: "decimal",
+      confirmText: "ส่งข้อเสนอ",
+    });
     if (!raw) return;
 
     const offeredPrice = Number(raw);
@@ -45,7 +51,11 @@ export default function SellToBuyerButton({
         return;
       }
 
-      alert("ส่งข้อเสนอขายให้ผู้รับซื้อสำเร็จ");
+      await nexoraAlert({
+        title: "ส่งข้อเสนอสำเร็จ",
+        message: "ระบบส่งข้อเสนอขายให้ผู้รับซื้อเรียบร้อยแล้ว",
+        tone: "success",
+      });
       router.push("/buy-market/deals");
       router.refresh();
     } catch {

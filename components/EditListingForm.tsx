@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
+import { nexoraAlert } from "@/lib/nexora-dialog";
 
 export default function EditListingForm({
   id,
@@ -35,10 +36,14 @@ export default function EditListingForm({
           });
 
           if (res.ok) {
-            alert("แก้ไขสำเร็จ");
+            await nexoraAlert({
+              title: "แก้ไขสำเร็จ",
+              message: "ระบบบันทึกราคาการ์ดเรียบร้อยแล้ว",
+              tone: "success",
+            });
             window.location.href = "/market/seller-center";
           } else {
-            alert("แก้ไขไม่สำเร็จ");
+            alert("เนเธเนเนเธเนเธกเนเธชเธณเน€เธฃเนเธ");
           }
         }}
         className="mt-4 rounded-xl bg-blue-500 px-4 py-2"

@@ -370,7 +370,7 @@ export async function sendPushNotificationToUser(
     title: safeString(payload.title) || "NEX POINT",
     body: safeString(payload.body),
     href: safeString(payload.href) || "/",
-    icon: safeString(payload.icon || payload.image) || "/icon-192-nex-point.png",
+    icon: safeString(payload.icon || payload.image) || "/icon-512-nex-point.png",
     tag: safeString(payload.tag || payload.id) || undefined,
   });
   const topic = safeString(payload.id)

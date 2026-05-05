@@ -16,11 +16,25 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icon-192-nex-point.png",
         sizes: "192x192",
         type: "image/png",
+        purpose: "any",
       },
       {
         src: "/icon-512-nex-point.png",
         sizes: "512x512",
         type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-192-nex-point.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icon-512-nex-point.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };

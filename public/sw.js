@@ -6,7 +6,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-const DEFAULT_NOTIFICATION_ICON = "/icon-192-nex-point.png";
+const DEFAULT_NOTIFICATION_ICON = "/icon-512-nex-point.png";
+const DEFAULT_NOTIFICATION_BADGE = "/icon-192-nex-point.png";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -44,14 +45,14 @@ async function showPushNotification(payload) {
   const body = String(payload.body || "").trim();
   const id = String(payload.id || "").trim();
   const href = String(payload.href || "/").trim() || "/";
-  const icon = String(payload.icon || payload.image || DEFAULT_NOTIFICATION_ICON).trim();
-  const image = String(payload.image || "").trim();
+  const icon = DEFAULT_NOTIFICATION_ICON;
+  const image = String(payload.image || payload.icon || "").trim();
   const tag = String(payload.tag || id || href || "nexora-push").trim();
 
   await self.registration.showNotification(title, {
     body,
-    icon: icon || DEFAULT_NOTIFICATION_ICON,
-    badge: DEFAULT_NOTIFICATION_ICON,
+    icon,
+    badge: DEFAULT_NOTIFICATION_BADGE,
     ...(image && image !== icon ? { image } : {}),
     tag,
     renotify: true,

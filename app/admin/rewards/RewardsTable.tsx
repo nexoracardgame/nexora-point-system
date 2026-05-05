@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatThaiDateTime } from "@/lib/thai-time";
+import { nexoraConfirm } from "@/lib/nexora-dialog";
 
 type RewardRow = {
   id: string;
@@ -104,7 +105,7 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
 
       if (!res.ok) {
         setRows(previousRows);
-        alert(data.error || "อัปเดตรางวัลไม่สำเร็จ");
+        alert(data.error || "เธญเธฑเธเน€เธ”เธ•เธฃเธฒเธเธงเธฑเธฅเนเธกเนเธชเธณเน€เธฃเนเธ");
         return;
       }
 
@@ -129,12 +130,21 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
       router.refresh();
     } catch {
       setRows(previousRows);
-      alert("อัปเดตรางวัลไม่สำเร็จ");
+      alert("เธญเธฑเธเน€เธ”เธ•เธฃเธฒเธเธงเธฑเธฅเนเธกเนเธชเธณเน€เธฃเนเธ");
     }
   };
 
   const deleteReward = async (reward: RewardRow) => {
-    if (!confirm(`ยืนยันลบรางวัล "${reward.name}" ?`)) return;
+    if (
+      !(await nexoraConfirm({
+        title: "ลบรางวัล",
+        message: `ยืนยันลบรางวัล "${reward.name}" ?`,
+        tone: "danger",
+        confirmText: "ยืนยันลบ",
+      }))
+    ) {
+      return;
+    }
 
     const previousRows = rows;
     setRows((prev) => prev.filter((item) => item.id !== reward.id));
@@ -150,14 +160,14 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
 
       if (!res.ok) {
         setRows(previousRows);
-        alert(data.error || "ลบไม่สำเร็จ");
+        alert(data.error || "เธฅเธเนเธกเนเธชเธณเน€เธฃเนเธ");
         return;
       }
 
       router.refresh();
     } catch {
       setRows(previousRows);
-      alert("ลบไม่สำเร็จ");
+      alert("เธฅเธเนเธกเนเธชเธณเน€เธฃเนเธ");
     }
   };
 
@@ -214,14 +224,14 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
                   onClick={() => startEdit(reward)}
                   className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black"
                 >
-                  แก้ไข
+                  เนเธเนเนเธ
                 </button>
                 <button
                   type="button"
                   onClick={() => deleteReward(reward)}
                   className="rounded-2xl border border-red-400/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-300"
                 >
-                  ลบ
+                  เธฅเธ
                 </button>
               </div>
             </div>
@@ -232,18 +242,18 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
       {editingId ? (
         <div className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5">
           <div className="w-full rounded-t-[28px] border border-white/10 bg-[#101118] p-4 sm:max-w-lg sm:rounded-[28px]">
-            <h2 className="text-xl font-black">แก้ไขรางวัล</h2>
+            <h2 className="text-xl font-black">เนเธเนเนเธเธฃเธฒเธเธงเธฑเธฅ</h2>
             <div className="mt-4 space-y-3">
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="ชื่อรางวัล"
+                placeholder="เธเธทเนเธญเธฃเธฒเธเธงเธฑเธฅ"
                 className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
               />
               <input
                 value={imageUrl}
                 onChange={(event) => setImageUrl(event.target.value)}
-                placeholder="ลิงก์รูปรางวัล"
+                placeholder="เธฅเธดเธเธเนเธฃเธนเธเธฃเธฒเธเธงเธฑเธฅ"
                 className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
               />
               <img
@@ -283,14 +293,14 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
                   onClick={saveEdit}
                   className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black"
                 >
-                  บันทึก
+                  เธเธฑเธเธ—เธถเธ
                 </button>
                 <button
                   type="button"
                   onClick={closeEditor}
                   className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-black text-white"
                 >
-                  ปิด
+                  เธเธดเธ”
                 </button>
               </div>
             </div>

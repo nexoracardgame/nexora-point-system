@@ -4,6 +4,7 @@ import { XCircle } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
 import { emitDealSync } from "@/lib/deal-sync";
+import { nexoraConfirm } from "@/lib/nexora-dialog";
 
 export default function CancelDealButton({
   dealId,
@@ -20,7 +21,12 @@ export default function CancelDealButton({
   const handleCancel = async () => {
     if (loading) return;
 
-    const ok = confirm("ยืนยันยกเลิกดีลนี้?");
+    const ok = await nexoraConfirm({
+      title: "ยกเลิกดีล",
+      message: "ยืนยันยกเลิกดีลนี้? ระบบจะปิดคำขอและซิงก์สถานะให้ทุกฝ่ายทันที",
+      tone: "danger",
+      confirmText: "ยืนยันยกเลิก",
+    });
     if (!ok) return;
 
     const rollback = onOptimisticCancel?.();

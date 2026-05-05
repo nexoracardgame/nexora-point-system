@@ -309,16 +309,19 @@ export default function NotificationBell() {
 
       swRegistrationRef.current = registration;
 
-      await registration.showNotification(item.title, {
+      const notificationOptions: NotificationOptions & { image?: string } = {
         body: item.body,
-        icon: item.image || "/icon-192-nex-point.png",
+        icon: "/icon-512-nex-point.png",
         badge: "/icon-192-nex-point.png",
+        image: item.image || undefined,
         tag: item.id,
         data: {
           href: item.href || "/",
           id: item.id,
         },
-      });
+      };
+
+      await registration.showNotification(item.title, notificationOptions);
 
       rememberDeliveredNotification(item.id);
     } catch {

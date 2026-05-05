@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import SafeCardImage from "@/components/SafeCardImage";
 import MarketFeatureNav from "@/components/MarketFeatureNav";
 import { emitMarketSync } from "@/lib/market-sync";
+import { nexoraAlert } from "@/lib/nexora-dialog";
 
 type CardData = {
   cardNo: string;
@@ -23,7 +24,7 @@ export default function CreateListingConsole() {
     if (loading) return;
 
     if (!cardNo.trim()) {
-      alert("กรอกเลขการ์ดก่อน");
+      alert("เธเธฃเธญเธเน€เธฅเธเธเธฒเธฃเนเธ”เธเนเธญเธ");
       return;
     }
 
@@ -40,7 +41,7 @@ export default function CreateListingConsole() {
         imageUrl: data.image_url || `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
       });
     } catch {
-      alert("ค้นหาการ์ดไม่สำเร็จ");
+      alert("เธเนเธเธซเธฒเธเธฒเธฃเนเธ”เนเธกเนเธชเธณเน€เธฃเนเธ");
     } finally {
       setLoading(false);
     }
@@ -50,19 +51,19 @@ export default function CreateListingConsole() {
     if (loading) return;
 
     if (!card) {
-      alert("ค้นหาการ์ดก่อน");
+      alert("เธเนเธเธซเธฒเธเธฒเธฃเนเธ”เธเนเธญเธ");
       return;
     }
 
     if (!serialNo.trim()) {
-      alert("กรอกซีเรียลหลังการ์ด");
+      alert("เธเธฃเธญเธเธเธตเน€เธฃเธตเธขเธฅเธซเธฅเธฑเธเธเธฒเธฃเนเธ”");
       return;
     }
 
     const numericPrice = Number(price);
 
     if (Number.isNaN(numericPrice) || numericPrice <= 0) {
-      alert("กรอกราคาขายให้ถูกต้อง");
+      alert("เธเธฃเธญเธเธฃเธฒเธเธฒเธเธฒเธขเนเธซเนเธ–เธนเธเธ•เนเธญเธ");
       return;
     }
 
@@ -91,15 +92,21 @@ export default function CreateListingConsole() {
           action: data.deduped ? "updated" : "created",
           listingId: data.listing?.id,
         });
-        alert(data.deduped ? "มีโพสต์ใบนี้อยู่แล้ว" : "ลงขายสำเร็จ");
+        await nexoraAlert({
+          title: data.deduped ? "อัปเดตรายการแล้ว" : "ลงขายสำเร็จ",
+          message: data.deduped
+            ? "มีโพสต์ใบนี้อยู่แล้ว ระบบอัปเดตรายการให้เรียบร้อย"
+            : "ระบบลงขายการ์ดใบนี้เรียบร้อยแล้ว",
+          tone: "success",
+        });
         window.location.href = "/market";
         return;
       }
 
-      alert(data.error || "ลงขายไม่สำเร็จ");
+      alert(data.error || "เธฅเธเธเธฒเธขเนเธกเนเธชเธณเน€เธฃเนเธ");
     } catch (error) {
       console.error("CREATE LISTING ERROR:", error);
-      alert("เกิดข้อผิดพลาด");
+      alert("เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”");
     } finally {
       setLoading(false);
     }
@@ -118,7 +125,7 @@ export default function CreateListingConsole() {
           </h1>
 
           <p className="mt-2 text-sm text-zinc-400 md:text-base">
-            ค้นหาการ์ดจากระบบหลัก ใส่ซีเรียล ตั้งราคา แล้วลงขายได้ทันที
+            เธเนเธเธซเธฒเธเธฒเธฃเนเธ”เธเธฒเธเธฃเธฐเธเธเธซเธฅเธฑเธ เนเธชเนเธเธตเน€เธฃเธตเธขเธฅ เธ•เธฑเนเธเธฃเธฒเธเธฒ เนเธฅเนเธงเธฅเธเธเธฒเธขเนเธ”เนเธ—เธฑเธเธ—เธต
           </p>
         </section>
 
@@ -140,13 +147,13 @@ export default function CreateListingConsole() {
                 <div className="mt-5 space-y-2 text-center">
                   <div className="text-2xl font-black">{card.cardName}</div>
                   <div className="text-sm text-zinc-400">
-                    No.{card.cardNo} • {card.rarity}
+                    No.{card.cardNo} โ€ข {card.rarity}
                   </div>
                 </div>
               </>
             ) : (
               <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-white/10 px-4 text-center text-zinc-500 sm:min-h-[420px]">
-                ค้นหาการ์ดเพื่อแสดงตัวอย่าง
+                เธเนเธเธซเธฒเธเธฒเธฃเนเธ”เน€เธเธทเนเธญเนเธชเธ”เธเธ•เธฑเธงเธญเธขเนเธฒเธ
               </div>
             )}
           </div>
@@ -154,7 +161,7 @@ export default function CreateListingConsole() {
           <div className="space-y-5 rounded-[28px] border border-white/8 bg-white/[0.03] p-5 backdrop-blur-2xl">
             <div>
               <label className="mb-2 block text-center text-sm font-bold text-white/80 md:text-left">
-                เลขการ์ด
+                เน€เธฅเธเธเธฒเธฃเนเธ”
               </label>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <input
@@ -165,7 +172,7 @@ export default function CreateListingConsole() {
                       void fetchCard();
                     }
                   }}
-                  placeholder="เช่น 6, 06, 006"
+                  placeholder="เน€เธเนเธ 6, 06, 006"
                   className="flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center outline-none sm:text-left"
                 />
                 <button
@@ -173,26 +180,26 @@ export default function CreateListingConsole() {
                   disabled={loading}
                   className="rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 px-6 py-4 font-bold text-black disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {loading ? "..." : "ค้นหาการ์ด"}
+                  {loading ? "..." : "เธเนเธเธซเธฒเธเธฒเธฃเนเธ”"}
                 </button>
               </div>
             </div>
 
             <div>
               <label className="mb-2 block text-center text-sm font-bold text-white/80 md:text-left">
-                ซีเรียลหลังการ์ด
+                เธเธตเน€เธฃเธตเธขเธฅเธซเธฅเธฑเธเธเธฒเธฃเนเธ”
               </label>
               <input
                 value={serialNo}
                 onChange={(e) => setSerialNo(e.target.value)}
-                placeholder="เช่น 369789"
+                placeholder="เน€เธเนเธ 369789"
                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center outline-none sm:text-left"
               />
             </div>
 
             <div>
               <label className="mb-2 block text-center text-sm font-bold text-white/80 md:text-left">
-                ราคาวางขาย (THB)
+                เธฃเธฒเธเธฒเธงเธฒเธเธเธฒเธข (THB)
               </label>
               <input
                 value={price}
@@ -202,7 +209,7 @@ export default function CreateListingConsole() {
                     void createListing();
                   }
                 }}
-                placeholder="เช่น 1500"
+                placeholder="เน€เธเนเธ 1500"
                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center outline-none sm:text-left"
               />
             </div>
@@ -212,7 +219,7 @@ export default function CreateListingConsole() {
               disabled={loading}
               className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-amber-400 py-4 text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? "กำลังลงขาย..." : "ลงขายการ์ดใบนี้"}
+              {loading ? "เธเธณเธฅเธฑเธเธฅเธเธเธฒเธข..." : "เธฅเธเธเธฒเธขเธเธฒเธฃเนเธ”เนเธเธเธตเน"}
             </button>
           </div>
         </div>

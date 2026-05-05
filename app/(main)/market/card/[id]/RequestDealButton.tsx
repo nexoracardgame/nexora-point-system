@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
+import { nexoraPrompt } from "@/lib/nexora-dialog";
 
 export default function RequestDealButton({
   cardId,
@@ -26,7 +27,13 @@ export default function RequestDealButton({
   const [loading, setLoading] = useState(false);
 
   const handleRequest = async () => {
-    const offeredPrice = prompt(t("deals.requestPricePrompt"));
+    const offeredPrice = await nexoraPrompt({
+      title: "เสนอราคาดีล",
+      message: t("deals.requestPricePrompt"),
+      placeholder: "ใส่ราคาที่ต้องการขอดีล (บาท)",
+      inputMode: "decimal",
+      confirmText: "ส่งคำขอ",
+    });
     if (!offeredPrice) return;
 
     const price = Number(offeredPrice);

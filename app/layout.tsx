@@ -6,6 +6,7 @@ import { DEFAULT_LOCALE } from "@/lib/i18n-core";
 import "./globals.css";
 
 import GlobalActivityBar from "@/components/GlobalActivityBar";
+import NexoraDialogProvider from "@/components/NexoraDialogProvider";
 import PageTransition from "@/components/PageTransition";
 import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
 
@@ -72,6 +73,7 @@ export default function RootLayout({
         "
       >
         <Providers>
+          <NexoraDialogProvider />
           <PushNotificationBootstrap />
           <FirstOpenSplash />
           <GlobalActivityBar />
