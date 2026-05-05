@@ -1183,7 +1183,7 @@ export default function MainLayout({
                 </div>
               </div>
 
-              <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-3">
+              <div className="flex min-w-0 shrink-0 items-center gap-1.5 xl:gap-3">
                 <NotificationBell />
 
                 <PrefetchLink
@@ -1199,7 +1199,7 @@ export default function MainLayout({
                   )}
                 </PrefetchLink>
 
-                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                <div className="hidden min-w-0 items-center gap-1.5 xl:flex xl:gap-2">
                   <div className="w-[110px] shrink-0 rounded-[13px] border border-white/10 bg-[#121418] px-1.5 py-1.5 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:hidden">
                     <div className="flex min-w-0 items-center justify-between gap-1">
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[8px] bg-white/[0.06] text-white">
@@ -1391,7 +1391,9 @@ export default function MainLayout({
       </div>
 
       <LiveFloatingPlayer />
-      <FloatingChatDock unreadCount={chatUnreadCount} />
+      <div className={pathname === "/dm" ? "hidden xl:block" : undefined}>
+        <FloatingChatDock unreadCount={chatUnreadCount} />
+      </div>
 
       {/* MOBILE DRAWER */}
       <div
@@ -1536,9 +1538,9 @@ export default function MainLayout({
 
       {/* MOBILE BOTTOM NAV */}
       {!isChatRoomPage && (
-        <nav className="fixed bottom-[12px] left-0 right-0 z-[1100] mx-auto max-w-[720px] overflow-hidden rounded-[26px] border border-white/10 bg-[#0b0c10]/82 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl xl:hidden">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))]" />
-          <div className="mx-auto grid max-w-[720px] grid-cols-7 gap-1 sm:gap-2">
+        <nav className="fixed inset-x-0 bottom-0 z-[1100] overflow-hidden rounded-t-[24px] border-x-0 border-b-0 border-t border-white/10 bg-[#030406]/96 px-1.5 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-1.5 shadow-[0_-18px_52px_rgba(0,0,0,0.72)] backdrop-blur-3xl xl:hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.01)_34%,rgba(0,0,0,0)_100%)]" />
+          <div className="relative mx-auto grid w-full max-w-[760px] grid-cols-7 gap-0.5 sm:gap-1.5">
             {mobileBottomItems.map((item) => {
               const Icon = item.icon;
 
@@ -1547,22 +1549,22 @@ export default function MainLayout({
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileNavOpen(false)}
-                  className={`relative flex min-h-[64px] flex-col items-center justify-center overflow-hidden rounded-[20px] border px-1 transition-all duration-200 ${
+                  className={`relative flex min-h-[62px] flex-col items-center justify-center overflow-hidden rounded-[19px] border px-0.5 transition-all duration-200 ${
                     item.active
-                      ? "border-amber-300/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.14),rgba(251,191,36,0.06))] text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
-                      : "border-transparent bg-white/[0.02] text-white/45 hover:bg-white/[0.04]"
+                      ? "border-amber-300/28 bg-[linear-gradient(180deg,rgba(251,191,36,0.18),rgba(251,191,36,0.055))] text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_24px_rgba(251,191,36,0.14)]"
+                      : "border-transparent bg-[#090a0d]/72 text-white/42 hover:bg-white/[0.055] hover:text-white/70"
                   }`}
                 >
                   {item.active && (
-                    <span className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
+                    <span className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/85 to-transparent" />
                   )}
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-5 w-5 shrink-0" />
                   {item.href === "/dm" && chatUnreadCount > 0 && (
                     <span className="absolute right-2 top-2 min-w-[19px] rounded-full border border-red-300/40 bg-[radial-gradient(circle_at_top,#ff7b7b,#ef4444_60%,#b91c1c)] px-1.5 py-0.5 text-center text-[10px] font-black leading-none text-white shadow-[0_0_20px_rgba(239,68,68,0.45)]">
                       {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                     </span>
                   )}
-                  <span className="mt-1 text-[10px] font-bold leading-none sm:text-[11px]">
+                  <span className="mt-1.5 max-w-full text-center text-[9.5px] font-black leading-[1.05] sm:text-[10.5px]">
                     {item.label}
                   </span>
                 </PrefetchLink>
