@@ -13,11 +13,11 @@ const MAX_HISTORY_ITEMS = 10;
 const DEFAULT_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
 const DEFAULT_DATA_SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg/export?format=csv&gid=0";
+  "https://docs.google.com/spreadsheets/d/1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg/export?format=csv&gid=400649088";
 const KNOWLEDGE_CACHE_MS = 5 * 60 * 1000;
 const SITE_CACHE_MS = 30 * 60 * 1000;
-const MAX_SHEET_CONTEXT_CHARS = 18000;
-const MAX_SITE_CONTEXT_CHARS = 6000;
+const MAX_SHEET_CONTEXT_CHARS = 60000;
+const MAX_SITE_CONTEXT_CHARS = 30000;
 
 type BlazeHistoryItem = {
   role: "user" | "model";
@@ -120,6 +120,28 @@ const OFFICIAL_SITE_PAGES = [
 
 let sheetKnowledgeCache: KnowledgeCache | null = null;
 const siteKnowledgeCache = new Map<string, SiteCacheEntry>();
+
+const BLAZE_RESPONSE_POLICY = [
+  "Blaze answer policy:",
+  "- Answer the exact user question first. Do not add sales closing lines, examples, or unrelated suggestions unless the user asks.",
+  "- If the user asks for a list, all options, every matching item, 'what are they', 'which sets', rewards, or conditions, enumerate every matching record found in the provided DATA/context. Never give only examples or a partial list when the data contains more matches.",
+  "- For set/collection overview questions, answer only the count and the set names. Do not list sample cards inside each set unless the user specifically asks for cards or details.",
+  "- For list/count questions, do not add motivational outros, marketing copy, or closing suggestions after the list.",
+  "- For reward-filter questions such as 100,000 NEX, 1 แสน, or one hundred thousand, include every set/collection/product row that matches that reward amount.",
+  "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
+  "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
+].join("\n");
+
+const BLAZE_COLLECTION_REWARD_INDEX = [
+  "NEXORA official collection reward index:",
+  "- 100,000 silver collection sets: total 5 sets: ชุดการ์ดสะสมที่ 6, ชุดการ์ดสะสมที่ 8, ชุดการ์ดสะสมที่ 9, ชุดการ์ดสะสมที่ 10, ชุดการ์ดสะสมที่ 13.",
+  "- Set 6 / ชุดการ์ดสะสมที่ 6: Legendary 4-star, 10 cards, reward 100,000 silver.",
+  "- Set 8 / ชุดการ์ดสะสมที่ 8: Legendary 4-star, 20 cards, reward 100,000 silver.",
+  "- Set 9 / ชุดการ์ดสะสมที่ 9: Legendary 4-star, 30 cards, reward 100,000 silver.",
+  "- Set 10 / ชุดการ์ดสะสมที่ 10: Legendary 4-star, 30 cards, reward 100,000 silver.",
+  "- Set 13 / ชุดการ์ดสะสมที่ 13: Legendary 3-star, 10 cards, reward 100,000 silver.",
+  "- If asked only which sets can get 100,000, answer the count and set names only. Do not list the cards in each set unless asked for details.",
+].join("\n");
 
 function sanitizeText(value: unknown) {
   return String(value || "").trim();
@@ -300,11 +322,11 @@ function csvRowsToKnowledgeRows(csv: string): KnowledgeRow[] {
 }
 
 function scoreKnowledgeRow(row: KnowledgeRow, message: string) {
-  const query = normalizeSearchText(message);
   const haystack = normalizeSearchText(
     `${row.key} ${row.value} ${row.category} ${row.notes}`
   );
-  const tokens = query.split(" ").filter((token) => token.length >= 2);
+  const expandedQuery = buildKnowledgeQueryTerms(message);
+  const tokens = expandedQuery.filter((token) => token.length >= 2);
   const tokenScore = tokens.reduce(
     (score, token) => score + (haystack.includes(token) ? 12 : 0),
     0
@@ -323,14 +345,57 @@ function scoreKnowledgeRow(row: KnowledgeRow, message: string) {
   return tokenScore + priorityScore + coreScore;
 }
 
+function buildKnowledgeQueryTerms(message: string) {
+  const text = message.toLowerCase();
+  const terms = new Set(
+    normalizeSearchText(message)
+      .split(" ")
+      .filter((token) => token.length >= 2)
+  );
+
+  if (/100\s*,?\s*000|1\s*แสน|หนึ่งแสน|แสน/.test(text)) {
+    ["100000", "100,000", "1 แสน", "หนึ่งแสน", "แสน"].forEach((term) =>
+      terms.add(normalizeSearchText(term))
+    );
+  }
+
+  if (/เซ็ต|set|ชุด|collection|คอลเลก/.test(text)) {
+    ["collection", "set", "เซ็ต", "ชุด", "คอลเลกชั่น", "สะสม"].forEach((term) =>
+      terms.add(normalizeSearchText(term))
+    );
+  }
+
+  if (/รางวัล|reward|แลก|nex|เน็ก/.test(text)) {
+    ["reward", "รางวัล", "แลก", "nex", "NEX"].forEach((term) =>
+      terms.add(normalizeSearchText(term))
+    );
+  }
+
+  return Array.from(terms).filter(Boolean);
+}
+
+function isExhaustiveKnowledgeQuestion(message: string) {
+  const text = message.toLowerCase();
+  return (
+    /อะไรบ้าง|ไหนบ้าง|ทั้งหมด|ทุก|ครบ|กี่|รายชื่อ|รายการ|เซ็ต|set|collection|คอลเลก|รางวัล|reward|แลก|100\s*,?\s*000|1\s*แสน|หนึ่งแสน/.test(
+      text
+    )
+  );
+}
+
 function formatKnowledgeRows(rows: KnowledgeRow[], message: string) {
-  const sortedRows = [...rows]
+  const exhaustive = isExhaustiveKnowledgeQuestion(message);
+  const scoredRows = [...rows]
     .map((row) => ({
       row,
       score: scoreKnowledgeRow(row, message),
     }))
-    .sort((a, b) => b.score - a.score || a.row.priority - b.row.priority)
-    .slice(0, 90)
+    .sort((a, b) => b.score - a.score || a.row.priority - b.row.priority);
+
+  const sortedRows = (exhaustive
+    ? scoredRows.filter((item) => item.score > 0 || item.row.priority <= 2)
+    : scoredRows.slice(0, 120)
+  )
     .map(({ row }) => {
       const source = row.sourceUrl ? ` | source: ${row.sourceUrl}` : "";
       return `- [${row.category || "DATA"}] ${row.key}: ${row.value}${source}`;
@@ -461,7 +526,7 @@ async function fetchOfficialPageText(url: string) {
     throw new Error(`site ${response.status}`);
   }
 
-  const text = stripHtml(html).slice(0, 2200);
+  const text = stripHtml(html).slice(0, 16000);
   siteKnowledgeCache.set(url, {
     expiresAt: now + SITE_CACHE_MS,
     text,
@@ -500,6 +565,7 @@ async function buildKnowledgeContext(message: string) {
 
   return [
     BLAZE_CORE_KNOWLEDGE,
+    BLAZE_COLLECTION_REWARD_INDEX,
     sheetContext,
     siteContext
       ? `ข้อมูลเสริมจากเว็บทางการ nexoracardgame.com แบบ cache ตามคำถาม:\n${siteContext}`
@@ -565,6 +631,7 @@ function buildSystemPrompt(userName: string, knowledgeContext: string) {
     "ถ้าเป็นข้อมูลปัจจุบัน ข่าว ราคา หุ้น ทอง อากาศ ตารางแข่ง หรือเรื่องที่เปลี่ยนเร็ว ห้ามเดาเอง ให้บอกว่าควรตรวจสอบข้อมูลล่าสุดก่อน",
     "เวลาตอบในแชท ห้ามใช้ Markdown เช่น **, *, #, ``` ให้ตอบเป็นข้อความธรรมดาอ่านง่าย",
     "ถ้าคำถามกำกวมหรือสั้น ให้ตอบจากบริบทก่อน ถ้าเดาไม่ได้จริงค่อยถามกลับสั้นๆ",
+    BLAZE_RESPONSE_POLICY,
     `ชื่อผู้ใช้ในระบบ: ${userName || "NEXORA User"}`,
     "",
     productContext,
@@ -656,7 +723,7 @@ async function askNativeGemini({
           temperature: 0.55,
           topP: 0.9,
           topK: 30,
-          maxOutputTokens: 1600,
+          maxOutputTokens: 8192,
         },
       }),
     },
@@ -743,9 +810,8 @@ function makeAppsScriptTextOnly(value: string) {
 }
 
 function buildLocalKnowledgeReply(message: string, knowledgeContext: string) {
-  const queryTokens = normalizeSearchText(message)
-    .split(" ")
-    .filter((token) => token.length >= 2);
+  const exhaustive = isExhaustiveKnowledgeQuestion(message);
+  const queryTokens = buildKnowledgeQueryTerms(message);
   const source = knowledgeContext || BLAZE_CORE_KNOWLEDGE;
   const lines = source
     .split("\n")
@@ -765,9 +831,9 @@ function buildLocalKnowledgeReply(message: string, knowledgeContext: string) {
 
   const selected = scored
     .filter((item) => item.score > 0)
-    .slice(0, 5)
+    .slice(0, exhaustive ? 40 : 5)
     .map((item) => item.line);
-  const fallback = scored.slice(0, 5).map((item) => item.line);
+  const fallback = scored.slice(0, exhaustive ? 20 : 5).map((item) => item.line);
   const facts = selected.length ? selected : fallback;
 
   return enforceBlazeStyle(
@@ -776,6 +842,20 @@ function buildLocalKnowledgeReply(message: string, knowledgeContext: string) {
       ...facts.map((fact) => fact.replace(/\s*\|\s*source:.*$/i, "")),
     ].join("\n")
   );
+}
+
+function trimListAnswerOutro(reply: string, message: string) {
+  if (!isExhaustiveKnowledgeQuestion(message)) {
+    return reply;
+  }
+
+  return sanitizeText(reply)
+    .replace(/\s*การสะสมให้ครบชุดเหล่านี้[\s\S]*$/i, "")
+    .replace(/\s*หากท่านต้องการรายละเอียด[\s\S]*$/i, "")
+    .replace(/\s*หากต้องการรายละเอียด[\s\S]*$/i, "")
+    .replace(/\s*ถ้าท่านต้องการรายละเอียด[\s\S]*$/i, "")
+    .replace(/\s*สามารถสอบถาม.*$/i, "")
+    .trim();
 }
 
 function buildScriptBridgeMessage({
@@ -803,6 +883,7 @@ function buildScriptBridgeMessage({
     retry
       ? "คำตอบก่อนหน้าผิดเพราะกล่าวถึงสิ่งที่ผู้ใช้ไม่ได้ส่ง รอบนี้ต้องตอบใหม่จากข้อความจริงเท่านั้น"
       : "",
+    BLAZE_RESPONSE_POLICY,
     "",
     knowledgeContext || BLAZE_CORE_KNOWLEDGE,
     "",
@@ -937,7 +1018,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-        reply: result.reply,
+        reply: trimListAnswerOutro(result.reply, message),
         source: result.source,
         native: result.source === "gemini",
       },

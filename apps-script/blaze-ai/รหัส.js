@@ -6,6 +6,7 @@ function doGet() {
 
 // ================== CONFIG ==================
 const SHEET_ID = "1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg";
+const DATA_SHEET_NAME = "DATA";
 
 // แชท / vision
 const CHAT_MODEL_NAME = "gemini-2.5-flash";
@@ -27,7 +28,29 @@ const LIVE_SEARCH_MAX_RESULTS = 5;
 // ===== CARD DATABASE =====
 const CARD_DB_SPREADSHEET_ID = "1zXG8UycndiDuehWQNfqXMvMWrnEoxuqjn_NURWSa7-0";
 const CARD_DB_SHEET_NAME = "";
-const CARD_DB_MAX_RESULTS = 8;
+const CARD_DB_MAX_RESULTS = 50;
+
+const BLAZE_RESPONSE_POLICY = [
+  "Blaze answer policy:",
+  "- Answer the exact user question first. Do not add sales closing lines, examples, or unrelated suggestions unless the user asks.",
+  "- If the user asks for a list, all options, every matching item, 'what are they', 'which sets', rewards, or conditions, enumerate every matching record found in the provided DATA/context. Never give only examples or a partial list when the data contains more matches.",
+  "- For set/collection overview questions, answer only the count and the set names. Do not list sample cards inside each set unless the user specifically asks for cards or details.",
+  "- For list/count questions, do not add motivational outros, marketing copy, or closing suggestions after the list.",
+  "- For reward-filter questions such as 100,000 NEX, 1 แสน, or one hundred thousand, include every set/collection/product row that matches that reward amount.",
+  "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
+  "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
+].join("\n");
+
+const BLAZE_COLLECTION_REWARD_INDEX = [
+  "NEXORA official collection reward index:",
+  "- 100,000 silver collection sets: total 5 sets: ชุดการ์ดสะสมที่ 6, ชุดการ์ดสะสมที่ 8, ชุดการ์ดสะสมที่ 9, ชุดการ์ดสะสมที่ 10, ชุดการ์ดสะสมที่ 13.",
+  "- Set 6 / ชุดการ์ดสะสมที่ 6: Legendary 4-star, 10 cards, reward 100,000 silver.",
+  "- Set 8 / ชุดการ์ดสะสมที่ 8: Legendary 4-star, 20 cards, reward 100,000 silver.",
+  "- Set 9 / ชุดการ์ดสะสมที่ 9: Legendary 4-star, 30 cards, reward 100,000 silver.",
+  "- Set 10 / ชุดการ์ดสะสมที่ 10: Legendary 4-star, 30 cards, reward 100,000 silver.",
+  "- Set 13 / ชุดการ์ดสะสมที่ 13: Legendary 3-star, 10 cards, reward 100,000 silver.",
+  "- If asked only which sets can get 100,000, answer the count and set names only. Do not list the cards in each set unless asked for details.",
+].join("\n");
 
 // ===== Presence / Analytics =====
 const ANALYTICS_SHEET_NAME = "ANALYTICS";
@@ -234,7 +257,8 @@ function dataUrlFromInlineData(inlineData) {
 
 // ================== DATA ==================
 function getMainSheet() {
-  return SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  return ss.getSheetByName(DATA_SHEET_NAME) || ss.getSheets()[0];
 }
 
 function getMemorySheet() {
@@ -592,6 +616,66 @@ function isCardRelatedQuestion(message) {
   return hasNumber || keywords.some(k => text.includes(k));
 }
 
+function hasExplicitCardNumberReference(message) {
+  const text = String(message || "").toLowerCase();
+  return /(?:no\.?|card\s*#|card\s*no|เลขการ์ด|หมายเลขการ์ด|การ์ด\s*เลข|การ์ด\s*หมายเลข|เบอร์การ์ด|#)\s*[0-9๐-๙]{1,3}/i.test(text);
+}
+
+function isCollectionOrRewardOverviewQuestion(message) {
+  const text = normalizeThaiText(message);
+  const asksCollection =
+    text.includes("เซ็ต") ||
+    text.includes("ชุด") ||
+    text.includes("collection") ||
+    text.includes("คอลเลก");
+  const asksReward =
+    text.includes("รางวัล") ||
+    text.includes("แลก") ||
+    text.includes("nex") ||
+    text.includes("แสน") ||
+    text.includes("100000") ||
+    text.includes("100,000");
+
+  return asksCollection || asksReward;
+}
+
+function shouldUseCardDatabaseContext(message) {
+  if (isCollectionOrRewardOverviewQuestion(message) && !hasExplicitCardNumberReference(message)) {
+    return false;
+  }
+
+  return isCardRelatedQuestion(message);
+}
+
+function isListOrCountQuestion(message) {
+  const text = normalizeThaiText(message);
+  return (
+    isCollectionOrRewardOverviewQuestion(message) ||
+    text.includes("อะไรบ้าง") ||
+    text.includes("ไหนบ้าง") ||
+    text.includes("ทั้งหมด") ||
+    text.includes("ทุก") ||
+    text.includes("ครบ") ||
+    text.includes("กี่") ||
+    text.includes("รายชื่อ") ||
+    text.includes("รายการ")
+  );
+}
+
+function trimListAnswerOutro(reply, message) {
+  if (!isListOrCountQuestion(message)) {
+    return reply;
+  }
+
+  return sanitizeText(reply)
+    .replace(/\s*การสะสมให้ครบชุดเหล่านี้[\s\S]*$/i, "")
+    .replace(/\s*หากท่านต้องการรายละเอียด[\s\S]*$/i, "")
+    .replace(/\s*หากต้องการรายละเอียด[\s\S]*$/i, "")
+    .replace(/\s*ถ้าท่านต้องการรายละเอียด[\s\S]*$/i, "")
+    .replace(/\s*สามารถสอบถาม.*$/i, "")
+    .trim();
+}
+
 function searchGoogle(query) {
   const url = "https://www.google.com/search?q=" + encodeURIComponent(query) + "&hl=th";
   
@@ -618,7 +702,9 @@ function searchGoogle(query) {
 function searchCardsFromMessage(message, limit) {
   const q = normalizeThaiText(message);
   const maxResults = limit || CARD_DB_MAX_RESULTS;
-  const queryCardNumber = normalizeCardNumber(message);
+  const queryCardNumber = hasExplicitCardNumberReference(message)
+    ? normalizeCardNumber(message)
+    : "";
 
   if (!q && !queryCardNumber) return [];
 
@@ -1038,23 +1124,10 @@ function buildDataKnowledgeContext(db) {
   });
 
   Object.keys(db).forEach(function(key) {
-    if (used[key] || lines.length >= 90) return;
+    if (used[key]) return;
     const value = sanitizeText(db[key]);
     if (!value || value.length < 2) return;
-
-    if (
-      key.indexOf("ai_") === 0 ||
-      key.indexOf("nexora_") === 0 ||
-      key.indexOf("card_") === 0 ||
-      key.indexOf("coin_") === 0 ||
-      key.indexOf("collection_") === 0 ||
-      key.indexOf("battle_") === 0 ||
-      key.indexOf("dealer_") === 0 ||
-      key.indexOf("event_") === 0 ||
-      key.indexOf("lore_") === 0
-    ) {
-      lines.push("- " + key + ": " + value);
-    }
+    lines.push("- " + key + ": " + value);
   });
 
   if (!lines.length) {
@@ -1087,6 +1160,7 @@ function buildSystemPrompt(db, memorySummary, decisionInstruction) {
 
     "- เวลาตอบในแชท ห้ามใช้ Markdown เช่น **, *, #, ```\n" +
     "- ให้ตอบเป็นข้อความธรรมดา อ่านง่าย\n\n" +
+    BLAZE_RESPONSE_POLICY + "\n\n" +
 
     (decisionInstruction || "") + "\n" +
 
@@ -1100,6 +1174,7 @@ function buildSystemPrompt(db, memorySummary, decisionInstruction) {
     "- การจัดส่ง: " + (db.shipping || "-") + "\n" +
     "- โปรโมชั่น: " + (db.promo || "-") + "\n" +
     "- ติดต่อ: Line " + (db.line_contact || "-") + "\n\n" +
+    BLAZE_COLLECTION_REWARD_INDEX + "\n\n" +
     buildDataKnowledgeContext(db) + "\n\n" +
 
     memorySummary + "\n\n" +
@@ -1375,7 +1450,7 @@ function answerWithRealWeb(query) {
       temperature: 0.25,
       topP: 0.9,
       topK: 20,
-      maxOutputTokens: 1800
+      maxOutputTokens: 8192
     }
   };
 
@@ -1456,7 +1531,7 @@ function answerWithLiveData(message, clientId, history) {
       temperature: 0.25,
       topP: 0.9,
       topK: 20,
-      maxOutputTokens: 1800
+      maxOutputTokens: 8192
     }
   };
 
@@ -1631,7 +1706,7 @@ function askGemini(message, history, clientId, imagePayload, options) {
     const memorySummary = buildMemorySummary(memoryRows);
     const intent = detectIntent(cleanMessage, false);
     const decisionInstruction = buildDecisionInstruction(intent);
-    const cardDbContext = cleanMessage && isCardRelatedQuestion(cleanMessage)
+    const cardDbContext = cleanMessage && shouldUseCardDatabaseContext(cleanMessage)
       ? buildCardDatabaseContext(cleanMessage)
       : "";
 
@@ -1695,7 +1770,7 @@ function askGemini(message, history, clientId, imagePayload, options) {
         temperature: 0.55,
         topP: 0.9,
         topK: 30,
-        maxOutputTokens: 1800
+        maxOutputTokens: 8192
       }
     };
 
@@ -1727,6 +1802,7 @@ function askGemini(message, history, clientId, imagePayload, options) {
     const finalReply = enforceBlazeStyle(
       removeImageLinksFromReply(textReply)
     );
+    const polishedReply = trimListAnswerOutro(finalReply, cleanMessage);
 
     if (cleanMessage) {
       saveMemory(cleanClientId, "user", cleanMessage);
@@ -1734,9 +1810,9 @@ function askGemini(message, history, clientId, imagePayload, options) {
       saveMemory(cleanClientId, "user", "[แนบรูปภาพ]");
     }
 
-    saveMemory(cleanClientId, "model", finalReply);
+    saveMemory(cleanClientId, "model", polishedReply);
 
-    return finalReply;
+    return polishedReply;
 
   } catch (error) {
     const msg = String(error && error.message ? error.message : error);
