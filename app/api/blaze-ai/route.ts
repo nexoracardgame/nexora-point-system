@@ -41,7 +41,7 @@ type GeminiCandidate = {
 
 type BlazeResult = {
   reply: string;
-  source: "gemini" | "apps-script" | "card-db";
+  source: "gemini" | "apps-script" | "card-db" | "canonical";
 };
 
 type KnowledgeRow = {
@@ -61,6 +61,19 @@ type CardDbRow = {
   value: string;
   imageUrl: string;
   searchText: string;
+};
+
+type CollectionSetRecord = {
+  id: number;
+  name: string;
+  aliases: string[];
+  reward: string;
+  rewardAliases: string[];
+  level: string;
+  rarity: string;
+  cardCount: number;
+  cards: string[];
+  sourceUrl: string;
 };
 
 type KnowledgeCache = {
@@ -148,35 +161,288 @@ const BLAZE_RESPONSE_POLICY = [
   "- For set/collection overview questions, answer only the count and the set names. Do not list sample cards inside each set unless the user specifically asks for cards or details.",
   "- For list/count questions, do not add motivational outros, marketing copy, or closing suggestions after the list.",
   "- For reward-filter questions such as 100,000, 1 แสน, PlayStation, Gold One, or any reward value, include every set/collection/product row that matches that reward.",
+  "- The canonical collection index is the highest-priority source for collection set rewards, set counts, and card numbers inside sets. Use it before live site snippets.",
+  "- If the user asks which collection sets a card belongs to, answer from the canonical card-to-collection membership derived from the collection index.",
   "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
 ].join("\n");
 
-const BLAZE_COLLECTION_REWARD_INDEX = [
-  "NEXORA official collection reward index:",
-  "- Set 1 / ชุดการ์ดสะสมที่ 1 / The Five Concordants: Mythic 5-star, 15 cards, reward 1,500,000 silver.",
-  "- Set 2 / ชุดการ์ดสะสมที่ 2: Mythic 5-star, 5 cards, reward 1,000,000 silver.",
-  "- Set 3 / ชุดการ์ดสะสมที่ 3: Legendary 4-star, 224 cards, reward 900,000 silver.",
-  "- Set 4 / ชุดการ์ดสะสมที่ 4: Legendary 4-star, 9 cards, reward 400,000 silver.",
-  "- Set 5 / ชุดการ์ดสะสมที่ 5: Legendary 4-star, 15 cards, reward 200,000 silver.",
-  "- Set 6 / ชุดการ์ดสะสมที่ 6: Legendary 4-star, 10 cards, reward 100,000 silver.",
-  "- Set 7 / ชุดการ์ดสะสมที่ 7: Legendary 4-star, 5 cards, reward 50,000 silver.",
-  "- Set 8 / ชุดการ์ดสะสมที่ 8: Legendary 4-star, 20 cards, reward 100,000 silver.",
-  "- Set 9 / ชุดการ์ดสะสมที่ 9: Legendary 4-star, 30 cards, reward 100,000 silver.",
-  "- Set 10 / ชุดการ์ดสะสมที่ 10: Legendary 4-star, 30 cards, reward 100,000 silver.",
-  "- Set 11 / ชุดการ์ดสะสมที่ 11: Legendary 2-star, 40 cards, reward 70,000 silver.",
-  "- Set 12 / ชุดการ์ดสะสมที่ 12: Legendary 2-star, 40 cards, reward NEXORA GOLD ONE.",
-  "- Set 13 / ชุดการ์ดสะสมที่ 13: Legendary 3-star, 10 cards, reward 100,000 silver.",
-  "- Set 14 / ชุดการ์ดสะสมที่ 14: Legendary 3-star, 10 cards, reward 50,000 silver.",
-  "- Set 15 / ชุดการ์ดสะสมที่ 15: Legendary 3-star, 50 cards, reward PlayStation 1 เครื่อง.",
-  "- Set 16 / ชุดการ์ดสะสมที่ 16: Legendary 2-star, 20 cards, reward 15,000 silver.",
-  "- Set 17 / ชุดการ์ดสะสมที่ 17: Legendary 2-star, 20 cards, reward 15,000 silver.",
-  "- Set 18 / ชุดการ์ดสะสมที่ 18: Legendary 2-star, 10 cards, reward 5,000 silver.",
-  "- Set 19 / ชุดการ์ดสะสมที่ 19: Legendary 2-star, 10 cards, reward 5,000 silver.",
-  "- Reward groups: 1,500,000 silver = set 1; 1,000,000 silver = set 2; 900,000 silver = set 3; 400,000 silver = set 4; 200,000 silver = set 5; 100,000 silver = sets 6, 8, 9, 10, 13; 70,000 silver = set 11; 50,000 silver = sets 7, 14; 15,000 silver = sets 16, 17; 5,000 silver = sets 18, 19; NEXORA GOLD ONE = set 12; PlayStation 1 เครื่อง = set 15.",
-  "- If asked only which sets match a reward, answer only the count and set names. Do not list cards in each set unless asked for details.",
-].join("\n");
+const COLLECTION_SOURCE_URL = "https://www.nexoracardgame.com/card-collections";
+
+const COLLECTION_SETS: CollectionSetRecord[] = [
+  {
+    id: 1,
+    name: "The Five Concordants",
+    aliases: ["ชุดการ์ดสะสมที่ 1", "set 1", "เซ็ต 1", "ชุด 1"],
+    reward: "1,500,000 ซิลเวอร์",
+    rewardAliases: ["1500000", "1,500,000", "หนึ่งล้านห้าแสน"],
+    level: "เทพปกรณัม (Mythic)",
+    rarity: "5 ดาว",
+    cardCount: 15,
+    cards: [
+      "การ์ดเพชร: 006, 007, 008, 009, 010",
+      "การ์ดทอง: 053, 054, 085, 090, 091, 097, 132, 170, 208, 209",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 2,
+    name: "ชุดการ์ดสะสมที่ 2",
+    aliases: ["set 2", "เซ็ต 2", "ชุด 2"],
+    reward: "1,000,000 ซิลเวอร์",
+    rewardAliases: ["1000000", "1,000,000", "หนึ่งล้าน"],
+    level: "เทพปกรณัม (Mythic)",
+    rarity: "5 ดาว",
+    cardCount: 5,
+    cards: ["การ์ดเพชร: 006, 007, 008, 009, 010"],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 3,
+    name: "ชุดการ์ดสะสมที่ 3",
+    aliases: ["set 3", "เซ็ต 3", "ชุด 3"],
+    reward: "900,000 ซิลเวอร์",
+    rewardAliases: ["900000", "900,000", "เก้าแสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 224,
+    cards: [
+      "การ์ดทอง: 091, 132, 170, 174, 209",
+      "การ์ดเงิน: 031, 032, 033, 034, 035, 036, 037, 038, 039, 040, 042, 043, 044, 045, 046, 047, 048, 049, 050, 058, 070, 071, 072, 073, 074, 075, 076, 077, 078, 079, 081, 082, 083, 086, 087, 088, 089, 092, 093, 098, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 120, 121, 122, 123, 124, 125, 127, 128, 134, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 161, 162, 163, 164, 165, 166, 167, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 206, 215",
+      "การ์ดธรรมดา: 021, 022, 023, 024, 025, 026, 027, 028, 029, 030, 060, 061, 062, 063, 064, 065, 066, 067, 068, 069, 099, 100, 101, 102, 103, 104, 105, 106, 107, 108, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 4,
+    name: "ชุดการ์ดสะสมที่ 4",
+    aliases: ["set 4", "เซ็ต 4", "ชุด 4"],
+    reward: "400,000 ซิลเวอร์",
+    rewardAliases: ["400000", "400,000", "สี่แสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 9,
+    cards: ["การ์ดทอง: 053, 054, 070, 085, 090, 097, 132, 208, 209"],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 5,
+    name: "ชุดการ์ดสะสมที่ 5",
+    aliases: ["set 5", "เซ็ต 5", "ชุด 5"],
+    reward: "200,000 ซิลเวอร์",
+    rewardAliases: ["200000", "200,000", "สองแสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 15,
+    cards: [
+      "การ์ดถัง: 011, 012, 013, 014, 015, 016, 017, 018, 019, 020",
+      "การ์ดทอง: 001, 002, 003, 004, 005",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 6,
+    name: "ชุดการ์ดสะสมที่ 6",
+    aliases: ["set 6", "เซ็ต 6", "ชุด 6"],
+    reward: "100,000 ซิลเวอร์",
+    rewardAliases: ["100000", "100,000", "1 แสน", "หนึ่งแสน", "แสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 10,
+    cards: ["การ์ดถัง: 011, 012, 013, 014, 015, 016, 017, 018, 019, 020"],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 7,
+    name: "ชุดการ์ดสะสมที่ 7",
+    aliases: ["set 7", "เซ็ต 7", "ชุด 7"],
+    reward: "50,000 ซิลเวอร์",
+    rewardAliases: ["50000", "50,000", "ห้าหมื่น"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 5,
+    cards: ["การ์ดทอง: 001, 002, 003, 004, 005"],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 8,
+    name: "ชุดการ์ดสะสมที่ 8",
+    aliases: ["set 8", "เซ็ต 8", "ชุด 8"],
+    reward: "100,000 ซิลเวอร์",
+    rewardAliases: ["100000", "100,000", "1 แสน", "หนึ่งแสน", "แสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 20,
+    cards: [
+      "การ์ดทอง: 041, 052, 056, 057, 059, 119, 129, 133, 136, 168, 169, 171, 172, 173, 174, 176, 207, 211, 212, 213",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 9,
+    name: "ชุดการ์ดสะสมที่ 9",
+    aliases: ["set 9", "เซ็ต 9", "ชุด 9"],
+    reward: "100,000 ซิลเวอร์",
+    rewardAliases: ["100000", "100,000", "1 แสน", "หนึ่งแสน", "แสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 30,
+    cards: [
+      "การ์ดทอง: 051, 055, 091, 130, 131, 135, 137, 205, 210, 214",
+      "การ์ดเงิน: 042, 043, 044, 045, 046, 047, 048, 049, 050, 058, 075, 120, 121, 122, 123, 124, 125, 127, 128, 215",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 10,
+    name: "ชุดการ์ดสะสมที่ 10",
+    aliases: ["set 10", "เซ็ต 10", "ชุด 10"],
+    reward: "100,000 ซิลเวอร์",
+    rewardAliases: ["100000", "100,000", "1 แสน", "หนึ่งแสน", "แสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "4 ดาว",
+    cardCount: 30,
+    cards: [
+      "การ์ดทอง: 005, 080, 084, 094, 095, 096, 119, 126, 160, 172",
+      "การ์ดเงิน: 081, 082, 083, 086, 087, 088, 089, 092, 093, 098",
+      "การ์ดธรรมดา: 236, 237, 238, 239, 240, 258, 259, 260, 261, 262",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 11,
+    name: "ชุดการ์ดสะสมที่ 11",
+    aliases: ["set 11", "เซ็ต 11", "ชุด 11"],
+    reward: "70,000 ซิลเวอร์",
+    rewardAliases: ["70000", "70,000", "เจ็ดหมื่น"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 40,
+    cards: [
+      "การ์ดธรรมดา: 021, 022, 241, 242, 243, 244, 245, 246, 247, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 12,
+    name: "ชุดการ์ดสะสมที่ 12",
+    aliases: ["set 12", "เซ็ต 12", "ชุด 12"],
+    reward: "NEXORA GOLD ONE",
+    rewardAliases: ["nexora gold one", "gold one", "โกลด์วัน", "ทองวัน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 40,
+    cards: [
+      "การ์ดธรรมดา: 027, 028, 029, 030, 060, 061, 062, 063, 064, 065, 066, 067, 068, 069, 104, 105, 106, 107, 108, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 247",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 13,
+    name: "ชุดการ์ดสะสมที่ 13",
+    aliases: ["set 13", "เซ็ต 13", "ชุด 13"],
+    reward: "100,000 ซิลเวอร์",
+    rewardAliases: ["100000", "100,000", "1 แสน", "หนึ่งแสน", "แสน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "3 ดาว",
+    cardCount: 10,
+    cards: ["การ์ดเงิน: 070, 071, 072, 073, 074, 075, 076, 077, 078, 079"],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 14,
+    name: "ชุดการ์ดสะสมที่ 14",
+    aliases: ["set 14", "เซ็ต 14", "ชุด 14"],
+    reward: "50,000 ซิลเวอร์",
+    rewardAliases: ["50000", "50,000", "ห้าหมื่น"],
+    level: "ตำนาน (Legendary)",
+    rarity: "3 ดาว",
+    cardCount: 50,
+    cards: [
+      "การ์ดทอง: 097",
+      "การ์ดเงิน: 134, 158, 159, 161, 162, 163, 164, 165, 166, 167, 175, 197, 198, 199, 200, 201, 202, 203, 204, 206",
+      "การ์ดธรรมดา: 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 248, 249, 250, 251, 252, 253, 255, 256, 257",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 15,
+    name: "ชุดการ์ดสะสมที่ 15",
+    aliases: ["set 15", "เซ็ต 15", "ชุด 15"],
+    reward: "PlayStation 1 เครื่อง",
+    rewardAliases: ["playstation", "playstation 1", "ps", "ps5", "เพลย์", "เครื่องเกม"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 20,
+    cards: [
+      "การ์ดธรรมดา: 023, 024, 025, 060, 069, 099, 100, 101, 102, 103, 143, 144, 145, 146, 147, 182, 183, 184, 185, 186",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 16,
+    name: "ชุดการ์ดสะสมที่ 16",
+    aliases: ["set 16", "เซ็ต 16", "ชุด 16"],
+    reward: "15,000 ซิลเวอร์",
+    rewardAliases: ["15000", "15,000", "หนึ่งหมื่นห้าพัน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 20,
+    cards: [
+      "การ์ดเงิน: 045, 089, 163, 164, 215",
+      "การ์ดธรรมดา: 068, 069, 099, 179, 226, 231, 232, 236, 238, 248, 256, 257, 270, 279, 287",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 17,
+    name: "ชุดการ์ดสะสมที่ 17",
+    aliases: ["set 17", "เซ็ต 17", "ชุด 17"],
+    reward: "15,000 ซิลเวอร์",
+    rewardAliases: ["15000", "15,000", "หนึ่งหมื่นห้าพัน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 20,
+    cards: [
+      "การ์ดธรรมดา: 024, 061, 099, 101, 102, 103, 144, 186, 218, 219, 222, 236, 240, 248, 249, 250, 268, 269, 277, 288",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 18,
+    name: "ชุดการ์ดสะสมที่ 18",
+    aliases: ["set 18", "เซ็ต 18", "ชุด 18"],
+    reward: "5,000 ซิลเวอร์",
+    rewardAliases: ["5000", "5,000", "ห้าพัน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 10,
+    cards: [
+      "การ์ดทอง: 095",
+      "การ์ดเงิน: 098",
+      "การ์ดธรรมดา: 060, 061, 062, 063, 064, 285, 289, 290",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+  {
+    id: 19,
+    name: "ชุดการ์ดสะสมที่ 19",
+    aliases: ["set 19", "เซ็ต 19", "ชุด 19"],
+    reward: "5,000 ซิลเวอร์",
+    rewardAliases: ["5000", "5,000", "ห้าพัน"],
+    level: "ตำนาน (Legendary)",
+    rarity: "2 ดาว",
+    cardCount: 10,
+    cards: [
+      "การ์ดเงิน: 044, 045, 046, 047",
+      "การ์ดธรรมดา: 178, 179, 241, 242, 255, 256",
+    ],
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
+];
+
+const BLAZE_COLLECTION_REWARD_INDEX = buildCollectionCanonicalIndex();
 
 function sanitizeText(value: unknown) {
   return String(value || "").trim();
@@ -264,6 +530,289 @@ function normalizeCardNumber(value: string) {
   }
 
   return String(number).padStart(3, "0");
+}
+
+function buildCollectionCanonicalIndex() {
+  const rewardGroups = COLLECTION_SETS.reduce<Record<string, number[]>>(
+    (groups, set) => {
+      const key = set.reward;
+      groups[key] = [...(groups[key] || []), set.id];
+      return groups;
+    },
+    {}
+  );
+
+  const rewardLines = Object.entries(rewardGroups).map(
+    ([reward, ids]) => `${reward} = เซ็ต ${ids.join(", ")}`
+  );
+
+  return [
+    "NEXORA canonical collection set index from official card-collections page:",
+    `- Total collection sets: ${COLLECTION_SETS.length}`,
+    ...COLLECTION_SETS.map((set) => `- ${formatCollectionSetSummary(set)}`),
+    `- Reward groups: ${rewardLines.join("; ")}`,
+    "- Canonical rule: ถ้าถามว่าเซ็ตใดตรงกับรางวัลใด ให้ใช้ดัชนีนี้ก่อน DATA/web snippet เสมอ และตอบครบทุกเซ็ตที่ match",
+    "- Canonical rule: ถ้าถามภาพรวมชุดสะสม ให้ตอบจำนวนเซ็ตและชื่อ/เลขเซ็ตก่อน ไม่ต้องยกตัวอย่างการ์ด เว้นแต่ผู้ใช้ถามรายละเอียดหรือถามว่าในเซ็ตมีการ์ดอะไร",
+  ].join("\n");
+}
+
+function formatCollectionSetSummary(set: CollectionSetRecord) {
+  const alias = set.name === `ชุดการ์ดสะสมที่ ${set.id}` ? "" : ` / ${set.name}`;
+  return `Set ${set.id} / ชุดการ์ดสะสมที่ ${set.id}${alias}: ${set.level}, ${set.rarity}, ${set.cardCount} ใบ, reward ${set.reward}`;
+}
+
+function formatCollectionSetDetail(set: CollectionSetRecord) {
+  return [
+    formatCollectionSetSummary(set),
+    `รายการการ์ด: ${set.cards.join(" | ")}`,
+    `แหล่งข้อมูล: ${set.sourceUrl}`,
+  ].join("\n");
+}
+
+function collectionSearchText(set: CollectionSetRecord) {
+  return normalizeSearchText(
+    [
+      `set ${set.id}`,
+      `เซ็ต ${set.id}`,
+      `ชุด ${set.id}`,
+      `ชุดการ์ดสะสมที่ ${set.id}`,
+      set.name,
+      set.reward,
+      set.level,
+      set.rarity,
+      ...set.aliases,
+      ...set.rewardAliases,
+      ...set.cards,
+    ].join(" ")
+  );
+}
+
+function hasCollectionIntent(message: string) {
+  const text = normalizeSearchText(message);
+  return [
+    "เซ็ต",
+    "ชุด",
+    "ชุดสะสม",
+    "ชุดการ์ด",
+    "คอลเลกชั่น",
+    "collection",
+    "set",
+    "ครบชุด",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function wantsCollectionCardList(message: string) {
+  const text = normalizeSearchText(message);
+  return [
+    "มีการ์ด",
+    "การ์ดอะไร",
+    "ใบไหน",
+    "เลขอะไร",
+    "เลขการ์ด",
+    "ลำดับ",
+    "รายละเอียด",
+    "ข้างใน",
+    "ประกอบด้วย",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function wantsCollectionOverview(message: string) {
+  const text = normalizeSearchText(message);
+  return [
+    "ทั้งหมด",
+    "ทุกเซ็ต",
+    "ทุกชุด",
+    "กี่เซ็ต",
+    "กี่ชุด",
+    "อะไรบ้าง",
+    "ไหนบ้าง",
+    "รายชื่อ",
+    "รายการ",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function hasSingleCardRewardIntent(message: string) {
+  const text = normalizeSearchText(message);
+  return [
+    "การ์ดใบเดียว",
+    "การ์ด 1 ใบ",
+    "การ์ดหนึ่งใบ",
+    "ใบเดียว",
+    "jackpot",
+    "การ์ดหายาก",
+    "รางวัลการ์ด",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function extractCollectionSetId(message: string) {
+  const normalized = normalizeThaiDigits(message);
+  const match = normalized.match(
+    /(?:set|เซ็ต|ชุด(?:การ์ดสะสม)?(?:ที่)?)\s*0*([1-9]\d?)/iu
+  );
+  const id = match?.[1] ? Number(match[1]) : 0;
+  return id >= 1 && id <= COLLECTION_SETS.length ? id : 0;
+}
+
+function extractRewardFilter(message: string) {
+  const raw = normalizeThaiDigits(message).toLowerCase();
+  const digits = raw.replace(/[^0-9]/g, "");
+  const text = normalizeSearchText(raw);
+  const digitRewards = [
+    "1500000",
+    "1000000",
+    "900000",
+    "400000",
+    "200000",
+    "100000",
+    "70000",
+    "50000",
+    "15000",
+    "5000",
+  ];
+
+  for (const reward of digitRewards) {
+    if (digits === reward || digits.endsWith(reward)) {
+      return reward;
+    }
+  }
+
+  if (/1\s*แสน|หนึ่งแสน|แสน/.test(raw)) return "100000";
+  if (/ห้าหมื่น|50\s*,?\s*000/.test(raw)) return "50000";
+  if (/เจ็ดหมื่น|70\s*,?\s*000/.test(raw)) return "70000";
+  if (/หนึ่งหมื่นห้าพัน|15\s*,?\s*000/.test(raw)) return "15000";
+  if (/ห้าพัน|5\s*,?\s*000/.test(raw)) return "5000";
+  if (text.includes("gold one") || text.includes("โกลด์วัน")) return "gold one";
+  if (text.includes("playstation") || text.includes("เพลย์")) return "playstation";
+
+  return "";
+}
+
+function collectionSetMatchesReward(set: CollectionSetRecord, rewardFilter: string) {
+  if (!rewardFilter) {
+    return false;
+  }
+
+  if (/^\d+$/.test(rewardFilter)) {
+    const numericAliases = [set.reward, ...set.rewardAliases]
+      .map((value) => normalizeThaiDigits(value).replace(/[^0-9]/g, ""))
+      .filter(Boolean);
+    return numericAliases.includes(rewardFilter);
+  }
+
+  const needle = normalizeSearchText(rewardFilter);
+  const haystack = normalizeSearchText(
+    [set.reward, ...set.rewardAliases].join(" ")
+  );
+
+  return haystack.includes(needle);
+}
+
+function buildDirectCollectionReply(message: string) {
+  const setId = extractCollectionSetId(message);
+  const rewardFilter = extractRewardFilter(message);
+  const collectionIntent = hasCollectionIntent(message);
+  const overview = wantsCollectionOverview(message);
+  const wantsCards = wantsCollectionCardList(message);
+
+  if (!collectionIntent && hasSingleCardRewardIntent(message)) {
+    return "";
+  }
+
+  if (!collectionIntent && !rewardFilter) {
+    return "";
+  }
+
+  if (setId) {
+    const set = COLLECTION_SETS.find((item) => item.id === setId);
+    if (!set) {
+      return "";
+    }
+
+    return enforceBlazeStyle(
+      wantsCards ? formatCollectionSetDetail(set) : formatCollectionSetSummary(set)
+    );
+  }
+
+  if (rewardFilter) {
+    const matches = COLLECTION_SETS.filter((set) =>
+      collectionSetMatchesReward(set, rewardFilter)
+    );
+
+    if (matches.length) {
+      const lines = matches.map((set) =>
+        wantsCards ? formatCollectionSetDetail(set) : formatCollectionSetSummary(set)
+      );
+      return enforceBlazeStyle(
+        [`พบ ${matches.length} เซ็ตที่ตรงกับรางวัลนี้`, ...lines].join("\n")
+      );
+    }
+  }
+
+  if (overview) {
+    return enforceBlazeStyle(
+      [
+        `ชุดการ์ดสะสม NEXORA มีทั้งหมด ${COLLECTION_SETS.length} เซ็ต`,
+        ...COLLECTION_SETS.map((set) => formatCollectionSetSummary(set)),
+      ].join("\n")
+    );
+  }
+
+  return "";
+}
+
+function buildDirectCardCollectionReply(message: string) {
+  if (!hasCollectionIntent(message)) {
+    return "";
+  }
+
+  const cardNo = extractExplicitCardNumber(message) || normalizeCardNumber(message);
+  if (!cardNo) {
+    return "";
+  }
+
+  const memberships = getCardCollectionMemberships(cardNo);
+  if (!memberships.length) {
+    return enforceBlazeStyle(
+      `การ์ด ${cardNo} ยังไม่พบในชุดสะสม canonical จากหน้าชุดคอลเลกชั่น`
+    );
+  }
+
+  return enforceBlazeStyle(
+    [
+      `การ์ด ${cardNo} อยู่ในชุดสะสม ${memberships.length} เซ็ต`,
+      ...memberships.map((set) => formatCollectionSetSummary(set)),
+    ].join("\n")
+  );
+}
+
+function extractCardNumbersFromCollectionSet(set: CollectionSetRecord) {
+  return set.cards.flatMap((line) =>
+    Array.from(line.matchAll(/\b0*([1-9]\d{0,2})\b/g))
+      .map((match) => normalizeCardNumber(match[1] || ""))
+      .filter(Boolean)
+  );
+}
+
+function getCardCollectionMemberships(cardNo: string) {
+  const normalized = normalizeCardNumber(cardNo);
+  if (!normalized) {
+    return [];
+  }
+
+  return COLLECTION_SETS.filter((set) =>
+    extractCardNumbersFromCollectionSet(set).includes(normalized)
+  );
+}
+
+function formatCardCollectionMemberships(cardNo: string) {
+  const memberships = getCardCollectionMemberships(cardNo);
+  if (!memberships.length) {
+    return "";
+  }
+
+  return memberships
+    .map((set) => `Set ${set.id} (${set.reward})`)
+    .join(", ");
 }
 
 function normalizeHeaderKey(value: string) {
@@ -714,21 +1263,48 @@ function wantsCardValue(message: string) {
   return text.includes("ระดับ") || text.includes("rarity") || text.includes("value");
 }
 
+function wantsCardCollection(message: string) {
+  return hasCollectionIntent(message);
+}
+
 function formatCardDbRow(row: CardDbRow, message: string) {
   const wantsName = wantsCardName(message);
   const wantsReward = wantsCardReward(message);
   const wantsValue = wantsCardValue(message);
+  const wantsCollection = wantsCardCollection(message);
+  const memberships = formatCardCollectionMemberships(row.cardNoNormalized);
+
+  if (wantsCollection && !wantsReward && !wantsValue) {
+    return [
+      `การ์ด ${row.cardNo} ${row.cardName}`,
+      memberships
+        ? `อยู่ในชุดสะสม: ${memberships}`
+        : "ยังไม่พบชุดสะสมที่มีการ์ดใบนี้ในดัชนี canonical",
+    ].join("\n");
+  }
 
   if (wantsName && !wantsReward && !wantsValue) {
     return `การ์ด ${row.cardNo} ชื่อ ${row.cardName}`;
   }
 
   if (wantsReward && !wantsName && !wantsValue) {
-    return `การ์ด ${row.cardNo} ${row.cardName}\nรางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`;
+    return [
+      `การ์ด ${row.cardNo} ${row.cardName}`,
+      `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
+      memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   if (wantsValue && !wantsName && !wantsReward) {
-    return `การ์ด ${row.cardNo} ${row.cardName}\nระดับ: ${row.value || "-"}`;
+    return [
+      `การ์ด ${row.cardNo} ${row.cardName}`,
+      `ระดับ: ${row.value || "-"}`,
+      memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   return [
@@ -736,7 +1312,10 @@ function formatCardDbRow(row: CardDbRow, message: string) {
     `ชื่อ: ${row.cardName}`,
     `ระดับ: ${row.value || "-"}`,
     `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
-  ].join("\n");
+    memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function buildDirectCardDbReply(
@@ -887,9 +1466,10 @@ function formatKnowledgeRows(rows: KnowledgeRow[], message: string) {
     .sort((a, b) => b.score - a.score || a.row.priority - b.row.priority);
 
   const sortedRows = (exhaustive
-    ? scoredRows.filter((item) => item.score > 0 || item.row.priority <= 2)
+    ? scoredRows.filter((item) => item.score > 0)
     : scoredRows.slice(0, 120)
   )
+    .slice(0, exhaustive ? 180 : 120)
     .map(({ row }) => {
       const source = row.sourceUrl ? ` | source: ${row.sourceUrl}` : "";
       return `- [${row.category || "DATA"}] ${row.key}: ${row.value}${source}`;
@@ -955,6 +1535,7 @@ async function loadSheetKnowledge(message: string) {
 
 function selectOfficialPages(message: string) {
   const query = normalizeSearchText(message);
+  const pageLimit = isExhaustiveKnowledgeQuestion(message) || hasCollectionIntent(message) ? 5 : 3;
 
   return [...OFFICIAL_SITE_PAGES]
     .map((page) => {
@@ -979,7 +1560,7 @@ function selectOfficialPages(message: string) {
     })
     .sort((a, b) => b.score - a.score)
     .filter((item, index) => item.score > 0 || index < 2)
-    .slice(0, 3)
+    .slice(0, pageLimit)
     .map((item) => item.page);
 }
 
@@ -1559,6 +2140,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "กรุณาพิมพ์ข้อความก่อน" },
         { status: 400 }
+      );
+    }
+
+    const directCollectionReply = buildDirectCollectionReply(message);
+    if (directCollectionReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCollectionReply, message),
+          source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directCardCollectionReply = buildDirectCardCollectionReply(message);
+    if (directCardCollectionReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCardCollectionReply, message),
+          source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
