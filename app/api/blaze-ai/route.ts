@@ -857,6 +857,68 @@ function buildDirectPointRedemptionReply(message: string) {
   );
 }
 
+function hasNexPointRewardCouponIntent(message: string) {
+  const text = normalizeSearchText(message);
+  const raw = normalizeThaiDigits(message).toLowerCase();
+  const hasRewardSubject = [
+    "รางวัล",
+    "ของรางวัล",
+    "คูปอง",
+    "coupon",
+    "แลกรางวัล",
+    "รับรางวัล",
+    "nex point",
+    "แอพ",
+    "app",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+  const hasCouponProcess = [
+    "คูปอง",
+    "coupon",
+    "qr",
+    "คิวอาร์",
+    "สแกน",
+    "ยิง",
+    "พนักงาน",
+    "หน้าร้าน",
+    "ที่ร้าน",
+    "หัก ณ ที่จ่าย",
+    "หักภาษี",
+    "ตามกฎหมาย",
+    "ใช้คูปอง",
+    "ยืนยันคูปอง",
+    "รับของ",
+    "รับรางวัล",
+    "แลกจริง",
+    "แลกรางวัลจริง",
+    "หมดก่อน",
+    "ใครไว",
+    "limited",
+    "ลิมิเต็ด",
+    "จำนวนจำกัด",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+
+  return hasRewardSubject && (hasCouponProcess || raw.includes("reward"));
+}
+
+function buildDirectNexPointRewardCouponReply(message: string) {
+  if (!hasNexPointRewardCouponIntent(message)) {
+    return "";
+  }
+
+  return enforceBlazeStyle(
+    [
+      "ในแอพ NEX POINT จะมีรางวัลให้แลกหลายระดับ ตั้งแต่รางวัลเล็ก รางวัลลิมิเต็ดจำนวนจำกัดจาก NEXORA แบบใครแลกก่อนได้ก่อนจนกว่าคูปองจะหมด ไปจนถึงรางวัลใหญ่",
+      "ขั้นตอนการแลกรางวัลจริงมีดังนี้",
+      "1. ลูกค้ากดแลกรางวัลในแอพ NEX POINT ให้สำเร็จก่อน ระบบจะออกคูปองสำหรับรางวัลนั้นให้ในแอพ",
+      "2. ลูกค้านำคูปองที่กดแลกได้มาแสดงที่หน้าร้าน",
+      "3. พนักงานตรวจสอบคูปอง แล้วสแกนหรือยิง QR Code บนคูปองเพื่อยืนยันการใช้งาน",
+      "4. เมื่อยืนยันคูปองสำเร็จ บริษัทจะดำเนินการหัก ณ ที่จ่ายสำหรับการแลกรางวัลตามที่กฎหมายกำหนด",
+      "5. หลังจากดำเนินการครบถ้วน พนักงานจะมอบรางวัลให้ลูกค้า ถือว่าการแลกรางวัลเสร็จสมบูรณ์",
+      "หมายเหตุ: รางวัลบางรายการมีจำนวนจำกัด หากคูปองหมดแล้วจะไม่สามารถแลกรายการนั้นได้ ต้องยึดสถานะคูปองและสต็อกในแอพเป็นหลัก",
+    ].join("\n")
+  );
+}
+
 function extractCardNumbersFromCollectionSet(set: CollectionSetRecord) {
   return set.cards.flatMap((line) =>
     Array.from(line.matchAll(/\b0*([1-9]\d{0,2})\b/g))
@@ -1531,6 +1593,22 @@ function buildKnowledgeQueryTerms(message: string) {
     ].forEach((term) => terms.add(normalizeSearchText(term)));
   }
 
+  if (/คูปอง|coupon|แลกรางวัล|รับรางวัล|ของรางวัล|qr|คิวอาร์|หัก ณ ที่จ่าย|ลิมิเต็ด|limited/.test(text)) {
+    [
+      "คูปอง",
+      "coupon",
+      "แลกรางวัล",
+      "รับรางวัล",
+      "ของรางวัล",
+      "NEX POINT",
+      "QR Code",
+      "คิวอาร์",
+      "หัก ณ ที่จ่าย",
+      "รางวัลลิมิเต็ด",
+      "จำนวนจำกัด",
+    ].forEach((term) => terms.add(normalizeSearchText(term)));
+  }
+
   return Array.from(terms).filter(Boolean);
 }
 
@@ -1764,6 +1842,7 @@ const BLAZE_CORE_KNOWLEDGE = [
   "- COIN คือเหรียญในการ์ดบางใบ ใช้สะสมเพื่อแลกรางวัลเฉพาะในระบบ NEXORA. อัตราดรอปบนเว็บระบุ 5-10% ต่อกล่อง และมูลค่าเหรียญรวม 2,000,000 NEX",
   "- ตัวอย่างรางวัล COIN: ทองคำแท่ง, มอเตอร์ไซค์ไฟฟ้า, iPhone 17 Pro Max, สร้อยทอง, MacBook Air, iPad Pro, PlayStation 5, Apple Watch, จักรยานไฟฟ้า, สกูตเตอร์ไฟฟ้า, เสื้อยืด, กระเป๋า, สมุดสะสมการ์ด, พวงกุญแจ NEXORA",
   "- ระบบแลกสินค้า No Limit ให้ใช้ NEX แลกสินค้าได้หลายประเภทตามมูลค่าและเงื่อนไข เช่น ฟิกเกอร์ เสื้อผ้า อุปกรณ์ไอที โทรศัพท์ เครื่องใช้ไฟฟ้า รถยนต์ รถจักรยานยนต์ ทองคำ และสินค้าอื่นตามความต้องการ",
+  "- รางวัลในแอพ NEX POINT: มีรางวัลให้แลกหลากหลาย ตั้งแต่รางวัลเล็ก รางวัลลิมิเต็ดจำนวนจำกัดจาก NEXORA แบบใครแลกก่อนได้ก่อนจนกว่าคูปองหมด ไปจนถึงรางวัลใหญ่ วิธีแลกรางวัลจริงคือกดแลกในแอพให้ได้คูปองก่อน จากนั้นนำคูปองมาแสดงที่หน้าร้าน พนักงานจะสแกนหรือยิง QR Code บนคูปองเพื่อยืนยันการใช้งาน เมื่อยืนยันแล้วบริษัทจะดำเนินการหัก ณ ที่จ่ายสำหรับการแลกรางวัลตามกฎหมาย แล้วจึงมอบรางวัลให้ลูกค้าเป็นอันเสร็จสิ้น",
   `- ขั้นตอนการแลกแต้ม NEX / COIN เข้าระบบ NEX POINT: ลูกค้าต้องนำการ์ดจริงมาให้บริษัทตรวจสอบก่อนเพิ่มแต้ม สามารถนำการ์ดมาที่หน้าร้านเองหรือส่งมาทางขนส่งได้ แต่ถ้าส่งมาลูกค้าต้องรับความเสี่ยงเรื่องสภาพการ์ดจากขนส่งเอง บริษัทจะถ่ายวิดีโอขณะเปิดกล่องพัสดุและตรวจสภาพการ์ดอย่างละเอียดให้ลูกค้าดู หากการ์ดเป็นของแท้และสภาพสมบูรณ์ 90-100% บริษัทจะเพิ่มแต้มเข้าบัญชีในแอพ NEX POINT ให้ทันที ทางที่ดีที่สุดคือมาหน้าร้านด้วยตนเองเพื่อความปลอดภัยของการ์ด พิกัดหน้าร้าน: ${POINT_REDEMPTION_LOCATION_URL}`,
   "- การ์ดหายากพิเศษบางใบสามารถนำมาแลกเป็นการ์ดซิลเวอร์จำนวนมากได้ เช่น 200,000 / 100,000 / 80,000 / 70,000 / 60,000 / 40,000 / 30,000 / 25,000 / 20,000 / 15,000 / 10,000 / 5,000 / 3,000 ตามรายการที่บริษัทกำหนด",
   "- Collection: ผู้เล่นสะสมการ์ดให้ครบ Set เพื่อปลดล็อกรางวัล. The Five Concordants เป็นเซ็ต Mythic 5 ดาว จำนวน 15 ใบ แลกซิลเวอร์ 1,500,000 ใบ. เซ็ต Mythic 5 ใบลำดับ 6-10 แลกซิลเวอร์ 1,000,000 ใบ",
@@ -2228,6 +2307,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "กรุณาพิมพ์ข้อความก่อน" },
         { status: 400 }
+      );
+    }
+
+    const directNexPointRewardCouponReply =
+      buildDirectNexPointRewardCouponReply(message);
+    if (directNexPointRewardCouponReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directNexPointRewardCouponReply, message),
+          source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
