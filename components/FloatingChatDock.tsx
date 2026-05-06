@@ -24,6 +24,7 @@ import ChatTypingIndicator from "@/components/ChatTypingIndicator";
 import { useOnlinePresence } from "@/components/OnlinePresenceProvider";
 import SafeCardImage from "@/components/SafeCardImage";
 import { prepareChatImageFile } from "@/lib/chat-image-client";
+import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { useChatTyping } from "@/lib/chat-typing-client";
 import {
@@ -104,7 +105,11 @@ type BlazeChatMessage = {
 const LIST_REFRESH_MS = 8500;
 const ROOM_SYNC_MS = 2500;
 const ROOM_CACHE_TTL_MS = 90000;
+const ROOM_PERSISTED_HISTORY_TTL_MS = 6 * 60 * 60 * 1000;
+const ROOM_LIST_SESSION_TTL_MS = 6 * 60 * 60 * 1000;
+const ROOM_LIST_LOCAL_TTL_MS = 20 * 60 * 1000;
 const ROOM_PREFETCH_COUNT = 8;
+const ROOM_WARM_PREFETCH_COUNT = 6;
 const ROOM_PREFETCH_LIMIT = 28;
 const ROOM_OPEN_LIMIT = 42;
 const BLAZE_AI_WEB_URL =
@@ -128,6 +133,19 @@ type RoomCacheEntry = RoomLoadResult & {
   fetchedAt: number;
 };
 
+type RoomListSnapshot = {
+  rooms: DMRoomListItem[];
+  cachedAt: number;
+  version: 2;
+};
+
+type CachedRoomMeta = {
+  me?: ChatUser | null;
+  other?: ChatUser | null;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+};
+
 type MessagePagePayload = {
   messages?: ChatMessage[];
   hasMore?: boolean;
@@ -141,6 +159,79 @@ function safeText(value?: string | number | null) {
 
 function getBlazeSessionStorageKey(userId?: string | null) {
   return `${BLAZE_SESSION_STORAGE_PREFIX}:${safeText(userId) || "guest"}`;
+}
+
+function getRoomListStorageKey(userId?: string | null) {
+  return `nexora:floating-chat-rooms:v2:${safeText(userId) || "guest"}`;
+}
+
+function parseRoomListSnapshot(raw: string | null, maxAgeMs: number) {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<RoomListSnapshot> | null;
+    const cachedAt = Number(parsed?.cachedAt || 0);
+
+    if (
+      parsed?.version !== 2 ||
+      !Array.isArray(parsed.rooms) ||
+      !cachedAt ||
+      Date.now() - cachedAt > maxAgeMs
+    ) {
+      return null;
+    }
+
+    const rooms = parsed.rooms
+      .map((room) => normalizeRoom(room))
+      .filter(Boolean) as FloatingRoom[];
+
+    return rooms;
+  } catch {
+    return null;
+  }
+}
+
+function readRoomListSnapshot(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) {
+    return null;
+  }
+
+  const sessionRooms = parseRoomListSnapshot(
+    window.sessionStorage.getItem(storageKey),
+    ROOM_LIST_SESSION_TTL_MS
+  );
+
+  if (sessionRooms) {
+    return sessionRooms;
+  }
+
+  return parseRoomListSnapshot(
+    window.localStorage.getItem(storageKey),
+    ROOM_LIST_LOCAL_TTL_MS
+  );
+}
+
+function writeRoomListSnapshot(storageKey: string, rooms: FloatingRoom[]) {
+  if (typeof window === "undefined" || !storageKey) {
+    return;
+  }
+
+  const payload: RoomListSnapshot = {
+    rooms,
+    cachedAt: Date.now(),
+    version: 2,
+  };
+  const serialized = JSON.stringify(payload);
+
+  try {
+    window.sessionStorage.setItem(storageKey, serialized);
+  } catch {}
+
+  try {
+    window.localStorage.setItem(storageKey, serialized);
+  } catch {}
 }
 
 function normalizeBlazeSessionMessage(value: unknown): BlazeChatMessage | null {
@@ -463,12 +554,15 @@ export default function FloatingChatDock({
   const [blazeSending, setBlazeSending] = useState(false);
   const [blazeError, setBlazeError] = useState("");
   const [blazeHydratedStorageKey, setBlazeHydratedStorageKey] = useState("");
+  const [roomsHydratedStorageKey, setRoomsHydratedStorageKey] = useState("");
 
   const activeRoomRef = useRef<ActiveFloatingRoom | null>(activeRoom);
   const roomsRef = useRef<FloatingRoom[]>(rooms);
   const loadingRoomKeyRef = useRef("");
   const roomCacheRef = useRef<Map<string, RoomCacheEntry>>(new Map());
   const roomLoadPromisesRef = useRef<Map<string, Promise<RoomLoadResult>>>(new Map());
+  const roomsLoadPromiseRef = useRef<Promise<FloatingRoom[]> | null>(null);
+  const warmPrefetchKeyRef = useRef("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRootRef = useRef<HTMLDivElement>(null);
@@ -485,6 +579,10 @@ export default function FloatingChatDock({
   const currentUserId = safeText(session?.user?.id);
   const blazeSessionStorageKey = useMemo(
     () => getBlazeSessionStorageKey(currentUserId || session?.user?.email),
+    [currentUserId, session?.user?.email]
+  );
+  const roomListStorageKey = useMemo(
+    () => getRoomListStorageKey(currentUserId || session?.user?.email),
     [currentUserId, session?.user?.email]
   );
   const badgeCount = Math.max(
@@ -548,6 +646,49 @@ export default function FloatingChatDock({
   }, [rooms]);
 
   useEffect(() => {
+    if (status !== "authenticated" || !roomListStorageKey) {
+      return;
+    }
+
+    const cachedRooms = readRoomListSnapshot(roomListStorageKey);
+    roomCacheRef.current.clear();
+    roomLoadPromisesRef.current.clear();
+    roomsLoadPromiseRef.current = null;
+    warmPrefetchKeyRef.current = "";
+    loadingRoomKeyRef.current = "";
+
+    if (cachedRooms?.length) {
+      roomsRef.current = cachedRooms;
+      setRooms(cachedRooms);
+      setLocalUnreadCount(
+        cachedRooms.reduce(
+          (total, room) => total + Math.max(0, Number(room.unread || 0)),
+          0
+        )
+      );
+      setRoomsLoading(false);
+    } else {
+      roomsRef.current = [];
+      setRooms([]);
+      setLocalUnreadCount(0);
+    }
+
+    setRoomsHydratedStorageKey(roomListStorageKey);
+  }, [roomListStorageKey, status]);
+
+  useEffect(() => {
+    if (
+      status !== "authenticated" ||
+      roomsHydratedStorageKey !== roomListStorageKey ||
+      rooms.length === 0
+    ) {
+      return;
+    }
+
+    writeRoomListSnapshot(roomListStorageKey, rooms);
+  }, [roomListStorageKey, rooms, roomsHydratedStorageKey, status]);
+
+  useEffect(() => {
     blazeMessagesRef.current = blazeMessages;
   }, [blazeMessages]);
 
@@ -607,12 +748,16 @@ export default function FloatingChatDock({
 
   const loadRooms = useCallback(async () => {
     if (status !== "authenticated") {
-      return;
+      return [];
     }
 
-    setRoomsLoading((current) => current || rooms.length === 0);
+    if (roomsLoadPromiseRef.current) {
+      return roomsLoadPromiseRef.current;
+    }
 
-    try {
+    setRoomsLoading((current) => current || roomsRef.current.length === 0);
+
+    const task = (async () => {
       const res = await fetch(`/api/dm/list?ts=${Date.now()}`, {
         cache: "no-store",
       });
@@ -621,21 +766,32 @@ export default function FloatingChatDock({
       } | null;
 
       if (!res.ok) {
-        return;
+        return roomsRef.current;
       }
 
       const nextRooms = (Array.isArray(payload?.rooms) ? payload.rooms : [])
         .map((room) => normalizeRoom(room))
         .filter(Boolean) as FloatingRoom[];
 
+      roomsRef.current = nextRooms;
       setRooms(nextRooms);
       setLocalUnreadCount(
         nextRooms.reduce((total, room) => total + Math.max(0, Number(room.unread || 0)), 0)
       );
+
+      writeRoomListSnapshot(roomListStorageKey, nextRooms);
+      return nextRooms;
+    })();
+
+    roomsLoadPromiseRef.current = task;
+
+    try {
+      return await task;
     } finally {
+      roomsLoadPromiseRef.current = null;
       setRoomsLoading(false);
     }
-  }, [rooms.length, status]);
+  }, [roomListStorageKey, status]);
 
   const markRoomSeen = useCallback(
     async (
@@ -784,6 +940,50 @@ export default function FloatingChatDock({
     [currentUserId, session?.user?.image, session?.user?.name]
   );
 
+  const readPersistedRoomCache = useCallback(
+    (room: FloatingRoom): RoomCacheEntry | null => {
+      const safeRoomId = safeText(room.roomId);
+      if (!safeRoomId) {
+        return null;
+      }
+
+      const cached = readChatHistoryCache<ChatMessage, CachedRoomMeta>(
+        "dm-room",
+        safeRoomId
+      );
+      const cachedAt = Number(cached?.cachedAt || 0);
+
+      if (
+        !cached ||
+        !cachedAt ||
+        Date.now() - cachedAt > ROOM_PERSISTED_HISTORY_TTL_MS
+      ) {
+        return null;
+      }
+
+      const meta = cached.meta || {};
+      const shell = buildRoomShell(room, false, {
+        ...room,
+        actualRoomId: safeRoomId,
+        me: meta.me || null,
+        other: meta.other || null,
+        loading: false,
+        hasMore: Boolean(meta.hasMore),
+        nextCursor: safeText(meta.nextCursor) || null,
+      });
+      const messages = cached.messages.map((message) =>
+        normalizeChatMessage(message, shell.actualRoomId, shell.me, shell.other)
+      );
+
+      return {
+        active: shell,
+        messages,
+        fetchedAt: cachedAt,
+      };
+    },
+    [buildRoomShell]
+  );
+
   const updateRoomCache = useCallback(
     (key: string, active: ActiveFloatingRoom, nextMessages: ChatMessage[]) => {
       const safeKey = safeText(key);
@@ -799,6 +999,21 @@ export default function FloatingChatDock({
         messages: nextMessages,
         fetchedAt: Date.now(),
       });
+
+      writeChatHistoryCache<ChatMessage, CachedRoomMeta>(
+        "dm-room",
+        active.actualRoomId,
+        {
+          messages: nextMessages.slice(-80),
+          meta: {
+            me: active.me,
+            other: active.other,
+            hasMore: active.hasMore,
+            nextCursor: active.nextCursor,
+          },
+          cachedAt: Date.now(),
+        }
+      );
     },
     []
   );
@@ -865,15 +1080,36 @@ export default function FloatingChatDock({
         return;
       }
 
-      const cached = roomCacheRef.current.get(room.key);
+      let cached = roomCacheRef.current.get(room.key);
+      if (!cached) {
+        cached = readPersistedRoomCache(room) || undefined;
+        if (cached) {
+          roomCacheRef.current.set(room.key, cached);
+        }
+      }
+
       if (cached && Date.now() - cached.fetchedAt < ROOM_CACHE_TTL_MS) {
         return;
       }
 
       void loadRoomFast(room, ROOM_PREFETCH_LIMIT).catch(() => undefined);
     },
-    [loadRoomFast, status]
+    [loadRoomFast, readPersistedRoomCache, status]
   );
+
+  const warmFloatingChat = useCallback(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
+    void loadRooms()
+      .then((loadedRooms) => {
+        const warmRooms = (loadedRooms?.length ? loadedRooms : roomsRef.current)
+          .slice(0, Math.min(3, ROOM_WARM_PREFETCH_COUNT));
+        warmRooms.forEach((room) => prefetchRoom(room));
+      })
+      .catch(() => undefined);
+  }, [loadRooms, prefetchRoom, status]);
 
   const updateRoomListFromMessage = useCallback(
     (
@@ -961,7 +1197,11 @@ export default function FloatingChatDock({
   const openRoom = useCallback(
     async (room: FloatingRoom) => {
       const key = room.key;
-      const cached = roomCacheRef.current.get(key);
+      const cached =
+        roomCacheRef.current.get(key) || readPersistedRoomCache(room);
+      if (cached) {
+        roomCacheRef.current.set(key, cached);
+      }
       const cachedMessages = cached?.messages || [];
       const shell = buildRoomShell(room, !cached, cached?.active);
 
@@ -1026,7 +1266,14 @@ export default function FloatingChatDock({
         );
       }
     },
-    [buildRoomShell, loadRoomFast, markRoomSeen, scrollToBottom, updateRoomCache]
+    [
+      buildRoomShell,
+      loadRoomFast,
+      markRoomSeen,
+      readPersistedRoomCache,
+      scrollToBottom,
+      updateRoomCache,
+    ]
   );
 
   const openFloatingDirectChat = useCallback(
@@ -1502,6 +1749,32 @@ export default function FloatingChatDock({
   }, [loadRooms, status]);
 
   useEffect(() => {
+    if (status !== "authenticated" || rooms.length === 0) {
+      return;
+    }
+
+    const warmRooms = rooms.slice(0, ROOM_WARM_PREFETCH_COUNT);
+    const warmKey = warmRooms
+      .map((room) => `${room.key}:${room.lastMessageAt || room.createdAt || ""}`)
+      .join("|");
+
+    if (!warmKey || warmPrefetchKeyRef.current === warmKey) {
+      return;
+    }
+
+    warmPrefetchKeyRef.current = warmKey;
+    const timers = warmRooms.map((room, index) =>
+      window.setTimeout(() => {
+        prefetchRoom(room);
+      }, 240 + index * 80)
+    );
+
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, [prefetchRoom, rooms, status]);
+
+  useEffect(() => {
     if (!open || activeRoom || visibleRooms.length === 0) {
       return;
     }
@@ -1527,7 +1800,7 @@ export default function FloatingChatDock({
       .map((room, index) =>
         window.setTimeout(() => {
           prefetchRoom(room);
-        }, 180 + index * 120)
+        }, 20 + index * 55)
       );
 
     return () => {
@@ -1722,11 +1995,14 @@ export default function FloatingChatDock({
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+104px)] right-3 z-[1110] flex max-w-[calc(100vw-24px)] items-center justify-end gap-2 xl:bottom-6 xl:right-6">
         <button
           type="button"
+          onPointerEnter={warmFloatingChat}
+          onFocus={warmFloatingChat}
+          onTouchStart={warmFloatingChat}
           onClick={() => {
             setDockMode("chat");
             setOpen(true);
             setMobileListVisible(!activeRoom);
-            void loadRooms();
+            warmFloatingChat();
           }}
           className="flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-black/90 px-3.5 py-3 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition hover:scale-[1.02] hover:bg-[#111318] active:scale-[0.98] xl:px-4"
           aria-label="เปิดแชท"
