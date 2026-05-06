@@ -12,6 +12,12 @@ const MAX_MESSAGE_LENGTH = 5000;
 const MAX_HISTORY_ITEMS = 10;
 const DEFAULT_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
+const DEFAULT_DATA_SHEET_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg/export?format=csv&gid=0";
+const KNOWLEDGE_CACHE_MS = 5 * 60 * 1000;
+const SITE_CACHE_MS = 30 * 60 * 1000;
+const MAX_SHEET_CONTEXT_CHARS = 18000;
+const MAX_SITE_CONTEXT_CHARS = 6000;
 const TINY_JPEG_BASE64 =
   "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDweiiigD//2Q==";
 
@@ -35,6 +41,87 @@ type BlazeResult = {
   reply: string;
   source: "gemini" | "apps-script";
 };
+
+type KnowledgeRow = {
+  key: string;
+  value: string;
+  category: string;
+  sourceUrl: string;
+  priority: number;
+  notes: string;
+};
+
+type KnowledgeCache = {
+  expiresAt: number;
+  rows: KnowledgeRow[];
+  text: string;
+};
+
+type SiteCacheEntry = {
+  expiresAt: number;
+  text: string;
+};
+
+const OFFICIAL_SITE_PAGES = [
+  {
+    title: "หน้าหลัก",
+    url: "https://www.nexoracardgame.com/",
+    keywords: ["nexora", "หน้าหลัก", "ภาพรวม", "รางวัลรวม", "ซอง", "กล่อง"],
+  },
+  {
+    title: "NEXORA คืออะไร",
+    url: "https://www.nexoracardgame.com/what-is-nexora",
+    keywords: ["nexora คือ", "คืออะไร", "ภาพรวม", "serial", "293", "999999"],
+  },
+  {
+    title: "ข้อมูลการ์ดและเนื้อเรื่อง",
+    url: "https://www.nexoracardgame.com/card-information",
+    keywords: ["เนื้อเรื่อง", "lore", "ธาตุ", "first ember", "sigil", "card of origin"],
+  },
+  {
+    title: "การ์ดหายากพิเศษ",
+    url: "https://www.nexoracardgame.com/jackpot-cards",
+    keywords: ["การ์ดหายาก", "jackpot", "รางวัลการ์ด", "ซิลเวอร์", "แลกการ์ด"],
+  },
+  {
+    title: "ชุดคอลเลกชั่นการ์ด",
+    url: "https://www.nexoracardgame.com/card-collections",
+    keywords: ["collection", "คอลเลกชั่น", "เซ็ต", "set", "ครบชุด"],
+  },
+  {
+    title: "รางวัลจำนวนการ์ดและ NEX",
+    url: "https://www.nexoracardgame.com/card-count-rewards",
+    keywords: ["nex", "จำนวนการ์ด", "แลกรางวัล", "bronze", "silver", "gold"],
+  },
+  {
+    title: "รางวัล COIN",
+    url: "https://www.nexoracardgame.com/coin-rewards",
+    keywords: ["coin", "เหรียญ", "ดรอป", "รางวัลเหรียญ"],
+  },
+  {
+    title: "แลกสินค้า No Limit",
+    url: "https://www.nexoracardgame.com/unlimited-redemption",
+    keywords: ["no limit", "แลกสินค้า", "redemption", "สินค้า", "รางวัล"],
+  },
+  {
+    title: "กติกาแบทเทิล",
+    url: "https://www.nexoracardgame.com/game-rules",
+    keywords: ["กติกา", "battle", "ดวล", "easy", "normal", "hard", "พนัน"],
+  },
+  {
+    title: "ตัวแทนจำหน่าย",
+    url: "https://www.nexoracardgame.com/contact",
+    keywords: ["ตัวแทน", "dealer", "สมาชิก", "member", "คอมมิชชั่น"],
+  },
+  {
+    title: "งานเปิดตัว NEXORA",
+    url: "https://www.nexoracardgame.com/งานเปิดตัว-nexora",
+    keywords: ["งานเปิดตัว", "ลงทะเบียน", "event", "ซองฟรี", "first release"],
+  },
+] as const;
+
+let sheetKnowledgeCache: KnowledgeCache | null = null;
+const siteKnowledgeCache = new Map<string, SiteCacheEntry>();
 
 function sanitizeText(value: unknown) {
   return String(value || "").trim();
@@ -84,6 +171,347 @@ function enforceBlazeStyle(text: string) {
   return value || "ข้าพร้อมแล้ว ถามท่านเบลซมาได้เลย";
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getDataSheetCsvUrl() {
+  return (
+    process.env.BLAZE_DATA_SHEET_CSV_URL ||
+    process.env.NEXORA_DATA_SHEET_CSV_URL ||
+    DEFAULT_DATA_SHEET_CSV_URL
+  ).trim();
+}
+
+function parseCsvLine(line: string) {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      index++;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      cells.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current);
+  return cells.map((cell) => cell.trim());
+}
+
+function parseCsv(csv: string) {
+  const rows: string[][] = [];
+  let line = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < csv.length; index++) {
+    const char = csv[index];
+    const next = csv[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      line += char + next;
+      index++;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      line += char;
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (line.trim()) {
+        rows.push(parseCsvLine(line));
+      }
+      line = "";
+      if (char === "\r" && next === "\n") {
+        index++;
+      }
+      continue;
+    }
+
+    line += char;
+  }
+
+  if (line.trim()) {
+    rows.push(parseCsvLine(line));
+  }
+
+  return rows;
+}
+
+function csvRowsToKnowledgeRows(csv: string): KnowledgeRow[] {
+  const rows = parseCsv(csv);
+  const [header, ...body] = rows;
+
+  if (!header || !header.some((cell) => cell.toLowerCase() === "key")) {
+    return [];
+  }
+
+  const indexOf = (name: string) =>
+    header.findIndex((cell) => cell.trim().toLowerCase() === name);
+
+  const keyIndex = indexOf("key");
+  const valueIndex = indexOf("value");
+  const categoryIndex = indexOf("category");
+  const sourceIndex = indexOf("source_url");
+  const priorityIndex = indexOf("priority");
+  const notesIndex = indexOf("notes");
+
+  return body
+    .map((row) => {
+      const key = sanitizeText(row[keyIndex]);
+      const value = sanitizeText(row[valueIndex]);
+
+      if (!key || !value || key.toLowerCase() === "key") {
+        return null;
+      }
+
+      return {
+        key,
+        value,
+        category: sanitizeText(row[categoryIndex]),
+        sourceUrl: sanitizeText(row[sourceIndex]),
+        priority: Math.max(1, Number(row[priorityIndex] || 2) || 2),
+        notes: sanitizeText(row[notesIndex]),
+      };
+    })
+    .filter(Boolean) as KnowledgeRow[];
+}
+
+function scoreKnowledgeRow(row: KnowledgeRow, message: string) {
+  const query = normalizeSearchText(message);
+  const haystack = normalizeSearchText(
+    `${row.key} ${row.value} ${row.category} ${row.notes}`
+  );
+  const tokens = query.split(" ").filter((token) => token.length >= 2);
+  const tokenScore = tokens.reduce(
+    (score, token) => score + (haystack.includes(token) ? 12 : 0),
+    0
+  );
+
+  const priorityScore = row.priority === 1 ? 18 : row.priority === 2 ? 8 : 0;
+  const coreScore = [
+    "ai_core",
+    "core_identity",
+    "card_system",
+    "ai_behavior",
+  ].includes(row.category)
+    ? 10
+    : 0;
+
+  return tokenScore + priorityScore + coreScore;
+}
+
+function formatKnowledgeRows(rows: KnowledgeRow[], message: string) {
+  const sortedRows = [...rows]
+    .map((row) => ({
+      row,
+      score: scoreKnowledgeRow(row, message),
+    }))
+    .sort((a, b) => b.score - a.score || a.row.priority - b.row.priority)
+    .slice(0, 90)
+    .map(({ row }) => {
+      const source = row.sourceUrl ? ` | source: ${row.sourceUrl}` : "";
+      return `- [${row.category || "DATA"}] ${row.key}: ${row.value}${source}`;
+    });
+
+  let text = sortedRows.join("\n");
+  if (text.length > MAX_SHEET_CONTEXT_CHARS) {
+    text = text.slice(0, MAX_SHEET_CONTEXT_CHARS) + "\n- [system] DATA ถูกย่อเพื่อให้ตอบไว";
+  }
+
+  return text;
+}
+
+async function loadSheetKnowledge(message: string) {
+  const now = Date.now();
+
+  if (sheetKnowledgeCache && sheetKnowledgeCache.expiresAt > now) {
+    return [
+      "ข้อมูลสดจาก Google Sheet DATA ล่าสุด:",
+      formatKnowledgeRows(sheetKnowledgeCache.rows, message),
+    ].join("\n");
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      getDataSheetCsvUrl(),
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "NEXORA-Blaze-AI/1.0",
+        },
+      },
+      4500
+    );
+    const csv = await response.text();
+
+    if (!response.ok || !csv.includes("key") || !csv.includes("value")) {
+      throw new Error(`DATA sheet unavailable (${response.status})`);
+    }
+
+    const rows = csvRowsToKnowledgeRows(csv);
+    if (!rows.length) {
+      throw new Error("DATA sheet empty");
+    }
+
+    const text = [
+      "ข้อมูลสดจาก Google Sheet DATA ล่าสุด:",
+      formatKnowledgeRows(rows, message),
+    ].join("\n");
+
+    sheetKnowledgeCache = {
+      expiresAt: now + KNOWLEDGE_CACHE_MS,
+      rows,
+      text,
+    };
+
+    return text;
+  } catch (error) {
+    console.warn("BLAZE DATA sheet knowledge fallback:", error);
+    return sheetKnowledgeCache?.text || "";
+  }
+}
+
+function selectOfficialPages(message: string) {
+  const query = normalizeSearchText(message);
+
+  return [...OFFICIAL_SITE_PAGES]
+    .map((page) => {
+      const haystack = normalizeSearchText(
+        `${page.title} ${page.url} ${page.keywords.join(" ")}`
+      );
+      const score = page.keywords.reduce(
+        (total, keyword) =>
+          total + (query.includes(normalizeSearchText(keyword)) ? 20 : 0),
+        0
+      );
+      return {
+        page,
+        score:
+          score ||
+          (query
+            .split(" ")
+            .some((token) => token.length >= 2 && haystack.includes(token))
+            ? 8
+            : 0),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter((item, index) => item.score > 0 || index < 2)
+    .slice(0, 3)
+    .map((item) => item.page);
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchOfficialPageText(url: string) {
+  const now = Date.now();
+  const cached = siteKnowledgeCache.get(url);
+
+  if (cached && cached.expiresAt > now) {
+    return cached.text;
+  }
+
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": "NEXORA-Blaze-AI/1.0",
+      },
+    },
+    4500
+  );
+  const html = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`site ${response.status}`);
+  }
+
+  const text = stripHtml(html).slice(0, 2200);
+  siteKnowledgeCache.set(url, {
+    expiresAt: now + SITE_CACHE_MS,
+    text,
+  });
+  return text;
+}
+
+async function loadOfficialSiteKnowledge(message: string) {
+  const pages = selectOfficialPages(message);
+  const chunks: string[] = [];
+
+  await Promise.all(
+    pages.map(async (page) => {
+      try {
+        const text = await fetchOfficialPageText(page.url);
+        if (text) {
+          chunks.push(`- ${page.title} (${page.url}): ${text}`);
+        }
+      } catch (error) {
+        console.warn("BLAZE official site knowledge skipped:", page.url, error);
+      }
+    })
+  );
+
+  const context = chunks.join("\n");
+  return context.length > MAX_SITE_CONTEXT_CHARS
+    ? context.slice(0, MAX_SITE_CONTEXT_CHARS) + "\n- [system] ข้อมูลเว็บถูกย่อเพื่อให้ตอบไว"
+    : context;
+}
+
+async function buildKnowledgeContext(message: string) {
+  const [sheetContext, siteContext] = await Promise.all([
+    loadSheetKnowledge(message),
+    loadOfficialSiteKnowledge(message),
+  ]);
+
+  return [
+    BLAZE_CORE_KNOWLEDGE,
+    sheetContext,
+    siteContext
+      ? `ข้อมูลเสริมจากเว็บทางการ nexoracardgame.com แบบ cache ตามคำถาม:\n${siteContext}`
+      : "",
+    "กฎสำคัญ: ยึด DATA และเว็บทางการก่อนเดา หากข้อมูลขัดกันให้บอกว่าให้ตรวจสอบประกาศล่าสุดหรือ Line Official @Nexoracard",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 const BLAZE_CORE_KNOWLEDGE = [
   "ฐานข้อมูล NEXORA สำหรับท่านเบลซ:",
   "- NEXORA CARDGAME คือการ์ดเกมสะสมและแข่งขันที่รวมโลกแฟนตาซี 5 ธาตุ การสะสม การดวล การซื้อขาย และระบบรางวัลจริงเข้าไว้ด้วยกัน",
@@ -120,8 +548,13 @@ const BLAZE_CORE_KNOWLEDGE = [
   "- ถ้าข้อมูลเป็นราคา ข่าว ตารางงาน รุ่นสินค้า หรือสิ่งที่เปลี่ยนได้ ให้บอกว่าควรตรวจสอบประกาศล่าสุดหรือทัก Line Official ก่อนยืนยัน",
 ].join("\n");
 
-function buildSystemPrompt(userName: string) {
-  const productContext = process.env.BLAZE_PRODUCT_CONTEXT || BLAZE_CORE_KNOWLEDGE;
+function buildSystemPrompt(userName: string, knowledgeContext: string) {
+  const productContext = [
+    knowledgeContext || BLAZE_CORE_KNOWLEDGE,
+    process.env.BLAZE_PRODUCT_CONTEXT || "",
+  ]
+    .filter(Boolean)
+    .join("\n\nข้อมูลเสริมจาก ENV:\n");
 
   return [
     "ชื่อของคุณคือ Blaze Warlock",
@@ -186,10 +619,12 @@ async function askNativeGemini({
   message,
   history,
   userName,
+  knowledgeContext,
 }: {
   message: string;
   history: BlazeHistoryItem[];
   userName: string;
+  knowledgeContext: string;
 }): Promise<BlazeResult | null> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -216,7 +651,7 @@ async function askNativeGemini({
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: buildSystemPrompt(userName) }],
+          parts: [{ text: buildSystemPrompt(userName, knowledgeContext) }],
         },
         contents,
         generationConfig: {
@@ -298,10 +733,12 @@ function buildScriptBridgeMessage({
   message,
   history,
   retry,
+  knowledgeContext,
 }: {
   message: string;
   history: BlazeHistoryItem[];
   retry: boolean;
+  knowledgeContext: string;
 }) {
   const recent = history
     .slice(-8)
@@ -318,7 +755,7 @@ function buildScriptBridgeMessage({
       ? "คำตอบก่อนหน้าผิดเพราะกล่าวถึงรูปหรือสิ่งที่ผู้ใช้ไม่ได้ส่ง รอบนี้ต้องตอบใหม่จากข้อความจริงเท่านั้น"
       : "",
     "",
-    BLAZE_CORE_KNOWLEDGE,
+    knowledgeContext || BLAZE_CORE_KNOWLEDGE,
     "",
     recent ? `บริบทแชทล่าสุด:\n${recent}` : "",
     "",
@@ -332,10 +769,12 @@ async function askAppsScriptBridge({
   message,
   history,
   clientId,
+  knowledgeContext,
 }: {
   message: string;
   history: BlazeHistoryItem[];
   clientId: string;
+  knowledgeContext: string;
 }): Promise<BlazeResult> {
   let lastReply = "";
 
@@ -353,6 +792,7 @@ async function askAppsScriptBridge({
             message,
             history,
             retry: attempt > 0,
+            knowledgeContext,
           }),
           image: `data:image/jpeg;base64,${TINY_JPEG_BASE64}`,
         }),
@@ -423,6 +863,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const knowledgeContext = await buildKnowledgeContext(message);
     let result: BlazeResult | null = null;
 
     try {
@@ -430,6 +871,7 @@ export async function POST(req: NextRequest) {
         message,
         history,
         userName,
+        knowledgeContext,
       });
     } catch (nativeError) {
       console.warn("BLAZE AI native Gemini fallback:", nativeError);
@@ -441,6 +883,7 @@ export async function POST(req: NextRequest) {
         message,
         history,
         clientId,
+        knowledgeContext,
       }));
 
     return NextResponse.json(
