@@ -729,6 +729,52 @@ function isPlaceholderImageReply(reply: string, message: string) {
   ].some((keyword) => text.includes(keyword));
 }
 
+function makeAppsScriptTextOnly(value: string) {
+  return value
+    .replace(/สร้าง\s*ภาพ|สร้าง\s*รูป|เจน\s*ภาพ|เจน\s*รูป|วาด\s*ภาพ|วาด\s*รูป|แก้\s*ภาพ|แก้\s*รูป/gi, "ทำงานข้อความ")
+    .replace(/generate image|image generation|create image|make image|edit image|edit photo|draw/gi, "text task")
+    .replace(/รูปภาพ|รูป|ภาพ/g, "สื่อ")
+    .replace(/แนบ/g, "ส่งประกอบ")
+    .replace(/สแกน/g, "ตรวจ")
+    .replace(/วิเคราะห์การ์ด/g, "ตรวจข้อมูลการ์ด");
+}
+
+function buildLocalKnowledgeReply(message: string, knowledgeContext: string) {
+  const queryTokens = normalizeSearchText(message)
+    .split(" ")
+    .filter((token) => token.length >= 2);
+  const source = knowledgeContext || BLAZE_CORE_KNOWLEDGE;
+  const lines = source
+    .split("\n")
+    .map((line) => line.replace(/^-\s*/, "").trim())
+    .filter((line) => line.length > 28 && !line.startsWith("ข้อมูลสดจาก"));
+
+  const scored = lines
+    .map((line, index) => {
+      const haystack = normalizeSearchText(line);
+      const score = queryTokens.reduce(
+        (total, token) => total + (haystack.includes(token) ? 10 : 0),
+        0
+      );
+      return { line, score, index };
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const selected = scored
+    .filter((item) => item.score > 0)
+    .slice(0, 5)
+    .map((item) => item.line);
+  const fallback = scored.slice(0, 5).map((item) => item.line);
+  const facts = selected.length ? selected : fallback;
+
+  return enforceBlazeStyle(
+    [
+      "ข้าสรุปจากฐานข้อมูล NEXORA ให้ก่อน",
+      ...facts.map((fact) => fact.replace(/\s*\|\s*source:.*$/i, "")),
+    ].join("\n")
+  );
+}
+
 function buildScriptBridgeMessage({
   message,
   history,
@@ -745,14 +791,14 @@ function buildScriptBridgeMessage({
     .map((item) => `${item.role === "model" ? "ท่านเบลซ" : "ผู้ใช้"}: ${item.text}`)
     .join("\n");
 
-  return [
+  const prompt = [
     "คำสั่งระบบสำคัญมาก:",
     "คำขอนี้เป็นแชทข้อความล้วนในแอพ NEXORA",
-    "ระบบภายในจำเป็นต้องส่ง payload รูป 1x1 เพื่อผ่าน doPost เท่านั้น payload นี้ไม่ใช่ข้อมูลที่ผู้ใช้แนบมา",
-    "ห้ามกล่าวถึง payload รูป สิ่งแนบ ไฟล์ หรือการมองเห็นใดๆ เว้นแต่ข้อความจริงของผู้ใช้ถามเรื่องรูปโดยตรง",
+    "ระบบภายในมี payload เล็กมากเพื่อผ่าน doPost เท่านั้น payload นี้ไม่ใช่ข้อมูลจากผู้ใช้",
+    "ห้ามกล่าวถึง payload สิ่งส่งประกอบ ไฟล์ หรือการมองเห็นใดๆ ให้ตอบจากข้อความจริงเท่านั้น",
     "ให้ตอบเฉพาะคำถามข้อความจริงของผู้ใช้เท่านั้น",
     retry
-      ? "คำตอบก่อนหน้าผิดเพราะกล่าวถึงรูปหรือสิ่งที่ผู้ใช้ไม่ได้ส่ง รอบนี้ต้องตอบใหม่จากข้อความจริงเท่านั้น"
+      ? "คำตอบก่อนหน้าผิดเพราะกล่าวถึงสิ่งที่ผู้ใช้ไม่ได้ส่ง รอบนี้ต้องตอบใหม่จากข้อความจริงเท่านั้น"
       : "",
     "",
     knowledgeContext || BLAZE_CORE_KNOWLEDGE,
@@ -763,6 +809,8 @@ function buildScriptBridgeMessage({
   ]
     .filter(Boolean)
     .join("\n");
+
+  return makeAppsScriptTextOnly(prompt);
 }
 
 async function askAppsScriptBridge({
@@ -815,12 +863,8 @@ async function askAppsScriptBridge({
 
     const rawReply = sanitizeText(data.reply);
     if (!rawReply || rawReply === "[object Object]") {
-      return {
-        reply: enforceBlazeStyle(
-          "ข้ารับคำสั่งแล้ว แต่แชทลอยนี้รองรับคำตอบแบบข้อความก่อน ลองถามเป็นข้อความทั่วไปได้เลย"
-        ),
-        source: "apps-script",
-      };
+      lastReply = "";
+      continue;
     }
 
     lastReply = enforceBlazeStyle(rawReply);
@@ -836,7 +880,7 @@ async function askAppsScriptBridge({
     reply:
       lastReply && !isPlaceholderImageReply(lastReply, "")
         ? lastReply
-        : "ข้าอยู่ตรงนี้แล้ว ถามต่อมาได้เลย รอบนี้ข้าจะตอบจากข้อความของท่านเท่านั้น",
+        : buildLocalKnowledgeReply(message, knowledgeContext),
     source: "apps-script",
   };
 }
