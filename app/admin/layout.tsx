@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 import { authOptions } from "@/lib/auth";
+import { isAdminRole } from "@/lib/staff-auth";
 import AdminSidebar from "./AdminSidebar";
 
 export default async function AdminLayout({
@@ -15,7 +16,7 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  if ((session.user as { role?: string }).role !== "admin") {
+  if (!isAdminRole(session.user.role)) {
     redirect("/");
   }
 

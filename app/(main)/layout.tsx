@@ -39,7 +39,9 @@ import {
   Radio,
   PackageOpen,
   BadgeDollarSign,
+  ShieldCheck,
 } from "lucide-react";
+import { isAdminRole } from "@/lib/staff-auth";
 
 function safeProfileSrc(image?: string | null) {
   const raw = String(image || "").trim();
@@ -893,6 +895,7 @@ export default function MainLayout({
   };
 
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
+  const isAdminModeUser = isAdminRole(session?.user?.role);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -921,6 +924,7 @@ export default function MainLayout({
       "/dm",
       ownProfileHref,
       "/settings/profile",
+      ...(isAdminModeUser ? ["/admin"] : []),
     ];
 
     const warmCommunityFriends = async () => {
@@ -971,7 +975,7 @@ export default function MainLayout({
 
     const timeoutId = globalThis.setTimeout(warmRoutes, 250);
     return () => globalThis.clearTimeout(timeoutId);
-  }, [ownProfileHref, router, session?.user?.id]);
+  }, [isAdminModeUser, ownProfileHref, router, session?.user?.id]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -1380,6 +1384,17 @@ export default function MainLayout({
                         <Settings className="h-4 w-4 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
                         {t("layout.nav.profileSettings")}
                       </PrefetchLink>
+
+                      {isAdminModeUser && (
+                        <PrefetchLink
+                          href="/admin"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.055] px-4 py-3 font-black text-amber-100 transition hover:border-amber-300/28 hover:bg-amber-300/[0.09] hover:text-amber-50"
+                        >
+                          <ShieldCheck className="h-4 w-4 text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.55)]" />
+                          โหมดแอดมิน
+                        </PrefetchLink>
+                      )}
 
                       <button
                         type="button"
