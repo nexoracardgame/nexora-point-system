@@ -1404,6 +1404,22 @@ function polishBlazeReply(reply: string, message: string) {
   return stripLineContactForNonSales(trimListAnswerOutro(reply, message), message);
 }
 
+function buildBlazeSafeFallbackReply(message: string, knowledgeContext = "") {
+  try {
+    const localReply = sanitizeText(buildLocalKnowledgeReply(message, knowledgeContext));
+
+    if (localReply) {
+      return polishBlazeReply(localReply, message);
+    }
+  } catch (fallbackError) {
+    console.warn("BLAZE local fallback skipped:", fallbackError);
+  }
+
+  return enforceBlazeStyle(
+    "ข้ารับคำถามแล้ว แต่ระบบเชื่อมต่อสมองหลักสะดุดชั่วคราว ลองถามใหม่อีกครั้งได้เลย"
+  );
+}
+
 function buildScriptBridgeMessage({
   message,
   history,
@@ -1517,6 +1533,9 @@ async function askAppsScriptBridge({
 }
 
 export async function POST(req: NextRequest) {
+  let fallbackMessage = "";
+  let fallbackKnowledgeContext = "";
+
   try {
     const session = await getServerSession(authOptions);
     const userId = sanitizeText(session?.user?.id);
@@ -1529,6 +1548,7 @@ export async function POST(req: NextRequest) {
     }
 
     const message = sanitizeText(body?.message).slice(0, MAX_MESSAGE_LENGTH);
+    fallbackMessage = message;
     const history = normalizeHistory(body?.history);
     const clientId = sanitizeText(body?.clientId) || userId || "nexora-embed";
     const userName =
@@ -1556,6 +1576,7 @@ export async function POST(req: NextRequest) {
     }
 
     const knowledgeContext = await buildKnowledgeContext(message, history);
+    fallbackKnowledgeContext = knowledgeContext;
     let result: BlazeResult | null = null;
 
     try {
@@ -1578,10 +1599,14 @@ export async function POST(req: NextRequest) {
         knowledgeContext,
       }));
 
+    const finalReply =
+      sanitizeText(polishBlazeReply(result.reply, message)) ||
+      buildBlazeSafeFallbackReply(message, knowledgeContext);
+
     return NextResponse.json(
       {
         ok: true,
-        reply: polishBlazeReply(result.reply, message),
+        reply: finalReply,
         source: result.source,
         native: result.source === "gemini" || result.source === "card-db",
       },
@@ -1589,6 +1614,23 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("BLAZE AI ERROR:", error);
+
+    if (fallbackMessage) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: buildBlazeSafeFallbackReply(
+            fallbackMessage,
+            fallbackKnowledgeContext
+          ),
+          source: "apps-script",
+          native: false,
+          fallback: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
     const message =
       error instanceof Error && error.message
         ? error.message

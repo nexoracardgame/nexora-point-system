@@ -109,6 +109,16 @@ function formatTime(value: string) {
   });
 }
 
+function buildEmbedFallbackReply(message: string) {
+  const cleanMessage = safeText(message);
+
+  if (!cleanMessage) {
+    return "ข้าพร้อมแล้ว ถามท่านเบลซมาได้เลย";
+  }
+
+  return "ข้ารับคำถามแล้ว แต่สมองหลักสะดุดชั่วคราวในจังหวะนี้ ลองส่งคำถามเดิมอีกครั้งได้เลย ข้าจะตอบจากฐานข้อมูล NEXORA ให้ทันที";
+}
+
 export default function BlazeEmbedClient() {
   const [messages, setMessages] = useState<BlazeMessage[]>([WELCOME_MESSAGE]);
   const [draft, setDraft] = useState("");
@@ -210,9 +220,10 @@ export default function BlazeEmbedClient() {
         reply?: string;
         error?: string;
       };
+      const replyText = safeText(payload.reply);
 
       if (!response.ok || payload.error) {
-        throw new Error(payload.error || "Blaze AI did not return text");
+        throw new Error(payload.error || "EMPTY_BLAZE_REPLY");
       }
 
       setMessages((current) => [
@@ -220,22 +231,28 @@ export default function BlazeEmbedClient() {
         {
           id: `model-${Date.now()}`,
           role: "model",
-          text: payload.reply || "ข้าพร้อมแล้ว ถามท่านเบลซมาได้เลย",
+          text: replyText || buildEmbedFallbackReply(text),
           createdAt: new Date().toISOString(),
         },
       ]);
     } catch (caught) {
-      const message =
+      const rawMessage =
         caught instanceof Error && caught.message
           ? caught.message
-          : "เชื่อมต่อไม่สำเร็จ";
-      setError(message);
+          : "EMPTY_BLAZE_REPLY";
+      const friendlyReply =
+        rawMessage === "EMPTY_BLAZE_REPLY" ||
+        rawMessage.includes("Blaze AI did not return text")
+          ? buildEmbedFallbackReply(text)
+          : "ข้าเชื่อมต่อสมองหลักสะดุดชั่วคราว ลองถามใหม่อีกครั้งได้เลย";
+
+      setError("");
       setMessages((current) => [
         ...current,
         {
           id: `error-${Date.now()}`,
           role: "model",
-          text: `ข้าเชื่อมต่อไม่สำเร็จ: ${message}`,
+          text: friendlyReply,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -247,6 +264,24 @@ export default function BlazeEmbedClient() {
 
   return (
     <main className="fixed inset-0 isolate flex min-h-[100dvh] flex-col overflow-hidden bg-[#050403] text-white md:p-[22px]">
+      <style>{`
+        html,
+        body {
+          overflow: hidden;
+          background: #050403;
+        }
+
+        .blaze-embed-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .blaze-embed-scroll::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
+        }
+      `}</style>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(250,204,21,0.16),transparent_26%),radial-gradient(circle_at_92%_6%,rgba(168,85,247,0.18),transparent_24%),linear-gradient(180deg,#070604_0%,#0b0906_46%,#050403_100%)]" />
       <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:32px_32px]" />
 
@@ -312,7 +347,7 @@ export default function BlazeEmbedClient() {
           </a>
         </header>
 
-        <section className="relative z-10 min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6 sm:px-5">
+        <section className="blaze-embed-scroll relative z-10 min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6 sm:px-5">
           <div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col justify-end md:max-w-none">
             {messages.map((message) => {
               const mine = message.role === "user";
