@@ -14,9 +14,13 @@ const DEFAULT_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
 const DEFAULT_DATA_SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg/export?format=csv&gid=400649088";
+const DEFAULT_CARD_DB_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1zXG8UycndiDuehWQNfqXMvMWrnEoxuqjn_NURWSa7-0/export?format=csv&gid=0";
 const KNOWLEDGE_CACHE_MS = 5 * 60 * 1000;
+const CARD_DB_CACHE_MS = 5 * 60 * 1000;
 const SITE_CACHE_MS = 30 * 60 * 1000;
 const MAX_SHEET_CONTEXT_CHARS = 60000;
+const MAX_CARD_DB_CONTEXT_CHARS = 50000;
 const MAX_SITE_CONTEXT_CHARS = 30000;
 
 type BlazeHistoryItem = {
@@ -37,7 +41,7 @@ type GeminiCandidate = {
 
 type BlazeResult = {
   reply: string;
-  source: "gemini" | "apps-script";
+  source: "gemini" | "apps-script" | "card-db";
 };
 
 type KnowledgeRow = {
@@ -49,10 +53,25 @@ type KnowledgeRow = {
   notes: string;
 };
 
+type CardDbRow = {
+  cardNo: string;
+  cardNoNormalized: string;
+  cardName: string;
+  reward: string;
+  value: string;
+  imageUrl: string;
+  searchText: string;
+};
+
 type KnowledgeCache = {
   expiresAt: number;
   rows: KnowledgeRow[];
   text: string;
+};
+
+type CardDbCache = {
+  expiresAt: number;
+  rows: CardDbRow[];
 };
 
 type SiteCacheEntry = {
@@ -119,6 +138,7 @@ const OFFICIAL_SITE_PAGES = [
 ] as const;
 
 let sheetKnowledgeCache: KnowledgeCache | null = null;
+let cardDbCache: CardDbCache | null = null;
 const siteKnowledgeCache = new Map<string, SiteCacheEntry>();
 
 const BLAZE_RESPONSE_POLICY = [
@@ -214,11 +234,55 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
+function normalizeThaiDigits(value: string) {
+  const thaiDigits: Record<string, string> = {
+    "๐": "0",
+    "๑": "1",
+    "๒": "2",
+    "๓": "3",
+    "๔": "4",
+    "๕": "5",
+    "๖": "6",
+    "๗": "7",
+    "๘": "8",
+    "๙": "9",
+  };
+
+  return value.replace(/[๐-๙]/g, (digit) => thaiDigits[digit] || digit);
+}
+
+function normalizeCardNumber(value: string) {
+  const digits = normalizeThaiDigits(value).replace(/[^0-9]/g, "");
+
+  if (!digits) {
+    return "";
+  }
+
+  const number = Number(digits.slice(-3));
+  if (!Number.isFinite(number) || number < 1 || number > 293) {
+    return "";
+  }
+
+  return String(number).padStart(3, "0");
+}
+
+function normalizeHeaderKey(value: string) {
+  return normalizeSearchText(value).replace(/\s+/g, "_");
+}
+
 function getDataSheetCsvUrl() {
   return (
     process.env.BLAZE_DATA_SHEET_CSV_URL ||
     process.env.NEXORA_DATA_SHEET_CSV_URL ||
     DEFAULT_DATA_SHEET_CSV_URL
+  ).trim();
+}
+
+function getCardDbCsvUrl() {
+  return (
+    process.env.BLAZE_CARD_DB_CSV_URL ||
+    process.env.NEXORA_CARD_DB_CSV_URL ||
+    DEFAULT_CARD_DB_CSV_URL
   ).trim();
 }
 
@@ -334,6 +398,421 @@ function csvRowsToKnowledgeRows(csv: string): KnowledgeRow[] {
       };
     })
     .filter(Boolean) as KnowledgeRow[];
+}
+
+function csvRowsToCardDbRows(csv: string): CardDbRow[] {
+  const rows = parseCsv(csv);
+  const [header, ...body] = rows;
+
+  if (!header?.length) {
+    return [];
+  }
+
+  const headers = header.map((cell) => normalizeHeaderKey(cell));
+  const findIndex = (aliases: string[]) =>
+    headers.findIndex((headerName) => aliases.includes(headerName));
+
+  const noIndex = findIndex([
+    "card_no",
+    "cardno",
+    "card_number",
+    "number",
+    "no",
+    "เลขการ์ด",
+    "หมายเลข",
+  ]);
+  const nameIndex = findIndex([
+    "card_name",
+    "cardname",
+    "name",
+    "ชื่อการ์ด",
+    "ชื่อ",
+  ]);
+  const rewardIndex = findIndex(["reward", "รางวัล"]);
+  const valueIndex = findIndex(["value", "rarity", "ระดับ", "ชนิด"]);
+  const imageIndex = findIndex([
+    "image_url",
+    "image",
+    "img",
+    "url",
+    "รูป",
+    "รูปภาพ",
+  ]);
+
+  if (noIndex < 0 || nameIndex < 0) {
+    return [];
+  }
+
+  return body
+    .map((row) => {
+      const cardNo = sanitizeText(row[noIndex]);
+      const cardNoNormalized = normalizeCardNumber(cardNo);
+      const cardName = sanitizeText(row[nameIndex]);
+
+      if (!cardNoNormalized || !cardName) {
+        return null;
+      }
+
+      const reward = sanitizeText(row[rewardIndex]);
+      const value = sanitizeText(row[valueIndex]);
+      const imageUrl = sanitizeText(row[imageIndex]);
+      const searchText = normalizeSearchText(
+        `${cardNo} ${cardNoNormalized} ${cardName} ${reward} ${value}`
+      );
+
+      return {
+        cardNo,
+        cardNoNormalized,
+        cardName,
+        reward,
+        value,
+        imageUrl,
+        searchText,
+      };
+    })
+    .filter(Boolean) as CardDbRow[];
+}
+
+async function loadCardDbRows() {
+  const now = Date.now();
+
+  if (cardDbCache && cardDbCache.expiresAt > now) {
+    return cardDbCache.rows;
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      getCardDbCsvUrl(),
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "NEXORA-Blaze-AI/1.0",
+        },
+      },
+      5500
+    );
+    const csv = await response.text();
+
+    if (!response.ok || !csv.includes("card_no") || !csv.includes("card_name")) {
+      throw new Error(`card DB sheet unavailable (${response.status})`);
+    }
+
+    const rows = csvRowsToCardDbRows(csv);
+    if (rows.length < 293) {
+      throw new Error(`card DB incomplete (${rows.length}/293)`);
+    }
+
+    cardDbCache = {
+      expiresAt: now + CARD_DB_CACHE_MS,
+      rows,
+    };
+
+    return rows;
+  } catch (error) {
+    console.warn("BLAZE card DB fallback:", error);
+    return cardDbCache?.rows || [];
+  }
+}
+
+function isCardDbQuestion(message: string) {
+  const text = normalizeSearchText(message);
+
+  return [
+    "การ์ด",
+    "card",
+    "no",
+    "เลขการ์ด",
+    "หมายเลข",
+    "ใบนี้",
+    "ใบที่",
+    "ชื่อ",
+    "รางวัล",
+    "แลกรับ",
+    "ได้อะไร",
+    "ระดับ",
+    "rarity",
+    "value",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function isCardLookupQuestion(message: string) {
+  const text = normalizeSearchText(message);
+  const hasLookupField = [
+    "ใบนี้",
+    "ใบที่",
+    "ชื่อ",
+    "รางวัล",
+    "แลกรับ",
+    "ได้อะไร",
+    "ระดับ",
+    "rarity",
+    "value",
+    "no",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+  const looksLikeCountQuestion = [
+    "ทั้งหมด",
+    "กี่ใบ",
+    "มีกี่",
+    "จำนวน",
+    "รวม",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+
+  if (looksLikeCountQuestion && !hasLookupField) {
+    return false;
+  }
+
+  return (
+    Boolean(extractExplicitCardNumber(message)) ||
+    hasLookupField
+  );
+}
+
+function extractExplicitCardNumber(text: string) {
+  const normalized = normalizeThaiDigits(text);
+  const patterns = [
+    /(?:no\.?|card|#|เลขการ์ด|หมายเลขการ์ด|การ์ด|ใบที่)\s*0*([1-9]\d{0,2})/giu,
+    /0*([1-9]\d{0,2})\s*(?:ชื่อ|รางวัล|แลก|ได้อะไร|ระดับ|rarity|value)/giu,
+    /(?:ชื่อ|รางวัล|แลก|ได้อะไร|ระดับ|rarity|value)\s*(?:ของ)?\s*(?:การ์ด|card|no\.?|#)?\s*0*([1-9]\d{0,2})/giu,
+  ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(normalized);
+    if (!match?.[1]) {
+      continue;
+    }
+
+    const cardNo = normalizeCardNumber(match[1]);
+    if (cardNo) {
+      return cardNo;
+    }
+  }
+
+  const standalone = normalized.match(/(?:^|[^\d])0*([1-9]\d{0,2})(?:[^\d]|$)/u);
+  if (standalone?.[1] && isCardDbQuestion(text)) {
+    return normalizeCardNumber(standalone[1]);
+  }
+
+  return "";
+}
+
+function extractCardNumberFromConversation(
+  message: string,
+  history: BlazeHistoryItem[]
+) {
+  const direct = extractExplicitCardNumber(message);
+  if (direct) {
+    return direct;
+  }
+
+  for (const item of [...history].reverse()) {
+    const cardNo = extractExplicitCardNumber(item.text);
+    if (cardNo) {
+      return cardNo;
+    }
+  }
+
+  return "";
+}
+
+function scoreCardDbRow(row: CardDbRow, message: string) {
+  const query = normalizeSearchText(message);
+  if (!query) {
+    return 0;
+  }
+
+  let score = 0;
+  const normalizedCardNo = extractExplicitCardNumber(message);
+  if (normalizedCardNo && row.cardNoNormalized === normalizedCardNo) {
+    score += 2000;
+  }
+
+  const cardName = normalizeSearchText(row.cardName);
+  if (cardName && query === cardName) {
+    score += 1200;
+  } else if (cardName && query.includes(cardName)) {
+    score += 900;
+  }
+
+  const tokens = query
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2)
+    .filter(
+      (token) =>
+        ![
+          "การ์ด",
+          "card",
+          "ชื่อ",
+          "รางวัล",
+          "อะไร",
+          "ได้",
+          "แลก",
+          "ระดับ",
+          "ใบนี้",
+          "ใบที่",
+        ].includes(token)
+    );
+
+  for (const token of tokens) {
+    if (row.searchText.includes(token)) {
+      score += token.length > 3 ? 35 : 18;
+    }
+  }
+
+  return score;
+}
+
+function findCardDbMatches(
+  rows: CardDbRow[],
+  message: string,
+  history: BlazeHistoryItem[]
+) {
+  const cardNo = extractCardNumberFromConversation(message, history);
+  if (cardNo) {
+    const exact = rows.find((row) => row.cardNoNormalized === cardNo);
+    return {
+      exact,
+      matches: exact ? [exact] : [],
+      cardNo,
+    };
+  }
+
+  const matches = rows
+    .map((row) => ({
+      row,
+      score: scoreCardDbRow(row, message),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized))
+    .slice(0, 8)
+    .map((item) => item.row);
+
+  return {
+    exact: matches.length === 1 ? matches[0] : null,
+    matches,
+    cardNo: "",
+  };
+}
+
+function wantsCardName(message: string) {
+  const text = normalizeSearchText(message);
+  return text.includes("ชื่อ") || text.includes("name");
+}
+
+function wantsCardReward(message: string) {
+  const text = normalizeSearchText(message);
+  return (
+    text.includes("รางวัล") ||
+    text.includes("แลกรับ") ||
+    text.includes("ได้อะไร") ||
+    text.includes("reward")
+  );
+}
+
+function wantsCardValue(message: string) {
+  const text = normalizeSearchText(message);
+  return text.includes("ระดับ") || text.includes("rarity") || text.includes("value");
+}
+
+function formatCardDbRow(row: CardDbRow, message: string) {
+  const wantsName = wantsCardName(message);
+  const wantsReward = wantsCardReward(message);
+  const wantsValue = wantsCardValue(message);
+
+  if (wantsName && !wantsReward && !wantsValue) {
+    return `การ์ด ${row.cardNo} ชื่อ ${row.cardName}`;
+  }
+
+  if (wantsReward && !wantsName && !wantsValue) {
+    return `การ์ด ${row.cardNo} ${row.cardName}\nรางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`;
+  }
+
+  if (wantsValue && !wantsName && !wantsReward) {
+    return `การ์ด ${row.cardNo} ${row.cardName}\nระดับ: ${row.value || "-"}`;
+  }
+
+  return [
+    `การ์ด ${row.cardNo}`,
+    `ชื่อ: ${row.cardName}`,
+    `ระดับ: ${row.value || "-"}`,
+    `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
+  ].join("\n");
+}
+
+async function buildDirectCardDbReply(
+  message: string,
+  history: BlazeHistoryItem[]
+) {
+  if (!isCardDbQuestion(message) || !isCardLookupQuestion(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const { exact, matches, cardNo } = findCardDbMatches(rows, message, history);
+
+  if (exact) {
+    return enforceBlazeStyle(formatCardDbRow(exact, message));
+  }
+
+  if (cardNo) {
+    return enforceBlazeStyle(
+      `ข้าไม่พบการ์ด No.${cardNo} ในฐานข้อมูลการ์ด 293 ใบตอนนี้`
+    );
+  }
+
+  if (matches.length > 1) {
+    return enforceBlazeStyle(
+      [
+        "ข้าพบการ์ดที่ชื่อใกล้เคียงหลายใบ ระบุเลข No. ให้ข้าอีกนิดแล้วข้าจะตอบชื่อ/รางวัลให้เป๊ะ",
+        ...matches.slice(0, 6).map((row) => `- ${row.cardNo} ${row.cardName}`),
+      ].join("\n")
+    );
+  }
+
+  return enforceBlazeStyle(
+    "ข้าต้องขอเลขการ์ด No.001-No.293 หรือชื่อการ์ดก่อน จึงจะตอบชื่อ ระดับ และรางวัลจากฐานข้อมูลจริงให้เป๊ะได้"
+  );
+}
+
+async function buildCardDbKnowledgeContext(
+  message: string,
+  history: BlazeHistoryItem[]
+) {
+  if (!isCardDbQuestion(message) || !isCardLookupQuestion(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const { exact, matches } = findCardDbMatches(rows, message, history);
+  const selectedRows = exact ? [exact] : matches.length ? matches : rows.slice(0, 293);
+  const lines = selectedRows.map((row) =>
+    [
+      `- ${row.cardNo} | ${row.cardName}`,
+      `ระดับ: ${row.value || "-"}`,
+      `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
+    ].join(" | ")
+  );
+  let text = [
+    `ฐานข้อมูลการ์ดจริงจาก Google Sheet CARD DB: พบ ${rows.length} ใบ`,
+    "กฎ: ถ้าถามชื่อ/รางวัล/ระดับของการ์ด ให้ยึดข้อมูล CARD DB นี้ก่อน ห้ามเดา และถ้ามีเลข No. ให้ตอบแถวเดียวแบบเป๊ะ",
+    ...lines,
+  ].join("\n");
+
+  if (text.length > MAX_CARD_DB_CONTEXT_CHARS) {
+    text =
+      text.slice(0, MAX_CARD_DB_CONTEXT_CHARS) +
+      "\n- [system] CARD DB ถูกย่อ ถ้าคำถามต้องการใบเฉพาะให้ค้นจากเลข No. ก่อนเสมอ";
+  }
+
+  return text;
 }
 
 function scoreKnowledgeRow(row: KnowledgeRow, message: string) {
@@ -572,15 +1051,20 @@ async function loadOfficialSiteKnowledge(message: string) {
     : context;
 }
 
-async function buildKnowledgeContext(message: string) {
-  const [sheetContext, siteContext] = await Promise.all([
+async function buildKnowledgeContext(
+  message: string,
+  history: BlazeHistoryItem[]
+) {
+  const [sheetContext, siteContext, cardDbContext] = await Promise.all([
     loadSheetKnowledge(message),
     loadOfficialSiteKnowledge(message),
+    buildCardDbKnowledgeContext(message, history),
   ]);
 
   return [
     BLAZE_CORE_KNOWLEDGE,
     BLAZE_COLLECTION_REWARD_INDEX,
+    cardDbContext,
     sheetContext,
     siteContext
       ? `ข้อมูลเสริมจากเว็บทางการ nexoracardgame.com แบบ cache ตามคำถาม:\n${siteContext}`
@@ -1054,7 +1538,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const knowledgeContext = await buildKnowledgeContext(message);
+    const directCardReply = await buildDirectCardDbReply(message, history);
+    if (directCardReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCardReply, message),
+          source: "card-db",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const knowledgeContext = await buildKnowledgeContext(message, history);
     let result: BlazeResult | null = null;
 
     try {
@@ -1082,7 +1579,7 @@ export async function POST(req: NextRequest) {
         ok: true,
         reply: polishBlazeReply(result.reply, message),
         source: result.source,
-        native: result.source === "gemini",
+        native: result.source === "gemini" || result.source === "card-db",
       },
       { headers: { "Cache-Control": "no-store" } }
     );
