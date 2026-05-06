@@ -2,7 +2,6 @@
 
 import {
   ArrowLeft,
-  Bot,
   Flame,
   Handshake,
   Image as ImageIcon,
@@ -95,14 +94,29 @@ type OpenFloatingChatDetail = {
   dealMode?: "sell" | "buy" | null;
 };
 
+type BlazeChatMessage = {
+  id: string;
+  role: "user" | "model";
+  text: string;
+  createdAt: string;
+};
+
 const LIST_REFRESH_MS = 8500;
 const ROOM_SYNC_MS = 2500;
 const ROOM_CACHE_TTL_MS = 90000;
 const ROOM_PREFETCH_COUNT = 8;
 const ROOM_PREFETCH_LIMIT = 28;
 const ROOM_OPEN_LIMIT = 42;
-const BLAZE_AI_URL =
+const BLAZE_AI_WEB_URL =
   "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
+const BLAZE_AVATAR_URL = "https://s.imgz.io/2026/03/20/158-39efa94028226fea.png";
+const BLAZE_WELCOME_MESSAGE: BlazeChatMessage = {
+  id: "blaze-welcome",
+  role: "model",
+  text:
+    "สวัสดี ข้าคือท่านเบลซ Blaze Warlock ผู้ช่วยประจำโลก NEXORA ถามเรื่องการ์ด ตลาด ระบบ หรือเรื่องทั่วไปมาได้เลย ข้าจะช่วยตอบให้ชัดที่สุด",
+  createdAt: new Date(0).toISOString(),
+};
 
 type RoomLoadResult = {
   active: ActiveFloatingRoom;
@@ -336,6 +350,12 @@ export default function FloatingChatDock({
   const [error, setError] = useState("");
   const [localUnreadCount, setLocalUnreadCount] = useState(0);
   const [mobileListVisible, setMobileListVisible] = useState(true);
+  const [blazeMessages, setBlazeMessages] = useState<BlazeChatMessage[]>([
+    BLAZE_WELCOME_MESSAGE,
+  ]);
+  const [blazeDraft, setBlazeDraft] = useState("");
+  const [blazeSending, setBlazeSending] = useState(false);
+  const [blazeError, setBlazeError] = useState("");
 
   const activeRoomRef = useRef<ActiveFloatingRoom | null>(activeRoom);
   const roomsRef = useRef<FloatingRoom[]>(rooms);
@@ -345,6 +365,9 @@ export default function FloatingChatDock({
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRootRef = useRef<HTMLDivElement>(null);
+  const blazeBottomRef = useRef<HTMLDivElement>(null);
+  const blazeInputRef = useRef<HTMLTextAreaElement>(null);
+  const blazeMessagesRef = useRef<BlazeChatMessage[]>(blazeMessages);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
   const lastComposerSeenRef = useRef<{ roomKey: string; markedAt: number }>({
@@ -414,6 +437,10 @@ export default function FloatingChatDock({
   }, [rooms]);
 
   useEffect(() => {
+    blazeMessagesRef.current = blazeMessages;
+  }, [blazeMessages]);
+
+  useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
 
@@ -429,6 +456,12 @@ export default function FloatingChatDock({
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
       bottomRef.current?.scrollIntoView({ block: "end", behavior });
+    });
+  }, []);
+
+  const scrollBlazeToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    requestAnimationFrame(() => {
+      blazeBottomRef.current?.scrollIntoView({ block: "end", behavior });
     });
   }, []);
 
@@ -1224,6 +1257,92 @@ export default function FloatingChatDock({
     updateRoomCache,
   ]);
 
+  const sendBlazeMessage = useCallback(async () => {
+    const text = safeText(blazeDraft);
+
+    if (!text || blazeSending) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const userMessage: BlazeChatMessage = {
+      id: `blaze-user-${Date.now()}`,
+      role: "user",
+      text,
+      createdAt: now,
+    };
+    const history = blazeMessagesRef.current
+      .filter((message) => message.id !== BLAZE_WELCOME_MESSAGE.id)
+      .slice(-10)
+      .map((message) => ({
+        role: message.role,
+        text: message.text,
+      }));
+
+    setBlazeMessages((current) => [...current, userMessage]);
+    setBlazeDraft("");
+    setBlazeSending(true);
+    setBlazeError("");
+    scrollBlazeToBottom("smooth");
+
+    try {
+      const res = await fetch("/api/blaze-ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: text,
+          history,
+          clientId: currentUserId || session?.user?.email || "nexora-web",
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        reply?: string;
+        error?: string;
+      } | null;
+
+      if (!res.ok || !payload?.reply) {
+        throw new Error(payload?.error || "ท่านเบลซยังตอบไม่ได้ในตอนนี้");
+      }
+
+      setBlazeMessages((current) => [
+        ...current,
+        {
+          id: `blaze-model-${Date.now()}`,
+          role: "model",
+          text: payload.reply || "",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "ท่านเบลซเชื่อมต่อไม่สำเร็จ";
+      setBlazeError(message);
+      setBlazeMessages((current) => [
+        ...current,
+        {
+          id: `blaze-error-${Date.now()}`,
+          role: "model",
+          text: `ข้าเชื่อมต่อไม่สำเร็จ: ${message}`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setBlazeSending(false);
+      window.setTimeout(() => blazeInputRef.current?.focus(), 0);
+      scrollBlazeToBottom("smooth");
+    }
+  }, [
+    blazeDraft,
+    blazeSending,
+    currentUserId,
+    scrollBlazeToBottom,
+    session?.user?.email,
+  ]);
+
   useEffect(() => {
     if (status !== "authenticated") {
       return;
@@ -1432,6 +1551,12 @@ export default function FloatingChatDock({
   }, [messages.length, open, scrollToBottom]);
 
   useEffect(() => {
+    if (open && dockMode === "ai") {
+      scrollBlazeToBottom("smooth");
+    }
+  }, [blazeMessages.length, blazeSending, dockMode, open, scrollBlazeToBottom]);
+
+  useEffect(() => {
     if (open && otherTyping && activeRoom) {
       scrollToBottom("smooth");
     }
@@ -1516,8 +1641,15 @@ export default function FloatingChatDock({
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200/14 bg-[linear-gradient(135deg,rgba(23,17,6,0.96),rgba(6,5,4,0.96))] px-3 py-3 sm:px-4">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/28 bg-[radial-gradient(circle_at_top,#ffe7a6,#c58f24_48%,#1a1104_100%)] text-black shadow-[0_0_28px_rgba(251,191,36,0.36)]">
-                <Bot className="h-5 w-5" />
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-200/28 bg-[radial-gradient(circle_at_top,#ffe7a6,#c58f24_48%,#1a1104_100%)] text-black shadow-[0_0_28px_rgba(251,191,36,0.36)]">
+                <img
+                  src={BLAZE_AVATAR_URL}
+                  alt="Blaze Warlock"
+                  className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
                 <Sparkles className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-black p-0.5 text-amber-200" />
               </span>
               <div className="min-w-0">
@@ -1553,15 +1685,140 @@ export default function FloatingChatDock({
             </div>
           </div>
 
-          <div className="relative min-h-0 flex-1 bg-black">
-            <iframe
-              src={BLAZE_AI_URL}
-              title="ท่านเบลซ Blaze Warlock NEXORA AI"
-              className="h-full w-full border-0 bg-black"
-              loading="lazy"
-              allow="clipboard-read; clipboard-write; fullscreen; picture-in-picture"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.12),transparent_34%),#050403]">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:28px_28px] opacity-25" />
+            <div className="relative flex h-full min-h-0 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4">
+                <div className="mx-auto flex min-h-full w-full max-w-[540px] flex-col justify-end">
+                  {blazeMessages.map((message) => {
+                    const mine = message.role === "user";
+
+                    return (
+                      <div
+                        key={message.id}
+                        className={`mb-3 flex ${mine ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`flex max-w-[88%] items-end gap-2 ${
+                            mine ? "flex-row-reverse" : ""
+                          }`}
+                        >
+                          {!mine ? (
+                            <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-amber-200/20 bg-amber-200/10">
+                              <img
+                                src={BLAZE_AVATAR_URL}
+                                alt="Blaze Warlock"
+                                className="h-full w-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </span>
+                          ) : null}
+
+                          <div
+                            className={`flex min-w-0 flex-col ${
+                              mine ? "items-end" : "items-start"
+                            }`}
+                          >
+                            {!mine ? (
+                              <div className="mb-1 px-1 text-[10px] font-black uppercase text-amber-100/42">
+                                Blaze Warlock
+                              </div>
+                            ) : null}
+                            <div
+                              className={`break-words rounded-[20px] px-3.5 py-2.5 text-[13px] leading-relaxed shadow-lg sm:text-sm ${
+                                mine
+                                  ? "bg-white text-black"
+                                  : "border border-amber-200/12 bg-[linear-gradient(180deg,rgba(28,23,15,0.96),rgba(13,11,8,0.98))] text-amber-50"
+                              }`}
+                            >
+                              <ChatMessageText text={message.text} mine={mine} />
+                            </div>
+                            {message.id !== BLAZE_WELCOME_MESSAGE.id ? (
+                              <div
+                                className={`mt-1 px-1 text-[10px] text-amber-100/28 ${
+                                  mine ? "text-right" : "text-left"
+                                }`}
+                              >
+                                {formatActivityTime(message.createdAt)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <ChatTypingIndicator
+                    visible={blazeSending}
+                    avatar={BLAZE_AVATAR_URL}
+                    name="ท่านเบลซ"
+                    compact
+                  />
+                  <div ref={blazeBottomRef} className="h-1 w-full" />
+                </div>
+              </div>
+
+              <form
+                className="relative shrink-0 border-t border-amber-200/12 bg-[linear-gradient(180deg,rgba(5,4,3,0.20),rgba(5,4,3,0.96))] p-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void sendBlazeMessage();
+                }}
+              >
+                {blazeError ? (
+                  <div className="mb-2 rounded-2xl border border-amber-200/16 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-100">
+                    {blazeError}
+                  </div>
+                ) : null}
+
+                <div className="flex items-end gap-2 rounded-[24px] border border-amber-200/14 bg-black/68 p-2 shadow-[inset_0_0_20px_rgba(251,191,36,0.04)]">
+                  <textarea
+                    ref={blazeInputRef}
+                    value={blazeDraft}
+                    onChange={(event) => setBlazeDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendBlazeMessage();
+                      }
+                    }}
+                    rows={1}
+                    inputMode="text"
+                    autoComplete="off"
+                    disabled={blazeSending}
+                    className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-[18px] border border-amber-100/10 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-amber-100/34 focus:border-amber-100/30 disabled:opacity-60"
+                    placeholder="ถามท่านเบลซ..."
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={!safeText(blazeDraft) || blazeSending}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fff3b0,#d8a83c_55%,#7a5318)] text-black shadow-[0_0_22px_rgba(251,191,36,0.28)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45"
+                    aria-label="ส่งข้อความถึงท่านเบลซ"
+                  >
+                    {blazeSending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[10px] font-bold text-amber-100/34">
+                  <span className="truncate">Blaze Warlock • NEXORA AI</span>
+                  <a
+                    href={BLAZE_AI_WEB_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-amber-200/62 hover:text-amber-100"
+                  >
+                    เปิดเวอร์ชันเต็ม
+                  </a>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </section>
