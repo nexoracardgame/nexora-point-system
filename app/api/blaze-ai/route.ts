@@ -18,8 +18,6 @@ const KNOWLEDGE_CACHE_MS = 5 * 60 * 1000;
 const SITE_CACHE_MS = 30 * 60 * 1000;
 const MAX_SHEET_CONTEXT_CHARS = 18000;
 const MAX_SITE_CONTEXT_CHARS = 6000;
-const TINY_JPEG_BASE64 =
-  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDweiiigD//2Q==";
 
 type BlazeHistoryItem = {
   role: "user" | "model";
@@ -794,8 +792,8 @@ function buildScriptBridgeMessage({
   const prompt = [
     "คำสั่งระบบสำคัญมาก:",
     "คำขอนี้เป็นแชทข้อความล้วนในแอพ NEXORA",
-    "ระบบภายในมี payload เล็กมากเพื่อผ่าน doPost เท่านั้น payload นี้ไม่ใช่ข้อมูลจากผู้ใช้",
-    "ห้ามกล่าวถึง payload สิ่งส่งประกอบ ไฟล์ หรือการมองเห็นใดๆ ให้ตอบจากข้อความจริงเท่านั้น",
+    "นี่คือโหมด chat เท่านั้น ไม่มีสิ่งส่งประกอบ ไม่มีไฟล์ และไม่มีการมองเห็นใดๆ",
+    "ห้ามกล่าวถึงสิ่งส่งประกอบ ไฟล์ หรือการมองเห็นใดๆ ให้ตอบจากข้อความจริงเท่านั้น",
     "ให้ตอบเฉพาะคำถามข้อความจริงของผู้ใช้เท่านั้น",
     retry
       ? "คำตอบก่อนหน้าผิดเพราะกล่าวถึงสิ่งที่ผู้ใช้ไม่ได้ส่ง รอบนี้ต้องตอบใหม่จากข้อความจริงเท่านั้น"
@@ -835,6 +833,7 @@ async function askAppsScriptBridge({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          mode: "chat",
           clientId,
           message: buildScriptBridgeMessage({
             message,
@@ -842,7 +841,7 @@ async function askAppsScriptBridge({
             retry: attempt > 0,
             knowledgeContext,
           }),
-          image: `data:image/jpeg;base64,${TINY_JPEG_BASE64}`,
+          history,
         }),
       },
       28000

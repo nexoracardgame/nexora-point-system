@@ -1,0 +1,16 @@
+{
+  "scriptId": "1BLLYryxQaMQ28OfZlVMThjg-VAb2_jmBPlrJehcJTkrFNHecoodf1e9B",
+  "rootDir": "apps-script\\blaze-ai",
+  "scriptExtensions": [
+    ".js",
+    ".gs"
+  ],
+  "htmlExtensions": [
+    ".html"
+  ],
+  "jsonExtensions": [
+    ".json"
+  ],
+  "filePushOrder": [],
+  "skipSubdirectories": false
+}

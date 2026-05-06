@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>(ท่านเบลซ) Blaze Warlock • NEXORA AI Assistant</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-1: #050506;
+      --bg-2: #0b0b0d;
+      --panel: rgba(13, 13, 16, 0.88);
+      --panel-2: rgba(20, 20, 24, 0.92);
+      --gold-1: #f7d77b;
+      --gold-2: #d6a84e;
+      --gold-3: #8b6526;
+      --text: #f7f3ea;
+      --muted: #b8ab90;
+      --line: rgba(247, 215, 123, 0.16);
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+      --purple: #7c4dff;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      font-family: "Noto Sans Thai", sans-serif;
+      color: var(--text);
+
+      background:
+        radial-gradient(circle at top left, rgba(214, 168, 78, 0.10), transparent 28%),
+        radial-gradient(circle at top right, rgba(214, 168, 78, 0.07), transparent 22%),
+        radial-gradient(circle at bottom center, rgba(214, 168, 78, 0.08), transparent 24%),
+        linear-gradient(180deg, #060607 0%, #0a0a0d 45%, #050506 100%);
+
+     overflow: hidden;            /* 🔥 ตัวสำคัญ */
+      overflow-x: hidden;
+
+     -webkit-overflow-scrolling: touch;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      opacity: 0.16;
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(247,215,123,0.08), transparent 35%);
+      mix-blend-mode: screen;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+
+      /* 🔥 แก้ตรงนี้ */
+      min-height: 100vh;
+      height: auto;
+
+      padding: 22px;
+
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+
+      /* 🔥 สำคัญมาก */
+      overflow: visible;
+}
+
+    .chat-shell {
+      width: min(1180px, calc(100% - 160px));
+      max-width: 1180px;
+      height: 100%;
+      margin-right: auto;
+      position: relative;
+      overflow: visible;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+
+    .chat-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      padding: 1px;
+      border-radius: 28px;
+      background: linear-gradient(
+        135deg,
+        rgba(247, 215, 123, 0.45),
+        rgba(214, 168, 78, 0.14),
+        rgba(247, 215, 123, 0.08)
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .chat-box {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(8px);
+      border-radius: 28px;
+      overflow: visible;
+      background: linear-gradient(180deg, rgba(10,10,14,0.92), rgba(8,8,11,0.94));
+      box-shadow: var(--shadow);
+    }
+
+    .ornament {
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      border-radius: 999px;
+      filter: blur(70px);
+      opacity: 0.18;
+      pointer-events: none;
+    }
+
+    .ornament.top {
+      top: -120px;
+      left: -60px;
+      background: radial-gradient(circle, rgba(247,215,123,0.85), transparent 65%);
+    }
+
+    .ornament.bottom {
+      bottom: -130px;
+      right: -40px;
+      background: radial-gradient(circle, rgba(214,168,78,0.70), transparent 65%);
+    }
+
+    .topbar {
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid rgba(247,215,123,0.12);
+      background: linear-gradient(180deg, rgba(22,22,26,0.92), rgba(12,12,15,0.86));
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .topbar::after {
+      content: "";
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(247,215,123,0.38),
+        transparent
+      );
+    }
+
+    .brand-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand-left {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold-2);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.05;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      font-family: "Cinzel", "Noto Sans Thai", serif;
+      background: linear-gradient(
+        180deg,
+        #fff8df 0%,
+        #f3d88c 35%,
+        #dca84c 65%,
+        #8e5f21 100%
+      );
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow:
+        0 0 12px rgba(241,204,116,0.15),
+        0 0 24px rgba(138,99,255,0.08);
+      position: relative;
+    }
+
+    .title-bar {
+      width: 220px;
+      height: 3px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(241,204,116,0),
+        rgba(241,204,116,1) 20%,
+        rgba(138,99,255,0.7) 50%,
+        rgba(241,204,116,1) 80%,
+        rgba(241,204,116,0)
+      );
+      box-shadow:
+        0 0 12px rgba(241,204,116,0.25),
+        0 0 24px rgba(138,99,255,0.18);
+      margin-top: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(247,215,123,0.16);
+      background: rgba(255, 224, 146, 0.05);
+      color: #f4dfac;
+      font-size: 13px;
+      box-shadow: inset 0 0 18px rgba(247,215,123,0.05);
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #ffe79d, #dba94b);
+      box-shadow: 0 0 14px rgba(247,215,123,0.7);
+      flex-shrink: 0;
+    }
+
+    .messages-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      background: radial-gradient(circle at center top, rgba(214,168,78,0.04), transparent 30%);
+    }
+
+    .messages-wrap::before,
+    .messages-wrap::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 24px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .messages-wrap::before {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(10,10,13,0.94), transparent);
+    }
+
+    .messages-wrap::after {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(10,10,13,0.94), transparent);
+    }
+
+    .messages {
+      height: 100%;
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px;
+      padding-right: 24px;
+      scroll-behavior: smooth;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(247,215,123,0.48), rgba(139,101,38,0.7));
+      border-radius: 10px;
+    }
+
+    .msg-row {
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .msg-row.user {
+      justify-content: flex-end;
+    }
+
+    .msg-row.bot {
+      justify-content: flex-start;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      overflow: hidden;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      border: 1px solid rgba(247,215,123,0.18);
+      background: linear-gradient(180deg, rgba(247,215,123,0.18), rgba(70,50,16,0.35));
+      color: #ffe9ae;
+      box-shadow: 0 0 18px rgba(214,168,78,0.12);
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .msg-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+      width: fit-content;
+      max-width: min(82%, 760px);
+    }
+
+    .msg-row.user .msg-col {
+      align-items: flex-end;
+    }
+
+    .msg-row.bot .msg-col {
+      align-items: flex-start;
+    }
+
+    .msg-label {
+      font-size: 11px;
+      color: #9f926f;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0 2px;
+    }
+
+    .msg {
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      min-width: 0;
+      padding: 14px 16px;
+      border-radius: 18px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      overflow: visible;
+      font-size: 15px;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.18);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .msg.user {
+      background: linear-gradient(135deg, #7d4cff 0%, #a462ff 55%, #d3a84d 160%);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-bottom-right-radius: 8px;
+    }
+
+    .msg.bot {
+      background: linear-gradient(180deg, rgba(28,28,35,0.96), rgba(16,16,21,0.98));
+      border: 1px solid rgba(247,215,123,0.12);
+      color: #f4f0e6;
+      border-bottom-left-radius: 8px;
+      position: relative;
+    }
+
+    .msg.bot:hover {
+      box-shadow:
+        0 0 0 1px rgba(247,215,123,0.18),
+        0 10px 30px rgba(214,168,78,0.14);
+    }
+
+    .msg.bot::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow: inset 0 1px 0 rgba(255, 233, 174, 0.04);
+    }
+
+    .msg.typing {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 52px;
+      min-width: 72px;
+    }
+
+    .msg.typing span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(247,215,123,0.85);
+      animation: blink 1.2s infinite ease-in-out;
+    }
+
+    .msg.typing span:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .msg.typing span:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes blink {
+      0%, 80%, 100% {
+        opacity: 0.25;
+        transform: translateY(0);
+      }
+      40% {
+        opacity: 1;
+        transform: translateY(-3px);
+      }
+    }
+
+    .composer {
+      padding: 16px 18px 18px;
+      border-top: 1px solid rgba(247,215,123,0.12);
+      background: linear-gradient(180deg, rgba(15,15,18,0.96), rgba(9,9,12,0.98));
+      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+
+    .composer-shell {
+      border: 1px solid rgba(247,215,123,0.13);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(17,17,21,0.98), rgba(10,10,13,0.98));
+      box-shadow: inset 0 0 20px rgba(247,215,123,0.03);
+      padding: 14px;
+    }
+
+    .attachment-preview {
+      display: none;
+      margin-bottom: 12px;
+      padding: 10px;
+      border-radius: 16px;
+      border: 1px solid rgba(247,215,123,0.14);
+      background: rgba(255,255,255,0.02);
+      align-items: center;
+      gap: 12px;
+    }
+
+    .attachment-preview.show {
+      display: flex;
+    }
+
+    .attachment-preview img {
+      width: 78px;
+      height: 78px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid rgba(247,215,123,0.18);
+      display: block;
+      background: #111;
+    }
+
+    .attachment-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .attachment-name {
+      font-size: 13px;
+      color: #f4dfac;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .attachment-size {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #9f926f;
+    }
+
+    .attachment-remove {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.06);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .input-wrap {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      position: relative;
+    }
+
+    .tool-btn,
+    .file-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(247,215,123,0.15);
+      background: linear-gradient(180deg, rgba(12,12,16,0.98), rgba(18,18,22,0.98));
+      color: #f4dfac;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      user-select: none;
+    }
+
+    .tool-btn:hover,
+    .file-btn:hover {
+      border-color: rgba(247,215,123,0.35);
+    }
+
+    .composer-status {
+      font-size: 12px;
+      color: #9f926f;
+    }
+
+    .image-bubble {
+      margin-top: 8px;
+      max-width: 280px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(247,215,123,0.16);
+      display: block;
+      background: #111;
+    }
+
+    .image-bubble img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .bot-generated-image {
+      margin-top: 8px;
+      max-width: 380px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(247,215,123,0.18);
+      background: #111;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+    }
+
+    .bot-generated-image img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .input {
+      flex: 1;
+      min-height: 58px;
+      max-height: 160px;
+      resize: none;
+      overflow-y: auto;
+      border: 1px solid rgba(247,215,123,0.15);
+      background: linear-gradient(180deg, rgba(9,9,12,0.98), rgba(15,15,18,0.98));
+      color: #fff;
+      border-radius: 18px;
+      padding: 16px 16px;
+      font-size: 15px;
+      outline: none;
+      box-shadow: inset 0 0 18px rgba(255,255,255,0.015);
+      font-family: inherit;
+      line-height: 1.55;
+    }
+
+    .input::placeholder {
+      color: #80755a;
+    }
+
+    .input:focus {
+      border-color: rgba(247,215,123,0.42);
+      box-shadow:
+        0 0 0 3px rgba(214,168,78,0.08),
+        inset 0 0 18px rgba(255,255,255,0.02);
+    }
+
+    .send-btn {
+      min-width: 124px;
+      height: 58px;
+      border: 0;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #f5d57b 0%, #d6a84e 42%, #7c4dff 130%);
+      color: #141414;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow:
+        0 12px 24px rgba(124, 77, 255, 0.20),
+        0 8px 24px rgba(214,168,78,0.22);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .send-btn:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 14px 28px rgba(124, 77, 255, 0.24),
+        0 10px 28px rgba(214,168,78,0.28);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .bottom-note {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #907f59;
+    }
+
+    .emoji-picker-wrap {
+      position: absolute;
+      bottom: 58px;
+      left: 130px;
+      z-index: 9999;
+      display: none;
+      width: min(360px, calc(100vw - 40px));
+      max-width: 360px;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(247,215,123,0.18);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    }
+
+    .emoji-picker-wrap.show {
+      display: block;
+    }
+
+    emoji-picker {
+      --background: #111318;
+      --border-color: rgba(247,215,123,0.12);
+      --button-hover-background: rgba(255,255,255,0.06);
+      --category-emoji-padding: 0.45rem;
+      height: 380px;
+      width: 100%;
+    }
+
+    .ai-mascot {
+      position: absolute;
+      right: -120px;
+      top: 150%;
+      width: clamp(160px, 18vw, 280px);
+      z-index: 10;
+      pointer-events: none;
+      transform-origin: center center;
+      will-change: transform;
+      backface-visibility: hidden;
+      filter:
+        drop-shadow(0 20px 40px rgba(0,0,0,0.55))
+        drop-shadow(0 0 24px rgba(214,168,78,0.28));
+      animation: mascotFloatDesktop 2.4s ease-in-out infinite;
+    }
+
+    .ai-mascot img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .ai-mascot::after {
+      content: "";
+      position: absolute;
+      bottom: 18px;
+      left: 10%;
+      width: 80%;
+      height: 20px;
+      background: radial-gradient(circle, rgba(0,0,0,0.42), transparent 70%);
+      filter: blur(10px);
+      opacity: 0.55;
+    }
+
+    .ai-mascot-badge {
+      position: absolute;
+      left: 50%;
+      bottom: -12px;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #141414;
+      background: linear-gradient(135deg, #f5d57b 0%, #d6a84e 100%);
+      box-shadow: 0 8px 20px rgba(214,168,78,0.28);
+      white-space: nowrap;
+    }
+
+    @keyframes mascotFloatDesktop {
+      0% {
+        transform: translate3d(0, -50%, 0) scale(1.05);
+      }
+      50% {
+        transform: translate3d(0, calc(-50% - 8px), 0) scale(1.05);
+      }
+      100% {
+        transform: translate3d(0, -50%, 0) scale(1.05);
+      }
+    }
+
+    @keyframes mascotFloatMobile {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      50% {
+        transform: translate3d(0, -8px, 0) scale(1);
+      }
+      100% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .ai-mascot {
+        right: -80px;
+        top: 120px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .wrap {
+        min-height: 100vh;
+        height: auto;
+        padding: 0;
+      }
+
+      .chat-shell {
+        width: 100% !important;
+        height: 100%;
+        margin-right: 0;
+      }
+
+      .chat-box {
+        height: auto;
+        min-height: 100vh;
+        border-radius: 0;
+      }
+
+      .topbar {
+        padding: 18px 16px 16px;
+      }
+
+      .title {
+        font-size: 24px;
+      }
+
+      .messages {
+        padding: 16px;
+        padding-right: 16px;
+      }
+
+      .msg-col {
+        max-width: 92%;
+      }
+
+      .composer {
+        padding: 12px;
+      }
+
+      .input-wrap {
+        flex-direction: column;
+      }
+
+      .send-btn {
+        width: 100%;
+      }
+
+      .composer-tools {
+        justify-content: space-between;
+      }
+
+      .emoji-picker-wrap {
+        left: 0;
+        right: 0;
+        bottom: 58px;
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .bot-generated-image {
+        max-width: 100%;
+      }
+
+      .status-row {
+        justify-content: flex-start;
+      }
+
+      .ai-mascot {
+        width: 180px;
+        right: -36px;
+        top: auto;
+        bottom: 100px;
+        transform: translate3d(0, 0, 0) scale(1);
+        animation: mascotFloatMobile 2.2s ease-in-out infinite;
+      }
+
+      .ai-mascot-badge {
+        font-size: 10px;
+        padding: 6px 10px;
+      }
+    }
+
+    body.in-iframe .ai-mascot {
+      width: 330px !important;
+      right: -230px !important;
+      top: 58% !important;
+      bottom: auto !important;
+      animation: mascotFloatDesktop 2.4s ease-in-out infinite !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="chat-shell">
+      <div class="ornament top"></div>
+      <div class="ornament bottom"></div>
+
+      <div class="ai-mascot">
+        <img
+          src="https://s.imgz.io/2026/03/20/158-39efa94028226fea.png"
+          alt="Blaze Warlock AI Assistant"
+        />
+        <div class="ai-mascot-badge">Blaze Warlock • AI</div>
+      </div>
+
+      <div class="chat-box">
+        <div class="topbar">
+          <div class="brand-row">
+            <div class="brand-left">
+              <div class="eyebrow">NEXORA • AI ระดับตำนาน!</div>
+              <h1 class="title">(ท่านเบลซ) Blaze Warlock • NEXORA AI</h1>
+              <div class="title-bar"></div>
+              <div class="subtitle">
+                🔱 ข้าคือผู้ช่วยประจำโลก NEXORA พร้อมตอบทุกเรื่องในจักรวาลนี้ เรื่องทั่วไป
+                วิเคราะห์รูป สร้างภาพ และช่วยงานต่างๆ ของท่านได้ในที่เดียว
+              </div>
+            </div>
+
+            <div class="status-row">
+              <div class="status-pill">
+                <span class="status-dot"></span>
+                <span>AI ONLINE • READY TO TALK</span>
+              </div>
+
+              <div class="status-pill">
+                <span>👥 ออนไลน์ตอนนี้: <strong id="onlineNowValue">0</strong></span>
+              </div>
+
+              <div class="status-pill">
+                <span>📊 ยอดใช้งานรวม: <strong id="totalSessionsValue">0</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="messages-wrap">
+          <div id="messages" class="messages">
+            <div class="msg-row bot">
+              <div class="avatar">
+                <img src="https://s.imgz.io/2026/03/20/158-39efa94028226fea.png" alt="AI" />
+              </div>
+              <div class="msg-col">
+                <div class="msg-label">(ท่านเบลซ) Blaze Warlock</div>
+                <div class="msg bot">
+                  สวัสดี 🔱 ชื่อของข้าคือ Blaze Warlock หรือเรียกสั้นๆว่าท่านเบลซ
+                  นักปราชญ์เพลิง ผู้รอบรู้ทุกอย่างอย่างแห่งจักรวาล NEXORA 
+                  🔥 ข้าพร้อมตอบคำถาม วิเคราะห์รูป สร้างภาพ และช่วยงานของท่านอย่างเต็มกำลัง
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer-shell">
+            <div id="attachmentPreview" class="attachment-preview">
+              <img id="attachmentThumb" src="" alt="preview" />
+              <div class="attachment-meta">
+                <div id="attachmentName" class="attachment-name"></div>
+                <div id="attachmentSize" class="attachment-size"></div>
+              </div>
+              <button id="removeAttachmentBtn" class="attachment-remove" type="button">ลบรูป</button>
+            </div>
+
+            <div class="input-wrap">
+              <textarea
+                id="userInput"
+                class="input"
+                placeholder="ถามอะไรก็ได้... เช่น สร้างภาพโปสเตอร์ NEXORA ดำทองอลังการ 😀🔥"
+                rows="1"
+              ></textarea>
+              <button id="sendBtn" class="send-btn">ส่งข้อความ</button>
+            </div>
+
+            <div class="composer-tools">
+              <label for="imageInput" class="file-btn">🖼️ แนบรูป</label>
+              <input
+                id="imageInput"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                hidden
+              />
+
+              <button id="emojiBtn" class="tool-btn" type="button">😀 อีโมจิ</button>
+
+              <div id="emojiPickerWrap" class="emoji-picker-wrap">
+                <emoji-picker id="emojiPicker" locale="th"></emoji-picker>
+              </div>
+
+              <div id="composerStatus" class="composer-status">รองรับข้อความ + อีโมจิ + รูปภาพ + เจนภาพ + สถิติออนไลน์</div>
+            </div>
+
+            <div class="bottom-note">(ท่านเบลซ) Blaze Warlock • NEXORA AI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const messages = document.getElementById("messages");
+    const userInput = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const imageInput = document.getElementById("imageInput");
+    const emojiBtn = document.getElementById("emojiBtn");
+    const attachmentPreview = document.getElementById("attachmentPreview");
+    const attachmentThumb = document.getElementById("attachmentThumb");
+    const attachmentName = document.getElementById("attachmentName");
+    const attachmentSize = document.getElementById("attachmentSize");
+    const removeAttachmentBtn = document.getElementById("removeAttachmentBtn");
+    const composerStatus = document.getElementById("composerStatus");
+    const emojiPickerWrap = document.getElementById("emojiPickerWrap");
+    const emojiPicker = document.getElementById("emojiPicker");
+    const onlineNowValue = document.getElementById("onlineNowValue");
+    const totalSessionsValue = document.getElementById("totalSessionsValue");
+
+    let chatHistory = [];
+    let pendingImage = null;
+
+    let clientId = localStorage.getItem("nexora_client_id");
+    if (!clientId) {
+      clientId = "client_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem("nexora_client_id", clientId);
+    }
+
+    let pageSessionId = sessionStorage.getItem("nexora_page_session_id");
+    if (!pageSessionId) {
+      pageSessionId = "session_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+      sessionStorage.setItem("nexora_page_session_id", pageSessionId);
+    }
+
+    let typingPresenceTimer = null;
+
+    function scrollMessagesToBottom() {
+      requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+      });
+    }
+
+    function autoResizeTextarea(el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    }
+
+    function normalizeReply(reply) {
+      if (reply == null) {
+        return {
+          text: "ไม่มีคำตอบ",
+          generatedImage: null,
+          mode: "text"
+        };
+      }
+
+      if (typeof reply === "string") {
+        return {
+          text: reply.trim(),
+          generatedImage: null,
+          mode: "text"
+        };
+      }
+
+      if (Array.isArray(reply)) {
+        return {
+          text: reply.map(item => String(item || "").trim()).join("\n\n").trim(),
+          generatedImage: null,
+          mode: "text"
+        };
+      }
+
+      if (typeof reply === "object") {
+        const text =
+          (typeof reply.reply === "string" && reply.reply.trim()) ||
+          (typeof reply.text === "string" && reply.text.trim()) ||
+          (typeof reply.message === "string" && reply.message.trim()) ||
+          "";
+
+        const generatedImage =
+          reply.generatedImage &&
+          typeof reply.generatedImage === "object" &&
+          reply.generatedImage.dataUrl
+            ? reply.generatedImage
+            : null;
+
+        return {
+          text: text || "ไม่มีคำตอบ",
+          generatedImage: generatedImage,
+          mode: reply.mode || (generatedImage ? "image" : "text")
+        };
+      }
+
+      return {
+        text: String(reply).trim(),
+        generatedImage: null,
+        mode: "text"
+      };
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes && bytes !== 0) return "";
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    }
+
+    function setComposerStatus(text) {
+      composerStatus.textContent = text || "";
+    }
+
+    function updateStatsUI(stats) {
+      if (!stats || typeof stats !== "object") return;
+
+      if (onlineNowValue) {
+        onlineNowValue.textContent = String(stats.onlineNow ?? 0);
+      }
+
+      if (totalSessionsValue) {
+        totalSessionsValue.textContent = String(stats.totalSessions ?? 0);
+      }
+    }
+
+    function sendPresence(action = "heartbeat") {
+      google.script.run
+        .withSuccessHandler(function(stats) {
+          updateStatsUI(stats);
+        })
+        .withFailureHandler(function(err) {
+          console.error("presence error:", err);
+        })
+        .heartbeatPresence(pageSessionId, clientId, {
+          action: action,
+          isVisible: !document.hidden,
+          userAgent: navigator.userAgent
+        });
+    }
+
+    function bootstrapPresenceClient() {
+      google.script.run
+        .withSuccessHandler(function(stats) {
+          updateStatsUI(stats);
+        })
+        .withFailureHandler(function(err) {
+          console.error("bootstrap presence error:", err);
+        })
+        .bootstrapPresence(pageSessionId, clientId, {
+          isVisible: !document.hidden,
+          userAgent: navigator.userAgent
+        });
+    }
+
+    function clearPendingImage() {
+      pendingImage = null;
+      imageInput.value = "";
+      attachmentThumb.src = "";
+      attachmentName.textContent = "";
+      attachmentSize.textContent = "";
+      attachmentPreview.classList.remove("show");
+      setComposerStatus("รองรับข้อความ + อีโมจิ + รูปภาพ + เจนภาพ + สถิติออนไลน์");
+    }
+
+    function setPendingImage(file, dataUrl) {
+      pendingImage = {
+        name: file.name,
+        type: file.type || "image/png",
+        size: file.size || 0,
+        dataUrl: dataUrl
+      };
+
+      attachmentThumb.src = dataUrl;
+      attachmentName.textContent = file.name;
+      attachmentSize.textContent = formatBytes(file.size);
+      attachmentPreview.classList.add("show");
+      setComposerStatus("แนบรูปแล้ว พร้อมส่ง");
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function extractBase64FromDataUrl(dataUrl) {
+      const idx = dataUrl.indexOf(",");
+      return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+    }
+
+    function createUserImageNode(src, alt = "uploaded image") {
+      const wrap = document.createElement("div");
+      wrap.className = "image-bubble";
+
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = alt;
+
+      wrap.appendChild(img);
+      return wrap;
+    }
+
+    function createBotGeneratedImageNode(src, alt = "generated image") {
+      const wrap = document.createElement("div");
+      wrap.className = "bot-generated-image";
+
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = alt;
+
+      wrap.appendChild(img);
+      return wrap;
+    }
+
+    function createMessageRow(text, type, options = {}) {
+      const row = document.createElement("div");
+      row.className = "msg-row " + type;
+
+      const safeText = typeof text === "string" ? text.trim() : String(text || "").trim();
+      const hasUserImage = !!options.imageSrc;
+      const hasGeneratedImage = !!options.generatedImageSrc;
+
+      if (type === "bot") {
+        row.innerHTML = `
+          <div class="avatar">
+            <img src="https://s.imgz.io/2026/03/20/158-39efa94028226fea.png" alt="AI" />
+          </div>
+          <div class="msg-col">
+            <div class="msg-label">(ท่านเบลซ) Blaze Warlock</div>
+            <div class="msg bot"></div>
+          </div>
+        `;
+        row.querySelector(".msg.bot").textContent = safeText || " ";
+      } else {
+        row.innerHTML = `
+          <div class="msg-col">
+            <div class="msg-label" style="text-align:right;">YOU</div>
+            <div class="msg user"></div>
+          </div>
+        `;
+        row.querySelector(".msg.user").textContent = safeText || (hasUserImage ? "📷 แนบรูปภาพ" : " ");
+      }
+
+      const targetCol = row.querySelector(".msg-col");
+
+      if (hasUserImage) {
+        targetCol.appendChild(
+          createUserImageNode(options.imageSrc, options.imageAlt || "user image")
+        );
+      }
+
+      if (hasGeneratedImage) {
+        targetCol.appendChild(
+          createBotGeneratedImageNode(
+            options.generatedImageSrc,
+            options.generatedImageAlt || "generated image"
+          )
+        );
+      }
+
+      return row;
+    }
+
+    function addMessage(text, type, options = {}) {
+      const row = createMessageRow(text, type, options);
+      messages.appendChild(row);
+      scrollMessagesToBottom();
+      return row;
+    }
+
+    function addTypingIndicator() {
+      removeTypingIndicator();
+
+      const row = document.createElement("div");
+      row.className = "msg-row bot typing-row";
+      row.innerHTML = `
+        <div class="avatar">
+          <img src="https://s.imgz.io/2026/03/20/158-39efa94028226fea.png" alt="AI" />
+        </div>
+        <div class="msg-col">
+          <div class="msg-label">(ท่านเบลซ) Blaze Warlock</div>
+          <div class="msg bot typing">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      `;
+      messages.appendChild(row);
+      scrollMessagesToBottom();
+      return row;
+    }
+
+    function removeTypingIndicator() {
+      const typingRow = messages.querySelector(".typing-row");
+      if (typingRow) typingRow.remove();
+    }
+
+    function setLoading(isLoading) {
+      sendBtn.disabled = isLoading;
+      sendBtn.textContent = isLoading ? "กำลังส่ง..." : "ส่งข้อความ";
+      userInput.disabled = isLoading;
+      imageInput.disabled = isLoading;
+      emojiBtn.disabled = isLoading;
+      removeAttachmentBtn.disabled = isLoading;
+    }
+
+    function appendBotReply(reply) {
+      removeTypingIndicator();
+      const normalized = normalizeReply(reply);
+
+      addMessage(normalized.text, "bot", normalized.generatedImage ? {
+        generatedImageSrc: normalized.generatedImage.dataUrl,
+        generatedImageAlt: "AI generated image"
+      } : {});
+    }
+
+    async function compressImage(file, maxWidth = 1024) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+          img.src = e.target.result;
+        };
+
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const scale = img.width > maxWidth ? (maxWidth / img.width) : 1;
+
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const compressed = canvas.toDataURL("image/jpeg", 0.8);
+          resolve(compressed);
+        };
+
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function onPickImage(file) {
+      if (!file) return;
+
+      const allowed = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+      if (!allowed.includes(file.type)) {
+        alert("รองรับเฉพาะไฟล์ PNG, JPG, JPEG, WEBP");
+        return;
+      }
+
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert("รูปใหญ่เกินไป กรุณาใช้ไฟล์ไม่เกิน 5MB");
+        return;
+      }
+
+      try {
+        setComposerStatus("กำลังประมวลผลรูป...");
+        let dataUrl;
+
+        if (file.size < 300000) {
+          dataUrl = await fileToDataUrl(file);
+        } else {
+          dataUrl = await compressImage(file);
+        }
+
+        setPendingImage(file, dataUrl);
+        sendPresence("attach_image");
+      } catch (err) {
+        console.error(err);
+        alert("ไม่สามารถอ่านไฟล์ภาพได้");
+        setComposerStatus("รองรับข้อความ + อีโมจิ + รูปภาพ + เจนภาพ + สถิติออนไลน์");
+      }
+    }
+
+    function insertAtCursor(textToInsert) {
+      const start = userInput.selectionStart || 0;
+      const end = userInput.selectionEnd || 0;
+      const current = userInput.value;
+
+      userInput.value = current.slice(0, start) + textToInsert + current.slice(end);
+
+      const newPos = start + textToInsert.length;
+      userInput.setSelectionRange(newPos, newPos);
+      userInput.focus();
+      autoResizeTextarea(userInput);
+    }
+
+    function pingTypingPresence() {
+      clearTimeout(typingPresenceTimer);
+      typingPresenceTimer = setTimeout(function() {
+        sendPresence("typing");
+      }, 250);
+    }
+
+    function sendMessage(customText) {
+      if (sendBtn.disabled) return;
+
+      const text = (customText != null ? customText : userInput.value).trim();
+      const hasText = !!text;
+      const hasImage = !!pendingImage;
+
+      if (!hasText && !hasImage) return;
+
+      const imagePayload = hasImage ? {
+        name: pendingImage.name,
+        mimeType: pendingImage.type,
+        size: pendingImage.size,
+        base64Data: extractBase64FromDataUrl(pendingImage.dataUrl)
+      } : null;
+
+      addMessage(
+        hasText ? text : "📷 แนบรูปภาพ",
+        "user",
+        hasImage ? { imageSrc: pendingImage.dataUrl, imageAlt: pendingImage.name } : {}
+      );
+
+      chatHistory.push({
+        role: "user",
+        text: text || "",
+        image: imagePayload ? {
+          name: imagePayload.name,
+          mimeType: imagePayload.mimeType
+        } : null
+      });
+
+      userInput.value = "";
+      autoResizeTextarea(userInput);
+      setLoading(true);
+      addTypingIndicator();
+      emojiPickerWrap.classList.remove("show");
+      setComposerStatus("กำลังประมวลผล...");
+
+      sendPresence("chat");
+
+      google.script.run
+        .withSuccessHandler(function(reply) {
+          const normalized = normalizeReply(reply);
+          appendBotReply(reply);
+
+          chatHistory.push({ role: "model", text: normalized.text });
+          if (chatHistory.length > 16) {
+            chatHistory = chatHistory.slice(-16);
+          }
+
+          clearPendingImage();
+          setLoading(false);
+          userInput.focus();
+          scrollMessagesToBottom();
+          sendPresence("reply_done");
+        })
+        .withFailureHandler(function(error) {
+          const errText =
+            "เชื่อมต่อไม่สำเร็จ: " +
+            (error && error.message ? error.message : "Unknown error");
+
+          appendBotReply(errText);
+
+          chatHistory.push({ role: "model", text: errText });
+          if (chatHistory.length > 16) {
+            chatHistory = chatHistory.slice(-16);
+          }
+
+          setLoading(false);
+          userInput.focus();
+          scrollMessagesToBottom();
+          setComposerStatus("รองรับข้อความ + อีโมจิ + รูปภาพ + เจนภาพ + สถิติออนไลน์");
+          sendPresence("error");
+        })
+        .askGemini(text || "", chatHistory, clientId, imagePayload);
+    }
+
+    sendBtn.addEventListener("click", function() {
+      sendMessage();
+    });
+
+    userInput.addEventListener("input", function() {
+      autoResizeTextarea(userInput);
+      pingTypingPresence();
+    });
+
+    userInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    imageInput.addEventListener("change", async function(e) {
+      const file = e.target.files && e.target.files[0];
+      await onPickImage(file);
+    });
+
+    removeAttachmentBtn.addEventListener("click", function() {
+      clearPendingImage();
+      userInput.focus();
+      sendPresence("remove_image");
+    });
+
+    emojiBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      emojiPickerWrap.classList.toggle("show");
+      sendPresence("emoji_open");
+    });
+
+    emojiPicker.addEventListener("emoji-click", function(event) {
+      const emoji = event.detail.unicode || "";
+      if (!emoji) return;
+      insertAtCursor(emoji);
+      sendPresence("emoji_pick");
+    });
+
+    document.addEventListener("click", function(e) {
+      if (
+        emojiPickerWrap &&
+        !emojiPickerWrap.contains(e.target) &&
+        !emojiBtn.contains(e.target)
+      ) {
+        emojiPickerWrap.classList.remove("show");
+      }
+    });
+
+    document.addEventListener("visibilitychange", function() {
+      sendPresence(document.hidden ? "hidden" : "visible");
+    });
+
+    window.addEventListener("focus", function() {
+      sendPresence("focus");
+    });
+
+    window.addEventListener("blur", function() {
+      sendPresence("blur");
+    });
+
+    autoResizeTextarea(userInput);
+    scrollMessagesToBottom();
+
+    bootstrapPresenceClient();
+
+    setInterval(function() {
+      sendPresence(document.hidden ? "idle" : "heartbeat");
+    }, 10000);
+
+    if (window.self !== window.top) {
+      document.body.classList.add("in-iframe");
+    }
+  
+function sendHeight() {
+  const height = document.body.scrollHeight;
+  window.parent.postMessage({ type: "NX_HEIGHT", height }, "*");
+}
+
+window.addEventListener("load", sendHeight);
+window.addEventListener("resize", sendHeight);
+
+new MutationObserver(sendHeight).observe(document.body, {
+  childList: true,
+  subtree: true
+});
+</script>
+</body>
+</html>
