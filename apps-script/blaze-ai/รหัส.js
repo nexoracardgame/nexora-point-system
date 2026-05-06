@@ -1569,8 +1569,11 @@ function generateImageWithGemini(message, clientId, imagePayload) {
 }
 
 // ================== MAIN ==================
-function askGemini(message, history, clientId, imagePayload) {
+function askGemini(message, history, clientId, imagePayload, options) {
   try {
+    options = options || {};
+    const forceTextMode = options.forceTextMode === true;
+
     if (imagePayload && typeof imagePayload !== "object") {
       imagePayload = null;
     }
@@ -1611,7 +1614,7 @@ function askGemini(message, history, clientId, imagePayload) {
   }
 }
     // ===== โหมดสร้างภาพ / แก้ภาพ =====
-    if (detectImageGenerationRequest(cleanMessage, hasImage)) {
+    if (!forceTextMode && detectImageGenerationRequest(cleanMessage, hasImage)) {
       return generateImageWithGemini(cleanMessage, cleanClientId, imagePayload);
     }
 
@@ -1941,7 +1944,9 @@ function doPost(e) {
     if (apiMode === "chat" || (!apiImage && apiMessage)) {
       const apiClientId = String(data.clientId || "nexora-web");
       const apiHistory = normalizeApiHistory(data.history || []);
-      const apiReply = askGemini(apiMessage, apiHistory, apiClientId, null);
+      const apiReply = askGemini(apiMessage, apiHistory, apiClientId, null, {
+        forceTextMode: true
+      });
       const apiTextReply = normalizeApiReply(apiReply);
 
       return jsonOut({

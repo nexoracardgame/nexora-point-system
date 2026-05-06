@@ -724,6 +724,11 @@ function isPlaceholderImageReply(reply: string, message: string) {
     "ไม่เห็นรายละเอียด",
     "รูปที่ท่าน",
     "ภาพที่ท่าน",
+    "สร้างภาพให้แล้ว",
+    "สร้างรูปให้แล้ว",
+    "แก้ภาพให้แล้ว",
+    "generated image",
+    "created an image",
   ].some((keyword) => text.includes(keyword));
 }
 
