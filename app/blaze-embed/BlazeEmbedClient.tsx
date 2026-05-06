@@ -131,6 +131,31 @@ export default function BlazeEmbedClient() {
   const messagesRef = useRef(messages);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverflow = root.style.overflow;
+    const previousRootHeight = root.style.height;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyHeight = body.style.height;
+
+    root.classList.add("blaze-embed-root");
+    body.classList.add("blaze-embed-body");
+    root.style.overflow = "hidden";
+    root.style.height = "100%";
+    body.style.overflow = "hidden";
+    body.style.height = "100%";
+
+    return () => {
+      root.classList.remove("blaze-embed-root");
+      body.classList.remove("blaze-embed-body");
+      root.style.overflow = previousRootOverflow;
+      root.style.height = previousRootHeight;
+      body.style.overflow = previousBodyOverflow;
+      body.style.height = previousBodyHeight;
+    };
+  }, []);
+
+  useEffect(() => {
     const snapshot = readSession();
     clientIdRef.current = makeClientId();
     messagesRef.current = snapshot.messages;
@@ -263,23 +288,117 @@ export default function BlazeEmbedClient() {
   }
 
   return (
-    <main className="fixed inset-0 isolate flex min-h-[100dvh] flex-col overflow-hidden bg-[#050403] text-white md:p-[22px]">
+    <main className="fixed inset-0 isolate flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#050403] text-white md:p-[22px]">
       <style>{`
+        html.blaze-embed-root,
+        html.blaze-embed-root body,
+        body.blaze-embed-body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          overflow: hidden !important;
+          overscroll-behavior: none;
+          background: #050403;
+        }
+
+        html.blaze-embed-root,
+        html.blaze-embed-root *,
+        body.blaze-embed-body,
+        body.blaze-embed-body * {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+
+        html.blaze-embed-root::-webkit-scrollbar,
+        html.blaze-embed-root *::-webkit-scrollbar,
+        body.blaze-embed-body::-webkit-scrollbar,
+        body.blaze-embed-body *::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+          background: transparent !important;
+        }
+
         html,
         body {
-          overflow: hidden;
+          overflow: hidden !important;
           background: #050403;
         }
 
         .blaze-embed-scroll {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
         }
 
         .blaze-embed-scroll::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+        }
+
+        .blaze-title {
+          color: transparent;
+          background:
+            linear-gradient(180deg, #fff8df 0%, #ffe29a 34%, #dca84c 66%, #8e5f21 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          text-shadow:
+            0 0 16px rgba(241, 204, 116, 0.22),
+            0 0 34px rgba(138, 99, 255, 0.10);
+        }
+
+        .blaze-label {
+          color: rgba(245, 213, 123, 0.86);
+          text-shadow: 0 0 12px rgba(214, 168, 78, 0.22);
+        }
+
+        .blaze-muted-gold {
+          color: rgba(232, 204, 139, 0.70);
+        }
+
+        .blaze-bot-bubble {
+          border: 1px solid rgba(247, 215, 123, 0.22);
+          background:
+            linear-gradient(180deg, rgba(39, 29, 12, 0.96), rgba(17, 13, 8, 0.98));
+          color: #fff1c9;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 242, 184, 0.08),
+            0 12px 34px rgba(0, 0, 0, 0.30),
+            0 0 28px rgba(214, 168, 78, 0.08);
+        }
+
+        .blaze-user-bubble {
+          border: 1px solid rgba(255, 248, 223, 0.48);
+          background:
+            linear-gradient(135deg, #fff8df 0%, #f3d57b 42%, #c89236 100%);
+          color: #181007;
+          box-shadow:
+            0 14px 34px rgba(0, 0, 0, 0.24),
+            0 0 26px rgba(241, 204, 116, 0.18);
+        }
+
+        .blaze-time {
+          color: rgba(245, 213, 123, 0.42);
+        }
+
+        .blaze-composer {
+          border-color: rgba(247, 215, 123, 0.24);
+          background:
+            linear-gradient(180deg, rgba(23, 17, 8, 0.94), rgba(9, 7, 4, 0.96));
+          box-shadow:
+            inset 0 0 24px rgba(247, 215, 123, 0.06),
+            0 0 24px rgba(214, 168, 78, 0.08);
+        }
+
+        .blaze-input {
+          border-color: rgba(247, 215, 123, 0.18);
+          background: linear-gradient(180deg, rgba(8, 8, 10, 0.98), rgba(16, 12, 7, 0.98));
+          color: #fff6db;
+        }
+
+        .blaze-input::placeholder {
+          color: rgba(245, 213, 123, 0.42);
         }
       `}</style>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(250,204,21,0.16),transparent_26%),radial-gradient(circle_at_92%_6%,rgba(168,85,247,0.18),transparent_24%),linear-gradient(180deg,#070604_0%,#0b0906_46%,#050403_100%)]" />
@@ -307,13 +426,13 @@ export default function BlazeEmbedClient() {
             <div className="hidden text-[11px] font-black uppercase tracking-[0.22em] text-[#d6a84e] md:block">
               NEXORA • AI ระดับตำนาน!
             </div>
-            <div className="truncate text-xl font-black leading-none text-white md:mt-1 md:text-[34px] md:leading-[1.05] sm:text-2xl">
+            <div className="blaze-title truncate text-xl font-black leading-none md:mt-1 md:text-[34px] md:leading-[1.05] sm:text-2xl">
               <span className="md:hidden">ท่านเบลซ</span>
               <span className="hidden md:inline">
                 (ท่านเบลซ) Blaze Warlock • NEXORA AI
               </span>
             </div>
-            <div className="mt-1 truncate text-xs font-extrabold text-amber-100/66 md:hidden sm:text-sm">
+            <div className="blaze-muted-gold mt-1 truncate text-xs font-extrabold md:hidden sm:text-sm">
               Blaze Warlock • NEXORA AI
             </div>
             <div className="mt-2 hidden h-[3px] w-[220px] rounded-full bg-[linear-gradient(90deg,rgba(241,204,116,0),rgba(241,204,116,1)_20%,rgba(138,99,255,0.7)_50%,rgba(241,204,116,1)_80%,rgba(241,204,116,0))] shadow-[0_0_12px_rgba(241,204,116,0.25),0_0_24px_rgba(138,99,255,0.18)] md:block" />
@@ -372,21 +491,21 @@ export default function BlazeEmbedClient() {
                     } max-w-[86%] flex-col md:max-w-[82%]`}
                   >
                     {!mine ? (
-                      <div className="mb-1 px-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100/45">
+                      <div className="blaze-label mb-1 px-1 text-[10px] font-black uppercase tracking-[0.14em]">
                         BLAZE WARLOCK
                       </div>
                     ) : null}
                     <div
                       className={
                         mine
-                          ? "rounded-[24px] rounded-br-lg bg-white px-4 py-3 text-sm font-bold leading-7 text-black shadow-[0_14px_34px_rgba(0,0,0,0.22)] sm:text-[15px]"
-                          : "rounded-[24px] rounded-bl-lg border border-amber-200/13 bg-[#171006]/92 px-4 py-3 text-sm font-bold leading-7 text-amber-50 shadow-[0_14px_34px_rgba(0,0,0,0.26)] sm:text-[15px]"
+                          ? "blaze-user-bubble rounded-[24px] rounded-br-lg px-4 py-3 text-sm font-bold leading-7 sm:text-[15px]"
+                          : "blaze-bot-bubble rounded-[24px] rounded-bl-lg px-4 py-3 text-sm font-bold leading-7 sm:text-[15px]"
                       }
                     >
                       {message.text}
                     </div>
                     {message.id !== WELCOME_MESSAGE.id ? (
-                      <div className="mt-1 px-1 text-[10px] font-semibold text-amber-100/32">
+                      <div className="blaze-time mt-1 px-1 text-[10px] font-semibold">
                         {formatTime(message.createdAt)}
                       </div>
                     ) : null}
@@ -402,7 +521,7 @@ export default function BlazeEmbedClient() {
                   alt=""
                   className="h-8 w-8 shrink-0 rounded-full border border-amber-200/18 object-cover"
                 />
-                <div className="rounded-[22px] rounded-bl-lg border border-amber-200/13 bg-[#171006]/92 px-4 py-3 shadow-[0_14px_34px_rgba(0,0,0,0.26)]">
+                <div className="blaze-bot-bubble rounded-[22px] rounded-bl-lg px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-100 [animation-delay:-0.2s]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-100 [animation-delay:-0.1s]" />
@@ -425,7 +544,7 @@ export default function BlazeEmbedClient() {
                 {error}
               </div>
             ) : null}
-            <div className="flex items-end gap-2 rounded-[26px] border border-amber-200/16 bg-[#0c0a07]/88 p-2 shadow-[inset_0_0_20px_rgba(251,191,36,0.05)] md:rounded-[22px] md:p-[14px]">
+            <div className="blaze-composer flex items-end gap-2 rounded-[26px] border p-2 md:rounded-[22px] md:p-[14px]">
               <textarea
                 ref={inputRef}
                 value={draft}
@@ -440,7 +559,7 @@ export default function BlazeEmbedClient() {
                 inputMode="text"
                 autoComplete="off"
                 placeholder="ถามท่านเบลซ..."
-                className="max-h-32 min-h-12 min-w-0 flex-1 resize-none rounded-[20px] border border-amber-100/10 bg-white/[0.06] px-4 py-3 text-sm font-bold leading-relaxed text-white outline-none placeholder:text-amber-100/34 focus:border-amber-100/34"
+                className="blaze-input max-h-32 min-h-12 min-w-0 flex-1 resize-none rounded-[20px] border px-4 py-3 text-sm font-bold leading-relaxed outline-none focus:border-amber-100/34"
               />
               <button
                 type="submit"
@@ -455,7 +574,7 @@ export default function BlazeEmbedClient() {
                 )}
               </button>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[11px] font-extrabold text-amber-100/48">
+            <div className="blaze-muted-gold mt-2 flex items-center justify-between gap-3 px-1 text-[11px] font-extrabold">
               <span>Blaze Warlock • NEXORA AI</span>
               <span className="hidden sm:inline">iframe-safe desktop / mobile chat</span>
             </div>
