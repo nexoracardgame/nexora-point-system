@@ -1320,7 +1320,7 @@ export default function FloatingChatDock({
         err instanceof Error && err.message
           ? err.message
           : "ท่านเบลซเชื่อมต่อไม่สำเร็จ";
-      setBlazeError(message);
+      setBlazeError("");
       setBlazeMessages((current) => [
         ...current,
         {

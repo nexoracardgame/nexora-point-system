@@ -7,13 +7,9 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const maxDuration = 30;
 
-const DEFAULT_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_HISTORY_ITEMS = 10;
-const TINY_JPEG_BASE64 =
-  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDweiiigD//2Q==";
 
 type BlazeHistoryItem = {
   role: "user" | "model";
@@ -43,10 +39,6 @@ function getGeminiApiKey() {
     process.env.GENERATIVE_LANGUAGE_API_KEY ||
     ""
   ).trim();
-}
-
-function getScriptUrl() {
-  return (process.env.BLAZE_AI_SCRIPT_URL || DEFAULT_SCRIPT_URL).trim();
 }
 
 function normalizeHistory(value: unknown): BlazeHistoryItem[] {
@@ -217,73 +209,6 @@ async function askNativeGemini({
   };
 }
 
-function buildScriptBridgeMessage(message: string, history: BlazeHistoryItem[]) {
-  const recent = history
-    .slice(-8)
-    .map((item) => `${item.role === "model" ? "ท่านเบลซ" : "ผู้ใช้"}: ${item.text}`)
-    .join("\n");
-
-  if (!recent) {
-    return message;
-  }
-
-  return [
-    "บริบทแชทล่าสุดในแอพ NEXORA:",
-    recent,
-    "",
-    `คำถามล่าสุดของผู้ใช้: ${message}`,
-  ].join("\n");
-}
-
-async function askAppsScriptBridge({
-  message,
-  history,
-  clientId,
-}: {
-  message: string;
-  history: BlazeHistoryItem[];
-  clientId: string;
-}) {
-  const response = await fetchWithTimeout(
-    getScriptUrl(),
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        clientId,
-        message: buildScriptBridgeMessage(message, history),
-        image: `data:image/jpeg;base64,${TINY_JPEG_BASE64}`,
-      }),
-    },
-    28000
-  );
-
-  const raw = await response.text();
-  let data: { ok?: boolean; reply?: string } | null = null;
-
-  try {
-    data = JSON.parse(raw) as { ok?: boolean; reply?: string };
-  } catch {
-    throw new Error("Apps Script response is not JSON");
-  }
-
-  if (!response.ok || !data?.ok) {
-    throw new Error(data?.reply || `Apps Script HTTP ${response.status}`);
-  }
-
-  const reply = sanitizeText(data.reply);
-  if (!reply || reply === "[object Object]") {
-    throw new Error("Apps Script did not return text");
-  }
-
-  return {
-    reply: enforceBlazeStyle(reply),
-    source: "apps-script",
-  };
-}
-
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -296,7 +221,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const message = sanitizeText(body?.message).slice(0, MAX_MESSAGE_LENGTH);
     const history = normalizeHistory(body?.history);
-    const clientId = sanitizeText(body?.clientId) || userId;
     const userName = sanitizeText(session?.user?.name) || "NEXORA User";
 
     if (!message) {
@@ -306,32 +230,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let result = null;
+    const result = await askNativeGemini({
+      message,
+      history,
+      userName,
+    });
 
-    try {
-      result = await askNativeGemini({
-        message,
-        history,
-        userName,
-      });
-    } catch (nativeError) {
-      console.warn("BLAZE AI native Gemini fallback:", nativeError);
+    if (!result) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "ระบบท่านเบลซสำหรับแชทข้อความต้องใช้ GEMINI_API_KEY บนเซิร์ฟเวอร์ ตอนนี้ยังไม่ได้ตั้งค่า จึงปิด fallback Apps Script ที่เคยทำให้ระบบเข้าใจผิดว่าแนบรูปแล้ว",
+        },
+        { status: 503 }
+      );
     }
-
-    result =
-      result ||
-      (await askAppsScriptBridge({
-        message,
-        history,
-        clientId,
-      }));
 
     return NextResponse.json(
       {
         ok: true,
         reply: result.reply,
         source: result.source,
-        native: result.source === "gemini",
+        native: true,
       },
       { headers: { "Cache-Control": "no-store" } }
     );
