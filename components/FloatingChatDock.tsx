@@ -1777,9 +1777,81 @@ export default function FloatingChatDock({
 
   if (dockMode === "ai") {
     return (
-      <section className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-amber-200/22 bg-[#050403]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.66),0_0_54px_rgba(251,191,36,0.18)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[620px] xl:bottom-6 xl:right-6">
+      <section className="blaze-floating-ai fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-amber-200/24 bg-[#050403]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.66),0_0_54px_rgba(251,191,36,0.22)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[620px] xl:bottom-6 xl:right-6">
+        <style>{`
+          .blaze-floating-ai-title {
+            color: transparent;
+            background:
+              linear-gradient(180deg, #fff8df 0%, #ffe29a 34%, #dca84c 66%, #8e5f21 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow:
+              0 0 16px rgba(241, 204, 116, 0.22),
+              0 0 34px rgba(138, 99, 255, 0.10);
+          }
+
+          .blaze-floating-ai-label {
+            color: rgba(245, 213, 123, 0.86);
+            text-shadow: 0 0 12px rgba(214, 168, 78, 0.22);
+          }
+
+          .blaze-floating-ai-muted {
+            color: rgba(232, 204, 139, 0.70);
+          }
+
+          .blaze-floating-ai-bot-bubble {
+            border: 1px solid rgba(247, 215, 123, 0.22);
+            background:
+              linear-gradient(180deg, rgba(39, 29, 12, 0.96), rgba(17, 13, 8, 0.98));
+            color: #fff1c9;
+            box-shadow:
+              inset 0 1px 0 rgba(255, 242, 184, 0.08),
+              0 12px 34px rgba(0, 0, 0, 0.30),
+              0 0 28px rgba(214, 168, 78, 0.08);
+          }
+
+          .blaze-floating-ai-bot-bubble a {
+            color: #fde68a !important;
+            text-decoration-color: rgba(253, 230, 138, 0.52) !important;
+          }
+
+          .blaze-floating-ai-user-bubble {
+            border: 1px solid rgba(255, 248, 223, 0.48);
+            background:
+              linear-gradient(135deg, #fff8df 0%, #f3d57b 42%, #c89236 100%);
+            color: #181007;
+            box-shadow:
+              0 14px 34px rgba(0, 0, 0, 0.24),
+              0 0 26px rgba(241, 204, 116, 0.18);
+          }
+
+          .blaze-floating-ai-time {
+            color: rgba(245, 213, 123, 0.42);
+          }
+
+          .blaze-floating-ai-composer {
+            border-color: rgba(247, 215, 123, 0.24);
+            background:
+              linear-gradient(180deg, rgba(23, 17, 8, 0.94), rgba(9, 7, 4, 0.96));
+            box-shadow:
+              inset 0 0 24px rgba(247, 215, 123, 0.06),
+              0 0 24px rgba(214, 168, 78, 0.08);
+          }
+
+          .blaze-floating-ai-input {
+            border-color: rgba(247, 215, 123, 0.18);
+            background:
+              linear-gradient(180deg, rgba(8, 8, 10, 0.98), rgba(16, 12, 7, 0.98));
+            color: #fff6db;
+          }
+
+          .blaze-floating-ai-input::placeholder {
+            color: rgba(245, 213, 123, 0.42);
+          }
+        `}</style>
         <div className="flex h-full min-h-0 flex-col">
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200/14 bg-[linear-gradient(135deg,rgba(23,17,6,0.96),rgba(6,5,4,0.96))] px-3 py-3 sm:px-4">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200/16 bg-[linear-gradient(135deg,rgba(23,17,6,0.96),rgba(6,5,4,0.96))] px-3 py-3 shadow-[0_18px_42px_rgba(0,0,0,0.32)] sm:px-4">
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-200/28 bg-[radial-gradient(circle_at_top,#ffe7a6,#c58f24_48%,#1a1104_100%)] text-black shadow-[0_0_28px_rgba(251,191,36,0.36)]">
                 <img
@@ -1793,10 +1865,10 @@ export default function FloatingChatDock({
                 <Sparkles className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-black p-0.5 text-amber-200" />
               </span>
               <div className="min-w-0">
-                <div className="truncate text-lg font-black leading-tight text-amber-50">
+                <div className="blaze-floating-ai-title truncate text-lg font-black leading-tight">
                   ท่านเบลซ
                 </div>
-                <div className="truncate text-xs font-bold text-amber-100/58">
+                <div className="blaze-floating-ai-muted truncate text-xs font-bold">
                   Blaze Warlock • NEXORA AI
                 </div>
               </div>
@@ -1825,7 +1897,7 @@ export default function FloatingChatDock({
             </div>
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.12),transparent_34%),#050403]">
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.14),transparent_34%),radial-gradient(circle_at_95%_10%,rgba(168,85,247,0.08),transparent_30%),#050403]">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:28px_28px] opacity-25" />
             <div className="relative flex h-full min-h-0 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4">
@@ -1862,22 +1934,22 @@ export default function FloatingChatDock({
                             }`}
                           >
                             {!mine ? (
-                              <div className="mb-1 px-1 text-[10px] font-black uppercase text-amber-100/42">
+                              <div className="blaze-floating-ai-label mb-1 px-1 text-[10px] font-black uppercase tracking-[0.14em]">
                                 Blaze Warlock
                               </div>
                             ) : null}
                             <div
                               className={`break-words rounded-[20px] px-3.5 py-2.5 text-[13px] leading-relaxed shadow-lg sm:text-sm ${
                                 mine
-                                  ? "bg-white text-black"
-                                  : "border border-amber-200/12 bg-[linear-gradient(180deg,rgba(28,23,15,0.96),rgba(13,11,8,0.98))] text-amber-50"
+                                  ? "blaze-floating-ai-user-bubble"
+                                  : "blaze-floating-ai-bot-bubble"
                               }`}
                             >
                               <ChatMessageText text={message.text} mine={mine} />
                             </div>
                             {message.id !== BLAZE_WELCOME_MESSAGE.id ? (
                               <div
-                                className={`mt-1 px-1 text-[10px] text-amber-100/28 ${
+                                className={`blaze-floating-ai-time mt-1 px-1 text-[10px] ${
                                   mine ? "text-right" : "text-left"
                                 }`}
                               >
@@ -1895,13 +1967,14 @@ export default function FloatingChatDock({
                     avatar={BLAZE_AVATAR_URL}
                     name="ท่านเบลซ"
                     compact
+                    variant="blaze"
                   />
                   <div ref={blazeBottomRef} className="h-1 w-full" />
                 </div>
               </div>
 
               <form
-                className="relative shrink-0 border-t border-amber-200/12 bg-[linear-gradient(180deg,rgba(5,4,3,0.20),rgba(5,4,3,0.96))] p-3"
+                className="relative shrink-0 border-t border-amber-200/14 bg-[linear-gradient(180deg,rgba(5,4,3,0.20),rgba(5,4,3,0.96))] p-3"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void sendBlazeMessage();
@@ -1913,7 +1986,7 @@ export default function FloatingChatDock({
                   </div>
                 ) : null}
 
-                <div className="flex items-end gap-2 rounded-[24px] border border-amber-200/14 bg-black/68 p-2 shadow-[inset_0_0_20px_rgba(251,191,36,0.04)]">
+                <div className="blaze-floating-ai-composer flex items-end gap-2 rounded-[24px] border p-2">
                   <textarea
                     ref={blazeInputRef}
                     value={blazeDraft}
@@ -1927,7 +2000,7 @@ export default function FloatingChatDock({
                     rows={1}
                     inputMode="text"
                     autoComplete="off"
-                    className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-[18px] border border-amber-100/10 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-amber-100/34 focus:border-amber-100/30"
+                    className="blaze-floating-ai-input max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-[18px] border px-4 py-3 text-sm font-bold leading-relaxed outline-none focus:border-amber-100/34"
                     placeholder="ถามท่านเบลซ..."
                   />
 
@@ -1945,13 +2018,13 @@ export default function FloatingChatDock({
                   </button>
                 </div>
 
-                <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[10px] font-bold text-amber-100/34">
+                <div className="blaze-floating-ai-muted mt-2 flex items-center justify-between gap-3 px-1 text-[10px] font-bold">
                   <span className="truncate">Blaze Warlock • NEXORA AI</span>
                   <a
                     href={BLAZE_AI_WEB_URL}
                     target="_blank"
                     rel="noreferrer"
-                    className="shrink-0 text-amber-200/62 hover:text-amber-100"
+                    className="shrink-0 text-amber-200/72 hover:text-amber-100"
                   >
                     เปิดเวอร์ชันเต็ม
                   </a>
