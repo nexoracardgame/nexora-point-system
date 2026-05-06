@@ -110,6 +110,7 @@ const ROOM_OPEN_LIMIT = 42;
 const BLAZE_AI_WEB_URL =
   "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
 const BLAZE_AVATAR_URL = "https://s.imgz.io/2026/03/20/158-39efa94028226fea.png";
+const BLAZE_SESSION_STORAGE_PREFIX = "nexora:blaze-chat-session:v1";
 const BLAZE_WELCOME_MESSAGE: BlazeChatMessage = {
   id: "blaze-welcome",
   role: "model",
@@ -136,6 +137,111 @@ type MessagePagePayload = {
 
 function safeText(value?: string | number | null) {
   return String(value || "").trim();
+}
+
+function getBlazeSessionStorageKey(userId?: string | null) {
+  return `${BLAZE_SESSION_STORAGE_PREFIX}:${safeText(userId) || "guest"}`;
+}
+
+function normalizeBlazeSessionMessage(value: unknown): BlazeChatMessage | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const role = record.role === "user" || record.role === "model" ? record.role : null;
+  const text = safeText(record.text as string | number | null);
+
+  if (!role || !text) {
+    return null;
+  }
+
+  const id =
+    safeText(record.id as string | number | null) ||
+    `blaze-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const rawCreatedAt = safeText(record.createdAt as string | number | null);
+  const parsedCreatedAt = rawCreatedAt ? new Date(rawCreatedAt) : null;
+  const createdAt =
+    parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+      ? parsedCreatedAt.toISOString()
+      : new Date().toISOString();
+
+  return {
+    id,
+    role,
+    text,
+    createdAt,
+  };
+}
+
+function withBlazeWelcomeMessage(messages: BlazeChatMessage[]) {
+  const conversation = messages.filter(
+    (message) => message.id !== BLAZE_WELCOME_MESSAGE.id && safeText(message.text)
+  );
+
+  return [BLAZE_WELCOME_MESSAGE, ...conversation];
+}
+
+function readBlazeSessionSnapshot(storageKey: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(storageKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as {
+      messages?: unknown;
+      draft?: unknown;
+    };
+    const messages = Array.isArray(parsed?.messages)
+      ? parsed.messages
+          .map((message) => normalizeBlazeSessionMessage(message))
+          .filter(Boolean)
+      : [];
+
+    return {
+      messages: withBlazeWelcomeMessage(messages as BlazeChatMessage[]),
+      draft: typeof parsed?.draft === "string" ? parsed.draft : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeBlazeSessionSnapshot(
+  storageKey: string,
+  messages: BlazeChatMessage[],
+  draft: string
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const payload = {
+    messages: withBlazeWelcomeMessage(messages),
+    draft,
+    savedAt: new Date().toISOString(),
+  };
+
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+  } catch {
+    try {
+      window.sessionStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          ...payload,
+          messages: withBlazeWelcomeMessage(messages).slice(-120),
+        })
+      );
+    } catch {
+      // Ignore storage quota/private mode failures. The in-memory chat still stays alive.
+    }
+  }
 }
 
 function buildDirectRoomId(userA?: string | null, userB?: string | null) {
@@ -356,6 +462,7 @@ export default function FloatingChatDock({
   const [blazeDraft, setBlazeDraft] = useState("");
   const [blazeSending, setBlazeSending] = useState(false);
   const [blazeError, setBlazeError] = useState("");
+  const [blazeHydratedStorageKey, setBlazeHydratedStorageKey] = useState("");
 
   const activeRoomRef = useRef<ActiveFloatingRoom | null>(activeRoom);
   const roomsRef = useRef<FloatingRoom[]>(rooms);
@@ -376,6 +483,10 @@ export default function FloatingChatDock({
   });
 
   const currentUserId = safeText(session?.user?.id);
+  const blazeSessionStorageKey = useMemo(
+    () => getBlazeSessionStorageKey(currentUserId || session?.user?.email),
+    [currentUserId, session?.user?.email]
+  );
   const badgeCount = Math.max(
     0,
     Number(unreadCount || 0),
@@ -439,6 +550,35 @@ export default function FloatingChatDock({
   useEffect(() => {
     blazeMessagesRef.current = blazeMessages;
   }, [blazeMessages]);
+
+  useEffect(() => {
+    const snapshot = readBlazeSessionSnapshot(blazeSessionStorageKey);
+    const nextMessages = snapshot?.messages?.length
+      ? snapshot.messages
+      : [BLAZE_WELCOME_MESSAGE];
+
+    blazeMessagesRef.current = nextMessages;
+    setBlazeMessages(nextMessages);
+    setBlazeDraft(snapshot?.draft || "");
+    setBlazeHydratedStorageKey(blazeSessionStorageKey);
+  }, [blazeSessionStorageKey]);
+
+  useEffect(() => {
+    if (blazeHydratedStorageKey !== blazeSessionStorageKey) {
+      return;
+    }
+
+    writeBlazeSessionSnapshot(
+      blazeSessionStorageKey,
+      blazeMessages,
+      blazeDraft
+    );
+  }, [
+    blazeDraft,
+    blazeHydratedStorageKey,
+    blazeMessages,
+    blazeSessionStorageKey,
+  ]);
 
   useEffect(() => {
     draftRef.current = draft;
