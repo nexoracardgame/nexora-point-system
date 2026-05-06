@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { nexoraAlert } from "@/lib/nexora-dialog";
@@ -43,7 +43,7 @@ export default function EditListingForm({
             });
             window.location.href = "/market/seller-center";
           } else {
-            alert("เนเธเนเนเธเนเธกเนเธชเธณเน€เธฃเนเธ");
+            alert("แก้ไขไม่สำเร็จ");
           }
         }}
         className="mt-4 rounded-xl bg-blue-500 px-4 py-2"

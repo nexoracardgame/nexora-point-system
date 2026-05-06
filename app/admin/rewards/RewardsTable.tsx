@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -105,7 +105,7 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
 
       if (!res.ok) {
         setRows(previousRows);
-        alert(data.error || "เธญเธฑเธเน€เธ”เธ•เธฃเธฒเธเธงเธฑเธฅเนเธกเนเธชเธณเน€เธฃเนเธ");
+        alert(data.error || "อัปเดตรางวัลไม่สำเร็จ");
         return;
       }
 
@@ -130,7 +130,7 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
       router.refresh();
     } catch {
       setRows(previousRows);
-      alert("เธญเธฑเธเน€เธ”เธ•เธฃเธฒเธเธงเธฑเธฅเนเธกเนเธชเธณเน€เธฃเนเธ");
+      alert("อัปเดตรางวัลไม่สำเร็จ");
     }
   };
 
@@ -160,14 +160,14 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
 
       if (!res.ok) {
         setRows(previousRows);
-        alert(data.error || "เธฅเธเนเธกเนเธชเธณเน€เธฃเนเธ");
+        alert(data.error || "ลบไม่สำเร็จ");
         return;
       }
 
       router.refresh();
     } catch {
       setRows(previousRows);
-      alert("เธฅเธเนเธกเนเธชเธณเน€เธฃเนเธ");
+      alert("ลบไม่สำเร็จ");
     }
   };
 
@@ -224,14 +224,14 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
                   onClick={() => startEdit(reward)}
                   className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black"
                 >
-                  เนเธเนเนเธ
+                  แก้ไข
                 </button>
                 <button
                   type="button"
                   onClick={() => deleteReward(reward)}
                   className="rounded-2xl border border-red-400/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-300"
                 >
-                  เธฅเธ
+                  ลบ
                 </button>
               </div>
             </div>
@@ -242,18 +242,18 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
       {editingId ? (
         <div className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5">
           <div className="w-full rounded-t-[28px] border border-white/10 bg-[#101118] p-4 sm:max-w-lg sm:rounded-[28px]">
-            <h2 className="text-xl font-black">เนเธเนเนเธเธฃเธฒเธเธงเธฑเธฅ</h2>
+            <h2 className="text-xl font-black">แก้ไขรางวัล</h2>
             <div className="mt-4 space-y-3">
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="เธเธทเนเธญเธฃเธฒเธเธงเธฑเธฅ"
+                placeholder="ชื่อรางวัล"
                 className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
               />
               <input
                 value={imageUrl}
                 onChange={(event) => setImageUrl(event.target.value)}
-                placeholder="เธฅเธดเธเธเนเธฃเธนเธเธฃเธฒเธเธงเธฑเธฅ"
+                placeholder="ลิงก์รูปรางวัล"
                 className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
               />
               <img
@@ -293,14 +293,14 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
                   onClick={saveEdit}
                   className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black"
                 >
-                  เธเธฑเธเธ—เธถเธ
+                  บันทึก
                 </button>
                 <button
                   type="button"
                   onClick={closeEditor}
                   className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-black text-white"
                 >
-                  เธเธดเธ”
+                  ปิด
                 </button>
               </div>
             </div>

@@ -203,7 +203,7 @@ export default function DealerVerifyClient() {
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-2 block text-xs font-black text-black/62">
-                ชื่อจริง
+                ชื่อ-นามสกุล
               </span>
               <input
                 value={form.fullName}

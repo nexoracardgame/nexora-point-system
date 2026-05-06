@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,7 @@ export default function VerifySaleForm({
   const handleVerify = async () => {
     if (loading) return;
     if (!serialInput.trim()) {
-      alert("เธเธฃเธญเธ serial เธเนเธญเธ");
+      alert("กรอก serial ก่อน");
       return;
     }
 
@@ -43,14 +43,14 @@ export default function VerifySaleForm({
           tone: "success",
         });
 
-        // ๐”ฅ เน€เธเธฅเธตเนเธขเธเธ•เธฃเธเธเธตเน
+        // 🔥 เปลี่ยนตรงนี้
         window.location.href = "/market/seller-center";
       } else {
-        alert(data.error || "Verify เนเธกเนเธชเธณเน€เธฃเนเธ");
+        alert(data.error || "Verify ไม่สำเร็จ");
       }
     } catch (error) {
       console.error(error);
-      alert("เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”");
+      alert("เกิดข้อผิดพลาด");
     } finally {
       setLoading(false);
     }
@@ -64,22 +64,22 @@ export default function VerifySaleForm({
         </div>
 
         <h1 className="mt-2 text-3xl font-black">
-          ๐” Verify Serial & Close Sale
+          🔐 Verify Serial & Close Sale
         </h1>
 
         <p className="mt-3 text-sm text-zinc-400">
-          เธซเธฅเธฑเธเธ•เธฃเธงเธเธชเธ เธฒเธเธเธฒเธฃเนเธ”เธเธฃเธดเธเนเธฅเนเธง เนเธซเนเธเธฃเธญเธ serial เธซเธฅเธฑเธเธเธฒเธฃเนเธ”เน€เธเธทเนเธญเธเธดเธ”เธเธฒเธฃเธเธฒเธขเธเธฃเธดเธเธ—เธฑเนเธเธฃเธฐเธเธ
+          หลังตรวจสภาพการ์ดจริงแล้ว ให้กรอก serial หลังการ์ดเพื่อปิดการขายจริงทั้งระบบ
         </p>
 
         <div className="mt-6">
           <label className="mb-2 block text-sm font-bold text-white/80">
-            Serial เธซเธฅเธฑเธเธเธฒเธฃเนเธ”
+            Serial หลังการ์ด
           </label>
 
           <input
             value={serialInput}
             onChange={(e) => setSerialInput(e.target.value)}
-            placeholder="เธเธฃเธญเธ serial เธซเธฅเธฑเธเธเธฒเธฃเนเธ”"
+            placeholder="กรอก serial หลังการ์ด"
             className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-zinc-500"
           />
         </div>
@@ -93,7 +93,7 @@ export default function VerifySaleForm({
               : "bg-gradient-to-r from-cyan-500 to-blue-600 hover:scale-[1.02]"
           }`}
         >
-          {loading ? "Verifying..." : "โ… Confirm & Close Sale"}
+          {loading ? "Verifying..." : "✅ Confirm & Close Sale"}
         </button>
       </div>
     </div>

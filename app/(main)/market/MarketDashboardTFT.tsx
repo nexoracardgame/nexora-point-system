@@ -215,8 +215,10 @@ function ActionButton({
     "Seller Center": "จัดการโพสต์ขายและลบรายการ",
   };
 
+  const mojibakeLead = "\u0e40\u0e18";
+  const mojibakeVowel = "\u0e40\u0e19\u20ac";
   const safeSubtitle =
-    subtitle.includes("เธ") || subtitle.includes("เน€")
+    subtitle.includes(mojibakeLead) || subtitle.includes(mojibakeVowel)
       ? subtitleMap[title] || ""
       : subtitle;
 
@@ -1112,25 +1114,25 @@ export default function MarketDashboardTFT({
           href="/market/create"
           icon={<Plus className="h-5 w-5" />}
           title="Create Listing"
-          subtitle="เธชเธฃเนเธฒเธเธฃเธฒเธขเธเธฒเธฃเธเธฒเธขเธเธฒเธฃเนเธ”เธเธฃเธดเธ"
+          subtitle="สร้างรายการขายการ์ดจริง"
         />
         <ActionButton
           href="/market/deals"
           icon={<Handshake className="h-5 w-5" />}
           title="Deal Requests"
-          subtitle="เธ”เธนเธเธณเธเธญเธ”เธตเธฅ / เธ•เธญเธเธฃเธฑเธ"
+          subtitle="ดูคำขอดีล / ตอบรับ"
         />
         <ActionButton
           href="/market/wishlist"
           icon={<Heart className="h-5 w-5" />}
           title="Wishlist"
-          subtitle="เธเธฒเธฃเนเธ”เธ—เธตเนเธเธณเธฅเธฑเธเธ•เธดเธ”เธ•เธฒเธก"
+          subtitle="การ์ดที่กำลังติดตาม"
         />
         <ActionButton
           href="/market/seller-center"
           icon={<ShieldCheck className="h-5 w-5" />}
           title="Seller Center"
-          subtitle="เธเธฑเธ”เธเธฒเธฃเนเธเธชเธ•เนเนเธฅเธฐเธฃเธตเธงเธดเธง"
+          subtitle="จัดการโพสต์และรีวิว"
         />
       </section>
 
