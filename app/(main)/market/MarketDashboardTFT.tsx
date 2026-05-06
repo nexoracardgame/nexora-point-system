@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Heart, Plus, Handshake, ShieldCheck, Search } from "lucide-react";
+import { Heart, Plus, Handshake, Rows3, ShieldCheck, Search } from "lucide-react";
 import {
   normalizeMarketListingView,
   type MarketViewItem,
@@ -209,6 +209,7 @@ function ActionButton({
   subtitle: string;
 }) {
   const subtitleMap: Record<string, string> = {
+    "Marketplace Listings": "ดูรายการขายล่าสุด",
     "Create Listing": "สร้างโพสต์ขายการ์ดของคุณ",
     "Deal Requests": "ดูคำขอดีลและตอบรับได้ทันที",
     Wishlist: "รายการการ์ดที่คุณติดตามไว้",
@@ -1109,7 +1110,13 @@ export default function MarketDashboardTFT({
       </section>
 
       {/* ACTIONS */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-5 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-5">
+        <ActionButton
+          href="/market#marketplace-listings"
+          icon={<Rows3 className="h-5 w-5" />}
+          title="Marketplace Listings"
+          subtitle="รายการขายล่าสุด"
+        />
         <ActionButton
           href="/market/create"
           icon={<Plus className="h-5 w-5" />}
@@ -1137,7 +1144,7 @@ export default function MarketDashboardTFT({
       </section>
 
       {/* MARKET GRID */}
-      <section>
+      <section id="marketplace-listings" className="scroll-mt-24">
         <div className="mb-4 flex flex-col gap-3 lg:mb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-2xl font-black lg:text-3xl">

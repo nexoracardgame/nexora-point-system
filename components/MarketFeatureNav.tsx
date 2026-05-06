@@ -2,29 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Handshake, Plus, ShieldCheck } from "lucide-react";
+import { Heart, Handshake, Plus, Rows3, ShieldCheck } from "lucide-react";
 
 const MARKET_ACTIONS = [
   {
+    href: "/market#marketplace-listings",
+    matchHref: "/market",
+    title: "Marketplace Listings",
+    subtitle: "รายการขายล่าสุด",
+    Icon: Rows3,
+  },
+  {
     href: "/market/create",
+    matchHref: "/market/create",
     title: "Create Listing",
     subtitle: "สร้างโพสต์ขายการ์ด",
     Icon: Plus,
   },
   {
     href: "/market/deals",
+    matchHref: "/market/deals",
     title: "Deal Requests",
     subtitle: "รับข้อเสนอและคุยดีล",
     Icon: Handshake,
   },
   {
     href: "/market/wishlist",
+    matchHref: "/market/wishlist",
     title: "Wishlist",
     subtitle: "การ์ดที่ติดตามไว้",
     Icon: Heart,
   },
   {
     href: "/market/seller-center",
+    matchHref: "/market/seller-center",
     title: "Seller Center",
     subtitle: "จัดการโพสต์ขาย",
     Icon: ShieldCheck,
@@ -33,6 +44,9 @@ const MARKET_ACTIONS = [
 
 function isActivePath(pathname: string, href: string) {
   const safePath = String(pathname || "").split("?")[0];
+  if (href === "/market") {
+    return safePath === href;
+  }
   return safePath === href || safePath.startsWith(`${href}/`);
 }
 
@@ -45,10 +59,10 @@ export default function MarketFeatureNav({
 
   return (
     <section
-      className={`grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4 ${className}`}
+      className={`grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-5 ${className}`}
     >
-      {MARKET_ACTIONS.map(({ href, title, subtitle, Icon }) => {
-        const active = isActivePath(pathname, href);
+      {MARKET_ACTIONS.map(({ href, matchHref, title, subtitle, Icon }) => {
+        const active = isActivePath(pathname, matchHref);
 
         return (
           <Link
