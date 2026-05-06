@@ -1787,8 +1787,7 @@ export default function FloatingChatDock({
                     rows={1}
                     inputMode="text"
                     autoComplete="off"
-                    disabled={blazeSending}
-                    className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-[18px] border border-amber-100/10 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-amber-100/34 focus:border-amber-100/30 disabled:opacity-60"
+                    className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-[18px] border border-amber-100/10 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-amber-100/34 focus:border-amber-100/30"
                     placeholder="ถามท่านเบลซ..."
                   />
 
