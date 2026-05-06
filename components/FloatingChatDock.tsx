@@ -2,6 +2,8 @@
 
 import {
   ArrowLeft,
+  Bot,
+  Flame,
   Handshake,
   Image as ImageIcon,
   Loader2,
@@ -11,6 +13,7 @@ import {
   Search,
   Send,
   Smile,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -98,6 +101,8 @@ const ROOM_CACHE_TTL_MS = 90000;
 const ROOM_PREFETCH_COUNT = 8;
 const ROOM_PREFETCH_LIMIT = 28;
 const ROOM_OPEN_LIMIT = 42;
+const BLAZE_AI_URL =
+  "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
 
 type RoomLoadResult = {
   active: ActiveFloatingRoom;
@@ -317,6 +322,7 @@ export default function FloatingChatDock({
   const { isOnline } = useOnlinePresence();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [dockMode, setDockMode] = useState<"chat" | "ai">("chat");
   const [filter, setFilter] = useState<RoomFilter>("all");
   const [query, setQuery] = useState("");
   const [rooms, setRooms] = useState<FloatingRoom[]>([]);
@@ -1448,31 +1454,117 @@ export default function FloatingChatDock({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          setMobileListVisible(!activeRoom);
-          void loadRooms();
-        }}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+104px)] right-3 z-[1110] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border border-white/12 bg-black/90 px-3.5 py-3 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition hover:scale-[1.02] hover:bg-[#111318] active:scale-[0.98] xl:bottom-6 xl:right-6 xl:px-4"
-        aria-label="เปิดแชท"
-      >
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.22)]">
-          <MessageCircle className="h-4 w-4" />
-          {badgeCount > 0 ? (
-            <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full border-2 border-black bg-red-500 px-1 text-center text-[10px] font-black leading-4 text-white">
-              {badgeCount > 99 ? "99+" : badgeCount}
-            </span>
-          ) : null}
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-black">Chat</span>
-          <span className="block truncate text-[11px] font-bold text-white/55">
-            {badgeCount > 0 ? "มีข้อความใหม่" : "พร้อมคุย"}
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+104px)] right-3 z-[1110] flex max-w-[calc(100vw-24px)] items-center justify-end gap-2 xl:bottom-6 xl:right-6">
+        <button
+          type="button"
+          onClick={() => {
+            setDockMode("chat");
+            setOpen(true);
+            setMobileListVisible(!activeRoom);
+            void loadRooms();
+          }}
+          className="flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-black/90 px-3.5 py-3 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition hover:scale-[1.02] hover:bg-[#111318] active:scale-[0.98] xl:px-4"
+          aria-label="เปิดแชท"
+        >
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.22)]">
+            <MessageCircle className="h-4 w-4" />
+            {badgeCount > 0 ? (
+              <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full border-2 border-black bg-red-500 px-1 text-center text-[10px] font-black leading-4 text-white">
+                {badgeCount > 99 ? "99+" : badgeCount}
+              </span>
+            ) : null}
           </span>
-        </span>
-      </button>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-black">Chat</span>
+            <span className="block truncate text-[11px] font-bold text-white/55">
+              {badgeCount > 0 ? "มีข้อความใหม่" : "พร้อมคุย"}
+            </span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setDockMode("ai");
+            setOpen(true);
+            setShowEmoji(false);
+            setMobileListVisible(false);
+          }}
+          className="group relative flex min-h-[58px] min-w-0 max-w-[210px] items-center gap-2 overflow-hidden rounded-full border border-amber-200/35 bg-[linear-gradient(135deg,#fff3b0_0%,#d8a83c_44%,#5d3d10_100%)] px-3 py-2.5 text-left text-black shadow-[0_0_34px_rgba(251,191,36,0.45),0_18px_48px_rgba(0,0,0,0.48)] transition hover:scale-[1.02] active:scale-[0.98] max-[380px]:max-w-[185px]"
+          aria-label="คุยกับท่านเบลซ AI"
+        >
+          <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.62),transparent_34%),linear-gradient(90deg,transparent,rgba(255,255,255,0.20),transparent)] opacity-70 transition group-hover:opacity-100" />
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-amber-200 shadow-[0_0_24px_rgba(0,0,0,0.28)]">
+            <Flame className="h-4 w-4" />
+          </span>
+          <span className="relative min-w-0">
+            <span className="block truncate text-[12px] font-black leading-tight">
+              (คุยกับท่านเบลซ AI)
+            </span>
+            <span className="block truncate text-[10px] font-black uppercase text-black/55">
+              Blaze Warlock
+            </span>
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  if (dockMode === "ai") {
+    return (
+      <section className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-amber-200/22 bg-[#050403]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.66),0_0_54px_rgba(251,191,36,0.18)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[620px] xl:bottom-6 xl:right-6">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200/14 bg-[linear-gradient(135deg,rgba(23,17,6,0.96),rgba(6,5,4,0.96))] px-3 py-3 sm:px-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/28 bg-[radial-gradient(circle_at_top,#ffe7a6,#c58f24_48%,#1a1104_100%)] text-black shadow-[0_0_28px_rgba(251,191,36,0.36)]">
+                <Bot className="h-5 w-5" />
+                <Sparkles className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-black p-0.5 text-amber-200" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-lg font-black leading-tight text-amber-50">
+                  ท่านเบลซ
+                </div>
+                <div className="truncate text-xs font-bold text-amber-100/58">
+                  Blaze Warlock • NEXORA AI
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-100/12 bg-white/[0.06] text-amber-100/70 transition hover:bg-white/[0.1] hover:text-white"
+                aria-label="ย่อแชท AI"
+              >
+                <Minimize2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setDockMode("chat");
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-100/12 bg-white/[0.06] text-amber-100/70 transition hover:bg-red-500/20 hover:text-white"
+                aria-label="ปิดแชท AI"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="relative min-h-0 flex-1 bg-black">
+            <iframe
+              src={BLAZE_AI_URL}
+              title="ท่านเบลซ Blaze Warlock NEXORA AI"
+              className="h-full w-full border-0 bg-black"
+              loading="lazy"
+              allow="clipboard-read; clipboard-write; fullscreen; picture-in-picture"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        </div>
+      </section>
     );
   }
 
