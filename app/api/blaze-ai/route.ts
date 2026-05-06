@@ -169,6 +169,7 @@ const BLAZE_RESPONSE_POLICY = [
 ].join("\n");
 
 const COLLECTION_SOURCE_URL = "https://www.nexoracardgame.com/card-collections";
+const POINT_REDEMPTION_LOCATION_URL = "https://maps.app.goo.gl/oUfs7y5LtNaBTSzm7";
 
 const COLLECTION_SETS: CollectionSetRecord[] = [
   {
@@ -781,6 +782,77 @@ function buildDirectCardCollectionReply(message: string) {
     [
       `การ์ด ${cardNo} อยู่ในชุดสะสม ${memberships.length} เซ็ต`,
       ...memberships.map((set) => formatCollectionSetSummary(set)),
+    ].join("\n")
+  );
+}
+
+function hasPointRedemptionProcessIntent(message: string) {
+  const text = normalizeSearchText(message);
+  const raw = normalizeThaiDigits(message).toLowerCase();
+  const hasPointSubject = [
+    "nex",
+    "coin",
+    "แต้ม",
+    "พอยท์",
+    "point",
+    "nex point",
+    "การ์ด",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+  const hasRedemptionIntent =
+    text.includes("แลก") ||
+    text.includes("เพิ่มแต้ม") ||
+    text.includes("เข้าระบบ") ||
+    text.includes("สะสมแต้ม");
+  const hasProcessIntent = [
+    "ยังไง",
+    "อย่างไร",
+    "วิธี",
+    "ขั้นตอน",
+    "ทำไง",
+    "ทำยังไง",
+    "ทำอย่างไร",
+    "ได้ไหม",
+    "ที่ไหน",
+    "นำการ์ด",
+    "ส่งการ์ด",
+    "ส่งมา",
+    "ขนส่ง",
+    "พัสดุ",
+    "เปิดกล่อง",
+    "วิดีโอ",
+    "วีดีโอ",
+    "สภาพการ์ด",
+    "ตรวจสภาพ",
+    "หน้าร้าน",
+    "ที่ร้าน",
+    "พิกัด",
+    "แผนที่",
+    "รับความเสี่ยง",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+
+  return (
+    hasPointSubject &&
+    (hasRedemptionIntent || raw.includes("redeem")) &&
+    hasProcessIntent
+  );
+}
+
+function buildDirectPointRedemptionReply(message: string) {
+  if (!hasPointRedemptionProcessIntent(message)) {
+    return "";
+  }
+
+  return enforceBlazeStyle(
+    [
+      "การแลกแต้ม NEX / COIN เข้าระบบ NEX POINT ต้องนำการ์ดจริงให้บริษัทตรวจสอบก่อนเพิ่มแต้มเข้าบัญชี",
+      "ขั้นตอนหลักมีดังนี้",
+      "1. ลูกค้าสามารถนำการ์ดมาที่หน้าร้านด้วยตนเองได้ วิธีนี้เป็นทางเลือกที่แนะนำที่สุด เพราะปลอดภัยต่อสภาพการ์ดมากที่สุด",
+      "2. หากไม่สะดวกมาหน้าร้าน ลูกค้าสามารถส่งการ์ดมาทางขนส่งได้ แต่ลูกค้าต้องรับความเสี่ยงเรื่องสภาพการ์ดระหว่างขนส่งเอง",
+      "3. เมื่อบริษัทได้รับพัสดุแล้ว บริษัทจะถ่ายวิดีโอขณะเปิดกล่องพัสดุ และตรวจสภาพการ์ดอย่างละเอียดให้ลูกค้าดูเพื่อใช้ยืนยันร่วมกัน",
+      "4. หากการ์ดเป็นของแท้และสภาพสมบูรณ์ประมาณ 90-100% บริษัทจะเพิ่มแต้ม NEX / COIN เข้าบัญชีของลูกค้าในแอพ NEX POINT ทันที",
+      "5. หากลูกค้าสะดวกเดินทางมาเอง ควรนำการ์ดมาที่หน้าร้านโดยตรงเพื่อความปลอดภัยสูงสุดของการ์ด",
+      `พิกัดหน้าร้าน: ${POINT_REDEMPTION_LOCATION_URL}`,
+      "ข้อแนะนำ: หากเลือกส่งพัสดุ ควรแพ็กการ์ดให้แน่นหนา ป้องกันการงอ กระแทก ความชื้น และรอยเสียหายระหว่างขนส่ง",
     ].join("\n")
   );
 }
@@ -1444,6 +1516,21 @@ function buildKnowledgeQueryTerms(message: string) {
     );
   }
 
+  if (/แลกแต้ม|เพิ่มแต้ม|nex point|coin|ส่งการ์ด|หน้าร้าน|พัสดุ|ขนส่ง|สภาพการ์ด/.test(text)) {
+    [
+      "แลกแต้ม",
+      "NEX POINT",
+      "NEX",
+      "COIN",
+      "ส่งการ์ด",
+      "หน้าร้าน",
+      "พัสดุ",
+      "ขนส่ง",
+      "สภาพการ์ด",
+      "ตรวจสภาพ",
+    ].forEach((term) => terms.add(normalizeSearchText(term)));
+  }
+
   return Array.from(terms).filter(Boolean);
 }
 
@@ -1677,6 +1764,7 @@ const BLAZE_CORE_KNOWLEDGE = [
   "- COIN คือเหรียญในการ์ดบางใบ ใช้สะสมเพื่อแลกรางวัลเฉพาะในระบบ NEXORA. อัตราดรอปบนเว็บระบุ 5-10% ต่อกล่อง และมูลค่าเหรียญรวม 2,000,000 NEX",
   "- ตัวอย่างรางวัล COIN: ทองคำแท่ง, มอเตอร์ไซค์ไฟฟ้า, iPhone 17 Pro Max, สร้อยทอง, MacBook Air, iPad Pro, PlayStation 5, Apple Watch, จักรยานไฟฟ้า, สกูตเตอร์ไฟฟ้า, เสื้อยืด, กระเป๋า, สมุดสะสมการ์ด, พวงกุญแจ NEXORA",
   "- ระบบแลกสินค้า No Limit ให้ใช้ NEX แลกสินค้าได้หลายประเภทตามมูลค่าและเงื่อนไข เช่น ฟิกเกอร์ เสื้อผ้า อุปกรณ์ไอที โทรศัพท์ เครื่องใช้ไฟฟ้า รถยนต์ รถจักรยานยนต์ ทองคำ และสินค้าอื่นตามความต้องการ",
+  `- ขั้นตอนการแลกแต้ม NEX / COIN เข้าระบบ NEX POINT: ลูกค้าต้องนำการ์ดจริงมาให้บริษัทตรวจสอบก่อนเพิ่มแต้ม สามารถนำการ์ดมาที่หน้าร้านเองหรือส่งมาทางขนส่งได้ แต่ถ้าส่งมาลูกค้าต้องรับความเสี่ยงเรื่องสภาพการ์ดจากขนส่งเอง บริษัทจะถ่ายวิดีโอขณะเปิดกล่องพัสดุและตรวจสภาพการ์ดอย่างละเอียดให้ลูกค้าดู หากการ์ดเป็นของแท้และสภาพสมบูรณ์ 90-100% บริษัทจะเพิ่มแต้มเข้าบัญชีในแอพ NEX POINT ให้ทันที ทางที่ดีที่สุดคือมาหน้าร้านด้วยตนเองเพื่อความปลอดภัยของการ์ด พิกัดหน้าร้าน: ${POINT_REDEMPTION_LOCATION_URL}`,
   "- การ์ดหายากพิเศษบางใบสามารถนำมาแลกเป็นการ์ดซิลเวอร์จำนวนมากได้ เช่น 200,000 / 100,000 / 80,000 / 70,000 / 60,000 / 40,000 / 30,000 / 25,000 / 20,000 / 15,000 / 10,000 / 5,000 / 3,000 ตามรายการที่บริษัทกำหนด",
   "- Collection: ผู้เล่นสะสมการ์ดให้ครบ Set เพื่อปลดล็อกรางวัล. The Five Concordants เป็นเซ็ต Mythic 5 ดาว จำนวน 15 ใบ แลกซิลเวอร์ 1,500,000 ใบ. เซ็ต Mythic 5 ใบลำดับ 6-10 แลกซิลเวอร์ 1,000,000 ใบ",
   "- Battle: มี 3 โหมดหลัก 13 เกม. Easy: RPS Battle, Hand of Fate RPS, Ultimate RPS Showdown, Rock Paper Scissors Royale. Normal: Elemental Chain, Triple Conflict, Decurion Conquest, Power Clash, Power Synergy Battle. Hard: Triad Dominion, Pentad Dominion, Heptad Dominion, Ennead Dominion",
@@ -2140,6 +2228,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "กรุณาพิมพ์ข้อความก่อน" },
         { status: 400 }
+      );
+    }
+
+    const directPointRedemptionReply = buildDirectPointRedemptionReply(message);
+    if (directPointRedemptionReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directPointRedemptionReply, message),
+          source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
