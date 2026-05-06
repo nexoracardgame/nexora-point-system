@@ -433,7 +433,10 @@ export default function BuyMarketClient({
 
         <BuyMarketFeatureNav />
 
-        <section className="rounded-[28px] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ring-1 ring-black/5 sm:p-5">
+        <section
+          id="latest-buy-posts"
+          className="scroll-mt-24 rounded-[28px] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ring-1 ring-black/5 sm:p-5"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-black/42">

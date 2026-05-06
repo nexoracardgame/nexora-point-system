@@ -2,29 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, HandCoins, Heart, Settings2 } from "lucide-react";
+import { ClipboardList, HandCoins, Heart, Rows3, Settings2 } from "lucide-react";
 
 const BUY_MARKET_ACTIONS = [
   {
+    href: "/buy-market#latest-buy-posts",
+    matchHref: "/buy-market",
+    title: "Latest Buy Posts",
+    subtitle: "โพสต์รับซื้อล่าสุด",
+    Icon: Rows3,
+  },
+  {
     href: "/buy-market/create",
+    matchHref: "/buy-market/create",
     title: "Create Buy Post",
     subtitle: "สร้างการ์ดรับซื้อ",
     Icon: HandCoins,
   },
   {
     href: "/buy-market/deals",
+    matchHref: "/buy-market/deals",
     title: "Buy Deal Requests",
     subtitle: "ดูคำขอดีลรับซื้อ",
     Icon: ClipboardList,
   },
   {
     href: "/buy-market/wishlist",
+    matchHref: "/buy-market/wishlist",
     title: "Following",
     subtitle: "รายการที่ติดตามไว้",
     Icon: Heart,
   },
   {
     href: "/buy-market/center",
+    matchHref: "/buy-market/center",
     title: "Buy Post Center",
     subtitle: "จัดการโพสต์รับซื้อและลบรายการ",
     Icon: Settings2,
@@ -33,6 +44,9 @@ const BUY_MARKET_ACTIONS = [
 
 function isActivePath(pathname: string, href: string) {
   const safePath = String(pathname || "").split("?")[0];
+  if (href === "/buy-market") {
+    return safePath === href;
+  }
   return safePath === href || safePath.startsWith(`${href}/`);
 }
 
@@ -45,10 +59,10 @@ export default function BuyMarketFeatureNav({
 
   return (
     <section
-      className={`grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4 ${className}`}
+      className={`grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-5 ${className}`}
     >
-      {BUY_MARKET_ACTIONS.map(({ href, title, subtitle, Icon }) => {
-        const active = isActivePath(pathname, href);
+      {BUY_MARKET_ACTIONS.map(({ href, matchHref, title, subtitle, Icon }) => {
+        const active = isActivePath(pathname, matchHref);
 
         return (
           <Link

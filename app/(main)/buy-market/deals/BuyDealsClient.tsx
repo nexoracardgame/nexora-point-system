@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BadgeCheck, Clock3, Loader2, MessageCircle, XCircle } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
@@ -220,7 +221,10 @@ export default function BuyDealsClient({
                       <div className="mt-2 text-sm font-bold text-black/48">
                         Card #{deal.cardNo} · ราคาเสนอ {formatPrice(deal.offeredPrice)}
                       </div>
-                      <div className="mt-3 flex items-center gap-2 rounded-[18px] bg-[#f4f4f5] p-2">
+                      <Link
+                        href={`/profile/${other.id}`}
+                        className="mt-3 flex items-center gap-2 rounded-[18px] bg-[#f4f4f5] p-2 transition hover:bg-zinc-100 hover:ring-1 hover:ring-black/10"
+                      >
                         <img
                           src={other.image || "/avatar.png"}
                           alt={other.name}
@@ -232,7 +236,7 @@ export default function BuyDealsClient({
                           </div>
                           <div className="truncate text-sm font-black">{other.name}</div>
                         </div>
-                      </div>
+                      </Link>
                     </div>
 
                     <div className="flex flex-wrap gap-2">

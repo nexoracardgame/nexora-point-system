@@ -59,7 +59,7 @@ export default function BuyMarketCreateClient() {
         return;
       }
 
-      router.push(`/buy-market/card/${data.listing.id}`);
+      router.push("/buy-market#latest-buy-posts");
       router.refresh();
     } catch {
       setError("เกิดข้อผิดพลาดระหว่างสร้างโพสต์รับซื้อ");
