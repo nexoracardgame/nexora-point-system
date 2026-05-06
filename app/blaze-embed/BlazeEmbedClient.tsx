@@ -126,9 +126,25 @@ export default function BlazeEmbedClient() {
   const [error, setError] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const clientIdRef = useRef("nexora-embed");
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesViewportRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef(messages);
+
+  function scrollChatToBottom() {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+
+  function scheduleScrollChatToBottom() {
+    requestAnimationFrame(() => {
+      scrollChatToBottom();
+      requestAnimationFrame(scrollChatToBottom);
+    });
+  }
 
   useEffect(() => {
     const root = document.documentElement;
@@ -188,8 +204,24 @@ export default function BlazeEmbedClient() {
   }, [draft, hydrated, messages]);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ block: "end" });
+    scheduleScrollChatToBottom();
   }, [messages.length, sending]);
+
+  useEffect(() => {
+    const handleViewportChange = () => {
+      scheduleScrollChatToBottom();
+    };
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("orientationchange", handleViewportChange);
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("orientationchange", handleViewportChange);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+    };
+  }, []);
 
   useEffect(() => {
     const input = inputRef.current;
@@ -227,6 +259,7 @@ export default function BlazeEmbedClient() {
     setDraft("");
     setError("");
     setSending(true);
+    scheduleScrollChatToBottom();
 
     try {
       const response = await fetch("/api/blaze-ai", {
@@ -283,7 +316,10 @@ export default function BlazeEmbedClient() {
       ]);
     } finally {
       setSending(false);
-      window.setTimeout(() => inputRef.current?.focus(), 0);
+      window.setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+        scheduleScrollChatToBottom();
+      }, 0);
     }
   }
 
@@ -326,8 +362,11 @@ export default function BlazeEmbedClient() {
         }
 
         .blaze-embed-scroll {
+          overflow-anchor: none;
           scrollbar-width: none !important;
           -ms-overflow-style: none !important;
+          scroll-behavior: auto;
+          overscroll-behavior: contain;
         }
 
         .blaze-embed-scroll::-webkit-scrollbar {
@@ -400,6 +439,10 @@ export default function BlazeEmbedClient() {
         .blaze-input::placeholder {
           color: rgba(245, 213, 123, 0.42);
         }
+
+        .blaze-message-stack {
+          overflow-anchor: none;
+        }
       `}</style>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(250,204,21,0.16),transparent_26%),radial-gradient(circle_at_92%_6%,rgba(168,85,247,0.18),transparent_24%),linear-gradient(180deg,#070604_0%,#0b0906_46%,#050403_100%)]" />
       <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:32px_32px]" />
@@ -466,8 +509,11 @@ export default function BlazeEmbedClient() {
           </a>
         </header>
 
-        <section className="blaze-embed-scroll relative z-10 min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6 sm:px-5">
-          <div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col justify-end md:max-w-none">
+        <section
+          ref={messagesViewportRef}
+          className="blaze-embed-scroll relative z-10 min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6 sm:px-5"
+        >
+          <div className="blaze-message-stack mx-auto flex min-h-full w-full max-w-[760px] flex-col justify-end md:max-w-none">
             {messages.map((message) => {
               const mine = message.role === "user";
 
@@ -530,7 +576,6 @@ export default function BlazeEmbedClient() {
                 </div>
               </div>
             ) : null}
-            <div ref={scrollRef} />
           </div>
         </section>
 
