@@ -1521,15 +1521,19 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     const userId = sanitizeText(session?.user?.id);
 
-    if (!userId) {
+    const body = await req.json().catch(() => ({}));
+    const publicEmbed = body?.publicEmbed === true;
+
+    if (!userId && !publicEmbed) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
     const message = sanitizeText(body?.message).slice(0, MAX_MESSAGE_LENGTH);
     const history = normalizeHistory(body?.history);
-    const clientId = sanitizeText(body?.clientId) || userId;
-    const userName = sanitizeText(session?.user?.name) || "NEXORA User";
+    const clientId = sanitizeText(body?.clientId) || userId || "nexora-embed";
+    const userName =
+      sanitizeText(session?.user?.name) ||
+      (publicEmbed ? "NEXORA Embed User" : "NEXORA User");
 
     if (!message) {
       return NextResponse.json(
