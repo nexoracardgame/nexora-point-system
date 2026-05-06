@@ -127,20 +127,35 @@ const BLAZE_RESPONSE_POLICY = [
   "- If the user asks for a list, all options, every matching item, 'what are they', 'which sets', rewards, or conditions, enumerate every matching record found in the provided DATA/context. Never give only examples or a partial list when the data contains more matches.",
   "- For set/collection overview questions, answer only the count and the set names. Do not list sample cards inside each set unless the user specifically asks for cards or details.",
   "- For list/count questions, do not add motivational outros, marketing copy, or closing suggestions after the list.",
-  "- For reward-filter questions such as 100,000 NEX, 1 แสน, or one hundred thousand, include every set/collection/product row that matches that reward amount.",
+  "- For reward-filter questions such as 100,000, 1 แสน, PlayStation, Gold One, or any reward value, include every set/collection/product row that matches that reward.",
+  "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
 ].join("\n");
 
 const BLAZE_COLLECTION_REWARD_INDEX = [
   "NEXORA official collection reward index:",
-  "- 100,000 silver collection sets: total 5 sets: ชุดการ์ดสะสมที่ 6, ชุดการ์ดสะสมที่ 8, ชุดการ์ดสะสมที่ 9, ชุดการ์ดสะสมที่ 10, ชุดการ์ดสะสมที่ 13.",
+  "- Set 1 / ชุดการ์ดสะสมที่ 1 / The Five Concordants: Mythic 5-star, 15 cards, reward 1,500,000 silver.",
+  "- Set 2 / ชุดการ์ดสะสมที่ 2: Mythic 5-star, 5 cards, reward 1,000,000 silver.",
+  "- Set 3 / ชุดการ์ดสะสมที่ 3: Legendary 4-star, 224 cards, reward 900,000 silver.",
+  "- Set 4 / ชุดการ์ดสะสมที่ 4: Legendary 4-star, 9 cards, reward 400,000 silver.",
+  "- Set 5 / ชุดการ์ดสะสมที่ 5: Legendary 4-star, 15 cards, reward 200,000 silver.",
   "- Set 6 / ชุดการ์ดสะสมที่ 6: Legendary 4-star, 10 cards, reward 100,000 silver.",
+  "- Set 7 / ชุดการ์ดสะสมที่ 7: Legendary 4-star, 5 cards, reward 50,000 silver.",
   "- Set 8 / ชุดการ์ดสะสมที่ 8: Legendary 4-star, 20 cards, reward 100,000 silver.",
   "- Set 9 / ชุดการ์ดสะสมที่ 9: Legendary 4-star, 30 cards, reward 100,000 silver.",
   "- Set 10 / ชุดการ์ดสะสมที่ 10: Legendary 4-star, 30 cards, reward 100,000 silver.",
+  "- Set 11 / ชุดการ์ดสะสมที่ 11: Legendary 2-star, 40 cards, reward 70,000 silver.",
+  "- Set 12 / ชุดการ์ดสะสมที่ 12: Legendary 2-star, 40 cards, reward NEXORA GOLD ONE.",
   "- Set 13 / ชุดการ์ดสะสมที่ 13: Legendary 3-star, 10 cards, reward 100,000 silver.",
-  "- If asked only which sets can get 100,000, answer the count and set names only. Do not list the cards in each set unless asked for details.",
+  "- Set 14 / ชุดการ์ดสะสมที่ 14: Legendary 3-star, 10 cards, reward 50,000 silver.",
+  "- Set 15 / ชุดการ์ดสะสมที่ 15: Legendary 3-star, 50 cards, reward PlayStation 1 เครื่อง.",
+  "- Set 16 / ชุดการ์ดสะสมที่ 16: Legendary 2-star, 20 cards, reward 15,000 silver.",
+  "- Set 17 / ชุดการ์ดสะสมที่ 17: Legendary 2-star, 20 cards, reward 15,000 silver.",
+  "- Set 18 / ชุดการ์ดสะสมที่ 18: Legendary 2-star, 10 cards, reward 5,000 silver.",
+  "- Set 19 / ชุดการ์ดสะสมที่ 19: Legendary 2-star, 10 cards, reward 5,000 silver.",
+  "- Reward groups: 1,500,000 silver = set 1; 1,000,000 silver = set 2; 900,000 silver = set 3; 400,000 silver = set 4; 200,000 silver = set 5; 100,000 silver = sets 6, 8, 9, 10, 13; 70,000 silver = set 11; 50,000 silver = sets 7, 14; 15,000 silver = sets 16, 17; 5,000 silver = sets 18, 19; NEXORA GOLD ONE = set 12; PlayStation 1 เครื่อง = set 15.",
+  "- If asked only which sets match a reward, answer only the count and set names. Do not list cards in each set unless asked for details.",
 ].join("\n");
 
 function sanitizeText(value: unknown) {
@@ -570,7 +585,7 @@ async function buildKnowledgeContext(message: string) {
     siteContext
       ? `ข้อมูลเสริมจากเว็บทางการ nexoracardgame.com แบบ cache ตามคำถาม:\n${siteContext}`
       : "",
-    "กฎสำคัญ: ยึด DATA และเว็บทางการก่อนเดา หากข้อมูลขัดกันให้บอกว่าให้ตรวจสอบประกาศล่าสุดหรือ Line Official @Nexoracard",
+    "กฎสำคัญ: ยึด DATA และเว็บทางการก่อนเดา หากข้อมูลขัดกันให้บอกว่าควรตรวจสอบประกาศล่าสุดก่อน ห้ามโยนไป Line ยกเว้นคำถามซื้อ/ขายสินค้าเท่านั้น",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -584,7 +599,7 @@ const BLAZE_CORE_KNOWLEDGE = [
   "- Ver.1 มีการ์ดทั้งหมด 293 แบบ ผลิตรวม 999,999 ใบ บรรจุภายใน 8,928 กล่อง",
   "- 1 ซองบรรจุการ์ด 7 ใบ และ 1 กล่องบรรจุ 16 ซอง",
   "- ราคาขายปัจจุบันจากฐาน DATA: Bronze Pack 45 บาท, Silver Pack 79 บาท, Gold Pack 115 บาท, Bronze Box 650 บาท, Silver Box 1,100 บาท, Gold Box 1,650 บาท",
-  "- ช่องทางหลัก: Line Official @Nexoracard, โทร 080-995-9979, อีเมล contact@nexoracardgame.com, บริษัท เนคโชร่า 63 จำกัด",
+  "- ข้อมูลบริษัท: บริษัท เนคโชร่า 63 จำกัด, โทร 080-995-9979, อีเมล contact@nexoracardgame.com. Line Official @Nexoracard ใช้ตอบเฉพาะเรื่องซื้อ/ขายสินค้า/สั่งซื้อ/ตัวแทนจำหน่ายเท่านั้น",
   "- การ์ดทุกใบมี Serial Number เฉพาะ ใช้ตรวจสอบข้อมูลและยืนยันความเป็นของแท้ในระบบ",
   "- ระดับการ์ดที่ต้องรู้: Bronze, Silver, Gold, Diamond. การ์ดใช้สะสม ใช้ดวล ใช้จัดเซ็ต ใช้ซื้อขาย และบางใบใช้เข้าเงื่อนไขแลกรางวัล",
   "- จักรวาล NEXORA มี 5 ธาตุหลัก: ดิน น้ำ ไฟ ไม้ ทอง. เมืองและกลุ่มสำคัญคือ Valecrown/Stoneborne, Thalassus/Mariners, Pyreholm/Pyrekin, Verdelore/Greenwardens, Aurion Spires/Mechanists",
@@ -608,8 +623,8 @@ const BLAZE_CORE_KNOWLEDGE = [
   "กฎการตอบจากฐานความรู้:",
   "- ถ้าถามว่า NEXORA คืออะไร ให้ตอบว่าไม่ใช่แค่เกม แต่คือการ์ดเกมสะสมและแข่งขันที่มีระบบรางวัลจริง มี Serial ตรวจสอบได้ มี 5 ธาตุ และมีระบบ NEX/COIN/Collection/Battle",
   "- ถ้าถามว่าคุ้มไหม ให้ย้ำทุกการ์ดมีค่า NEX, มีเส้นทางสะสม, มี COIN และมีรางวัลจริง แต่ NEX/COIN ไม่ใช่เงินสด",
-  "- ถ้าถามซื้อ ให้ตอบข้อมูลสำคัญก่อน แล้วชวนติดต่อ Line Official @Nexoracard",
-  "- ถ้าข้อมูลเป็นราคา ข่าว ตารางงาน รุ่นสินค้า หรือสิ่งที่เปลี่ยนได้ ให้บอกว่าควรตรวจสอบประกาศล่าสุดหรือทัก Line Official ก่อนยืนยัน",
+  "- ถ้าถามซื้อ ขายสินค้า สั่งซื้อ ราคา ซอง กล่อง การจัดส่ง หรือสมัครตัวแทน ให้ตอบข้อมูลสำคัญก่อน แล้วจึงแนะนำ Line Official @Nexoracard ได้",
+  "- ถ้าข้อมูลเป็นข่าว ตารางงาน รุ่นสินค้า หรือสิ่งที่เปลี่ยนได้ ให้บอกว่าควรตรวจสอบประกาศล่าสุดก่อนยืนยัน แต่ห้ามโยนไป Line ถ้าไม่ใช่เรื่องซื้อ/ขายสินค้า",
 ].join("\n");
 
 function buildSystemPrompt(userName: string, knowledgeContext: string) {
@@ -850,12 +865,59 @@ function trimListAnswerOutro(reply: string, message: string) {
   }
 
   return sanitizeText(reply)
+    .replace(/^\s*\*\s+/gm, "")
+    .replace(/\s+\*\s+/g, "\n")
     .replace(/\s*การสะสมให้ครบชุดเหล่านี้[\s\S]*$/i, "")
+    .replace(/\s*การสะสมการ์ดให้ครบชุดเหล่านี้[\s\S]*$/i, "")
+    .replace(/\s*เซ็ตเหล่านี้ล้วน[\s\S]*$/i, "")
+    .replace(/\s*แต่ละชุดมีจำนวน[\s\S]*$/i, "")
+    .replace(/\s*นี่คือชุดการ์ดสะสมทั้งหมด[\s\S]*$/i, "")
     .replace(/\s*หากท่านต้องการรายละเอียด[\s\S]*$/i, "")
     .replace(/\s*หากต้องการรายละเอียด[\s\S]*$/i, "")
     .replace(/\s*ถ้าท่านต้องการรายละเอียด[\s\S]*$/i, "")
     .replace(/\s*สามารถสอบถาม.*$/i, "")
     .trim();
+}
+
+function isSalesLineQuestion(message: string) {
+  const text = normalizeSearchText(message);
+  return [
+    "ซื้อ",
+    "ขาย",
+    "สั่งซื้อ",
+    "สั่ง",
+    "ราคา",
+    "สินค้า",
+    "ซอง",
+    "กล่อง",
+    "pack",
+    "box",
+    "จัดส่ง",
+    "ค่าส่ง",
+    "ตัวแทน",
+    "dealer",
+    "สมัครสมาชิก",
+    "โปร",
+    "โปรโมชั่น",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function stripLineContactForNonSales(reply: string, message: string) {
+  if (isSalesLineQuestion(message)) {
+    return reply;
+  }
+
+  return sanitizeText(reply)
+    .replace(/\s*(?:หาก|ถ้า)?ท่าน(?:ต้องการ|สนใจ)?(?:ข้อมูลเพิ่มเติม|รายละเอียดเพิ่มเติม)?[^.\n]*(?:Line|ไลน์)[^.\n]*(?:@Nexoracard|@nexoracard)?[^.\n]*$/gim, "")
+    .replace(/\s*(?:ติดต่อ|ทัก|สอบถาม|แอด)\s*(?:Line|ไลน์)[^.\n]*(?:@Nexoracard|@nexoracard)?[^.\n]*$/gim, "")
+    .replace(/\s*Line Official\s*@Nexoracard[^.\n]*$/gim, "")
+    .replace(/\s*Line\s*@Nexoracard[^.\n]*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function polishBlazeReply(reply: string, message: string) {
+  return stripLineContactForNonSales(trimListAnswerOutro(reply, message), message);
 }
 
 function buildScriptBridgeMessage({
@@ -1018,7 +1080,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-        reply: trimListAnswerOutro(result.reply, message),
+        reply: polishBlazeReply(result.reply, message),
         source: result.source,
         native: result.source === "gemini",
       },

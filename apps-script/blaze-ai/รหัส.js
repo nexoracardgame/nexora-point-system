@@ -36,20 +36,35 @@ const BLAZE_RESPONSE_POLICY = [
   "- If the user asks for a list, all options, every matching item, 'what are they', 'which sets', rewards, or conditions, enumerate every matching record found in the provided DATA/context. Never give only examples or a partial list when the data contains more matches.",
   "- For set/collection overview questions, answer only the count and the set names. Do not list sample cards inside each set unless the user specifically asks for cards or details.",
   "- For list/count questions, do not add motivational outros, marketing copy, or closing suggestions after the list.",
-  "- For reward-filter questions such as 100,000 NEX, 1 แสน, or one hundred thousand, include every set/collection/product row that matches that reward amount.",
+  "- For reward-filter questions such as 100,000, 1 แสน, PlayStation, Gold One, or any reward value, include every set/collection/product row that matches that reward.",
+  "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
 ].join("\n");
 
 const BLAZE_COLLECTION_REWARD_INDEX = [
   "NEXORA official collection reward index:",
-  "- 100,000 silver collection sets: total 5 sets: ชุดการ์ดสะสมที่ 6, ชุดการ์ดสะสมที่ 8, ชุดการ์ดสะสมที่ 9, ชุดการ์ดสะสมที่ 10, ชุดการ์ดสะสมที่ 13.",
+  "- Set 1 / ชุดการ์ดสะสมที่ 1 / The Five Concordants: Mythic 5-star, 15 cards, reward 1,500,000 silver.",
+  "- Set 2 / ชุดการ์ดสะสมที่ 2: Mythic 5-star, 5 cards, reward 1,000,000 silver.",
+  "- Set 3 / ชุดการ์ดสะสมที่ 3: Legendary 4-star, 224 cards, reward 900,000 silver.",
+  "- Set 4 / ชุดการ์ดสะสมที่ 4: Legendary 4-star, 9 cards, reward 400,000 silver.",
+  "- Set 5 / ชุดการ์ดสะสมที่ 5: Legendary 4-star, 15 cards, reward 200,000 silver.",
   "- Set 6 / ชุดการ์ดสะสมที่ 6: Legendary 4-star, 10 cards, reward 100,000 silver.",
+  "- Set 7 / ชุดการ์ดสะสมที่ 7: Legendary 4-star, 5 cards, reward 50,000 silver.",
   "- Set 8 / ชุดการ์ดสะสมที่ 8: Legendary 4-star, 20 cards, reward 100,000 silver.",
   "- Set 9 / ชุดการ์ดสะสมที่ 9: Legendary 4-star, 30 cards, reward 100,000 silver.",
   "- Set 10 / ชุดการ์ดสะสมที่ 10: Legendary 4-star, 30 cards, reward 100,000 silver.",
+  "- Set 11 / ชุดการ์ดสะสมที่ 11: Legendary 2-star, 40 cards, reward 70,000 silver.",
+  "- Set 12 / ชุดการ์ดสะสมที่ 12: Legendary 2-star, 40 cards, reward NEXORA GOLD ONE.",
   "- Set 13 / ชุดการ์ดสะสมที่ 13: Legendary 3-star, 10 cards, reward 100,000 silver.",
-  "- If asked only which sets can get 100,000, answer the count and set names only. Do not list the cards in each set unless asked for details.",
+  "- Set 14 / ชุดการ์ดสะสมที่ 14: Legendary 3-star, 10 cards, reward 50,000 silver.",
+  "- Set 15 / ชุดการ์ดสะสมที่ 15: Legendary 3-star, 50 cards, reward PlayStation 1 เครื่อง.",
+  "- Set 16 / ชุดการ์ดสะสมที่ 16: Legendary 2-star, 20 cards, reward 15,000 silver.",
+  "- Set 17 / ชุดการ์ดสะสมที่ 17: Legendary 2-star, 20 cards, reward 15,000 silver.",
+  "- Set 18 / ชุดการ์ดสะสมที่ 18: Legendary 2-star, 10 cards, reward 5,000 silver.",
+  "- Set 19 / ชุดการ์ดสะสมที่ 19: Legendary 2-star, 10 cards, reward 5,000 silver.",
+  "- Reward groups: 1,500,000 silver = set 1; 1,000,000 silver = set 2; 900,000 silver = set 3; 400,000 silver = set 4; 200,000 silver = set 5; 100,000 silver = sets 6, 8, 9, 10, 13; 70,000 silver = set 11; 50,000 silver = sets 7, 14; 15,000 silver = sets 16, 17; 5,000 silver = sets 18, 19; NEXORA GOLD ONE = set 12; PlayStation 1 เครื่อง = set 15.",
+  "- If asked only which sets match a reward, answer only the count and set names. Do not list the cards in each set unless asked for details.",
 ].join("\n");
 
 // ===== Presence / Analytics =====
@@ -668,12 +683,63 @@ function trimListAnswerOutro(reply, message) {
   }
 
   return sanitizeText(reply)
+    .replace(/^\s*\*\s+/gm, "")
+    .replace(/\s+\*\s+/g, "\n")
     .replace(/\s*การสะสมให้ครบชุดเหล่านี้[\s\S]*$/i, "")
+    .replace(/\s*การสะสมการ์ดให้ครบชุดเหล่านี้[\s\S]*$/i, "")
+    .replace(/\s*เซ็ตเหล่านี้ล้วน[\s\S]*$/i, "")
+    .replace(/\s*แต่ละชุดมีจำนวน[\s\S]*$/i, "")
+    .replace(/\s*นี่คือชุดการ์ดสะสมทั้งหมด[\s\S]*$/i, "")
     .replace(/\s*หากท่านต้องการรายละเอียด[\s\S]*$/i, "")
     .replace(/\s*หากต้องการรายละเอียด[\s\S]*$/i, "")
     .replace(/\s*ถ้าท่านต้องการรายละเอียด[\s\S]*$/i, "")
     .replace(/\s*สามารถสอบถาม.*$/i, "")
     .trim();
+}
+
+function isSalesLineQuestion(message) {
+  const text = normalizeThaiText(message);
+  const keywords = [
+    "ซื้อ",
+    "ขาย",
+    "สั่งซื้อ",
+    "สั่ง",
+    "ราคา",
+    "สินค้า",
+    "ซอง",
+    "กล่อง",
+    "pack",
+    "box",
+    "จัดส่ง",
+    "ค่าส่ง",
+    "ตัวแทน",
+    "dealer",
+    "สมัครสมาชิก",
+    "โปร",
+    "โปรโมชั่น"
+  ];
+
+  return keywords.some(function(keyword) {
+    return text.indexOf(normalizeThaiText(keyword)) >= 0;
+  });
+}
+
+function stripLineContactForNonSales(reply, message) {
+  if (isSalesLineQuestion(message)) {
+    return reply;
+  }
+
+  return sanitizeText(reply)
+    .replace(/\s*(?:หาก|ถ้า)?ท่าน(?:ต้องการ|สนใจ)?(?:ข้อมูลเพิ่มเติม|รายละเอียดเพิ่มเติม)?[^.\n]*(?:Line|ไลน์)[^.\n]*(?:@Nexoracard|@nexoracard)?[^.\n]*$/gim, "")
+    .replace(/\s*(?:ติดต่อ|ทัก|สอบถาม|แอด)\s*(?:Line|ไลน์)[^.\n]*(?:@Nexoracard|@nexoracard)?[^.\n]*$/gim, "")
+    .replace(/\s*Line Official\s*@Nexoracard[^.\n]*$/gim, "")
+    .replace(/\s*Line\s*@Nexoracard[^.\n]*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function polishBlazeReply(reply, message) {
+  return stripLineContactForNonSales(trimListAnswerOutro(reply, message), message);
 }
 
 function searchGoogle(query) {
@@ -1173,7 +1239,7 @@ function buildSystemPrompt(db, memorySummary, decisionInstruction) {
     "- Gold Box ราคา " + (db.gold_box_price || "-") + " บาท\n" +
     "- การจัดส่ง: " + (db.shipping || "-") + "\n" +
     "- โปรโมชั่น: " + (db.promo || "-") + "\n" +
-    "- ติดต่อ: Line " + (db.line_contact || "-") + "\n\n" +
+    "- ช่องทาง Line " + (db.line_contact || "-") + " ใช้ตอบเฉพาะคำถามซื้อ/ขายสินค้า/สั่งซื้อ/ตัวแทนจำหน่ายเท่านั้น\n\n" +
     BLAZE_COLLECTION_REWARD_INDEX + "\n\n" +
     buildDataKnowledgeContext(db) + "\n\n" +
 
@@ -1182,6 +1248,7 @@ function buildSystemPrompt(db, memorySummary, decisionInstruction) {
     "กฎการตอบ:\n" +
     "- ถ้าผู้ใช้เคยคุยเรื่องเดิม ให้ตอบต่อเนื่องจากบริบทเก่า\n" +
     "- ถ้าเป็นเรื่อง NEXORA ให้ตอบแม่นและแนะนำต่อได้\n" +
+    "- ห้ามชวนติดต่อ Line @Nexoracard ในคำถามความรู้ เช่น lore, กติกา, เซ็ตรางวัล, รายละเอียดการ์ด, รางวัล, ระบบสะสม หรือคำถามทั่วไป\n" +
     "- ถ้าเป็นข้อมูลโลกภายนอกที่เกี่ยวกับปัจจุบัน เช่น หุ้น ทอง ข่าว อากาศ ตารางคะแนน รุ่นล่าสุด หรือบุคคลสาธารณะ ต้องตรวจสอบข้อมูลล่าสุดก่อนตอบเสมอ\n" +
     "- ห้ามเดาข้อมูลปัจจุบันเอง\n" +
     "- ถ้าไม่แน่ใจจริงๆ ให้บอกตรงๆว่าไม่แน่ใจ\n"
@@ -1802,7 +1869,7 @@ function askGemini(message, history, clientId, imagePayload, options) {
     const finalReply = enforceBlazeStyle(
       removeImageLinksFromReply(textReply)
     );
-    const polishedReply = trimListAnswerOutro(finalReply, cleanMessage);
+    const polishedReply = polishBlazeReply(finalReply, cleanMessage);
 
     if (cleanMessage) {
       saveMemory(cleanClientId, "user", cleanMessage);
