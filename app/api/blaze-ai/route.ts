@@ -219,6 +219,7 @@ const BLAZE_RESPONSE_POLICY = [
   "- NEXORA has five elements shown by crystal color: brown = earth, blue = water, dark orange/red = fire, green = wood, yellow/gold = gold. When answering about a card, include its element when known or inferred from the card index.",
   "- For deck advice, buffs, combo, strong/annoying/control skill questions, behave like a knowledgeable game friend: recommend cards from CARD DB, explain why they fit, mention element/type, and keep the advice practical.",
   "- For broad gameplay questions such as combos, deck building, element strategy, 'use with what', or 'how to play this line', do not require an exact skill keyword match. Build practical advice from card element, card type, ATK/SUP, and skill text.",
+  "- For precise skill questions with a clear ability, answer the exact matching card first and keep it short. Only add nearby skill suggestions under a clearly labeled 'similar/nearby' section, and never present nearby cards as the exact answer.",
   "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
@@ -2144,6 +2145,123 @@ async function buildDirectCardSkillSearchReply(message: string) {
   }
 
   return formatCardSkillSearchMatches(matches, message);
+}
+
+function isAtkSupSwapQuestion(message: string) {
+  const raw = message.toLowerCase();
+  const hasSwapIntent = includesAnyThaiOrEnglish(message, [
+    "สลับ",
+    "swap",
+    "reverse",
+    "กลับค่า",
+    "เปลี่ยนสลับ",
+  ]);
+  const hasAtk = /(?:\batk\b|\battack\b|พลังโจมตี|ค่าโจมตี)/i.test(raw);
+  const hasSup = /(?:\bsup\b|\bsupport\b|พลังรับ|ค่ารับ|ซัพ)/i.test(raw);
+  const hasCardIntent = includesAnyThaiOrEnglish(message, [
+    "การ์ด",
+    "เลขไหน",
+    "ใบไหน",
+    "หมายเลข",
+    "card",
+    "no",
+  ]);
+
+  return hasSwapIntent && hasAtk && hasSup && hasCardIntent;
+}
+
+function hasDirectAtkSupSwapSkill(row: CardDbRow) {
+  const text = `${row.skill} ${row.rawText}`.toLowerCase();
+
+  return (
+    /สลับ\s*(?:ค่า)?\s*(?:attack|atk)\s*(?:และ|กับ|\/|,)?\s*(?:support|sup)/i.test(text) ||
+    /(?:attack|atk)\s*(?:และ|กับ|\/|,)\s*(?:support|sup).*สลับ/i.test(text) ||
+    /swap\s*(?:attack|atk)\s*(?:and|with|\/|,)?\s*(?:support|sup)/i.test(text)
+  );
+}
+
+function getAtkSupNearbySkillNote(row: CardDbRow) {
+  const text = `${row.skill} ${row.rawText}`.toLowerCase();
+
+  if (
+    includesAnyThaiOrEnglish(text, ["เปลี่ยนค่า attack และ support", "attack และ support เป็น", "attack หรือ support 5000"])
+  ) {
+    return "ใกล้เคียง: เปลี่ยน/ตั้งค่า ATK และ SUP ไม่ใช่สลับค่าโดยตรง";
+  }
+
+  if (includesAnyThaiOrEnglish(text, ["ไม่สามารถเปลี่ยนแปลง attack และ support"])) {
+    return "ใกล้เคียง: ล็อคไม่ให้เปลี่ยน ATK/SUP ไม่ใช่สลับค่า";
+  }
+
+  if (includesAnyThaiOrEnglish(text, ["สลับตำแหน่ง", "swap position"])) {
+    return "ใกล้เคียง: สลับตำแหน่งมอนสเตอร์ ไม่ใช่สลับ ATK/SUP";
+  }
+
+  return "";
+}
+
+function formatPreciseSkillLine(row: CardDbRow, note = "") {
+  const skill = row.skill ? row.skill.replace(/\s+/g, " ").trim() : "-";
+  const suffix = note ? `\nเหตุผล: ${note}` : "";
+
+  return `No.${row.cardNoNormalized} ${row.cardName} | ${formatCardElement(getCardElement(row))}\nสกิล: ${skill}${suffix}`;
+}
+
+async function buildDirectAtkSupSwapReply(message: string) {
+  if (!isAtkSupSwapQuestion(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const exactMatches = rows
+    .filter((row) => isSkillCard(row) && hasDirectAtkSupSwapSkill(row))
+    .sort((a, b) => a.cardNoNormalized.localeCompare(b.cardNoNormalized));
+  const exactNos = new Set(exactMatches.map((row) => row.cardNoNormalized));
+  const nearbyMatches = rows
+    .map((row) => ({
+      row,
+      note: exactNos.has(row.cardNoNormalized) ? "" : getAtkSupNearbySkillNote(row),
+    }))
+    .filter((item) => item.note)
+    .sort((a, b) => a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized))
+    .slice(0, 3);
+
+  if (!exactMatches.length) {
+    return enforceBlazeStyle(
+      [
+        "ข้าค้นจากฐานการ์ด 293 ใบแล้ว ยังไม่พบใบที่เขียนว่าสลับ ATK กับ SUP โดยตรง",
+        nearbyMatches.length
+          ? "แต่มีสกิลใกล้เคียงที่เกี่ยวกับค่า ATK/SUP ดังนี้"
+          : "",
+        ...nearbyMatches.map((item, index) =>
+          `${index + 1}. ${formatPreciseSkillLine(item.row, item.note)}`
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
+  }
+
+  return enforceBlazeStyle(
+    [
+      "ใบที่สลับ ATK กับ SUP โดยตรงคือ",
+      ...exactMatches.map((row, index) =>
+        `${index + 1}. ${formatPreciseSkillLine(row)}`
+      ),
+      nearbyMatches.length
+        ? "สกิลที่น่าสนใจใกล้เคียง แต่ไม่ใช่สลับค่าโดยตรง:"
+        : "",
+      ...nearbyMatches.map((item, index) =>
+        `${index + 1}. ${formatPreciseSkillLine(item.row, item.note)}`
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
 }
 
 const CARD_ELEMENT_ORDER: CardElement[] = ["fire", "water", "gold", "earth", "wood"];
@@ -4292,6 +4410,20 @@ export async function POST(req: NextRequest) {
         {
           ok: true,
           reply: polishBlazeReply(directCardStatExtremeReply, effectiveMessage),
+          source: "card-db",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directAtkSupSwapReply =
+      await buildDirectAtkSupSwapReply(effectiveMessage);
+    if (directAtkSupSwapReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directAtkSupSwapReply, effectiveMessage),
           source: "card-db",
           native: true,
         },
