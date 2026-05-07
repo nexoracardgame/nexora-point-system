@@ -9,6 +9,7 @@ import {
   MessageCircle,
   MessagesSquare,
   Minimize2,
+  MoreHorizontal,
   Search,
   Send,
   Smile,
@@ -33,10 +34,12 @@ import {
   mergeSingleChatMessage,
   normalizeChatMessage,
   reconcileRecentChatMessages,
+  removeChatMessage,
   type ChatMessage,
   type ChatUser,
 } from "@/lib/chat-room-types";
 import type { DMRoomListItem } from "@/lib/dm-list";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 type RoomFilter = "all" | "direct" | "deal";
 
@@ -78,6 +81,13 @@ type ChatSeenDetail = {
   readAt?: string | null;
   seenAt?: string | null;
   senderId?: string | null;
+};
+
+type ChatDeletedDetail = {
+  id?: string | number | null;
+  messageId?: string | number | null;
+  roomId?: string | null;
+  roomIds?: Array<string | null | undefined> | null;
 };
 
 type OpenFloatingChatDetail = {
@@ -577,6 +587,8 @@ export default function FloatingChatDock({
   const [error, setError] = useState("");
   const [localUnreadCount, setLocalUnreadCount] = useState(0);
   const [mobileListVisible, setMobileListVisible] = useState(true);
+  const [messageMenuId, setMessageMenuId] = useState("");
+  const [deletingMessageId, setDeletingMessageId] = useState("");
   const [blazeMessages, setBlazeMessages] = useState<BlazeChatMessage[]>([
     BLAZE_WELCOME_MESSAGE,
   ]);
@@ -602,6 +614,8 @@ export default function FloatingChatDock({
   const blazeInputRef = useRef<HTMLTextAreaElement>(null);
   const blazeMessagesRef = useRef<BlazeChatMessage[]>(blazeMessages);
   const blazeFileRef = useRef<File | null>(blazeFile);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  const longPressTimerRef = useRef<number | null>(null);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
   const lastComposerSeenRef = useRef<{ roomKey: string; markedAt: number }>({
@@ -681,6 +695,10 @@ export default function FloatingChatDock({
   useEffect(() => {
     roomsRef.current = rooms;
   }, [rooms]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     if (status !== "authenticated" || !roomListStorageKey) {
@@ -1062,6 +1080,50 @@ export default function FloatingChatDock({
       );
     },
     []
+  );
+
+  const removeFloatingChatMessage = useCallback(
+    (messageId: string, roomId?: string | null) => {
+      const safeMessageId = safeText(messageId);
+      const safeRoomId = safeText(roomId);
+      if (!safeMessageId) {
+        return;
+      }
+
+      setMessages((current) => {
+        const active = activeRoomRef.current;
+        if (!active) {
+          return current;
+        }
+
+        const activeRoomIds = getReadRoomIds(active, active.actualRoomId);
+        if (safeRoomId && !activeRoomIds.includes(safeRoomId)) {
+          return current;
+        }
+
+        const nextMessages = removeChatMessage(current, safeMessageId);
+        if (nextMessages !== current) {
+          updateRoomCache(active.key, active, nextMessages);
+        }
+
+        return nextMessages;
+      });
+
+      for (const [key, cached] of roomCacheRef.current.entries()) {
+        const cachedRoomIds = getReadRoomIds(cached.active, cached.active.actualRoomId);
+        if (safeRoomId && !cachedRoomIds.includes(safeRoomId)) {
+          continue;
+        }
+
+        const nextMessages = removeChatMessage(cached.messages, safeMessageId);
+        if (nextMessages !== cached.messages) {
+          updateRoomCache(key, cached.active, nextMessages);
+        }
+      }
+
+      setMessageMenuId((current) => (current === safeMessageId ? "" : current));
+    },
+    [updateRoomCache]
   );
 
   const fetchRoomMessagesPage = useCallback(
@@ -1533,6 +1595,80 @@ export default function FloatingChatDock({
     void markRoomSeen(active, active.actualRoomId, freshMessages, active.me);
   }, [markRoomSeen, updateRoomCache]);
 
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      const active = activeRoomRef.current;
+      const safeMessageId = safeText(messageId);
+      if (!active?.actualRoomId || !safeMessageId || deletingMessageId) {
+        return;
+      }
+
+      const snapshot = messagesRef.current;
+      const targetMessage = snapshot.find(
+        (message) => safeText(message.id) === safeMessageId
+      );
+
+      setDeletingMessageId(safeMessageId);
+      setError("");
+      setMessageMenuId("");
+      removeFloatingChatMessage(safeMessageId, active.actualRoomId);
+
+      if (targetMessage?.optimistic) {
+        setDeletingMessageId("");
+        return;
+      }
+
+      const res = await fetch("/api/dm/messages", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomId: active.actualRoomId,
+          messageId: safeMessageId,
+        }),
+      }).catch(() => null);
+
+      if (!res?.ok) {
+        setMessages(snapshot);
+        updateRoomCache(active.key, active, snapshot);
+        setError("ลบข้อความไม่สำเร็จ กรุณาลองใหม่");
+        setDeletingMessageId("");
+        return;
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("nexora:chat-message-deleted", {
+          detail: {
+            messageId: safeMessageId,
+            roomId: active.actualRoomId,
+            roomIds: getReadRoomIds(active, active.actualRoomId),
+          } satisfies ChatDeletedDetail,
+        })
+      );
+      void loadRooms();
+      setDeletingMessageId("");
+    },
+    [deletingMessageId, loadRooms, removeFloatingChatMessage, updateRoomCache]
+  );
+
+  const startMessageLongPress = useCallback((messageId: string) => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      setMessageMenuId(messageId);
+    }, 650);
+  }, []);
+
+  const stopMessageLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
   const sendMessage = useCallback(async () => {
     const active = activeRoomRef.current;
     const text = safeText(draftRef.current);
@@ -1908,6 +2044,56 @@ export default function FloatingChatDock({
   }, [activeRoom, open, syncActiveRoom]);
 
   useEffect(() => {
+    if (status !== "authenticated" || !open || !activeRoom?.actualRoomId) {
+      return;
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) {
+      return;
+    }
+
+    const roomId = activeRoom.actualRoomId;
+    const channel = supabase.channel(`floating-dm-room-${roomId}-${Date.now()}`);
+    const handleDeletedMessage = (payload: { old?: unknown }) => {
+      const oldRow = payload.old as { id?: string; roomId?: string } | null;
+      const deletedId = safeText(oldRow?.id);
+      const deletedRoomId = safeText(oldRow?.roomId) || roomId;
+
+      if (!deletedId) {
+        void syncActiveRoom();
+        return;
+      }
+
+      removeFloatingChatMessage(deletedId, deletedRoomId);
+      void loadRooms();
+    };
+
+    channel.on(
+      "postgres_changes",
+      { event: "DELETE", schema: "public", table: "dmMessage", filter: `roomId=eq.${roomId}` },
+      handleDeletedMessage
+    );
+
+    channel.subscribe((realtimeStatus) => {
+      if (realtimeStatus === "SUBSCRIBED") {
+        void syncActiveRoom();
+      }
+    });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [
+    activeRoom?.actualRoomId,
+    loadRooms,
+    open,
+    removeFloatingChatMessage,
+    status,
+    syncActiveRoom,
+  ]);
+
+  useEffect(() => {
     const handleUnread = (event: Event) => {
       const detail = (event as CustomEvent<{ count?: number | null }>).detail;
       setLocalUnreadCount(Math.max(0, Number(detail?.count || 0)));
@@ -2003,21 +2189,39 @@ export default function FloatingChatDock({
         return changed ? nextMessages : current;
       });
     };
+    const handleDeleted = (event: Event) => {
+      const detail = (event as CustomEvent<ChatDeletedDetail>).detail;
+      const messageId = safeText(detail?.messageId || detail?.id);
+      const roomId = safeText(detail?.roomId);
+
+      if (!messageId) {
+        void syncActiveRoom();
+        return;
+      }
+
+      removeFloatingChatMessage(messageId, roomId);
+      void loadRooms();
+    };
 
     window.addEventListener("nexora:chat-unread-count", handleUnread);
     window.addEventListener("nexora:chat-message-received", handleRealtime);
     window.addEventListener("nexora:chat-message-seen", handleSeen);
+    window.addEventListener("nexora:chat-message-deleted", handleDeleted);
 
     return () => {
       window.removeEventListener("nexora:chat-unread-count", handleUnread);
       window.removeEventListener("nexora:chat-message-received", handleRealtime);
       window.removeEventListener("nexora:chat-message-seen", handleSeen);
+      window.removeEventListener("nexora:chat-message-deleted", handleDeleted);
     };
   }, [
     currentUserId,
+    loadRooms,
     markRoomSeen,
     open,
+    removeFloatingChatMessage,
     scrollToBottom,
+    syncActiveRoom,
     updateRoomCache,
     updateRoomListFromMessage,
   ]);
@@ -2072,6 +2276,35 @@ export default function FloatingChatDock({
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
+
+  useEffect(() => {
+    setMessageMenuId("");
+    stopMessageLongPress();
+  }, [activeRoom?.key, stopMessageLongPress]);
+
+  useEffect(() => {
+    if (!messageMenuId) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-floating-message-menu]")) {
+        return;
+      }
+
+      setMessageMenuId("");
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [messageMenuId]);
+
+  useEffect(() => {
+    return () => {
+      stopMessageLongPress();
+    };
+  }, [stopMessageLongPress]);
 
   if (status !== "authenticated") {
     return null;
@@ -2813,20 +3046,68 @@ export default function FloatingChatDock({
                                 }`}
                               >
                                 <div
-                                  className={`break-words rounded-[20px] px-3.5 py-2.5 text-[13px] leading-relaxed shadow-lg sm:text-sm ${
-                                    mine
-                                      ? "bg-white text-black"
-                                      : "bg-white/[0.10] text-white"
-                                  }`}
+                                  className="group/message relative"
+                                  data-floating-message-menu
+                                  onTouchStart={() =>
+                                    mine && !message.optimistic
+                                      ? startMessageLongPress(message.id)
+                                      : undefined
+                                  }
+                                  onTouchEnd={stopMessageLongPress}
+                                  onTouchCancel={stopMessageLongPress}
                                 >
-                                  {message.imageUrl ? (
-                                    <img
-                                      src={message.imageUrl}
-                                      alt="chat attachment"
-                                      className="mb-2 max-h-[180px] max-w-full rounded-xl object-contain"
-                                    />
+                                  <div
+                                    className={`break-words rounded-[20px] px-3.5 py-2.5 text-[13px] leading-relaxed shadow-lg sm:text-sm ${
+                                      mine
+                                        ? "bg-white text-black"
+                                        : "bg-white/[0.10] text-white"
+                                    }`}
+                                  >
+                                    {message.imageUrl ? (
+                                      <img
+                                        src={message.imageUrl}
+                                        alt="chat attachment"
+                                        className="mb-2 max-h-[180px] max-w-full rounded-xl object-contain"
+                                      />
+                                    ) : null}
+                                    <ChatMessageText text={message.content} mine={mine} />
+                                  </div>
+
+                                  {mine && !message.optimistic ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setMessageMenuId((current) =>
+                                          current === message.id ? "" : message.id
+                                        )
+                                      }
+                                      className={`absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-[#111318]/95 text-white/65 opacity-0 shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition hover:text-white group-hover/message:opacity-100 ${
+                                        mine ? "-left-9" : "-right-9"
+                                      } ${messageMenuId === message.id ? "opacity-100" : ""}`}
+                                      aria-label="เปิดเมนูข้อความ"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </button>
                                   ) : null}
-                                  <ChatMessageText text={message.content} mine={mine} />
+
+                                  {messageMenuId === message.id ? (
+                                    <div
+                                      className={`absolute z-40 mt-2 min-w-[132px] overflow-hidden rounded-2xl border border-red-300/15 bg-[#121318]/98 p-1 shadow-[0_20px_55px_rgba(0,0,0,0.55)] ${
+                                        mine ? "right-0" : "left-0"
+                                      }`}
+                                    >
+                                      <button
+                                        type="button"
+                                        disabled={deletingMessageId === message.id}
+                                        onClick={() => void deleteMessage(message.id)}
+                                        className="w-full rounded-xl px-3 py-2 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/12 disabled:cursor-wait disabled:opacity-60"
+                                      >
+                                        {deletingMessageId === message.id
+                                          ? "กำลังลบ..."
+                                          : "ลบข้อความ"}
+                                      </button>
+                                    </div>
+                                  ) : null}
                                 </div>
                                 <div
                                   className={`mt-1 px-1 text-[10px] text-white/28 ${
