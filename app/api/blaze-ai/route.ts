@@ -73,6 +73,9 @@ type CollectionSetRecord = {
   rarity: string;
   cardCount: number;
   cards: string[];
+  cardNumberLines?: string[];
+  rule?: string;
+  statusNote?: string;
   sourceUrl: string;
 };
 
@@ -170,6 +173,23 @@ const BLAZE_RESPONSE_POLICY = [
 
 const COLLECTION_SOURCE_URL = "https://www.nexoracardgame.com/card-collections";
 const POINT_REDEMPTION_LOCATION_URL = "https://maps.app.goo.gl/oUfs7y5LtNaBTSzm7";
+
+function createPendingCollectionSet(id: number): CollectionSetRecord {
+  return {
+    id,
+    name: `ชุดการ์ดสะสมที่ ${id}`,
+    aliases: [`set ${id}`, `เซ็ต ${id}`, `ชุด ${id}`, `ชุดการ์ดสะสมที่ ${id}`],
+    reward: "รออัปเดตรางวัลจากประกาศทางการ",
+    rewardAliases: [],
+    level: "รออัปเดตจากประกาศทางการ",
+    rarity: "รออัปเดตจากประกาศทางการ",
+    cardCount: 0,
+    cards: ["รออัปเดตรายการการ์ดจากประกาศทางการ"],
+    cardNumberLines: [],
+    statusNote: "มีเลขเซ็ตในฐานความรู้แล้ว แต่ชื่อ รางวัล และรายการการ์ดของเซ็ตนี้ยังรอการอัปเดตทางการ",
+    sourceUrl: COLLECTION_SOURCE_URL,
+  };
+}
 
 const COLLECTION_SETS: CollectionSetRecord[] = [
   {
@@ -441,6 +461,34 @@ const COLLECTION_SETS: CollectionSetRecord[] = [
     ],
     sourceUrl: COLLECTION_SOURCE_URL,
   },
+  ...[20, 21, 22, 23, 24, 25, 26].map(createPendingCollectionSet),
+  {
+    id: 27,
+    name: "ชุดการ์ดสะสมที่ 27",
+    aliases: [
+      "set 27",
+      "เซ็ต 27",
+      "ชุด 27",
+      "ชุดการ์ดสะสมที่ 27",
+      "เซ็ตฟอยล์",
+      "ชุดฟอยล์",
+      "foil set",
+    ],
+    reward: "รออัปเดตรางวัลจากประกาศทางการ",
+    rewardAliases: [],
+    level: "กติกาพิเศษ (Foil Collection)",
+    rarity: "ฟอยล์",
+    cardCount: 36,
+    cards: [
+      "ใช้การ์ดฟอยล์แบบเดียวกันและหมายเลขเดียวกัน 1 แบบเท่านั้น แล้วสะสมใบนั้นซ้ำให้ครบ 36 ใบ",
+      "ไม่ต้องผสมหลายหมายเลข เลือกการ์ดฟอยล์แบบใดก็ได้ 1 หมายเลข แล้วเก็บซ้ำใบเดิมให้ครบตามจำนวน",
+    ],
+    cardNumberLines: [],
+    rule:
+      "เซ็ต 27 เป็นกติกาพิเศษ: ใช้การ์ดฟอยล์ในเซ็ตนี้แบบไหนก็ได้ 1 แบบหมายเลขเท่านั้น และใช้ใบนั้นซ้ำกันให้ครบ 36 ใบจึงเสร็จสิ้น",
+    statusNote: "ชื่อเซ็ตอย่างเป็นทางการและรางวัลจะอัปเดตภายหลัง แต่กติกาฟอยล์ 36 ใบให้ยึดตามนี้",
+    sourceUrl: COLLECTION_SOURCE_URL,
+  },
 ];
 
 const BLAZE_COLLECTION_REWARD_INDEX = buildCollectionCanonicalIndex();
@@ -552,22 +600,36 @@ function buildCollectionCanonicalIndex() {
     `- Total collection sets: ${COLLECTION_SETS.length}`,
     ...COLLECTION_SETS.map((set) => `- ${formatCollectionSetSummary(set)}`),
     `- Reward groups: ${rewardLines.join("; ")}`,
+    "- Canonical update: NEXORA now has 27 collection sets in the AI index. Sets 20-26 are known set numbers pending official names, rewards, and card lists. Do not invent those missing details.",
+    "- Canonical update: Set 27 is a special foil collection rule: choose any one foil card type with one card number, then collect that exact same foil card number repeatedly until reaching 36 copies. Do not treat the number 36 as a card number.",
     "- Canonical rule: ถ้าถามว่าเซ็ตใดตรงกับรางวัลใด ให้ใช้ดัชนีนี้ก่อน DATA/web snippet เสมอ และตอบครบทุกเซ็ตที่ match",
     "- Canonical rule: ถ้าถามภาพรวมชุดสะสม ให้ตอบจำนวนเซ็ตและชื่อ/เลขเซ็ตก่อน ไม่ต้องยกตัวอย่างการ์ด เว้นแต่ผู้ใช้ถามรายละเอียดหรือถามว่าในเซ็ตมีการ์ดอะไร",
   ].join("\n");
 }
 
+function formatCollectionSetOverview(set: CollectionSetRecord) {
+  const alias = set.name === `ชุดการ์ดสะสมที่ ${set.id}` ? "" : ` / ${set.name}`;
+  const note = set.statusNote ? ` (${set.statusNote})` : "";
+  return `Set ${set.id} / ชุดการ์ดสะสมที่ ${set.id}${alias}${note}`;
+}
+
 function formatCollectionSetSummary(set: CollectionSetRecord) {
   const alias = set.name === `ชุดการ์ดสะสมที่ ${set.id}` ? "" : ` / ${set.name}`;
-  return `Set ${set.id} / ชุดการ์ดสะสมที่ ${set.id}${alias}: ${set.level}, ${set.rarity}, ${set.cardCount} ใบ, reward ${set.reward}`;
+  const rule = set.rule ? `, rule ${set.rule}` : "";
+  const note = set.statusNote ? `, note ${set.statusNote}` : "";
+  return `Set ${set.id} / ชุดการ์ดสะสมที่ ${set.id}${alias}: ${set.level}, ${set.rarity}, ${set.cardCount} ใบ, reward ${set.reward}${rule}${note}`;
 }
 
 function formatCollectionSetDetail(set: CollectionSetRecord) {
   return [
     formatCollectionSetSummary(set),
     `รายการการ์ด: ${set.cards.join(" | ")}`,
+    set.rule ? `กติกาพิเศษ: ${set.rule}` : "",
+    set.statusNote ? `หมายเหตุ: ${set.statusNote}` : "",
     `แหล่งข้อมูล: ${set.sourceUrl}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function collectionSearchText(set: CollectionSetRecord) {
@@ -581,6 +643,8 @@ function collectionSearchText(set: CollectionSetRecord) {
       set.reward,
       set.level,
       set.rarity,
+      set.rule,
+      set.statusNote,
       ...set.aliases,
       ...set.rewardAliases,
       ...set.cards,
@@ -753,7 +817,7 @@ function buildDirectCollectionReply(message: string) {
     return enforceBlazeStyle(
       [
         `ชุดการ์ดสะสม NEXORA มีทั้งหมด ${COLLECTION_SETS.length} เซ็ต`,
-        ...COLLECTION_SETS.map((set) => formatCollectionSetSummary(set)),
+        ...COLLECTION_SETS.map((set) => formatCollectionSetOverview(set)),
       ].join("\n")
     );
   }
@@ -920,7 +984,8 @@ function buildDirectNexPointRewardCouponReply(message: string) {
 }
 
 function extractCardNumbersFromCollectionSet(set: CollectionSetRecord) {
-  return set.cards.flatMap((line) =>
+  const lines = set.cardNumberLines ?? set.cards;
+  return lines.flatMap((line) =>
     Array.from(line.matchAll(/\b0*([1-9]\d{0,2})\b/g))
       .map((match) => normalizeCardNumber(match[1] || ""))
       .filter(Boolean)
@@ -1845,7 +1910,7 @@ const BLAZE_CORE_KNOWLEDGE = [
   "- รางวัลในแอพ NEX POINT: มีรางวัลให้แลกหลากหลาย ตั้งแต่รางวัลเล็ก รางวัลลิมิเต็ดจำนวนจำกัดจาก NEXORA แบบใครแลกก่อนได้ก่อนจนกว่าคูปองหมด ไปจนถึงรางวัลใหญ่ วิธีแลกรางวัลจริงคือกดแลกในแอพให้ได้คูปองก่อน จากนั้นนำคูปองมาแสดงที่หน้าร้าน พนักงานจะสแกนหรือยิง QR Code บนคูปองเพื่อยืนยันการใช้งาน เมื่อยืนยันแล้วบริษัทจะดำเนินการหัก ณ ที่จ่ายสำหรับการแลกรางวัลตามกฎหมาย แล้วจึงมอบรางวัลให้ลูกค้าเป็นอันเสร็จสิ้น",
   `- ขั้นตอนการแลกแต้ม NEX / COIN เข้าระบบ NEX POINT: ลูกค้าต้องนำการ์ดจริงมาให้บริษัทตรวจสอบก่อนเพิ่มแต้ม สามารถนำการ์ดมาที่หน้าร้านเองหรือส่งมาทางขนส่งได้ แต่ถ้าส่งมาลูกค้าต้องรับความเสี่ยงเรื่องสภาพการ์ดจากขนส่งเอง บริษัทจะถ่ายวิดีโอขณะเปิดกล่องพัสดุและตรวจสภาพการ์ดอย่างละเอียดให้ลูกค้าดู หากการ์ดเป็นของแท้และสภาพสมบูรณ์ 90-100% บริษัทจะเพิ่มแต้มเข้าบัญชีในแอพ NEX POINT ให้ทันที ทางที่ดีที่สุดคือมาหน้าร้านด้วยตนเองเพื่อความปลอดภัยของการ์ด พิกัดหน้าร้าน: ${POINT_REDEMPTION_LOCATION_URL}`,
   "- การ์ดหายากพิเศษบางใบสามารถนำมาแลกเป็นการ์ดซิลเวอร์จำนวนมากได้ เช่น 200,000 / 100,000 / 80,000 / 70,000 / 60,000 / 40,000 / 30,000 / 25,000 / 20,000 / 15,000 / 10,000 / 5,000 / 3,000 ตามรายการที่บริษัทกำหนด",
-  "- Collection: ผู้เล่นสะสมการ์ดให้ครบ Set เพื่อปลดล็อกรางวัล. The Five Concordants เป็นเซ็ต Mythic 5 ดาว จำนวน 15 ใบ แลกซิลเวอร์ 1,500,000 ใบ. เซ็ต Mythic 5 ใบลำดับ 6-10 แลกซิลเวอร์ 1,000,000 ใบ",
+  "- Collection: ผู้เล่นสะสมการ์ดให้ครบ Set เพื่อปลดล็อกรางวัล. ฐาน canonical ตอนนี้มีชุดการ์ดสะสมทั้งหมด 27 เซ็ต. เซ็ต 1-19 มีรายละเอียดจากหน้า card-collections แล้ว, เซ็ต 20-26 มีเลขเซ็ตในฐานแต่รอชื่อ/รางวัล/รายการการ์ดทางการ, และเซ็ต 27 เป็นกติกาพิเศษแบบฟอยล์: เลือกการ์ดฟอยล์แบบใดก็ได้ 1 แบบหมายเลขเดียวกัน แล้วสะสมใบนั้นซ้ำให้ครบ 36 ใบ",
   "- Battle: มี 3 โหมดหลัก 13 เกม. Easy: RPS Battle, Hand of Fate RPS, Ultimate RPS Showdown, Rock Paper Scissors Royale. Normal: Elemental Chain, Triple Conflict, Decurion Conquest, Power Clash, Power Synergy Battle. Hard: Triad Dominion, Pentad Dominion, Heptad Dominion, Ennead Dominion",
   "- กติกาบนเว็บระบุชัดว่าใช้เพื่อการสะสมและความบันเทิง ห้ามนำไปใช้ในเชิงการพนันหรือการเดิมพันทุกกรณี. เมื่อตอบเรื่องดวลต้องย้ำจุดนี้",
   "- งานเปิดตัว NEXORA: ลงทะเบียนฟรี มีสิทธิ์รับซองสุ่ม 1 ซอง 7 ใบ, สุ่มเสื้อและเข็มกลัด Limited, ทดลองเล่นกับทีมงาน, ลุ้นรางวัล, ซื้อสินค้า First Release, พบทีมผู้สร้าง. ข้อมูลเดิมใน DATA ระบุสถานที่ตลาด Black Market สมุทรปราการ และช่วง 28 มีนาคม 2569 - 1 เมษายน 2569",
