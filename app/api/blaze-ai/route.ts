@@ -1847,6 +1847,10 @@ function getCardAdviceIntent(message: string) {
 }
 
 function isCardSkillSearchQuestion(message: string) {
+  if (isPlainCardStatExtremeQuestion(message)) {
+    return false;
+  }
+
   if (extractExplicitCardNumber(message)) {
     return false;
   }
@@ -2968,10 +2972,66 @@ function getRequestedStatDirection(message: string): "highest" | "lowest" | "" {
   return "";
 }
 
+function isPlainCardStatExtremeQuestion(message: string) {
+  const raw = message.toLowerCase();
+  const normalized = normalizeSearchText(message);
+  const hasStat =
+    /(?:^|\s)(?:atk|attack|sup|support)(?:\s|$)/i.test(raw) ||
+    normalized.includes("พลังโจมตี") ||
+    normalized.includes("ค่าโจมตี") ||
+    normalized.includes("พลังรับ") ||
+    normalized.includes("ค่ารับ") ||
+    normalized.includes("ซัพ") ||
+    normalized.includes("ซัพพอร์ต");
+  const hasExtreme =
+    raw.includes("สูงสุด") ||
+    raw.includes("มากสุด") ||
+    raw.includes("เยอะสุด") ||
+    raw.includes("ต่ำสุด") ||
+    raw.includes("น้อยสุด") ||
+    /\b(?:highest|max|top|lowest|min)\b/i.test(raw);
+  const hasSkillOrBuff =
+    raw.includes("สกิล") ||
+    raw.includes("ความสามารถ") ||
+    raw.includes("บัฟ") ||
+    raw.includes("เพิ่ม") ||
+    raw.includes("+") ||
+    /\b(?:skill|effect|ability|buff)\b/i.test(raw);
+
+  return hasStat && hasExtreme && !hasSkillOrBuff;
+}
+
 function isCardStatExtremeQuestion(message: string) {
-  const hasCardIntent = includesAnyThaiOrEnglish(message, ["การ์ด", "ใบ", "card"]);
+  if (isPlainCardStatExtremeQuestion(message)) {
+    return true;
+  }
+
+  const hasCardIntent = includesAnyThaiOrEnglish(message, [
+    "การ์ด",
+    "ใบ",
+    "ตัว",
+    "ตัวไหน",
+    "ตัวใด",
+    "ตัวอะไร",
+    "มอนสเตอร์",
+    "monster",
+    "card",
+  ]);
+  const hasSkillOrBuffIntent = includesAnyThaiOrEnglish(message, [
+    "สกิล",
+    "ความสามารถ",
+    "บัฟ",
+    "เพิ่ม",
+    "skill",
+    "effect",
+    "ability",
+    "buff",
+    "+",
+  ]);
+
   return Boolean(
-    hasCardIntent &&
+    !hasSkillOrBuffIntent &&
+      hasCardIntent &&
       getRequestedCardStat(message) &&
       getRequestedStatDirection(message)
   );
