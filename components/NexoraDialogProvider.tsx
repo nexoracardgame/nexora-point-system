@@ -90,12 +90,23 @@ function isDangerMessage(message: string) {
   return /ลบ|ยกเลิก|delete|remove|cancel/i.test(message);
 }
 
+function isFailureMessage(message: string) {
+  return /ไม่สำเร็จ|ไม่พอ|ผิดพลาด|ล้มเหลว|ไม่ถูกต้อง|failed|failure|fail|error|invalid/i.test(
+    message
+  );
+}
+
 function isSuccessMessage(message: string) {
+  if (isFailureMessage(message)) {
+    return false;
+  }
+
   return /สำเร็จ|success|เรียบร้อย/i.test(message);
 }
 
 function inferTone(message: string, preferred?: NexoraDialogTone) {
   if (preferred) return preferred;
+  if (isFailureMessage(message)) return "danger";
   if (isDangerMessage(message)) return "danger";
   if (isSuccessMessage(message)) return "success";
   return "info";
@@ -136,6 +147,8 @@ export default function NexoraDialogProvider() {
               ? "กรอกข้อมูล"
               : options.kind === "confirm"
                 ? "ยืนยันการทำรายการ"
+                : isFailureMessage(message)
+                  ? "ไม่สำเร็จ"
                 : isSuccessMessage(message)
                   ? "สำเร็จ"
                   : "แจ้งเตือน"),

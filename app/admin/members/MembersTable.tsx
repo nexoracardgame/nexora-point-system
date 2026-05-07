@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { nexoraAlert } from "@/lib/nexora-dialog";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
 type UserRow = {
@@ -21,7 +22,7 @@ function normalizeSearch(value: string) {
 }
 
 function parseAdminAdjustment(value: string | undefined, label: string, integerOnly = false) {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().replace(/[−–—]/g, "-").replace(/,/g, "");
 
   if (!raw) {
     return null;
@@ -34,6 +35,29 @@ function parseAdminAdjustment(value: string | undefined, label: string, integerO
   }
 
   return amount;
+}
+
+function formatSignedAdjustment(asset: "NEX" | "COIN", amount: number) {
+  const action = amount < 0 ? "ลด" : "เพิ่ม";
+  return `${action} ${asset} ${Math.abs(amount).toLocaleString("th-TH")} สำเร็จ`;
+}
+
+function getAdjustmentDialogMeta(nexAmount: number | null, coinAmount: number | null) {
+  const amounts = [nexAmount, coinAmount].filter(
+    (amount): amount is number => amount !== null
+  );
+  const hasDecrease = amounts.some((amount) => amount < 0);
+  const hasIncrease = amounts.some((amount) => amount > 0);
+
+  return {
+    title:
+      hasDecrease && !hasIncrease
+        ? "ลดแต้มสำเร็จ"
+        : hasDecrease && hasIncrease
+          ? "อัปเดตแต้มสำเร็จ"
+          : "สำเร็จ",
+    tone: hasDecrease ? ("warning" as const) : ("success" as const),
+  };
 }
 
 export default function MembersTable({ users }: { users: UserRow[] }) {
@@ -83,27 +107,36 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
 
     try {
       setLoadingId(lineId);
-      if (nexAmount !== null) {
-        const nexRes = await fetch("/api/admin/members/update-nex", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lineId, amount: nexAmount }),
-        });
-        const nexData = await nexRes.json().catch(() => ({}));
-        if (!nexRes.ok) throw new Error(nexData.error || "อัปเดต NEX ไม่สำเร็จ");
+      const response = await fetch("/api/admin/members/adjust-wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineId,
+          nexAmount,
+          coinAmount,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.success) {
+        throw new Error(data.error || "อัปเดตแต้มไม่สำเร็จ");
       }
-      if (coinAmount !== null) {
-        const coinRes = await fetch("/api/admin/members/update-coin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lineId, amount: coinAmount }),
-        });
-        const coinData = await coinRes.json().catch(() => ({}));
-        if (!coinRes.ok) throw new Error(coinData.error || "อัปเดต COIN ไม่สำเร็จ");
-      }
+
+      const message = [
+        nexAmount !== null ? formatSignedAdjustment("NEX", nexAmount) : "",
+        coinAmount !== null ? formatSignedAdjustment("COIN", coinAmount) : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const dialogMeta = getAdjustmentDialogMeta(nexAmount, coinAmount);
+
       setNexInputs((prev) => ({ ...prev, [lineId]: "" }));
       setCoinInputs((prev) => ({ ...prev, [lineId]: "" }));
       router.refresh();
+      await nexoraAlert({
+        title: dialogMeta.title,
+        message,
+        tone: dialogMeta.tone,
+      });
     } catch (error) {
       alert(error instanceof Error ? error.message : "อัปเดตแต้มไม่สำเร็จ");
     } finally {
@@ -177,16 +210,16 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
               value={nexInputs[user.lineId] || ""}
               onChange={(e) => setNexInputs((prev) => ({ ...prev, [user.lineId]: e.target.value }))}
               placeholder="เพิ่ม / ลด NEX"
-              type="number"
-              step="any"
+              type="text"
+              inputMode="decimal"
               className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
             />
             <input
               value={coinInputs[user.lineId] || ""}
               onChange={(e) => setCoinInputs((prev) => ({ ...prev, [user.lineId]: e.target.value }))}
               placeholder="เพิ่ม / ลด COIN"
-              type="number"
-              step="1"
+              type="text"
+              inputMode="decimal"
               className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
             />
             <button
