@@ -791,6 +791,10 @@ function hasCollectionIntent(message: string) {
 function wantsCollectionCardList(message: string) {
   const text = normalizeSearchText(message);
   return [
+    "มีใบ",
+    "มีใบอะไร",
+    "ใบอะไร",
+    "ใบอะไรบ้าง",
     "มีการ์ด",
     "การ์ดอะไร",
     "ใบไหน",
@@ -899,7 +903,9 @@ function buildDirectCollectionReply(message: string) {
   const rewardFilter = extractRewardFilter(message);
   const collectionIntent = hasCollectionIntent(message);
   const overview = wantsCollectionOverview(message);
-  const wantsCards = wantsCollectionCardList(message);
+  const wantsCards =
+    wantsCollectionCardList(message) ||
+    Boolean(setId && /\b(?:มี)?อะไรบ้าง\b|อะไรบ้าง|ข้างใน|ประกอบด้วย/u.test(message));
 
   if (!collectionIntent && hasSingleCardRewardIntent(message)) {
     return "";
