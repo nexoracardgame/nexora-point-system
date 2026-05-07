@@ -4223,6 +4223,7 @@ async function askAppsScriptBridge({
         },
         body: JSON.stringify({
           mode: "chat",
+          fromCentralBrain: true,
           clientId,
           message: buildScriptBridgeMessage({
             message,

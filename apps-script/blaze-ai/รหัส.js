@@ -7,6 +7,7 @@ function doGet() {
 // ================== CONFIG ==================
 const SHEET_ID = "1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg";
 const DATA_SHEET_NAME = "DATA";
+const BLAZE_CENTRAL_BRAIN_URL = "https://nexora-point-system.vercel.app/api/blaze-ai";
 
 // แชท / vision
 const CHAT_MODEL_NAME = "gemini-2.5-flash";
@@ -254,6 +255,49 @@ function fetchJson(url, headers) {
   }
 
   return JSON.parse(raw);
+}
+
+function askCentralBlazeBrain(message, history, clientId, imagePayload) {
+  try {
+    const payload = {
+      message: sanitizeText(message),
+      history: Array.isArray(history) ? history.slice(-10) : [],
+      clientId: sanitizeText(clientId) || "apps-script-blaze",
+      publicEmbed: true
+    };
+
+    if (imagePayload && imagePayload.base64Data && imagePayload.mimeType) {
+      payload.imagePayload = imagePayload;
+    }
+
+    const response = UrlFetchApp.fetch(BLAZE_CENTRAL_BRAIN_URL, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      followRedirects: true,
+      muteHttpExceptions: true
+    });
+    const code = response.getResponseCode();
+    const raw = response.getContentText();
+    let json;
+
+    try {
+      json = JSON.parse(raw);
+    } catch (parseError) {
+      Logger.log("Central Blaze brain invalid JSON: " + raw.slice(0, 300));
+      return "";
+    }
+
+    if (code < 200 || code >= 300 || !json || json.ok === false) {
+      Logger.log("Central Blaze brain HTTP " + code + ": " + raw.slice(0, 300));
+      return "";
+    }
+
+    return sanitizeText(json.reply || json.text || json.message || "");
+  } catch (error) {
+    Logger.log("Central Blaze brain skipped: " + String(error));
+    return "";
+  }
 }
 
 function buildGenerateContentUrl(modelName, apiKey) {
@@ -1744,6 +1788,26 @@ function askGemini(message, history, clientId, imagePayload, options) {
       throw new Error("MISSING_CLIENT_ID");
     }
 
+    if (!forceTextMode && !detectImageGenerationRequest(cleanMessage, hasImage)) {
+      const centralReply = askCentralBlazeBrain(
+        cleanMessage,
+        history || [],
+        cleanClientId,
+        hasImage ? imagePayload : null
+      );
+
+      if (centralReply) {
+        if (cleanMessage) {
+          saveMemory(cleanClientId, "user", cleanMessage);
+        } else if (hasImage) {
+          saveMemory(cleanClientId, "user", "[แนบรูปภาพ]");
+        }
+
+        saveMemory(cleanClientId, "model", centralReply);
+        return centralReply;
+      }
+    }
+
     const apiKey = getApiKey();
     if (!apiKey) {
       throw new Error("MISSING_API_KEY");
@@ -2088,7 +2152,7 @@ function doPost(e) {
       const apiClientId = String(data.clientId || "nexora-web");
       const apiHistory = normalizeApiHistory(data.history || []);
       const apiReply = askGemini(apiMessage, apiHistory, apiClientId, null, {
-        forceTextMode: true
+        forceTextMode: data.fromCentralBrain === true
       });
       const apiTextReply = normalizeApiReply(apiReply);
 
