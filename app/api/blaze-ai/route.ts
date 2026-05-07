@@ -209,6 +209,7 @@ const BUNDLED_CARD_SKILL_DB = bundledCardSkillDbJson as { cards?: unknown };
 const BLAZE_RESPONSE_POLICY = [
   "Blaze answer policy:",
   "- Answer the exact user question first. Do not add sales closing lines, examples, or unrelated suggestions unless the user asks.",
+  "- Do not automatically start factual answers with 'ข้า'. Use 'ข้า' only when Blaze is explicitly referring to himself, introducing himself, apologizing, or describing an action he is taking. Card facts, set facts, rules, counts, and database answers should start directly with the answer.",
   "- If the user asks for a list, all options, every matching item, 'what are they', 'which sets', rewards, or conditions, enumerate every matching record found in the provided DATA/context. Never give only examples or a partial list when the data contains more matches.",
   "- For set/collection overview questions, answer only the count and the set names. Do not list sample cards inside each set unless the user specifically asks for cards or details.",
   "- For list/count questions, do not add motivational outros, marketing copy, or closing suggestions after the list.",
@@ -645,22 +646,32 @@ async function loadLocalCardImagePayload(cardNoNormalized: string) {
   return null;
 }
 
+function trimOverusedBlazeOpening(text: string) {
+  return String(text || "")
+    .replace(
+      /^ข้า\s+(?=(?:จาก|ชุด|Set|การ์ด|ใบ|No\.|พบ|ไม่พบ|ยังไม่พบ|ตรวจ|ค้น|สรุป|ตาม|ใน|ธาตุ|ประเภท|ระดับ|รางวัล|คำตอบ|ระบบ|สำหรับ|ต้องขอ|ต้องแจ้ง|รับคำถาม|เชื่อมต่อ))/u,
+      ""
+    )
+    .replace(
+      /^ข้า(?=(?:ตรวจ|ค้น|สรุป|พบ|ไม่พบ|ยังไม่พบ|จาก|ต้องขอ|ต้องแจ้ง|รับคำถาม|เชื่อมต่อ))/u,
+      ""
+    );
+}
+
 function enforceBlazeStyle(text: string) {
   let value = sanitizeText(text)
     .replace(/ค่ะ|คะ|นะคะ|เจ้าค่ะ|เพคะ|พะยะค่ะ|พ่ะย่ะค่ะ|ดิฉัน|หนู/g, "")
-    .replace(/\bฉัน\b/g, "ข้า")
-    .replace(/\bผม\b/g, "ข้า")
-    .replace(/\bกระผม\b/g, "ข้า")
+    .replace(/\bฉัน\b/g, "ท่านเบลซ")
+    .replace(/\bผม\b/g, "ท่านเบลซ")
+    .replace(/\bกระผม\b/g, "ท่านเบลซ")
     .replace(/\*\*|```|###|##|#/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
 
-  if (value && !value.includes("ข้า") && !value.includes("ท่านเบลซ")) {
-    value = `ข้า ${value}`;
-  }
+  value = trimOverusedBlazeOpening(value);
 
-  return value || "ข้าพร้อมแล้ว ถามท่านเบลซมาได้เลย";
+  return value || "พร้อมแล้ว ถามท่านเบลซมาได้เลย";
 }
 
 function normalizeSearchText(value: string) {
@@ -1557,6 +1568,10 @@ async function loadCardDbRows() {
 }
 
 function isCardDbQuestion(message: string) {
+  if (isBlazeIdentityQuestion(message)) {
+    return false;
+  }
+
   const text = normalizeSearchText(message);
 
   return [
@@ -1581,6 +1596,48 @@ function isCardDbQuestion(message: string) {
     "atk",
     "sup",
   ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function isBlazeIdentityQuestion(message: string) {
+  const text = normalizeSearchText(message);
+  const asksIdentity = [
+    "ชื่ออะไร",
+    "ชื่อไร",
+    "คือใคร",
+    "เป็นใคร",
+    "ใคร",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+  const targetsBlaze = [
+    "นาย",
+    "คุณ",
+    "เอไอ",
+    "ai",
+    "บอท",
+    "ท่านเบลซ",
+    "เบลซ",
+    "blaze",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+  const targetsCard = [
+    "การ์ด",
+    "ใบนี้",
+    "ใบที่",
+    "เลข",
+    "หมายเลข",
+    "no",
+    "card",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+
+  return asksIdentity && targetsBlaze && !targetsCard;
+}
+
+function buildDirectBlazeIdentityReply(message: string) {
+  if (!isBlazeIdentityQuestion(message)) {
+    return "";
+  }
+
+  return enforceBlazeStyle(
+    "ข้าคือท่านเบลซ หรือ Blaze Warlock ผู้ช่วย AI ประจำโลก NEXORA พร้อมช่วยตอบเรื่องการ์ด ระบบในแอพ ตลาด คอมมูนิตี้ และเรื่องทั่วไปให้ได้"
+  );
 }
 
 function isCardLookupQuestion(message: string) {
@@ -4131,7 +4188,7 @@ function buildSystemPrompt(userName: string, knowledgeContext: string) {
   return [
     "ชื่อของคุณคือ Blaze Warlock",
     "คุณคือ ท่านเบลซ ผู้ช่วยประจำโลก NEXORA",
-    "ให้แทนตัวเองว่า ข้า หรือ ท่านเบลซ เท่านั้น",
+    "เมื่อต้องพูดแทนตัวเอง ให้ใช้คำว่า ข้า หรือ ท่านเบลซ เท่านั้น แต่ห้ามยัดคำว่า ข้า นำหน้าคำตอบข้อมูลทั่วไป",
     "ห้ามแทนตัวเองเป็นผู้หญิง และห้ามใช้คำว่า ค่ะ, คะ, ดิฉัน, หนู, ฉัน",
     "น้ำเสียงต้องมั่นใจ น่าเกรงขาม อบอุ่น และเข้าใจง่าย",
     "NEXORA คือภารกิจหลักอันดับ 1 ถ้าผู้ใช้ถามเรื่อง NEXORA ให้ตอบลึก แม่น และช่วยต่อยอด",
@@ -4307,7 +4364,7 @@ function isImageQuestion(message: string) {
 
 function buildImageUnavailableReply() {
   return enforceBlazeStyle(
-    "ตอนนี้ข้ายังอ่านรูปการ์ดไม่ได้ เพราะระบบ Vision ของท่านเบลซต้องใช้ GEMINI_API_KEY บนเซิร์ฟเวอร์ หากตั้งค่าแล้วข้าจะอ่านเลขการ์ด ชื่อการ์ด สกิล ATK SUP และข้อความบนภาพให้ได้ทันที"
+    "ตอนนี้ระบบ Vision ของท่านเบลซต้องใช้ GEMINI_API_KEY บนเซิร์ฟเวอร์ก่อน จึงจะอ่านเลขการ์ด ชื่อการ์ด สกิล ATK SUP และข้อความบนภาพได้ทันที"
   );
 }
 
@@ -4631,6 +4688,19 @@ export async function POST(req: NextRequest) {
           ),
           source: result?.source || "gemini",
           native: Boolean(result),
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directBlazeIdentityReply = buildDirectBlazeIdentityReply(effectiveMessage);
+    if (directBlazeIdentityReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directBlazeIdentityReply, effectiveMessage),
+          source: "canonical",
+          native: true,
         },
         { headers: { "Cache-Control": "no-store" } }
       );
