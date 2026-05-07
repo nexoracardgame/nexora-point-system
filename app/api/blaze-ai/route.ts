@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -22,6 +24,7 @@ const SITE_CACHE_MS = 30 * 60 * 1000;
 const MAX_SHEET_CONTEXT_CHARS = 60000;
 const MAX_CARD_DB_CONTEXT_CHARS = 50000;
 const MAX_SITE_CONTEXT_CHARS = 30000;
+const CARD_IMAGE_SCAN_CACHE_MS = 24 * 60 * 60 * 1000;
 
 type BlazeHistoryItem = {
   role: "user" | "model";
@@ -30,6 +33,10 @@ type BlazeHistoryItem = {
 
 type GeminiPart = {
   text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
 };
 
 type GeminiCandidate = {
@@ -53,6 +60,13 @@ type KnowledgeRow = {
   notes: string;
 };
 
+type BlazeImagePayload = {
+  mimeType: string;
+  base64Data: string;
+  size: number;
+  name: string;
+};
+
 type CardDbRow = {
   cardNo: string;
   cardNoNormalized: string;
@@ -60,6 +74,9 @@ type CardDbRow = {
   reward: string;
   value: string;
   imageUrl: string;
+  skill: string;
+  atk: string;
+  sup: string;
   searchText: string;
 };
 
@@ -156,6 +173,7 @@ const OFFICIAL_SITE_PAGES = [
 let sheetKnowledgeCache: KnowledgeCache | null = null;
 let cardDbCache: CardDbCache | null = null;
 const siteKnowledgeCache = new Map<string, SiteCacheEntry>();
+const cardImageScanCache = new Map<string, SiteCacheEntry>();
 
 const BLAZE_RESPONSE_POLICY = [
   "Blaze answer policy:",
@@ -521,6 +539,74 @@ function normalizeHistory(value: unknown): BlazeHistoryItem[] {
     })
     .filter(Boolean)
     .slice(-MAX_HISTORY_ITEMS) as BlazeHistoryItem[];
+}
+
+function normalizeImagePayload(value: unknown): BlazeImagePayload | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const mimeType = sanitizeText(record.mimeType).toLowerCase();
+  const rawBase64 = sanitizeText(record.base64Data);
+  const base64Data = rawBase64.includes(",")
+    ? rawBase64.slice(rawBase64.indexOf(",") + 1)
+    : rawBase64;
+  const size = Math.max(0, Number(record.size || 0) || 0);
+  const name = sanitizeText(record.name) || "card-image";
+
+  if (!mimeType.startsWith("image/") || !base64Data) {
+    return null;
+  }
+
+  if (size > 8 * 1024 * 1024 || base64Data.length > 11_500_000) {
+    throw new Error("รูปใหญ่เกินไป กรุณาใช้รูปไม่เกิน 8MB หลังบีบอัด");
+  }
+
+  return {
+    mimeType,
+    base64Data,
+    size,
+    name,
+  };
+}
+
+async function loadLocalCardImagePayload(cardNoNormalized: string) {
+  const cleanNo = sanitizeText(cardNoNormalized).padStart(3, "0");
+
+  if (!/^\d{3}$/.test(cleanNo)) {
+    return null;
+  }
+
+  const candidates = [
+    { ext: "jpg", mimeType: "image/jpeg" },
+    { ext: "jpeg", mimeType: "image/jpeg" },
+    { ext: "png", mimeType: "image/png" },
+    { ext: "webp", mimeType: "image/webp" },
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const filePath = path.join(
+        process.cwd(),
+        "public",
+        "cards",
+        `${cleanNo}.${candidate.ext}`
+      );
+      const buffer = await readFile(filePath);
+
+      return {
+        mimeType: candidate.mimeType,
+        base64Data: buffer.toString("base64"),
+        size: buffer.byteLength,
+        name: `${cleanNo}.${candidate.ext}`,
+      };
+    } catch {
+      // Try the next supported image extension.
+    }
+  }
+
+  return null;
 }
 
 function enforceBlazeStyle(text: string) {
@@ -1178,6 +1264,9 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
   ]);
   const rewardIndex = findIndex(["reward", "รางวัล"]);
   const valueIndex = findIndex(["value", "rarity", "ระดับ", "ชนิด"]);
+  const skillIndex = findIndex(["skill", "skills", "ability", "effect", "สกิล", "ความสามารถ"]);
+  const atkIndex = findIndex(["atk", "attack", "โจมตี", "พลังโจมตี"]);
+  const supIndex = findIndex(["sup", "support", "สนับสนุน", "พลังสนับสนุน"]);
   const imageIndex = findIndex([
     "image_url",
     "image",
@@ -1203,9 +1292,12 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
 
       const reward = sanitizeText(row[rewardIndex]);
       const value = sanitizeText(row[valueIndex]);
+      const skill = sanitizeText(row[skillIndex]);
+      const atk = sanitizeText(row[atkIndex]);
+      const sup = sanitizeText(row[supIndex]);
       const imageUrl = sanitizeText(row[imageIndex]);
       const searchText = normalizeSearchText(
-        `${cardNo} ${cardNoNormalized} ${cardName} ${reward} ${value}`
+        `${cardNo} ${cardNoNormalized} ${cardName} ${reward} ${value} ${skill} ${atk} ${sup}`
       );
 
       return {
@@ -1215,6 +1307,9 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
         reward,
         value,
         imageUrl,
+        skill,
+        atk,
+        sup,
         searchText,
       };
     })
@@ -1280,6 +1375,12 @@ function isCardDbQuestion(message: string) {
     "ระดับ",
     "rarity",
     "value",
+    "สกิล",
+    "ความสามารถ",
+    "skill",
+    "ability",
+    "atk",
+    "sup",
   ].some((keyword) => text.includes(normalizeSearchText(keyword)));
 }
 
@@ -1296,6 +1397,12 @@ function isCardLookupQuestion(message: string) {
     "rarity",
     "value",
     "no",
+    "สกิล",
+    "ความสามารถ",
+    "skill",
+    "ability",
+    "atk",
+    "sup",
   ].some((keyword) => text.includes(normalizeSearchText(keyword)));
   const looksLikeCountQuestion = [
     "ทั้งหมด",
@@ -1462,6 +1569,23 @@ function wantsCardValue(message: string) {
   return text.includes("ระดับ") || text.includes("rarity") || text.includes("value");
 }
 
+function wantsCardSkillStats(message: string) {
+  const text = normalizeSearchText(message);
+  return [
+    "สกิล",
+    "ความสามารถ",
+    "skill",
+    "ability",
+    "effect",
+    "atk",
+    "attack",
+    "โจมตี",
+    "sup",
+    "support",
+    "สนับสนุน",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
 function wantsCardCollection(message: string) {
   return hasCollectionIntent(message);
 }
@@ -1470,8 +1594,29 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   const wantsName = wantsCardName(message);
   const wantsReward = wantsCardReward(message);
   const wantsValue = wantsCardValue(message);
+  const wantsSkillStats = wantsCardSkillStats(message);
   const wantsCollection = wantsCardCollection(message);
   const memberships = formatCardCollectionMemberships(row.cardNoNormalized);
+
+  const skillLines = [
+    `สกิล/ความสามารถ: ${row.skill || "ยังไม่มีข้อมูลใน Card DB"}`,
+    `ATK: ${row.atk || "ยังไม่มีข้อมูลใน Card DB"}`,
+    `SUP: ${row.sup || "ยังไม่มีข้อมูลใน Card DB"}`,
+  ];
+
+  if (wantsSkillStats) {
+    return [
+      `การ์ด ${row.cardNo} ${row.cardName}`,
+      wantsValue ? `ระดับ: ${row.value || "-"}` : "",
+      wantsReward ? `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}` : "",
+      ...skillLines,
+      !row.skill && !row.atk && !row.sup
+        ? "ถ้าผู้ใช้แนบรูปการ์ดมา ข้าจะอ่านสกิล ATK และ SUP จากภาพให้โดยตรง"
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
 
   if (wantsCollection && !wantsReward && !wantsValue) {
     return [
@@ -1510,6 +1655,9 @@ function formatCardDbRow(row: CardDbRow, message: string) {
     `การ์ด ${row.cardNo}`,
     `ชื่อ: ${row.cardName}`,
     `ระดับ: ${row.value || "-"}`,
+    row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
+    row.atk ? `ATK: ${row.atk}` : "",
+    row.sup ? `SUP: ${row.sup}` : "",
     `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
     memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
   ]
@@ -1517,26 +1665,149 @@ function formatCardDbRow(row: CardDbRow, message: string) {
     .join("\n");
 }
 
+async function buildCardImageSkillScanReply(
+  row: CardDbRow,
+  message: string,
+  history: BlazeHistoryItem[],
+  userName: string
+) {
+  if (!wantsCardSkillStats(message) || !row.cardNoNormalized) {
+    return "";
+  }
+
+  if (row.skill && row.atk && row.sup) {
+    return "";
+  }
+
+  const cacheKey = `${row.cardNoNormalized}:${normalizeSearchText(message).slice(0, 180)}`;
+  const cached = cardImageScanCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.text;
+  }
+
+  const imagePayload = await loadLocalCardImagePayload(row.cardNoNormalized);
+  if (!imagePayload) {
+    return "";
+  }
+
+  const scanMessage = [
+    `ผู้ใช้ถามเรื่องสกิล/ATK/SUP ของการ์ด No.${row.cardNoNormalized}`,
+    `ข้อมูลจาก Card DB: No.${row.cardNo || row.cardNoNormalized} | ชื่อ ${row.cardName || "-"} | ระดับ ${row.value || "-"} | รางวัล ${row.reward || "-"}`,
+    "ให้ตรวจรูปการ์ด NEXORA ที่ระบบแนบจาก public/cards โดยอ่าน OCR จากรูปจริง",
+    "ตอบให้ตรงคำถามและครบเฉพาะข้อมูลที่เห็น: ชื่อการ์ด, เลขการ์ด, สกิล/ความสามารถ, ATK, SUP และถ้าจุดใดไม่ชัดให้บอกว่าอ่านไม่ชัด ห้ามเดา",
+    `คำถามผู้ใช้: ${message}`,
+  ].join("\n");
+
+  const result = await askNativeGemini({
+    message: scanMessage,
+    history: history.slice(-4),
+    userName,
+    knowledgeContext: [
+      "บริบทเฉพาะการ์ดจากฐานข้อมูล NEXORA:",
+      `No.${row.cardNo || row.cardNoNormalized}`,
+      `ชื่อ: ${row.cardName || "-"}`,
+      `ระดับ: ${row.value || "-"}`,
+      `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
+      "ถ้าข้อมูลสกิล/ATK/SUP ไม่มีในชีท ให้ยึดการอ่านจากรูปการ์ดที่แนบในคำขอนี้เท่านั้น",
+    ].join("\n"),
+    imagePayload,
+  }).catch((error) => {
+    console.warn("BLAZE card image scan fallback:", error);
+    return null;
+  });
+
+  const reply = result?.reply || "";
+  if (reply) {
+    cardImageScanCache.set(cacheKey, {
+      expiresAt: Date.now() + CARD_IMAGE_SCAN_CACHE_MS,
+      text: reply,
+    });
+  }
+
+  return reply;
+}
+
 async function buildDirectCardDbReply(
   message: string,
-  history: BlazeHistoryItem[]
+  history: BlazeHistoryItem[],
+  userName = "NEXORA User"
 ) {
   if (!isCardDbQuestion(message) || !isCardLookupQuestion(message)) {
     return "";
   }
 
+  const requestedCardNo = extractCardNumberFromConversation(message, history);
   const rows = await loadCardDbRows();
   if (!rows.length) {
+    if (requestedCardNo && wantsCardSkillStats(message)) {
+      const scannedReply = await buildCardImageSkillScanReply(
+        {
+          cardNo: requestedCardNo,
+          cardNoNormalized: requestedCardNo,
+          cardName: "",
+          reward: "",
+          value: "",
+          imageUrl: "",
+          skill: "",
+          atk: "",
+          sup: "",
+          searchText: requestedCardNo,
+        },
+        message,
+        history,
+        userName
+      );
+
+      if (scannedReply) {
+        return enforceBlazeStyle(scannedReply);
+      }
+    }
+
     return "";
   }
 
   const { exact, matches, cardNo } = findCardDbMatches(rows, message, history);
 
   if (exact) {
+    const scannedReply = await buildCardImageSkillScanReply(
+      exact,
+      message,
+      history,
+      userName
+    );
+
+    if (scannedReply) {
+      return enforceBlazeStyle(scannedReply);
+    }
+
     return enforceBlazeStyle(formatCardDbRow(exact, message));
   }
 
   if (cardNo) {
+    if (wantsCardSkillStats(message)) {
+      const scannedReply = await buildCardImageSkillScanReply(
+        {
+          cardNo,
+          cardNoNormalized: cardNo,
+          cardName: "",
+          reward: "",
+          value: "",
+          imageUrl: "",
+          skill: "",
+          atk: "",
+          sup: "",
+          searchText: cardNo,
+        },
+        message,
+        history,
+        userName
+      );
+
+      if (scannedReply) {
+        return enforceBlazeStyle(scannedReply);
+      }
+    }
+
     return enforceBlazeStyle(
       `ข้าไม่พบการ์ด No.${cardNo} ในฐานข้อมูลการ์ด 293 ใบตอนนี้`
     );
@@ -1575,8 +1846,11 @@ async function buildCardDbKnowledgeContext(
     [
       `- ${row.cardNo} | ${row.cardName}`,
       `ระดับ: ${row.value || "-"}`,
+      row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
+      row.atk ? `ATK: ${row.atk}` : "",
+      row.sup ? `SUP: ${row.sup}` : "",
       `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
-    ].join(" | ")
+    ].filter(Boolean).join(" | ")
   );
   let text = [
     `ฐานข้อมูลการ์ดจริงจาก Google Sheet CARD DB: พบ ${rows.length} ใบ`,
@@ -1997,11 +2271,13 @@ async function askNativeGemini({
   history,
   userName,
   knowledgeContext,
+  imagePayload,
 }: {
   message: string;
   history: BlazeHistoryItem[];
   userName: string;
   knowledgeContext: string;
+  imagePayload?: BlazeImagePayload | null;
 }): Promise<BlazeResult | null> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -2009,14 +2285,37 @@ async function askNativeGemini({
   }
 
   const modelName = process.env.BLAZE_AI_MODEL || DEFAULT_MODEL;
-  const contents = history.map((item) => ({
+  const contents: { role: "user" | "model"; parts: GeminiPart[] }[] = history.map((item) => ({
     role: item.role,
     parts: [{ text: item.text }],
   }));
 
+  const userParts: GeminiPart[] = [
+    {
+      text: imagePayload
+        ? [
+            "ผู้ใช้แนบรูปการ์ดหรือภาพที่ต้องการให้ตรวจสอบ",
+            "งานหลัก: อ่าน OCR จากภาพให้ละเอียดก่อนตอบ โดยเฉพาะเลขการ์ด ชื่อการ์ด สกิล/ความสามารถ ค่า ATK ค่า SUP ระดับ ธาตุ และข้อความเล็กบนการ์ด",
+            "ถ้าภาพเป็นการ์ด NEXORA ให้เทียบกับบริบท Card DB/ฐานความรู้เท่าที่มี แต่รายละเอียดที่เห็นจากภาพ เช่น สกิล ATK SUP ให้ยึดสิ่งที่อ่านได้จากภาพเป็นหลัก",
+            "ถ้ามองไม่ชัด ให้บอกตรง ๆ ว่าจุดไหนไม่ชัด ห้ามเดาตัวเลขหรือสกิล",
+            `คำถามของผู้ใช้: ${message || "วิเคราะห์รูปการ์ดนี้และอ่านรายละเอียดทั้งหมดที่เห็น"}`,
+          ].join("\n")
+        : `คำถามของผู้ใช้: ${message}`,
+    },
+  ];
+
+  if (imagePayload) {
+    userParts.push({
+      inlineData: {
+        mimeType: imagePayload.mimeType,
+        data: imagePayload.base64Data,
+      },
+    });
+  }
+
   contents.push({
     role: "user",
-    parts: [{ text: `คำถามของผู้ใช้: ${message}` }],
+    parts: userParts,
   });
 
   const response = await fetchWithTimeout(
@@ -2082,6 +2381,12 @@ function isImageQuestion(message: string) {
     "photo",
     "scan",
   ].some((keyword) => text.includes(keyword));
+}
+
+function buildImageUnavailableReply() {
+  return enforceBlazeStyle(
+    "ตอนนี้ข้ายังอ่านรูปการ์ดไม่ได้ เพราะระบบ Vision ของท่านเบลซต้องใช้ GEMINI_API_KEY บนเซิร์ฟเวอร์ หากตั้งค่าแล้วข้าจะอ่านเลขการ์ด ชื่อการ์ด สกิล ATK SUP และข้อความบนภาพให้ได้ทันที"
+  );
 }
 
 function isPlaceholderImageReply(reply: string, message: string) {
@@ -2360,6 +2665,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const imagePayload = normalizeImagePayload(
+      body?.imagePayload || body?.image || body?.attachment
+    );
     const message = sanitizeText(body?.message).slice(0, MAX_MESSAGE_LENGTH);
     fallbackMessage = message;
     const history = normalizeHistory(body?.history);
@@ -2368,20 +2676,50 @@ export async function POST(req: NextRequest) {
       sanitizeText(session?.user?.name) ||
       (publicEmbed ? "NEXORA Embed User" : "NEXORA User");
 
-    if (!message) {
+    if (!message && !imagePayload) {
       return NextResponse.json(
         { error: "กรุณาพิมพ์ข้อความก่อน" },
         { status: 400 }
       );
     }
 
+    const effectiveMessage =
+      message ||
+      "ช่วยสแกนรูปการ์ดนี้ อ่านเลขการ์ด ชื่อการ์ด สกิล ค่า ATK ค่า SUP ระดับ ธาตุ และข้อความทั้งหมดที่เห็น";
+
+    if (imagePayload) {
+      const knowledgeContext = await buildKnowledgeContext(effectiveMessage, history);
+      fallbackKnowledgeContext = knowledgeContext;
+
+      const result = await askNativeGemini({
+        message: effectiveMessage,
+        history,
+        userName,
+        knowledgeContext,
+        imagePayload,
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(
+            result?.reply || buildImageUnavailableReply(),
+            effectiveMessage
+          ),
+          source: result?.source || "gemini",
+          native: Boolean(result),
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
     const directNexPointRewardCouponReply =
-      buildDirectNexPointRewardCouponReply(message);
+      buildDirectNexPointRewardCouponReply(effectiveMessage);
     if (directNexPointRewardCouponReply) {
       return NextResponse.json(
         {
           ok: true,
-          reply: polishBlazeReply(directNexPointRewardCouponReply, message),
+          reply: polishBlazeReply(directNexPointRewardCouponReply, effectiveMessage),
           source: "canonical",
           native: true,
         },
@@ -2389,12 +2727,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const directPointRedemptionReply = buildDirectPointRedemptionReply(message);
+    const directPointRedemptionReply = buildDirectPointRedemptionReply(effectiveMessage);
     if (directPointRedemptionReply) {
       return NextResponse.json(
         {
           ok: true,
-          reply: polishBlazeReply(directPointRedemptionReply, message),
+          reply: polishBlazeReply(directPointRedemptionReply, effectiveMessage),
           source: "canonical",
           native: true,
         },
@@ -2402,12 +2740,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const directCollectionReply = buildDirectCollectionReply(message);
+    const directCollectionReply = buildDirectCollectionReply(effectiveMessage);
     if (directCollectionReply) {
       return NextResponse.json(
         {
           ok: true,
-          reply: polishBlazeReply(directCollectionReply, message),
+          reply: polishBlazeReply(directCollectionReply, effectiveMessage),
           source: "canonical",
           native: true,
         },
@@ -2415,12 +2753,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const directCardCollectionReply = buildDirectCardCollectionReply(message);
+    const directCardCollectionReply = buildDirectCardCollectionReply(effectiveMessage);
     if (directCardCollectionReply) {
       return NextResponse.json(
         {
           ok: true,
-          reply: polishBlazeReply(directCardCollectionReply, message),
+          reply: polishBlazeReply(directCardCollectionReply, effectiveMessage),
           source: "canonical",
           native: true,
         },
@@ -2428,12 +2766,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const directCardReply = await buildDirectCardDbReply(message, history);
+    const directCardReply = await buildDirectCardDbReply(
+      effectiveMessage,
+      history,
+      userName
+    );
     if (directCardReply) {
       return NextResponse.json(
         {
           ok: true,
-          reply: polishBlazeReply(directCardReply, message),
+          reply: polishBlazeReply(directCardReply, effectiveMessage),
           source: "card-db",
           native: true,
         },
@@ -2441,13 +2783,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const knowledgeContext = await buildKnowledgeContext(message, history);
+    const knowledgeContext = await buildKnowledgeContext(effectiveMessage, history);
     fallbackKnowledgeContext = knowledgeContext;
     let result: BlazeResult | null = null;
 
     try {
       result = await askNativeGemini({
-        message,
+        message: effectiveMessage,
         history,
         userName,
         knowledgeContext,
@@ -2459,15 +2801,15 @@ export async function POST(req: NextRequest) {
     result =
       result ||
       (await askAppsScriptBridge({
-        message,
+        message: effectiveMessage,
         history,
         clientId,
         knowledgeContext,
       }));
 
     const finalReply =
-      sanitizeText(polishBlazeReply(result.reply, message)) ||
-      buildBlazeSafeFallbackReply(message, knowledgeContext);
+      sanitizeText(polishBlazeReply(result.reply, effectiveMessage)) ||
+      buildBlazeSafeFallbackReply(effectiveMessage, knowledgeContext);
 
     return NextResponse.json(
       {

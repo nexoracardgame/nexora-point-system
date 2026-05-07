@@ -1,13 +1,16 @@
 "use client";
 
-import { Maximize2, Send, Sparkles } from "lucide-react";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { Image as ImageIcon, Maximize2, Send, Sparkles, X } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { prepareChatImageFile } from "@/lib/chat-image-client";
 
 type BlazeMessage = {
   id: string;
   role: "user" | "model";
   text: string;
   createdAt: string;
+  imageName?: string;
+  imagePreviewUrl?: string;
 };
 
 const BLAZE_AVATAR_URL = "https://s.imgz.io/2026/03/20/158-39efa94028226fea.png";
@@ -23,6 +26,29 @@ const WELCOME_MESSAGE: BlazeMessage = {
 
 function safeText(value: unknown) {
   return String(value || "").trim();
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("อ่านรูปไม่สำเร็จ"));
+    };
+
+    reader.onerror = () => reject(new Error("อ่านรูปไม่สำเร็จ"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function dataUrlToBase64(dataUrl: string) {
+  const commaIndex = dataUrl.indexOf(",");
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
 }
 
 function normalizeStoredMessage(value: unknown): BlazeMessage | null {
@@ -45,6 +71,7 @@ function normalizeStoredMessage(value: unknown): BlazeMessage | null {
     role,
     text,
     createdAt: safeText(record.createdAt) || new Date().toISOString(),
+    imageName: safeText(record.imageName) || undefined,
   };
 }
 
@@ -122,13 +149,20 @@ function buildEmbedFallbackReply(message: string) {
 export default function BlazeEmbedClient() {
   const [messages, setMessages] = useState<BlazeMessage[]>([WELCOME_MESSAGE]);
   const [draft, setDraft] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const clientIdRef = useRef("nexora-embed");
   const messagesViewportRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef(messages);
+  const imageFileRef = useRef<File | null>(null);
+  const imagePreviewUrl = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : ""),
+    [imageFile]
+  );
 
   function scrollChatToBottom() {
     const viewport = messagesViewportRef.current;
@@ -188,10 +222,14 @@ export default function BlazeEmbedClient() {
     }
 
     try {
+      const persistedMessages = withWelcome(messages).map(
+        ({ imagePreviewUrl: _imagePreviewUrl, ...message }) => message
+      );
+
       window.sessionStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          messages: withWelcome(messages)
+          messages: persistedMessages
             .filter((item) => item.id !== WELCOME_MESSAGE.id)
             .slice(-80),
           draft,
@@ -202,6 +240,18 @@ export default function BlazeEmbedClient() {
       // Keep the in-memory chat alive even if the iframe browser blocks storage.
     }
   }, [draft, hydrated, messages]);
+
+  useEffect(() => {
+    imageFileRef.current = imageFile;
+  }, [imageFile]);
+
+  useEffect(() => {
+    if (!imagePreviewUrl) {
+      return;
+    }
+
+    return () => URL.revokeObjectURL(imagePreviewUrl);
+  }, [imagePreviewUrl]);
 
   useEffect(() => {
     scheduleScrollChatToBottom();
@@ -237,15 +287,54 @@ export default function BlazeEmbedClient() {
     event?.preventDefault();
 
     const text = safeText(draft);
-    if (!text || sending) {
+    const selectedImage = imageFileRef.current;
+
+    if ((!text && !selectedImage) || sending) {
+      return;
+    }
+
+    setSending(true);
+    setError("");
+
+    let imagePayload:
+      | {
+          name: string;
+          mimeType: string;
+          size: number;
+          base64Data: string;
+        }
+      | null = null;
+    let messageImagePreviewUrl = "";
+
+    try {
+      if (selectedImage) {
+        const optimizedImage = await prepareChatImageFile(selectedImage);
+        messageImagePreviewUrl = await readFileAsDataUrl(optimizedImage);
+        imagePayload = {
+          name: selectedImage.name || optimizedImage.name,
+          mimeType: optimizedImage.type || "image/jpeg",
+          size: optimizedImage.size,
+          base64Data: dataUrlToBase64(messageImagePreviewUrl),
+        };
+      }
+    } catch (caught) {
+      const message =
+        caught instanceof Error && caught.message
+          ? caught.message
+          : "เตรียมรูปให้ท่านเบลซไม่สำเร็จ";
+
+      setSending(false);
+      setError(message);
       return;
     }
 
     const userMessage: BlazeMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      text,
+      text: text || "แนบรูปการ์ดให้ท่านเบลซสแกน",
       createdAt: new Date().toISOString(),
+      imageName: selectedImage?.name,
+      imagePreviewUrl: messageImagePreviewUrl || undefined,
     };
     const history = messagesRef.current
       .filter((item) => item.id !== WELCOME_MESSAGE.id)
@@ -257,8 +346,11 @@ export default function BlazeEmbedClient() {
 
     setMessages((current) => [...current, userMessage]);
     setDraft("");
+    setImageFile(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
     setError("");
-    setSending(true);
     scheduleScrollChatToBottom();
 
     try {
@@ -272,6 +364,7 @@ export default function BlazeEmbedClient() {
           history,
           clientId: clientIdRef.current || "nexora-embed",
           publicEmbed: true,
+          imagePayload,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
@@ -548,6 +641,18 @@ export default function BlazeEmbedClient() {
                           : "blaze-bot-bubble rounded-[24px] rounded-bl-lg px-4 py-3 text-sm font-bold leading-7 sm:text-[15px]"
                       }
                     >
+                      {message.imagePreviewUrl ? (
+                        <img
+                          src={message.imagePreviewUrl}
+                          alt={message.imageName || "card scan"}
+                          className="mb-2 max-h-52 w-full max-w-[260px] rounded-2xl border border-amber-100/18 object-contain"
+                        />
+                      ) : message.imageName ? (
+                        <div className="mb-2 inline-flex max-w-full items-center gap-2 rounded-2xl border border-amber-100/14 bg-amber-200/10 px-3 py-2 text-[11px] font-black text-amber-100/86">
+                          <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{message.imageName}</span>
+                        </div>
+                      ) : null}
                       {message.text}
                     </div>
                     {message.id !== WELCOME_MESSAGE.id ? (
@@ -589,7 +694,49 @@ export default function BlazeEmbedClient() {
                 {error}
               </div>
             ) : null}
+            {imageFile && imagePreviewUrl ? (
+              <div className="mb-2 flex items-center gap-3 rounded-2xl border border-amber-200/14 bg-amber-200/[0.07] p-2">
+                <img
+                  src={imagePreviewUrl}
+                  alt="Blaze scan preview"
+                  className="h-12 w-12 rounded-xl border border-amber-100/14 object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-black text-amber-50">
+                    {imageFile.name}
+                  </div>
+                  <div className="truncate text-[10px] font-bold text-amber-100/50">
+                    ท่านเบลซจะอ่านเลขการ์ด สกิล ATK และ SUP จากรูปนี้
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null);
+                    if (imageInputRef.current) {
+                      imageInputRef.current.value = "";
+                    }
+                  }}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-amber-100/72 transition hover:bg-white/15 hover:text-white"
+                  aria-label="ลบรูปสแกน"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
             <div className="blaze-composer flex items-end gap-2 rounded-[26px] border p-2 md:rounded-[22px] md:p-[14px]">
+              <label className="inline-flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full border border-amber-100/12 bg-amber-200/10 text-amber-100/78 transition hover:bg-amber-200/16 hover:text-amber-50">
+                <ImageIcon className="h-5 w-5" />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    setImageFile(event.target.files?.[0] || null);
+                  }}
+                />
+              </label>
               <textarea
                 ref={inputRef}
                 value={draft}
@@ -608,7 +755,7 @@ export default function BlazeEmbedClient() {
               />
               <button
                 type="submit"
-                disabled={!safeText(draft) || sending}
+                disabled={(!safeText(draft) && !imageFile) || sending}
                 className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#f8dc83_0%,#b3842d_100%)] text-black shadow-[0_14px_34px_rgba(245,158,11,0.26)] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="ส่งข้อความ"
               >

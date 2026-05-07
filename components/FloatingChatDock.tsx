@@ -100,6 +100,8 @@ type BlazeChatMessage = {
   role: "user" | "model";
   text: string;
   createdAt: string;
+  imageName?: string;
+  imagePreviewUrl?: string;
 };
 
 const LIST_REFRESH_MS = 8500;
@@ -155,6 +157,29 @@ type MessagePagePayload = {
 
 function safeText(value?: string | number | null) {
   return String(value || "").trim();
+}
+
+function readFileAsDataUrlForBlaze(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("อ่านรูปไม่สำเร็จ"));
+    };
+
+    reader.onerror = () => reject(new Error("อ่านรูปไม่สำเร็จ"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function dataUrlToBase64(dataUrl: string) {
+  const commaIndex = dataUrl.indexOf(",");
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
 }
 
 function getBlazeSessionStorageKey(userId?: string | null) {
@@ -261,6 +286,7 @@ function normalizeBlazeSessionMessage(value: unknown): BlazeChatMessage | null {
     id,
     role,
     text,
+    imageName: safeText(record.imageName as string | number | null) || undefined,
     createdAt,
   };
 }
@@ -312,8 +338,12 @@ function writeBlazeSessionSnapshot(
     return;
   }
 
+  const persistedMessages = withBlazeWelcomeMessage(messages).map(
+    ({ imagePreviewUrl: _imagePreviewUrl, ...message }) => message
+  );
+
   const payload = {
-    messages: withBlazeWelcomeMessage(messages),
+    messages: persistedMessages,
     draft,
     savedAt: new Date().toISOString(),
   };
@@ -326,7 +356,7 @@ function writeBlazeSessionSnapshot(
         storageKey,
         JSON.stringify({
           ...payload,
-          messages: withBlazeWelcomeMessage(messages).slice(-120),
+          messages: persistedMessages.slice(-120),
         })
       );
     } catch {
@@ -551,6 +581,7 @@ export default function FloatingChatDock({
     BLAZE_WELCOME_MESSAGE,
   ]);
   const [blazeDraft, setBlazeDraft] = useState("");
+  const [blazeFile, setBlazeFile] = useState<File | null>(null);
   const [blazeSending, setBlazeSending] = useState(false);
   const [blazeError, setBlazeError] = useState("");
   const [blazeHydratedStorageKey, setBlazeHydratedStorageKey] = useState("");
@@ -565,10 +596,12 @@ export default function FloatingChatDock({
   const warmPrefetchKeyRef = useRef("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const blazeFileInputRef = useRef<HTMLInputElement>(null);
   const emojiRootRef = useRef<HTMLDivElement>(null);
   const blazeBottomRef = useRef<HTMLDivElement>(null);
   const blazeInputRef = useRef<HTMLTextAreaElement>(null);
   const blazeMessagesRef = useRef<BlazeChatMessage[]>(blazeMessages);
+  const blazeFileRef = useRef<File | null>(blazeFile);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
   const lastComposerSeenRef = useRef<{ roomKey: string; markedAt: number }>({
@@ -599,6 +632,10 @@ export default function FloatingChatDock({
     [filter, query, rooms]
   );
   const filePreview = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
+  const blazeFilePreview = useMemo(
+    () => (blazeFile ? URL.createObjectURL(blazeFile) : ""),
+    [blazeFile]
+  );
   const canSend = Boolean(safeText(draft) || file) && !sending && !!activeRoom?.actualRoomId;
   const activeProfileHref = activeRoom?.other?.id
     ? `/profile/${encodeURIComponent(activeRoom.other.id)}`
@@ -730,9 +767,18 @@ export default function FloatingChatDock({
   }, [file]);
 
   useEffect(() => {
+    blazeFileRef.current = blazeFile;
+  }, [blazeFile]);
+
+  useEffect(() => {
     if (!filePreview) return;
     return () => URL.revokeObjectURL(filePreview);
   }, [filePreview]);
+
+  useEffect(() => {
+    if (!blazeFilePreview) return;
+    return () => URL.revokeObjectURL(blazeFilePreview);
+  }, [blazeFilePreview]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     requestAnimationFrame(() => {
@@ -1646,8 +1692,43 @@ export default function FloatingChatDock({
 
   const sendBlazeMessage = useCallback(async () => {
     const text = safeText(blazeDraft);
+    const selectedFile = blazeFileRef.current;
 
-    if (!text || blazeSending) {
+    if ((!text && !selectedFile) || blazeSending) {
+      return;
+    }
+
+    setBlazeSending(true);
+    setBlazeError("");
+
+    let imagePayload:
+      | {
+          name: string;
+          mimeType: string;
+          size: number;
+          base64Data: string;
+        }
+      | null = null;
+    let imagePreviewUrl = "";
+
+    try {
+      if (selectedFile) {
+        const optimizedFile = await prepareChatImageFile(selectedFile);
+        imagePreviewUrl = await readFileAsDataUrlForBlaze(optimizedFile);
+        imagePayload = {
+          name: selectedFile.name || optimizedFile.name,
+          mimeType: optimizedFile.type || "image/jpeg",
+          size: optimizedFile.size,
+          base64Data: dataUrlToBase64(imagePreviewUrl),
+        };
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "เตรียมรูปให้ท่านเบลซไม่สำเร็จ";
+      setBlazeSending(false);
+      setBlazeError(message);
       return;
     }
 
@@ -1655,8 +1736,10 @@ export default function FloatingChatDock({
     const userMessage: BlazeChatMessage = {
       id: `blaze-user-${Date.now()}`,
       role: "user",
-      text,
+      text: text || "แนบรูปการ์ดให้ท่านเบลซสแกน",
       createdAt: now,
+      imageName: selectedFile?.name,
+      imagePreviewUrl: imagePreviewUrl || undefined,
     };
     const history = blazeMessagesRef.current
       .filter((message) => message.id !== BLAZE_WELCOME_MESSAGE.id)
@@ -1668,8 +1751,10 @@ export default function FloatingChatDock({
 
     setBlazeMessages((current) => [...current, userMessage]);
     setBlazeDraft("");
-    setBlazeSending(true);
-    setBlazeError("");
+    setBlazeFile(null);
+    if (blazeFileInputRef.current) {
+      blazeFileInputRef.current.value = "";
+    }
     scrollBlazeToBottom("smooth");
 
     try {
@@ -1682,6 +1767,7 @@ export default function FloatingChatDock({
           message: text,
           history,
           clientId: currentUserId || session?.user?.email || "nexora-web",
+          imagePayload,
         }),
       });
       const payload = (await res.json().catch(() => null)) as {
@@ -1724,6 +1810,7 @@ export default function FloatingChatDock({
     }
   }, [
     blazeDraft,
+    blazeFileRef,
     blazeSending,
     currentUserId,
     scrollBlazeToBottom,
@@ -2221,6 +2308,18 @@ export default function FloatingChatDock({
                                   : "blaze-floating-ai-bot-bubble"
                               }`}
                             >
+                              {message.imagePreviewUrl ? (
+                                <img
+                                  src={message.imagePreviewUrl}
+                                  alt={message.imageName || "card scan"}
+                                  className="mb-2 max-h-48 max-w-full rounded-2xl border border-amber-100/18 object-contain"
+                                />
+                              ) : message.imageName ? (
+                                <div className="mb-2 inline-flex max-w-full items-center gap-2 rounded-2xl border border-amber-100/14 bg-amber-200/10 px-3 py-2 text-[11px] font-black text-amber-100/86">
+                                  <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{message.imageName}</span>
+                                </div>
+                              ) : null}
                               <ChatMessageText text={message.text} mine={mine} />
                             </div>
                             {message.id !== BLAZE_WELCOME_MESSAGE.id ? (
@@ -2262,7 +2361,51 @@ export default function FloatingChatDock({
                   </div>
                 ) : null}
 
+                {blazeFile && blazeFilePreview ? (
+                  <div className="mb-2 flex items-center gap-3 rounded-2xl border border-amber-200/14 bg-amber-200/[0.07] p-2">
+                    <img
+                      src={blazeFilePreview}
+                      alt="Blaze scan preview"
+                      className="h-12 w-12 rounded-xl border border-amber-100/14 object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-black text-amber-50">
+                        {blazeFile.name}
+                      </div>
+                      <div className="truncate text-[10px] font-bold text-amber-100/50">
+                        ท่านเบลซจะอ่านเลขการ์ด สกิล ATK และ SUP จากรูปนี้
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBlazeFile(null);
+                        if (blazeFileInputRef.current) {
+                          blazeFileInputRef.current.value = "";
+                        }
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-amber-100/72 transition hover:bg-white/15 hover:text-white"
+                      aria-label="ลบรูปสแกน"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : null}
+
                 <div className="blaze-floating-ai-composer flex items-end gap-2 rounded-[24px] border p-2">
+                  <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-amber-100/12 bg-amber-200/10 text-amber-100/78 transition hover:bg-amber-200/16 hover:text-amber-50">
+                    <ImageIcon className="h-4 w-4" />
+                    <input
+                      ref={blazeFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        setBlazeFile(event.target.files?.[0] || null);
+                      }}
+                    />
+                  </label>
+
                   <textarea
                     ref={blazeInputRef}
                     value={blazeDraft}
@@ -2282,7 +2425,7 @@ export default function FloatingChatDock({
 
                   <button
                     type="submit"
-                    disabled={!safeText(blazeDraft) || blazeSending}
+                    disabled={(!safeText(blazeDraft) && !blazeFile) || blazeSending}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fff3b0,#d8a83c_55%,#7a5318)] text-black shadow-[0_0_22px_rgba(251,191,36,0.28)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45"
                     aria-label="ส่งข้อความถึงท่านเบลซ"
                   >
