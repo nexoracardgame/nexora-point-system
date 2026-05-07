@@ -3299,6 +3299,112 @@ async function buildDirectCardTypeCountReply(message: string) {
   );
 }
 
+function getRequestedElementCountKind(message: string): CardKind | "all" {
+  if (includesAnyThaiOrEnglish(message, ["การ์ดสกิล", "สกิล", "skill"])) {
+    return "skill";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(message, [
+      "การ์ดมอนสเตอร์",
+      "มอนสเตอร์",
+      "monster",
+    ])
+  ) {
+    return "monster";
+  }
+
+  return "all";
+}
+
+function isElementCardCountQuestion(message: string) {
+  const hasElementIntent = includesAnyThaiOrEnglish(message, [
+    "แต่ละธาตุ",
+    "แยกธาตุ",
+    "ตามธาตุ",
+    "ธาตุละ",
+    "ธาตุ",
+    "element",
+  ]);
+  const hasCountIntent = includesAnyThaiOrEnglish(message, [
+    "กี่ใบ",
+    "มีกี่",
+    "จำนวน",
+    "นับ",
+    "รวม",
+    "count",
+    "how many",
+  ]);
+  const hasCardIntent = includesAnyThaiOrEnglish(message, [
+    "การ์ด",
+    "ใบ",
+    "มอนสเตอร์",
+    "สกิล",
+    "card",
+    "monster",
+    "skill",
+  ]);
+
+  return hasElementIntent && hasCountIntent && hasCardIntent;
+}
+
+async function buildDirectElementCardCountReply(message: string) {
+  if (!isElementCardCountQuestion(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const kind = getRequestedElementCountKind(message);
+  const filteredRows = rows.filter((row) => {
+    if (kind === "skill") return isSkillCard(row);
+    if (kind === "monster") return isMonsterCard(row);
+    return isSkillCard(row) || isMonsterCard(row);
+  });
+  const orderedElements: CardElement[] = [
+    "earth",
+    "water",
+    "fire",
+    "wood",
+    "gold",
+    "unknown",
+  ];
+  const counts = new Map<CardElement, number>(
+    orderedElements.map((element) => [element, 0])
+  );
+
+  for (const row of filteredRows) {
+    const element = getCardElement(row);
+    counts.set(element, (counts.get(element) || 0) + 1);
+  }
+
+  const kindLabel =
+    kind === "skill"
+      ? "การ์ดสกิล"
+      : kind === "monster"
+        ? "การ์ดมอนสเตอร์"
+        : "การ์ดที่ระบุประเภทได้";
+  const total = filteredRows.length;
+  const lines = [
+    `จากฐานการ์ด NEXORA ${rows.length} ใบ ${kindLabel} แยกตามธาตุได้ดังนี้`,
+    ...orderedElements
+      .map((element) => {
+        const count = counts.get(element) || 0;
+        if (element === "unknown" && count <= 0) {
+          return "";
+        }
+        return `${formatCardElement(element)}: ${count} ใบ`;
+      })
+      .filter(Boolean),
+    `รวมทั้งหมด: ${total} ใบ`,
+  ];
+
+  return enforceBlazeStyle(lines.join("\n"));
+}
+
 function wantsCardName(message: string) {
   const text = normalizeSearchText(message);
   return text.includes("ชื่อ") || text.includes("name");
@@ -4571,6 +4677,20 @@ export async function POST(req: NextRequest) {
           ok: true,
           reply: polishBlazeReply(directCardCollectionReply, effectiveMessage),
           source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directElementCardCountReply =
+      await buildDirectElementCardCountReply(effectiveMessage);
+    if (directElementCardCountReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directElementCardCountReply, effectiveMessage),
+          source: "card-db",
           native: true,
         },
         { headers: { "Cache-Control": "no-store" } }
