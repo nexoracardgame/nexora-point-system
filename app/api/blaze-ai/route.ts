@@ -1719,6 +1719,216 @@ function findCardDbMatches(
   };
 }
 
+function includesAnyThaiOrEnglish(value: string, terms: string[]) {
+  const raw = value.toLowerCase();
+  const normalized = normalizeSearchText(value);
+
+  return terms.some((term) => {
+    const cleanTerm = term.toLowerCase();
+    return raw.includes(cleanTerm) || normalized.includes(normalizeSearchText(term));
+  });
+}
+
+function isCardSkillSearchQuestion(message: string) {
+  const text = message.toLowerCase();
+  const hasCardIntent = includesAnyThaiOrEnglish(message, ["การ์ด", "ใบ", "card"]);
+  const hasSkillIntent = includesAnyThaiOrEnglish(message, [
+    "สกิล",
+    "ความสามารถ",
+    "เอฟเฟกต์",
+    "effect",
+    "skill",
+    "ability",
+    "buff",
+    "บัฟ",
+    "atk",
+    "attack",
+    "sup",
+    "support",
+  ]);
+  const hasSearchIntent =
+    /ใบไหน|การ์ดไหน|ตัวไหน|อันไหน|อะไรบ้าง|ไหนบ้าง|มีใบ|หา|ค้น/.test(text) ||
+    includesAnyThaiOrEnglish(message, ["which", "what card", "find", "search"]);
+  const hasControlIntent = includesAnyThaiOrEnglish(message, [
+    "แบน",
+    "ห้ามใช้",
+    "ใช้ไม่ได้",
+    "ไม่สามารถใช้",
+    "ยกเลิก",
+    "ปิดผนึก",
+    "สกัด",
+    "หยุด",
+    "ลบสกิล",
+    "ปิดสกิล",
+    "อีกฝ่าย",
+    "ฝ่ายตรงข้าม",
+    "ศัตรู",
+    "คู่แข่ง",
+  ]);
+
+  return hasCardIntent && hasSkillIntent && (hasSearchIntent || hasControlIntent);
+}
+
+function scoreCardSkillSearchRow(row: CardDbRow, message: string) {
+  const query = normalizeSearchText(message);
+  const rawMessage = message.toLowerCase();
+  const skillText = [row.cardName, row.skill, row.searchText]
+    .filter(Boolean)
+    .join(" ");
+  const haystack = normalizeSearchText(skillText);
+  const rawHaystack = skillText.toLowerCase();
+  let score = 0;
+
+  const ignoredTokens = new Set(
+    [
+      "การ์ด",
+      "ใบ",
+      "ใบไหน",
+      "การ์ดไหน",
+      "ไหน",
+      "อะไร",
+      "อะไรบ้าง",
+      "มี",
+      "หา",
+      "ที่",
+      "ของ",
+      "อีกฝ่าย",
+      "ฝ่ายตรงข้าม",
+      "card",
+      "which",
+      "what",
+      "find",
+      "search",
+    ].map((term) => normalizeSearchText(term))
+  );
+
+  const tokens = query
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !ignoredTokens.has(token));
+
+  for (const token of tokens) {
+    if (haystack.includes(token)) {
+      score += token.length >= 4 ? 24 : 12;
+    }
+  }
+
+  const wantsDisable = includesAnyThaiOrEnglish(rawMessage, [
+    "แบน",
+    "ห้ามใช้",
+    "ใช้ไม่ได้",
+    "ไม่สามารถใช้",
+    "ปิดผนึก",
+    "สกัด",
+    "หยุด",
+    "ปิดสกิล",
+    "ลบสกิล",
+  ]);
+  const wantsCancel = includesAnyThaiOrEnglish(rawMessage, ["ยกเลิก", "cancel"]);
+  const wantsOpponent = includesAnyThaiOrEnglish(rawMessage, [
+    "อีกฝ่าย",
+    "ฝ่ายตรงข้าม",
+    "ศัตรู",
+    "คู่แข่ง",
+    "opponent",
+  ]);
+  const wantsSkill = includesAnyThaiOrEnglish(rawMessage, [
+    "สกิล",
+    "skill",
+    "ability",
+    "effect",
+    "buff",
+    "บัฟ",
+  ]);
+
+  if (wantsSkill && includesAnyThaiOrEnglish(rawHaystack, ["สกิล", "skill", "buff", "บัฟ"])) {
+    score += 70;
+  }
+  if (wantsDisable && includesAnyThaiOrEnglish(rawHaystack, ["ไม่สามารถใช้", "ปิดผนึก", "สกัด"])) {
+    score += 110;
+  }
+  if (wantsDisable && includesAnyThaiOrEnglish(rawHaystack, ["ยกเลิก"])) {
+    score += 90;
+  }
+  if (wantsCancel && includesAnyThaiOrEnglish(rawHaystack, ["ยกเลิก"])) {
+    score += 120;
+  }
+  if (wantsOpponent && includesAnyThaiOrEnglish(rawHaystack, ["ฝ่ายตรงข้าม", "ศัตรู", "คู่แข่ง"])) {
+    score += 70;
+  }
+  if (wantsOpponent && includesAnyThaiOrEnglish(rawHaystack, ["เรา 1 ใบ", "บนสนามเรา"])) {
+    score -= 35;
+  }
+  if (wantsSkill && !includesAnyThaiOrEnglish(rawHaystack, ["สกิล", "skill", "buff", "บัฟ"])) {
+    score -= 35;
+  }
+
+  return Math.max(0, score);
+}
+
+function formatCardSkillSearchMatches(matches: CardDbRow[], message: string) {
+  const wantsDisable = includesAnyThaiOrEnglish(message, [
+    "แบน",
+    "ห้ามใช้",
+    "ใช้ไม่ได้",
+    "ไม่สามารถใช้",
+    "ปิดผนึก",
+    "สกัด",
+    "ปิดสกิล",
+    "ลบสกิล",
+  ]);
+  const title = wantsDisable
+    ? "จากฐานการ์ด 293 ใบ ใบที่ตรงกับสกิลแนวปิด/แบน/ยกเลิกสกิลอีกฝ่ายมีดังนี้"
+    : "จากฐานการ์ด 293 ใบ ใบที่ตรงกับเงื่อนไขสกิลนี้มีดังนี้";
+
+  return enforceBlazeStyle(
+    [
+      title,
+      ...matches.map((row, index) => {
+        const skill = (row.skill || "-").replace(/\s+/g, " ").trim();
+        const prefix = index === 0 ? "ตรงที่สุด" : `ใกล้เคียง ${index}`;
+        return `${prefix}: No.${row.cardNoNormalized} ${row.cardName} — ${skill}`;
+      }),
+    ].join("\n")
+  );
+}
+
+async function buildDirectCardSkillSearchReply(message: string) {
+  if (!isCardSkillSearchQuestion(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const scored = rows
+    .map((row) => ({
+      row,
+      score: scoreCardSkillSearchRow(row, message),
+    }))
+    .filter((item) => item.score >= 90 && item.row.skill)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized)
+    );
+  const topScore = scored[0]?.score || 0;
+  const matches = scored
+    .filter((item) => item.score >= Math.max(90, topScore - 80))
+    .slice(0, 8)
+    .map((item) => item.row);
+
+  if (!matches.length) {
+    return enforceBlazeStyle(
+      "ข้าค้นจากฐานการ์ด 293 ใบแล้ว ยังไม่พบการ์ดที่สกิลตรงเงื่อนไขนี้แบบชัดเจน"
+    );
+  }
+
+  return formatCardSkillSearchMatches(matches, message);
+}
+
 function wantsCardName(message: string) {
   const text = normalizeSearchText(message);
   return text.includes("ชื่อ") || text.includes("name");
@@ -2930,6 +3140,20 @@ export async function POST(req: NextRequest) {
           ok: true,
           reply: polishBlazeReply(directCardCollectionReply, effectiveMessage),
           source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directCardSkillSearchReply =
+      await buildDirectCardSkillSearchReply(effectiveMessage);
+    if (directCardSkillSearchReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCardSkillSearchReply, effectiveMessage),
+          source: "card-db",
           native: true,
         },
         { headers: { "Cache-Control": "no-store" } }
