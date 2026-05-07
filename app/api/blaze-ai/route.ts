@@ -81,6 +81,8 @@ type CardDbRow = {
   searchText: string;
 };
 
+type CardKind = "monster" | "skill" | "unknown";
+
 type CardSkillDbEntry = {
   cardNo: string;
   cardName: string;
@@ -210,6 +212,7 @@ const BLAZE_RESPONSE_POLICY = [
   "- For reward-filter questions such as 100,000, 1 แสน, PlayStation, Gold One, or any reward value, include every set/collection/product row that matches that reward.",
   "- The canonical collection index is the highest-priority source for collection set rewards, set counts, and card numbers inside sets. Use it before live site snippets.",
   "- If the user asks which collection sets a card belongs to, answer from the canonical card-to-collection membership derived from the collection index.",
+  "- NEXORA cards have two card types: monster cards have ATK and SUP only with no skill text; skill cards have effect/skill text only and no direct ATK/SUP stat. Never show 'ยังไม่มีข้อมูลใน Card DB' placeholders for fields that do not belong to that card type.",
   "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
@@ -1941,6 +1944,49 @@ function parseCardStatValue(value: string) {
   return Number.isFinite(number) ? number : null;
 }
 
+function hasCardSkillText(row: CardDbRow) {
+  return Boolean(row.skill.trim());
+}
+
+function hasMonsterStatPair(row: CardDbRow) {
+  return (
+    parseCardStatValue(row.atk) !== null &&
+    parseCardStatValue(row.sup) !== null
+  );
+}
+
+function getCardKind(row: CardDbRow): CardKind {
+  if (hasCardSkillText(row)) {
+    return "skill";
+  }
+
+  if (hasMonsterStatPair(row)) {
+    return "monster";
+  }
+
+  return "unknown";
+}
+
+function isMonsterCard(row: CardDbRow) {
+  return getCardKind(row) === "monster";
+}
+
+function isSkillCard(row: CardDbRow) {
+  return getCardKind(row) === "skill";
+}
+
+function formatCardKind(kind: CardKind) {
+  if (kind === "monster") {
+    return "การ์ดมอนสเตอร์";
+  }
+
+  if (kind === "skill") {
+    return "การ์ดสกิล";
+  }
+
+  return "ยังไม่ระบุประเภท";
+}
+
 function getRequestedCardStat(message: string): "atk" | "sup" | "" {
   if (
     includesAnyThaiOrEnglish(message, [
@@ -2058,6 +2104,10 @@ async function buildDirectCardStatExtremeReply(message: string) {
   const rows = await loadCardDbRows();
   const ranked = rows
     .map((row) => {
+      if (!isMonsterCard(row)) {
+        return null;
+      }
+
       const atkValue = parseCardStatValue(row.atk);
       const supValue = parseCardStatValue(row.sup);
 
@@ -2093,6 +2143,56 @@ async function buildDirectCardStatExtremeReply(message: string) {
   return formatCardStatExtremeRows(ranked, stat, direction);
 }
 
+function isCardTypeCountQuestion(message: string) {
+  const hasCardIntent = includesAnyThaiOrEnglish(message, ["การ์ด", "card", "ใบ"]);
+  const hasTypeIntent = includesAnyThaiOrEnglish(message, [
+    "มอนสเตอร์",
+    "monster",
+    "สกิล",
+    "skill",
+    "ประเภท",
+    "แยกประเภท",
+  ]);
+  const hasCountIntent = includesAnyThaiOrEnglish(message, [
+    "กี่ใบ",
+    "มีกี่",
+    "กี่ประเภท",
+    "จำนวน",
+    "ทั้งหมด",
+    "รวม",
+    "นับ",
+  ]);
+
+  return hasCardIntent && hasTypeIntent && hasCountIntent;
+}
+
+async function buildDirectCardTypeCountReply(message: string) {
+  if (!isCardTypeCountQuestion(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const monsterCount = rows.filter(isMonsterCard).length;
+  const skillCount = rows.filter(isSkillCard).length;
+  const unknownCount = rows.length - monsterCount - skillCount;
+
+  return enforceBlazeStyle(
+    [
+      `จากฐานข้อมูลการ์ด NEXORA ${rows.length} ใบตอนนี้ แยกประเภทได้ดังนี้`,
+      `การ์ดมอนสเตอร์: ${monsterCount} ใบ`,
+      `การ์ดสกิล: ${skillCount} ใบ`,
+      unknownCount > 0 ? `ยังไม่ระบุประเภทชัดเจน: ${unknownCount} ใบ` : "",
+      "หลักแยกประเภท: การ์ดมอนสเตอร์มีค่า ATK/SUP และไม่มีข้อความสกิล ส่วนการ์ดสกิลมีข้อความผลสกิลและไม่มีค่า ATK/SUP โดยตรง",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
+}
+
 function wantsCardName(message: string) {
   const text = normalizeSearchText(message);
   return text.includes("ชื่อ") || text.includes("name");
@@ -2113,7 +2213,7 @@ function wantsCardValue(message: string) {
   return text.includes("ระดับ") || text.includes("rarity") || text.includes("value");
 }
 
-function wantsCardSkillStats(message: string) {
+function wantsCardSkillText(message: string) {
   const text = normalizeSearchText(message);
   return [
     "สกิล",
@@ -2121,6 +2221,12 @@ function wantsCardSkillStats(message: string) {
     "skill",
     "ability",
     "effect",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function wantsCardCombatStats(message: string) {
+  const text = normalizeSearchText(message);
+  return [
     "atk",
     "attack",
     "โจมตี",
@@ -2128,6 +2234,10 @@ function wantsCardSkillStats(message: string) {
     "support",
     "สนับสนุน",
   ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function wantsCardSkillStats(message: string) {
+  return wantsCardSkillText(message) || wantsCardCombatStats(message);
 }
 
 function wantsCardCollection(message: string) {
@@ -2139,23 +2249,49 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   const wantsReward = wantsCardReward(message);
   const wantsValue = wantsCardValue(message);
   const wantsSkillStats = wantsCardSkillStats(message);
+  const wantsSkillText = wantsCardSkillText(message);
+  const wantsCombatStats = wantsCardCombatStats(message);
   const wantsCollection = wantsCardCollection(message);
   const memberships = formatCardCollectionMemberships(row.cardNoNormalized);
-
-  const skillLines = [
-    `สกิล/ความสามารถ: ${row.skill || "ยังไม่มีข้อมูลใน Card DB"}`,
-    `ATK: ${row.atk || "ยังไม่มีข้อมูลใน Card DB"}`,
-    `SUP: ${row.sup || "ยังไม่มีข้อมูลใน Card DB"}`,
-  ];
+  const kind = getCardKind(row);
+  const title = `การ์ด ${row.cardNo} ${row.cardName}`.trim();
+  const typeLine = `ประเภท: ${formatCardKind(kind)}`;
+  const monsterStatLines = isMonsterCard(row)
+    ? [`ATK: ${row.atk}`, `SUP: ${row.sup}`]
+    : [];
+  const skillLines = isSkillCard(row) ? [`สกิล/ความสามารถ: ${row.skill}`] : [];
 
   if (wantsSkillStats) {
+    if (wantsSkillText && isMonsterCard(row) && !wantsCombatStats) {
+      return [
+        title,
+        typeLine,
+        "ใบนี้เป็นการ์ดมอนสเตอร์ จึงไม่มีข้อความสกิลแบบการ์ดสกิล",
+        ...monsterStatLines,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    if (wantsCombatStats && isSkillCard(row) && !wantsSkillText) {
+      return [
+        title,
+        typeLine,
+        "ใบนี้เป็นการ์ดสกิล จึงไม่มีค่า ATK/SUP แบบการ์ดมอนสเตอร์",
+        ...skillLines,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+
     return [
-      `การ์ด ${row.cardNo} ${row.cardName}`,
+      title,
+      typeLine,
       wantsValue ? `ระดับ: ${row.value || "-"}` : "",
       wantsReward ? `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}` : "",
-      ...skillLines,
-      !row.skill && !row.atk && !row.sup
-        ? "ถ้าผู้ใช้แนบรูปการ์ดมา ข้าจะอ่านสกิล ATK และ SUP จากภาพให้โดยตรง"
+      ...(isSkillCard(row) ? skillLines : monsterStatLines),
+      kind === "unknown"
+        ? "ถ้าผู้ใช้แนบรูปการ์ดมา ข้าจะอ่านประเภทการ์ดและข้อมูลจากภาพให้โดยตรง"
         : "",
     ]
       .filter(Boolean)
@@ -2198,10 +2334,10 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   return [
     `การ์ด ${row.cardNo}`,
     `ชื่อ: ${row.cardName}`,
+    typeLine,
     `ระดับ: ${row.value || "-"}`,
-    row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
-    row.atk ? `ATK: ${row.atk}` : "",
-    row.sup ? `SUP: ${row.sup}` : "",
+    ...skillLines,
+    ...monsterStatLines,
     `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
     memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
   ]
@@ -2219,7 +2355,7 @@ async function buildCardImageSkillScanReply(
     return "";
   }
 
-  if (row.skill && row.atk && row.sup) {
+  if ((isSkillCard(row) && row.skill) || (isMonsterCard(row) && row.atk && row.sup)) {
     return "";
   }
 
@@ -2386,16 +2522,18 @@ async function buildCardDbKnowledgeContext(
 
   const { exact, matches } = findCardDbMatches(rows, message, history);
   const selectedRows = exact ? [exact] : matches.length ? matches : rows.slice(0, 293);
-  const lines = selectedRows.map((row) =>
-    [
+  const lines = selectedRows.map((row) => {
+    const kind = getCardKind(row);
+    return [
       `- ${row.cardNo} | ${row.cardName}`,
+      `ประเภท: ${formatCardKind(kind)}`,
       `ระดับ: ${row.value || "-"}`,
-      row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
-      row.atk ? `ATK: ${row.atk}` : "",
-      row.sup ? `SUP: ${row.sup}` : "",
+      isSkillCard(row) && row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
+      isMonsterCard(row) && row.atk ? `ATK: ${row.atk}` : "",
+      isMonsterCard(row) && row.sup ? `SUP: ${row.sup}` : "",
       `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
-    ].filter(Boolean).join(" | ")
-  );
+    ].filter(Boolean).join(" | ");
+  });
   let text = [
     `ฐานข้อมูลการ์ดจริงจาก Google Sheet CARD DB: พบ ${rows.length} ใบ`,
     "กฎ: ถ้าถามชื่อ/รางวัล/ระดับของการ์ด ให้ยึดข้อมูล CARD DB นี้ก่อน ห้ามเดา และถ้ามีเลข No. ให้ตอบแถวเดียวแบบเป๊ะ",
@@ -3304,6 +3442,20 @@ export async function POST(req: NextRequest) {
           ok: true,
           reply: polishBlazeReply(directCardCollectionReply, effectiveMessage),
           source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directCardTypeCountReply =
+      await buildDirectCardTypeCountReply(effectiveMessage);
+    if (directCardTypeCountReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCardTypeCountReply, effectiveMessage),
+          source: "card-db",
           native: true,
         },
         { headers: { "Cache-Control": "no-store" } }
