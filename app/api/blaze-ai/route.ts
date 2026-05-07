@@ -218,6 +218,7 @@ const BLAZE_RESPONSE_POLICY = [
   "- NEXORA cards have two card types: monster cards have ATK and SUP only with no skill text; skill cards have effect/skill text only and no direct ATK/SUP stat. Never show 'ยังไม่มีข้อมูลใน Card DB' placeholders for fields that do not belong to that card type.",
   "- NEXORA has five elements shown by crystal color: brown = earth, blue = water, dark orange/red = fire, green = wood, yellow/gold = gold. When answering about a card, include its element when known or inferred from the card index.",
   "- For deck advice, buffs, combo, strong/annoying/control skill questions, behave like a knowledgeable game friend: recommend cards from CARD DB, explain why they fit, mention element/type, and keep the advice practical.",
+  "- For broad gameplay questions such as combos, deck building, element strategy, 'use with what', or 'how to play this line', do not require an exact skill keyword match. Build practical advice from card element, card type, ATK/SUP, and skill text.",
   "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
@@ -2145,6 +2146,374 @@ async function buildDirectCardSkillSearchReply(message: string) {
   return formatCardSkillSearchMatches(matches, message);
 }
 
+const CARD_ELEMENT_ORDER: CardElement[] = ["fire", "water", "gold", "earth", "wood"];
+
+const CARD_ELEMENT_PLAYBOOK: Record<
+  Exclude<CardElement, "unknown">,
+  {
+    label: string;
+    tone: string;
+    plan: string;
+  }
+> = {
+  fire: {
+    label: "สายไฟ",
+    tone: "บุกแรง ปิดเกมไว",
+    plan: "ใช้มอนสเตอร์ ATK สูงเป็นตัวปิดเกม แล้วเสริมด้วยสกิลบัฟ ATK หรือสกิลทำลาย/ลดจังหวะอีกฝ่าย",
+  },
+  water: {
+    label: "สายน้ำ",
+    tone: "คุมจังหวะ ยื้อเกม แล้วสวนกลับ",
+    plan: "ใช้มอนสเตอร์ที่บาลานซ์ดีหรือ SUP สูง คุมเกมด้วยสกิลลดพลัง/กันบัฟ แล้วรอจังหวะสวน",
+  },
+  gold: {
+    label: "สายทอง",
+    tone: "มั่นคง คุมกระดาน เล่นเป็นระบบ",
+    plan: "ใช้ตัวแกนที่ค่า ATK/SUP แน่น จับคู่กับสกิลบัฟและสกิลยกเลิก/แก้ทางเพื่อรักษาความได้เปรียบ",
+  },
+  earth: {
+    label: "สายดิน",
+    tone: "ตั้งรับแน่น หน่วงเกม แล้วบีบพื้นที่",
+    plan: "ใช้มอนสเตอร์ SUP หรือค่าสมดุลสูงเป็นกำแพง แล้วเติมสกิลบัฟ/สกิลปิดค่าพลังเพื่อทำให้อีกฝ่ายผ่านยาก",
+  },
+  wood: {
+    label: "สายไม้",
+    tone: "เล่นยืดหยุ่น ปั่นเกม และค่อยๆ ได้เปรียบ",
+    plan: "ใช้มอนสเตอร์ที่ยืนสนามได้นาน จับคู่สกิลลดพลัง/ปั่นจังหวะ และบัฟเพื่อค่อยๆ ดันเกม",
+  },
+};
+
+type GameplaySkillTheme =
+  | "atkBuff"
+  | "supBuff"
+  | "debuff"
+  | "control"
+  | "destroy"
+  | "cancel"
+  | "lock"
+  | "swap"
+  | "teamBuff";
+
+function hasGameplayAdvisorIntent(message: string) {
+  if (extractExplicitCardNumber(message)) {
+    return false;
+  }
+
+  const hasGameplayTerm = includesAnyThaiOrEnglish(message, [
+    "คอมโบ",
+    "combo",
+    "จัดเด็ค",
+    "เด็ค",
+    "บิ้ว",
+    "build",
+    "เล่นยังไง",
+    "เล่นแบบไหน",
+    "เล่นธาตุ",
+    "ธาตุทำไง",
+    "สายไหนดี",
+    "สายไหน",
+    "ใช้กับอะไร",
+    "เข้ากับอะไร",
+    "จับคู่",
+    "มันส์",
+    "แนะนำเล่น",
+    "แนะนำเด็ค",
+    "ปิดเกม",
+    "เปิดเกม",
+    "แก้ทาง",
+    "คุมเกม",
+    "กติกา",
+    "ดวล",
+    "battle",
+    "strategy",
+  ]);
+  const hasCardGameContext = includesAnyThaiOrEnglish(message, [
+    "การ์ด",
+    "มอนสเตอร์",
+    "สกิล",
+    "ธาตุ",
+    "atk",
+    "sup",
+    "card",
+    "monster",
+    "skill",
+  ]);
+
+  return hasGameplayTerm && hasCardGameContext;
+}
+
+function getGameplaySkillThemes(row: CardDbRow): GameplaySkillTheme[] {
+  const text = `${row.cardName} ${row.skill} ${row.rawText}`.toLowerCase();
+  const themes: GameplaySkillTheme[] = [];
+  const add = (theme: GameplaySkillTheme) => {
+    if (!themes.includes(theme)) {
+      themes.push(theme);
+    }
+  };
+
+  if (/(?:attack|atk)\s*\+\s*\d+/i.test(text)) add("atkBuff");
+  if (/(?:support|sup)\s*\+\s*\d+/i.test(text)) add("supBuff");
+  if (/(?:attack|atk)\s*-\s*\d+/i.test(text) || /(?:support|sup)\s*-\s*\d+/i.test(text)) add("debuff");
+  if (includesAnyThaiOrEnglish(text, ["ทุกใบ", "บนสนามเราทุกใบ"])) add("teamBuff");
+  if (includesAnyThaiOrEnglish(text, ["ทำลาย", "destroy"])) add("destroy");
+  if (includesAnyThaiOrEnglish(text, ["ยกเลิก", "cancel"])) add("cancel");
+  if (
+    includesAnyThaiOrEnglish(text, [
+      "ไม่สามารถใช้",
+      "ห้ามใช้",
+      "ปิดผนึก",
+      "สกัด",
+      "หยุด",
+      "ไม่สามารถเพิ่มค่า attack",
+      "ไม่สามารถใช้ค่า attack",
+      "ไม่สามารถใช้ค่า support",
+      "ไม่สามารถใช้ buff",
+      "ไม่สามารถใช้บัฟ",
+    ])
+  ) {
+    add("lock");
+  }
+  if (includesAnyThaiOrEnglish(text, ["สลับ", "swap", "สุ่ม", "random"])) add("swap");
+  if (themes.some((theme) => ["debuff", "destroy", "cancel", "lock", "swap"].includes(theme))) {
+    add("control");
+  }
+
+  return themes;
+}
+
+function formatGameplayThemeLabels(row: CardDbRow) {
+  const labels = getGameplaySkillThemes(row).map((theme) => {
+    if (theme === "atkBuff") return "บัฟ ATK";
+    if (theme === "supBuff") return "บัฟ SUP";
+    if (theme === "teamBuff") return "บัฟหลายใบ";
+    if (theme === "debuff") return "ลดพลัง";
+    if (theme === "destroy") return "ทำลาย";
+    if (theme === "cancel") return "ยกเลิก/แก้ทาง";
+    if (theme === "lock") return "ล็อคจังหวะ";
+    if (theme === "swap") return "ปั่นตำแหน่ง";
+    return "คุมเกม";
+  });
+
+  return labels.filter((label, index) => labels.indexOf(label) === index).join(", ") || "สกิลเทคนิค";
+}
+
+function getMonsterGameplayScore(row: CardDbRow, mode: "attack" | "defense" | "balanced") {
+  const atk = parseCardStatValue(row.atk) || 0;
+  const sup = parseCardStatValue(row.sup) || 0;
+
+  if (mode === "attack") {
+    return atk * 1.2 + sup * 0.25;
+  }
+
+  if (mode === "defense") {
+    return sup * 1.2 + atk * 0.25;
+  }
+
+  return atk + sup;
+}
+
+function pickGameplayMonsters(
+  rows: CardDbRow[],
+  element: CardElement,
+  mode: "attack" | "defense" | "balanced",
+  limit: number
+) {
+  return rows
+    .filter((row) => isMonsterCard(row))
+    .filter((row) => element === "unknown" || getCardElement(row) === element)
+    .map((row) => ({
+      row,
+      score: getMonsterGameplayScore(row, mode),
+    }))
+    .filter((item) => item.score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized)
+    )
+    .slice(0, limit)
+    .map((item) => item.row);
+}
+
+function scoreGameplaySkill(
+  row: CardDbRow,
+  element: CardElement,
+  preferredThemes: GameplaySkillTheme[]
+) {
+  if (!isSkillCard(row)) {
+    return 0;
+  }
+
+  const themes = getGameplaySkillThemes(row);
+  let score = 0;
+
+  if (element !== "unknown" && getCardElement(row) === element) {
+    score += 80;
+  }
+
+  for (const preferred of preferredThemes) {
+    if (themes.includes(preferred)) {
+      score += preferred === "control" ? 45 : 70;
+    }
+  }
+
+  if (themes.includes("teamBuff")) score += 20;
+  if (themes.includes("control")) score += 16;
+  if (row.cardNoNormalized && Number(row.cardNoNormalized) <= 20) score += 10;
+
+  return score;
+}
+
+function pickGameplaySkills(
+  rows: CardDbRow[],
+  element: CardElement,
+  preferredThemes: GameplaySkillTheme[],
+  limit: number
+) {
+  return rows
+    .map((row) => ({
+      row,
+      score: scoreGameplaySkill(row, element, preferredThemes),
+    }))
+    .filter((item) => item.score >= 55)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized)
+    )
+    .slice(0, limit)
+    .map((item) => item.row);
+}
+
+function shortenGameplayText(value: string, maxLength = 120) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLength) {
+    return clean;
+  }
+
+  return `${clean.slice(0, maxLength - 1).trim()}…`;
+}
+
+function formatGameplayMonster(row: CardDbRow) {
+  const atk = parseCardStatValue(row.atk);
+  const sup = parseCardStatValue(row.sup);
+  const stats = [
+    atk !== null ? `ATK ${atk.toLocaleString("th-TH")}` : "",
+    sup !== null ? `SUP ${sup.toLocaleString("th-TH")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" / ");
+
+  return `No.${row.cardNoNormalized} ${row.cardName} (${formatCardElement(getCardElement(row))}${stats ? `, ${stats}` : ""})`;
+}
+
+function formatGameplaySkill(row: CardDbRow) {
+  const skill = row.skill ? `: ${shortenGameplayText(row.skill, 90)}` : "";
+  return `No.${row.cardNoNormalized} ${row.cardName} (${formatCardElement(getCardElement(row))}, ${formatGameplayThemeLabels(row)})${skill}`;
+}
+
+function buildElementGameplayBlock(rows: CardDbRow[], element: Exclude<CardElement, "unknown">) {
+  const playbook = CARD_ELEMENT_PLAYBOOK[element];
+  const mode = element === "fire" ? "attack" : element === "earth" || element === "water" ? "defense" : "balanced";
+  const monsters = pickGameplayMonsters(rows, element, mode, 3);
+  const buffSkills = pickGameplaySkills(rows, element, ["atkBuff", "supBuff", "teamBuff"], 3);
+  const controlSkills = pickGameplaySkills(rows, element, ["control", "debuff", "destroy", "lock", "cancel", "swap"], 3);
+  const mainMonster = monsters[0];
+  const mainBuff = buffSkills[0];
+  const mainControl = controlSkills[0];
+  const comboParts = [mainMonster, mainBuff, mainControl].filter(Boolean);
+
+  return [
+    `${playbook.label} - ${playbook.tone}`,
+    `แนวเล่น: ${playbook.plan}`,
+    monsters.length ? `ตัวแกน: ${monsters.map(formatGameplayMonster).join(" | ")}` : "",
+    buffSkills.length ? `ไพ่บัฟ/เร่งพลัง: ${buffSkills.map(formatGameplaySkill).join(" | ")}` : "",
+    controlSkills.length ? `ไพ่ปั่น/แก้ทาง: ${controlSkills.map(formatGameplaySkill).join(" | ")}` : "",
+    comboParts.length
+      ? `คอมโบตัวอย่าง: ${comboParts
+          .map((row) => (isMonsterCard(row) ? formatGameplayMonster(row) : formatGameplaySkill(row)))
+          .join(" + ")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function getRequestedGameplayElements(message: string): Exclude<CardElement, "unknown">[] {
+  const requested = getRequestedCardElements(message).filter(
+    (element): element is Exclude<CardElement, "unknown"> => element !== "unknown"
+  );
+
+  if (requested.length) {
+    return requested;
+  }
+
+  return CARD_ELEMENT_ORDER.filter(
+    (element): element is Exclude<CardElement, "unknown"> => element !== "unknown"
+  );
+}
+
+function wantsAllElementGameplay(message: string) {
+  return (
+    getRequestedCardElements(message).length === 0 &&
+    includesAnyThaiOrEnglish(message, [
+      "ธาตุ",
+      "ทุกธาตุ",
+      "สายไหนดี",
+      "คอมโบการ์ดไหน",
+      "คอมโบการ์ดธาตุ",
+      "คอมโบ",
+      "จัดเด็ค",
+      "เด็ค",
+    ])
+  );
+}
+
+async function buildDirectCardGameplayReply(message: string) {
+  if (!hasGameplayAdvisorIntent(message)) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  if (!rows.length) {
+    return "";
+  }
+
+  const requestedElements = getRequestedGameplayElements(message);
+  const elementsToShow = wantsAllElementGameplay(message)
+    ? requestedElements
+    : requestedElements.slice(0, 2);
+  const intent = getCardAdviceIntent(message);
+  const wantsCounter = intent.wantsControl || includesAnyThaiOrEnglish(message, ["แก้ทาง", "คุมเกม", "ปั่น", "เกรียน"]);
+  const wantsFastKill = includesAnyThaiOrEnglish(message, ["ปิดเกม", "บุก", "แรง", "โหด", "atk", "attack"]);
+  const intro = wantsAllElementGameplay(message)
+    ? "หลักคอมโบ NEXORA ให้คิดเป็น 3 ชั้น: 1) เลือกธาตุเป็นแกน 2) เลือกมอนสเตอร์ที่ค่าสเตตัสเด่น 3) วางสกิลบัฟหรือสกิลปั่นเพื่อชนะจังหวะสำคัญ"
+    : wantsCounter
+      ? "ถ้าจะเล่นสายปั่น/แก้ทาง ให้คิดแบบนี้: อย่าทุ่มบัฟก่อน เหลือสกิลล็อค/ยกเลิก/ลดพลังไว้ตอบจังหวะที่อีกฝ่ายกำลังปิดเกม"
+      : wantsFastKill
+        ? "ถ้าจะเล่นสายบุก ให้ใช้มอนสเตอร์ ATK สูงเป็นตัวปิดเกม แล้วซ้อนบัฟธาตุเดียวกันหรือบัฟหลายใบเพื่อบีบให้อีกฝ่ายต้องแก้ทันที"
+        : "คอมโบที่เล่นสนุกให้มองเป็นชุด: ตัวแกนมอนสเตอร์ + ไพ่บัฟ + ไพ่ปั่น/แก้ทาง ไม่ใช่ดูสกิลใบเดียวแยกๆ";
+
+  const blocks = elementsToShow.map((element) => buildElementGameplayBlock(rows, element));
+  const generalTips = [
+    "สูตรจำง่าย:",
+    "- มอนสเตอร์ = ตัวทำคะแนนหลัก ดู ATK/SUP และธาตุ",
+    "- สกิลบัฟ = ใช้เร่งจังหวะตอนเรามีตัวแกนพร้อมแล้ว",
+    "- สกิลปั่น/แก้ทาง = เก็บไว้ตัดคอมโบอีกฝ่าย ไม่ควรรีบใช้ตั้งแต่ต้นถ้าไม่จำเป็น",
+    "- ธาตุเดียวกันมักอ่านเกมง่ายกว่า เพราะสกิลคริสตัล/บัฟธาตุจะเข้ากับตัวแกนได้ตรงกว่า",
+  ].join("\n");
+
+  const answer = [
+    intro,
+    ...blocks,
+    generalTips,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return enforceBlazeStyle(answer);
+}
+
 function parseCardStatValue(value: string) {
   const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
   if (!match) {
@@ -3923,6 +4292,20 @@ export async function POST(req: NextRequest) {
         {
           ok: true,
           reply: polishBlazeReply(directCardStatExtremeReply, effectiveMessage),
+          source: "card-db",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directCardGameplayReply =
+      await buildDirectCardGameplayReply(effectiveMessage);
+    if (directCardGameplayReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCardGameplayReply, effectiveMessage),
           source: "card-db",
           native: true,
         },
