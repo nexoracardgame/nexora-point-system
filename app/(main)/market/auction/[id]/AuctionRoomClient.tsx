@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Clock,
@@ -114,6 +114,11 @@ function isAdminRoleClient(role?: string | null) {
   return normalized === "admin" || normalized === "gm" || normalized === "superadmin";
 }
 
+function getProfileHref(userId?: string | null) {
+  const safeUserId = String(userId || "").trim();
+  return safeUserId ? `/profile/${encodeURIComponent(safeUserId)}` : "/profile/me";
+}
+
 function RuleOverlay({ onAccept }: { onAccept: () => void }) {
   return (
     <div
@@ -171,6 +176,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [acceptedRules, setAcceptedRules] = useState(true);
+  const bidBoardEndRef = useRef<HTMLDivElement>(null);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
 
   const room = payload?.room || null;
@@ -250,6 +256,16 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     setAcceptedRules(true);
   };
 
+  const scrollBidBoardToBottom = useCallback(() => {
+    window.setTimeout(() => {
+      bidBoardEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+        inline: "nearest",
+      });
+    }, 120);
+  }, []);
+
   const submitBid = async () => {
     if (submitting || !room) return;
 
@@ -289,6 +305,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       setMessage("");
       setAmount(String(data.nextMinimumBid || numericAmount + room.minBidStep));
       await fetchRoom();
+      scrollBidBoardToBottom();
     } catch (error) {
       await nexoraAlert({
         title: "ส่งบิทไม่สำเร็จ",
@@ -453,7 +470,10 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center gap-3 rounded-[24px] border border-white/10 bg-black/28 p-4">
+              <Link
+                href={getProfileHref(room.sellerId)}
+                className="mt-5 flex items-center gap-3 rounded-[24px] border border-white/10 bg-black/28 p-4 transition hover:border-amber-200/28 hover:bg-amber-300/[0.06] focus:outline-none focus:ring-2 focus:ring-amber-300/24"
+              >
                 <img
                   src={room.sellerImage || "/default-avatar.png"}
                   alt={room.sellerName}
@@ -467,7 +487,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
                     {room.sellerName}
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         </section>
@@ -497,9 +517,12 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
                     <div className="mt-1 text-3xl font-black text-amber-100">
                       {formatBaht(topBid.amount)}
                     </div>
-                    <div className="mt-1 truncate text-sm font-bold text-white/54">
+                    <Link
+                      href={getProfileHref(topBid.bidderId)}
+                      className="mt-1 block truncate text-sm font-bold text-white/54 transition hover:text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-300/24"
+                    >
                       {topBid.bidderName} • {formatTime(topBid.createdAt)}
-                    </div>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -517,17 +540,25 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
                     className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))] p-4"
                   >
                     <div className="flex gap-3">
-                      <img
-                        src={bid.bidderImage || "/default-avatar.png"}
-                        alt={bid.bidderName}
-                        className="h-11 w-11 shrink-0 rounded-2xl object-cover ring-1 ring-white/10"
-                      />
+                      <Link
+                        href={getProfileHref(bid.bidderId)}
+                        className="h-11 w-11 shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-300/24"
+                      >
+                        <img
+                          src={bid.bidderImage || "/default-avatar.png"}
+                          alt={bid.bidderName}
+                          className="h-full w-full rounded-2xl object-cover ring-1 ring-white/10 transition hover:ring-amber-200/40"
+                        />
+                      </Link>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-black text-white">
+                            <Link
+                              href={getProfileHref(bid.bidderId)}
+                              className="block truncate text-sm font-black text-white transition hover:text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-300/24"
+                            >
                               {bid.bidderName}
-                            </div>
+                            </Link>
                             <div className="text-[11px] font-bold text-white/34">
                               ลำดับที่ {index + 1} • {formatTime(bid.createdAt)}
                             </div>
@@ -546,6 +577,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
                   </div>
                 ))
               )}
+              <div ref={bidBoardEndRef} aria-hidden="true" className="h-1" />
             </div>
           </div>
 
