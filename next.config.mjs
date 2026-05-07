@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingExcludes: {
+    "/*": ["./public/**/*"],
     "/box-market": ["./public/**/*"],
     "/api/box-market": ["./public/**/*"],
     "/api/box-market/verify": ["./public/**/*"],
