@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { authOptions } from "@/lib/auth";
+import bundledCardSkillDbJson from "@/public/cards/card-skill-db.json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -198,6 +199,7 @@ let cardDbCache: CardDbCache | null = null;
 let cardSkillDbCache: CardSkillDbCache | null = null;
 const siteKnowledgeCache = new Map<string, SiteCacheEntry>();
 const cardImageScanCache = new Map<string, SiteCacheEntry>();
+const BUNDLED_CARD_SKILL_DB = bundledCardSkillDbJson as { cards?: unknown };
 
 const BLAZE_RESPONSE_POLICY = [
   "Blaze answer policy:",
@@ -1370,6 +1372,21 @@ function normalizeCardSkillDbEntry(value: unknown): CardSkillDbEntry | null {
   };
 }
 
+function buildCardSkillDbCacheFromSource(source: unknown, now: number) {
+  const parsed = source as { cards?: unknown };
+  const rows = Array.isArray(parsed.cards)
+    ? parsed.cards.map(normalizeCardSkillDbEntry).filter(Boolean)
+    : [];
+  const normalizedRows = rows as CardSkillDbEntry[];
+  const byNo = new Map(normalizedRows.map((row) => [row.cardNo, row]));
+
+  return {
+    expiresAt: now + CARD_DB_CACHE_MS,
+    rows: normalizedRows,
+    byNo,
+  };
+}
+
 async function loadCardSkillDb() {
   const now = Date.now();
 
@@ -1380,27 +1397,12 @@ async function loadCardSkillDb() {
   try {
     const filePath = path.join(process.cwd(), "public", "cards", "card-skill-db.json");
     const raw = await readFile(filePath, "utf8");
-    const parsed = JSON.parse(raw) as { cards?: unknown };
-    const rows = Array.isArray(parsed.cards)
-      ? parsed.cards.map(normalizeCardSkillDbEntry).filter(Boolean)
-      : [];
-    const normalizedRows = rows as CardSkillDbEntry[];
-    const byNo = new Map(normalizedRows.map((row) => [row.cardNo, row]));
-
-    cardSkillDbCache = {
-      expiresAt: now + CARD_DB_CACHE_MS,
-      rows: normalizedRows,
-      byNo,
-    };
-
+    cardSkillDbCache = buildCardSkillDbCacheFromSource(JSON.parse(raw), now);
     return cardSkillDbCache;
   } catch (error) {
     console.warn("BLAZE card skill DB fallback:", error);
-    return {
-      expiresAt: now + CARD_DB_CACHE_MS,
-      rows: [],
-      byNo: new Map<string, CardSkillDbEntry>(),
-    };
+    cardSkillDbCache = buildCardSkillDbCacheFromSource(BUNDLED_CARD_SKILL_DB, now);
+    return cardSkillDbCache;
   }
 }
 
