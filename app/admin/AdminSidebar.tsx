@@ -21,7 +21,7 @@ const items = [
   { href: "/admin/rewards", label: "Rewards", icon: Gift },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/point-logs", label: "Point Logs", icon: ScrollText },
-  { href: "/staff", label: "Staff Scan", icon: ScanLine },
+  { href: "/admin/staff-scan", label: "Staff Scan", icon: ScanLine },
 ];
 
 export default function AdminSidebar() {

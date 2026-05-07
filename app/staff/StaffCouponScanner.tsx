@@ -66,7 +66,11 @@ async function ensureHtml5QrScript() {
   return Boolean(window.Html5Qrcode);
 }
 
-export default function StaffCouponScanner() {
+type StaffCouponScannerProps = {
+  embedded?: boolean;
+};
+
+export default function StaffCouponScanner({ embedded = false }: StaffCouponScannerProps = {}) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -224,12 +228,24 @@ export default function StaffCouponScanner() {
   };
 
   return (
-    <div className="min-h-[var(--app-shell-height)] bg-[radial-gradient(circle_at_top,#181222_0%,#090a11_42%,#04050a_100%)] text-white">
-      <div className="pointer-events-none fixed inset-0">
+    <div
+      className={
+        embedded
+          ? "relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,#181222_0%,#090a11_42%,#04050a_100%)] p-3 text-white shadow-[0_25px_120px_rgba(0,0,0,0.32)] sm:p-4"
+          : "min-h-[var(--app-shell-height)] bg-[radial-gradient(circle_at_top,#181222_0%,#090a11_42%,#04050a_100%)] text-white"
+      }
+    >
+      <div className={`pointer-events-none ${embedded ? "absolute" : "fixed"} inset-0`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.1),transparent_28%)]" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl space-y-5 px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
+      <div
+        className={
+          embedded
+            ? "relative mx-auto max-w-6xl space-y-5"
+            : "relative mx-auto max-w-6xl space-y-5 px-3 py-4 sm:px-5 sm:py-6 xl:px-6"
+        }
+      >
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,19,29,0.96),rgba(10,12,20,0.96))] p-4 shadow-[0_25px_120px_rgba(0,0,0,0.45)] sm:p-6 xl:p-8">
           <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
             <div>

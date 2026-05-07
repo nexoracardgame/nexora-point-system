@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import StaffCouponScanner from "./StaffCouponScanner";
 import { authOptions } from "@/lib/auth";
-import { isStaffRole } from "@/lib/staff-auth";
+import { isAdminRole, isStaffRole } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,6 +19,10 @@ export default async function StaffPage() {
 
   if (!isStaffRole(role)) {
     redirect("/");
+  }
+
+  if (isAdminRole(role)) {
+    redirect("/admin/staff-scan");
   }
 
   return <StaffCouponScanner />;
