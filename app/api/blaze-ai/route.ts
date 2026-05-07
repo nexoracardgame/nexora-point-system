@@ -80,6 +80,23 @@ type CardDbRow = {
   searchText: string;
 };
 
+type CardSkillDbEntry = {
+  cardNo: string;
+  cardName: string;
+  skill: string;
+  atk: string;
+  sup: string;
+  element: string;
+  rarity: string;
+  type: string;
+  rawText: string;
+  confidence: string;
+  reviewed: boolean;
+  sourceImage: string;
+  scannedAt: string;
+  notes: string;
+};
+
 type CollectionSetRecord = {
   id: number;
   name: string;
@@ -105,6 +122,12 @@ type KnowledgeCache = {
 type CardDbCache = {
   expiresAt: number;
   rows: CardDbRow[];
+};
+
+type CardSkillDbCache = {
+  expiresAt: number;
+  rows: CardSkillDbEntry[];
+  byNo: Map<string, CardSkillDbEntry>;
 };
 
 type SiteCacheEntry = {
@@ -172,6 +195,7 @@ const OFFICIAL_SITE_PAGES = [
 
 let sheetKnowledgeCache: KnowledgeCache | null = null;
 let cardDbCache: CardDbCache | null = null;
+let cardSkillDbCache: CardSkillDbCache | null = null;
 const siteKnowledgeCache = new Map<string, SiteCacheEntry>();
 const cardImageScanCache = new Map<string, SiteCacheEntry>();
 
@@ -1316,12 +1340,158 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
     .filter(Boolean) as CardDbRow[];
 }
 
+function normalizeCardSkillDbEntry(value: unknown): CardSkillDbEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const cardNoNormalized = normalizeCardNumber(sanitizeText(record.cardNo));
+
+  if (!cardNoNormalized) {
+    return null;
+  }
+
+  return {
+    cardNo: cardNoNormalized,
+    cardName: sanitizeText(record.cardName),
+    skill: sanitizeText(record.skill),
+    atk: sanitizeText(record.atk),
+    sup: sanitizeText(record.sup),
+    element: sanitizeText(record.element),
+    rarity: sanitizeText(record.rarity),
+    type: sanitizeText(record.type),
+    rawText: sanitizeText(record.rawText),
+    confidence: sanitizeText(record.confidence) || "pending",
+    reviewed: record.reviewed === true,
+    sourceImage: sanitizeText(record.sourceImage) || `/cards/${cardNoNormalized}.jpg`,
+    scannedAt: sanitizeText(record.scannedAt),
+    notes: sanitizeText(record.notes),
+  };
+}
+
+async function loadCardSkillDb() {
+  const now = Date.now();
+
+  if (cardSkillDbCache && cardSkillDbCache.expiresAt > now) {
+    return cardSkillDbCache;
+  }
+
+  try {
+    const filePath = path.join(process.cwd(), "public", "cards", "card-skill-db.json");
+    const raw = await readFile(filePath, "utf8");
+    const parsed = JSON.parse(raw) as { cards?: unknown };
+    const rows = Array.isArray(parsed.cards)
+      ? parsed.cards.map(normalizeCardSkillDbEntry).filter(Boolean)
+      : [];
+    const normalizedRows = rows as CardSkillDbEntry[];
+    const byNo = new Map(normalizedRows.map((row) => [row.cardNo, row]));
+
+    cardSkillDbCache = {
+      expiresAt: now + CARD_DB_CACHE_MS,
+      rows: normalizedRows,
+      byNo,
+    };
+
+    return cardSkillDbCache;
+  } catch (error) {
+    console.warn("BLAZE card skill DB fallback:", error);
+    return {
+      expiresAt: now + CARD_DB_CACHE_MS,
+      rows: [],
+      byNo: new Map<string, CardSkillDbEntry>(),
+    };
+  }
+}
+
+function isUsefulCardSkillEntry(entry: CardSkillDbEntry) {
+  return Boolean(
+    entry.cardName ||
+      entry.skill ||
+      entry.atk ||
+      entry.sup ||
+      entry.element ||
+      entry.rarity ||
+      entry.rawText
+  );
+}
+
+function buildCardRowSearchText(row: Omit<CardDbRow, "searchText">) {
+  return normalizeSearchText(
+    [
+      row.cardNo,
+      row.cardNoNormalized,
+      row.cardName,
+      row.reward,
+      row.value,
+      row.skill,
+      row.atk,
+      row.sup,
+    ].join(" ")
+  );
+}
+
+function mergeCardSkillDbRows(
+  rows: CardDbRow[],
+  skillByNo: Map<string, CardSkillDbEntry>
+) {
+  if (!skillByNo.size) {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    const skillRow = skillByNo.get(row.cardNoNormalized);
+
+    if (!skillRow || !isUsefulCardSkillEntry(skillRow)) {
+      return row;
+    }
+
+    const merged = {
+      ...row,
+      cardName: row.cardName || skillRow.cardName,
+      value: row.value || skillRow.rarity,
+      imageUrl: row.imageUrl || skillRow.sourceImage,
+      skill: row.skill || skillRow.skill,
+      atk: row.atk || skillRow.atk,
+      sup: row.sup || skillRow.sup,
+    };
+
+    return {
+      ...merged,
+      searchText: buildCardRowSearchText(merged),
+    };
+  });
+}
+
+function cardSkillDbRowsToCardDbRows(rows: CardSkillDbEntry[]): CardDbRow[] {
+  return rows.filter(isUsefulCardSkillEntry).map((row) => {
+    const cardRow = {
+      cardNo: row.cardNo,
+      cardNoNormalized: row.cardNo,
+      cardName: row.cardName,
+      reward: "",
+      value: row.rarity,
+      imageUrl: row.sourceImage,
+      skill: row.skill,
+      atk: row.atk,
+      sup: row.sup,
+    };
+
+    return {
+      ...cardRow,
+      searchText: buildCardRowSearchText(cardRow),
+    };
+  });
+}
+
 async function loadCardDbRows() {
   const now = Date.now();
 
   if (cardDbCache && cardDbCache.expiresAt > now) {
     return cardDbCache.rows;
   }
+
+  const skillDb = await loadCardSkillDb();
 
   try {
     const response = await fetchWithTimeout(
@@ -1340,7 +1510,7 @@ async function loadCardDbRows() {
       throw new Error(`card DB sheet unavailable (${response.status})`);
     }
 
-    const rows = csvRowsToCardDbRows(csv);
+    const rows = mergeCardSkillDbRows(csvRowsToCardDbRows(csv), skillDb.byNo);
     if (rows.length < 293) {
       throw new Error(`card DB incomplete (${rows.length}/293)`);
     }
@@ -1353,7 +1523,7 @@ async function loadCardDbRows() {
     return rows;
   } catch (error) {
     console.warn("BLAZE card DB fallback:", error);
-    return cardDbCache?.rows || [];
+    return cardDbCache?.rows || cardSkillDbRowsToCardDbRows(skillDb.rows);
   }
 }
 
