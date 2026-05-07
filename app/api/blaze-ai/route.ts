@@ -1847,6 +1847,10 @@ function getCardAdviceIntent(message: string) {
 }
 
 function isCardSkillSearchQuestion(message: string) {
+  if (isDisableStatUseQuestion(message)) {
+    return false;
+  }
+
   if (isPlainCardStatExtremeQuestion(message)) {
     return false;
   }
@@ -3035,6 +3039,129 @@ function isCardStatExtremeQuestion(message: string) {
       getRequestedCardStat(message) &&
       getRequestedStatDirection(message)
   );
+}
+
+function getDisableStatUseIntent(message: string) {
+  const raw = message.toLowerCase();
+  const normalized = normalizeSearchText(message);
+  const hasDisableIntent =
+    raw.includes("ใช้งาน") ||
+    raw.includes("ใช้ค่า") ||
+    raw.includes("ใช้คำ") ||
+    raw.includes("ใช้ไม่ได้") ||
+    raw.includes("ไม่ได้") ||
+    raw.includes("ห้ามใช้") ||
+    raw.includes("ปิดค่า") ||
+    raw.includes("ไม่สามารถใช้") ||
+    normalized.includes("ใช้งาน") ||
+    normalized.includes("ใช้ค่า") ||
+    normalized.includes("ใช้คำ") ||
+    normalized.includes("ใช้ไม่ได้") ||
+    normalized.includes("ไม่ได้") ||
+    normalized.includes("ห้ามใช้") ||
+    normalized.includes("ปิดค่า") ||
+    normalized.includes("ไม่สามารถใช้");
+  const wantsAtk =
+    /(?:^|\s)(?:atk|attack)(?:\s|$)/i.test(raw) ||
+    normalized.includes("พลังโจมตี") ||
+    normalized.includes("ค่าโจมตี");
+  const wantsSup =
+    /(?:^|\s)(?:sup|support)(?:\s|$)/i.test(raw) ||
+    normalized.includes("พลังรับ") ||
+    normalized.includes("ค่ารับ") ||
+    normalized.includes("ซัพ") ||
+    normalized.includes("ซัพพอร์ต");
+
+  return {
+    wantsDisableUse: hasDisableIntent && (wantsAtk || wantsSup),
+    wantsAtk,
+    wantsSup,
+  };
+}
+
+function isDisableStatUseQuestion(message: string) {
+  return getDisableStatUseIntent(message).wantsDisableUse;
+}
+
+function rowBlocksAttackUse(row: CardDbRow) {
+  const text = `${row.skill} ${row.rawText}`.toLowerCase();
+  return (
+    /ไม่สามารถใช้(?:ค่า|คำ)?\s*(?:attack|atk)/i.test(text) ||
+    includesAnyThaiOrEnglish(text, [
+      "ไม่สามารถใช้ค่า attack",
+      "ไม่สามารถใช้คำ attack",
+      "ไม่สามารถใช้ attack",
+      "ไม่สามารถใช้ค่า atk",
+      "ไม่สามารถใช้ atk",
+    ])
+  );
+}
+
+function rowBlocksSupportUse(row: CardDbRow) {
+  const text = `${row.skill} ${row.rawText}`.toLowerCase();
+  return (
+    /ไม่สามารถใช้(?:ค่า|คำ)?\s*(?:support|sup)/i.test(text) ||
+    includesAnyThaiOrEnglish(text, [
+      "ไม่สามารถใช้ค่า support",
+      "ไม่สามารถใช้คำ support",
+      "ไม่สามารถใช้ support",
+      "ไม่สามารถใช้ค่า sup",
+      "ไม่สามารถใช้ sup",
+    ])
+  );
+}
+
+function formatStatBlockCard(row: CardDbRow) {
+  const skill = (row.skill || "-").replace(/\s+/g, " ").trim();
+  return `No.${row.cardNoNormalized} ${row.cardName} | ${formatCardElement(getCardElement(row))}\nสกิล: ${skill}`;
+}
+
+async function buildDirectDisableStatUseReply(message: string) {
+  const intent = getDisableStatUseIntent(message);
+  if (!intent.wantsDisableUse) {
+    return "";
+  }
+
+  const rows = (await loadCardDbRows()).filter(isSkillCard);
+  const attackLocks = rows.filter(rowBlocksAttackUse);
+  const supportLocks = rows.filter(rowBlocksSupportUse);
+  const bothLocks = rows.filter(
+    (row) => rowBlocksAttackUse(row) && rowBlocksSupportUse(row)
+  );
+  const lines: string[] = [];
+
+  if (intent.wantsAtk && intent.wantsSup) {
+    if (bothLocks.length) {
+      lines.push("ใบที่ทำให้อีกฝ่ายใช้งาน ATK และ SUP ไม่ได้พร้อมกันคือ");
+      lines.push(...bothLocks.map(formatStatBlockCard));
+    } else {
+      lines.push(
+        "ข้าตรวจจากฐานการ์ด 293 ใบแล้ว ยังไม่พบใบเดียวที่ปิดการใช้งานทั้ง ATK และ SUP พร้อมกันโดยตรง"
+      );
+
+      if (attackLocks.length) {
+        lines.push("ใบที่ปิดการใช้งาน ATK:");
+        lines.push(...attackLocks.map(formatStatBlockCard));
+      }
+
+      if (supportLocks.length) {
+        lines.push("ใบที่ปิดการใช้งาน SUP:");
+        lines.push(...supportLocks.map(formatStatBlockCard));
+      }
+
+      lines.push(
+        "หมายเหตุ: No.244 Time Reverse ทำให้เปลี่ยนแปลง ATTACK และ SUPPORT ไม่ได้ แต่ไม่ใช่การปิดใช้งานค่า ATK/SUP โดยตรง"
+      );
+    }
+  } else if (intent.wantsAtk) {
+    lines.push("ใบที่ทำให้อีกฝ่ายใช้งาน ATK ไม่ได้คือ");
+    lines.push(...attackLocks.map(formatStatBlockCard));
+  } else if (intent.wantsSup) {
+    lines.push("ใบที่ทำให้อีกฝ่ายใช้งาน SUP ไม่ได้คือ");
+    lines.push(...supportLocks.map(formatStatBlockCard));
+  }
+
+  return enforceBlazeStyle(lines.filter(Boolean).join("\n"));
 }
 
 function formatCardStatExtremeRows(
@@ -4457,6 +4584,20 @@ export async function POST(req: NextRequest) {
         {
           ok: true,
           reply: polishBlazeReply(directCardTypeCountReply, effectiveMessage),
+          source: "card-db",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directDisableStatUseReply =
+      await buildDirectDisableStatUseReply(effectiveMessage);
+    if (directDisableStatUseReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directDisableStatUseReply, effectiveMessage),
           source: "card-db",
           native: true,
         },
