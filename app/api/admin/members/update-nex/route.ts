@@ -9,15 +9,16 @@ export async function POST(req: Request) {
     if (error) return error;
 
     const { lineId, amount } = await req.json();
+    const cleanLineId = String(lineId || "").trim();
     const nextAmount = Number(amount);
 
-    if (!lineId || amount === undefined || !Number.isFinite(nextAmount)) {
+    if (!cleanLineId || amount === undefined || !Number.isFinite(nextAmount) || nextAmount === 0) {
       return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
 
     await prisma.$transaction(async (tx) => {
       const beforeUser = await tx.user.findUnique({
-        where: { lineId },
+        where: { lineId: cleanLineId },
         select: {
           id: true,
           lineId: true,
@@ -31,6 +32,10 @@ export async function POST(req: Request) {
         throw new Error("user_not_found");
       }
 
+      if (beforeUser.nexPoint + nextAmount < 0) {
+        throw new Error("insufficient_nex");
+      }
+
       const updatedUser = await tx.user.update({
         where: { id: beforeUser.id },
         data: {
@@ -42,7 +47,7 @@ export async function POST(req: Request) {
 
       await tx.pointLog.create({
         data: {
-          lineId,
+          lineId: cleanLineId,
           type: "admin",
           amount: Math.trunc(nextAmount),
           point: nextAmount,
@@ -79,6 +84,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("UPDATE NEX ERROR:", error);
+
+    if (error instanceof Error && error.message === "insufficient_nex") {
+      return NextResponse.json(
+        { error: "NEX ไม่พอให้หัก" },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json(
       { error: "update NEX failed" },
