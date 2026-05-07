@@ -20,6 +20,22 @@ function normalizeSearch(value: string) {
   return value.toLowerCase().trim().replace(/^@+/, "");
 }
 
+function parseAdminAdjustment(value: string | undefined, label: string, integerOnly = false) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const amount = Number(raw);
+
+  if (!Number.isFinite(amount) || amount === 0 || (integerOnly && !Number.isInteger(amount))) {
+    throw new Error(`${label} ต้องเป็นตัวเลข${integerOnly ? "จำนวนเต็ม" : ""} เช่น 100 หรือ -100`);
+  }
+
+  return amount;
+}
+
 export default function MembersTable({ users }: { users: UserRow[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -52,37 +68,44 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
   }, [query, users]);
 
   const updateMember = async (lineId: string) => {
-    const nexValue = nexInputs[lineId];
-    const coinValue = coinInputs[lineId];
-    if (!nexValue && !coinValue) return alert("กรอก NEX หรือ COIN");
+    let nexAmount: number | null = null;
+    let coinAmount: number | null = null;
+
+    try {
+      nexAmount = parseAdminAdjustment(nexInputs[lineId], "NEX");
+      coinAmount = parseAdminAdjustment(coinInputs[lineId], "COIN", true);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "จำนวนไม่ถูกต้อง");
+      return;
+    }
+
+    if (nexAmount === null && coinAmount === null) return alert("กรอก NEX หรือ COIN");
 
     try {
       setLoadingId(lineId);
-      if (nexValue && Number(nexValue) !== 0) {
-        const nexRes = await fetch("/api/point/add", {
+      if (nexAmount !== null) {
+        const nexRes = await fetch("/api/admin/members/update-nex", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lineId, type: "silver", amount: Number(nexValue) }),
+          body: JSON.stringify({ lineId, amount: nexAmount }),
         });
-        const nexData = await nexRes.json();
-        if (!nexRes.ok) return alert(nexData.error || "เพิ่ม NEX ไม่สำเร็จ");
+        const nexData = await nexRes.json().catch(() => ({}));
+        if (!nexRes.ok) throw new Error(nexData.error || "อัปเดต NEX ไม่สำเร็จ");
       }
-      if (coinValue && Number(coinValue) !== 0) {
-        const coinRes = await fetch("/api/coin/update", {
+      if (coinAmount !== null) {
+        const coinRes = await fetch("/api/admin/members/update-coin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lineId,
-            amount: Math.abs(Number(coinValue)),
-            action: Number(coinValue) >= 0 ? "add" : "subtract",
-          }),
+          body: JSON.stringify({ lineId, amount: coinAmount }),
         });
-        const coinData = await coinRes.json();
-        if (!coinRes.ok) return alert(coinData.error || "เพิ่ม COIN ไม่สำเร็จ");
+        const coinData = await coinRes.json().catch(() => ({}));
+        if (!coinRes.ok) throw new Error(coinData.error || "อัปเดต COIN ไม่สำเร็จ");
       }
       setNexInputs((prev) => ({ ...prev, [lineId]: "" }));
       setCoinInputs((prev) => ({ ...prev, [lineId]: "" }));
       router.refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "อัปเดตแต้มไม่สำเร็จ");
     } finally {
       setLoadingId(null);
     }
@@ -155,6 +178,7 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
               onChange={(e) => setNexInputs((prev) => ({ ...prev, [user.lineId]: e.target.value }))}
               placeholder="เพิ่ม / ลด NEX"
               type="number"
+              step="any"
               className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
             />
             <input
@@ -162,6 +186,7 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
               onChange={(e) => setCoinInputs((prev) => ({ ...prev, [user.lineId]: e.target.value }))}
               placeholder="เพิ่ม / ลด COIN"
               type="number"
+              step="1"
               className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
             />
             <button
