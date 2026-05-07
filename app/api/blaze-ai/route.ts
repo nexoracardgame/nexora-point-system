@@ -1929,6 +1929,168 @@ async function buildDirectCardSkillSearchReply(message: string) {
   return formatCardSkillSearchMatches(matches, message);
 }
 
+function parseCardStatValue(value: string) {
+  const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const number = Number(match[0]);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getRequestedCardStat(message: string): "atk" | "sup" | "" {
+  if (
+    includesAnyThaiOrEnglish(message, [
+      "atk",
+      "attack",
+      "พลังโจมตี",
+      "โจมตี",
+      "ค่าโจมตี",
+    ])
+  ) {
+    return "atk";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(message, [
+      "sup",
+      "support",
+      "พลังรับ",
+      "ซัพ",
+      "ซัพพอร์ต",
+      "สนับสนุน",
+      "ค่ารับ",
+    ])
+  ) {
+    return "sup";
+  }
+
+  return "";
+}
+
+function getRequestedStatDirection(message: string): "highest" | "lowest" | "" {
+  if (
+    includesAnyThaiOrEnglish(message, [
+      "สูงสุด",
+      "มากสุด",
+      "เยอะสุด",
+      "สูงที่สุด",
+      "มากที่สุด",
+      "highest",
+      "max",
+      "top",
+    ])
+  ) {
+    return "highest";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(message, [
+      "ต่ำสุด",
+      "น้อยสุด",
+      "ต่ำที่สุด",
+      "น้อยที่สุด",
+      "lowest",
+      "min",
+    ])
+  ) {
+    return "lowest";
+  }
+
+  return "";
+}
+
+function isCardStatExtremeQuestion(message: string) {
+  const hasCardIntent = includesAnyThaiOrEnglish(message, ["การ์ด", "ใบ", "card"]);
+  return Boolean(
+    hasCardIntent &&
+      getRequestedCardStat(message) &&
+      getRequestedStatDirection(message)
+  );
+}
+
+function formatCardStatExtremeRows(
+  rows: Array<{ row: CardDbRow; value: number }>,
+  stat: "atk" | "sup",
+  direction: "highest" | "lowest"
+) {
+  const statLabel = stat === "atk" ? "ATK" : "SUP";
+  const directionLabel = direction === "highest" ? "สูงสุด" : "ต่ำสุด";
+  const topValue = rows[0]?.value;
+  const ties = rows.filter((item) => item.value === topValue);
+  const tieLine =
+    ties.length > 1
+      ? `พบ ${ties.length} ใบที่ค่า ${statLabel} เท่ากัน`
+      : "พบ 1 ใบ";
+
+  return enforceBlazeStyle(
+    [
+      `ข้าตรวจจากฐานการ์ด 293 ใบแล้ว การ์ดที่ ${statLabel} ${directionLabel} คือ`,
+      tieLine,
+      ...ties.map(({ row, value }) => {
+        const otherStat = stat === "atk" ? "SUP" : "ATK";
+        const otherValue = parseCardStatValue(stat === "atk" ? row.sup : row.atk);
+
+        return `No.${row.cardNoNormalized} ${row.cardName} — ${statLabel} ${value.toLocaleString("th-TH")}${
+          otherValue !== null
+            ? ` / ${otherStat} ${otherValue.toLocaleString("th-TH")}`
+            : ""
+        }`;
+      }),
+    ].join("\n")
+  );
+}
+
+async function buildDirectCardStatExtremeReply(message: string) {
+  if (!isCardStatExtremeQuestion(message)) {
+    return "";
+  }
+
+  const stat = getRequestedCardStat(message);
+  const direction = getRequestedStatDirection(message);
+  if (!stat || !direction) {
+    return "";
+  }
+
+  const rows = await loadCardDbRows();
+  const ranked = rows
+    .map((row) => {
+      const atkValue = parseCardStatValue(row.atk);
+      const supValue = parseCardStatValue(row.sup);
+
+      if (
+        atkValue === null ||
+        supValue === null ||
+        atkValue < 0 ||
+        supValue < 0
+      ) {
+        return null;
+      }
+
+      return {
+        row,
+        value: stat === "atk" ? atkValue : supValue,
+      };
+    })
+    .filter((item): item is { row: CardDbRow; value: number } => item !== null)
+    .sort((a, b) =>
+      direction === "highest"
+        ? b.value - a.value ||
+          a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized)
+        : a.value - b.value ||
+          a.row.cardNoNormalized.localeCompare(b.row.cardNoNormalized)
+    );
+
+  if (!ranked.length) {
+    return enforceBlazeStyle(
+      `ข้าค้นจากฐานการ์ด 293 ใบแล้ว ยังไม่พบข้อมูล ${stat.toUpperCase()} ที่ใช้จัดอันดับได้`
+    );
+  }
+
+  return formatCardStatExtremeRows(ranked, stat, direction);
+}
+
 function wantsCardName(message: string) {
   const text = normalizeSearchText(message);
   return text.includes("ชื่อ") || text.includes("name");
@@ -3140,6 +3302,20 @@ export async function POST(req: NextRequest) {
           ok: true,
           reply: polishBlazeReply(directCardCollectionReply, effectiveMessage),
           source: "canonical",
+          native: true,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directCardStatExtremeReply =
+      await buildDirectCardStatExtremeReply(effectiveMessage);
+    if (directCardStatExtremeReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directCardStatExtremeReply, effectiveMessage),
+          source: "card-db",
           native: true,
         },
         { headers: { "Cache-Control": "no-store" } }
