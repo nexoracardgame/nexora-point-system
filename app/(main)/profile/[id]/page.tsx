@@ -16,7 +16,10 @@ import ProfilePresenceDot from "@/components/ProfilePresenceDot";
 import ProfileShareButton from "@/components/ProfileShareButton";
 import { authOptions } from "@/lib/auth";
 import { getDealerVerificationProfile } from "@/lib/box-market-store";
-import { getDealerSheetSalesByMemberId } from "@/lib/dealer-sheet";
+import {
+  getDealerSheetSalesByMemberIds,
+  normalizeDealerMemberId,
+} from "@/lib/dealer-sheet";
 import { getMarketListingsBySeller } from "@/lib/market-listings";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
@@ -25,6 +28,7 @@ import {
   buildSellerScore,
   buildTopPercent,
   buildTrustScore,
+  type SellerMetrics,
 } from "@/lib/seller-rank";
 
 function formatCurrency(value: number) {
@@ -61,6 +65,13 @@ type ReviewStatsRow = {
   sellerId: string;
   _avg: { rating: number | null };
   _count: { rating: number };
+};
+
+type DealerSalesLookupRow = {
+  userId?: string | null;
+  userid?: string | null;
+  memberId?: string | null;
+  memberid?: string | null;
 };
 
 type SellerProfileFallback = {
@@ -573,21 +584,61 @@ export default async function SellerProfilePage({
   );
 
   const now = new Date().getTime();
+  const dealerSalesRows = await prisma
+    .$queryRawUnsafe<DealerSalesLookupRow[]>(
+      'SELECT "userId", "memberId" FROM "DealerVerification" WHERE LOWER("status") = \'verified\''
+    )
+    .catch(() => [] as DealerSalesLookupRow[]);
+  const dealerMemberIds = new Set(
+    dealerSalesRows
+      .map((row) => row.memberId || row.memberid || "")
+      .map(normalizeDealerMemberId)
+      .filter(Boolean)
+  );
+
+  if (dealerVerification.verified && dealerVerification.memberId) {
+    dealerMemberIds.add(normalizeDealerMemberId(dealerVerification.memberId));
+  }
+
+  const dealerSalesByMemberId = await getDealerSheetSalesByMemberIds(
+    Array.from(dealerMemberIds)
+  ).catch(() => new Map<string, number>());
+  const dealerSalesByUserId = new Map<string, number>();
+
+  for (const row of dealerSalesRows) {
+    const rowUserId = String(row.userId || row.userid || "").trim();
+    const rowMemberId = normalizeDealerMemberId(
+      String(row.memberId || row.memberid || "")
+    );
+    const sheetSales = dealerSalesByMemberId.get(rowMemberId) || 0;
+
+    if (rowUserId && sheetSales > 0) {
+      dealerSalesByUserId.set(rowUserId, sheetSales);
+    }
+  }
+
+  const sellerBoxSalesVolume =
+    dealerVerification.verified && dealerVerification.memberId
+      ? dealerSalesByMemberId.get(
+          normalizeDealerMemberId(dealerVerification.memberId)
+        ) || 0
+      : 0;
 
   const ranking = sellerIds
     .map((userId) => {
       const listingStats = listingStatMap.get(userId);
       const soldStats = soldStatMap.get(userId);
       const reviewStats = reviewStatMap.get(userId);
+      const boxSalesVolume = dealerSalesByUserId.get(userId) || 0;
       const startedAt =
         sellerCreatedAtMap.get(userId) ||
         listingStats?.startedAt ||
         soldStats?.startedAt ||
         (userId === seller.id ? seller.createdAt : new Date(now));
 
-      const metrics = {
+      const metrics: SellerMetrics = {
         soldCount: soldStats?.soldCount || 0,
-        totalVolume: soldStats?.totalVolume || 0,
+        totalVolume: (soldStats?.totalVolume || 0) + boxSalesVolume,
         activeListings: listingStats?.activeListings || 0,
         totalLikes: listingStats?.totalLikes || 0,
         avgRating: reviewStats?.avgRating || 0,
@@ -605,6 +656,7 @@ export default async function SellerProfilePage({
         trust,
         soldCount: metrics.soldCount,
         totalVolume: metrics.totalVolume,
+        metrics,
       };
     })
     .filter((item) => item.score > 0 || item.userId === seller.id)
@@ -614,13 +666,16 @@ export default async function SellerProfilePage({
       if (b.soldCount !== a.soldCount) return b.soldCount - a.soldCount;
       if (b.totalVolume !== a.totalVolume) return b.totalVolume - a.totalVolume;
       return a.userId.localeCompare(b.userId);
-    });
+  });
 
   const sellerListingMetrics = listingStatMap.get(seller.id);
   const sellerSoldMetrics = soldStatMap.get(seller.id);
-  const metrics = {
+  const cardSalesVolume = sellerSoldMetrics?.totalVolume || 0;
+  const boxProductSalesVolume = sellerBoxSalesVolume;
+  const combinedSalesVolume = cardSalesVolume + boxProductSalesVolume;
+  const metrics: SellerMetrics = {
     soldCount: sellerSoldMetrics?.soldCount || 0,
-    totalVolume: sellerSoldMetrics?.totalVolume || 0,
+    totalVolume: combinedSalesVolume,
     activeListings: sellerListingMetrics?.activeListings ?? listings.length,
     totalLikes: sellerListingMetrics?.totalLikes || 0,
     avgRating: Number(reviewAggregate._avg.rating || 0),
@@ -632,13 +687,7 @@ export default async function SellerProfilePage({
   };
 
   const completedDeals = metrics.soldCount;
-  const totalVolume = metrics.totalVolume;
-  const boxProductSalesVolume = dealerVerification.verified
-    ? await getDealerSheetSalesByMemberId(dealerVerification.memberId).catch(
-        () => 0
-      )
-    : 0;
-  const combinedSalesVolume = totalVolume + boxProductSalesVolume;
+  const totalVolume = cardSalesVolume;
   const trustScore = buildTrustScore(metrics);
   const sellerScore = buildSellerScore(metrics);
   const isSellerAdmin = String(seller.role || "").trim().toLowerCase() === "admin";
@@ -656,7 +705,8 @@ export default async function SellerProfilePage({
     sellerRankIndex >= 0 ? sellerRankIndex + 1 : ranking.length || 1,
     Math.max(ranking.length, 1),
     sellerScore,
-    trustScore
+    trustScore,
+    metrics
   );
 
   const isGrowingSeller = completedDeals >= 10;

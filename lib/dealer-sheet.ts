@@ -185,6 +185,10 @@ function normalizeCode(value: string) {
   return String(value || "").trim().toLowerCase().replace(/[\s\-_./]+/g, "");
 }
 
+export function normalizeDealerMemberId(value: string) {
+  return normalizeCode(value);
+}
+
 function normalizeDigits(value: string) {
   const digits = String(value || "").replace(/[^\d]/g, "");
   if (digits.startsWith("66") && digits.length === 11) {
@@ -332,4 +336,54 @@ export async function getDealerSheetSalesByMemberId(memberId: string) {
   }
 
   return parseSalesValue(getComparableRowValue(match, headerMap.sales, 0));
+}
+
+export async function getDealerSheetSalesByMemberIds(memberIds: string[]) {
+  const requestedMemberIds = Array.from(
+    new Set(memberIds.map(normalizeCode).filter(Boolean))
+  );
+  const emptyResult = new Map<string, number>();
+
+  if (requestedMemberIds.length === 0) {
+    return emptyResult;
+  }
+
+  const response = await fetch(getDealerSheetCsvUrl(), {
+    cache: "no-store",
+    headers: {
+      Accept: "text/csv,text/plain,*/*",
+    },
+  });
+
+  if (!response.ok) {
+    return emptyResult;
+  }
+
+  const csv = await response.text();
+  const rows = parseCsv(csv);
+  if (rows.length === 0) {
+    return emptyResult;
+  }
+
+  const requested = new Set(requestedMemberIds);
+  const headers = Object.keys(rows[0] || {});
+  const headerMap = getHeaderMap(headers);
+  const result = new Map<string, number>();
+
+  for (const row of rows) {
+    const rowMemberId = normalizeCode(
+      getComparableRowValue(row, headerMap.memberId, 1)
+    );
+
+    if (!requested.has(rowMemberId)) {
+      continue;
+    }
+
+    result.set(
+      rowMemberId,
+      parseSalesValue(getComparableRowValue(row, headerMap.sales, 0))
+    );
+  }
+
+  return result;
 }

@@ -1,4 +1,4 @@
-type SellerMetrics = {
+export type SellerMetrics = {
   soldCount: number;
   totalVolume: number;
   activeListings: number;
@@ -115,29 +115,70 @@ export function buildTopPercent(
   rank: number,
   total: number,
   score = 0,
-  trustScore = 0
+  trustScore = 0,
+  metrics?: Partial<SellerMetrics>
 ) {
   if (rank <= 0 || total <= 0) return 100;
 
-  const rankPercent = clamp(Math.ceil((rank / total) * 100), 1, 100);
-  const qualityGate =
-    score >= 880 && trustScore >= 94
-      ? 1
-      : score >= 780 && trustScore >= 90
-        ? 2
-        : score >= 680 && trustScore >= 86
-          ? 5
-          : score >= 560 && trustScore >= 80
-            ? 10
-            : score >= 430 && trustScore >= 73
-              ? 20
-              : score >= 310 && trustScore >= 65
-                ? 35
-                : score >= 210 && trustScore >= 56
-                  ? 55
-                  : score >= 120 && trustScore >= 45
-                    ? 75
-                    : 100;
+  const soldCount = Math.max(0, Number(metrics?.soldCount || 0));
+  const totalVolume = Math.max(0, Number(metrics?.totalVolume || 0));
+  const activeListings = Math.max(0, Number(metrics?.activeListings || 0));
+  const totalLikes = Math.max(0, Number(metrics?.totalLikes || 0));
+  const avgRating = Math.max(0, Number(metrics?.avgRating || 0));
+  const reviewCount = Math.max(0, Number(metrics?.reviewCount || 0));
+  const accountAgeDays = Math.max(0, Number(metrics?.accountAgeDays || 0));
+  const marketBase = Math.max(total, 100);
+  const rankPercent = clamp(Math.ceil((rank / marketBase) * 100), 1, 100);
 
-  return Math.max(rankPercent, qualityGate);
+  const reviewQuality = ratingQuality(avgRating, reviewCount) * reviewConfidence(reviewCount);
+  const marketDepth =
+    logScale(soldCount, 220) * 30 +
+    logScale(totalVolume, 420_000) * 23 +
+    Math.pow(Math.max(0, trustScore) / 100, 1.55) * 18 +
+    reviewQuality * 12 +
+    logScale(reviewCount, 90) * 6 +
+    logScale(activeListings, 80) * 5 +
+    logScale(totalLikes, 1200) * 3 +
+    logScale(score, 950) * 3 +
+    logScale(accountAgeDays, 1095) * 3;
+  const continuousGate = clamp(Math.ceil(100 - marketDepth * 0.88), 1, 100);
+
+  const hardGate =
+    soldCount >= 220 &&
+    totalVolume >= 420_000 &&
+    trustScore >= 96 &&
+    reviewCount >= 45 &&
+    avgRating >= 4.85
+      ? 1
+      : soldCount >= 150 &&
+          totalVolume >= 300_000 &&
+          trustScore >= 94 &&
+          reviewCount >= 32 &&
+          avgRating >= 4.75
+        ? 2
+        : soldCount >= 95 &&
+            totalVolume >= 200_000 &&
+            trustScore >= 91 &&
+            reviewCount >= 22 &&
+            avgRating >= 4.65
+          ? 5
+          : soldCount >= 55 &&
+              totalVolume >= 120_000 &&
+              trustScore >= 86 &&
+              reviewCount >= 14
+            ? 10
+            : soldCount >= 28 &&
+                totalVolume >= 60_000 &&
+                trustScore >= 80 &&
+                reviewCount >= 8
+              ? 20
+              : soldCount >= 12 && totalVolume >= 25_000 && trustScore >= 72
+                ? 35
+                : soldCount >= 5 && trustScore >= 62
+                  ? 55
+                  : soldCount >= 1 || activeListings >= 3 || reviewCount >= 1
+                    ? 82
+                    : 98;
+
+  return Math.max(rankPercent, continuousGate, hardGate);
 }
