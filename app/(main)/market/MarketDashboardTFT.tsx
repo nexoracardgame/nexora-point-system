@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Heart, Plus, Handshake, Rows3, ShieldCheck, Search } from "lucide-react";
+import { Heart, Plus, Handshake, Rows3, ShieldCheck, Search, Gavel } from "lucide-react";
 import {
   normalizeMarketListingView,
   type MarketViewItem,
@@ -688,6 +688,13 @@ export default function MarketDashboardTFT({
             <h1 className="font-[family:var(--font-market-display)] mt-3 text-3xl font-black tracking-[-0.05em]">
               FEATURED TOP 3
             </h1>
+            <Link
+              href="/market/auction"
+              className="mt-3 inline-flex min-h-[46px] items-center gap-2 rounded-2xl border border-amber-200/30 bg-[linear-gradient(135deg,#050505,#171007_52%,#3a2508)] px-4 text-sm font-black text-amber-100 shadow-[0_16px_42px_rgba(20,20,30,0.18)] ring-1 ring-black/10 transition hover:-translate-y-0.5"
+            >
+              <Gavel className="h-4 w-4 text-amber-300" />
+              สนามประมูลการ์ด
+            </Link>
           </div>
 
           <div className="flex gap-2">
@@ -875,6 +882,13 @@ export default function MarketDashboardTFT({
             <h1 className="font-[family:var(--font-market-display)] mt-4 text-4xl font-black tracking-[-0.05em] md:text-6xl">
               FEATURED TOP 3
             </h1>
+            <Link
+              href="/market/auction"
+              className="mt-5 inline-flex min-h-[50px] items-center gap-2 rounded-2xl border border-amber-200/30 bg-[linear-gradient(135deg,#050505,#171007_52%,#3a2508)] px-5 text-sm font-black text-amber-100 shadow-[0_18px_46px_rgba(20,20,30,0.18)] ring-1 ring-black/10 transition hover:-translate-y-0.5 hover:shadow-[0_24px_62px_rgba(20,20,30,0.24)]"
+            >
+              <Gavel className="h-4 w-4 text-amber-300" />
+              สนามประมูลการ์ด
+            </Link>
           </div>
 
           <div className="flex gap-2">

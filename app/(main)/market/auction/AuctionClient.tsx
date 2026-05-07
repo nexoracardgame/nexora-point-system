@@ -1,0 +1,566 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CalendarDays,
+  Clock,
+  Crown,
+  Gavel,
+  Loader2,
+  Plus,
+  ShieldAlert,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
+import SafeCardImage from "@/components/SafeCardImage";
+import MarketFeatureNav from "@/components/MarketFeatureNav";
+import { nexoraAlert } from "@/lib/nexora-dialog";
+
+type CardData = {
+  cardNo: string;
+  cardName: string;
+  rarity: string;
+  imageUrl: string;
+};
+
+type AuctionRoom = {
+  id: string;
+  cardNo: string;
+  cardName: string;
+  imageUrl: string;
+  rarity: string;
+  openingPrice: number;
+  minBidStep: number;
+  startsAt: string;
+  endsAt: string;
+  sellerId: string;
+  sellerName: string;
+  sellerImage: string;
+  status: string;
+  createdAt: string;
+  topBid: number;
+  bidCount: number;
+};
+
+function normalizeCardNo(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? digits.padStart(3, "0").slice(-3) : "";
+}
+
+function formatBaht(value: number) {
+  return `฿${Number(value || 0).toLocaleString("th-TH")}`;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function toLocalDateTimeValue(date: Date) {
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function getRoomPhase(room: AuctionRoom) {
+  const now = Date.now();
+  const startsAt = new Date(room.startsAt).getTime();
+  const endsAt = new Date(room.endsAt).getTime();
+
+  if (now < startsAt) return "scheduled";
+  if (now > endsAt || room.status !== "active") return "ended";
+  return "live";
+}
+
+function getNextMinimum(room: AuctionRoom) {
+  return (room.topBid || room.openingPrice) + room.minBidStep;
+}
+
+function RuleModal({
+  room,
+  onClose,
+  onEnter,
+}: {
+  room: AuctionRoom;
+  onClose: () => void;
+  onEnter: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="กฎก่อนเข้าห้องประมูล"
+      className="fixed inset-0 z-[1600] flex items-center justify-center bg-black/78 px-4 py-6 backdrop-blur-xl"
+    >
+      <div className="w-full max-w-2xl overflow-hidden rounded-[30px] border border-amber-300/24 bg-[radial-gradient(circle_at_top,#2a2110_0%,#100e0a_48%,#050505_100%)] p-5 text-white shadow-[0_35px_130px_rgba(0,0,0,0.72)] sm:p-7">
+        <div className="flex items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/14 text-amber-200">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-black uppercase tracking-[0.28em] text-amber-200/70">
+              Auction Rule
+            </div>
+            <h2 className="mt-2 text-2xl font-black leading-tight text-amber-100 sm:text-3xl">
+              กฎเหล็กก่อนเข้าห้องประมูล
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-white/62">
+              ห้อง {room.cardName} จะใช้กติกานี้เพื่อกันการปั่นราคาและรักษาสิทธิ์ของผู้เล่นทุกคน
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 text-sm font-bold leading-6 text-white/78">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            ถ้าหมดเวลาประมูลแล้วผู้ชนะอันดับ 1 ติดต่อไม่ได้หรือไม่กดยืนยันภายใน 24 ชั่วโมง สิทธิ์จะเลื่อนไปอันดับรองลงมาตามลำดับ
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            ผู้ที่ชนะแล้วไม่รับสิทธิ์จะถูกระงับสิทธิ์ประมูลถาวร และมีสัญลักษณ์เตือนบนโปรไฟล์
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            เมื่อชนะและกดยืนยัน ระบบจะใช้ห้องแชทพิเศษเพื่อให้ผู้ซื้อกับเจ้าของการ์ดนัดรับกันเอง
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[52px] rounded-2xl border border-white/12 bg-white/[0.05] px-4 text-sm font-black text-white/72"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={onEnter}
+            className="min-h-[52px] rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#f6c453_48%,#a36b12)] px-4 text-sm font-black text-black shadow-[0_0_36px_rgba(246,196,83,0.28)]"
+          >
+            เข้าไปประมูล
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AuctionClient() {
+  const router = useRouter();
+  const [rooms, setRooms] = useState<AuctionRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [cardNo, setCardNo] = useState("");
+  const [cardLoading, setCardLoading] = useState(false);
+  const [card, setCard] = useState<CardData | null>(null);
+  const [openingPrice, setOpeningPrice] = useState("");
+  const [minBidStep, setMinBidStep] = useState("");
+  const [startsAt, setStartsAt] = useState(() => toLocalDateTimeValue(new Date()));
+  const [endsAt, setEndsAt] = useState(() =>
+    toLocalDateTimeValue(new Date(Date.now() + 24 * 60 * 60 * 1000))
+  );
+  const [ruleRoom, setRuleRoom] = useState<AuctionRoom | null>(null);
+  const lastCardLookupRef = useRef("");
+
+  const fetchRooms = useCallback(async () => {
+    try {
+      const res = await fetch("/api/market/auction", { cache: "no-store" });
+      const data = await res.json();
+      setRooms(Array.isArray(data.rooms) ? data.rooms : []);
+    } catch {
+      setRooms([]);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchRooms();
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchRooms();
+      }
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchRooms]);
+
+  useEffect(() => {
+    const normalized = normalizeCardNo(cardNo);
+
+    if (!normalized) {
+      setCard(null);
+      lastCardLookupRef.current = "";
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      if (lastCardLookupRef.current === normalized) {
+        return;
+      }
+
+      lastCardLookupRef.current = normalized;
+      setCardLoading(true);
+
+      try {
+        const res = await fetch(`/api/card?cardNo=${encodeURIComponent(normalized)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        setCard({
+          cardNo: normalized,
+          cardName: data.card_name || data.cardName || `NEXORA Card #${normalized}`,
+          rarity: data.rarity || data.value || "Legendary",
+          imageUrl: data.image_url || data.imageUrl || `/cards/${normalized}.jpg`,
+        });
+      } catch {
+        setCard({
+          cardNo: normalized,
+          cardName: `NEXORA Card #${normalized}`,
+          rarity: "Legendary",
+          imageUrl: `/cards/${normalized}.jpg`,
+        });
+      } finally {
+        setCardLoading(false);
+      }
+    }, 320);
+
+    return () => window.clearTimeout(timer);
+  }, [cardNo]);
+
+  const featuredRooms = useMemo(() => rooms.slice(0, 6), [rooms]);
+
+  const createAuction = async () => {
+    if (creating) return;
+
+    if (!card) {
+      await nexoraAlert({
+        title: "ยังไม่ได้เลือกการ์ด",
+        message: "กรอกเลขการ์ดก่อน ระบบจะดึงการ์ดขึ้นมาให้ทันที",
+        tone: "warning",
+      });
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const res = await fetch("/api/market/auction", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cardNo: card.cardNo,
+          cardName: card.cardName,
+          imageUrl: card.imageUrl,
+          rarity: card.rarity,
+          openingPrice,
+          minBidStep,
+          startsAt: new Date(startsAt).toISOString(),
+          endsAt: new Date(endsAt).toISOString(),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "สร้างห้องประมูลไม่สำเร็จ");
+      }
+
+      await nexoraAlert({
+        title: "สร้างห้องประมูลสำเร็จ",
+        message: "ห้องถูกเปิดในสนามประมูลแล้ว และไม่สามารถแก้ไขข้อมูลห้องนี้ได้",
+        tone: "success",
+      });
+
+      router.push(`/market/auction/${data.room.id}`);
+    } catch (error) {
+      await nexoraAlert({
+        title: "สร้างห้องไม่สำเร็จ",
+        message: String(error instanceof Error ? error.message : error),
+        tone: "danger",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="min-h-full overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,#231706_0%,#080706_46%,#020202_100%)] text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,rgba(250,204,21,0.16),transparent_28%),radial-gradient(circle_at_85%_8%,rgba(255,255,255,0.07),transparent_22%)]" />
+
+      <div className="mx-auto max-w-7xl space-y-5 px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 md:pb-4 xl:px-6">
+        <section className="relative overflow-hidden rounded-[34px] border border-amber-200/18 bg-[linear-gradient(135deg,rgba(255,224,138,0.14),rgba(255,255,255,0.045)_34%,rgba(0,0,0,0.42))] p-5 shadow-[0_30px_120px_rgba(0,0,0,0.52)] sm:p-7 lg:p-9">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_20%,rgba(251,191,36,0.22),transparent_24%),linear-gradient(90deg,rgba(255,255,255,0.045),transparent_48%)]" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/24 bg-black/35 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-amber-200">
+                <Gavel className="h-4 w-4" />
+                NEXORA AUCTION ARENA
+              </div>
+              <h1 className="mt-4 text-4xl font-black leading-[0.95] tracking-tight text-amber-100 sm:text-5xl lg:text-7xl">
+                สนามประมูลการ์ด
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/62 sm:text-base">
+                เปิดห้องประมูลการ์ดใบเดียว ตั้งราคาเปิด บิทขั้นต่ำ วันเวลาเปิดปิด และให้ทุกคนแข่งบิทกันแบบเห็นกระดานเดียวกันทั้งห้อง
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="rounded-[24px] border border-white/10 bg-black/30 p-4">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/36">
+                  <Trophy className="h-4 w-4 text-amber-300" />
+                  Rooms
+                </div>
+                <div className="mt-2 text-3xl font-black text-white">
+                  {rooms.length.toLocaleString("th-TH")}
+                </div>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-black/30 p-4">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/36">
+                  <Sparkles className="h-4 w-4 text-amber-300" />
+                  Live
+                </div>
+                <div className="mt-2 text-3xl font-black text-emerald-300">
+                  {rooms.filter((room) => getRoomPhase(room) === "live").length}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <MarketFeatureNav />
+
+        <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
+          <div className="rounded-[30px] border border-amber-200/14 bg-black/34 p-4 shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.26em] text-amber-200/54">
+                  Create Room
+                </div>
+                <h2 className="mt-1 text-2xl font-black text-white">
+                  สร้างห้องประมูล
+                </h2>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#d59a21)] text-black">
+                <Plus className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-white/72">
+                  เลขการ์ด
+                </span>
+                <input
+                  value={cardNo}
+                  onChange={(event) => setCardNo(event.target.value)}
+                  inputMode="numeric"
+                  placeholder="เช่น 75, 216, 293"
+                  className="min-h-[54px] w-full rounded-[20px] border border-white/10 bg-white/[0.04] px-4 text-base font-black text-white outline-none placeholder:text-white/28 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/12"
+                />
+              </label>
+
+              <div className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.035] p-4">
+                {card ? (
+                  <div className="grid gap-4 sm:grid-cols-[130px_1fr] sm:items-center">
+                    <SafeCardImage
+                      cardNo={card.cardNo}
+                      imageUrl={card.imageUrl}
+                      alt={card.cardName}
+                      loading="eager"
+                      className="mx-auto aspect-[3/4] w-full max-w-[160px] rounded-[18px] object-contain shadow-[0_0_40px_rgba(251,191,36,0.2)]"
+                    />
+                    <div className="min-w-0 text-center sm:text-left">
+                      <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-200/54">
+                        Card Found
+                      </div>
+                      <div className="mt-2 break-words text-xl font-black text-white">
+                        {card.cardName}
+                      </div>
+                      <div className="mt-1 text-sm font-bold text-white/48">
+                        No.{card.cardNo} • {card.rarity}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[160px] items-center justify-center text-center text-sm font-bold leading-6 text-white/38">
+                    {cardLoading ? (
+                      <span className="inline-flex items-center gap-2 text-amber-200">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        กำลังดึงการ์ด...
+                      </span>
+                    ) : (
+                      "กรอกเลขการ์ดแล้วตัวอย่างจะเด้งขึ้นมาทันที"
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-black text-white/72">
+                    เปิดราคาประมูล
+                  </span>
+                  <input
+                    value={openingPrice}
+                    onChange={(event) => setOpeningPrice(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="เช่น 100"
+                    className="min-h-[54px] w-full rounded-[20px] border border-white/10 bg-white/[0.04] px-4 text-base font-black text-white outline-none placeholder:text-white/28 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/12"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-black text-white/72">
+                    บิทขั้นต่ำประมูล
+                  </span>
+                  <input
+                    value={minBidStep}
+                    onChange={(event) => setMinBidStep(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="เช่น 50"
+                    className="min-h-[54px] w-full rounded-[20px] border border-white/10 bg-white/[0.04] px-4 text-base font-black text-white outline-none placeholder:text-white/28 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/12"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 flex items-center gap-2 text-sm font-black text-white/72">
+                    <CalendarDays className="h-4 w-4 text-amber-300" />
+                    เวลาเปิดประมูล
+                  </span>
+                  <input
+                    value={startsAt}
+                    onChange={(event) => setStartsAt(event.target.value)}
+                    type="datetime-local"
+                    className="min-h-[54px] w-full rounded-[20px] border border-white/10 bg-white/[0.04] px-4 text-sm font-black text-white outline-none [color-scheme:dark] focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/12"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 flex items-center gap-2 text-sm font-black text-white/72">
+                    <Clock className="h-4 w-4 text-amber-300" />
+                    เวลาปิดประมูล
+                  </span>
+                  <input
+                    value={endsAt}
+                    onChange={(event) => setEndsAt(event.target.value)}
+                    type="datetime-local"
+                    className="min-h-[54px] w-full rounded-[20px] border border-white/10 bg-white/[0.04] px-4 text-sm font-black text-white outline-none [color-scheme:dark] focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/12"
+                  />
+                </label>
+              </div>
+
+              <button
+                type="button"
+                onClick={createAuction}
+                disabled={creating}
+                className="min-h-[58px] rounded-[22px] bg-[linear-gradient(135deg,#fff5bd,#f7c84d_50%,#9c650c)] px-5 text-base font-black text-black shadow-[0_0_42px_rgba(247,200,77,0.28)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-65"
+              >
+                {creating ? "กำลังสร้างห้อง..." : "สร้างห้องประมูล"}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-amber-200/14 bg-black/30 p-4 shadow-[0_24px_90px_rgba(0,0,0,0.34)] sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.26em] text-amber-200/54">
+                  Latest Rooms
+                </div>
+                <h2 className="mt-1 text-2xl font-black text-white">
+                  ห้องประมูลล่าสุด
+                </h2>
+              </div>
+              <Crown className="h-7 w-7 text-amber-300" />
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              {roomsLoading ? (
+                <div className="col-span-full flex min-h-[260px] items-center justify-center rounded-[26px] border border-white/10 bg-white/[0.035] text-amber-200">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : featuredRooms.length === 0 ? (
+                <div className="col-span-full flex min-h-[260px] items-center justify-center rounded-[26px] border border-dashed border-white/12 bg-white/[0.025] px-4 text-center text-sm font-bold leading-6 text-white/42">
+                  ยังไม่มีห้องประมูล เปิดห้องแรกแล้วสนามจะสว่างขึ้นทันที
+                </div>
+              ) : (
+                featuredRooms.map((room) => {
+                  const phase = getRoomPhase(room);
+                  const nextMinimum = getNextMinimum(room);
+
+                  return (
+                    <button
+                      key={room.id}
+                      type="button"
+                      onClick={() => setRuleRoom(room)}
+                      className="group overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))] text-left shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition hover:-translate-y-1 hover:border-amber-200/28"
+                    >
+                      <div className="relative h-[220px] overflow-hidden bg-black/35">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.28),transparent_46%)] opacity-80" />
+                        <SafeCardImage
+                          cardNo={room.cardNo}
+                          imageUrl={room.imageUrl}
+                          alt={room.cardName}
+                          className="relative z-10 mx-auto h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
+                        />
+                        <div className="absolute left-3 top-3 rounded-full border border-amber-200/28 bg-black/58 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
+                          {phase === "live" ? "LIVE" : phase === "scheduled" ? "SOON" : "ENDED"}
+                        </div>
+                      </div>
+
+                      <div className="p-4">
+                        <div className="line-clamp-2 text-lg font-black text-white">
+                          {room.cardName}
+                        </div>
+                        <div className="mt-1 text-xs font-bold text-white/42">
+                          No.{room.cardNo} • {room.rarity}
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          <div className="rounded-2xl bg-black/28 p-3">
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                              Top Bid
+                            </div>
+                            <div className="mt-1 text-lg font-black text-amber-200">
+                              {formatBaht(room.topBid || room.openingPrice)}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl bg-black/28 p-3">
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                              Next
+                            </div>
+                            <div className="mt-1 text-lg font-black text-white">
+                              {formatBaht(nextMinimum)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 text-xs font-bold leading-5 text-white/42">
+                          ปิด {formatDateTime(room.endsAt)} • {room.bidCount} บิท
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {ruleRoom ? (
+        <RuleModal
+          room={ruleRoom}
+          onClose={() => setRuleRoom(null)}
+          onEnter={() => {
+            const target = ruleRoom.id;
+            setRuleRoom(null);
+            router.push(`/market/auction/${target}`);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
