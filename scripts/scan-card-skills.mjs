@@ -194,17 +194,23 @@ function extractJson(text) {
 function normalizeOcrResult(cardNo, result) {
   const record = result && typeof result === "object" ? result : {};
   const confidence = String(record.confidence || "medium").toLowerCase();
+  const rawText = String(record.rawText || "").trim();
+  const inferredName = rawText
+    .split(/\r?\n|Card No\.?|ATTACK|SUPPORT|\bNo\./i)[0]
+    ?.replace(/\b\d{1,3}\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
   return normalizeCard(
     {
-      cardName: record.cardName,
+      cardName: record.cardName || inferredName,
       skill: record.skill,
       atk: record.atk,
       sup: record.sup,
       element: record.element,
       rarity: record.rarity,
       type: record.type,
-      rawText: record.rawText,
+      rawText,
       confidence: ["high", "medium", "low"].includes(confidence) ? confidence : "medium",
       reviewed: false,
       sourceImage: `/cards/${cardNo}.jpg`,
@@ -221,70 +227,99 @@ async function scanCard({ apiKey, model, cardNo, filePath }) {
   const mimeType =
     ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
 
-  const response = await fetch(buildGeminiUrl(model, apiKey), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: [
-                "You are extracting exact data from a NEXORA trading card image.",
-                `Card number expected: ${cardNo}.`,
-                "Read only visible text and numbers. Do not invent missing text.",
-                "Return JSON only with these keys:",
-                "cardNo, cardName, skill, atk, sup, element, rarity, type, rawText, confidence, notes.",
-                "Rules:",
-                "- cardNo must be 3 digits if visible or expected.",
-                "- atk and sup must be numeric strings only if visible, otherwise empty strings.",
-                "- skill must be the full visible ability/skill text. Preserve Thai wording.",
-                "- confidence must be high, medium, or low.",
-                "- notes should mention unclear areas briefly.",
-              ].join("\n"),
-            },
-            {
-              inlineData: {
-                mimeType,
-                data: image.toString("base64"),
-              },
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0,
-        topP: 0.1,
-        topK: 1,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json",
+  const buildPrompt = (retry = false) =>
+    [
+      "You are extracting exact data from a NEXORA trading card image.",
+      `Card number expected: ${cardNo}.`,
+      "Read only visible text and numbers. Do not invent missing text.",
+      retry
+        ? "The previous response was not valid JSON. Return valid JSON only, with no prose."
+        : "Return JSON only with these keys:",
+      "cardNo, cardName, skill, atk, sup, element, rarity, type, rawText, confidence, notes.",
+      "Rules:",
+      "- cardNo must be 3 digits if visible or expected.",
+      "- atk and sup must be numeric strings only if visible, otherwise empty strings.",
+      "- skill must be the full visible ability/skill text. Preserve Thai wording.",
+      "- confidence must be high, medium, or low.",
+      "- notes should mention unclear areas briefly.",
+    ].join("\n");
+
+  async function requestGemini(retry = false) {
+    const response = await fetch(buildGeminiUrl(model, apiKey), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: buildPrompt(retry),
+              },
+              {
+                inlineData: {
+                  mimeType,
+                  data: image.toString("base64"),
+                },
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: retry ? 0 : 0.05,
+          topP: 0.1,
+          topK: 1,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+        },
+      }),
+    });
 
-  const raw = await response.text();
-  let data;
+    const raw = await response.text();
+    let data;
 
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error(`Gemini returned invalid HTTP JSON for ${cardNo}`);
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(`Gemini returned invalid HTTP JSON for ${cardNo}: ${raw.slice(0, 180)}`);
+    }
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error?.message || `Gemini HTTP ${response.status}`);
+    }
+
+    const text = data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || "")
+      .join("\n")
+      .trim();
+
+    return {
+      text: text || "",
+      finishReason: data.candidates?.[0]?.finishReason || "",
+    };
   }
 
-  if (!response.ok || data.error) {
-    throw new Error(data.error?.message || `Gemini HTTP ${response.status}`);
+  let responseText = "";
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const geminiResult = await requestGemini(attempt > 0);
+    responseText = geminiResult.text;
+
+    try {
+      const parsed = extractJson(responseText);
+      return normalizeOcrResult(cardNo, parsed);
+    } catch (error) {
+      if (attempt === 2) {
+        throw new Error(
+          `Gemini did not return JSON: ${responseText.slice(0, 220) || geminiResult.finishReason || "empty"}`
+        );
+      }
+    }
   }
 
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text || "")
-    .join("\n")
-    .trim();
-  const parsed = extractJson(text);
-
-  return normalizeOcrResult(cardNo, parsed);
+  throw new Error("Gemini did not return JSON");
 }
 
 function shouldSkip(card, force) {
