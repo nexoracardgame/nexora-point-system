@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -10,10 +12,11 @@ import {
   Loader2,
   Send,
   ShieldAlert,
+  Trash2,
   Trophy,
 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
-import { nexoraAlert } from "@/lib/nexora-dialog";
+import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
 
 type AuctionRoom = {
   id: string;
@@ -106,6 +109,11 @@ function getTimeLeftLabel(room?: AuctionRoom | null) {
   return `${Math.max(1, minutes)} นาที`;
 }
 
+function isAdminRoleClient(role?: string | null) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return normalized === "admin" || normalized === "gm" || normalized === "superadmin";
+}
+
 function RuleOverlay({ onAccept }: { onAccept: () => void }) {
   return (
     <div
@@ -154,12 +162,16 @@ function RuleOverlay({ onAccept }: { onAccept: () => void }) {
 }
 
 export default function AuctionRoomClient({ roomId }: { roomId: string }) {
+  const router = useRouter();
+  const { data: session } = useSession();
   const [payload, setPayload] = useState<AuctionPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingRoom, setDeletingRoom] = useState(false);
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [acceptedRules, setAcceptedRules] = useState(true);
+  const adminCanDelete = isAdminRoleClient(session?.user?.role);
 
   const room = payload?.room || null;
   const bids = payload?.bids || [];
@@ -288,6 +300,47 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     }
   };
 
+  const deleteCurrentRoom = async () => {
+    if (!room || !adminCanDelete || deletingRoom) return;
+
+    const confirmed = await nexoraConfirm({
+      title: "ลบห้องประมูล",
+      message: `ยืนยันการลบห้องประมูล ${room.cardName} ใช่ไหม? ข้อมูลบิททั้งหมดในห้องนี้จะถูกลบออกจากระบบด้วย`,
+      tone: "danger",
+      confirmText: "ยืนยันการลบ",
+      cancelText: "ยกเลิก",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingRoom(true);
+      const res = await fetch(`/api/market/auction/${encodeURIComponent(room.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "ลบห้องประมูลไม่สำเร็จ");
+      }
+
+      await nexoraAlert({
+        title: "ลบห้องประมูลแล้ว",
+        message: "ห้องประมูลนี้ถูกลบออกจากระบบเรียบร้อย",
+        tone: "success",
+      });
+      router.push("/market/auction");
+    } catch (error) {
+      await nexoraAlert({
+        title: "ลบห้องประมูลไม่สำเร็จ",
+        message: String(error instanceof Error ? error.message : error),
+        tone: "danger",
+      });
+    } finally {
+      setDeletingRoom(false);
+    }
+  };
+
   if (loading && !room) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center rounded-[28px] bg-black text-amber-200">
@@ -315,8 +368,25 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
             <ArrowLeft className="h-4 w-4" />
             กลับสนามประมูล
           </Link>
-          <div className="rounded-full border border-amber-200/16 bg-amber-300/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-amber-200">
-            {phase === "live" ? "LIVE AUCTION" : phase === "scheduled" ? "COMING SOON" : "ENDED"}
+          <div className="flex items-center gap-2">
+            {adminCanDelete ? (
+              <button
+                type="button"
+                onClick={() => void deleteCurrentRoom()}
+                disabled={deletingRoom}
+                className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl border border-red-200/22 bg-red-500/14 px-3 text-sm font-black text-red-100 shadow-[0_14px_38px_rgba(127,29,29,0.24)] transition hover:bg-red-500/24 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+              >
+                {deletingRoom ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">ลบห้อง</span>
+              </button>
+            ) : null}
+            <div className="rounded-full border border-amber-200/16 bg-amber-300/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-amber-200">
+              {phase === "live" ? "LIVE AUCTION" : phase === "scheduled" ? "COMING SOON" : "ENDED"}
+            </div>
           </div>
         </div>
 

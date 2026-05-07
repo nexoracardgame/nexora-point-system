@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -11,11 +12,12 @@ import {
   Plus,
   ShieldAlert,
   Sparkles,
+  Trash2,
   Trophy,
 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
 import MarketFeatureNav from "@/components/MarketFeatureNav";
-import { nexoraAlert } from "@/lib/nexora-dialog";
+import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
 
 type CardData = {
   cardNo: string;
@@ -79,6 +81,11 @@ function getRoomPhase(room: AuctionRoom) {
 
 function getNextMinimum(room: AuctionRoom) {
   return (room.topBid || room.openingPrice) + room.minBidStep;
+}
+
+function isAdminRoleClient(role?: string | null) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return normalized === "admin" || normalized === "gm" || normalized === "superadmin";
 }
 
 function RuleModal({
@@ -150,9 +157,11 @@ function RuleModal({
 
 export default function AuctionClient() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [rooms, setRooms] = useState<AuctionRoom[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [deletingRoomId, setDeletingRoomId] = useState("");
   const [cardNo, setCardNo] = useState("");
   const [cardLoading, setCardLoading] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
@@ -164,6 +173,7 @@ export default function AuctionClient() {
   );
   const [ruleRoom, setRuleRoom] = useState<AuctionRoom | null>(null);
   const lastCardLookupRef = useRef("");
+  const adminCanDelete = isAdminRoleClient(session?.user?.role);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -285,6 +295,50 @@ export default function AuctionClient() {
       });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const deleteAuction = async (room: AuctionRoom) => {
+    if (!adminCanDelete || deletingRoomId) return;
+
+    const confirmed = await nexoraConfirm({
+      title: "ลบห้องประมูล",
+      message: `ยืนยันการลบห้องประมูล ${room.cardName} ใช่ไหม? ข้อมูลบิททั้งหมดในห้องนี้จะถูกลบออกจากระบบด้วย`,
+      tone: "danger",
+      confirmText: "ยืนยันการลบ",
+      cancelText: "ยกเลิก",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingRoomId(room.id);
+      const res = await fetch(`/api/market/auction/${encodeURIComponent(room.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "ลบห้องประมูลไม่สำเร็จ");
+      }
+
+      setRooms((currentRooms) =>
+        currentRooms.filter((currentRoom) => currentRoom.id !== room.id)
+      );
+
+      await nexoraAlert({
+        title: "ลบห้องประมูลแล้ว",
+        message: "ห้องประมูลนี้ถูกลบออกจากระบบเรียบร้อย",
+        tone: "success",
+      });
+    } catch (error) {
+      await nexoraAlert({
+        title: "ลบห้องประมูลไม่สำเร็จ",
+        message: String(error instanceof Error ? error.message : error),
+        tone: "danger",
+      });
+    } finally {
+      setDeletingRoomId("");
     }
   };
 
@@ -493,12 +547,35 @@ export default function AuctionClient() {
                   const nextMinimum = getNextMinimum(room);
 
                   return (
-                    <button
+                    <article
                       key={room.id}
-                      type="button"
-                      onClick={() => setRuleRoom(room)}
-                      className="group overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))] text-left shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition hover:-translate-y-1 hover:border-amber-200/28"
+                      className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))] shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition hover:-translate-y-1 hover:border-amber-200/28"
                     >
+                      {adminCanDelete ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void deleteAuction(room);
+                          }}
+                          disabled={deletingRoomId === room.id}
+                          aria-label={`ลบห้องประมูล ${room.cardName}`}
+                          className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-2xl border border-red-200/28 bg-red-500/18 text-red-100 shadow-[0_12px_34px_rgba(127,29,29,0.36)] backdrop-blur transition hover:bg-red-500/28 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deletingRoomId === room.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => setRuleRoom(room)}
+                        className="block w-full text-left"
+                      >
                       <div className="relative h-[220px] overflow-hidden bg-black/35">
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.28),transparent_46%)] opacity-80" />
                         <SafeCardImage
@@ -541,7 +618,8 @@ export default function AuctionClient() {
                           ปิด {formatDateTime(room.endsAt)} • {room.bidCount} บิท
                         </div>
                       </div>
-                    </button>
+                      </button>
+                    </article>
                   );
                 })
               )}

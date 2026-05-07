@@ -271,6 +271,17 @@ export async function getAuctionRoomWithBids(id: string) {
   };
 }
 
+export async function deleteAuctionRoom(id: string) {
+  await ensureAuctionSchema();
+
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    `DELETE FROM "AuctionRoom" WHERE "id" = $1 RETURNING "id"`,
+    id
+  );
+
+  return rows.length > 0;
+}
+
 export async function createAuctionRoom(input: CreateAuctionInput) {
   await ensureAuctionSchema();
 
@@ -413,4 +424,3 @@ export async function createAuctionBid(input: CreateAuctionBidInput) {
     };
   });
 }
-
