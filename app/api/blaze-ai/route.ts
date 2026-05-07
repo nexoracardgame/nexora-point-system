@@ -78,10 +78,13 @@ type CardDbRow = {
   skill: string;
   atk: string;
   sup: string;
+  element: string;
+  rawText: string;
   searchText: string;
 };
 
 type CardKind = "monster" | "skill" | "unknown";
+type CardElement = "earth" | "water" | "fire" | "wood" | "gold" | "unknown";
 
 type CardSkillDbEntry = {
   cardNo: string;
@@ -213,6 +216,8 @@ const BLAZE_RESPONSE_POLICY = [
   "- The canonical collection index is the highest-priority source for collection set rewards, set counts, and card numbers inside sets. Use it before live site snippets.",
   "- If the user asks which collection sets a card belongs to, answer from the canonical card-to-collection membership derived from the collection index.",
   "- NEXORA cards have two card types: monster cards have ATK and SUP only with no skill text; skill cards have effect/skill text only and no direct ATK/SUP stat. Never show 'ยังไม่มีข้อมูลใน Card DB' placeholders for fields that do not belong to that card type.",
+  "- NEXORA has five elements shown by crystal color: brown = earth, blue = water, dark orange/red = fire, green = wood, yellow/gold = gold. When answering about a card, include its element when known or inferred from the card index.",
+  "- For deck advice, buffs, combo, strong/annoying/control skill questions, behave like a knowledgeable game friend: recommend cards from CARD DB, explain why they fit, mention element/type, and keep the advice practical.",
   "- Mention Line Official @Nexoracard only for purchase, sales, product order, dealer, shipping, or product price questions. Never mention Line for lore, rules, rewards, collection sets, card facts, or general knowledge questions.",
   "- If the provided DATA/context is incomplete or ambiguous, say that the answer is based on the records currently found, then list all found records without inventing missing ones.",
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
@@ -1296,6 +1301,7 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
   const skillIndex = findIndex(["skill", "skills", "ability", "effect", "สกิล", "ความสามารถ"]);
   const atkIndex = findIndex(["atk", "attack", "โจมตี", "พลังโจมตี"]);
   const supIndex = findIndex(["sup", "support", "สนับสนุน", "พลังสนับสนุน"]);
+  const elementIndex = findIndex(["element", "ธาตุ"]);
   const imageIndex = findIndex([
     "image_url",
     "image",
@@ -1324,9 +1330,11 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
       const skill = sanitizeText(row[skillIndex]);
       const atk = sanitizeText(row[atkIndex]);
       const sup = sanitizeText(row[supIndex]);
+      const element = sanitizeText(row[elementIndex]);
+      const rawText = "";
       const imageUrl = sanitizeText(row[imageIndex]);
       const searchText = normalizeSearchText(
-        `${cardNo} ${cardNoNormalized} ${cardName} ${reward} ${value} ${skill} ${atk} ${sup}`
+        `${cardNo} ${cardNoNormalized} ${cardName} ${reward} ${value} ${skill} ${atk} ${sup} ${element} ${rawText}`
       );
 
       return {
@@ -1339,6 +1347,8 @@ function csvRowsToCardDbRows(csv: string): CardDbRow[] {
         skill,
         atk,
         sup,
+        element,
+        rawText,
         searchText,
       };
     })
@@ -1432,6 +1442,8 @@ function buildCardRowSearchText(row: Omit<CardDbRow, "searchText">) {
       row.skill,
       row.atk,
       row.sup,
+      row.element,
+      row.rawText,
     ].join(" ")
   );
 }
@@ -1459,6 +1471,8 @@ function mergeCardSkillDbRows(
       skill: row.skill || skillRow.skill,
       atk: row.atk || skillRow.atk,
       sup: row.sup || skillRow.sup,
+      element: row.element || skillRow.element,
+      rawText: row.rawText || skillRow.rawText,
     };
 
     return {
@@ -1480,6 +1494,8 @@ function cardSkillDbRowsToCardDbRows(rows: CardSkillDbEntry[]): CardDbRow[] {
       skill: row.skill,
       atk: row.atk,
       sup: row.sup,
+      element: row.element,
+      rawText: row.rawText,
     };
 
     return {
@@ -1734,9 +1750,111 @@ function includesAnyThaiOrEnglish(value: string, terms: string[]) {
   });
 }
 
+function getRequestedCardElements(message: string): CardElement[] {
+  const elements: CardElement[] = [];
+  const add = (element: CardElement) => {
+    if (element !== "unknown" && !elements.includes(element)) {
+      elements.push(element);
+    }
+  };
+
+  if (includesAnyThaiOrEnglish(message, ["ธาตุดิน", "สายดิน", "ปฐพี", "สีน้ำตาล", "earth"])) add("earth");
+  if (includesAnyThaiOrEnglish(message, ["ธาตุน้ำ", "สายน้ำ", "วารี", "สีฟ้า", "water", "aqua"])) add("water");
+  if (includesAnyThaiOrEnglish(message, ["ธาตุไฟ", "สายไฟ", "เพลิง", "สีส้ม", "fire", "flame"])) add("fire");
+  if (includesAnyThaiOrEnglish(message, ["ธาตุไม้", "สายไม้", "พฤกษา", "สีเขียว", "wood", "nature", "forest"])) add("wood");
+  if (includesAnyThaiOrEnglish(message, ["ธาตุทอง", "สายทอง", "โลหะ", "สีเหลือง", "gold", "metal"])) add("gold");
+
+  return elements;
+}
+
+function getCardAdviceIntent(message: string) {
+  const wantsAtkBuff = includesAnyThaiOrEnglish(message, [
+    "บัฟ at",
+    "บัฟ atk",
+    "บัฟ attack",
+    "บัฟพลังโจมตี",
+    "บัฟโจมตี",
+    "เพิ่ม atk",
+    "เพิ่ม attack",
+    "เพิ่มพลังโจมตี",
+    "attack +",
+    "atk +",
+  ]);
+  const wantsSupBuff = includesAnyThaiOrEnglish(message, [
+    "บัฟ sup",
+    "บัฟ support",
+    "บัฟพลังรับ",
+    "บัฟซัพ",
+    "เพิ่ม sup",
+    "เพิ่ม support",
+    "เพิ่มพลังรับ",
+    "support +",
+    "sup +",
+  ]);
+  const wantsBuff =
+    wantsAtkBuff ||
+    wantsSupBuff ||
+    includesAnyThaiOrEnglish(message, ["บัฟ", "buff", "เสริมพลัง", "เพิ่มพลัง", "พลังโหด"]);
+  const wantsDebuff = includesAnyThaiOrEnglish(message, [
+    "ลดพลัง",
+    "ลด atk",
+    "ลด attack",
+    "ลด sup",
+    "ลด support",
+    "debuff",
+    "เนิร์ฟ",
+    "ตัดพลัง",
+  ]);
+  const wantsControl = includesAnyThaiOrEnglish(message, [
+    "เกรียน",
+    "ปั่น",
+    "โกง",
+    "กวน",
+    "หยุด",
+    "สกัด",
+    "แบน",
+    "ปิดสกิล",
+    "ยกเลิก",
+    "ทำลาย",
+    "สลับ",
+    "ล็อค",
+    "control",
+    "counter",
+  ]);
+  const wantsCombo = includesAnyThaiOrEnglish(message, [
+    "คอมโบ",
+    "combo",
+    "จัดเด็ค",
+    "เด็ค",
+    "เล่นคู่",
+    "เข้ากับ",
+    "แนะนำ",
+    "ใช้ใบไหน",
+    "ตัวไหนดี",
+  ]);
+
+  return {
+    wantsAtkBuff,
+    wantsSupBuff,
+    wantsBuff,
+    wantsDebuff,
+    wantsControl,
+    wantsCombo,
+    requestedElements: getRequestedCardElements(message),
+  };
+}
+
 function isCardSkillSearchQuestion(message: string) {
+  if (extractExplicitCardNumber(message)) {
+    return false;
+  }
+
   const text = message.toLowerCase();
-  const hasCardIntent = includesAnyThaiOrEnglish(message, ["การ์ด", "ใบ", "card"]);
+  const intent = getCardAdviceIntent(message);
+  const hasCardIntent =
+    includesAnyThaiOrEnglish(message, ["การ์ด", "ใบ", "card", "เด็ค", "คอมโบ"]) ||
+    intent.wantsBuff ||
+    intent.wantsControl;
   const hasSkillIntent = includesAnyThaiOrEnglish(message, [
     "สกิล",
     "ความสามารถ",
@@ -1752,8 +1870,8 @@ function isCardSkillSearchQuestion(message: string) {
     "support",
   ]);
   const hasSearchIntent =
-    /ใบไหน|การ์ดไหน|ตัวไหน|อันไหน|อะไรบ้าง|ไหนบ้าง|มีใบ|หา|ค้น/.test(text) ||
-    includesAnyThaiOrEnglish(message, ["which", "what card", "find", "search"]);
+    /ใบไหน|การ์ดไหน|ตัวไหน|อันไหน|อะไรบ้าง|ไหนบ้าง|มีใบ|หา|ค้น|แนะนำ|ตัวไหนดี|ใช้ใบไหน|โหด/.test(text) ||
+    includesAnyThaiOrEnglish(message, ["which", "what card", "find", "search", "recommend", "best"]);
   const hasControlIntent = includesAnyThaiOrEnglish(message, [
     "แบน",
     "ห้ามใช้",
@@ -1771,17 +1889,22 @@ function isCardSkillSearchQuestion(message: string) {
     "คู่แข่ง",
   ]);
 
-  return hasCardIntent && hasSkillIntent && (hasSearchIntent || hasControlIntent);
+  return (
+    hasCardIntent &&
+    (hasSkillIntent || intent.wantsBuff || intent.wantsControl || intent.wantsCombo) &&
+    (hasSearchIntent || hasControlIntent || intent.wantsBuff || intent.wantsControl || intent.wantsCombo)
+  );
 }
 
 function scoreCardSkillSearchRow(row: CardDbRow, message: string) {
   const query = normalizeSearchText(message);
   const rawMessage = message.toLowerCase();
-  const skillText = [row.cardName, row.skill, row.searchText]
+  const skillText = [row.cardName, row.skill, row.rawText, row.searchText]
     .filter(Boolean)
     .join(" ");
   const haystack = normalizeSearchText(skillText);
   const rawHaystack = skillText.toLowerCase();
+  const intent = getCardAdviceIntent(message);
   let score = 0;
 
   const ignoredTokens = new Set(
@@ -1845,9 +1968,66 @@ function scoreCardSkillSearchRow(row: CardDbRow, message: string) {
     "buff",
     "บัฟ",
   ]);
+  const hasAtkPlus = /(?:attack|atk)\s*\+\s*\d+/i.test(rawHaystack);
+  const hasSupPlus = /(?:support|sup)\s*\+\s*\d+/i.test(rawHaystack);
+  const hasAtkMinus = /(?:attack|atk)\s*-\s*\d+/i.test(rawHaystack);
+  const hasSupMinus = /(?:support|sup)\s*-\s*\d+/i.test(rawHaystack);
+  const hasDisableAttack = includesAnyThaiOrEnglish(rawHaystack, [
+    "ไม่สามารถใช้ค่า attack",
+    "ไม่สามารถใช้ attack",
+    "ไม่สามารถเพิ่มค่า attack",
+  ]);
+  const hasDisableSupport = includesAnyThaiOrEnglish(rawHaystack, [
+    "ไม่สามารถใช้ค่า support",
+    "ไม่สามารถใช้ support",
+  ]);
+  const hasDestroy = includesAnyThaiOrEnglish(rawHaystack, ["ทำลาย", "destroy"]);
+  const hasSwap = includesAnyThaiOrEnglish(rawHaystack, ["สลับ", "swap"]);
+  const hasCancel = includesAnyThaiOrEnglish(rawHaystack, ["ยกเลิกผล", "ยกเลิก", "cancel"]);
+  const hasRandom = includesAnyThaiOrEnglish(rawHaystack, ["สุ่ม", "random"]);
+  const hasBuffLock = includesAnyThaiOrEnglish(rawHaystack, ["ไม่สามารถใช้ buff", "ไม่สามารถใช้บัฟ"]);
+  const hasTeamWide = includesAnyThaiOrEnglish(rawHaystack, ["ทุกใบ", "บนสนามเราทุกใบ"]);
+  const hasOpponent = includesAnyThaiOrEnglish(rawHaystack, [
+    "ฝ่ายตรงข้าม",
+    "คู่แข่ง",
+    "ศัตรู",
+    "opponent",
+  ]);
+  const requestedElements = intent.requestedElements;
+  if (requestedElements.length) {
+    score += requestedElements.includes(getCardElement(row)) ? 120 : -45;
+  }
 
   if (wantsSkill && includesAnyThaiOrEnglish(rawHaystack, ["สกิล", "skill", "buff", "บัฟ"])) {
     score += 70;
+  }
+  if (intent.wantsAtkBuff && hasAtkPlus) {
+    score += 150;
+  }
+  if (intent.wantsSupBuff && hasSupPlus) {
+    score += 150;
+  }
+  if (intent.wantsBuff && (hasAtkPlus || hasSupPlus)) {
+    score += 95;
+  }
+  if (intent.wantsDebuff && (hasAtkMinus || hasSupMinus)) {
+    score += 125;
+  }
+  if (intent.wantsControl) {
+    if (hasDisableAttack || hasDisableSupport || hasBuffLock) score += 135;
+    if (hasDestroy) score += 130;
+    if (hasSwap) score += 120;
+    if (hasCancel) score += 105;
+    if (hasRandom) score += 80;
+    if (hasAtkMinus || hasSupMinus) score += 75;
+    if (hasOpponent) score += 40;
+  }
+  if (intent.wantsCombo) {
+    if (hasAtkPlus || hasSupPlus) score += 55;
+    if (hasDisableAttack || hasDisableSupport || hasBuffLock || hasDestroy || hasSwap || hasCancel) score += 55;
+  }
+  if (hasTeamWide && intent.wantsBuff) {
+    score += 50;
   }
   if (wantsDisable && includesAnyThaiOrEnglish(rawHaystack, ["ไม่สามารถใช้", "ปิดผนึก", "สกัด"])) {
     score += 110;
@@ -1872,6 +2052,7 @@ function scoreCardSkillSearchRow(row: CardDbRow, message: string) {
 }
 
 function formatCardSkillSearchMatches(matches: CardDbRow[], message: string) {
+  const intent = getCardAdviceIntent(message);
   const wantsDisable = includesAnyThaiOrEnglish(message, [
     "แบน",
     "ห้ามใช้",
@@ -1882,18 +2063,48 @@ function formatCardSkillSearchMatches(matches: CardDbRow[], message: string) {
     "ปิดสกิล",
     "ลบสกิล",
   ]);
-  const title = wantsDisable
-    ? "จากฐานการ์ด 293 ใบ ใบที่ตรงกับสกิลแนวปิด/แบน/ยกเลิกสกิลอีกฝ่ายมีดังนี้"
-    : "จากฐานการ์ด 293 ใบ ใบที่ตรงกับเงื่อนไขสกิลนี้มีดังนี้";
+  const title = intent.wantsAtkBuff
+    ? "จากฐานการ์ด 293 ใบ การ์ดสกิลสายบัฟ ATK ที่น่าใช้มีดังนี้"
+    : intent.wantsSupBuff
+      ? "จากฐานการ์ด 293 ใบ การ์ดสกิลสายบัฟ SUP/ตั้งรับที่น่าใช้มีดังนี้"
+      : intent.wantsBuff
+        ? "จากฐานการ์ด 293 ใบ การ์ดสกิลสายบัฟพลังที่น่าใช้มีดังนี้"
+        : intent.wantsControl || wantsDisable
+          ? "จากฐานการ์ด 293 ใบ สกิลสายปั่น/เกรียน/คุมเกมที่น่าใช้มีดังนี้"
+          : intent.wantsCombo
+            ? "จากฐานการ์ด 293 ใบ การ์ดที่เอาไปต่อคอมโบได้ดีมีดังนี้"
+            : "จากฐานการ์ด 293 ใบ ใบที่ตรงกับเงื่อนไขสกิลนี้มีดังนี้";
+
+  const describeWhy = (row: CardDbRow) => {
+    const text = `${row.skill} ${row.rawText}`.toLowerCase();
+    const notes: string[] = [];
+
+    if (/(?:attack|atk)\s*\+\s*\d+/i.test(text)) notes.push("บัฟ ATK");
+    if (/(?:support|sup)\s*\+\s*\d+/i.test(text)) notes.push("บัฟ SUP");
+    if (/(?:attack|atk)\s*-\s*\d+/i.test(text)) notes.push("ลด ATK");
+    if (/(?:support|sup)\s*-\s*\d+/i.test(text)) notes.push("ลด SUP");
+    if (includesAnyThaiOrEnglish(text, ["ไม่สามารถใช้ค่า attack", "ไม่สามารถใช้ attack"])) notes.push("ปิดค่า ATK");
+    if (includesAnyThaiOrEnglish(text, ["ไม่สามารถใช้ค่า support", "ไม่สามารถใช้ support"])) notes.push("ปิดค่า SUP");
+    if (includesAnyThaiOrEnglish(text, ["ไม่สามารถใช้ buff", "ไม่สามารถใช้บัฟ"])) notes.push("กันบัฟ");
+    if (includesAnyThaiOrEnglish(text, ["ทำลาย"])) notes.push("ทำลายมอนสเตอร์");
+    if (includesAnyThaiOrEnglish(text, ["สลับ"])) notes.push("สลับ/ปั่นตำแหน่ง");
+    if (includesAnyThaiOrEnglish(text, ["ยกเลิก"])) notes.push("ล้างผลลบ/ยกเลิกผล");
+    if (includesAnyThaiOrEnglish(text, ["ทุกใบ", "บนสนามเราทุกใบ"])) notes.push("มีผลหลายใบ");
+
+    return notes.length ? notes.join(", ") : "ใช้เป็นไพ่เทคนิคตามจังหวะเกม";
+  };
 
   return enforceBlazeStyle(
     [
       title,
       ...matches.map((row, index) => {
         const skill = (row.skill || "-").replace(/\s+/g, " ").trim();
-        const prefix = index === 0 ? "ตรงที่สุด" : `ใกล้เคียง ${index}`;
-        return `${prefix}: No.${row.cardNoNormalized} ${row.cardName} — ${skill}`;
+        const prefix = `${index + 1}.`;
+        return `${prefix} No.${row.cardNoNormalized} ${row.cardName} | ${formatCardElement(getCardElement(row))} | ${describeWhy(row)}\nสกิล: ${skill}`;
       }),
+      intent.wantsCombo || intent.wantsBuff || intent.wantsControl
+        ? "หลักเล่นให้โหด: จับคู่สกิลบัฟกับมอนสเตอร์ธาตุเดียวกันหรือมอนสเตอร์ที่มีค่าเด่นอยู่แล้ว ส่วนสกิลปั่นให้เก็บไว้ใช้ตอนอีกฝ่ายกำลังจะปิดเกมหรือกำลังบัฟหนัก"
+        : "",
     ].join("\n")
   );
 }
@@ -1985,6 +2196,227 @@ function formatCardKind(kind: CardKind) {
   }
 
   return "ยังไม่ระบุประเภท";
+}
+
+function inferElementFromText(value: string): CardElement {
+  const raw = value.toLowerCase();
+
+  if (
+    includesAnyThaiOrEnglish(raw, [
+      "water",
+      "aqua",
+      "hydro",
+      "ocean",
+      "sea",
+      "river",
+      "wave",
+      "tide",
+      "mist",
+      "rain",
+      "droplet",
+      "frost",
+      "ice",
+      "วารี",
+      "น้ำ",
+      "ทะเล",
+      "คลื่น",
+      "หยดน้ำ",
+      "น้ำแข็ง",
+      "สีฟ้า",
+    ])
+  ) {
+    return "water";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(raw, [
+      "fire",
+      "flame",
+      "blaze",
+      "inferno",
+      "lava",
+      "ember",
+      "pyro",
+      "ash",
+      "solar",
+      "hellfire",
+      "ไฟ",
+      "เพลิง",
+      "อัคคี",
+      "ลาวา",
+      "เถ้าถ่าน",
+      "สีส้ม",
+      "สีแดง",
+    ])
+  ) {
+    return "fire";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(raw, [
+      "nature",
+      "green",
+      "plant",
+      "forest",
+      "leaf",
+      "vine",
+      "root",
+      "tree",
+      "seed",
+      "thorn",
+      "bloom",
+      "spring",
+      "wood",
+      "verdant",
+      "ไม้",
+      "พฤกษา",
+      "ใบไม้",
+      "ป่า",
+      "ราก",
+      "เถาวัลย์",
+      "เมล็ด",
+      "หนาม",
+      "สีเขียว",
+    ])
+  ) {
+    return "wood";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(raw, [
+      "gold",
+      "golden",
+      "metal",
+      "metallic",
+      "iron",
+      "silver",
+      "ore",
+      "mech",
+      "machine",
+      "gear",
+      "magnetic",
+      "rust",
+      "armor",
+      "aurex",
+      "auron",
+      "ทอง",
+      "โลหะ",
+      "เหล็ก",
+      "เงิน",
+      "แร่",
+      "กลไก",
+      "จักรกล",
+      "แม่เหล็ก",
+      "สีเหลือง",
+    ])
+  ) {
+    return "gold";
+  }
+
+  if (
+    includesAnyThaiOrEnglish(raw, [
+      "earth",
+      "rock",
+      "stone",
+      "sand",
+      "soil",
+      "mud",
+      "cliff",
+      "cave",
+      "dune",
+      "boulder",
+      "terra",
+      "ปฐพี",
+      "ดิน",
+      "หิน",
+      "ทราย",
+      "ภูผา",
+      "ธรณี",
+      "โคลน",
+      "สีน้ำตาล",
+      "brown",
+      "orange triangle",
+    ])
+  ) {
+    return "earth";
+  }
+
+  return "unknown";
+}
+
+function inferElementFromCardNo(cardNo: string): CardElement {
+  const no = Number(cardNo);
+  if (!Number.isFinite(no)) {
+    return "unknown";
+  }
+
+  const specialElements: Record<number, CardElement> = {
+    1: "earth",
+    2: "fire",
+    3: "gold",
+    4: "wood",
+    5: "water",
+    6: "fire",
+    7: "earth",
+    8: "water",
+    9: "wood",
+    10: "gold",
+    11: "earth",
+    12: "fire",
+    13: "gold",
+    14: "wood",
+    15: "water",
+    16: "earth",
+    17: "fire",
+    18: "gold",
+    19: "wood",
+    20: "water",
+  };
+
+  if (specialElements[no]) {
+    return specialElements[no];
+  }
+
+  if ((no >= 21 && no <= 60) || (no >= 216 && no <= 230)) {
+    return "earth";
+  }
+  if ((no >= 61 && no <= 98) || (no >= 231 && no <= 248)) {
+    return "gold";
+  }
+  if ((no >= 99 && no <= 137) || (no >= 249 && no <= 263)) {
+    return "water";
+  }
+  if ((no >= 138 && no <= 176) || (no >= 264 && no <= 278)) {
+    return "fire";
+  }
+  if ((no >= 177 && no <= 215) || (no >= 279 && no <= 293)) {
+    return "wood";
+  }
+
+  return "unknown";
+}
+
+function getCardElement(row: CardDbRow): CardElement {
+  const candidates = [
+    inferElementFromText(row.element),
+    inferElementFromCardNo(row.cardNoNormalized),
+    inferElementFromText(`${row.cardName} ${row.skill} ${row.rawText}`),
+  ];
+
+  return candidates.find((element) => element !== "unknown") || "unknown";
+}
+
+function formatCardElement(element: CardElement) {
+  if (element === "earth") return "ธาตุดิน";
+  if (element === "water") return "ธาตุน้ำ";
+  if (element === "fire") return "ธาตุไฟ";
+  if (element === "wood") return "ธาตุไม้";
+  if (element === "gold") return "ธาตุทอง";
+  return "ยังไม่ระบุธาตุ";
+}
+
+function formatCardElementLine(row: CardDbRow) {
+  return `ธาตุ: ${formatCardElement(getCardElement(row))}`;
 }
 
 function getRequestedCardStat(message: string): "atk" | "sup" | "" {
@@ -2080,7 +2512,7 @@ function formatCardStatExtremeRows(
         const otherStat = stat === "atk" ? "SUP" : "ATK";
         const otherValue = parseCardStatValue(stat === "atk" ? row.sup : row.atk);
 
-        return `No.${row.cardNoNormalized} ${row.cardName} — ${statLabel} ${value.toLocaleString("th-TH")}${
+        return `No.${row.cardNoNormalized} ${row.cardName} | ${formatCardElement(getCardElement(row))} — ${statLabel} ${value.toLocaleString("th-TH")}${
           otherValue !== null
             ? ` / ${otherStat} ${otherValue.toLocaleString("th-TH")}`
             : ""
@@ -2256,16 +2688,27 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   const kind = getCardKind(row);
   const title = `การ์ด ${row.cardNo} ${row.cardName}`.trim();
   const typeLine = `ประเภท: ${formatCardKind(kind)}`;
+  const elementLine = formatCardElementLine(row);
+  const wantsOnlyName =
+    /ชื่อ|name/i.test(message) &&
+    !/รางวัล|แลกรับ|ได้อะไร|ระดับ|rarity|value|สกิล|skill|ability|effect|atk|attack|sup|support|เซ็ต|ชุด|collection|set/i.test(
+      message
+    );
   const monsterStatLines = isMonsterCard(row)
     ? [`ATK: ${row.atk}`, `SUP: ${row.sup}`]
     : [];
   const skillLines = isSkillCard(row) ? [`สกิล/ความสามารถ: ${row.skill}`] : [];
+
+  if (wantsOnlyName) {
+    return [`การ์ด ${row.cardNo} ชื่อ ${row.cardName}`, elementLine].join("\n");
+  }
 
   if (wantsSkillStats) {
     if (wantsSkillText && isMonsterCard(row) && !wantsCombatStats) {
       return [
         title,
         typeLine,
+        elementLine,
         "ใบนี้เป็นการ์ดมอนสเตอร์ จึงไม่มีข้อความสกิลแบบการ์ดสกิล",
         ...monsterStatLines,
       ]
@@ -2277,6 +2720,7 @@ function formatCardDbRow(row: CardDbRow, message: string) {
       return [
         title,
         typeLine,
+        elementLine,
         "ใบนี้เป็นการ์ดสกิล จึงไม่มีค่า ATK/SUP แบบการ์ดมอนสเตอร์",
         ...skillLines,
       ]
@@ -2287,6 +2731,7 @@ function formatCardDbRow(row: CardDbRow, message: string) {
     return [
       title,
       typeLine,
+      elementLine,
       wantsValue ? `ระดับ: ${row.value || "-"}` : "",
       wantsReward ? `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}` : "",
       ...(isSkillCard(row) ? skillLines : monsterStatLines),
@@ -2301,6 +2746,7 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   if (wantsCollection && !wantsReward && !wantsValue) {
     return [
       `การ์ด ${row.cardNo} ${row.cardName}`,
+      elementLine,
       memberships
         ? `อยู่ในชุดสะสม: ${memberships}`
         : "ยังไม่พบชุดสะสมที่มีการ์ดใบนี้ในดัชนี canonical",
@@ -2308,12 +2754,13 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   }
 
   if (wantsName && !wantsReward && !wantsValue) {
-    return `การ์ด ${row.cardNo} ชื่อ ${row.cardName}`;
+    return [`การ์ด ${row.cardNo} ชื่อ ${row.cardName}`, elementLine].join("\n");
   }
 
   if (wantsReward && !wantsName && !wantsValue) {
     return [
       `การ์ด ${row.cardNo} ${row.cardName}`,
+      elementLine,
       `รางวัล/เงื่อนไขแลกรับ: ${row.reward || "-"}`,
       memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
     ]
@@ -2324,6 +2771,7 @@ function formatCardDbRow(row: CardDbRow, message: string) {
   if (wantsValue && !wantsName && !wantsReward) {
     return [
       `การ์ด ${row.cardNo} ${row.cardName}`,
+      elementLine,
       `ระดับ: ${row.value || "-"}`,
       memberships ? `ชุดสะสมที่เกี่ยวข้อง: ${memberships}` : "",
     ]
@@ -2335,6 +2783,7 @@ function formatCardDbRow(row: CardDbRow, message: string) {
     `การ์ด ${row.cardNo}`,
     `ชื่อ: ${row.cardName}`,
     typeLine,
+    elementLine,
     `ระดับ: ${row.value || "-"}`,
     ...skillLines,
     ...monsterStatLines,
@@ -2431,6 +2880,8 @@ async function buildDirectCardDbReply(
           skill: "",
           atk: "",
           sup: "",
+          element: "",
+          rawText: "",
           searchText: requestedCardNo,
         },
         message,
@@ -2476,6 +2927,8 @@ async function buildDirectCardDbReply(
           skill: "",
           atk: "",
           sup: "",
+          element: "",
+          rawText: "",
           searchText: cardNo,
         },
         message,
@@ -2527,6 +2980,7 @@ async function buildCardDbKnowledgeContext(
     return [
       `- ${row.cardNo} | ${row.cardName}`,
       `ประเภท: ${formatCardKind(kind)}`,
+      formatCardElementLine(row),
       `ระดับ: ${row.value || "-"}`,
       isSkillCard(row) && row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
       isMonsterCard(row) && row.atk ? `ATK: ${row.atk}` : "",
