@@ -177,6 +177,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const [message, setMessage] = useState("");
   const [acceptedRules, setAcceptedRules] = useState(true);
   const bidBoardEndRef = useRef<HTMLDivElement>(null);
+  const mobileBidBoardRef = useRef<HTMLDivElement>(null);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
 
   const room = payload?.room || null;
@@ -256,15 +257,32 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     setAcceptedRules(true);
   };
 
-  const scrollBidBoardToBottom = useCallback(() => {
+  const scrollMobileBidBoardToBottom = useCallback(() => {
     window.setTimeout(() => {
+      if (!window.matchMedia("(max-width: 639px)").matches) return;
+
+      const mobileBoard = mobileBidBoardRef.current;
+      if (mobileBoard) {
+        mobileBoard.scrollTo({
+          top: mobileBoard.scrollHeight,
+          behavior: "smooth",
+        });
+        return;
+      }
+
       bidBoardEndRef.current?.scrollIntoView({
         behavior: "smooth",
-        block: "end",
+        block: "nearest",
         inline: "nearest",
       });
-    }, 120);
+    }, 90);
   }, []);
+
+  useEffect(() => {
+    if (bids.length > 0) {
+      scrollMobileBidBoardToBottom();
+    }
+  }, [bids.length, scrollMobileBidBoardToBottom]);
 
   const submitBid = async () => {
     if (submitting || !room) return;
@@ -305,7 +323,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       setMessage("");
       setAmount(String(data.nextMinimumBid || numericAmount + room.minBidStep));
       await fetchRoom();
-      scrollBidBoardToBottom();
+      scrollMobileBidBoardToBottom();
     } catch (error) {
       await nexoraAlert({
         title: "ส่งบิทไม่สำเร็จ",
@@ -528,7 +546,10 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
               </div>
             ) : null}
 
-            <div className="mt-5 grid gap-3">
+            <div
+              ref={mobileBidBoardRef}
+              className="mt-5 flex max-h-[58vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1 scroll-smooth sm:max-h-none sm:flex-col-reverse sm:overflow-visible sm:pr-0"
+            >
               {bids.length === 0 ? (
                 <div className="flex min-h-[220px] items-center justify-center rounded-[26px] border border-dashed border-white/12 bg-white/[0.025] px-4 text-center text-sm font-bold leading-6 text-white/42">
                   ยังไม่มีใครบิท เป็นคนแรกที่เปิดกระดานนี้ได้เลย
