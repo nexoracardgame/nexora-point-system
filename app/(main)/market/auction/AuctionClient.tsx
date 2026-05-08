@@ -99,12 +99,70 @@ function isAdminRoleClient(role?: string | null) {
   return normalized === "admin" || normalized === "gm" || normalized === "superadmin";
 }
 
-function notifyAuctionRoomsChanged() {
+type AuctionRoomsChangedDetail = {
+  action?: "created" | "deleted" | "updated";
+  roomId?: string | null;
+};
+
+const AUCTION_DELETED_STORAGE_KEY = "nexora:auction-deleted-rooms";
+const AUCTION_DELETED_TTL_MS = 10 * 60 * 1000;
+
+function readDeletedAuctionRoomMap() {
+  if (typeof window === "undefined") return {} as Record<string, number>;
+
   try {
-    window.localStorage.setItem("nexora:auction-rooms-changed", String(Date.now()));
+    const raw = window.localStorage.getItem(AUCTION_DELETED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    const now = Date.now();
+    const activeEntries = Object.entries(parsed as Record<string, unknown>)
+      .map(([id, timestamp]) => [String(id), Number(timestamp)] as const)
+      .filter(([id, timestamp]) => id && Number.isFinite(timestamp))
+      .filter(([, timestamp]) => now - timestamp < AUCTION_DELETED_TTL_MS);
+
+    const nextMap = Object.fromEntries(activeEntries);
+    if (activeEntries.length !== Object.keys(parsed).length) {
+      window.localStorage.setItem(AUCTION_DELETED_STORAGE_KEY, JSON.stringify(nextMap));
+    }
+
+    return nextMap;
+  } catch {
+    return {};
+  }
+}
+
+function readDeletedAuctionRoomIds() {
+  return new Set(Object.keys(readDeletedAuctionRoomMap()));
+}
+
+function markAuctionRoomDeleted(roomId?: string | null) {
+  const safeRoomId = String(roomId || "").trim();
+  if (!safeRoomId || typeof window === "undefined") return;
+
+  try {
+    const nextMap = {
+      ...readDeletedAuctionRoomMap(),
+      [safeRoomId]: Date.now(),
+    };
+    window.localStorage.setItem(AUCTION_DELETED_STORAGE_KEY, JSON.stringify(nextMap));
+  } catch {}
+}
+
+function notifyAuctionRoomsChanged(detail?: AuctionRoomsChangedDetail) {
+  try {
+    window.localStorage.setItem(
+      "nexora:auction-rooms-changed",
+      JSON.stringify({
+        at: Date.now(),
+        ...(detail || {}),
+      })
+    );
   } catch {}
 
-  window.dispatchEvent(new Event("nexora:auction-rooms-changed"));
+  window.dispatchEvent(new CustomEvent("nexora:auction-rooms-changed", { detail }));
 }
 
 const AUCTION_SEEN_STORAGE_PREFIX = "nexora:auction-seen-rooms";
@@ -248,6 +306,7 @@ export default function AuctionClient() {
   const lastCardLookupRef = useRef("");
   const seenRoomIdsRef = useRef<Set<string>>(new Set());
   const roomsRef = useRef<AuctionRoom[]>([]);
+  const latestFetchSeqRef = useRef(0);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
   const sessionUser = session?.user as
     | { id?: string | null; lineId?: string | null }
@@ -258,12 +317,21 @@ export default function AuctionClient() {
   );
 
   const fetchRooms = useCallback(async () => {
+    const fetchSeq = latestFetchSeqRef.current + 1;
+    latestFetchSeqRef.current = fetchSeq;
+
     try {
       const res = await fetch(`/api/market/auction?ts=${Date.now()}`, {
         cache: "no-store",
       });
       const data = await res.json();
-      const nextRooms = Array.isArray(data.rooms) ? (data.rooms as AuctionRoom[]) : [];
+      if (fetchSeq !== latestFetchSeqRef.current) {
+        return;
+      }
+
+      const deletedRoomIds = readDeletedAuctionRoomIds();
+      const nextRooms = (Array.isArray(data.rooms) ? (data.rooms as AuctionRoom[]) : [])
+        .filter((room) => !deletedRoomIds.has(room.id));
       setRooms(nextRooms);
 
       const currentIds = nextRooms.map((room) => room.id).filter(Boolean);
@@ -298,10 +366,12 @@ export default function AuctionClient() {
         newIds.forEach((id) => merged.add(id));
         return Array.from(merged);
       });
-    } catch {
-      setRooms([]);
+    } catch (error) {
+      console.error("LOAD AUCTION ROOMS ERROR", error);
     } finally {
-      setRoomsLoading(false);
+      if (fetchSeq === latestFetchSeqRef.current) {
+        setRoomsLoading(false);
+      }
     }
   }, [viewerSeenStorageKey]);
 
@@ -324,6 +394,18 @@ export default function AuctionClient() {
       }
     }, 1500);
 
+    const removeDeletedRoomFromState = (roomId?: string | null) => {
+      const safeRoomId = String(roomId || "").trim();
+      if (!safeRoomId) return;
+
+      setRooms((currentRooms) =>
+        currentRooms.filter((room) => room.id !== safeRoomId)
+      );
+      setFreshRoomIds((currentIds) =>
+        currentIds.filter((id) => id !== safeRoomId)
+      );
+    };
+
     const refresh = () => {
       if (document.visibilityState === "visible") {
         void fetchRooms();
@@ -331,20 +413,35 @@ export default function AuctionClient() {
     };
     const refreshFromStorage = (event: StorageEvent) => {
       if (event.key === "nexora:auction-rooms-changed") {
+        try {
+          const detail = JSON.parse(event.newValue || "{}") as AuctionRoomsChangedDetail;
+          if (detail.action === "deleted" && detail.roomId) {
+            markAuctionRoomDeleted(detail.roomId);
+            removeDeletedRoomFromState(detail.roomId);
+          }
+        } catch {}
         refresh();
       }
+    };
+    const refreshFromEvent = (event: Event) => {
+      const detail = (event as CustomEvent<AuctionRoomsChangedDetail>).detail;
+      if (detail?.action === "deleted" && detail.roomId) {
+        markAuctionRoomDeleted(detail.roomId);
+        removeDeletedRoomFromState(detail.roomId);
+      }
+      refresh();
     };
     const refreshOnVisibility = () => refresh();
 
     window.addEventListener("focus", refresh);
-    window.addEventListener("nexora:auction-rooms-changed", refresh);
+    window.addEventListener("nexora:auction-rooms-changed", refreshFromEvent);
     window.addEventListener("storage", refreshFromStorage);
     document.addEventListener("visibilitychange", refreshOnVisibility);
 
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", refresh);
-      window.removeEventListener("nexora:auction-rooms-changed", refresh);
+      window.removeEventListener("nexora:auction-rooms-changed", refreshFromEvent);
       window.removeEventListener("storage", refreshFromStorage);
       document.removeEventListener("visibilitychange", refreshOnVisibility);
     };
@@ -446,7 +543,7 @@ export default function AuctionClient() {
         tone: "success",
       });
 
-      notifyAuctionRoomsChanged();
+      notifyAuctionRoomsChanged({ action: "created", roomId: data.room?.id });
       router.push(`/market/auction/${data.room.id}`);
     } catch (error) {
       await nexoraAlert({
@@ -483,10 +580,12 @@ export default function AuctionClient() {
         throw new Error(data.error || "ลบห้องประมูลไม่สำเร็จ");
       }
 
+      markAuctionRoomDeleted(room.id);
       setRooms((currentRooms) =>
         currentRooms.filter((currentRoom) => currentRoom.id !== room.id)
       );
-      notifyAuctionRoomsChanged();
+      setFreshRoomIds((currentIds) => currentIds.filter((id) => id !== room.id));
+      notifyAuctionRoomsChanged({ action: "deleted", roomId: room.id });
 
       await nexoraAlert({
         title: "ลบห้องประมูลแล้ว",

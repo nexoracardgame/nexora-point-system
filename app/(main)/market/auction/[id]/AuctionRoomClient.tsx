@@ -192,12 +192,48 @@ function formatRemaining(ms: number) {
   return `${minutes} นาที`;
 }
 
-function notifyAuctionRoomsChanged() {
+type AuctionRoomsChangedDetail = {
+  action?: "created" | "deleted" | "updated";
+  roomId?: string | null;
+};
+
+const AUCTION_DELETED_STORAGE_KEY = "nexora:auction-deleted-rooms";
+const AUCTION_DELETED_TTL_MS = 10 * 60 * 1000;
+
+function markAuctionRoomDeleted(roomId?: string | null) {
+  const safeRoomId = String(roomId || "").trim();
+  if (!safeRoomId || typeof window === "undefined") return;
+
   try {
-    window.localStorage.setItem("nexora:auction-rooms-changed", String(Date.now()));
+    const raw = window.localStorage.getItem(AUCTION_DELETED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    const activeEntries = Object.entries(
+      parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
+    )
+      .map(([id, timestamp]) => [String(id), Number(timestamp)] as const)
+      .filter(([id, timestamp]) => id && Number.isFinite(timestamp))
+      .filter(([, timestamp]) => now - timestamp < AUCTION_DELETED_TTL_MS);
+    const nextMap = {
+      ...Object.fromEntries(activeEntries),
+      [safeRoomId]: now,
+    };
+    window.localStorage.setItem(AUCTION_DELETED_STORAGE_KEY, JSON.stringify(nextMap));
+  } catch {}
+}
+
+function notifyAuctionRoomsChanged(detail?: AuctionRoomsChangedDetail) {
+  try {
+    window.localStorage.setItem(
+      "nexora:auction-rooms-changed",
+      JSON.stringify({
+        at: Date.now(),
+        ...(detail || {}),
+      })
+    );
   } catch {}
 
-  window.dispatchEvent(new Event("nexora:auction-rooms-changed"));
+  window.dispatchEvent(new CustomEvent("nexora:auction-rooms-changed", { detail }));
 }
 
 function AuctionFireworks({ active }: { active: boolean }) {
@@ -628,7 +664,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       }
 
       await fetchRoom();
-      notifyAuctionRoomsChanged();
+      notifyAuctionRoomsChanged({ action: "updated", roomId: room.id });
       await nexoraAlert({
         title: "ยืนยันผู้ชนะแล้ว",
         message:
@@ -675,7 +711,8 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
         message: "ห้องประมูลนี้ถูกลบออกจากระบบเรียบร้อย",
         tone: "success",
       });
-      notifyAuctionRoomsChanged();
+      markAuctionRoomDeleted(room.id);
+      notifyAuctionRoomsChanged({ action: "deleted", roomId: room.id });
       router.push("/market/auction");
     } catch (error) {
       await nexoraAlert({
