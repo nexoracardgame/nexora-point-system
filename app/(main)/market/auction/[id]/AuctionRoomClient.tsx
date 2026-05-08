@@ -23,6 +23,7 @@ import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
 
 type AuctionRoom = {
   id: string;
+  roomNumber: number;
   cardNo: string;
   cardName: string;
   imageUrl: string;
@@ -65,6 +66,13 @@ type AuctionFinalRank = AuctionBid & {
 
 function formatBaht(value: number) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
+}
+
+function formatAuctionRoomNumber(value?: number | string | null) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) && numeric > 0
+    ? String(Math.floor(numeric)).padStart(3, "0")
+    : "---";
 }
 
 function formatDateTime(value: string) {
@@ -700,7 +708,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     <div className="relative min-h-full overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,#241806_0%,#080706_48%,#020202_100%)] text-white">
       <AuctionFireworks active={phase === "ended"} />
       <div className="relative z-10 mx-auto max-w-7xl space-y-5 px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 md:pb-4 xl:px-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/market/auction"
             className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl border border-amber-200/16 bg-black/38 px-4 text-sm font-black text-amber-100"
@@ -708,6 +716,9 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
             <ArrowLeft className="h-4 w-4" />
             กลับสนามประมูล
           </Link>
+          <div className="inline-flex min-h-[46px] items-center rounded-2xl border border-amber-200/30 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-4 text-sm font-black text-black shadow-[0_0_26px_rgba(251,191,36,0.24)]">
+            ห้อง {formatAuctionRoomNumber(room.roomNumber)}
+          </div>
           <div className="flex items-center gap-2">
             {roomCanDelete ? (
               <button

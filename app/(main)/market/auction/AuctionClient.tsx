@@ -10,6 +10,7 @@ import {
   Gavel,
   Loader2,
   Plus,
+  Search,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -28,6 +29,7 @@ type CardData = {
 
 type AuctionRoom = {
   id: string;
+  roomNumber: number;
   cardNo: string;
   cardName: string;
   imageUrl: string;
@@ -54,6 +56,13 @@ function normalizeCardNo(value: string) {
 
 function formatBaht(value: number) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
+}
+
+function formatAuctionRoomNumber(value?: number | string | null) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) && numeric > 0
+    ? String(Math.floor(numeric)).padStart(3, "0")
+    : "---";
 }
 
 function formatDateTime(value: string) {
@@ -96,6 +105,52 @@ function notifyAuctionRoomsChanged() {
   } catch {}
 
   window.dispatchEvent(new Event("nexora:auction-rooms-changed"));
+}
+
+const AUCTION_SEEN_STORAGE_PREFIX = "nexora:auction-seen-rooms";
+const MAX_SEEN_AUCTION_ROOM_IDS = 2000;
+
+function buildAuctionSeenStorageKey(viewerKey?: string | null) {
+  const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
+  return `${AUCTION_SEEN_STORAGE_PREFIX}:${safeViewerKey}`;
+}
+
+function readSeenAuctionRoomIdArray(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) return [];
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function hasSeenAuctionRoomSnapshot(storageKey: string) {
+  if (typeof window === "undefined" || !storageKey) return false;
+
+  try {
+    return window.localStorage.getItem(storageKey) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function rememberSeenAuctionRoomIds(storageKey: string, ids: string[]) {
+  if (typeof window === "undefined" || !storageKey) return;
+
+  const nextIds = Array.from(
+    new Set([
+      ...ids.map(String).filter(Boolean),
+      ...readSeenAuctionRoomIdArray(storageKey),
+    ])
+  ).slice(0, MAX_SEEN_AUCTION_ROOM_IDS);
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(nextIds));
+  } catch {}
 }
 
 function RuleModal({
@@ -178,6 +233,8 @@ export default function AuctionClient() {
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deletingRoomId, setDeletingRoomId] = useState("");
+  const [roomSearch, setRoomSearch] = useState("");
+  const [freshRoomIds, setFreshRoomIds] = useState<string[]>([]);
   const [cardNo, setCardNo] = useState("");
   const [cardLoading, setCardLoading] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
@@ -189,7 +246,16 @@ export default function AuctionClient() {
   );
   const [ruleRoom, setRuleRoom] = useState<AuctionRoom | null>(null);
   const lastCardLookupRef = useRef("");
+  const seenRoomIdsRef = useRef<Set<string>>(new Set());
+  const roomsRef = useRef<AuctionRoom[]>([]);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
+  const sessionUser = session?.user as
+    | { id?: string | null; lineId?: string | null }
+    | undefined;
+  const viewerSeenStorageKey = useMemo(
+    () => buildAuctionSeenStorageKey(sessionUser?.id || sessionUser?.lineId),
+    [sessionUser?.id, sessionUser?.lineId]
+  );
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -197,13 +263,57 @@ export default function AuctionClient() {
         cache: "no-store",
       });
       const data = await res.json();
-      setRooms(Array.isArray(data.rooms) ? data.rooms : []);
+      const nextRooms = Array.isArray(data.rooms) ? (data.rooms as AuctionRoom[]) : [];
+      setRooms(nextRooms);
+
+      const currentIds = nextRooms.map((room) => room.id).filter(Boolean);
+      const hasBaseline =
+        hasSeenAuctionRoomSnapshot(viewerSeenStorageKey) ||
+        seenRoomIdsRef.current.size > 0 ||
+        roomsRef.current.length > 0;
+      const storedSeenIds = new Set(readSeenAuctionRoomIdArray(viewerSeenStorageKey));
+      const knownIds = new Set([
+        ...Array.from(storedSeenIds),
+        ...Array.from(seenRoomIdsRef.current),
+      ]);
+      const newIds = hasBaseline
+        ? currentIds.filter((id) => !knownIds.has(id))
+        : [];
+      currentIds.forEach((id) => knownIds.add(id));
+      seenRoomIdsRef.current = knownIds;
+
+      if (currentIds.length > 0) {
+        window.setTimeout(() => {
+          rememberSeenAuctionRoomIds(viewerSeenStorageKey, currentIds);
+        }, 0);
+      }
+
+      setFreshRoomIds((prev) => {
+        const visibleFreshIds = prev.filter((id) => currentIds.includes(id));
+        if (newIds.length === 0) {
+          return visibleFreshIds.length === prev.length ? prev : visibleFreshIds;
+        }
+
+        const merged = new Set(visibleFreshIds);
+        newIds.forEach((id) => merged.add(id));
+        return Array.from(merged);
+      });
     } catch {
       setRooms([]);
     } finally {
       setRoomsLoading(false);
     }
-  }, []);
+  }, [viewerSeenStorageKey]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
+
+  useEffect(() => {
+    seenRoomIdsRef.current = new Set(readSeenAuctionRoomIdArray(viewerSeenStorageKey));
+    roomsRef.current = [];
+    setFreshRoomIds([]);
+  }, [viewerSeenStorageKey]);
 
   useEffect(() => {
     void fetchRooms();
@@ -283,7 +393,16 @@ export default function AuctionClient() {
     return () => window.clearTimeout(timer);
   }, [cardNo]);
 
-  const featuredRooms = useMemo(() => rooms.slice(0, 6), [rooms]);
+  const normalizedRoomSearch = roomSearch.replace(/\D/g, "").slice(0, 3);
+  const featuredRooms = useMemo(() => {
+    if (!normalizedRoomSearch) return rooms.slice(0, 6);
+
+    return rooms.filter((room) =>
+      formatAuctionRoomNumber(room.roomNumber).includes(
+        normalizedRoomSearch.padStart(normalizedRoomSearch.length, "0")
+      )
+    );
+  }, [normalizedRoomSearch, rooms]);
 
   const createAuction = async () => {
     if (creating) return;
@@ -327,6 +446,7 @@ export default function AuctionClient() {
         tone: "success",
       });
 
+      notifyAuctionRoomsChanged();
       router.push(`/market/auction/${data.room.id}`);
     } catch (error) {
       await nexoraAlert({
@@ -574,6 +694,24 @@ export default function AuctionClient() {
               <Crown className="h-7 w-7 text-amber-300" />
             </div>
 
+            <label className="mt-4 flex min-h-[52px] items-center gap-3 rounded-[22px] border border-amber-200/16 bg-black/34 px-4 text-sm font-black text-white shadow-[inset_0_0_22px_rgba(251,191,36,0.035)] focus-within:border-amber-300/42 focus-within:ring-2 focus-within:ring-amber-300/12">
+              <Search className="h-4 w-4 shrink-0 text-amber-300" />
+              <input
+                value={roomSearch}
+                onChange={(event) =>
+                  setRoomSearch(event.target.value.replace(/\D/g, "").slice(0, 3))
+                }
+                inputMode="numeric"
+                placeholder="ค้นหาห้องประมูล เช่น 001"
+                className="min-w-0 flex-1 bg-transparent text-white outline-none placeholder:text-white/30"
+              />
+              {normalizedRoomSearch ? (
+                <span className="rounded-full border border-amber-200/22 bg-amber-300/12 px-3 py-1 text-[10px] font-black text-amber-100">
+                  ห้อง {normalizedRoomSearch.padStart(3, "0")}
+                </span>
+              ) : null}
+            </label>
+
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               {roomsLoading ? (
                 <div className="col-span-full flex min-h-[260px] items-center justify-center rounded-[26px] border border-white/10 bg-white/[0.035] text-amber-200">
@@ -587,6 +725,8 @@ export default function AuctionClient() {
                 featuredRooms.map((room) => {
                   const phase = getRoomPhase(room);
                   const nextMinimum = getNextMinimum(room);
+                  const roomNumberLabel = formatAuctionRoomNumber(room.roomNumber);
+                  const isFreshRoom = freshRoomIds.includes(room.id);
 
                   return (
                     <article
@@ -626,9 +766,19 @@ export default function AuctionClient() {
                           alt={room.cardName}
                           className="relative z-10 mx-auto h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
                         />
-                        <div className="absolute left-3 top-3 rounded-full border border-amber-200/28 bg-black/58 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
-                          {phase === "live" ? "LIVE" : phase === "scheduled" ? "SOON" : "ENDED"}
+                        <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
+                          <div className="rounded-full border border-amber-200/28 bg-black/58 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
+                            {phase === "live" ? "LIVE" : phase === "scheduled" ? "SOON" : "ENDED"}
+                          </div>
+                          <div className="rounded-full border border-amber-200/32 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-3 py-1 text-[10px] font-black text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]">
+                            ห้อง {roomNumberLabel}
+                          </div>
                         </div>
+                        {isFreshRoom ? (
+                          <div className="absolute right-3 top-14 rounded-full border border-amber-300/30 bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(251,191,36,0.35)]">
+                            NEW
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="p-4">

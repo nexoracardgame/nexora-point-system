@@ -5,6 +5,7 @@ import { resolveCardDisplayImage, sanitizeCardImageUrl } from "@/lib/card-image"
 
 export type AuctionRoomRecord = {
   id: string;
+  roomNumber: number;
   cardNo: string;
   cardName: string;
   imageUrl: string;
@@ -37,6 +38,7 @@ export type AuctionBidRecord = {
 
 type AuctionRoomRow = {
   id: string;
+  roomNumber?: number | string | null;
   cardNo: string;
   cardName: string | null;
   imageUrl: string | null;
@@ -125,6 +127,7 @@ function normalizeRoom(row: AuctionRoomRow): AuctionRoomRecord {
 
   return {
     id: String(row.id || ""),
+    roomNumber: Math.max(0, Math.floor(toNumber(row.roomNumber))),
     cardNo,
     cardName: String(row.cardName || `Card #${cardNo}`).trim(),
     imageUrl,
@@ -168,6 +171,7 @@ export async function ensureAuctionSchema() {
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "AuctionRoom" (
           "id" TEXT PRIMARY KEY,
+          "roomNumber" INTEGER,
           "cardNo" TEXT NOT NULL,
           "cardName" TEXT,
           "imageUrl" TEXT,
@@ -224,6 +228,50 @@ export async function ensureAuctionSchema() {
         ALTER TABLE "AuctionRoom"
         ADD COLUMN IF NOT EXISTS "confirmedAt" TIMESTAMPTZ
       `);
+
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "AuctionRoom"
+        ADD COLUMN IF NOT EXISTS "roomNumber" INTEGER
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        WITH ordered AS (
+          SELECT
+            "id",
+            ROW_NUMBER() OVER (ORDER BY "createdAt" ASC, "id" ASC) AS rn
+          FROM "AuctionRoom"
+          WHERE "roomNumber" IS NULL
+        ),
+        available AS (
+          SELECT
+            n,
+            ROW_NUMBER() OVER (ORDER BY n ASC) AS rn
+          FROM generate_series(
+            1,
+            GREATEST((SELECT COUNT(*)::int + 100 FROM "AuctionRoom"), 100)
+          ) AS n
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM "AuctionRoom" ar
+            WHERE ar."roomNumber" = n
+          )
+        ),
+        mapped AS (
+          SELECT ordered."id", available.n
+          FROM ordered
+          JOIN available ON available.rn = ordered.rn
+        )
+        UPDATE "AuctionRoom" r
+        SET "roomNumber" = mapped.n
+        FROM mapped
+        WHERE r."id" = mapped."id"
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "AuctionRoom_roomNumber_key"
+        ON "AuctionRoom" ("roomNumber")
+        WHERE "roomNumber" IS NOT NULL
+      `);
     })();
   }
 
@@ -237,7 +285,7 @@ async function cleanupExpiredAuctionRooms() {
   `);
 }
 
-export async function getAuctionRooms(limit = 80) {
+export async function getAuctionRooms(limit = 300) {
   await ensureAuctionSchema();
   await cleanupExpiredAuctionRooms();
 
@@ -251,7 +299,7 @@ export async function getAuctionRooms(limit = 80) {
       ORDER BY r."createdAt" DESC
       LIMIT $1
     `,
-    Math.max(1, Math.min(200, Math.floor(limit)))
+    Math.max(1, Math.min(500, Math.floor(limit)))
   );
 
   return rows.map(normalizeRoom);
@@ -366,41 +414,68 @@ export async function createAuctionRoom(input: CreateAuctionInput) {
   const cardNo = normalizeCardNo(input.cardNo);
   const imageUrl = sanitizeCardImageUrl(input.imageUrl) || resolveCardDisplayImage(cardNo, null);
 
-  const rows = await prisma.$queryRawUnsafe<AuctionRoomRow[]>(
-    `
-      INSERT INTO "AuctionRoom" (
-        "id",
-        "cardNo",
-        "cardName",
-        "imageUrl",
-        "rarity",
-        "openingPrice",
-        "minBidStep",
-        "startsAt",
-        "endsAt",
-        "sellerId",
-        "sellerName",
-        "sellerImage",
-        "status"
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active')
-      RETURNING *, 0 AS "topBid", 0 AS "bidCount"
-    `,
-    id,
-    cardNo,
-    input.cardName,
-    imageUrl,
-    String(input.rarity || "Legendary").trim() || "Legendary",
-    input.openingPrice,
-    input.minBidStep,
-    input.startsAt,
-    input.endsAt,
-    input.sellerId,
-    input.sellerName,
-    input.sellerImage
-  );
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('auction_room_number'))`);
 
-  return normalizeRoom(rows[0]);
+    const numberRows = await tx.$queryRawUnsafe<Array<{ roomNumber: number }>>(
+      `
+        WITH candidates AS (
+          SELECT generate_series(
+            1,
+            GREATEST((SELECT COUNT(*)::int + 1 FROM "AuctionRoom"), 1)
+          ) AS n
+        )
+        SELECT n AS "roomNumber"
+        FROM candidates
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM "AuctionRoom" r
+          WHERE r."roomNumber" = n
+        )
+        ORDER BY n ASC
+        LIMIT 1
+      `
+    );
+    const roomNumber = Number(numberRows[0]?.roomNumber || 1);
+
+    const rows = await tx.$queryRawUnsafe<AuctionRoomRow[]>(
+      `
+        INSERT INTO "AuctionRoom" (
+          "id",
+          "roomNumber",
+          "cardNo",
+          "cardName",
+          "imageUrl",
+          "rarity",
+          "openingPrice",
+          "minBidStep",
+          "startsAt",
+          "endsAt",
+          "sellerId",
+          "sellerName",
+          "sellerImage",
+          "status"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')
+        RETURNING *, 0 AS "topBid", 0 AS "bidCount"
+      `,
+      id,
+      roomNumber,
+      cardNo,
+      input.cardName,
+      imageUrl,
+      String(input.rarity || "Legendary").trim() || "Legendary",
+      input.openingPrice,
+      input.minBidStep,
+      input.startsAt,
+      input.endsAt,
+      input.sellerId,
+      input.sellerName,
+      input.sellerImage
+    );
+
+    return normalizeRoom(rows[0]);
+  });
 }
 
 export async function isAuctionBlacklisted(userId: string) {
