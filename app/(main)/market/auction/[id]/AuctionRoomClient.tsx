@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -52,6 +53,10 @@ type AuctionPayload = {
   room: AuctionRoom;
   bids: AuctionBid[];
   nextMinimumBid: number;
+};
+
+type AuctionFinalRank = AuctionBid & {
+  bidTotal: number;
 };
 
 function formatBaht(value: number) {
@@ -117,6 +122,109 @@ function isAdminRoleClient(role?: string | null) {
 function getProfileHref(userId?: string | null) {
   const safeUserId = String(userId || "").trim();
   return safeUserId ? `/profile/${encodeURIComponent(safeUserId)}` : "/profile/me";
+}
+
+function getBidTime(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function AuctionFireworks({ active }: { active: boolean }) {
+  if (!active) return null;
+
+  const bursts = [
+    { left: "8%", top: "18%", delay: "0s" },
+    { left: "24%", top: "44%", delay: "0.5s" },
+    { left: "48%", top: "14%", delay: "0.9s" },
+    { left: "72%", top: "32%", delay: "0.25s" },
+    { left: "88%", top: "16%", delay: "0.7s" },
+    { left: "64%", top: "62%", delay: "1.15s" },
+  ];
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_18%,rgba(251,191,36,0.18),transparent_18%),radial-gradient(circle_at_72%_22%,rgba(255,237,180,0.14),transparent_16%),radial-gradient(circle_at_54%_68%,rgba(180,83,9,0.16),transparent_20%)]" />
+      {bursts.map((burst, burstIndex) => (
+        <div
+          key={`${burst.left}-${burst.top}`}
+          className="nexora-auction-burst"
+          style={{
+            left: burst.left,
+            top: burst.top,
+            animationDelay: burst.delay,
+          }}
+        >
+          {Array.from({ length: 12 }).map((_, sparkIndex) => (
+            <span
+              key={sparkIndex}
+              style={
+                {
+                  "--spark-angle": `${sparkIndex * 30 + burstIndex * 8}deg`,
+                  animationDelay: burst.delay,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </div>
+      ))}
+      <style>{`
+        .nexora-auction-burst {
+          position: absolute;
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: #fde68a;
+          box-shadow: 0 0 28px rgba(251, 191, 36, 0.72);
+          animation: nexoraAuctionBurst 2.8s ease-out infinite;
+        }
+        .nexora-auction-burst span {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 4px;
+          height: 15px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #fff7cc, #f59e0b 62%, transparent);
+          transform-origin: center top;
+          animation: nexoraAuctionSpark 2.8s ease-out infinite;
+        }
+        @keyframes nexoraAuctionBurst {
+          0%, 16% {
+            opacity: 0;
+            transform: scale(0.2);
+          }
+          24% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.25);
+          }
+        }
+        @keyframes nexoraAuctionSpark {
+          0%, 20% {
+            opacity: 0;
+            transform: rotate(var(--spark-angle)) translateY(0) scaleY(0.2);
+          }
+          28% {
+            opacity: 1;
+          }
+          82%, 100% {
+            opacity: 0;
+            transform: rotate(var(--spark-angle)) translateY(-92px) scaleY(1);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nexora-auction-burst,
+          .nexora-auction-burst span {
+            animation: none;
+            opacity: 0.45;
+          }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 function RuleOverlay({ onAccept }: { onAccept: () => void }) {
@@ -191,6 +299,33 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       ),
     [bids]
   );
+  const finalRanking = useMemo(() => {
+    const latestByBidder = new Map<string, AuctionFinalRank>();
+
+    bids.forEach((bid) => {
+      const bidderKey = bid.bidderId || bid.bidderName || bid.id;
+      const existing = latestByBidder.get(bidderKey);
+      const bidTotal = (existing?.bidTotal || 0) + 1;
+
+      if (!existing || getBidTime(bid.createdAt) >= getBidTime(existing.createdAt)) {
+        latestByBidder.set(bidderKey, {
+          ...bid,
+          bidTotal,
+        });
+        return;
+      }
+
+      latestByBidder.set(bidderKey, {
+        ...existing,
+        bidTotal,
+      });
+    });
+
+    return Array.from(latestByBidder.values()).sort((a, b) => {
+      if (b.amount !== a.amount) return b.amount - a.amount;
+      return getBidTime(a.createdAt) - getBidTime(b.createdAt);
+    });
+  }, [bids]);
   const nextMinimumBid = Number(payload?.nextMinimumBid || 0);
   const canBid = phase === "live";
 
@@ -393,8 +528,9 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   }
 
   return (
-    <div className="min-h-full overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,#241806_0%,#080706_48%,#020202_100%)] text-white">
-      <div className="mx-auto max-w-7xl space-y-5 px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 md:pb-4 xl:px-6">
+    <div className="relative min-h-full overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,#241806_0%,#080706_48%,#020202_100%)] text-white">
+      <AuctionFireworks active={phase === "ended"} />
+      <div className="relative z-10 mx-auto max-w-7xl space-y-5 px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 md:pb-4 xl:px-6">
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/market/auction"
@@ -509,6 +645,64 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
             </div>
           </div>
         </section>
+
+        {phase === "ended" && finalRanking.length > 0 ? (
+          <section className="overflow-hidden rounded-[32px] border border-amber-200/20 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(0,0,0,0.42))] p-4 shadow-[0_28px_110px_rgba(0,0,0,0.48)] sm:p-5 lg:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.28em] text-amber-200/60">
+                  Final Ranking
+                </div>
+                <h2 className="mt-1 text-2xl font-black text-amber-50 sm:text-3xl">
+                  สรุปอันดับผู้ประมูลหลังปิดห้อง
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-white/54">
+                  อันดับนี้คำนวณจากราคาบิทล่าสุดของผู้ประมูลแต่ละไอดี แล้วเรียงจากราคาสูงสุดลงต่ำสุด กดที่รายชื่อเพื่อไปหน้าโปรไฟล์ได้ทันที
+                </p>
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200/24 bg-amber-300/12 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-amber-100">
+                <Trophy className="h-4 w-4" />
+                {finalRanking.length} bidders
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {finalRanking.map((bid, index) => (
+                <Link
+                  key={`${bid.bidderId || bid.bidderName}-${bid.id}`}
+                  href={getProfileHref(bid.bidderId)}
+                  className="group flex items-center gap-3 rounded-[24px] border border-white/10 bg-black/32 p-3 transition hover:border-amber-200/36 hover:bg-amber-300/[0.08] focus:outline-none focus:ring-2 focus:ring-amber-300/24 sm:p-4"
+                >
+                  <div
+                    className={`flex h-12 w-16 shrink-0 items-center justify-center rounded-2xl border text-sm font-black ${
+                      index === 0
+                        ? "border-amber-200/40 bg-[linear-gradient(135deg,#fff1a8,#d89a14)] text-black shadow-[0_0_30px_rgba(251,191,36,0.28)]"
+                        : "border-white/10 bg-white/[0.045] text-amber-100"
+                    }`}
+                  >
+                    TOP {index + 1}
+                  </div>
+                  <img
+                    src={bid.bidderImage || "/default-avatar.png"}
+                    alt={bid.bidderName}
+                    className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-1 ring-white/10 transition group-hover:ring-amber-200/40"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-black text-white group-hover:text-amber-100">
+                      {bid.bidderName}
+                    </div>
+                    <div className="mt-1 text-[11px] font-bold text-white/38">
+                      บิทล่าสุด {formatTime(bid.createdAt)} • รวม {bid.bidTotal} ครั้ง
+                    </div>
+                  </div>
+                  <div className="shrink-0 rounded-2xl border border-amber-200/18 bg-amber-300/10 px-3 py-2 text-base font-black text-amber-100 sm:text-xl">
+                    {formatBaht(bid.amount)}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
           <div className="rounded-[30px] border border-white/10 bg-black/32 p-4 shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:p-5">
