@@ -26,6 +26,7 @@ export type DMRoomListItem = {
   dealCardNo?: string;
   dealPrice?: number;
   dealMode?: "sell" | "buy";
+  auctionDeal?: boolean;
   sellerName?: string;
   sellerImage?: string;
 };

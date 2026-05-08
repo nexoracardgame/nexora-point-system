@@ -92,6 +92,7 @@ type ChatDeletedDetail = {
 
 type OpenFloatingChatDetail = {
   kind?: "direct" | "deal" | null;
+  auctionDeal?: boolean | null;
   roomId?: string | null;
   userId?: string | null;
   userName?: string | null;
@@ -1398,6 +1399,8 @@ export default function FloatingChatDock({
       const now = new Date().toISOString();
       const optimisticRoomId =
         safeText(detail.roomId) || buildDirectRoomId(currentUserId, targetUserId);
+      const cardNo = safeText(detail.dealCardNo) || "001";
+      const isAuctionDeal = Boolean(detail.auctionDeal);
       const optimisticRoom = normalizeRoom({
         kind: "direct",
         roomId: optimisticRoomId,
@@ -1408,6 +1411,11 @@ export default function FloatingChatDock({
         createdAt: now,
         lastMessageAt: now,
         unread: 0,
+        auctionDeal: isAuctionDeal,
+        dealCardName: safeText(detail.dealCardName) || `Card #${cardNo}`,
+        dealCardImage: safeText(detail.dealCardImage) || `/cards/${cardNo}.jpg`,
+        dealCardNo: cardNo,
+        dealPrice: Number(detail.dealPrice || 0),
       });
 
       if (!optimisticRoom) {
@@ -1458,6 +1466,11 @@ export default function FloatingChatDock({
         createdAt: optimisticRoom.createdAt,
         lastMessageAt: optimisticRoom.lastMessageAt,
         unread: 0,
+        auctionDeal: optimisticRoom.auctionDeal,
+        dealCardName: optimisticRoom.dealCardName,
+        dealCardImage: optimisticRoom.dealCardImage,
+        dealCardNo: optimisticRoom.dealCardNo,
+        dealPrice: optimisticRoom.dealPrice,
       });
 
       if (actualRoom) {
@@ -2820,14 +2833,16 @@ export default function FloatingChatDock({
                           </span>
                           <span
                             className={`absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
-                              room.kind === "deal"
+                              room.auctionDeal
+                                ? "bg-[linear-gradient(135deg,#fff1a8,#f6c453)] text-black shadow-[0_0_14px_rgba(251,191,36,0.42)]"
+                                : room.kind === "deal"
                                 ? room.dealMode === "buy"
                                   ? "bg-white text-black shadow-[0_0_12px_rgba(255,255,255,0.28)]"
                                   : "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
                                 : "bg-white text-black"
                             }`}
                           >
-                            {room.kind === "deal" ? (
+                            {room.kind === "deal" || room.auctionDeal ? (
                               <Handshake className="h-3 w-3" />
                             ) : (
                               <MessageCircle className="h-3 w-3" />
@@ -2848,11 +2863,11 @@ export default function FloatingChatDock({
                               {room.otherName}
                             </span>
                             <span className="shrink-0 text-[10px] font-black uppercase text-white/30">
-                              {room.kind === "deal" ? "DEAL" : "DM"}
+                              {room.auctionDeal ? "AUCTION" : room.kind === "deal" ? "DEAL" : "DM"}
                             </span>
                           </span>
-                          {room.kind === "deal" ? (
-                            <span className="mt-0.5 block truncate text-[11px] font-bold text-cyan-200/70">
+                          {room.kind === "deal" || room.auctionDeal ? (
+                            <span className={`mt-0.5 block truncate text-[11px] font-bold ${room.auctionDeal ? "text-amber-100/75" : "text-cyan-200/70"}`}>
                               {room.dealMode === "buy" ? "รับซื้อ · " : ""}
                               #{safeText(room.dealCardNo) || "001"}{" "}
                               {room.dealCardName || "ดีลการ์ด"}{" "}
@@ -2925,14 +2940,16 @@ export default function FloatingChatDock({
                       </span>
                       <span
                         className={`absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#08090d] ${
-                          activeRoom.kind === "deal"
+                          activeRoom.auctionDeal
+                            ? "bg-[linear-gradient(135deg,#fff1a8,#f6c453)] text-black shadow-[0_0_14px_rgba(251,191,36,0.42)]"
+                            : activeRoom.kind === "deal"
                             ? activeRoom.dealMode === "buy"
                               ? "bg-white text-black shadow-[0_0_12px_rgba(255,255,255,0.28)]"
                               : "bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.38)]"
                             : "bg-white text-black"
                         }`}
                       >
-                        {activeRoom.kind === "deal" ? (
+                        {activeRoom.kind === "deal" || activeRoom.auctionDeal ? (
                           <Handshake className="h-3 w-3" />
                         ) : (
                           <MessageCircle className="h-3 w-3" />
@@ -2978,8 +2995,14 @@ export default function FloatingChatDock({
                     </span>
                   </button>
 
-                  {activeRoom.kind === "deal" ? (
-                    <div className="flex max-w-[118px] shrink-0 items-center gap-1.5 rounded-2xl border border-cyan-300/15 bg-cyan-400/10 p-1 pr-2 sm:max-w-[168px]">
+                  {activeRoom.kind === "deal" || activeRoom.auctionDeal ? (
+                    <div
+                      className={`flex max-w-[118px] shrink-0 items-center gap-1.5 rounded-2xl p-1 pr-2 sm:max-w-[168px] ${
+                        activeRoom.auctionDeal
+                          ? "border border-amber-300/18 bg-amber-300/10"
+                          : "border border-cyan-300/15 bg-cyan-400/10"
+                      }`}
+                    >
                       <div className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
                         <SafeCardImage
                           cardNo={activeDealCardNo}

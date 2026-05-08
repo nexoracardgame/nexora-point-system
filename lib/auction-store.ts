@@ -18,6 +18,8 @@ export type AuctionRoomRecord = {
   sellerImage: string;
   status: string;
   createdAt: string;
+  confirmedWinnerId: string;
+  confirmedAt: string | null;
   topBid: number;
   bidCount: number;
 };
@@ -48,6 +50,8 @@ type AuctionRoomRow = {
   sellerImage: string | null;
   status: string | null;
   createdAt: Date;
+  confirmedWinnerId?: string | null;
+  confirmedAt?: Date | null;
   topBid?: Prisma.Decimal | number | string | null;
   bidCount?: bigint | number | string | null;
 };
@@ -84,6 +88,14 @@ export type CreateAuctionBidInput = {
   bidderImage: string;
   amount: number;
   message?: string | null;
+};
+
+export type ConfirmAuctionWinnerInput = {
+  auctionId: string;
+  winnerId: string;
+  actorId: string;
+  actorLineId?: string | null;
+  isAdmin?: boolean;
 };
 
 let auctionSchemaReady: Promise<void> | null = null;
@@ -126,6 +138,8 @@ function normalizeRoom(row: AuctionRoomRow): AuctionRoomRecord {
     sellerImage: String(row.sellerImage || "/default-avatar.png").trim(),
     status: String(row.status || "active").trim(),
     createdAt: toIso(row.createdAt),
+    confirmedWinnerId: String(row.confirmedWinnerId || "").trim(),
+    confirmedAt: row.confirmedAt ? toIso(row.confirmedAt) : null,
     topBid: toNumber(row.topBid),
     bidCount: toNumber(row.bidCount),
   };
@@ -200,14 +214,32 @@ export async function ensureAuctionSchema() {
         CREATE INDEX IF NOT EXISTS "AuctionBid_auctionId_createdAt_idx"
         ON "AuctionBid" ("auctionId", "createdAt" ASC)
       `);
+
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "AuctionRoom"
+        ADD COLUMN IF NOT EXISTS "confirmedWinnerId" TEXT
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "AuctionRoom"
+        ADD COLUMN IF NOT EXISTS "confirmedAt" TIMESTAMPTZ
+      `);
     })();
   }
 
   return auctionSchemaReady;
 }
 
+async function cleanupExpiredAuctionRooms() {
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "AuctionRoom"
+    WHERE "endsAt" < NOW() - INTERVAL '7 days'
+  `);
+}
+
 export async function getAuctionRooms(limit = 80) {
   await ensureAuctionSchema();
+  await cleanupExpiredAuctionRooms();
 
   const rows = await prisma.$queryRawUnsafe<AuctionRoomRow[]>(
     `
@@ -227,6 +259,7 @@ export async function getAuctionRooms(limit = 80) {
 
 export async function getAuctionRoomWithBids(id: string) {
   await ensureAuctionSchema();
+  await cleanupExpiredAuctionRooms();
 
   const rows = await prisma.$queryRawUnsafe<AuctionRoomRow[]>(
     `
@@ -280,6 +313,50 @@ export async function deleteAuctionRoom(id: string) {
   );
 
   return rows.length > 0;
+}
+
+export async function canDeleteAuctionRoom(input: {
+  id: string;
+  actorId: string;
+  actorLineId?: string | null;
+  isAdmin?: boolean;
+}) {
+  await ensureAuctionSchema();
+
+  if (input.isAdmin) {
+    return true;
+  }
+
+  const actorIds = [input.actorId, input.actorLineId]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  if (actorIds.length === 0) {
+    return false;
+  }
+
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{
+      sellerId: string | null;
+      confirmedWinnerId: string | null;
+      confirmedAt: Date | null;
+    }>
+  >(
+    `
+      SELECT "sellerId", "confirmedWinnerId", "confirmedAt"
+      FROM "AuctionRoom"
+      WHERE "id" = $1
+      LIMIT 1
+    `,
+    input.id
+  );
+
+  const room = rows[0];
+  if (!room?.confirmedWinnerId || !room.confirmedAt) {
+    return false;
+  }
+
+  return actorIds.includes(String(room.sellerId || "").trim());
 }
 
 export async function createAuctionRoom(input: CreateAuctionInput) {
@@ -422,5 +499,105 @@ export async function createAuctionBid(input: CreateAuctionBidInput) {
       bid: normalizeBid(bidRows[0]),
       nextMinimumBid: input.amount + room.minBidStep,
     };
+  });
+}
+
+export async function confirmAuctionWinner(input: ConfirmAuctionWinnerInput) {
+  await ensureAuctionSchema();
+
+  const actorIds = [input.actorId, input.actorLineId]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      `SELECT pg_advisory_xact_lock(hashtext($1))`,
+      input.auctionId
+    );
+
+    const roomRows = await tx.$queryRawUnsafe<AuctionRoomRow[]>(
+      `SELECT * FROM "AuctionRoom" WHERE "id" = $1 LIMIT 1`,
+      input.auctionId
+    );
+    const room = roomRows[0] ? normalizeRoom(roomRows[0]) : null;
+
+    if (!room) {
+      throw new Error("AUCTION_NOT_FOUND");
+    }
+
+    if (!input.isAdmin && !actorIds.includes(room.sellerId)) {
+      throw new Error("AUCTION_OWNER_ONLY");
+    }
+
+    const now = Date.now();
+    if (now <= new Date(room.endsAt).getTime()) {
+      throw new Error("AUCTION_NOT_ENDED");
+    }
+
+    const winnerId = String(input.winnerId || "").trim();
+    if (!winnerId) {
+      throw new Error("MISSING_WINNER");
+    }
+
+    if (room.confirmedWinnerId) {
+      throw new Error("AUCTION_ALREADY_CONFIRMED");
+    }
+
+    const bidRows = await tx.$queryRawUnsafe<
+      Array<{ bidderId: string; amount: Prisma.Decimal | number | string; createdAt: Date }>
+    >(
+      `
+        SELECT DISTINCT ON ("bidderId")
+          "bidderId",
+          "amount",
+          "createdAt"
+        FROM "AuctionBid"
+        WHERE "auctionId" = $1
+        ORDER BY "bidderId", "createdAt" DESC, "amount" DESC
+      `,
+      input.auctionId
+    );
+
+    if (bidRows.length === 0 || !bidRows.some((bid) => bid.bidderId === winnerId)) {
+      throw new Error("WINNER_NOT_FOUND");
+    }
+
+    const finalRanking = bidRows.sort((a, b) => {
+      const amountDiff = toNumber(b.amount) - toNumber(a.amount);
+      if (amountDiff !== 0) return amountDiff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    let elapsedMs = now - new Date(room.endsAt).getTime();
+    let activeWinnerId = "";
+    for (let index = 0; index < finalRanking.length; index += 1) {
+      const hours = index === 0 ? 24 : index === 1 ? 12 : index === 2 ? 6 : 3;
+      const windowMs = hours * 60 * 60 * 1000;
+      if (elapsedMs < windowMs) {
+        activeWinnerId = finalRanking[index]?.bidderId || "";
+        break;
+      }
+      elapsedMs -= windowMs;
+    }
+
+    if (activeWinnerId !== winnerId) {
+      throw new Error("AUCTION_WINNER_WINDOW_EXPIRED");
+    }
+
+    const updatedRows = await tx.$queryRawUnsafe<AuctionRoomRow[]>(
+      `
+        UPDATE "AuctionRoom"
+        SET
+          "confirmedWinnerId" = $2,
+          "confirmedAt" = NOW(),
+          "status" = 'settled'
+        WHERE "id" = $1
+        RETURNING *, 0 AS "topBid", 0 AS "bidCount"
+      `,
+      input.auctionId,
+      winnerId
+    );
+
+    return normalizeRoom(updatedRows[0]);
   });
 }

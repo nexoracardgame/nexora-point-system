@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { deleteAuctionRoom, getAuctionRoomWithBids } from "@/lib/auction-store";
+import {
+  canDeleteAuctionRoom,
+  deleteAuctionRoom,
+  getAuctionRoomWithBids,
+} from "@/lib/auction-store";
 import { isAdminRole } from "@/lib/staff-auth";
+import { resolveUserIdentity } from "@/lib/user-identity";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -49,23 +54,40 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     const role = String(session?.user?.role || "");
+    const identity = await resolveUserIdentity(session?.user);
+    const actorId = String(session?.user?.id || identity.userId || "").trim();
+    const actorLineId = String(
+      ((session?.user || {}) as { lineId?: string | null }).lineId || ""
+    ).trim();
 
-    if (!session?.user?.id) {
+    if (!actorId) {
       return NextResponse.json(
         { success: false, error: "กรุณาเข้าสู่ระบบก่อน" },
         { status: 401 }
       );
     }
 
-    if (!isAdminRole(role)) {
+    const { id } = await params;
+    const safeId = String(id || "").trim();
+    const canDelete = await canDeleteAuctionRoom({
+      id: safeId,
+      actorId,
+      actorLineId,
+      isAdmin: isAdminRole(role),
+    });
+
+    if (!canDelete) {
       return NextResponse.json(
-        { success: false, error: "เฉพาะ GM/admin เท่านั้นที่ลบห้องประมูลได้" },
+        {
+          success: false,
+          error:
+            "เฉพาะ GM/admin หรือเจ้าของห้องที่ยืนยันผู้ชนะแล้วเท่านั้นที่ลบห้องประมูลได้",
+        },
         { status: 403 }
       );
     }
 
-    const { id } = await params;
-    const deleted = await deleteAuctionRoom(String(id || "").trim());
+    const deleted = await deleteAuctionRoom(safeId);
 
     if (!deleted) {
       return NextResponse.json(

@@ -41,6 +41,8 @@ type AuctionRoom = {
   sellerImage: string;
   status: string;
   createdAt: string;
+  confirmedWinnerId?: string;
+  confirmedAt?: string | null;
   topBid: number;
   bidCount: number;
 };
@@ -86,6 +88,14 @@ function getNextMinimum(room: AuctionRoom) {
 function isAdminRoleClient(role?: string | null) {
   const normalized = String(role || "").trim().toLowerCase();
   return normalized === "admin" || normalized === "gm" || normalized === "superadmin";
+}
+
+function notifyAuctionRoomsChanged() {
+  try {
+    window.localStorage.setItem("nexora:auction-rooms-changed", String(Date.now()));
+  } catch {}
+
+  window.dispatchEvent(new Event("nexora:auction-rooms-changed"));
 }
 
 function RuleModal({
@@ -134,6 +144,12 @@ function RuleModal({
           </div>
         </div>
 
+        <div className="mt-3 rounded-2xl border border-amber-200/18 bg-amber-300/10 p-4 text-sm font-black leading-6 text-amber-50">
+          หลังปิดประมูล สิทธิ์ซื้อขายจะไล่ตามอันดับแบบอัตโนมัติ: อันดับ 1 มีเวลา 24 ชม.,
+          อันดับ 2 มีเวลา 12 ชม., อันดับ 3 มีเวลา 6 ชม., อันดับ 4 ขึ้นไปมีเวลา 3 ชม.
+          เมื่อเจ้าของห้องยืนยันผู้ชนะแล้ว ห้องจะยังดูย้อนหลังได้ และระบบจะลบห้องอัตโนมัติหลังครบ 7 วัน
+        </div>
+
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -177,7 +193,9 @@ export default function AuctionClient() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      const res = await fetch("/api/market/auction", { cache: "no-store" });
+      const res = await fetch(`/api/market/auction?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
       setRooms(Array.isArray(data.rooms) ? data.rooms : []);
     } catch {
@@ -194,9 +212,32 @@ export default function AuctionClient() {
       if (document.visibilityState === "visible") {
         void fetchRooms();
       }
-    }, 3000);
+    }, 1500);
 
-    return () => window.clearInterval(intervalId);
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        void fetchRooms();
+      }
+    };
+    const refreshFromStorage = (event: StorageEvent) => {
+      if (event.key === "nexora:auction-rooms-changed") {
+        refresh();
+      }
+    };
+    const refreshOnVisibility = () => refresh();
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("nexora:auction-rooms-changed", refresh);
+    window.addEventListener("storage", refreshFromStorage);
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("nexora:auction-rooms-changed", refresh);
+      window.removeEventListener("storage", refreshFromStorage);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+    };
   }, [fetchRooms]);
 
   useEffect(() => {
@@ -325,6 +366,7 @@ export default function AuctionClient() {
       setRooms((currentRooms) =>
         currentRooms.filter((currentRoom) => currentRoom.id !== room.id)
       );
+      notifyAuctionRoomsChanged();
 
       await nexoraAlert({
         title: "ลบห้องประมูลแล้ว",

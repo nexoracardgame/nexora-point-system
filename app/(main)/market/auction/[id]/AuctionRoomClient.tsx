@@ -7,9 +7,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  CheckCircle2,
   Clock,
   Crown,
   Gavel,
+  Handshake,
   Loader2,
   Send,
   ShieldAlert,
@@ -34,6 +36,8 @@ type AuctionRoom = {
   sellerImage: string;
   status: string;
   createdAt: string;
+  confirmedWinnerId: string;
+  confirmedAt: string | null;
   topBid: number;
   bidCount: number;
 };
@@ -127,6 +131,65 @@ function getProfileHref(userId?: string | null) {
 function getBidTime(value: string) {
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : 0;
+}
+
+function getAuctionRankWindowHours(index: number) {
+  if (index === 0) return 24;
+  if (index === 1) return 12;
+  if (index === 2) return 6;
+  return 3;
+}
+
+function formatHourWindow(hours: number) {
+  return `${hours} ชม.`;
+}
+
+function getActiveAuctionRankIndex(room: AuctionRoom, ranking: AuctionFinalRank[]) {
+  if (!room || ranking.length === 0 || room.confirmedWinnerId) return -1;
+
+  const endedAt = new Date(room.endsAt).getTime();
+  const now = Date.now();
+  if (!Number.isFinite(endedAt) || now <= endedAt) return -1;
+
+  let elapsedMs = now - endedAt;
+  for (let index = 0; index < ranking.length; index += 1) {
+    const windowMs = getAuctionRankWindowHours(index) * 60 * 60 * 1000;
+    if (elapsedMs < windowMs) return index;
+    elapsedMs -= windowMs;
+  }
+
+  return -1;
+}
+
+function getAuctionRankRemainingMs(room: AuctionRoom, index: number) {
+  const endedAt = new Date(room.endsAt).getTime();
+  if (!Number.isFinite(endedAt) || index < 0) return 0;
+
+  let startsAfterMs = 0;
+  for (let rankIndex = 0; rankIndex < index; rankIndex += 1) {
+    startsAfterMs += getAuctionRankWindowHours(rankIndex) * 60 * 60 * 1000;
+  }
+
+  const endsAt = endedAt + startsAfterMs + getAuctionRankWindowHours(index) * 60 * 60 * 1000;
+  return Math.max(0, endsAt - Date.now());
+}
+
+function formatRemaining(ms: number) {
+  const totalMinutes = Math.max(1, Math.ceil(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) return `${hours} ชม. ${minutes} นาที`;
+  if (hours > 0) return `${hours} ชม.`;
+  return `${minutes} นาที`;
+}
+
+function notifyAuctionRoomsChanged() {
+  try {
+    window.localStorage.setItem("nexora:auction-rooms-changed", String(Date.now()));
+  } catch {}
+
+  window.dispatchEvent(new Event("nexora:auction-rooms-changed"));
 }
 
 function AuctionFireworks({ active }: { active: boolean }) {
@@ -262,6 +325,10 @@ function RuleOverlay({ onAccept }: { onAccept: () => void }) {
           </div>
         </div>
 
+        <div className="mt-3 rounded-2xl border border-amber-200/18 bg-amber-300/10 p-4 text-sm font-black leading-6 text-amber-50">
+          สิทธิ์หลังปิดประมูลจะไล่ตามอันดับ: TOP 1 มีเวลา 24 ชม., TOP 2 มีเวลา 12 ชม., TOP 3 มีเวลา 6 ชม., TOP 4 ขึ้นไปมีเวลา 3 ชม. เจ้าของห้องจะเปิดแชทซื้อขายกับผู้ได้สิทธิ์ และห้องจะถูกลบอัตโนมัติหลังปิดประมูลครบ 7 วัน
+        </div>
+
         <button
           type="button"
           onClick={onAccept}
@@ -281,16 +348,33 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deletingRoom, setDeletingRoom] = useState(false);
+  const [confirmingWinnerId, setConfirmingWinnerId] = useState("");
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [acceptedRules, setAcceptedRules] = useState(true);
   const bidBoardEndRef = useRef<HTMLDivElement>(null);
   const mobileBidBoardRef = useRef<HTMLDivElement>(null);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
+  const sessionUser = session?.user as
+    | { id?: string | null; lineId?: string | null }
+    | undefined;
 
   const room = payload?.room || null;
   const bids = payload?.bids || [];
   const phase = getRoomPhase(room);
+  const currentUserIds = useMemo(
+    () =>
+      new Set(
+        [sessionUser?.id, sessionUser?.lineId]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      ),
+    [sessionUser?.id, sessionUser?.lineId]
+  );
+  const isRoomOwner = Boolean(room?.sellerId && currentUserIds.has(room.sellerId));
+  const roomCanDelete = Boolean(
+    adminCanDelete || (isRoomOwner && room?.confirmedWinnerId && room?.confirmedAt)
+  );
   const topBid = useMemo(
     () =>
       bids.reduce<AuctionBid | null>(
@@ -326,6 +410,12 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       return getBidTime(a.createdAt) - getBidTime(b.createdAt);
     });
   }, [bids]);
+  const activeRankIndex = room ? getActiveAuctionRankIndex(room, finalRanking) : -1;
+  const activeRank =
+    activeRankIndex >= 0 ? finalRanking[activeRankIndex] || null : null;
+  const confirmedWinner = room?.confirmedWinnerId
+    ? finalRanking.find((bid) => bid.bidderId === room.confirmedWinnerId) || null
+    : null;
   const nextMinimumBid = Number(payload?.nextMinimumBid || 0);
   const canBid = phase === "live";
 
@@ -470,8 +560,86 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     }
   };
 
+  const openAuctionDealChat = useCallback(
+    (bid: AuctionFinalRank) => {
+      if (!room) return;
+
+      const roomId = `auction:${room.id}:${bid.bidderId || bid.id}`;
+      window.dispatchEvent(
+        new CustomEvent("nexora:open-floating-chat", {
+          detail: {
+            kind: "direct",
+            auctionDeal: true,
+            roomId,
+            userId: bid.bidderId,
+            userName: bid.bidderName,
+            userImage: bid.bidderImage,
+            legacyRoomId: roomId,
+            dealCardName: room.cardName,
+            dealCardImage: room.imageUrl,
+            dealCardNo: room.cardNo,
+            dealPrice: bid.amount,
+          },
+        })
+      );
+    },
+    [room]
+  );
+
+  const confirmAuctionWinner = async (bid: AuctionFinalRank) => {
+    if (!room || confirmingWinnerId) return;
+
+    const confirmed = await nexoraConfirm({
+      title: "ยืนยันผู้ชนะ",
+      message: `ยืนยันว่า ${bid.bidderName} ติดต่อซื้อขายการ์ดกับเจ้าของห้องเรียบร้อยแล้วใช่ไหม? หลังจากยืนยัน ห้องจะเข้าสถานะปิดประมูลสมบูรณ์`,
+      confirmText: "ยืนยันผู้ชนะ",
+      cancelText: "ยกเลิก",
+      tone: "success",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setConfirmingWinnerId(bid.bidderId || bid.id);
+      const res = await fetch(
+        `/api/market/auction/${encodeURIComponent(room.id)}/confirm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            winnerId: bid.bidderId,
+          }),
+        }
+      );
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "ยืนยันผู้ชนะไม่สำเร็จ");
+      }
+
+      await fetchRoom();
+      notifyAuctionRoomsChanged();
+      await nexoraAlert({
+        title: "ยืนยันผู้ชนะแล้ว",
+        message:
+          "ห้องนี้ถูกปิดการประมูลสมบูรณ์ และเจ้าของห้องสามารถลบห้องได้เมื่อพร้อม",
+        tone: "success",
+      });
+    } catch (error) {
+      await nexoraAlert({
+        title: "ยืนยันผู้ชนะไม่สำเร็จ",
+        message: String(error instanceof Error ? error.message : error),
+        tone: "danger",
+      });
+    } finally {
+      setConfirmingWinnerId("");
+    }
+  };
+
   const deleteCurrentRoom = async () => {
-    if (!room || !adminCanDelete || deletingRoom) return;
+    if (!room || !roomCanDelete || deletingRoom) return;
 
     const confirmed = await nexoraConfirm({
       title: "ลบห้องประมูล",
@@ -499,6 +667,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
         message: "ห้องประมูลนี้ถูกลบออกจากระบบเรียบร้อย",
         tone: "success",
       });
+      notifyAuctionRoomsChanged();
       router.push("/market/auction");
     } catch (error) {
       await nexoraAlert({
@@ -540,7 +709,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
             กลับสนามประมูล
           </Link>
           <div className="flex items-center gap-2">
-            {adminCanDelete ? (
+            {roomCanDelete ? (
               <button
                 type="button"
                 onClick={() => void deleteCurrentRoom()}
@@ -646,6 +815,92 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
           </div>
         </section>
 
+        {phase === "ended" && confirmedWinner ? (
+          <section className="rounded-[30px] border border-emerald-200/24 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(251,191,36,0.10),rgba(0,0,0,0.42))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/30 bg-emerald-400/16 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.22)]">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-100/70">
+                    Auction Settled
+                  </div>
+                  <div className="mt-1 text-lg font-black leading-7 text-white sm:text-2xl">
+                    ผู้ชนะได้ทำการติดต่อซื้อขายการ์ดกับเจ้าของห้องเป็นที่เรียบร้อยแล้ว
+                  </div>
+                  <div className="mt-1 truncate text-sm font-bold text-amber-100/72">
+                    ผู้ชนะ: {confirmedWinner.bidderName} • {formatBaht(confirmedWinner.amount)}
+                  </div>
+                </div>
+              </div>
+              {roomCanDelete ? (
+                <button
+                  type="button"
+                  onClick={() => void deleteCurrentRoom()}
+                  disabled={deletingRoom}
+                  className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-red-200/26 bg-red-500/18 px-4 text-sm font-black text-red-50 shadow-[0_14px_42px_rgba(127,29,29,0.30)] transition hover:bg-red-500/28 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingRoom ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  ลบห้องประมูล
+                </button>
+              ) : null}
+            </div>
+          </section>
+        ) : phase === "ended" && activeRank ? (
+          <section className="rounded-[30px] border border-amber-200/24 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(255,255,255,0.055),rgba(0,0,0,0.42))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-200/34 bg-amber-300/16 text-amber-100 shadow-[0_0_28px_rgba(251,191,36,0.24)]">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-100/70">
+                    Negotiation Window
+                  </div>
+                  <div className="mt-1 text-lg font-black leading-7 text-white sm:text-2xl">
+                    อยู่ระหว่างดำเนินการซื้อขายภายใน{" "}
+                    {formatRemaining(getAuctionRankRemainingMs(room, activeRankIndex))}
+                  </div>
+                  <div className="mt-1 truncate text-sm font-bold text-amber-100/72">
+                    สิทธิ์ตอนนี้: TOP {activeRankIndex + 1} • {activeRank.bidderName} •{" "}
+                    {formatBaht(activeRank.amount)}
+                  </div>
+                </div>
+              </div>
+              {isRoomOwner ? (
+                <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[340px]">
+                  <button
+                    type="button"
+                    onClick={() => openAuctionDealChat(activeRank)}
+                    className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl border border-white/24 bg-white px-4 text-sm font-black text-black shadow-[0_14px_36px_rgba(255,255,255,0.12)] transition hover:bg-amber-50"
+                  >
+                    <Handshake className="h-4 w-4 text-amber-700" />
+                    ห้องแชทซื้อขาย
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmAuctionWinner(activeRank)}
+                    disabled={Boolean(confirmingWinnerId)}
+                    className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#a36b12)] px-4 text-sm font-black text-black shadow-[0_0_34px_rgba(251,191,36,0.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {confirmingWinnerId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    ยืนยันผู้ชนะ
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
         {phase === "ended" && finalRanking.length > 0 ? (
           <section className="overflow-hidden rounded-[32px] border border-amber-200/20 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(0,0,0,0.42))] p-4 shadow-[0_28px_110px_rgba(0,0,0,0.48)] sm:p-5 lg:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -665,6 +920,20 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
                 {finalRanking.length} bidders
               </div>
             </div>
+
+            {room.confirmedWinnerId && confirmedWinner ? (
+              <div className="mt-5 rounded-[24px] border border-emerald-200/24 bg-emerald-400/10 p-4 text-sm font-black leading-6 text-emerald-50">
+                ผู้ชนะได้ทำการติดต่อซื้อขายการ์ดกับเจ้าของห้องเป็นที่เรียบร้อยแล้ว •{" "}
+                {confirmedWinner.bidderName} • {formatBaht(confirmedWinner.amount)}
+              </div>
+            ) : activeRank ? (
+              <div className="mt-5 rounded-[24px] border border-amber-200/28 bg-amber-300/12 p-4 text-sm font-black leading-6 text-amber-50 shadow-[0_0_34px_rgba(251,191,36,0.12)]">
+                อยู่ระหว่างดำเนินการซื้อขายภายใน{" "}
+                {formatRemaining(getAuctionRankRemainingMs(room, activeRankIndex))} •
+                สิทธิ์ตอนนี้ TOP {activeRankIndex + 1} {activeRank.bidderName} •{" "}
+                {formatBaht(activeRank.amount)}
+              </div>
+            ) : null}
 
             <div className="mt-5 grid gap-3">
               {finalRanking.map((bid, index) => (
