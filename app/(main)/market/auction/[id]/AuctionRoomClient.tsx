@@ -13,10 +13,12 @@ import {
   Gavel,
   Handshake,
   Loader2,
+  ScrollText,
   Send,
   ShieldAlert,
   Trash2,
   Trophy,
+  X,
 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
 import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
@@ -73,6 +75,12 @@ function formatAuctionRoomNumber(value?: number | string | null) {
   return Number.isFinite(numeric) && numeric > 0
     ? String(Math.floor(numeric)).padStart(3, "0")
     : "---";
+}
+
+function buildAuctionTermsStorageKey(roomId: string, viewerKey?: string | null) {
+  const safeRoomId = String(roomId || "unknown").trim() || "unknown";
+  const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
+  return `nexora:auction-terms:${safeRoomId}:${safeViewerKey}`;
 }
 
 function formatDateTime(value: string) {
@@ -385,6 +393,127 @@ function RuleOverlay({ onAccept }: { onAccept: () => void }) {
   );
 }
 
+const AUCTION_TERMS = [
+  "ห้องประมูลที่สร้างแล้วจะแก้ไขเลขการ์ด ราคาเปิด บิทขั้นต่ำ วันเวลาเริ่ม และวันเวลาปิดไม่ได้ เพื่อให้ทุกคนเห็นเงื่อนไขเดียวกันตั้งแต่ต้น",
+  "ราคาบิทต้องไม่ต่ำกว่าราคาปัจจุบันบวกบิทขั้นต่ำของห้อง เช่น ราคาเปิด 100 บาท บิทขั้นต่ำ 50 บาท คนแรกต้องใส่อย่างน้อย 150 บาท ถ้าคนล่าสุดบิท 1,000 บาท คนถัดไปต้องใส่อย่างน้อย 1,050 บาท",
+  "ระบบจะนับบิทล่าสุดของแต่ละผู้ใช้เป็นราคาสุดท้ายของคนนั้น แล้วเรียงอันดับ TOP จากราคาสูงสุดลงมาต่ำสุด หากราคาเท่ากันจะยึดเวลาบิทที่เกิดก่อนเป็นลำดับที่สูงกว่า",
+  "เมื่อหมดเวลาประมูล ห้องจะสรุปอันดับ TOP ให้เห็นทั้งหมด และสิทธิ์ซื้อขายจะเริ่มที่ TOP 1 ก่อน",
+  "ช่วงเวลาตอบรับสิทธิ์หลังปิดประมูลคือ TOP 1 มีเวลา 24 ชม., TOP 2 มีเวลา 12 ชม., TOP 3 มีเวลา 6 ชม., TOP 4 ขึ้นไปมีเวลา 3 ชม. ต่ออันดับ",
+  "ในช่วงที่อันดับใดได้สิทธิ์ เจ้าของห้องจะเห็นปุ่มห้องแชทซื้อขายและปุ่มยืนยันผู้ชนะเฉพาะอันดับนั้น เพื่อคุยตกลงรับการ์ดจริง",
+  "ถ้าเจ้าของห้องไม่กดยืนยันผู้ชนะภายในเวลาของอันดับนั้น แชทดีลของอันดับนั้นจะถูกปิด และสิทธิ์จะเลื่อนไปอันดับถัดไปอัตโนมัติ",
+  "ถ้าเจ้าของห้องกดยืนยันผู้ชนะแล้ว ระบบจะถือว่าผู้ชนะคนนั้นติดต่อซื้อขายกับเจ้าของห้องเรียบร้อย แชทดีลนั้นจะอยู่ต่อจนกว่าห้องถูกลบหรือครบ 7 วันหลังเวลาปิดประมูล",
+  "หลังปิดประมูล ห้องจะถูกลบอัตโนมัติเมื่อครบ 7 วันนับจากเวลาสิ้นสุด เพื่อให้มีเวลาตรวจสอบอันดับและคุยซื้อขายให้จบ",
+  "GM/แอดมินสามารถลบห้องได้ทุกเวลา ส่วนเจ้าของห้องจะเห็นปุ่มลบห้องหลังยืนยันผู้ชนะแล้ว",
+  "การบิทเล่น ปั่นราคา ใช้ข้อความก่อกวน หรือชนะแล้วจงใจหาย อาจถูกตรวจสอบและระงับสิทธิ์การร่วมประมูลตามความเหมาะสม",
+  "การนัดรับ โอนเงิน ส่งมอบการ์ด และรายละเอียดภายนอกแชทดีล เป็นข้อตกลงระหว่างเจ้าของห้องและผู้ชนะ ควรตรวจสอบตัวตน หลักฐาน และสภาพการ์ดให้ชัดเจนก่อนจบดีล",
+];
+
+function AuctionTermsOverlay({
+  mode,
+  onAccept,
+  onCancel,
+  onClose,
+}: {
+  mode: "required" | "info";
+  onAccept: () => void;
+  onCancel: () => void;
+  onClose: () => void;
+}) {
+  const isRequired = mode === "required";
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="เงื่อนไขการประมูล"
+      className="fixed inset-0 z-[1700] flex items-center justify-center bg-black/82 px-3 py-5 backdrop-blur-2xl sm:px-4"
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] border border-amber-200/35 bg-[radial-gradient(circle_at_top,#3b2a0d_0%,#120f08_46%,#030303_100%)] text-white shadow-[0_34px_150px_rgba(0,0,0,0.78),0_0_50px_rgba(251,191,36,0.16)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_0%,rgba(255,231,151,0.18),transparent_28%),radial-gradient(circle_at_8%_10%,rgba(251,191,36,0.12),transparent_24%)]" />
+
+        {isRequired ? null : (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="ปิดเงื่อนไขการประมูล"
+            className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/72 transition hover:bg-white/[0.1] hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
+
+        <div className="relative z-10 border-b border-amber-200/14 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex items-start gap-4 pr-10">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200/34 bg-amber-300/14 text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.18)]">
+              <ScrollText className="h-7 w-7" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-[0.28em] text-amber-200/68">
+                Auction Terms
+              </div>
+              <h2 className="mt-2 text-2xl font-black leading-tight text-amber-50 sm:text-3xl">
+                เงื่อนไขการประมูล NEXORA
+              </h2>
+              <p className="mt-2 text-sm font-bold leading-6 text-white/58">
+                อ่านให้ครบก่อนเข้าร่วม เพื่อให้เข้าใจกติกาบิท สิทธิ์ผู้ชนะ แชทดีล และเวลาของแต่ละอันดับอย่างชัดเจน
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
+          <div className="grid gap-3">
+            {AUCTION_TERMS.map((term, index) => (
+              <div
+                key={term}
+                className="grid grid-cols-[42px_1fr] gap-3 rounded-[22px] border border-white/10 bg-white/[0.045] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-4"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/12 text-sm font-black text-amber-100">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+                <div className="pt-1 text-sm font-bold leading-6 text-white/78">
+                  {term}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-[24px] border border-amber-200/22 bg-amber-300/10 p-4 text-sm font-black leading-6 text-amber-50">
+            สรุปสั้นๆ: บิทให้ถึงขั้นต่ำ รอระบบจัดอันดับหลังปิดประมูล เจ้าของห้องติดต่อผู้มีสิทธิ์ตามลำดับเวลา และเมื่อยืนยันผู้ชนะแล้วแชทดีลจะอยู่ต่อให้คุยซื้อขายจนจบภายในกรอบ 7 วัน
+          </div>
+        </div>
+
+        <div className="relative z-10 grid gap-3 border-t border-amber-200/14 bg-black/22 px-5 py-4 sm:grid-cols-[1fr_0.8fr] sm:px-7">
+          <button
+            type="button"
+            onClick={onAccept}
+            className="min-h-[54px] rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#f6c453_48%,#a36b12)] px-4 text-sm font-black text-black shadow-[0_0_36px_rgba(246,196,83,0.28)] transition active:scale-[0.99]"
+          >
+            {isRequired ? "ยอมรับเงื่อนไขทุกประการ" : "รับทราบเงื่อนไขแล้ว"}
+          </button>
+          {isRequired ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="min-h-[54px] rounded-2xl border border-white/14 bg-white/[0.08] px-4 text-sm font-black text-white/82 transition hover:bg-white/[0.12] active:scale-[0.99]"
+            >
+              ยกเลิกการเข้าร่วมประมูล
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-[54px] rounded-2xl border border-white/14 bg-white/[0.08] px-4 text-sm font-black text-white/82 transition hover:bg-white/[0.12] active:scale-[0.99]"
+            >
+              ปิดหน้าต่าง
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -396,12 +525,26 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [acceptedRules, setAcceptedRules] = useState(true);
+  const [acceptedAuctionTerms, setAcceptedAuctionTerms] = useState(true);
+  const [showAuctionTerms, setShowAuctionTerms] = useState(false);
+  const [auctionTermsMode, setAuctionTermsMode] = useState<"required" | "info">("required");
   const bidBoardEndRef = useRef<HTMLDivElement>(null);
   const mobileBidBoardRef = useRef<HTMLDivElement>(null);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
   const sessionUser = session?.user as
-    | { id?: string | null; lineId?: string | null }
+    | { id?: string | null; lineId?: string | null; email?: string | null }
     | undefined;
+  const auctionTermsViewerKey = useMemo(() => {
+    return (
+      [sessionUser?.id, sessionUser?.lineId, sessionUser?.email]
+        .map((value) => String(value || "").trim())
+        .find(Boolean) || "guest"
+    );
+  }, [sessionUser?.email, sessionUser?.id, sessionUser?.lineId]);
+  const auctionTermsStorageKey = useMemo(
+    () => buildAuctionTermsStorageKey(roomId, auctionTermsViewerKey),
+    [auctionTermsViewerKey, roomId]
+  );
 
   const room = payload?.room || null;
   const bids = payload?.bids || [];
@@ -497,6 +640,21 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   }, [roomId]);
 
   useEffect(() => {
+    try {
+      setAcceptedAuctionTerms(window.localStorage.getItem(auctionTermsStorageKey) === "1");
+    } catch {
+      setAcceptedAuctionTerms(false);
+    }
+  }, [auctionTermsStorageKey]);
+
+  useEffect(() => {
+    if (!room || !acceptedRules || acceptedAuctionTerms) return;
+
+    setAuctionTermsMode("required");
+    setShowAuctionTerms(true);
+  }, [acceptedAuctionTerms, acceptedRules, room?.id]);
+
+  useEffect(() => {
     void fetchRoom();
 
     const intervalId = window.setInterval(() => {
@@ -524,6 +682,24 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       window.localStorage.setItem(`nexora:auction-rules:${roomId}`, "1");
     } catch {}
     setAcceptedRules(true);
+  };
+
+  const acceptAuctionTerms = () => {
+    try {
+      window.localStorage.setItem(auctionTermsStorageKey, "1");
+    } catch {}
+    setAcceptedAuctionTerms(true);
+    setShowAuctionTerms(false);
+  };
+
+  const cancelAuctionTerms = () => {
+    setShowAuctionTerms(false);
+    router.push("/market/auction");
+  };
+
+  const openAuctionTerms = () => {
+    setAuctionTermsMode("info");
+    setShowAuctionTerms(true);
   };
 
   const scrollMobileBidBoardToBottom = useCallback(() => {
@@ -758,6 +934,14 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
           <div className="inline-flex min-h-[46px] items-center rounded-2xl border border-amber-200/30 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-4 text-sm font-black text-black shadow-[0_0_26px_rgba(251,191,36,0.24)]">
             ห้อง {formatAuctionRoomNumber(room.roomNumber)}
           </div>
+          <button
+            type="button"
+            onClick={openAuctionTerms}
+            className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl border border-amber-200/24 bg-black/44 px-4 text-sm font-black text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.12)] transition hover:border-amber-200/42 hover:bg-amber-300/10"
+          >
+            <ScrollText className="h-4 w-4" />
+            เงื่อนไขการประมูล
+          </button>
           <div className="flex items-center gap-2">
             {roomCanDelete ? (
               <button
@@ -1196,6 +1380,14 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       </div>
 
       {!acceptedRules ? <RuleOverlay onAccept={acceptRules} /> : null}
+      {acceptedRules && showAuctionTerms ? (
+        <AuctionTermsOverlay
+          mode={auctionTermsMode}
+          onAccept={acceptAuctionTerms}
+          onCancel={cancelAuctionTerms}
+          onClose={() => setShowAuctionTerms(false)}
+        />
+      ) : null}
     </div>
   );
 }

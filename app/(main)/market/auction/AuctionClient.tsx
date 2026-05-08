@@ -869,7 +869,10 @@ export default function AuctionClient() {
                           <div className="rounded-full border border-amber-200/28 bg-black/58 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
                             {phase === "live" ? "LIVE" : phase === "scheduled" ? "SOON" : "ENDED"}
                           </div>
-                          <div className="rounded-full border border-amber-200/32 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-3 py-1 text-[10px] font-black text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]">
+                          <div className="rounded-full border border-amber-200/32 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]">
+                            ROOM {roomNumberLabel}
+                          </div>
+                          <div className="hidden">
                             ห้อง {roomNumberLabel}
                           </div>
                         </div>
