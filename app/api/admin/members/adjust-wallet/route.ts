@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminActor } from "@/lib/admin-auth";
 import { writeCriticalBackup } from "@/lib/critical-backup";
+import { createWalletReceivedNotification } from "@/lib/wallet-notification";
 
 function parseOptionalAmount(value: unknown, integerOnly = false) {
   if (value === undefined || value === null || value === "") {
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
           id: true,
           lineId: true,
           name: true,
+          image: true,
           nexPoint: true,
           coin: true,
         },
@@ -124,8 +126,30 @@ export async function POST(req: Request) {
         lineId: updatedUser.lineId,
         nexPoint: updatedUser.nexPoint,
         coin: updatedUser.coin,
+        image: updatedUser.image,
       };
     });
+
+    await Promise.all([
+      nextNexAmount !== null && nextNexAmount > 0
+        ? createWalletReceivedNotification({
+            userId: result.id,
+            asset: "NEX",
+            amount: nextNexAmount,
+            image: result.image,
+            source: "admin-members-adjust-wallet",
+          })
+        : Promise.resolve(null),
+      nextCoinAmount !== null && nextCoinAmount > 0
+        ? createWalletReceivedNotification({
+            userId: result.id,
+            asset: "COIN",
+            amount: nextCoinAmount,
+            image: result.image,
+            source: "admin-members-adjust-wallet",
+          })
+        : Promise.resolve(null),
+    ]);
 
     return NextResponse.json({
       success: true,

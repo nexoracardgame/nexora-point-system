@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminActor } from "@/lib/admin-auth";
 import { writeCriticalBackup } from "@/lib/critical-backup";
+import { createWalletReceivedNotification } from "@/lib/wallet-notification";
 
 export async function POST(req: Request) {
   try {
@@ -22,13 +23,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
 
-    await prisma.$transaction(async (tx) => {
+    const updatedUser = await prisma.$transaction(async (tx) => {
       const beforeUser = await tx.user.findUnique({
         where: { lineId: cleanLineId },
         select: {
           id: true,
           lineId: true,
           name: true,
+          image: true,
           nexPoint: true,
           coin: true,
         },
@@ -76,7 +78,19 @@ export async function POST(req: Request) {
           source: "admin-members-update-coin",
         },
       });
+
+      return updatedUser;
     });
+
+    if (nextAmount > 0) {
+      await createWalletReceivedNotification({
+        userId: updatedUser.id,
+        asset: "COIN",
+        amount: nextAmount,
+        image: updatedUser.image,
+        source: "admin-members-update-coin",
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

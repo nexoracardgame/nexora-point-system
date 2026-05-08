@@ -50,6 +50,18 @@ function uniqueStrings(values: Array<string | null | undefined>) {
   );
 }
 
+function isWalletReceivedNotification(item: { href?: string; meta?: Record<string, string | number | boolean | null> | null }) {
+  const asset = String(item.meta?.asset || "").toUpperCase();
+  const action = String(item.meta?.action || "add").toLowerCase();
+  const href = String(item.href || "").trim();
+
+  return (
+    (asset === "NEX" || asset === "COIN") &&
+    action === "add" &&
+    href.startsWith("/wallet")
+  );
+}
+
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
@@ -97,7 +109,7 @@ export async function GET() {
     );
     const visibleLocalNotifications = localNotifications.filter(
       (item) =>
-        item.type !== "wallet" &&
+        (item.type !== "wallet" || isWalletReceivedNotification(item)) &&
         (item.type !== "friend" ||
           String(item.meta?.action || "") !== "request")
     );
