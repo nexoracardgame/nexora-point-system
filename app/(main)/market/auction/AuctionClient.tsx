@@ -865,19 +865,19 @@ export default function AuctionClient() {
                           alt={room.cardName}
                           className="relative z-10 mx-auto h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
                         />
-                        <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
+                        <div className="absolute left-3 top-3 z-30 flex flex-wrap items-center gap-2">
                           <div className="rounded-full border border-amber-200/28 bg-black/58 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
                             {phase === "live" ? "LIVE" : phase === "scheduled" ? "SOON" : "ENDED"}
                           </div>
-                          <div className="rounded-full border border-amber-200/32 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]">
-                            ROOM {roomNumberLabel}
+                          <div className="rounded-full border border-amber-200/32 bg-[linear-gradient(135deg,#fff1a8,#f6c453_52%,#9c650c)] px-3 py-1 text-[10px] font-black text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]">
+                            ห้อง {roomNumberLabel}
                           </div>
                           <div className="hidden">
                             ห้อง {roomNumberLabel}
                           </div>
                         </div>
                         {isFreshRoom ? (
-                          <div className="absolute right-3 top-14 rounded-full border border-amber-300/30 bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(251,191,36,0.35)]">
+                          <div className="absolute right-3 top-14 z-30 rounded-full border border-amber-300/30 bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(251,191,36,0.35)]">
                             NEW
                           </div>
                         ) : null}

@@ -428,7 +428,7 @@ function AuctionTermsOverlay({
       aria-label="เงื่อนไขการประมูล"
       className="fixed inset-0 z-[1700] flex items-center justify-center bg-black/82 px-3 py-5 backdrop-blur-2xl sm:px-4"
     >
-      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] border border-amber-200/35 bg-[radial-gradient(circle_at_top,#3b2a0d_0%,#120f08_46%,#030303_100%)] text-white shadow-[0_34px_150px_rgba(0,0,0,0.78),0_0_50px_rgba(251,191,36,0.16)]">
+      <div className="relative flex max-h-[96vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-amber-200/35 bg-[radial-gradient(circle_at_top,#3b2a0d_0%,#120f08_46%,#030303_100%)] text-white shadow-[0_34px_150px_rgba(0,0,0,0.78),0_0_50px_rgba(251,191,36,0.16)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_0%,rgba(255,231,151,0.18),transparent_28%),radial-gradient(circle_at_8%_10%,rgba(251,191,36,0.12),transparent_24%)]" />
 
         {isRequired ? null : (
@@ -442,52 +442,52 @@ function AuctionTermsOverlay({
           </button>
         )}
 
-        <div className="relative z-10 border-b border-amber-200/14 px-5 py-5 sm:px-7 sm:py-6">
-          <div className="flex items-start gap-4 pr-10">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200/34 bg-amber-300/14 text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.18)]">
-              <ScrollText className="h-7 w-7" />
+        <div className="relative z-10 border-b border-amber-200/14 px-4 py-3.5 sm:px-5 sm:py-4">
+          <div className="flex items-start gap-3 pr-10">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-200/34 bg-amber-300/14 text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.18)]">
+              <ScrollText className="h-6 w-6" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-black uppercase tracking-[0.28em] text-amber-200/68">
                 Auction Terms
               </div>
-              <h2 className="mt-2 text-2xl font-black leading-tight text-amber-50 sm:text-3xl">
+              <h2 className="mt-1.5 text-xl font-black leading-tight text-amber-50 sm:text-2xl">
                 เงื่อนไขการประมูล NEXORA
               </h2>
-              <p className="mt-2 text-sm font-bold leading-6 text-white/58">
+              <p className="mt-1.5 text-xs font-bold leading-5 text-white/58 sm:text-sm">
                 อ่านให้ครบก่อนเข้าร่วม เพื่อให้เข้าใจกติกาบิท สิทธิ์ผู้ชนะ แชทดีล และเวลาของแต่ละอันดับอย่างชัดเจน
               </p>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
-          <div className="grid gap-3">
+        <div className="relative z-10 min-h-0 flex-1 overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4">
+          <div className="grid gap-2.5 lg:grid-cols-2">
             {AUCTION_TERMS.map((term, index) => (
               <div
                 key={term}
-                className="grid grid-cols-[42px_1fr] gap-3 rounded-[22px] border border-white/10 bg-white/[0.045] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-4"
+                className="grid grid-cols-[34px_1fr] gap-2.5 rounded-[18px] border border-white/10 bg-white/[0.045] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-3"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/12 text-sm font-black text-amber-100">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-200/30 bg-amber-300/12 text-xs font-black text-amber-100">
                   {String(index + 1).padStart(2, "0")}
                 </div>
-                <div className="pt-1 text-sm font-bold leading-6 text-white/78">
+                <div className="text-xs font-bold leading-5 text-white/78 sm:text-[13px]">
                   {term}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 rounded-[24px] border border-amber-200/22 bg-amber-300/10 p-4 text-sm font-black leading-6 text-amber-50">
+          <div className="mt-3 rounded-[20px] border border-amber-200/22 bg-amber-300/10 p-3 text-xs font-black leading-5 text-amber-50 sm:text-[13px]">
             สรุปสั้นๆ: บิทให้ถึงขั้นต่ำ รอระบบจัดอันดับหลังปิดประมูล เจ้าของห้องติดต่อผู้มีสิทธิ์ตามลำดับเวลา และเมื่อยืนยันผู้ชนะแล้วแชทดีลจะอยู่ต่อให้คุยซื้อขายจนจบภายในกรอบ 7 วัน
           </div>
         </div>
 
-        <div className="relative z-10 grid gap-3 border-t border-amber-200/14 bg-black/22 px-5 py-4 sm:grid-cols-[1fr_0.8fr] sm:px-7">
+        <div className="relative z-10 grid gap-3 border-t border-amber-200/14 bg-black/22 px-4 py-3 sm:grid-cols-[1fr_0.8fr] sm:px-5">
           <button
             type="button"
             onClick={onAccept}
-            className="min-h-[54px] rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#f6c453_48%,#a36b12)] px-4 text-sm font-black text-black shadow-[0_0_36px_rgba(246,196,83,0.28)] transition active:scale-[0.99]"
+            className="min-h-[48px] rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#f6c453_48%,#a36b12)] px-4 text-sm font-black text-black shadow-[0_0_36px_rgba(246,196,83,0.28)] transition active:scale-[0.99]"
           >
             {isRequired ? "ยอมรับเงื่อนไขทุกประการ" : "รับทราบเงื่อนไขแล้ว"}
           </button>
@@ -495,7 +495,7 @@ function AuctionTermsOverlay({
             <button
               type="button"
               onClick={onCancel}
-              className="min-h-[54px] rounded-2xl border border-white/14 bg-white/[0.08] px-4 text-sm font-black text-white/82 transition hover:bg-white/[0.12] active:scale-[0.99]"
+              className="min-h-[48px] rounded-2xl border border-white/14 bg-white/[0.08] px-4 text-sm font-black text-white/82 transition hover:bg-white/[0.12] active:scale-[0.99]"
             >
               ยกเลิกการเข้าร่วมประมูล
             </button>
@@ -503,7 +503,7 @@ function AuctionTermsOverlay({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[54px] rounded-2xl border border-white/14 bg-white/[0.08] px-4 text-sm font-black text-white/82 transition hover:bg-white/[0.12] active:scale-[0.99]"
+              className="min-h-[48px] rounded-2xl border border-white/14 bg-white/[0.08] px-4 text-sm font-black text-white/82 transition hover:bg-white/[0.12] active:scale-[0.99]"
             >
               ปิดหน้าต่าง
             </button>
