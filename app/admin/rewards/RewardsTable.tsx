@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { formatThaiDateTime } from "@/lib/thai-time";
 import { nexoraConfirm } from "@/lib/nexora-dialog";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 type RewardRow = {
   id: string;
@@ -17,6 +19,12 @@ type RewardRow = {
 
 const REWARD_FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200";
+const REWARD_SYNC_POLL_MS = 1000;
+const REWARD_SYNC_CONFIRM_MS = 350;
+
+type RewardListResponse = {
+  rewards?: Array<Partial<RewardRow>>;
+};
 
 function publishRewardsUpdated() {
   if (typeof window === "undefined") return;
@@ -32,6 +40,36 @@ function publishRewardsUpdated() {
   }
 }
 
+function normalizeRewardRow(reward: Partial<RewardRow>, fallback?: RewardRow): RewardRow {
+  return {
+    id: String(reward.id || fallback?.id || "").trim(),
+    name: String(reward.name || fallback?.name || "").trim(),
+    imageUrl:
+      reward.imageUrl === undefined
+        ? fallback?.imageUrl || null
+        : reward.imageUrl || null,
+    nexCost:
+      reward.nexCost === undefined
+        ? fallback?.nexCost ?? null
+        : reward.nexCost == null
+          ? null
+          : Number(reward.nexCost),
+    coinCost:
+      reward.coinCost === undefined
+        ? fallback?.coinCost ?? null
+        : reward.coinCost == null
+          ? null
+          : Number(reward.coinCost),
+    stock: Number.isFinite(Number(reward.stock))
+      ? Number(reward.stock)
+      : Number(fallback?.stock || 0),
+    createdAt:
+      typeof reward.createdAt === "string" && reward.createdAt
+        ? reward.createdAt
+        : fallback?.createdAt || new Date().toISOString(),
+  };
+}
+
 export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
   const router = useRouter();
   const [rows, setRows] = useState(rewards);
@@ -41,10 +79,147 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
   const [nexCost, setNexCost] = useState("");
   const [coinCost, setCoinCost] = useState("");
   const [stock, setStock] = useState("");
+  const editingIdRef = useRef<string | null>(null);
+  const syncInFlightRef = useRef(false);
+  const syncQueuedRef = useRef(false);
+  const confirmSyncTimeoutRef = useRef<number | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const rowsRef = useRef(rewards);
 
   useEffect(() => {
     setRows(rewards);
+    rowsRef.current = rewards;
   }, [rewards]);
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
+  useEffect(() => {
+    editingIdRef.current = editingId;
+  }, [editingId]);
+
+  const applySyncedRewards = useCallback((nextRewards: Array<Partial<RewardRow>>) => {
+    const currentById = new Map(rowsRef.current.map((row) => [row.id, row]));
+    const nextRows = nextRewards
+      .map((reward) => {
+        const id = String(reward.id || "").trim();
+        if (!id) return null;
+        return normalizeRewardRow(reward, currentById.get(id));
+      })
+      .filter((reward): reward is RewardRow => Boolean(reward));
+    const nextById = new Map(nextRows.map((row) => [row.id, row]));
+    const activeEditingId = editingIdRef.current;
+    const liveReward = activeEditingId ? nextById.get(activeEditingId) : null;
+
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+
+    if (liveReward) {
+      setStock(String(liveReward.stock));
+    }
+  }, []);
+
+  const syncRewards = useCallback(async () => {
+    if (syncInFlightRef.current) {
+      syncQueuedRef.current = true;
+      return;
+    }
+
+    syncInFlightRef.current = true;
+
+    try {
+      const res = await fetch(`/api/reward/list?adminSync=1&ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) return;
+
+      const data = (await res.json()) as RewardListResponse;
+      if (!Array.isArray(data?.rewards)) return;
+
+      applySyncedRewards(data.rewards);
+    } catch {
+      return;
+    } finally {
+      syncInFlightRef.current = false;
+      if (syncQueuedRef.current) {
+        syncQueuedRef.current = false;
+        void syncRewards();
+      }
+    }
+  }, [applySyncedRewards]);
+
+  const queueRewardSync = useCallback(() => {
+    void syncRewards();
+
+    if (confirmSyncTimeoutRef.current != null) {
+      window.clearTimeout(confirmSyncTimeoutRef.current);
+    }
+
+    confirmSyncTimeoutRef.current = window.setTimeout(() => {
+      void syncRewards();
+    }, REWARD_SYNC_CONFIRM_MS);
+  }, [syncRewards]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncRewards();
+      }
+    }, REWARD_SYNC_POLL_MS);
+
+    const onFocus = () => queueRewardSync();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") queueRewardSync();
+    };
+    const onRewardsUpdated = () => queueRewardSync();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "nexora:rewards-updated") queueRewardSync();
+    };
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("nexora:rewards-updated", onRewardsUpdated);
+    document.addEventListener("visibilitychange", onVisibility);
+    queueRewardSync();
+
+    return () => {
+      window.clearInterval(intervalId);
+      if (confirmSyncTimeoutRef.current != null) {
+        window.clearTimeout(confirmSyncTimeoutRef.current);
+      }
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("nexora:rewards-updated", onRewardsUpdated);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [queueRewardSync, syncRewards]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase.channel(`admin-rewards-stock-${Date.now()}`);
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "Reward" },
+      () => {
+        queueRewardSync();
+      }
+    );
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") queueRewardSync();
+    });
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [queueRewardSync]);
 
   const startEdit = (reward: RewardRow) => {
     setEditingId(reward.id);

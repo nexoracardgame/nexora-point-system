@@ -16,6 +16,7 @@ export async function GET() {
         nexCost: true,
         coinCost: true,
         stock: true,
+        createdAt: true,
       },
     });
 
