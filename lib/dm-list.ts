@@ -1,5 +1,6 @@
 import { getDealChatRoomId, isDealChatRoomId } from "@/lib/deal-chat";
 import { resolveCardDisplayImage } from "@/lib/card-image";
+import { getAuctionDealRoomSeedsForUser } from "@/lib/auction-deal-chat";
 import {
   getDmConversationClearedAtMap,
   getDmRoomClearedAtMap,
@@ -78,7 +79,7 @@ export async function getDmRoomsForUser(
     roomOrFilters.push(`usera.eq.${myLineId}`, `userb.eq.${myLineId}`);
   }
 
-  const [directRoomsResult, deals] = await Promise.all([
+  const [directRoomsResult, dealData] = await Promise.all([
     supabase
       .from("dm_room")
       .select(
@@ -86,31 +87,35 @@ export async function getDmRoomsForUser(
       )
       .or(roomOrFilters.join(","))
       .order("updatedat", { ascending: false }),
-    prisma.dealRequest.findMany({
-      where: {
-        status: "accepted",
-        OR: [{ buyerId: myId }, { sellerId: myId }],
-      },
-      include: {
-        buyer: {
-          select: {
-            id: true,
-            displayName: true,
-            name: true,
-            image: true,
+    Promise.all([
+      prisma.dealRequest.findMany({
+        where: {
+          status: "accepted",
+          OR: [{ buyerId: myId }, { sellerId: myId }],
+        },
+        include: {
+          buyer: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
+          },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              name: true,
+              image: true,
+            },
           },
         },
-        seller: {
-          select: {
-            id: true,
-            displayName: true,
-            name: true,
-            image: true,
-          },
-        },
-      },
-    }),
+      }),
+      getAuctionDealRoomSeedsForUser(myId).catch(() => []),
+    ]),
   ]);
+  const [deals, auctionDealSeeds] = dealData;
 
   if (directRoomsResult.error) {
     console.error("LOAD DM ROOM ERROR:", directRoomsResult.error);
@@ -121,12 +126,16 @@ export async function getDmRoomsForUser(
     new Map(
       (directRoomsResult.data || [])
         .filter((room) => !isDealChatRoomId(room.roomid))
+        .filter((room) => !String(room.roomid || "").startsWith("auction:"))
         .map((room) => [room.roomid, room])
     ).values()
   );
 
   const directRoomIds = dedupedRooms.map((room) => String(room.roomid));
-  const dealRoomIds = deals.map((deal) => getDealChatRoomId(deal.id));
+  const dealRoomIds = [
+    ...deals.map((deal) => getDealChatRoomId(deal.id)),
+    ...auctionDealSeeds.map((room) => room.roomId),
+  ];
   const roomIds = Array.from(new Set([...directRoomIds, ...dealRoomIds]));
   const directRoomClearAtByRoomId = await getDmRoomClearedAtMap(myId, directRoomIds);
 
@@ -434,7 +443,24 @@ export async function getDmRoomsForUser(
     };
   });
 
-  return [...Array.from(directByOther.values()), ...dealItems].sort(
+  const auctionDealItems: Array<DMRoomListItem & { otherUserId?: string }> =
+    auctionDealSeeds.map((seed) => {
+      const latestMessage = latestMessageByRoom.get(seed.roomId);
+      const lastMessageAt = String(latestMessage?.createdAt || "").trim();
+      const createdAt = lastMessageAt || String(seed.createdAt || "").trim();
+
+      return {
+        ...seed,
+        createdAt,
+        lastMessageAt,
+        lastMessage: latestMessage
+          ? buildPreview(latestMessage.content, latestMessage.imageUrl)
+          : seed.lastMessage,
+        unread: unreadCountByRoom.get(seed.roomId) || 0,
+      };
+    });
+
+  return [...Array.from(directByOther.values()), ...dealItems, ...auctionDealItems].sort(
     compareRoomsByLatest
   );
 }

@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import {
+  getAccessibleAuctionDealRoomIds,
+  getAuctionDealAccess,
+  isAuctionDealId,
+} from "@/lib/auction-deal-chat";
 import { getDealChatRoomId, isDealChatRoomId } from "@/lib/deal-chat";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -35,6 +40,8 @@ export type DmAccessResult =
       otherUserId: string;
       buyer: DealParticipant;
       seller: DealParticipant;
+      auctionDeal?: boolean;
+      auctionId?: string;
     }
   | {
       ok: false;
@@ -70,6 +77,7 @@ export async function getAccessibleDirectRoomIds(
       (data || [])
         .map((room) => String(room.roomid || "").trim())
         .filter((roomId) => !isDealChatRoomId(roomId))
+        .filter((roomId) => !roomId.startsWith("auction:"))
         .filter(Boolean)
     )
   );
@@ -80,17 +88,20 @@ export async function getAccessibleDealRoomIds(userId: string) {
     return [];
   }
 
-  const deals = await prisma.dealRequest.findMany({
-    where: {
-      status: "accepted",
-      OR: [{ buyerId: userId }, { sellerId: userId }],
-    },
-    select: {
-      id: true,
-    },
-  });
+  const [deals, auctionDealRoomIds] = await Promise.all([
+    prisma.dealRequest.findMany({
+      where: {
+        status: "accepted",
+        OR: [{ buyerId: userId }, { sellerId: userId }],
+      },
+      select: {
+        id: true,
+      },
+    }),
+    getAccessibleAuctionDealRoomIds(userId).catch(() => []),
+  ]);
 
-  return deals.map((deal) => getDealChatRoomId(deal.id));
+  return [...deals.map((deal) => getDealChatRoomId(deal.id)), ...auctionDealRoomIds];
 }
 
 export async function getAccessibleRoomIds(
@@ -139,6 +150,32 @@ export async function getDmRoomAccess(input: {
 
   if (isDealChatRoomId(roomId)) {
     const dealId = roomId.replace(/^deal:/, "");
+    if (isAuctionDealId(dealId)) {
+      const access = await getAuctionDealAccess({
+        dealId,
+        userId,
+        lineId,
+      });
+
+      if (!access.ok) {
+        return access;
+      }
+
+      return {
+        ok: true,
+        kind: "deal",
+        roomId: access.roomId,
+        dealId: access.dealId,
+        buyerId: access.bidderId,
+        sellerId: access.sellerId,
+        otherUserId: access.otherUserId,
+        buyer: access.bidder,
+        seller: access.seller,
+        auctionDeal: true,
+        auctionId: access.auctionId,
+      };
+    }
+
     const deal = await prisma.dealRequest.findUnique({
       where: {
         id: dealId,
@@ -187,6 +224,10 @@ export async function getDmRoomAccess(input: {
       buyer: deal.buyer,
       seller: deal.seller,
     };
+  }
+
+  if (roomId.startsWith("auction:")) {
+    return { ok: false, reason: "closed" };
   }
 
   const supabase = getServerSupabaseClient();

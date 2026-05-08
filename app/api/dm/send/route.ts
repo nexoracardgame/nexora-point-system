@@ -5,6 +5,7 @@ import path from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { isAuctionDealId } from "@/lib/auction-deal-chat";
 import { getDmRoomAccess } from "@/lib/dm-access";
 import type { DmAccessResult } from "@/lib/dm-access";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +40,10 @@ async function getChatPushHref(access: Extract<DmAccessResult, { ok: true }>) {
   }
 
   try {
+    if (isAuctionDealId(access.dealId)) {
+      return `/market/deals/chat/${encodeURIComponent(access.dealId)}`;
+    }
+
     const deal = await prisma.dealRequest.findUnique({
       where: {
         id: access.dealId,

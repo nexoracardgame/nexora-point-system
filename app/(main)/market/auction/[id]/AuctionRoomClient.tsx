@@ -608,21 +608,23 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     (bid: AuctionFinalRank) => {
       if (!room) return;
 
-      const roomId = `auction:${room.id}:${bid.bidderId || bid.id}`;
+      const dealId = `auction:${room.id}:${bid.bidderId || bid.id}`;
+      const roomId = `deal:${dealId}`;
       window.dispatchEvent(
         new CustomEvent("nexora:open-floating-chat", {
           detail: {
-            kind: "direct",
+            kind: "deal",
             auctionDeal: true,
             roomId,
+            dealId,
             userId: bid.bidderId,
             userName: bid.bidderName,
             userImage: bid.bidderImage,
-            legacyRoomId: roomId,
             dealCardName: room.cardName,
             dealCardImage: room.imageUrl,
             dealCardNo: room.cardNo,
             dealPrice: bid.amount,
+            dealMode: "sell",
           },
         })
       );

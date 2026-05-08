@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  getAuctionDealBootstrap,
+  isAuctionDealId,
+} from "@/lib/auction-deal-chat";
 import { resolveCardDisplayImage } from "@/lib/card-image";
 import { getChatMessagesPage } from "@/lib/chat-room-server";
 import {
@@ -81,6 +85,15 @@ export async function getDealChatBootstrap(input: {
 }): Promise<DealChatBootstrap> {
   const dealId = String(input.dealId || "").trim();
   const userId = String(input.userId || "").trim();
+
+  if (isAuctionDealId(dealId)) {
+    return getAuctionDealBootstrap({
+      dealId,
+      userId,
+      limit: input.limit,
+      before: input.before,
+    });
+  }
 
   if (!dealId || !userId) {
     return {

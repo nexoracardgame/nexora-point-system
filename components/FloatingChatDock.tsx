@@ -396,7 +396,10 @@ function normalizeRoom(room: DMRoomListItem): FloatingRoom | null {
     return null;
   }
 
-  if (room.kind !== "deal" && safeRoomId.startsWith("deal:")) {
+  if (
+    room.kind !== "deal" &&
+    (safeRoomId.startsWith("deal:") || safeRoomId.startsWith("auction:"))
+  ) {
     return null;
   }
 
@@ -409,6 +412,7 @@ function normalizeRoom(room: DMRoomListItem): FloatingRoom | null {
     lastMessage: safeText(room.lastMessage) || "เริ่มแชท",
     createdAt: safeText(room.createdAt) || new Date().toISOString(),
     unread: Math.max(0, Number(room.unread || 0)),
+    auctionDeal: Boolean(room.auctionDeal),
   };
 }
 
@@ -1528,6 +1532,7 @@ export default function FloatingChatDock({
         dealCardNo: cardNo,
         dealPrice: Number(detail.dealPrice || 0),
         dealMode,
+        auctionDeal: Boolean(detail.auctionDeal),
       });
 
       if (!optimisticRoom) {

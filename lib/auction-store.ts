@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  cleanupAuctionDealMessagesForAuction,
+  deleteAuctionDealMessagesForAuctionIds,
+  getAuctionDealChatRoomId,
+} from "@/lib/auction-deal-chat";
 import { resolveCardDisplayImage, sanitizeCardImageUrl } from "@/lib/card-image";
 
 export type AuctionRoomRecord = {
@@ -279,6 +284,21 @@ export async function ensureAuctionSchema() {
 }
 
 async function cleanupExpiredAuctionRooms() {
+  const expiredRows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    `
+      SELECT "id"
+      FROM "AuctionRoom"
+      WHERE "endsAt" < NOW() - INTERVAL '7 days'
+    `
+  );
+  const expiredIds = expiredRows.map((row) => String(row.id || "").trim()).filter(Boolean);
+
+  if (expiredIds.length > 0) {
+    await deleteAuctionDealMessagesForAuctionIds(expiredIds).catch((error) => {
+      console.error("CLEANUP EXPIRED AUCTION DEAL CHAT ERROR:", error);
+    });
+  }
+
   await prisma.$executeRawUnsafe(`
     DELETE FROM "AuctionRoom"
     WHERE "endsAt" < NOW() - INTERVAL '7 days'
@@ -354,6 +374,9 @@ export async function getAuctionRoomWithBids(id: string) {
 
 export async function deleteAuctionRoom(id: string) {
   await ensureAuctionSchema();
+  await deleteAuctionDealMessagesForAuctionIds([id]).catch((error) => {
+    console.error("DELETE AUCTION DEAL CHAT ERROR:", error);
+  });
 
   const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
     `DELETE FROM "AuctionRoom" WHERE "id" = $1 RETURNING "id"`,
@@ -584,7 +607,7 @@ export async function confirmAuctionWinner(input: ConfirmAuctionWinnerInput) {
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 
-  return prisma.$transaction(async (tx) => {
+  const updatedRoom = await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
       `SELECT pg_advisory_xact_lock(hashtext($1))`,
       input.auctionId
@@ -675,4 +698,20 @@ export async function confirmAuctionWinner(input: ConfirmAuctionWinnerInput) {
 
     return normalizeRoom(updatedRows[0]);
   });
+
+  if (updatedRoom?.confirmedWinnerId) {
+    await cleanupAuctionDealMessagesForAuction(
+      updatedRoom.id,
+      [
+        getAuctionDealChatRoomId(
+          updatedRoom.id,
+          updatedRoom.confirmedWinnerId
+        ),
+      ]
+    ).catch((error) => {
+      console.error("CONFIRM AUCTION DEAL CHAT CLEANUP ERROR:", error);
+    });
+  }
+
+  return updatedRoom;
 }

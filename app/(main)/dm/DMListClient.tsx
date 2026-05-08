@@ -173,6 +173,10 @@ function isDealRoomId(roomId?: string | null) {
   return String(roomId || "").trim().startsWith("deal:");
 }
 
+function isLegacyAuctionRoomId(roomId?: string | null) {
+  return String(roomId || "").trim().startsWith("auction:");
+}
+
 function buildDirectRoomHref(roomId: string) {
   return `/dm/${encodeURIComponent(roomId)}?back=${encodeURIComponent("/dm")}`;
 }
@@ -186,7 +190,10 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem | null {
   const roomId = String(room.roomId || "").trim();
   const kind = room.kind === "deal" ? "deal" : "direct";
 
-  if (!roomId || (kind === "direct" && isDealRoomId(roomId))) {
+  if (
+    !roomId ||
+    (kind === "direct" && (isDealRoomId(roomId) || isLegacyAuctionRoomId(roomId)))
+  ) {
     return null;
   }
 
@@ -206,6 +213,7 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem | null {
     dealCardNo: room.dealCardNo ? String(room.dealCardNo) : undefined,
     dealPrice: Number(room.dealPrice || 0),
     dealMode: room.dealMode === "buy" ? "buy" : "sell",
+    auctionDeal: Boolean(room.auctionDeal),
     sellerName: room.sellerName ? String(room.sellerName) : undefined,
     sellerImage: room.sellerImage ? String(room.sellerImage) : undefined,
   };
@@ -1328,14 +1336,20 @@ export default function DMListClient({
                           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <div className="line-clamp-1 text-sm font-black text-white sm:text-base">
-                                {room.dealMode === "buy" ? "รับซื้อ: " : ""}
+                                {room.auctionDeal
+                                  ? "ประมูล: "
+                                  : room.dealMode === "buy"
+                                    ? "รับซื้อ: "
+                                    : ""}
                                 {room.dealCardName || "Deal chat"}
                               </div>
                               <div className="mt-1 text-sm font-black text-[#ffe27a] sm:text-base">
                                 {formatDealPriceLabel(room.dealPrice)}
                               </div>
                               <div className="mt-1 line-clamp-1 text-[11px] font-semibold text-white/62 sm:text-xs">
-                                {room.dealMode === "buy" ? "ผู้เสนอขาย" : "ผู้ขาย"}: {room.sellerName || room.otherName}
+                                {room.auctionDeal
+                                  ? "ห้องซื้อขายผู้ชนะประมูล"
+                                  : `${room.dealMode === "buy" ? "ผู้เสนอขาย" : "ผู้ขาย"}: ${room.sellerName || room.otherName}`}
                               </div>
                               <div
                                 className={`mt-1 flex items-center gap-1.5 text-[11px] font-black ${
@@ -1374,6 +1388,8 @@ export default function DMListClient({
                                 <div className="max-w-full truncate text-[10px] font-black uppercase tracking-[0.12em] text-[#ffe27a] sm:max-w-[110px]">
                                   {room.dealMode === "buy"
                                     ? "BUY DEAL"
+                                    : room.auctionDeal
+                                      ? "AUCTION DEAL"
                                     : room.dealCardNo
                                       ? `CARD ${room.dealCardNo}`
                                       : "DEAL CARD"}
