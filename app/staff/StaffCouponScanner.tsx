@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import jsQR from "jsqr";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   CheckCircle2,
@@ -12,65 +13,89 @@ import {
   XCircle,
 } from "lucide-react";
 import type { CouponViewModel } from "@/components/CouponDetailCard";
+import { nexoraConfirm } from "@/lib/nexora-dialog";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
-declare global {
-  interface Window {
-    Html5Qrcode?: new (elementId: string, config?: { verbose?: boolean }) => {
-      start: (
-        cameraConfig: { facingMode?: string } | string,
-        config: { fps?: number; qrbox?: { width: number; height: number } },
-        onSuccess: (decodedText: string) => void,
-        onError?: (errorMessage: string) => void
-      ) => Promise<void>;
-      stop: () => Promise<void>;
-      clear: () => Promise<void>;
-      isScanning?: boolean;
-    };
-  }
-}
-
-const SCANNER_ELEMENT_ID = "staff-coupon-scanner";
-const HTML5_QRCODE_SRC =
-  "https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js";
-
-async function ensureHtml5QrScript() {
-  if (typeof window === "undefined") return false;
-  if (window.Html5Qrcode) return true;
-
-  await new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[data-html5-qrcode="true"]`
-    );
-
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("load_failed")),
-        { once: true }
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = HTML5_QRCODE_SRC;
-    script.async = true;
-    script.defer = true;
-    script.dataset.html5Qrcode = "true";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("load_failed"));
-    document.body.appendChild(script);
-  });
-
-  return Boolean(window.Html5Qrcode);
-}
+const COUPON_CODE_PATTERN = /NXR-(NEX|COIN)-\d+-\d{10,}-[A-Z0-9]{4,16}/i;
 
 type StaffCouponScannerProps = {
   embedded?: boolean;
 };
 
-export default function StaffCouponScanner({ embedded = false }: StaffCouponScannerProps = {}) {
+type LookupOptions = {
+  promptUse?: boolean;
+};
+
+function waitForPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+function extractCouponCode(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const candidates = new Set<string>([raw]);
+
+  try {
+    candidates.add(decodeURIComponent(raw));
+  } catch {}
+
+  for (const candidate of Array.from(candidates)) {
+    try {
+      const url = new URL(candidate);
+      candidates.add(url.pathname);
+      candidates.add(url.search);
+
+      for (const key of ["code", "coupon", "open"]) {
+        const param = url.searchParams.get(key);
+        if (param) {
+          candidates.add(param);
+        }
+      }
+
+      url.pathname
+        .split("/")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((part) => candidates.add(part));
+    } catch {}
+  }
+
+  for (const candidate of candidates) {
+    const match = candidate.toUpperCase().match(COUPON_CODE_PATTERN);
+    if (match?.[0]) {
+      return match[0];
+    }
+  }
+
+  return "";
+}
+
+function normalizeCouponInput(value?: string | null) {
+  const raw = String(value || "").trim();
+  return extractCouponCode(raw) || raw;
+}
+
+function getLookupError(status: number) {
+  if (status === 403) return "บัญชีนี้ไม่มีสิทธิ์ตรวจสอบคูปอง";
+  if (status === 404) return "ไม่พบคูปองนี้ในระบบ";
+  return "ตรวจสอบคูปองไม่สำเร็จ";
+}
+
+function getUseError(status: number) {
+  if (status === 403) return "บัญชีนี้ไม่มีสิทธิ์ยืนยันคูปอง";
+  if (status === 404) return "ไม่พบคูปองนี้ในระบบ";
+  if (status === 409) return "คูปองใบนี้ถูกใช้งานไปแล้ว";
+  return "ยืนยันคูปองไม่สำเร็จ";
+}
+
+export default function StaffCouponScanner({
+  embedded = false,
+}: StaffCouponScannerProps = {}) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -81,11 +106,18 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
   const [cameraError, setCameraError] = useState("");
   const [cameraAvailable, setCameraAvailable] = useState(false);
 
-  const scannerRef = useRef<InstanceType<NonNullable<typeof window.Html5Qrcode>> | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanFrameRef = useRef<number | null>(null);
+  const lastScannedCodeRef = useRef("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setCameraAvailable(typeof window !== "undefined" && "mediaDevices" in navigator);
+    setCameraAvailable(
+      typeof navigator !== "undefined" &&
+        Boolean(navigator.mediaDevices?.getUserMedia),
+    );
     inputRef.current?.focus();
   }, []);
 
@@ -95,137 +127,256 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
     return "idle";
   }, [error, message]);
 
-  const stopCamera = async () => {
-    const scanner = scannerRef.current;
-    scannerRef.current = null;
+  const stopCamera = useCallback(async () => {
+    if (scanFrameRef.current != null) {
+      window.cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
+    }
+
+    const stream = streamRef.current;
+    streamRef.current = null;
     setCameraOpen(false);
 
-    if (!scanner) return;
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
 
-    try {
-      await scanner.stop();
-    } catch {}
-
-    try {
-      await scanner.clear();
-    } catch {}
-  };
+    stream?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   useEffect(() => {
     return () => {
       void stopCamera();
     };
-  }, []);
+  }, [stopCamera]);
 
-  const lookupCoupon = async (manualCode?: string) => {
-    const nextCode = String(manualCode || code).trim();
-    if (!nextCode) {
-      setError("กรุณากรอกรหัสหรือยิงสแกนคูปองก่อน");
-      setMessage("");
-      setResult(null);
-      return;
-    }
+  const confirmCouponUse = useCallback(
+    async (targetCode?: string) => {
+      const nextCode = normalizeCouponInput(targetCode || result?.code || code);
+      if (!nextCode) return;
 
-    try {
-      setLookupLoading(true);
-      setError("");
-      setMessage("");
+      try {
+        setLoading(true);
+        setError("");
+        setMessage("");
 
-      const res = await fetch(`/api/coupon/${encodeURIComponent(nextCode)}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
+        const res = await fetch("/api/coupon/use", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: nextCode }),
+        });
+        const data = await res.json();
 
-      if (!res.ok) {
-        setError(String(data?.error || "ไม่พบคูปองนี้"));
+        if (!res.ok) {
+          setError(getUseError(res.status));
+          if (data?.coupon) {
+            setResult(data.coupon);
+          }
+          return;
+        }
+
+        setMessage("ยืนยันใช้งานคูปองสำเร็จ");
+        setResult(data?.coupon || null);
+        setCode(nextCode);
+        inputRef.current?.focus();
+      } catch {
+        setError("เกิดข้อผิดพลาดระหว่างยืนยันใช้งานคูปอง");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [code, result?.code],
+  );
+
+  const lookupCoupon = useCallback(
+    async (manualCode?: string, options: LookupOptions = {}) => {
+      const nextCode = normalizeCouponInput(manualCode || code);
+      if (!nextCode) {
+        setError("กรุณากรอกรหัสหรือยิงสแกนคูปองก่อน");
+        setMessage("");
         setResult(null);
         return;
       }
 
-      setCode(nextCode);
-      setResult(data?.coupon || null);
-    } catch {
-      setError("เกิดข้อผิดพลาดระหว่างโหลดข้อมูลคูปอง");
-      setResult(null);
-    } finally {
-      setLookupLoading(false);
-    }
-  };
+      try {
+        setLookupLoading(true);
+        setError("");
+        setMessage("");
 
-  const confirmCouponUse = async () => {
-    const nextCode = String(result?.code || code).trim();
-    if (!nextCode) return;
+        const res = await fetch(`/api/coupon/${encodeURIComponent(nextCode)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
 
-    try {
-      setLoading(true);
-      setError("");
-      setMessage("");
-
-      const res = await fetch("/api/coupon/use", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: nextCode }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(String(data?.error || "ยืนยันคูปองไม่สำเร็จ"));
-        if (data?.coupon) {
-          setResult(data.coupon);
+        if (!res.ok) {
+          setError(getLookupError(res.status));
+          setResult(null);
+          return;
         }
-        return;
+
+        const coupon = (data?.coupon || null) as CouponViewModel | null;
+        setCode(nextCode);
+        setResult(coupon);
+
+        if (options.promptUse && coupon) {
+          if (coupon.used) {
+            setMessage("สแกนสำเร็จ แต่คูปองใบนี้ถูกใช้งานไปแล้ว");
+            return;
+          }
+
+          const confirmed = await nexoraConfirm({
+            title: "สแกน QR CODE คูปองสำเร็จ",
+            message: `พบคูปอง ${coupon.rewardName} รหัส ${coupon.code} ต้องการยืนยันการใช้งานคูปองนี้เลยไหม`,
+            tone: "success",
+            confirmText: "ยืนยันใช้งาน",
+            cancelText: "ตรวจสอบก่อน",
+          });
+
+          if (confirmed) {
+            await confirmCouponUse(coupon.code);
+          } else {
+            setMessage("สแกน QR CODE คูปองสำเร็จ");
+          }
+        }
+      } catch {
+        setError("เกิดข้อผิดพลาดระหว่างโหลดข้อมูลคูปอง");
+        setResult(null);
+      } finally {
+        setLookupLoading(false);
       }
+    },
+    [code, confirmCouponUse],
+  );
 
-      setMessage(String(data?.message || "ใช้คูปองสำเร็จ"));
-      setResult(data?.coupon || null);
-      setCode(nextCode);
-      inputRef.current?.focus();
-    } catch {
-      setError("เกิดข้อผิดพลาดระหว่างยืนยันใช้งานคูปอง");
-    } finally {
-      setLoading(false);
+  const scanFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const stream = streamRef.current;
+
+    if (!video || !canvas || !stream) return;
+
+    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (context) {
+        context.drawImage(video, 0, 0, width, height);
+        const imageData = context.getImageData(0, 0, width, height);
+        const qr = jsQR(imageData.data, width, height, {
+          inversionAttempts: "attemptBoth",
+        });
+        const detectedCode = extractCouponCode(qr?.data);
+
+        if (detectedCode && detectedCode !== lastScannedCodeRef.current) {
+          lastScannedCodeRef.current = detectedCode;
+          setCode(detectedCode);
+          setCameraError("");
+          void stopCamera().then(() => {
+            void lookupCoupon(detectedCode, { promptUse: true });
+          });
+          return;
+        }
+      }
     }
-  };
 
-  const startCamera = async () => {
+    scanFrameRef.current = window.requestAnimationFrame(scanFrame);
+  }, [lookupCoupon, stopCamera]);
+
+  const startCamera = useCallback(async () => {
     if (!cameraAvailable) {
-      setCameraError("อุปกรณ์นี้ไม่รองรับการเปิดกล้อง");
+      setCameraError("อุปกรณ์นี้ไม่รองรับการเปิดกล้อง หรือหน้านี้ไม่ได้เปิดผ่าน HTTPS");
       return;
     }
 
     try {
+      await stopCamera();
+      lastScannedCodeRef.current = "";
       setCameraError("");
-      const ready = await ensureHtml5QrScript();
-      if (!ready || !window.Html5Qrcode) {
-        setCameraError("โหลดตัวสแกนกล้องไม่สำเร็จ");
-        return;
+      setError("");
+      setMessage("");
+      setCameraOpen(true);
+      await waitForPaint();
+
+      const attempts: MediaStreamConstraints[] = [
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        },
+        {
+          audio: false,
+          video: { facingMode: "environment" },
+        },
+        {
+          audio: false,
+          video: true,
+        },
+      ];
+
+      let stream: MediaStream | null = null;
+      let lastError: unknown = null;
+
+      for (const constraints of attempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (err) {
+          lastError = err;
+        }
       }
 
-      const scanner = new window.Html5Qrcode(SCANNER_ELEMENT_ID, { verbose: false });
-      scannerRef.current = scanner;
-      setCameraOpen(true);
+      if (!stream) {
+        throw lastError || new Error("camera_unavailable");
+      }
 
-      await scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 240, height: 240 },
-        },
-        (decodedText: string) => {
-          const detectedCode = String(decodedText || "").trim();
-          if (!detectedCode) return;
-          setCode(detectedCode);
-          void stopCamera().then(() => {
-            void lookupCoupon(detectedCode);
-          });
-        }
-      );
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) {
+        throw new Error("video_not_ready");
+      }
+
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute("playsinline", "true");
+
+      await video.play().catch(() => undefined);
+
+      if (!video.videoWidth) {
+        await new Promise<void>((resolve) => {
+          const timeout = window.setTimeout(resolve, 900);
+          video.onloadedmetadata = () => {
+            window.clearTimeout(timeout);
+            resolve();
+          };
+        });
+        await video.play().catch(() => undefined);
+      }
+
+      scanFrameRef.current = window.requestAnimationFrame(scanFrame);
     } catch (err) {
       console.error("STAFF_CAMERA_START_ERROR", err);
-      setCameraError("ไม่สามารถเปิดกล้องสแกนได้ กรุณาอนุญาตสิทธิ์กล้องหรือใช้รหัสคูปองแทน");
+      const denied = err instanceof DOMException && err.name === "NotAllowedError";
+      const notFound = err instanceof DOMException && err.name === "NotFoundError";
+
+      setCameraError(
+        denied
+          ? "ยังไม่ได้อนุญาตสิทธิ์กล้อง กรุณาอนุญาตกล้องแล้วลองเปิดใหม่"
+          : notFound
+            ? "ไม่พบกล้องในอุปกรณ์นี้ กรุณากรอกรหัสคูปองแทน"
+            : "ไม่สามารถเปิดกล้องสแกนได้ กรุณาลองใหม่หรือกรอกรหัสคูปองแทน",
+      );
       await stopCamera();
     }
-  };
+  }, [cameraAvailable, scanFrame, stopCamera]);
 
   return (
     <div
@@ -255,11 +406,12 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
               </div>
 
               <h1 className="mt-4 text-3xl font-black sm:text-4xl xl:text-5xl">
-                สแกนคูปอง แล้วค่อยกดยืนยันใช้งานจริง
+                สแกนคูปอง แล้วกดยืนยันใช้งานจริง
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65 sm:text-base sm:leading-7">
-                หลังยิงสแกนหรือกรอกรหัส ระบบจะดึงข้อมูลคูปองที่ถูกสร้างไว้จริงขึ้นมาให้ตรวจสอบก่อน แล้วพนักงานกดยืนยันใช้คูปองจากปุ่มเหลืองได้ทันที
+                สแกน QR CODE จากคูปองรางวัลใน NEX POINT หรือกรอกรหัสคูปองตรงนี้ ระบบจะดึงคูปองจริงขึ้นมาให้ตรวจสอบก่อนใช้งาน
+                QR อื่นที่ไม่ใช่คูปองของระบบจะไม่ถูกนำไปใช้
               </p>
             </div>
 
@@ -288,7 +440,11 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
                         : "text-white"
                   }`}
                 >
-                  {statusTone === "success" ? "พร้อมปิดงาน" : statusTone === "error" ? "ต้องตรวจสอบ" : "รอสแกน"}
+                  {statusTone === "success"
+                    ? "พร้อมปิดงาน"
+                    : statusTone === "error"
+                      ? "ต้องตรวจสอบ"
+                      : "รอสแกน"}
                 </div>
               </div>
             </div>
@@ -324,7 +480,11 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
                   disabled={lookupLoading}
                   className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.26)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {lookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {lookupLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4" />
+                  )}
                   ตรวจสอบคูปอง
                 </button>
 
@@ -348,9 +508,21 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
 
             {cameraOpen ? (
               <div className="mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-black/35">
-                <div id={SCANNER_ELEMENT_ID} className="min-h-[320px] w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover" />
+                <div className="relative min-h-[320px] w-full overflow-hidden bg-black">
+                  <video
+                    ref={videoRef}
+                    muted
+                    playsInline
+                    autoPlay
+                    className="h-full min-h-[320px] w-full object-cover"
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="h-56 w-56 rounded-[28px] border-2 border-cyan-200/80 shadow-[0_0_50px_rgba(34,211,238,0.35)]" />
+                  </div>
+                </div>
                 <div className="flex items-center justify-between gap-3 border-t border-white/8 px-4 py-3 text-sm text-white/60">
-                  <span>กำลังมองหา QR ของคูปอง...</span>
+                  <span>กำลังมองหา QR CODE คูปอง NEX POINT...</span>
                   <button
                     type="button"
                     onClick={() => void stopCamera()}
@@ -386,36 +558,56 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
             {result ? (
               <div className="mt-4 grid gap-4">
                 <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/38">รางวัล</div>
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/38">
+                    รางวัล
+                  </div>
                   <div className="mt-2 text-2xl font-black">{result.rewardName}</div>
                   <div className="mt-1 text-sm text-white/55">{result.valueLabel}</div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">ผู้แลก</div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      ผู้แลก
+                    </div>
                     <div className="mt-2 text-base font-black">{result.userName}</div>
                   </div>
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">สถานะ</div>
-                    <div className={`mt-2 text-base font-black ${result.used ? "text-white/70" : "text-emerald-300"}`}>
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      สถานะ
+                    </div>
+                    <div
+                      className={`mt-2 text-base font-black ${
+                        result.used ? "text-white/70" : "text-emerald-300"
+                      }`}
+                    >
                       {result.statusLabel}
                     </div>
                   </div>
                 </div>
 
                 <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">รหัสคูปอง</div>
-                  <div className="mt-2 break-all text-sm font-black text-white/88">{result.code}</div>
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                    รหัสคูปอง
+                  </div>
+                  <div className="mt-2 break-all text-sm font-black text-white/88">
+                    {result.code}
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">สร้างเมื่อ</div>
-                    <div className="mt-2 text-sm font-bold text-white/75">{formatThaiDateTime(result.createdAt)}</div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      สร้างเมื่อ
+                    </div>
+                    <div className="mt-2 text-sm font-bold text-white/75">
+                      {formatThaiDateTime(result.createdAt)}
+                    </div>
                   </div>
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">ใช้งานเมื่อ</div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      ใช้งานเมื่อ
+                    </div>
                     <div className="mt-2 text-sm font-bold text-white/75">
                       {result.usedAt ? formatThaiDateTime(result.usedAt) : "-"}
                     </div>
@@ -428,8 +620,14 @@ export default function StaffCouponScanner({ embedded = false }: StaffCouponScan
                   disabled={loading || result.used}
                   className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.26)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
                 >
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                  {result.used ? "คูปองถูกใช้งานแล้ว" : "ยืนยันการใช้งานของจริง"}
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4" />
+                  )}
+                  {result.used
+                    ? "คูปองถูกใช้งานแล้ว"
+                    : "ยืนยันการใช้งานของจริง"}
                 </button>
               </div>
             ) : (
