@@ -106,6 +106,24 @@ export type ConfirmAuctionWinnerInput = {
 };
 
 let auctionSchemaReady: Promise<void> | null = null;
+let auctionCleanupReadyAt = 0;
+let auctionCleanupPromise: Promise<void> | null = null;
+
+const AUCTION_CLEANUP_INTERVAL_MS = 60 * 1000;
+const AUCTION_ROOMS_CACHE_MS = 1200;
+
+type AuctionRoomsMemoryCache = {
+  expiresAt: number;
+  limit: number;
+  rooms: AuctionRoomRecord[];
+  promise?: Promise<AuctionRoomRecord[]>;
+};
+
+let auctionRoomsCache: AuctionRoomsMemoryCache | null = null;
+
+export function invalidateAuctionRoomsCache() {
+  auctionRoomsCache = null;
+}
 
 function hasDatabaseConfig() {
   return Boolean(String(process.env.DATABASE_URL || "").trim());
@@ -283,46 +301,116 @@ export async function ensureAuctionSchema() {
   return auctionSchemaReady;
 }
 
-async function cleanupExpiredAuctionRooms() {
-  const expiredRows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-    `
-      SELECT "id"
-      FROM "AuctionRoom"
-      WHERE "endsAt" < NOW() - INTERVAL '7 days'
-    `
-  );
-  const expiredIds = expiredRows.map((row) => String(row.id || "").trim()).filter(Boolean);
-
-  if (expiredIds.length > 0) {
-    await deleteAuctionDealMessagesForAuctionIds(expiredIds).catch((error) => {
-      console.error("CLEANUP EXPIRED AUCTION DEAL CHAT ERROR:", error);
-    });
+async function cleanupExpiredAuctionRooms(force = false) {
+  const now = Date.now();
+  if (!force && now < auctionCleanupReadyAt) {
+    return;
   }
 
-  await prisma.$executeRawUnsafe(`
-    DELETE FROM "AuctionRoom"
-    WHERE "endsAt" < NOW() - INTERVAL '7 days'
-  `);
+  if (auctionCleanupPromise) {
+    await auctionCleanupPromise;
+    return;
+  }
+
+  auctionCleanupReadyAt = now + AUCTION_CLEANUP_INTERVAL_MS;
+  auctionCleanupPromise = (async () => {
+    const expiredRows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `
+        SELECT "id"
+        FROM "AuctionRoom"
+        WHERE "endsAt" < NOW() - INTERVAL '7 days'
+      `
+    );
+    const expiredIds = expiredRows.map((row) => String(row.id || "").trim()).filter(Boolean);
+
+    if (expiredIds.length > 0) {
+      await deleteAuctionDealMessagesForAuctionIds(expiredIds).catch((error) => {
+        console.error("CLEANUP EXPIRED AUCTION DEAL CHAT ERROR:", error);
+      });
+      invalidateAuctionRoomsCache();
+    }
+
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM "AuctionRoom"
+      WHERE "endsAt" < NOW() - INTERVAL '7 days'
+    `);
+  })().finally(() => {
+    auctionCleanupPromise = null;
+  });
+
+  await auctionCleanupPromise;
 }
 
 export async function getAuctionRooms(limit = 300) {
+  const safeLimit = Math.max(1, Math.min(500, Math.floor(limit)));
+  const now = Date.now();
+  if (
+    auctionRoomsCache &&
+    auctionRoomsCache.limit === safeLimit &&
+    auctionRoomsCache.expiresAt > now
+  ) {
+    return auctionRoomsCache.rooms;
+  }
+
+  if (auctionRoomsCache?.promise && auctionRoomsCache.limit === safeLimit) {
+    return auctionRoomsCache.promise;
+  }
+
   await ensureAuctionSchema();
-  await cleanupExpiredAuctionRooms();
 
-  const rows = await prisma.$queryRawUnsafe<AuctionRoomRow[]>(
-    `
-      SELECT
-        r.*,
-        COALESCE((SELECT MAX(b."amount") FROM "AuctionBid" b WHERE b."auctionId" = r."id"), 0) AS "topBid",
-        COALESCE((SELECT COUNT(*) FROM "AuctionBid" b WHERE b."auctionId" = r."id"), 0) AS "bidCount"
-      FROM "AuctionRoom" r
-      ORDER BY r."createdAt" DESC
-      LIMIT $1
-    `,
-    Math.max(1, Math.min(500, Math.floor(limit)))
-  );
+  const promise = (async () => {
+    await cleanupExpiredAuctionRooms();
 
-  return rows.map(normalizeRoom);
+    const rows = await prisma.$queryRawUnsafe<AuctionRoomRow[]>(
+      `
+        WITH latest_rooms AS (
+          SELECT *
+          FROM "AuctionRoom"
+          ORDER BY "createdAt" DESC
+          LIMIT $1
+        ),
+        bid_stats AS (
+          SELECT
+            "auctionId",
+            MAX("amount") AS "topBid",
+            COUNT(*) AS "bidCount"
+          FROM "AuctionBid"
+          WHERE "auctionId" IN (SELECT "id" FROM latest_rooms)
+          GROUP BY "auctionId"
+        )
+        SELECT
+          r.*,
+          COALESCE(bid_stats."topBid", 0) AS "topBid",
+          COALESCE(bid_stats."bidCount", 0) AS "bidCount"
+        FROM latest_rooms r
+        LEFT JOIN bid_stats ON bid_stats."auctionId" = r."id"
+        ORDER BY r."createdAt" DESC
+      `,
+      safeLimit
+    );
+
+    const rooms = rows.map(normalizeRoom);
+    auctionRoomsCache = {
+      expiresAt: Date.now() + AUCTION_ROOMS_CACHE_MS,
+      limit: safeLimit,
+      rooms,
+    };
+    return rooms;
+  })().catch((error) => {
+    if (auctionRoomsCache?.promise === promise) {
+      auctionRoomsCache = null;
+    }
+    throw error;
+  });
+
+  auctionRoomsCache = {
+    expiresAt: now + AUCTION_ROOMS_CACHE_MS,
+    limit: safeLimit,
+    rooms: auctionRoomsCache?.rooms || [],
+    promise,
+  };
+
+  return promise;
 }
 
 export async function getAuctionRoomWithBids(id: string) {
@@ -383,6 +471,10 @@ export async function deleteAuctionRoom(id: string) {
     id
   );
 
+  if (rows.length > 0) {
+    invalidateAuctionRoomsCache();
+  }
+
   return rows.length > 0;
 }
 
@@ -437,7 +529,7 @@ export async function createAuctionRoom(input: CreateAuctionInput) {
   const cardNo = normalizeCardNo(input.cardNo);
   const imageUrl = sanitizeCardImageUrl(input.imageUrl) || resolveCardDisplayImage(cardNo, null);
 
-  return prisma.$transaction(async (tx) => {
+  const room = await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('auction_room_number'))`);
 
     const numberRows = await tx.$queryRawUnsafe<Array<{ roomNumber: number }>>(
@@ -499,6 +591,9 @@ export async function createAuctionRoom(input: CreateAuctionInput) {
 
     return normalizeRoom(rows[0]);
   });
+
+  invalidateAuctionRoomsCache();
+  return room;
 }
 
 export async function isAuctionBlacklisted(userId: string) {
@@ -515,7 +610,7 @@ export async function isAuctionBlacklisted(userId: string) {
 export async function createAuctionBid(input: CreateAuctionBidInput) {
   await ensureAuctionSchema();
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
       `SELECT pg_advisory_xact_lock(hashtext($1))`,
       input.auctionId
@@ -598,6 +693,9 @@ export async function createAuctionBid(input: CreateAuctionBidInput) {
       nextMinimumBid: input.amount + room.minBidStep,
     };
   });
+
+  invalidateAuctionRoomsCache();
+  return result;
 }
 
 export async function confirmAuctionWinner(input: ConfirmAuctionWinnerInput) {
@@ -713,5 +811,6 @@ export async function confirmAuctionWinner(input: ConfirmAuctionWinnerInput) {
     });
   }
 
+  invalidateAuctionRoomsCache();
   return updatedRoom;
 }

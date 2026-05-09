@@ -2,6 +2,8 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
@@ -167,6 +169,8 @@ function notifyAuctionRoomsChanged(detail?: AuctionRoomsChangedDetail) {
 
 const AUCTION_SEEN_STORAGE_PREFIX = "nexora:auction-seen-rooms";
 const MAX_SEEN_AUCTION_ROOM_IDS = 2000;
+const AUCTION_ROOMS_CACHE_KEY = "nexora:auction-rooms-cache:v1";
+const AUCTION_ROOMS_CACHE_MAX_AGE_MS = 45 * 1000;
 
 function buildAuctionSeenStorageKey(viewerKey?: string | null) {
   const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
@@ -211,6 +215,52 @@ function rememberSeenAuctionRoomIds(storageKey: string, ids: string[]) {
   } catch {}
 }
 
+function AuctionModalPortal({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(children, document.body);
+}
+
+function readAuctionRoomsCache() {
+  if (typeof window === "undefined") return [] as AuctionRoom[];
+
+  try {
+    const raw =
+      window.sessionStorage.getItem(AUCTION_ROOMS_CACHE_KEY) ||
+      window.localStorage.getItem(AUCTION_ROOMS_CACHE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as { at?: number; rooms?: unknown };
+    const cachedAt = Number(parsed?.at || 0);
+    if (!Number.isFinite(cachedAt) || Date.now() - cachedAt > AUCTION_ROOMS_CACHE_MAX_AGE_MS) {
+      return [];
+    }
+
+    return Array.isArray(parsed.rooms) ? (parsed.rooms as AuctionRoom[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeAuctionRoomsCache(rooms: AuctionRoom[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const payload = JSON.stringify({
+      at: Date.now(),
+      rooms: rooms.slice(0, 24),
+    });
+    window.sessionStorage.setItem(AUCTION_ROOMS_CACHE_KEY, payload);
+    window.localStorage.setItem(AUCTION_ROOMS_CACHE_KEY, payload);
+  } catch {}
+}
+
 function RuleModal({
   room,
   onClose,
@@ -221,66 +271,70 @@ function RuleModal({
   onEnter: () => void;
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="กฎก่อนเข้าห้องประมูล"
-      className="fixed inset-0 z-[1600] flex items-center justify-center bg-black/78 px-4 py-6 backdrop-blur-xl"
-    >
-      <div className="w-full max-w-2xl overflow-hidden rounded-[30px] border border-amber-300/24 bg-[radial-gradient(circle_at_top,#2a2110_0%,#100e0a_48%,#050505_100%)] p-5 text-white shadow-[0_35px_130px_rgba(0,0,0,0.72)] sm:p-7">
-        <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/14 text-amber-200">
-            <ShieldAlert className="h-7 w-7" />
+    <AuctionModalPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="กฎก่อนเข้าห้องประมูล"
+        className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/88 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl sm:px-4 sm:py-6"
+      >
+      <div className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-amber-300/24 bg-[radial-gradient(circle_at_top,#2a2110_0%,#100e0a_48%,#050505_100%)] text-white shadow-[0_35px_130px_rgba(0,0,0,0.72)] sm:max-h-[92vh] sm:rounded-[30px]">
+        <div className="flex shrink-0 items-start gap-3 border-b border-amber-200/10 p-4 pb-3 sm:gap-4 sm:border-b-0 sm:p-7 sm:pb-0">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/14 text-amber-200 sm:h-14 sm:w-14">
+            <ShieldAlert className="h-5 w-5 sm:h-7 sm:w-7" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-black uppercase tracking-[0.28em] text-amber-200/70">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-200/70 sm:text-[11px] sm:tracking-[0.28em]">
               Auction Rule
             </div>
-            <h2 className="mt-2 text-2xl font-black leading-tight text-amber-100 sm:text-3xl">
+            <h2 className="mt-1.5 break-words text-xl font-black leading-tight text-amber-100 sm:mt-2 sm:text-3xl">
               กฎเหล็กก่อนเข้าห้องประมูล
             </h2>
-            <p className="mt-2 text-sm leading-6 text-white/62">
+            <p className="mt-1.5 break-words text-xs font-bold leading-5 text-white/62 sm:mt-2 sm:text-sm sm:leading-6">
               ห้อง {room.cardName} จะใช้กติกานี้เพื่อกันการปั่นราคาและรักษาสิทธิ์ของผู้เล่นทุกคน
             </p>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 text-sm font-bold leading-6 text-white/78">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-7 sm:py-5">
+        <div className="grid gap-2.5 text-xs font-bold leading-5 text-white/78 sm:gap-3 sm:text-sm sm:leading-6">
+          <div className="break-words rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:p-4">
             ถ้าหมดเวลาประมูลแล้วผู้ชนะอันดับ 1 ติดต่อไม่ได้หรือไม่กดยืนยันภายใน 24 ชั่วโมง สิทธิ์จะเลื่อนไปอันดับรองลงมาตามลำดับ
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="break-words rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:p-4">
             ผู้ที่ชนะแล้วไม่รับสิทธิ์จะถูกระงับสิทธิ์ประมูลถาวร และมีสัญลักษณ์เตือนบนโปรไฟล์
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="break-words rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:p-4">
             เมื่อชนะและกดยืนยัน ระบบจะใช้ห้องแชทพิเศษเพื่อให้ผู้ซื้อกับเจ้าของการ์ดนัดรับกันเอง
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-amber-200/18 bg-amber-300/10 p-4 text-sm font-black leading-6 text-amber-50">
+        <div className="mt-3 break-words rounded-2xl border border-amber-200/18 bg-amber-300/10 p-3 text-xs font-black leading-5 text-amber-50 sm:p-4 sm:text-sm sm:leading-6">
           หลังปิดประมูล สิทธิ์ซื้อขายจะไล่ตามอันดับแบบอัตโนมัติ: อันดับ 1 มีเวลา 24 ชม.,
           อันดับ 2 มีเวลา 12 ชม., อันดับ 3 มีเวลา 6 ชม., อันดับ 4 ขึ้นไปมีเวลา 3 ชม.
           เมื่อเจ้าของห้องยืนยันผู้ชนะแล้ว ห้องจะยังดูย้อนหลังได้ และระบบจะลบห้องอัตโนมัติหลังครบ 7 วัน
         </div>
+        </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="grid shrink-0 gap-2 border-t border-amber-200/14 bg-black/30 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:grid-cols-2 sm:gap-3 sm:px-7 sm:pb-7">
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[52px] rounded-2xl border border-white/12 bg-white/[0.05] px-4 text-sm font-black text-white/72"
+            className="min-h-[48px] whitespace-normal rounded-2xl border border-white/12 bg-white/[0.05] px-4 text-center text-xs font-black leading-5 text-white/72 sm:min-h-[52px] sm:text-sm"
           >
             ยกเลิก
           </button>
           <button
             type="button"
             onClick={onEnter}
-            className="min-h-[52px] rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#f6c453_48%,#a36b12)] px-4 text-sm font-black text-black shadow-[0_0_36px_rgba(246,196,83,0.28)]"
+            className="min-h-[48px] whitespace-normal rounded-2xl bg-[linear-gradient(135deg,#fff0a8,#f6c453_48%,#a36b12)] px-4 text-center text-xs font-black leading-5 text-black shadow-[0_0_36px_rgba(246,196,83,0.28)] sm:min-h-[52px] sm:text-sm"
           >
             เข้าไปประมูล
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </AuctionModalPortal>
   );
 }
 
@@ -333,6 +387,7 @@ export default function AuctionClient() {
       const nextRooms = (Array.isArray(data.rooms) ? (data.rooms as AuctionRoom[]) : [])
         .filter((room) => !deletedRoomIds.has(room.id));
       setRooms(nextRooms);
+      writeAuctionRoomsCache(nextRooms);
 
       const currentIds = nextRooms.map((room) => room.id).filter(Boolean);
       const hasBaseline =
@@ -380,12 +435,32 @@ export default function AuctionClient() {
   }, [rooms]);
 
   useEffect(() => {
+    if (!ruleRoom) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [ruleRoom]);
+
+  useEffect(() => {
     seenRoomIdsRef.current = new Set(readSeenAuctionRoomIdArray(viewerSeenStorageKey));
     roomsRef.current = [];
     setFreshRoomIds([]);
   }, [viewerSeenStorageKey]);
 
   useEffect(() => {
+    const cachedRooms = readAuctionRoomsCache().filter(
+      (room) => !readDeletedAuctionRoomIds().has(room.id)
+    );
+    if (cachedRooms.length > 0) {
+      setRooms(cachedRooms);
+      roomsRef.current = cachedRooms;
+      setRoomsLoading(false);
+    }
+
     void fetchRooms();
 
     const intervalId = window.setInterval(() => {
@@ -813,9 +888,27 @@ export default function AuctionClient() {
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               {roomsLoading ? (
-                <div className="col-span-full flex min-h-[260px] items-center justify-center rounded-[26px] border border-white/10 bg-white/[0.035] text-amber-200">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={`auction-room-skeleton-${index}`}
+                    className="min-h-[348px] overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] shadow-[0_18px_70px_rgba(0,0,0,0.24)]"
+                  >
+                    <div className="relative h-[220px] bg-black/35">
+                      <div className="absolute inset-0 animate-pulse bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.16),transparent_45%)]" />
+                      <div className="absolute left-3 top-3 h-7 w-24 rounded-full bg-amber-200/12" />
+                      <div className="absolute left-1/2 top-1/2 h-36 w-24 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white/8" />
+                    </div>
+                    <div className="space-y-3 p-4">
+                      <div className="h-5 w-3/4 rounded-full bg-white/10" />
+                      <div className="h-3 w-1/2 rounded-full bg-white/6" />
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="h-16 rounded-2xl bg-black/26" />
+                        <div className="h-16 rounded-2xl bg-black/26" />
+                      </div>
+                      <div className="h-3 w-2/3 rounded-full bg-white/6" />
+                    </div>
+                  </div>
+                ))
               ) : featuredRooms.length === 0 ? (
                 <div className="col-span-full flex min-h-[260px] items-center justify-center rounded-[26px] border border-dashed border-white/12 bg-white/[0.025] px-4 text-center text-sm font-bold leading-6 text-white/42">
                   ยังไม่มีห้องประมูล เปิดห้องแรกแล้วสนามจะสว่างขึ้นทันที
@@ -928,6 +1021,9 @@ export default function AuctionClient() {
           onClose={() => setRuleRoom(null)}
           onEnter={() => {
             const target = ruleRoom.id;
+            try {
+              window.localStorage.setItem(`nexora:auction-rules:${target}`, "1");
+            } catch {}
             setRuleRoom(null);
             router.push(`/market/auction/${target}`);
           }}
