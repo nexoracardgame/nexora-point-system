@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -81,6 +82,23 @@ function buildAuctionTermsStorageKey(roomId: string, viewerKey?: string | null) 
   const safeRoomId = String(roomId || "unknown").trim() || "unknown";
   const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
   return `nexora:auction-terms:${safeRoomId}:${safeViewerKey}`;
+}
+
+function buildAuctionTermsRoomStorageKey(roomId: string) {
+  const safeRoomId = String(roomId || "unknown").trim() || "unknown";
+  return `nexora:auction-terms:${safeRoomId}:accepted`;
+}
+
+function AuctionModalPortal({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(children, document.body);
 }
 
 function formatDateTime(value: string) {
@@ -344,13 +362,14 @@ function AuctionFireworks({ active }: { active: boolean }) {
 
 function RuleOverlay({ onAccept }: { onAccept: () => void }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="กฎก่อนประมูล"
-      className="fixed inset-0 z-[1600] flex items-center justify-center bg-black/78 px-3 py-3 backdrop-blur-xl sm:px-4 sm:py-6"
-    >
-      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-amber-300/24 bg-[radial-gradient(circle_at_top,#2a2110_0%,#100e0a_48%,#050505_100%)] text-white shadow-[0_35px_130px_rgba(0,0,0,0.72)] sm:max-h-[92vh] sm:rounded-[30px]">
+    <AuctionModalPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="กฎก่อนประมูล"
+        className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/86 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl sm:px-4 sm:py-6"
+      >
+      <div className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-amber-300/24 bg-[radial-gradient(circle_at_top,#2a2110_0%,#100e0a_48%,#050505_100%)] text-white shadow-[0_35px_130px_rgba(0,0,0,0.72)] sm:max-h-[92vh] sm:rounded-[30px]">
         <div className="flex shrink-0 items-start gap-3 border-b border-amber-200/10 p-4 pb-3 sm:gap-4 sm:border-b-0 sm:p-7 sm:pb-0">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/14 text-amber-200 sm:h-14 sm:w-14">
             <ShieldAlert className="h-5 w-5 sm:h-7 sm:w-7" />
@@ -391,7 +410,8 @@ function RuleOverlay({ onAccept }: { onAccept: () => void }) {
           เข้าใจแล้ว เริ่มดูห้องประมูล
         </button>
       </div>
-    </div>
+      </div>
+    </AuctionModalPortal>
   );
 }
 
@@ -424,13 +444,14 @@ function AuctionTermsOverlay({
   const isRequired = mode === "required";
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="เงื่อนไขการประมูล"
-      className="fixed inset-0 z-[1700] flex items-center justify-center bg-black/82 px-2 py-2 backdrop-blur-2xl sm:px-4 sm:py-5"
-    >
-      <div className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[24px] border border-amber-200/35 bg-[radial-gradient(circle_at_top,#3b2a0d_0%,#120f08_46%,#030303_100%)] text-white shadow-[0_34px_150px_rgba(0,0,0,0.78),0_0_50px_rgba(251,191,36,0.16)] sm:max-h-[96vh] sm:rounded-[28px]">
+    <AuctionModalPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="เงื่อนไขการประมูล"
+        className="fixed inset-0 z-[5010] flex items-center justify-center bg-black/88 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-2xl sm:px-4 sm:py-5"
+      >
+      <div className="relative flex max-h-[calc(100svh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[22px] border border-amber-200/35 bg-[radial-gradient(circle_at_top,#3b2a0d_0%,#120f08_46%,#030303_100%)] text-white shadow-[0_34px_150px_rgba(0,0,0,0.78),0_0_50px_rgba(251,191,36,0.16)] sm:max-h-[96vh] sm:rounded-[28px]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_0%,rgba(255,231,151,0.18),transparent_28%),radial-gradient(circle_at_8%_10%,rgba(251,191,36,0.12),transparent_24%)]" />
 
         {isRequired ? null : (
@@ -444,7 +465,7 @@ function AuctionTermsOverlay({
           </button>
         )}
 
-        <div className="relative z-10 border-b border-amber-200/14 px-3 py-3 sm:px-5 sm:py-4">
+        <div className="relative z-10 border-b border-amber-200/14 px-3 py-2.5 sm:px-5 sm:py-4">
           <div className="flex items-start gap-2 pr-9 sm:gap-3 sm:pr-10">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-200/34 bg-amber-300/14 text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.18)] sm:h-12 sm:w-12">
               <ScrollText className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -464,28 +485,28 @@ function AuctionTermsOverlay({
         </div>
 
         <div className="relative z-10 min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
-          <div className="grid gap-2 lg:grid-cols-2 lg:gap-2.5">
+          <div className="grid gap-1.5 lg:grid-cols-2 lg:gap-2.5">
             {AUCTION_TERMS.map((term, index) => (
               <div
                 key={term}
-                className="grid grid-cols-[30px_1fr] gap-2 rounded-2xl border border-white/10 bg-white/[0.045] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:grid-cols-[34px_1fr] sm:gap-2.5 sm:rounded-[18px] sm:p-3"
+                className="grid grid-cols-[28px_1fr] gap-2 rounded-[15px] border border-white/10 bg-white/[0.045] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:grid-cols-[34px_1fr] sm:gap-2.5 sm:rounded-[18px] sm:p-3"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-xl border border-amber-200/30 bg-amber-300/12 text-[11px] font-black text-amber-100 sm:h-8 sm:w-8 sm:text-xs">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl border border-amber-200/30 bg-amber-300/12 text-[10px] font-black text-amber-100 sm:h-8 sm:w-8 sm:text-xs">
                   {String(index + 1).padStart(2, "0")}
                 </div>
-                <div className="break-words text-[11px] font-bold leading-[1.55] text-white/78 sm:text-[13px] sm:leading-5">
+                <div className="break-words text-[10px] font-bold leading-[1.48] text-white/78 sm:text-[13px] sm:leading-5">
                   {term}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-2.5 break-words rounded-[18px] border border-amber-200/22 bg-amber-300/10 p-2.5 text-[11px] font-black leading-5 text-amber-50 sm:mt-3 sm:rounded-[20px] sm:p-3 sm:text-[13px]">
+          <div className="mt-2 break-words rounded-[16px] border border-amber-200/22 bg-amber-300/10 p-2 text-[10px] font-black leading-[1.55] text-amber-50 sm:mt-3 sm:rounded-[20px] sm:p-3 sm:text-[13px] sm:leading-5">
             สรุปสั้นๆ: บิทให้ถึงขั้นต่ำ รอระบบจัดอันดับหลังปิดประมูล เจ้าของห้องติดต่อผู้มีสิทธิ์ตามลำดับเวลา และเมื่อยืนยันผู้ชนะแล้วแชทดีลจะอยู่ต่อให้คุยซื้อขายจนจบภายในกรอบ 7 วัน
           </div>
         </div>
 
-        <div className="relative z-10 grid shrink-0 gap-2 border-t border-amber-200/14 bg-black/22 px-3 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] sm:grid-cols-[1fr_0.8fr] sm:gap-3 sm:px-5 sm:py-3">
+        <div className="relative z-10 grid shrink-0 gap-2 border-t border-amber-200/14 bg-black/30 px-3 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] sm:grid-cols-[1fr_0.8fr] sm:gap-3 sm:px-5 sm:py-3">
           <button
             type="button"
             onClick={onAccept}
@@ -512,7 +533,8 @@ function AuctionTermsOverlay({
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </AuctionModalPortal>
   );
 }
 
@@ -546,6 +568,10 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const auctionTermsStorageKey = useMemo(
     () => buildAuctionTermsStorageKey(roomId, auctionTermsViewerKey),
     [auctionTermsViewerKey, roomId]
+  );
+  const auctionTermsRoomStorageKey = useMemo(
+    () => buildAuctionTermsRoomStorageKey(roomId),
+    [roomId]
   );
 
   const room = payload?.room || null;
@@ -643,11 +669,14 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     try {
-      setAcceptedAuctionTerms(window.localStorage.getItem(auctionTermsStorageKey) === "1");
+      setAcceptedAuctionTerms(
+        window.localStorage.getItem(auctionTermsStorageKey) === "1" ||
+          window.localStorage.getItem(auctionTermsRoomStorageKey) === "1"
+      );
     } catch {
       setAcceptedAuctionTerms(false);
     }
-  }, [auctionTermsStorageKey]);
+  }, [auctionTermsRoomStorageKey, auctionTermsStorageKey]);
 
   useEffect(() => {
     if (!room || !acceptedRules || acceptedAuctionTerms) return;
@@ -655,6 +684,20 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     setAuctionTermsMode("required");
     setShowAuctionTerms(true);
   }, [acceptedAuctionTerms, acceptedRules, room?.id]);
+
+  const auctionGateOpen = !acceptedRules || (acceptedRules && showAuctionTerms);
+
+  useEffect(() => {
+    if (!auctionGateOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [auctionGateOpen]);
 
   useEffect(() => {
     void fetchRoom();
@@ -689,6 +732,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const acceptAuctionTerms = () => {
     try {
       window.localStorage.setItem(auctionTermsStorageKey, "1");
+      window.localStorage.setItem(auctionTermsRoomStorageKey, "1");
     } catch {}
     setAcceptedAuctionTerms(true);
     setShowAuctionTerms(false);
