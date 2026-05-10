@@ -16,6 +16,8 @@ const notoSansThai = Noto_Sans_Thai({
 
 const heroPills = ["สะสม +", "ต่อสู้ +", "แลกเปลี่ยน +", "รับรางวัล +"];
 
+const showDownloadStoreButtons = false;
+
 export default function NexoraLuxuryHome() {
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
@@ -79,11 +81,13 @@ export default function NexoraLuxuryHome() {
           <AppInstallButton variant="dark" />
         </div>
 
-        <div className="mt-3 flex flex-wrap justify-center gap-3">
-          <WindowsDownloadButton />
-          <GooglePlayButton />
-          <AppStoreButton />
-        </div>
+        {showDownloadStoreButtons ? (
+          <div className="mt-3 flex flex-wrap justify-center gap-3">
+            <WindowsDownloadButton />
+            <GooglePlayButton />
+            <AppStoreButton />
+          </div>
+        ) : null}
 
         <div className="mt-3 flex flex-wrap gap-2">
           {heroPills.map((item) => (
@@ -158,9 +162,13 @@ export default function NexoraLuxuryHome() {
 
       <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center gap-3 sm:flex">
         <AppInstallButton variant="dark" />
-        <WindowsDownloadButton />
-        <GooglePlayButton />
-        <AppStoreButton />
+        {showDownloadStoreButtons ? (
+          <>
+            <WindowsDownloadButton />
+            <GooglePlayButton />
+            <AppStoreButton />
+          </>
+        ) : null}
       </div>
 
       <div

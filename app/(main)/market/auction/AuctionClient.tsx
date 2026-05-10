@@ -262,6 +262,25 @@ function writeAuctionRoomsCache(rooms: AuctionRoom[]) {
   } catch {}
 }
 
+function areAuctionRoomsEqual(currentRooms: AuctionRoom[], nextRooms: AuctionRoom[]) {
+  if (currentRooms.length !== nextRooms.length) return false;
+
+  return currentRooms.every((currentRoom, index) => {
+    const nextRoom = nextRooms[index];
+
+    return (
+      currentRoom?.id === nextRoom?.id &&
+      currentRoom?.roomNumber === nextRoom?.roomNumber &&
+      currentRoom?.status === nextRoom?.status &&
+      currentRoom?.topBid === nextRoom?.topBid &&
+      currentRoom?.bidCount === nextRoom?.bidCount &&
+      currentRoom?.confirmedWinnerId === nextRoom?.confirmedWinnerId &&
+      currentRoom?.confirmedAt === nextRoom?.confirmedAt &&
+      currentRoom?.endsAt === nextRoom?.endsAt
+    );
+  });
+}
+
 function RuleModal({
   room,
   onClose,
@@ -346,7 +365,7 @@ export default function AuctionClient({
   const { data: session } = useSession();
   const safeInitialRooms = Array.isArray(initialRooms) ? initialRooms : [];
   const [rooms, setRooms] = useState<AuctionRoom[]>(() => safeInitialRooms);
-  const [roomsLoading, setRoomsLoading] = useState(safeInitialRooms.length === 0);
+  const [roomsLoading, setRoomsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deletingRoomId, setDeletingRoomId] = useState("");
   const [roomSearch, setRoomSearch] = useState("");
@@ -389,6 +408,9 @@ export default function AuctionClient({
         cache: "no-store",
       });
       const data = await res.json();
+      if (!res.ok || data?.success === false) {
+        return;
+      }
       if (fetchSeq !== latestFetchSeqRef.current) {
         return;
       }
@@ -396,7 +418,10 @@ export default function AuctionClient({
       const deletedRoomIds = readDeletedAuctionRoomIds();
       const nextRooms = (Array.isArray(data.rooms) ? (data.rooms as AuctionRoom[]) : [])
         .filter((room) => !deletedRoomIds.has(room.id));
-      setRooms(nextRooms);
+      setRooms((currentRooms) =>
+        areAuctionRoomsEqual(currentRooms, nextRooms) ? currentRooms : nextRooms
+      );
+      roomsRef.current = nextRooms;
       writeAuctionRoomsCache(nextRooms);
 
       const currentIds = nextRooms.map((room) => room.id).filter(Boolean);
@@ -435,9 +460,7 @@ export default function AuctionClient({
       console.error("LOAD AUCTION ROOMS ERROR", error);
     } finally {
       roomsFetchInFlightRef.current = false;
-      if (fetchSeq === latestFetchSeqRef.current) {
-        setRoomsLoading(false);
-      }
+      setRoomsLoading(false);
     }
   }, [viewerSeenStorageKey]);
 
@@ -469,7 +492,6 @@ export default function AuctionClient({
     if (roomsRef.current.length === 0 && cachedRooms.length > 0) {
       setRooms(cachedRooms);
       roomsRef.current = cachedRooms;
-      setRoomsLoading(false);
     }
 
     void fetchRooms();
@@ -967,6 +989,7 @@ export default function AuctionClient({
                           cardNo={room.cardNo}
                           imageUrl={room.imageUrl}
                           alt={room.cardName}
+                          loading="eager"
                           className="relative z-10 mx-auto h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
                         />
                         <div className="absolute left-3 top-3 z-30 flex flex-wrap items-center gap-2">
