@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 20,
+      static: 180,
+    },
+  },
   outputFileTracingExcludes: {
     "/*": ["./public/**/*"],
     "/box-market": ["./public/**/*"],
@@ -63,8 +69,34 @@ const nextConfig = {
         value: "max-age=63072000; includeSubDomains; preload",
       },
     ];
+    const reusableAssetHeaders = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=3600, stale-while-revalidate=86400",
+      },
+    ];
 
     return [
+      {
+        source: "/cards/:path*",
+        headers: reusableAssetHeaders,
+      },
+      {
+        source: "/box-products/:path*",
+        headers: reusableAssetHeaders,
+      },
+      {
+        source: "/model/:path*",
+        headers: reusableAssetHeaders,
+      },
+      {
+        source: "/card-vectors.json",
+        headers: reusableAssetHeaders,
+      },
+      {
+        source: "/seller-cover.jpg",
+        headers: reusableAssetHeaders,
+      },
       {
         source: "/blaze-embed/:path*",
         headers: [

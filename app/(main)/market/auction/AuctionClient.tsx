@@ -171,6 +171,7 @@ const AUCTION_SEEN_STORAGE_PREFIX = "nexora:auction-seen-rooms";
 const MAX_SEEN_AUCTION_ROOM_IDS = 2000;
 const AUCTION_ROOMS_CACHE_KEY = "nexora:auction-rooms-cache:v1";
 const AUCTION_ROOMS_CACHE_MAX_AGE_MS = 45 * 1000;
+const AUCTION_ROOMS_REFRESH_MS = 3000;
 
 function buildAuctionSeenStorageKey(viewerKey?: string | null) {
   const safeViewerKey = String(viewerKey || "guest").trim() || "guest";
@@ -336,11 +337,16 @@ function RuleModal({
   );
 }
 
-export default function AuctionClient() {
+export default function AuctionClient({
+  initialRooms = [],
+}: {
+  initialRooms?: AuctionRoom[];
+}) {
   const router = useRouter();
   const { data: session } = useSession();
-  const [rooms, setRooms] = useState<AuctionRoom[]>([]);
-  const [roomsLoading, setRoomsLoading] = useState(true);
+  const safeInitialRooms = Array.isArray(initialRooms) ? initialRooms : [];
+  const [rooms, setRooms] = useState<AuctionRoom[]>(() => safeInitialRooms);
+  const [roomsLoading, setRoomsLoading] = useState(safeInitialRooms.length === 0);
   const [creating, setCreating] = useState(false);
   const [deletingRoomId, setDeletingRoomId] = useState("");
   const [roomSearch, setRoomSearch] = useState("");
@@ -359,6 +365,7 @@ export default function AuctionClient() {
   const seenRoomIdsRef = useRef<Set<string>>(new Set());
   const roomsRef = useRef<AuctionRoom[]>([]);
   const latestFetchSeqRef = useRef(0);
+  const roomsFetchInFlightRef = useRef(false);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
   const sessionUser = session?.user as
     | { id?: string | null; lineId?: string | null }
@@ -369,6 +376,11 @@ export default function AuctionClient() {
   );
 
   const fetchRooms = useCallback(async () => {
+    if (roomsFetchInFlightRef.current) {
+      return;
+    }
+
+    roomsFetchInFlightRef.current = true;
     const fetchSeq = latestFetchSeqRef.current + 1;
     latestFetchSeqRef.current = fetchSeq;
 
@@ -422,6 +434,7 @@ export default function AuctionClient() {
     } catch (error) {
       console.error("LOAD AUCTION ROOMS ERROR", error);
     } finally {
+      roomsFetchInFlightRef.current = false;
       if (fetchSeq === latestFetchSeqRef.current) {
         setRoomsLoading(false);
       }
@@ -453,7 +466,7 @@ export default function AuctionClient() {
     const cachedRooms = readAuctionRoomsCache().filter(
       (room) => !readDeletedAuctionRoomIds().has(room.id)
     );
-    if (cachedRooms.length > 0) {
+    if (roomsRef.current.length === 0 && cachedRooms.length > 0) {
       setRooms(cachedRooms);
       roomsRef.current = cachedRooms;
       setRoomsLoading(false);
@@ -465,7 +478,7 @@ export default function AuctionClient() {
       if (document.visibilityState === "visible") {
         void fetchRooms();
       }
-    }, 1500);
+    }, AUCTION_ROOMS_REFRESH_MS);
 
     const removeDeletedRoomFromState = (roomId?: string | null) => {
       const safeRoomId = String(roomId || "").trim();

@@ -18,6 +18,7 @@ import type { BuyMarketListing } from "@/lib/buy-market-types";
 const BUY_WISHLIST_KEY = "nexora_buy_wishlist";
 const BUY_SEEN_STORAGE_PREFIX = "nexora:buy-market-seen-listings";
 const MAX_SEEN_BUY_LISTING_IDS = 2000;
+const BUY_MARKET_REFRESH_MS = 5000;
 
 function formatPrice(value?: number | null) {
   return `฿${Number(value || 0).toLocaleString("th-TH")}`;
@@ -172,6 +173,7 @@ export default function BuyMarketClient({
   const seenStorageKeyRef = useRef("");
   const initializedSeenStorageKeyRef = useRef<string | null>(null);
   const buySeenBaselineReadyRef = useRef(initialListings.length > 0);
+  const refreshInFlightRef = useRef(false);
   const viewerSeenStorageKey = useMemo(
     () => buildBuySeenStorageKey(currentUser.id),
     [currentUser.id]
@@ -260,6 +262,9 @@ export default function BuyMarketClient({
     let cancelled = false;
 
     async function refresh(silent = true) {
+      if (refreshInFlightRef.current) return;
+
+      refreshInFlightRef.current = true;
       if (!silent) setRefreshing(true);
 
       try {
@@ -274,6 +279,7 @@ export default function BuyMarketClient({
       } catch {
         return;
       } finally {
+        refreshInFlightRef.current = false;
         if (!cancelled) setRefreshing(false);
       }
     }
@@ -282,7 +288,7 @@ export default function BuyMarketClient({
       if (document.visibilityState === "visible") {
         void refresh(true);
       }
-    }, 2500);
+    }, BUY_MARKET_REFRESH_MS);
     const onFocus = () => void refresh(true);
     const onVisible = () => {
       if (document.visibilityState === "visible") void refresh(true);

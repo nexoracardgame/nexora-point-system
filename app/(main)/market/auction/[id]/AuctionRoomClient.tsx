@@ -101,6 +101,8 @@ function AuctionModalPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }
 
+const AUCTION_ROOM_REFRESH_MS = 3000;
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
@@ -538,11 +540,17 @@ function AuctionTermsOverlay({
   );
 }
 
-export default function AuctionRoomClient({ roomId }: { roomId: string }) {
+export default function AuctionRoomClient({
+  roomId,
+  initialPayload = null,
+}: {
+  roomId: string;
+  initialPayload?: AuctionPayload | null;
+}) {
   const router = useRouter();
   const { data: session } = useSession();
-  const [payload, setPayload] = useState<AuctionPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [payload, setPayload] = useState<AuctionPayload | null>(initialPayload);
+  const [loading, setLoading] = useState(!initialPayload);
   const [submitting, setSubmitting] = useState(false);
   const [deletingRoom, setDeletingRoom] = useState(false);
   const [confirmingWinnerId, setConfirmingWinnerId] = useState("");
@@ -554,6 +562,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const [auctionTermsMode, setAuctionTermsMode] = useState<"required" | "info">("required");
   const bidBoardEndRef = useRef<HTMLDivElement>(null);
   const mobileBidBoardRef = useRef<HTMLDivElement>(null);
+  const roomFetchInFlightRef = useRef(false);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
   const sessionUser = session?.user as
     | { id?: string | null; lineId?: string | null; email?: string | null }
@@ -635,6 +644,11 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
   const canBid = phase === "live";
 
   const fetchRoom = useCallback(async () => {
+    if (roomFetchInFlightRef.current) {
+      return;
+    }
+
+    roomFetchInFlightRef.current = true;
     try {
       const res = await fetch(`/api/market/auction/${encodeURIComponent(roomId)}`, {
         cache: "no-store",
@@ -653,6 +667,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
     } catch (error) {
       console.error("LOAD AUCTION ROOM ERROR", error);
     } finally {
+      roomFetchInFlightRef.current = false;
       setLoading(false);
     }
   }, [roomId]);
@@ -706,7 +721,7 @@ export default function AuctionRoomClient({ roomId }: { roomId: string }) {
       if (document.visibilityState === "visible") {
         void fetchRoom();
       }
-    }, 1500);
+    }, AUCTION_ROOM_REFRESH_MS);
 
     return () => window.clearInterval(intervalId);
   }, [fetchRoom]);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
   Boxes,
@@ -42,6 +42,8 @@ type ListingDialog =
   | { type: "edit"; listing: BoxMarketListing }
   | { type: "delete"; listing: BoxMarketListing }
   | null;
+
+const BOX_MARKET_REFRESH_MS = 5000;
 
 type SealedProductOption = {
   id: string;
@@ -202,6 +204,7 @@ export default function BoxMarketClient({
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [contactingSellerId, setContactingSellerId] = useState("");
+  const refreshInFlightRef = useRef(false);
 
   const verifiedListings = useMemo(
     () => listings.filter((item) => item.isDealerVerified).length,
@@ -266,6 +269,9 @@ export default function BoxMarketClient({
     let cancelled = false;
 
     async function refreshListings(silent = true) {
+      if (refreshInFlightRef.current) return;
+
+      refreshInFlightRef.current = true;
       if (!silent) setRefreshing(true);
       try {
         const res = await fetch(`/api/box-market?ts=${Date.now()}`, {
@@ -283,6 +289,7 @@ export default function BoxMarketClient({
       } catch {
         return;
       } finally {
+        refreshInFlightRef.current = false;
         if (!cancelled) setRefreshing(false);
       }
     }
@@ -299,7 +306,7 @@ export default function BoxMarketClient({
       if (document.visibilityState === "visible") {
         void refreshListings(true);
       }
-    }, 2000);
+    }, BOX_MARKET_REFRESH_MS);
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const ACTIVE_STALE_SECONDS = 5;
+const ACTIVE_STALE_SECONDS = 12;
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);

@@ -17,9 +17,9 @@ type OnlinePresenceContextValue = {
   isOnline: (...ids: Array<string | null | undefined>) => boolean;
 };
 
-const PRESENCE_HEARTBEAT_MS = 1200;
-const PRESENCE_SYNC_MS = 1200;
-const PRESENCE_FAST_RETRY_MS = 350;
+const PRESENCE_HEARTBEAT_MS = 3500;
+const PRESENCE_SYNC_MS = 4500;
+const PRESENCE_FAST_RETRY_MS = 800;
 
 const OnlinePresenceContext = createContext<OnlinePresenceContextValue>({
   onlineIds: new Set(),

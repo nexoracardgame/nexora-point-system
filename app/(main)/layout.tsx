@@ -479,7 +479,7 @@ export default function MainLayout({
         clearInterval(intervalId);
       }
 
-      intervalId = setInterval(syncLatestProfile, 2500);
+      intervalId = setInterval(syncLatestProfile, 15000);
     };
 
     const handleVisibility = () => {
