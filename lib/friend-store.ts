@@ -71,6 +71,9 @@ async function ensureCommunitySchema() {
         'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT'
       );
       await prisma.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bio" TEXT'
+      );
+      await prisma.$executeRawUnsafe(
         'CREATE TABLE IF NOT EXISTS "FriendRequest" ("id" TEXT PRIMARY KEY, "fromUserId" TEXT NOT NULL, "toUserId" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT \'pending\', "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
       );
       await prisma.$executeRawUnsafe(
@@ -1013,10 +1016,11 @@ export async function searchCommunityUsers(
       displayName: string | null;
       username: string | null;
       image: string | null;
+      bio: string | null;
       createdAt: Date | string;
     }>
   >(
-    'SELECT "id", "lineId", "name", "displayName", "username", "image", "createdAt" FROM "User" ORDER BY "createdAt" DESC, "id" ASC'
+    'SELECT "id", "lineId", "name", "displayName", "username", "image", "bio", "createdAt" FROM "User" ORDER BY "createdAt" DESC, "id" ASC'
   ).catch(() => []);
   const localProfiles = await getAllLocalProfiles();
   const localMap = new Map(localProfiles.map((item) => [item.userId, item]));
@@ -1037,7 +1041,7 @@ export async function searchCommunityUsers(
         displayName,
         username,
         image: local?.image || user.image || "/avatar.png",
-        bio: local?.bio || "",
+        bio: local?.bio || user.bio || "",
       };
     });
 

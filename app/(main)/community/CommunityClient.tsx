@@ -111,10 +111,49 @@ function normalizeResults(items: SearchUser[]) {
       ...item,
       relation,
       requestId: item.requestId || current.requestId || null,
+      displayName: item.displayName?.trim() || current.displayName,
+      username: item.username ?? current.username ?? null,
+      image: item.image || current.image || "/avatar.png",
+      bio: item.bio?.trim() || current.bio || "",
     });
   });
 
   return Array.from(next.values());
+}
+
+function mergeStableProfileItems<
+  T extends {
+    displayName: string;
+    username: string | null;
+    image: string;
+    bio: string;
+  },
+>(previous: T[], next: T[], getKey: (item: T) => string) {
+  const previousByKey = new Map(
+    previous
+      .map((item) => [getKey(item), item] as const)
+      .filter(([key]) => Boolean(key))
+  );
+
+  return next.map((item) => {
+    const previousItem = previousByKey.get(getKey(item));
+
+    if (!previousItem) {
+      return {
+        ...item,
+        image: item.image || "/avatar.png",
+        bio: item.bio || "",
+      };
+    }
+
+    return {
+      ...item,
+      displayName: item.displayName?.trim() || previousItem.displayName,
+      username: item.username ?? previousItem.username ?? null,
+      image: item.image || previousItem.image || "/avatar.png",
+      bio: item.bio?.trim() || previousItem.bio || "",
+    };
+  });
 }
 
 function normalizeCount(value: unknown, fallback = 0) {
@@ -158,10 +197,16 @@ function CommunityAvatar({ src, alt }: { src?: string | null; alt: string }) {
 export default function CommunityClient({
   initialFriends = [],
   initialRequests = [],
+  initialResults = [],
+  initialResultCount,
+  initialTotalUsers,
   hasInitialCommunityState = false,
 }: {
   initialFriends?: FriendItem[];
   initialRequests?: IncomingRequest[];
+  initialResults?: SearchUser[];
+  initialResultCount?: number;
+  initialTotalUsers?: number;
   hasInitialCommunityState?: boolean;
 }) {
   const cachedCommunityState = useMemo(
@@ -180,6 +225,12 @@ export default function CommunityClient({
   const cachedResults = Array.isArray(cachedCommunityState?.data?.results)
     ? normalizeResults(cachedCommunityState.data.results)
     : [];
+  const normalizedInitialResults = normalizeResults(initialResults);
+  const hasInitialSearchSnapshot =
+    hasInitialCommunityState ||
+    typeof initialResultCount === "number" ||
+    typeof initialTotalUsers === "number" ||
+    normalizedInitialResults.length > 0;
   const cachedResultCount = normalizeCount(
     cachedCommunityState?.data?.resultCount,
     cachedResults.length
@@ -210,16 +261,27 @@ export default function CommunityClient({
     initialRequests.length > 0 ||
     cachedHasFriendsSnapshot;
   const didBootstrapSuggestionsRef = useRef(
-    cachedHasSearchCounts &&
-      (cachedHasResultsSnapshot || cachedResults.length > 0)
+    hasInitialSearchSnapshot ||
+      (cachedHasSearchCounts &&
+        (cachedHasResultsSnapshot || cachedResults.length > 0))
   );
   const previousQueryRef = useRef("");
   const router = useRouter();
   const { isOnline } = useOnlinePresence();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchUser[]>(cachedResults);
-  const [resultCount, setResultCount] = useState(cachedResultCount);
-  const [totalUsers, setTotalUsers] = useState(cachedTotalUsers);
+  const [results, setResults] = useState<SearchUser[]>(
+    hasInitialSearchSnapshot ? normalizedInitialResults : cachedResults
+  );
+  const [resultCount, setResultCount] = useState(
+    hasInitialSearchSnapshot
+      ? normalizeCount(initialResultCount, normalizedInitialResults.length)
+      : cachedResultCount
+  );
+  const [totalUsers, setTotalUsers] = useState(
+    hasInitialSearchSnapshot
+      ? normalizeCount(initialTotalUsers, normalizedInitialResults.length)
+      : cachedTotalUsers
+  );
   const [friends, setFriends] = useState<FriendItem[]>(
     hasInitialCommunityState ? normalizeFriends(initialFriends) : cachedFriends
   );
@@ -232,10 +294,10 @@ export default function CommunityClient({
     hasReadyFriendsSnapshot
   );
   const [resultsHydrated, setResultsHydrated] = useState(
-    cachedHasResultsSnapshot || cachedResults.length > 0
+    hasInitialSearchSnapshot || cachedHasResultsSnapshot || cachedResults.length > 0
   );
   const [bootstrappingSuggestions, setBootstrappingSuggestions] = useState(
-    !(cachedHasResultsSnapshot || cachedResults.length > 0)
+    !(hasInitialSearchSnapshot || cachedHasResultsSnapshot || cachedResults.length > 0)
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -253,11 +315,32 @@ export default function CommunityClient({
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
-      setFriends(
-        Array.isArray(data?.friends) ? normalizeFriends(data.friends) : []
+      if (!res.ok) return;
+
+      const nextFriends = Array.isArray(data?.friends)
+        ? normalizeFriends(data.friends)
+        : [];
+      const nextRequests = Array.isArray(data?.requests)
+        ? normalizeRequests(data.requests)
+        : [];
+
+      setFriends((prev) =>
+        normalizeFriends(
+          mergeStableProfileItems(
+            prev,
+            nextFriends,
+            (friend) => friend.friendId || friend.id
+          )
+        )
       );
-      setRequests(
-        Array.isArray(data?.requests) ? normalizeRequests(data.requests) : []
+      setRequests((prev) =>
+        normalizeRequests(
+          mergeStableProfileItems(
+            prev,
+            nextRequests,
+            (request) => request.fromUserId || request.id
+          )
+        )
       );
       setFriendsHydrated(true);
     } catch {
@@ -282,10 +365,16 @@ export default function CommunityClient({
         }
       );
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+
       const nextResults = Array.isArray(data?.users)
         ? normalizeResults(data.users)
         : [];
-      setResults(nextResults);
+      setResults((prev) =>
+        normalizeResults(
+          mergeStableProfileItems(prev, nextResults, (user) => user.id)
+        )
+      );
       setResultCount(normalizeCount(data?.resultCount, nextResults.length));
       setTotalUsers(normalizeCount(data?.totalUsers, nextResults.length));
       setResultsHydrated(true);

@@ -23,7 +23,6 @@ import {
   revokeUserSessions,
 } from "@/lib/auth-session-control";
 import {
-  createProviderProfileImageSnapshot,
   isDefaultProfileImageUrl,
   isProviderProfileImageUrl,
 } from "@/lib/profile-image-snapshot";
@@ -66,6 +65,39 @@ type DbUserSnapshot = {
   sessionsRevokedAt: Date | null;
 };
 
+const DEFAULT_AUTH_REDIRECT_PATH = "/home";
+
+function isUnsafeAuthRedirectPath(pathname: string) {
+  return pathname === "/" || pathname === "/login" || pathname.startsWith("/api/auth");
+}
+
+function resolveAuthRedirectUrl(url: string, baseUrl: string, depth = 0): string {
+  const safeBaseUrl = new URL(baseUrl).origin;
+
+  if (depth > 2) {
+    return new URL(DEFAULT_AUTH_REDIRECT_PATH, safeBaseUrl).toString();
+  }
+
+  try {
+    const parsed = new URL(url, safeBaseUrl);
+
+    if (parsed.origin !== safeBaseUrl) {
+      return new URL(DEFAULT_AUTH_REDIRECT_PATH, safeBaseUrl).toString();
+    }
+
+    if (isUnsafeAuthRedirectPath(parsed.pathname)) {
+      const nestedCallback = parsed.searchParams.get("callbackUrl");
+      return nestedCallback
+        ? resolveAuthRedirectUrl(nestedCallback, safeBaseUrl, depth + 1)
+        : new URL(DEFAULT_AUTH_REDIRECT_PATH, safeBaseUrl).toString();
+    }
+
+    return parsed.toString();
+  } catch {
+    return new URL(DEFAULT_AUTH_REDIRECT_PATH, safeBaseUrl).toString();
+  }
+}
+
 function getSafeSessionImage(image?: string | null) {
   const raw = String(image || "").trim();
 
@@ -101,18 +133,11 @@ async function getStableInitialProfileImage(
   userId?: string | null
 ) {
   const safeImage = getSafeSessionImage(image);
+  void lineId;
+  void provider;
+  void userId;
 
-  if (!isProviderProfileImageUrl(safeImage)) {
-    return safeImage;
-  }
-
-  const snapshotImage = await createProviderProfileImageSnapshot(safeImage, {
-    userId,
-    lineId,
-    provider,
-  });
-
-  return snapshotImage || safeImage;
+  return safeImage;
 }
 
 function resolveSessionProfileImage(
@@ -536,6 +561,10 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      return resolveAuthRedirectUrl(url, baseUrl);
+    },
+
     async signIn({ account, profile }) {
       const provider = getAuthProvider(account?.provider);
       const oauthProfile = (profile || {}) as OAuthProfile;

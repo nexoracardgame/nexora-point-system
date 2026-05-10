@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import {
   listFriendsForUser,
   listIncomingFriendRequests,
+  searchCommunityUsers,
 } from "@/lib/friend-store";
 
 export const dynamic = "force-dynamic";
@@ -17,17 +18,31 @@ export default async function CommunityPage() {
     ((session?.user || {}) as { lineId?: string | null }).lineId || ""
   ).trim();
   const aliases = lineId && lineId !== userId ? [lineId] : [];
-  const [initialFriends, initialRequests] = userId
-    ? await Promise.all([
-        listFriendsForUser(userId, aliases),
-        listIncomingFriendRequests(userId, aliases),
-      ])
-    : [[], []];
+  let initialFriends: Awaited<ReturnType<typeof listFriendsForUser>> = [];
+  let initialRequests: Awaited<
+    ReturnType<typeof listIncomingFriendRequests>
+  > = [];
+  let initialSearch: Awaited<ReturnType<typeof searchCommunityUsers>> = {
+    users: [],
+    resultCount: 0,
+    totalUsers: 0,
+  };
+
+  if (userId) {
+    [initialFriends, initialRequests, initialSearch] = await Promise.all([
+      listFriendsForUser(userId, aliases),
+      listIncomingFriendRequests(userId, aliases),
+      searchCommunityUsers(userId, "", aliases),
+    ]);
+  }
 
   return (
     <CommunityClient
       initialFriends={initialFriends}
       initialRequests={initialRequests}
+      initialResults={initialSearch.users}
+      initialResultCount={initialSearch.resultCount}
+      initialTotalUsers={initialSearch.totalUsers}
       hasInitialCommunityState={Boolean(userId)}
     />
   );
