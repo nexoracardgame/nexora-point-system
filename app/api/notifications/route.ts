@@ -16,7 +16,7 @@ import { getServerSupabaseClient } from "@/lib/supabase-server";
 
 type NotificationItem = {
   id: string;
-  type: "chat" | "deal" | "wishlist" | "friend" | "wallet";
+  type: "chat" | "deal" | "wishlist" | "friend" | "wallet" | "auction";
   title: string;
   body: string;
   href: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -24,11 +24,12 @@ import {
   ChevronRight,
   UserPlus,
   Gift,
+  Gavel,
 } from "lucide-react";
 
 type NotificationItem = {
   id: string;
-  type: "chat" | "deal" | "wishlist" | "friend" | "wallet";
+  type: "chat" | "deal" | "wishlist" | "friend" | "wallet" | "auction";
   title: string;
   body: string;
   href: string;
@@ -120,6 +121,8 @@ function getNotificationIcon(type: NotificationItem["type"]) {
       return UserPlus;
     case "wallet":
       return Gift;
+    case "auction":
+      return Gavel;
     default:
       return Heart;
   }
@@ -250,6 +253,7 @@ function isChatNotificationReadByRoom(
 
 export default function NotificationBell() {
   const pathname = usePathname();
+  const router = useRouter();
   const { locale, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -544,6 +548,16 @@ export default function NotificationBell() {
           : "ปฏิเสธคำขอเพื่อนไม่สำเร็จ"
       );
     }
+  };
+
+  const acceptAuctionInvite = (notificationId: string, href: string) => {
+    const safeHref = String(href || "").trim();
+    const nextHref = safeHref.startsWith("/market/auction/")
+      ? safeHref
+      : "/market/auction";
+    markNotificationRead(notificationId);
+    setOpen(false);
+    router.push(nextHref);
   };
 
   useEffect(() => {
@@ -902,6 +916,9 @@ export default function NotificationBell() {
                   item.type === "friend" &&
                   String(item.meta?.action || "") === "request" &&
                   String(item.meta?.requestId || "").trim();
+                const isAuctionInvite =
+                  item.type === "auction" &&
+                  String(item.meta?.action || "") === "auction_invite";
                 const requestId = String(item.meta?.requestId || "").trim();
 
                 return (
@@ -962,6 +979,17 @@ export default function NotificationBell() {
                               className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-red-300/18 bg-red-500/10 px-3 text-xs font-black text-red-200 transition hover:bg-red-500/16"
                             >
                               ปฏิเสธ
+                            </button>
+                          </div>
+                        ) : isAuctionInvite ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => acceptAuctionInvite(item.id, item.href)}
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-amber-300/24 bg-[linear-gradient(180deg,rgba(251,191,36,0.2),rgba(251,191,36,0.08))] px-3 text-xs font-black text-amber-100 transition hover:brightness-110"
+                            >
+                              ตอบรับคำเชิญ
+                              <ChevronRight className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ) : (

@@ -6,7 +6,12 @@ import {
 import { prisma } from "@/lib/prisma";
 import { sendPushNotificationToUser } from "@/lib/push-notification-store";
 
-export type LocalNotificationType = "deal" | "wishlist" | "friend" | "wallet";
+export type LocalNotificationType =
+  | "deal"
+  | "wishlist"
+  | "friend"
+  | "wallet"
+  | "auction";
 
 export type LocalNotificationMeta = Record<string, string | number | boolean | null>;
 

@@ -8,17 +8,23 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   Crown,
   Gavel,
   Handshake,
   Loader2,
+  Search,
   ScrollText,
   Send,
+  Share2,
   ShieldAlert,
   Trash2,
   Trophy,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
@@ -65,6 +71,15 @@ type AuctionPayload = {
 
 type AuctionFinalRank = AuctionBid & {
   bidTotal: number;
+};
+
+type AuctionFriend = {
+  id: string;
+  friendId: string;
+  displayName: string;
+  username: string | null;
+  image: string;
+  bio?: string | null;
 };
 
 function formatBaht(value: number) {
@@ -162,6 +177,39 @@ function isAdminRoleClient(role?: string | null) {
 function getProfileHref(userId?: string | null) {
   const safeUserId = String(userId || "").trim();
   return safeUserId ? `/profile/${encodeURIComponent(safeUserId)}` : "/profile/me";
+}
+
+function buildAuctionRoomUrl(roomId: string) {
+  const path = `/market/auction/${encodeURIComponent(roomId)}`;
+  if (typeof window === "undefined") {
+    return path;
+  }
+
+  return `${window.location.origin}${path}`;
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("COPY_FAILED");
+  }
 }
 
 function getBidTime(value: string) {
@@ -540,6 +588,175 @@ function AuctionTermsOverlay({
   );
 }
 
+function AuctionInviteDialog({
+  open,
+  room,
+  query,
+  friends,
+  loading,
+  invitedIds,
+  invitingIds,
+  error,
+  onQueryChange,
+  onInvite,
+  onClose,
+  onReload,
+}: {
+  open: boolean;
+  room: AuctionRoom;
+  query: string;
+  friends: AuctionFriend[];
+  loading: boolean;
+  invitedIds: Set<string>;
+  invitingIds: Set<string>;
+  error: string;
+  onQueryChange: (value: string) => void;
+  onInvite: (friend: AuctionFriend) => void;
+  onClose: () => void;
+  onReload: () => void;
+}) {
+  const normalizedQuery = query.trim().toLocaleLowerCase("th-TH");
+  const visibleFriends = normalizedQuery
+    ? friends.filter((friend) => {
+        const haystack = [
+          friend.displayName,
+          friend.username || "",
+          friend.bio || "",
+        ]
+          .join(" ")
+          .toLocaleLowerCase("th-TH");
+        return haystack.includes(normalizedQuery);
+      })
+    : friends;
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <AuctionModalPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="เชิญเพื่อนเข้าห้องประมูล"
+        className="fixed inset-0 z-[5020] flex items-center justify-center bg-black/78 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl sm:px-4 sm:py-6"
+      >
+        <div className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-amber-200/24 bg-[#0d0b08] text-white shadow-[0_34px_140px_rgba(0,0,0,0.72)] sm:max-h-[92vh] sm:rounded-[30px]">
+          <div className="border-b border-amber-200/12 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_58%)] px-4 py-4 sm:px-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-300/14 text-amber-100">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-200/62">
+                    Invite Friends
+                  </div>
+                  <h2 className="mt-1 break-words text-xl font-black leading-tight text-amber-50 sm:text-2xl">
+                    เชิญเพื่อนเข้าห้อง {formatAuctionRoomNumber(room.roomNumber)}
+                  </h2>
+                  <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-white/54 sm:text-sm">
+                    {room.cardName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="ปิดหน้าต่างเชิญเพื่อน"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/72 transition hover:bg-white/[0.1] hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <label className="mt-4 flex min-h-[46px] items-center gap-2 rounded-2xl border border-white/10 bg-black/34 px-3 focus-within:border-amber-200/36 focus-within:ring-2 focus-within:ring-amber-300/12">
+              <Search className="h-4 w-4 shrink-0 text-amber-200/72" />
+              <input
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                placeholder="ค้นหาชื่อเพื่อนหรือ username"
+                className="min-h-[44px] min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none placeholder:text-white/32"
+              />
+            </label>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4">
+            {error ? (
+              <div className="mb-3 rounded-2xl border border-red-200/20 bg-red-500/12 px-3 py-2 text-xs font-bold leading-5 text-red-100">
+                {error}
+              </div>
+            ) : null}
+
+            {loading ? (
+              <div className="flex min-h-[220px] items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.035] text-amber-100">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : visibleFriends.length === 0 ? (
+              <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/12 bg-white/[0.025] px-4 text-center">
+                <Users className="h-8 w-8 text-white/30" />
+                <div className="mt-3 text-sm font-black text-white/70">
+                  {friends.length === 0 ? "ยังไม่มีเพื่อนในระบบ" : "ไม่พบเพื่อนที่ค้นหา"}
+                </div>
+                <button
+                  type="button"
+                  onClick={onReload}
+                  className="mt-4 min-h-[40px] rounded-2xl border border-amber-200/20 bg-amber-300/10 px-4 text-xs font-black text-amber-100 transition hover:bg-amber-300/16"
+                >
+                  โหลดรายชื่ออีกครั้ง
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                {visibleFriends.map((friend) => {
+                  const isInviting = invitingIds.has(friend.friendId);
+                  const isInvited = invitedIds.has(friend.friendId);
+
+                  return (
+                    <div
+                      key={friend.friendId || friend.id}
+                      className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] p-3"
+                    >
+                      <img
+                        src={friend.image || "/avatar.png"}
+                        alt={friend.displayName}
+                        className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-1 ring-white/10"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black text-white">
+                          {friend.displayName}
+                        </div>
+                        <div className="mt-1 truncate text-xs font-bold text-white/42">
+                          {friend.username ? `@${friend.username}` : "NEXORA Friend"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onInvite(friend)}
+                        disabled={isInviting || isInvited}
+                        className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-amber-200/22 bg-[linear-gradient(180deg,rgba(251,191,36,0.18),rgba(251,191,36,0.08))] px-3 text-xs font-black text-amber-100 transition hover:brightness-110 disabled:cursor-default disabled:opacity-60 sm:px-4"
+                      >
+                        {isInviting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isInvited ? (
+                          <Check className="h-4 w-4 text-emerald-300" />
+                        ) : (
+                          <UserPlus className="h-4 w-4" />
+                        )}
+                        <span>{isInvited ? "เชิญแล้ว" : "เชิญ"}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </AuctionModalPortal>
+  );
+}
+
 export default function AuctionRoomClient({
   roomId,
   initialPayload = null,
@@ -560,9 +777,25 @@ export default function AuctionRoomClient({
   const [acceptedAuctionTerms, setAcceptedAuctionTerms] = useState(true);
   const [showAuctionTerms, setShowAuctionTerms] = useState(false);
   const [auctionTermsMode, setAuctionTermsMode] = useState<"required" | "info">("required");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [friends, setFriends] = useState<AuctionFriend[]>([]);
+  const [friendsLoaded, setFriendsLoaded] = useState(false);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [friendSearch, setFriendSearch] = useState("");
+  const [inviteError, setInviteError] = useState("");
+  const [invitingFriendIds, setInvitingFriendIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [invitedFriendIds, setInvitedFriendIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [copiedRoomUrl, setCopiedRoomUrl] = useState(false);
+  const [sharingRoom, setSharingRoom] = useState(false);
   const bidBoardEndRef = useRef<HTMLDivElement>(null);
   const mobileBidBoardRef = useRef<HTMLDivElement>(null);
   const roomFetchInFlightRef = useRef(false);
+  const friendsFetchInFlightRef = useRef(false);
+  const copiedResetRef = useRef<number | null>(null);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
   const sessionUser = session?.user as
     | { id?: string | null; lineId?: string | null; email?: string | null }
@@ -672,6 +905,51 @@ export default function AuctionRoomClient({
     }
   }, [roomId]);
 
+  const loadFriends = useCallback(async () => {
+    if (friendsFetchInFlightRef.current) return;
+
+    try {
+      friendsFetchInFlightRef.current = true;
+      setLoadingFriends(true);
+      setInviteError("");
+      const res = await fetch("/api/community/friends", {
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "โหลดรายชื่อเพื่อนไม่สำเร็จ");
+      }
+
+      setFriends(Array.isArray(data?.friends) ? data.friends : []);
+      setFriendsLoaded(true);
+    } catch (error) {
+      setInviteError(String(error instanceof Error ? error.message : error));
+    } finally {
+      friendsFetchInFlightRef.current = false;
+      setLoadingFriends(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copiedResetRef.current !== null) {
+        window.clearTimeout(copiedResetRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!inviteOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [inviteOpen]);
+
   useEffect(() => {
     try {
       setAcceptedRules(
@@ -761,6 +1039,97 @@ export default function AuctionRoomClient({
   const openAuctionTerms = () => {
     setAuctionTermsMode("info");
     setShowAuctionTerms(true);
+  };
+
+  const openInviteDialog = () => {
+    setInviteOpen(true);
+    if (!friendsLoaded) {
+      void loadFriends();
+    }
+  };
+
+  const copyRoomUrl = async () => {
+    try {
+      await copyTextToClipboard(buildAuctionRoomUrl(room?.id || roomId));
+      setCopiedRoomUrl(true);
+      if (copiedResetRef.current !== null) {
+        window.clearTimeout(copiedResetRef.current);
+      }
+      copiedResetRef.current = window.setTimeout(() => {
+        setCopiedRoomUrl(false);
+        copiedResetRef.current = null;
+      }, 1800);
+    } catch {
+      await nexoraAlert({
+        title: "คัดลอกลิงก์ไม่สำเร็จ",
+        message: "อุปกรณ์นี้ไม่อนุญาตให้คัดลอกอัตโนมัติ ลองกดแชร์หรือคัดลอกอีกครั้ง",
+        tone: "warning",
+      });
+    }
+  };
+
+  const shareRoom = async () => {
+    if (!room) return;
+
+    if (!navigator.share) {
+      await copyRoomUrl();
+      return;
+    }
+
+    try {
+      setSharingRoom(true);
+      await navigator.share({
+        title: `ห้องประมูล ${room.cardName}`,
+        text: `เข้าร่วมห้องประมูล ${room.cardName} บน NEXORA`,
+        url: buildAuctionRoomUrl(room.id),
+      });
+    } catch (error) {
+      if ((error as Error)?.name !== "AbortError") {
+        await copyRoomUrl();
+      }
+    } finally {
+      setSharingRoom(false);
+    }
+  };
+
+  const inviteFriendToRoom = async (friend: AuctionFriend) => {
+    if (!room) return;
+
+    const targetUserId = String(friend.friendId || "").trim();
+    if (!targetUserId || invitingFriendIds.has(targetUserId)) return;
+
+    setInvitingFriendIds((current) => new Set(current).add(targetUserId));
+    setInviteError("");
+
+    try {
+      const res = await fetch(
+        `/api/market/auction/${encodeURIComponent(room.id)}/invite`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            targetUserId,
+          }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        throw new Error(data?.error || "ส่งคำเชิญไม่สำเร็จ");
+      }
+
+      setInvitedFriendIds((current) => new Set(current).add(targetUserId));
+    } catch (error) {
+      setInviteError(String(error instanceof Error ? error.message : error));
+    } finally {
+      setInvitingFriendIds((current) => {
+        const next = new Set(current);
+        next.delete(targetUserId);
+        return next;
+      });
+    }
   };
 
   const scrollMobileBidBoardToBottom = useCallback(() => {
@@ -997,6 +1366,14 @@ export default function AuctionRoomClient({
           </div>
           <button
             type="button"
+            onClick={openInviteDialog}
+            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-amber-200/24 bg-amber-300/12 px-4 text-sm font-black text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.12)] transition hover:border-amber-200/42 hover:bg-amber-300/18"
+          >
+            <UserPlus className="h-4 w-4" />
+            เชิญเพื่อน
+          </button>
+          <button
+            type="button"
             onClick={openAuctionTerms}
             className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl border border-amber-200/24 bg-black/44 px-4 text-sm font-black text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.12)] transition hover:border-amber-200/42 hover:bg-amber-300/10"
           >
@@ -1004,6 +1381,33 @@ export default function AuctionRoomClient({
             เงื่อนไขการประมูล
           </button>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void copyRoomUrl()}
+              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.055] px-3 text-sm font-black text-white/86 transition hover:bg-white/[0.09] sm:px-4"
+            >
+              {copiedRoomUrl ? (
+                <Check className="h-4 w-4 text-emerald-300" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">
+                {copiedRoomUrl ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void shareRoom()}
+              disabled={sharingRoom}
+              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.055] px-3 text-sm font-black text-white/86 transition hover:bg-white/[0.09] disabled:cursor-wait disabled:opacity-65 sm:px-4"
+            >
+              {sharingRoom ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">แชร์</span>
+            </button>
             {roomCanDelete ? (
               <button
                 type="button"
@@ -1440,6 +1844,20 @@ export default function AuctionRoomClient({
         </section>
       </div>
 
+      <AuctionInviteDialog
+        open={inviteOpen}
+        room={room}
+        query={friendSearch}
+        friends={friends}
+        loading={loadingFriends}
+        invitedIds={invitedFriendIds}
+        invitingIds={invitingFriendIds}
+        error={inviteError}
+        onQueryChange={setFriendSearch}
+        onInvite={(friend) => void inviteFriendToRoom(friend)}
+        onClose={() => setInviteOpen(false)}
+        onReload={() => void loadFriends()}
+      />
       {!acceptedRules ? <RuleOverlay onAccept={acceptRules} /> : null}
       {acceptedRules && showAuctionTerms ? (
         <AuctionTermsOverlay
