@@ -594,6 +594,10 @@ export default function FloatingChatDock({
   const [mobileListVisible, setMobileListVisible] = useState(true);
   const [messageMenuId, setMessageMenuId] = useState("");
   const [deletingMessageId, setDeletingMessageId] = useState("");
+  const [previewImage, setPreviewImage] = useState<{
+    src: string;
+    alt: string;
+  } | null>(null);
   const [blazeMessages, setBlazeMessages] = useState<BlazeChatMessage[]>([
     BLAZE_WELCOME_MESSAGE,
   ]);
@@ -1320,6 +1324,7 @@ export default function FloatingChatDock({
 
       loadingRoomKeyRef.current = key;
       setError("");
+      setPreviewImage(null);
       setMobileListVisible(false);
       setShowEmoji(false);
       setActiveRoom(shell);
@@ -1686,6 +1691,20 @@ export default function FloatingChatDock({
       longPressTimerRef.current = null;
     }
   }, []);
+
+  const openImagePreview = useCallback(
+    (src?: string | null, alt = "chat attachment") => {
+      const imageSrc = safeText(src);
+      if (!imageSrc) {
+        return;
+      }
+
+      stopMessageLongPress();
+      setMessageMenuId("");
+      setPreviewImage({ src: imageSrc, alt });
+    },
+    [stopMessageLongPress]
+  );
 
   const sendMessage = useCallback(async () => {
     const active = activeRoomRef.current;
@@ -2285,6 +2304,27 @@ export default function FloatingChatDock({
   }, [activeRoom, open, otherTyping, scrollToBottom]);
 
   useEffect(() => {
+    if (!previewImage) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPreviewImage(null);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [previewImage]);
+
+  useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
       if (!emojiRootRef.current?.contains(event.target as Node)) {
         setShowEmoji(false);
@@ -2708,6 +2748,7 @@ export default function FloatingChatDock({
   }
 
   return (
+    <>
     <section className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-white/12 bg-[#050608]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] lg:w-[820px] xl:bottom-6 xl:right-6">
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/64 px-3 py-3 sm:px-4">
@@ -3092,11 +3133,31 @@ export default function FloatingChatDock({
                                     }`}
                                   >
                                     {message.imageUrl ? (
-                                      <img
-                                        src={message.imageUrl}
-                                        alt="chat attachment"
-                                        className="mb-2 max-h-[180px] max-w-full rounded-xl object-contain"
-                                      />
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          openImagePreview(message.imageUrl, "chat attachment");
+                                        }}
+                                        onPointerDown={(event) => {
+                                          event.stopPropagation();
+                                        }}
+                                        onTouchStart={(event) => {
+                                          event.stopPropagation();
+                                          stopMessageLongPress();
+                                        }}
+                                        onTouchEnd={(event) => {
+                                          event.stopPropagation();
+                                        }}
+                                        className="mb-2 block max-w-full overflow-hidden rounded-xl border border-white/10 bg-black/20 p-0 transition duration-200 hover:scale-[1.01] hover:border-white/25 focus:outline-none focus:ring-2 focus:ring-white/35 active:scale-[0.99]"
+                                        aria-label="Open image preview"
+                                      >
+                                        <img
+                                          src={message.imageUrl}
+                                          alt="chat attachment"
+                                          className="block h-auto max-h-[180px] max-w-full object-contain"
+                                        />
+                                      </button>
                                     ) : null}
                                     <ChatMessageText text={message.content} mine={mine} />
                                   </div>
@@ -3287,5 +3348,38 @@ export default function FloatingChatDock({
         </div>
       </div>
     </section>
+    {previewImage ? (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Image preview"
+        onClick={() => setPreviewImage(null)}
+        className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/90 px-3 py-[calc(env(safe-area-inset-top)+18px)] text-white backdrop-blur-xl sm:px-6"
+      >
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setPreviewImage(null);
+          }}
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+12px)] z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 shadow-[0_14px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:bg-white/16 hover:text-white active:scale-95 sm:right-5"
+          aria-label="Close image preview"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div
+          className="relative flex max-h-full max-w-full items-center justify-center"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <img
+            src={previewImage.src}
+            alt={previewImage.alt}
+            className="max-h-[calc(100dvh-92px)] max-w-[calc(100vw-24px)] select-none rounded-[18px] object-contain shadow-[0_30px_100px_rgba(0,0,0,0.7)] ring-1 ring-white/12 sm:max-h-[calc(100dvh-72px)] sm:max-w-[calc(100vw-72px)]"
+          />
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
