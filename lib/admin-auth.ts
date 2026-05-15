@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { isStaffRole } from "@/lib/staff-auth";
+import { isAdminRole, isStaffRole } from "@/lib/staff-auth";
 
 export type ApiActor = {
   id: string;
@@ -47,7 +47,7 @@ export async function requireAdminActor() {
     };
   }
 
-  if (actor.role !== "admin") {
+  if (!isAdminRole(actor.role)) {
     return {
       actor: null,
       error: NextResponse.json({ error: "forbidden" }, { status: 403 }),

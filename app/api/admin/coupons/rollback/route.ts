@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { requireAdminActor } from "@/lib/admin-auth";
 import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatCouponValue, serializeCouponRecord } from "@/lib/coupon-utils";
-import { writeCriticalBackup } from "@/lib/critical-backup";
+import {
+  ensureCriticalBackupSchema,
+  writeCriticalBackup,
+} from "@/lib/critical-backup";
 import { prisma } from "@/lib/prisma";
 import { createWalletReceivedNotification } from "@/lib/wallet-notification";
 
@@ -25,9 +28,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      await ensureCouponRollbackSchema(tx);
+    await ensureCouponRollbackSchema();
+    await ensureCriticalBackupSchema();
 
+    const result = await prisma.$transaction(async (tx) => {
       const beforeCoupon = await tx.coupon.findUnique({
         where: couponId ? { id: couponId } : { code },
         include: {
@@ -179,32 +183,36 @@ export async function POST(req: Request) {
         throw new Error("coupon_not_found");
       }
 
-      await writeCriticalBackup(tx, {
-        scope: "coupon",
-        action: "coupon.rollback",
-        actorUserId: actor?.id,
-        targetUserId: beforeCoupon.user.id,
-        entityType: "Coupon",
-        entityId: beforeCoupon.id,
-        beforeSnapshot: {
-          coupon: beforeCoupon,
-          user: beforeCoupon.user,
-          reward: beforeCoupon.reward,
+      await writeCriticalBackup(
+        tx,
+        {
+          scope: "coupon",
+          action: "coupon.rollback",
+          actorUserId: actor?.id,
+          targetUserId: beforeCoupon.user.id,
+          entityType: "Coupon",
+          entityId: beforeCoupon.id,
+          beforeSnapshot: {
+            coupon: beforeCoupon,
+            user: beforeCoupon.user,
+            reward: beforeCoupon.reward,
+          },
+          afterSnapshot: {
+            coupon: updatedCoupon,
+            user: updatedUser,
+            reward: updatedReward,
+            pointLog,
+          },
+          meta: {
+            code: beforeCoupon.code,
+            currency: value.currency,
+            amount: refundAmount,
+            rewardId: beforeCoupon.reward.id,
+            source: "admin-coupon-rollback",
+          },
         },
-        afterSnapshot: {
-          coupon: updatedCoupon,
-          user: updatedUser,
-          reward: updatedReward,
-          pointLog,
-        },
-        meta: {
-          code: beforeCoupon.code,
-          currency: value.currency,
-          amount: refundAmount,
-          rewardId: beforeCoupon.reward.id,
-          source: "admin-coupon-rollback",
-        },
-      });
+        { skipEnsure: true }
+      );
 
       return {
         coupon: updatedCoupon,
@@ -280,7 +288,13 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { error: "ย้อนกลับคูปองไม่สำเร็จ" },
+      {
+        error: "ย้อนกลับคูปองไม่สำเร็จ",
+        detail:
+          process.env.NODE_ENV !== "production" && error instanceof Error
+            ? error.message
+            : undefined,
+      },
       { status: 500 }
     );
   }

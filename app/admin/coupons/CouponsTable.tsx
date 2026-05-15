@@ -48,6 +48,29 @@ function getStatusStyle(coupon: CouponViewModel): React.CSSProperties {
   };
 }
 
+async function readApiPayload(res: Response) {
+  const raw = await res.text();
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { error: raw.slice(0, 240) };
+  }
+}
+
+function normalizeRollbackError(message: unknown) {
+  const text = String(message || "").trim();
+  if (!text) return "ย้อนกลับคูปองไม่สำเร็จ";
+  if (text === "forbidden") {
+    return "บัญชีนี้ไม่มีสิทธิ์แอดมินสำหรับย้อนกลับคูปอง";
+  }
+  if (text === "unauthorized") {
+    return "กรุณาเข้าสู่ระบบแอดมินอีกครั้ง";
+  }
+  return text;
+}
+
 export default function CouponsTable({ coupons }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState(coupons);
@@ -77,10 +100,12 @@ export default function CouponsTable({ coupons }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ couponId: coupon.id }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = await readApiPayload(res);
 
       if (!res.ok || !data?.success) {
-        throw new Error(data?.error || "ย้อนกลับคูปองไม่สำเร็จ");
+        throw new Error(
+          normalizeRollbackError(data?.error || data?.detail)
+        );
       }
 
       if (data?.coupon) {
@@ -99,7 +124,13 @@ export default function CouponsTable({ coupons }: Props) {
         tone: "success",
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "ย้อนกลับคูปองไม่สำเร็จ");
+      await nexoraAlert({
+        title: "ไม่สำเร็จ",
+        message: normalizeRollbackError(
+          error instanceof Error ? error.message : error
+        ),
+        tone: "danger",
+      });
     } finally {
       setRollingBackId(null);
     }

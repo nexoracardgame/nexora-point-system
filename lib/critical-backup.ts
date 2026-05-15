@@ -94,9 +94,12 @@ export async function ensureCriticalBackupSchema(db: DbClient = prisma) {
 
 export async function writeCriticalBackup(
   db: DbClient,
-  input: CriticalBackupInput
+  input: CriticalBackupInput,
+  options?: { skipEnsure?: boolean }
 ) {
-  await ensureCriticalBackupSchema(db);
+  if (!options?.skipEnsure) {
+    await ensureCriticalBackupSchema(db);
+  }
 
   const previous = await db.$queryRawUnsafe<Array<{ hash: string | null }>>(
     'SELECT "hash" FROM "CriticalBackupLog" ORDER BY "createdAt" DESC LIMIT 1'
