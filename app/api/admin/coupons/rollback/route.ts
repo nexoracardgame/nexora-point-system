@@ -2,15 +2,44 @@ import { NextResponse } from "next/server";
 import { requireAdminActor } from "@/lib/admin-auth";
 import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatCouponValue, serializeCouponRecord } from "@/lib/coupon-utils";
-import {
-  ensureCriticalBackupSchema,
-  writeCriticalBackup,
-} from "@/lib/critical-backup";
+import { writeCriticalBackup } from "@/lib/critical-backup";
 import { prisma } from "@/lib/prisma";
 import { createWalletReceivedNotification } from "@/lib/wallet-notification";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+
+function getUnexpectedRollbackMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("tls connection")) {
+    return "เชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณารีสตาร์ทแอปหรือเช็ก DATABASE_URL/TLS ของฐานข้อมูล";
+  }
+
+  if (normalized.includes("permission denied")) {
+    return "ฐานข้อมูลไม่อนุญาตให้ปรับข้อมูล rollback กรุณาใช้บัญชีฐานข้อมูลที่มีสิทธิ์เขียน/แก้ schema";
+  }
+
+  if (
+    normalized.includes("column") &&
+    (normalized.includes("reversedat") ||
+      normalized.includes("reversedbyid") ||
+      normalized.includes("reversalreason"))
+  ) {
+    return "ฐานข้อมูลยังไม่มีคอลัมน์ rollback ของคูปอง กรุณารัน migration แล้วลองใหม่";
+  }
+
+  if (normalized.includes("criticalbackuplog")) {
+    return "ย้อนกลับคูปองสำเร็จไม่ได้เพราะระบบ backup log มีปัญหา กรุณาลองใหม่หลังรีสตาร์ทแอป";
+  }
+
+  if (message.trim()) {
+    return `ย้อนกลับคูปองไม่สำเร็จ: ${message.trim().slice(0, 180)}`;
+  }
+
+  return "ย้อนกลับคูปองไม่สำเร็จ";
+}
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +58,6 @@ export async function POST(req: Request) {
     }
 
     await ensureCouponRollbackSchema();
-    await ensureCriticalBackupSchema();
 
     const result = await prisma.$transaction(async (tx) => {
       const beforeCoupon = await tx.coupon.findUnique({
@@ -183,36 +211,32 @@ export async function POST(req: Request) {
         throw new Error("coupon_not_found");
       }
 
-      await writeCriticalBackup(
-        tx,
-        {
-          scope: "coupon",
-          action: "coupon.rollback",
-          actorUserId: actor?.id,
-          targetUserId: beforeCoupon.user.id,
-          entityType: "Coupon",
-          entityId: beforeCoupon.id,
-          beforeSnapshot: {
-            coupon: beforeCoupon,
-            user: beforeCoupon.user,
-            reward: beforeCoupon.reward,
-          },
-          afterSnapshot: {
-            coupon: updatedCoupon,
-            user: updatedUser,
-            reward: updatedReward,
-            pointLog,
-          },
-          meta: {
-            code: beforeCoupon.code,
-            currency: value.currency,
-            amount: refundAmount,
-            rewardId: beforeCoupon.reward.id,
-            source: "admin-coupon-rollback",
-          },
+      const backupInput = {
+        scope: "coupon" as const,
+        action: "coupon.rollback",
+        actorUserId: actor?.id,
+        targetUserId: beforeCoupon.user.id,
+        entityType: "Coupon",
+        entityId: beforeCoupon.id,
+        beforeSnapshot: {
+          coupon: beforeCoupon,
+          user: beforeCoupon.user,
+          reward: beforeCoupon.reward,
         },
-        { skipEnsure: true }
-      );
+        afterSnapshot: {
+          coupon: updatedCoupon,
+          user: updatedUser,
+          reward: updatedReward,
+          pointLog,
+        },
+        meta: {
+          code: beforeCoupon.code,
+          currency: value.currency,
+          amount: refundAmount,
+          rewardId: beforeCoupon.reward.id,
+          source: "admin-coupon-rollback",
+        },
+      };
 
       return {
         coupon: updatedCoupon,
@@ -228,7 +252,12 @@ export async function POST(req: Request) {
         rewardStock: Number(updatedReward.stock || 0),
         notificationImage:
           beforeCoupon.reward.imageUrl || beforeCoupon.user.image || "/avatar.png",
+        backupInput,
       };
+    });
+
+    await writeCriticalBackup(prisma, result.backupInput).catch((backupError) => {
+      console.error("ADMIN_COUPON_ROLLBACK_BACKUP_ERROR", backupError);
     });
 
     await createWalletReceivedNotification({
@@ -287,13 +316,10 @@ export async function POST(req: Request) {
       }
     }
 
+    const fallbackMessage = getUnexpectedRollbackMessage(error);
     return NextResponse.json(
       {
-        error: "ย้อนกลับคูปองไม่สำเร็จ",
-        detail:
-          process.env.NODE_ENV !== "production" && error instanceof Error
-            ? error.message
-            : undefined,
+        error: fallbackMessage,
       },
       { status: 500 }
     );
