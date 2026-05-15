@@ -65,10 +65,10 @@ type DbUserSnapshot = {
   sessionsRevokedAt: Date | null;
 };
 
-const DEFAULT_AUTH_REDIRECT_PATH = "/home";
+const DEFAULT_AUTH_REDIRECT_PATH = "/";
 
 function isUnsafeAuthRedirectPath(pathname: string) {
-  return pathname === "/" || pathname === "/login" || pathname.startsWith("/api/auth");
+  return pathname === "/login" || pathname.startsWith("/api/auth");
 }
 
 function resolveAuthRedirectUrl(url: string, baseUrl: string, depth = 0): string {

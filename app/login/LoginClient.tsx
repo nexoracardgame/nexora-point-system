@@ -6,10 +6,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
-const DEFAULT_CALLBACK_PATH = "/home";
+const DEFAULT_CALLBACK_PATH = "/";
 
 function isUnsafeCallbackPath(pathname: string) {
-  return pathname === "/" || pathname === "/login" || pathname.startsWith("/api/auth");
+  return pathname === "/login" || pathname.startsWith("/api/auth");
 }
 
 function resolveCallbackPath(rawCallbackUrl?: string | null, depth = 0): string {
