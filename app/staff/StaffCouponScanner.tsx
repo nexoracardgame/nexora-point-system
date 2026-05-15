@@ -169,7 +169,7 @@ export default function StaffCouponScanner({
         const data = await res.json();
 
         if (!res.ok) {
-          setError(getUseError(res.status));
+          setError(String(data?.error || getUseError(res.status)));
           if (data?.coupon) {
             setResult(data.coupon);
           }
@@ -220,6 +220,11 @@ export default function StaffCouponScanner({
         setResult(coupon);
 
         if (options.promptUse && coupon) {
+          if (coupon.isReversed) {
+            setMessage("สแกนสำเร็จ แต่คูปองใบนี้ถูกย้อนกลับแล้ว");
+            return;
+          }
+
           if (coupon.used) {
             setMessage("สแกนสำเร็จ แต่คูปองใบนี้ถูกใช้งานไปแล้ว");
             return;
@@ -578,7 +583,11 @@ export default function StaffCouponScanner({
                     </div>
                     <div
                       className={`mt-2 text-base font-black ${
-                        result.used ? "text-white/70" : "text-emerald-300"
+                        result.isReversed
+                          ? "text-red-300"
+                          : result.used
+                            ? "text-white/70"
+                            : "text-emerald-300"
                       }`}
                     >
                       {result.statusLabel}
@@ -617,7 +626,7 @@ export default function StaffCouponScanner({
                 <button
                   type="button"
                   onClick={() => void confirmCouponUse()}
-                  disabled={loading || result.used}
+                  disabled={loading || result.used || result.isReversed}
                   className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.26)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   {loading ? (
@@ -627,6 +636,8 @@ export default function StaffCouponScanner({
                   )}
                   {result.used
                     ? "คูปองถูกใช้งานแล้ว"
+                    : result.isReversed
+                      ? "คูปองถูกย้อนกลับแล้ว"
                     : "ยืนยันการใช้งานของจริง"}
                 </button>
               </div>

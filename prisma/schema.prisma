@@ -95,9 +95,14 @@ model Coupon {
   used      Boolean   @default(false)
   createdAt DateTime  @default(now())
   usedAt    DateTime?
+  reversedAt DateTime?
+  reversedById String?
+  reversalReason String?
 
   user   User   @relation(fields: [userId], references: [id])
   reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@index([reversedAt])
 }
 
 model MarketListing {

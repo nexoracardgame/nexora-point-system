@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import { isStaffRole } from "@/lib/staff-auth";
 import { createLocalNotification } from "@/lib/local-notification-store";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    await ensureCouponRollbackSchema();
 
     const coupon = await prisma.coupon.findUnique({
       where: { code },
@@ -75,6 +78,16 @@ export async function POST(req: Request) {
       );
     }
 
+    if (coupon.reversedAt) {
+      return NextResponse.json(
+        {
+          error: "คูปองใบนี้ถูกย้อนกลับแล้ว ไม่สามารถใช้งานได้",
+          coupon: serializeCouponRecord(coupon),
+        },
+        { status: 409 }
+      );
+    }
+
     const usedCoupon = await prisma.$transaction(async (tx) => {
       const beforeCoupon = await tx.coupon.findUnique({
         where: { id: coupon.id },
@@ -108,12 +121,28 @@ export async function POST(req: Request) {
         throw new Error("coupon_already_used");
       }
 
-      const nextCoupon = await tx.coupon.update({
-        where: { id: beforeCoupon.id },
+      if (beforeCoupon.reversedAt) {
+        throw new Error("coupon_reversed");
+      }
+
+      const markResult = await tx.coupon.updateMany({
+        where: {
+          id: beforeCoupon.id,
+          used: false,
+          reversedAt: null,
+        },
         data: {
           used: true,
           usedAt: new Date(),
         },
+      });
+
+      if (markResult.count !== 1) {
+        throw new Error("coupon_not_available");
+      }
+
+      const nextCoupon = await tx.coupon.findUnique({
+        where: { id: beforeCoupon.id },
         include: {
           user: {
             select: {
@@ -135,6 +164,10 @@ export async function POST(req: Request) {
           },
         },
       });
+
+      if (!nextCoupon) {
+        throw new Error("coupon_not_found");
+      }
 
       await writeCriticalBackup(tx, {
         scope: "coupon",
@@ -182,6 +215,22 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("COUPON_USE_ERROR", error);
+
+    if (error instanceof Error) {
+      if (error.message === "coupon_reversed") {
+        return NextResponse.json(
+          { error: "คูปองใบนี้ถูกย้อนกลับแล้ว ไม่สามารถใช้งานได้" },
+          { status: 409 }
+        );
+      }
+
+      if (error.message === "coupon_not_available") {
+        return NextResponse.json(
+          { error: "คูปองนี้ไม่อยู่ในสถานะพร้อมใช้งานแล้ว" },
+          { status: 409 }
+        );
+      }
+    }
 
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดระหว่างยืนยันคูปอง" },

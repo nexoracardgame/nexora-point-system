@@ -5,6 +5,7 @@ import {
   listCriticalBackups,
   writeCriticalBackup,
 } from "@/lib/critical-backup";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
@@ -67,6 +68,8 @@ export async function POST(req: Request) {
   const user = asRecord(snapshot.user);
   const reward = asRecord(snapshot.reward);
   const coupon = asRecord(snapshot.coupon);
+
+  await ensureCouponRollbackSchema();
 
   const restored = await prisma.$transaction(async (tx) => {
     const changes: Record<string, unknown> = {};
@@ -131,6 +134,11 @@ export async function POST(req: Request) {
           rewardId: String(coupon.rewardId),
           used: Boolean(coupon.used),
           usedAt: snapshotDate(coupon.usedAt),
+          reversedAt: snapshotDate(coupon.reversedAt),
+          reversedById: coupon.reversedById ? String(coupon.reversedById) : null,
+          reversalReason: coupon.reversalReason
+            ? String(coupon.reversalReason)
+            : null,
           createdAt: snapshotDate(coupon.createdAt) || undefined,
         },
         create: {
@@ -140,6 +148,11 @@ export async function POST(req: Request) {
           rewardId: String(coupon.rewardId),
           used: Boolean(coupon.used),
           usedAt: snapshotDate(coupon.usedAt),
+          reversedAt: snapshotDate(coupon.reversedAt),
+          reversedById: coupon.reversedById ? String(coupon.reversedById) : null,
+          reversalReason: coupon.reversalReason
+            ? String(coupon.reversalReason)
+            : null,
           createdAt: snapshotDate(coupon.createdAt) || undefined,
         },
       });

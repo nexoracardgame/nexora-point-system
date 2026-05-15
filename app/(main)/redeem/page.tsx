@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import RedeemCouponsClient from "@/components/RedeemCouponsClient";
 
@@ -26,8 +27,10 @@ export default async function RedeemPage({ searchParams }: PageProps) {
 
   const { open } = await searchParams;
 
+  await ensureCouponRollbackSchema();
+
   const coupons = await prisma.coupon.findMany({
-    where: { userId },
+    where: { userId, reversedAt: null },
     include: {
       user: {
         select: {

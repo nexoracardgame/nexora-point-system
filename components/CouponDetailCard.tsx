@@ -18,6 +18,10 @@ export type CouponViewModel = {
   used: boolean;
   createdAt: string;
   usedAt: string | null;
+  reversedAt: string | null;
+  reversedById: string | null;
+  reversalReason: string | null;
+  isReversed: boolean;
   expiresAt: string | null;
   rewardId: string;
   rewardName: string;
@@ -50,6 +54,7 @@ export default function CouponDetailCard({
   compact?: boolean;
 }) {
   const qrSize = compact ? 166 : 196;
+  const isReversed = coupon.isReversed || Boolean(coupon.reversedAt);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[0.96fr_1.04fr]">
@@ -65,7 +70,9 @@ export default function CouponDetailCard({
           </div>
           <div
             className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] ${
-              coupon.used
+              isReversed
+                ? "bg-red-100 text-red-700"
+                : coupon.used
                 ? "bg-black text-white"
                 : "bg-[#e7fff1] text-[#0f9f68]"
             }`}
@@ -114,10 +121,21 @@ export default function CouponDetailCard({
                 Scan To Redeem
               </div>
               <div className="mt-4 flex justify-center">
-                <div className="rounded-[28px] bg-white p-3 shadow-[0_18px_46px_rgba(20,20,30,0.12)] ring-1 ring-black/5">
-                  <QRCodeCanvas value={coupon.code} size={qrSize} />
-                </div>
+                {isReversed ? (
+                  <div className="grid min-h-[190px] w-full place-items-center rounded-[28px] bg-red-50 p-5 text-center text-sm font-black text-red-700 shadow-[0_18px_46px_rgba(20,20,30,0.08)] ring-1 ring-red-100">
+                    คูปองนี้ถูกย้อนกลับแล้ว ไม่สามารถนำไปสแกนใช้งานได้
+                  </div>
+                ) : (
+                  <div className="rounded-[28px] bg-white p-3 shadow-[0_18px_46px_rgba(20,20,30,0.12)] ring-1 ring-black/5">
+                    <QRCodeCanvas value={coupon.code} size={qrSize} />
+                  </div>
+                )}
               </div>
+              {isReversed ? (
+                <div className="mt-3 rounded-[20px] bg-red-50 px-4 py-3 text-xs font-bold leading-5 text-red-700 ring-1 ring-red-100">
+                  คืน {coupon.valueLabel} กลับเข้ากระเป๋าแล้ว
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -185,6 +203,17 @@ export default function CouponDetailCard({
                 </div>
               </div>
             </div>
+
+            {isReversed ? (
+              <div className="rounded-[24px] bg-red-50 p-4 ring-1 ring-red-100">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-red-500/70">
+                  ย้อนกลับเมื่อ
+                </div>
+                <div className="mt-2 text-sm font-black text-red-800 sm:text-base">
+                  {formatDateTime(coupon.reversedAt)}
+                </div>
+              </div>
+            ) : null}
 
             <div className="rounded-[24px] bg-[#eef2fa] p-4 ring-1 ring-black/5">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-black/35">

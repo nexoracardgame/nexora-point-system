@@ -37,10 +37,12 @@ function mergeCoupons(
     map.set(key, coupon);
   }
 
-  return Array.from(map.values()).sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  return Array.from(map.values())
+    .filter((coupon) => !coupon.isReversed)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 }
 
 function formatDateTime(value?: string | null) {
@@ -143,22 +145,23 @@ export default function RedeemCouponsClient({
     coupons.find((coupon) => coupon.code === selectedCode) || null;
 
   const summary = useMemo(() => {
-    const ready = coupons.filter((coupon) => !coupon.used).length;
-    const used = coupons.filter((coupon) => coupon.used).length;
+    const activeCoupons = coupons.filter((coupon) => !coupon.isReversed);
+    const ready = activeCoupons.filter((coupon) => !coupon.used).length;
+    const used = activeCoupons.filter((coupon) => coupon.used).length;
     return {
-      total: coupons.length,
+      total: activeCoupons.length,
       ready,
       used,
     };
   }, [coupons]);
 
   const readyCoupons = useMemo(
-    () => coupons.filter((coupon) => !coupon.used),
+    () => coupons.filter((coupon) => !coupon.used && !coupon.isReversed),
     [coupons]
   );
 
   const usedCoupons = useMemo(
-    () => coupons.filter((coupon) => coupon.used),
+    () => coupons.filter((coupon) => coupon.used && !coupon.isReversed),
     [coupons]
   );
 

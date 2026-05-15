@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 
 const NO_STORE_HEADERS = {
@@ -22,8 +23,10 @@ export async function GET() {
       );
     }
 
+    await ensureCouponRollbackSchema();
+
     const coupons = await prisma.coupon.findMany({
-      where: { userId },
+      where: { userId, reversedAt: null },
       include: {
         user: {
           select: {

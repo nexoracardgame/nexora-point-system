@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import CouponsTable from "./CouponsTable";
 
@@ -11,6 +12,16 @@ type PageProps = {
 
 export default async function AdminCouponsPage({ searchParams }: PageProps) {
   const { q = "", status = "all" } = await searchParams;
+  const statusWhere =
+    status === "used"
+      ? { used: true, reversedAt: null }
+      : status === "unused"
+        ? { used: false, reversedAt: null }
+        : status === "reversed"
+          ? { reversedAt: { not: null } }
+          : {};
+
+  await ensureCouponRollbackSchema();
 
   const coupons = await prisma.coupon.findMany({
     where: {
@@ -25,8 +36,7 @@ export default async function AdminCouponsPage({ searchParams }: PageProps) {
             ],
           }
         : {}),
-      ...(status === "used" ? { used: true } : {}),
-      ...(status === "unused" ? { used: false } : {}),
+      ...statusWhere,
     },
     include: {
       user: {
@@ -82,6 +92,7 @@ export default async function AdminCouponsPage({ searchParams }: PageProps) {
           <option value="all">ทั้งหมด</option>
           <option value="used">ใช้งานแล้ว</option>
           <option value="unused">พร้อมใช้งาน</option>
+          <option value="reversed">ย้อนกลับแล้ว</option>
         </select>
 
         <button type="submit" style={goldBtnStyle}>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { buildCouponCode, serializeCouponRecord } from "@/lib/coupon-utils";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { prisma } from "@/lib/prisma";
 import { createLocalNotification } from "@/lib/local-notification-store";
 import { writeCriticalBackup } from "@/lib/critical-backup";
@@ -19,6 +20,8 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
+
+    await ensureCouponRollbackSchema();
 
     const body = await req.json();
     const rewardId = String(body?.rewardId || "").trim();

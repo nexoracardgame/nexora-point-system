@@ -16,6 +16,39 @@ type PointLogRow = {
   createdAt: string;
 };
 
+function formatNumber(value: number) {
+  return Number(value || 0).toLocaleString("th-TH");
+}
+
+function getLogDisplay(log: PointLogRow) {
+  const type = String(log.type || "").trim().toLowerCase();
+
+  if (type === "coupon_rollback_coin") {
+    return {
+      typeLabel: "rollback coin",
+      amountLabel: `คืน ${formatNumber(log.amount)} COIN`,
+      valueLabel: `+${formatNumber(log.amount)} COIN`,
+      valueClass: "text-sky-300",
+    };
+  }
+
+  if (type === "coupon_rollback_nex") {
+    return {
+      typeLabel: "rollback nex",
+      amountLabel: "ย้อนกลับคูปอง",
+      valueLabel: `+${formatNumber(log.point)} NEX`,
+      valueClass: "text-amber-300",
+    };
+  }
+
+  return {
+    typeLabel: log.type,
+    amountLabel: `จำนวน ${formatNumber(log.amount)}`,
+    valueLabel: `+${formatNumber(log.point)}`,
+    valueClass: "text-amber-300",
+  };
+}
+
 export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
   return (
     <div className="grid gap-3">
@@ -27,6 +60,7 @@ export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
         logs.map((log) => {
           const displayName = log.displayName || log.name || "Unknown member";
           const username = String(log.username || "").trim().replace(/^@+/, "");
+          const logDisplay = getLogDisplay(log);
 
           return (
             <div
@@ -63,13 +97,13 @@ export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
                 </div>
 
                 <span className="w-fit rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase text-amber-300">
-                  {log.type}
+                  {logDisplay.typeLabel}
                 </span>
                 <div className="text-sm font-bold text-white/78">
-                  จำนวน {log.amount}
+                  {logDisplay.amountLabel}
                 </div>
-                <div className="text-sm font-black text-amber-300">
-                  +{log.point}
+                <div className={`text-sm font-black ${logDisplay.valueClass}`}>
+                  {logDisplay.valueLabel}
                 </div>
               </div>
               <div className="mt-3 text-xs text-white/42">

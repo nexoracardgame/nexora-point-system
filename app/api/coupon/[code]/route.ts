@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import { isStaffRole } from "@/lib/staff-auth";
 
@@ -33,6 +34,8 @@ export async function GET(_req: Request, { params }: RouteProps) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+
+    await ensureCouponRollbackSchema();
 
     const coupon = await prisma.coupon.findUnique({
       where: { code: safeCode },

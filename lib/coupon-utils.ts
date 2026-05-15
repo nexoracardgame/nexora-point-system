@@ -78,6 +78,9 @@ export function serializeCouponRecord(coupon: {
   used: boolean;
   createdAt: Date;
   usedAt: Date | null;
+  reversedAt?: Date | null;
+  reversedById?: string | null;
+  reversalReason?: string | null;
   reward: {
     id: string;
     name: string;
@@ -94,6 +97,7 @@ export function serializeCouponRecord(coupon: {
   };
 }) {
   const value = formatCouponValue(coupon.code, coupon.reward);
+  const isReversed = Boolean(coupon.reversedAt);
 
   return {
     id: coupon.id,
@@ -101,6 +105,10 @@ export function serializeCouponRecord(coupon: {
     used: coupon.used,
     createdAt: coupon.createdAt.toISOString(),
     usedAt: coupon.usedAt ? coupon.usedAt.toISOString() : null,
+    reversedAt: coupon.reversedAt ? coupon.reversedAt.toISOString() : null,
+    reversedById: coupon.reversedById || null,
+    reversalReason: coupon.reversalReason || null,
+    isReversed,
     expiresAt: null,
     rewardId: coupon.reward.id,
     rewardName: coupon.reward.name,
@@ -115,7 +123,11 @@ export function serializeCouponRecord(coupon: {
       "NEXORA User",
     userImage: safeRewardImage(coupon.user.image),
     detailUrl: `/coupon/${encodeURIComponent(coupon.code)}`,
-    statusLabel: coupon.used ? "ใช้งานแล้ว" : "พร้อมใช้งาน",
+    statusLabel: isReversed
+      ? "ย้อนกลับแล้ว"
+      : coupon.used
+        ? "ใช้งานแล้ว"
+        : "พร้อมใช้งาน",
     expiryLabel: "ไม่มีวันหมดอายุ",
   };
 }

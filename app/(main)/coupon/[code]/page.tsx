@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import CouponQRClient from "./CouponQRClient";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { serializeCouponRecord } from "@/lib/coupon-utils";
 import { isStaffRole } from "@/lib/staff-auth";
 
@@ -30,6 +31,8 @@ export default async function CouponPage({ params }: PageProps) {
 
   const { code } = await params;
   const safeCode = decodeURIComponent(String(code || "").trim());
+
+  await ensureCouponRollbackSchema();
 
   const coupon = await prisma.coupon.findUnique({
     where: { code: safeCode },

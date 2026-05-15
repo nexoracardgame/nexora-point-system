@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatThaiDateTime, formatThaiTimeAgo } from "@/lib/thai-time";
 
 export const revalidate = 30;
@@ -47,6 +48,48 @@ function activityToneClass(tone: ActivityItem["tone"]) {
     default:
       return "border-white/10 bg-white/[0.06] text-white/70";
   }
+}
+
+function buildPointLogActivity(log: {
+  id: string;
+  point: number | null;
+  amount: number | null;
+  type: string | null;
+  createdAt: Date;
+}): ActivityItem {
+  const type = String(log.type || "").trim().toLowerCase();
+  const amount = Number(log.amount || 0);
+  const point = Number(log.point || 0);
+
+  if (type === "coupon_rollback_coin") {
+    return {
+      id: `point-${log.id}`,
+      title: `ย้อนกลับคูปอง ได้คืน ${formatNumber(amount)} COIN`,
+      subtitle: "แอดมินย้อนกลับรายการแลกคูปองและคืน COIN เข้ากระเป๋าแล้ว",
+      createdAt: log.createdAt,
+      tone: "cyan",
+    };
+  }
+
+  if (type === "coupon_rollback_nex") {
+    return {
+      id: `point-${log.id}`,
+      title: `ย้อนกลับคูปอง ได้คืน ${formatNumber(point)} NEX`,
+      subtitle: "แอดมินย้อนกลับรายการแลกคูปองและคืน NEX เข้ากระเป๋าแล้ว",
+      createdAt: log.createdAt,
+      tone: "emerald",
+    };
+  }
+
+  return {
+    id: `point-${log.id}`,
+    title: `ได้รับ ${formatNumber(point)} NEX`,
+    subtitle: `สแกนการ์ด ${String(log.type || "").toUpperCase()} จำนวน ${formatNumber(
+      amount
+    )} ใบ`,
+    createdAt: log.createdAt,
+    tone: "emerald",
+  };
 }
 
 export default async function WalletPage() {
@@ -116,6 +159,8 @@ export default async function WalletPage() {
     });
 
     if (user) {
+      await ensureCouponRollbackSchema();
+
       [pointLogs, coupons] = await Promise.all([
         prisma.pointLog.findMany({
           where: {
@@ -129,6 +174,7 @@ export default async function WalletPage() {
         prisma.coupon.findMany({
           where: {
             userId: user.id,
+            reversedAt: null,
           },
           include: {
             reward: {
@@ -166,11 +212,17 @@ export default async function WalletPage() {
   const nexPoint = Number(safeUser.nexPoint || 0);
   const coin = Number(safeUser.coin || 0);
   const totalEarnedNex = pointLogs.reduce(
-    (sum, log) => sum + Number(log.point || 0),
+    (sum, log) =>
+      String(log.type || "").startsWith("coupon_rollback_")
+        ? sum
+        : sum + Number(log.point || 0),
     0
   );
   const totalCardsScanned = pointLogs.reduce(
-    (sum, log) => sum + Number(log.amount || 0),
+    (sum, log) =>
+      String(log.type || "").startsWith("coupon_rollback_")
+        ? sum
+        : sum + Number(log.amount || 0),
     0
   );
   const activeCoupons = coupons.filter((coupon) => !coupon.used).length;
@@ -291,15 +343,7 @@ export default async function WalletPage() {
                           };
 
   const activities: ActivityItem[] = [
-    ...pointLogs.map((log) => ({
-      id: `point-${log.id}`,
-      title: `ได้รับ ${formatNumber(Number(log.point || 0))} NEX`,
-      subtitle: `สแกนการ์ด ${String(log.type || "").toUpperCase()} จำนวน ${formatNumber(
-        Number(log.amount || 0)
-      )} ใบ`,
-      createdAt: log.createdAt,
-      tone: "emerald" as const,
-    })),
+    ...pointLogs.map(buildPointLogActivity),
     ...coupons.map((coupon) => ({
       id: `coupon-${coupon.id}`,
       title: coupon.used
