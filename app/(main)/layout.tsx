@@ -40,6 +40,7 @@ import {
   PackageOpen,
   BadgeDollarSign,
   ShieldCheck,
+  Swords,
 } from "lucide-react";
 import { isAdminRole } from "@/lib/staff-auth";
 
@@ -991,6 +992,7 @@ export default function MainLayout({
   const pageContext = useMemo(() => {
     if (pathname.startsWith("/buy-market")) return "ตลาดรับซื้อการ์ดใบเดียว";
     if (pathname.startsWith("/box-market")) return "ร้านขายซอง/กล่องการ์ดแท้";
+    if (pathname.startsWith("/battle")) return "Triad Dominion";
     if (pathname.startsWith("/market")) return t("layout.page.market");
     if (pathname.startsWith("/collections")) return t("layout.page.collections");
     if (pathname.startsWith("/community")) return t("layout.page.community");
@@ -1041,6 +1043,16 @@ export default function MainLayout({
         icon: FolderKanban,
         active: pathname.startsWith("/collections"),
       },
+      ...(isAdminModeUser
+        ? [
+            {
+              href: "/battle/triad-dominion",
+              label: "Triad",
+              icon: Swords,
+              active: pathname.startsWith("/battle"),
+            },
+          ]
+        : []),
       {
         href: "/community",
         label: t("layout.nav.community"),
@@ -1060,7 +1072,7 @@ export default function MainLayout({
        active: pathname.startsWith("/dm"),
       },
     ],
-    [pathname, t]
+    [isAdminModeUser, pathname, t]
   );
 
   const mobileBottomItems = useMemo(
@@ -1078,6 +1090,16 @@ export default function MainLayout({
         icon: FolderKanban,
         active: pathname.startsWith("/collections"),
       },
+      ...(isAdminModeUser
+        ? [
+            {
+              href: "/battle/triad-dominion",
+              label: "Triad",
+              icon: Swords,
+              active: pathname.startsWith("/battle"),
+            },
+          ]
+        : []),
       {
         href: "/community",
         label: t("layout.nav.community"),
@@ -1103,7 +1125,7 @@ export default function MainLayout({
         active: pathname.startsWith("/profile"),
       },
     ],
-    [ownProfileHref, pathname, t]
+    [isAdminModeUser, ownProfileHref, pathname, t]
   );
 
   const drawerLinks = [
