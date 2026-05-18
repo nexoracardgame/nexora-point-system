@@ -114,19 +114,18 @@ function getWinnerPoints(turns: TriadTurnResult[]) {
 function chooseBotTriangle(
   player: TriadTriangle,
   monsters: CardView[],
-  playable: CardView[],
   usedCards: Set<string>
 ): TriadTriangle {
   const openMonsters = monsters
     .filter((card) => !usedCards.has(card.cardNo) && card.cardNo !== player.top)
     .sort((a, b) => b.attack + b.support - (a.attack + a.support))
-    .slice(0, 18);
-  const openPlayable = playable
+    .slice(0, 24);
+  const openSideMonsters = monsters
     .filter((card) => !usedCards.has(card.cardNo))
     .filter((card) => ![player.top, player.left, player.right].includes(card.cardNo))
     .sort((a, b) => {
-      const aPower = a.kind === "monster" ? a.attack + a.support : a.skillText.length;
-      const bPower = b.kind === "monster" ? b.attack + b.support : b.skillText.length;
+      const aPower = Math.max(a.attack, a.support) + Math.round((a.attack + a.support) / 4);
+      const bPower = Math.max(b.attack, b.support) + Math.round((b.attack + b.support) / 4);
       return bPower - aPower;
     })
     .slice(0, 34);
@@ -134,9 +133,9 @@ function chooseBotTriangle(
   let best: { triangle: TriadTriangle; points: number; total: number } | null = null;
 
   for (const top of openMonsters) {
-    for (const left of openPlayable) {
+    for (const left of openSideMonsters) {
       if (left.cardNo === top.cardNo) continue;
-      for (const right of openPlayable) {
+      for (const right of openSideMonsters) {
         if (right.cardNo === top.cardNo || right.cardNo === left.cardNo) continue;
 
         const bot = { top: top.cardNo, left: left.cardNo, right: right.cardNo };
@@ -157,8 +156,8 @@ function chooseBotTriangle(
   return (
     best?.triangle || {
       top: openMonsters[0]?.cardNo || "006",
-      left: openPlayable[0]?.cardNo || "016",
-      right: openPlayable[1]?.cardNo || "017",
+      left: openSideMonsters[0]?.cardNo || "007",
+      right: openSideMonsters[1]?.cardNo || "008",
     }
   );
 }
@@ -215,7 +214,7 @@ function BattleCard({
 }) {
   if (!card || hidden) {
     return (
-      <div className="grid aspect-[3/4] place-items-center overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_50%_24%,rgba(245,158,11,0.22),rgba(13,18,27,0.96)_58%)] shadow-[0_18px_44px_rgba(0,0,0,0.25)]">
+      <div className="grid aspect-[3/4] place-items-center overflow-hidden rounded-xl border border-white/10 bg-[radial-gradient(circle_at_50%_24%,rgba(245,158,11,0.22),rgba(13,18,27,0.96)_58%)] shadow-[0_18px_44px_rgba(0,0,0,0.25)]">
         <div className="text-center">
           <Sparkles className="mx-auto h-8 w-8 text-amber-300/80" />
           <div className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-white/45">
@@ -228,16 +227,16 @@ function BattleCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-lg border bg-black/45 shadow-[0_18px_44px_rgba(0,0,0,0.28)] transition ${
+      className={`overflow-hidden rounded-xl border bg-black/45 shadow-[0_18px_44px_rgba(0,0,0,0.28)] transition ${
         active ? "border-amber-300/80 ring-2 ring-amber-300/30" : "border-white/10"
       }`}
     >
       <div className="relative aspect-[3/4] bg-black/45">
         <Image src={card.sourceImage} alt={card.name} fill sizes="180px" className="object-cover" />
       </div>
-      <div className="space-y-1 p-2">
-        <div className="truncate text-xs font-black text-white">No.{card.cardNo} {card.name}</div>
-        <div className="truncate text-[11px] font-semibold text-white/55">{cardLabel(card)}</div>
+      <div className="space-y-1 p-2.5">
+        <div className="truncate text-sm font-black text-white">No.{card.cardNo} {card.name}</div>
+        <div className="truncate text-xs font-semibold text-white/60">{cardLabel(card)}</div>
       </div>
     </div>
   );
@@ -272,8 +271,8 @@ function TriangleArena({
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-[330px] grid-cols-2 gap-3">
-        <div className="col-span-2 mx-auto w-[46%]">
+      <div className="mx-auto grid max-w-[520px] grid-cols-2 gap-3 sm:gap-4">
+        <div className="col-span-2 mx-auto w-[58%] sm:w-[48%]">
           <BattleCard card={cardsByNo.get(triangle.top)} active={activeLane === "top"} hidden={bot && !reveal && activeTurn === 1} />
         </div>
         <BattleCard card={triangle.left ? cardsByNo.get(triangle.left) : undefined} active={activeLane === "left"} hidden={bot && !reveal && activeTurn <= 2} />
@@ -295,7 +294,7 @@ function ScorePill({ label, value, tone }: { label: string; value: number; tone:
 export default function TriadDominionClient({ cards, reviewSkills, summary }: Props) {
   const cardsByNo = useMemo(() => new Map(cards.map((card) => [card.cardNo, card])), [cards]);
   const monsters = useMemo(() => uniqueByNo(cards.filter((card) => card.kind === "monster")), [cards]);
-  const playable = useMemo(() => uniqueByNo(cards.filter((card) => card.kind !== "unknown")), [cards]);
+  const playable = monsters;
 
   const [usedCards, setUsedCards] = useState<string[]>([]);
   const usedSet = useMemo(() => new Set(usedCards), [usedCards]);
@@ -305,10 +304,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const initialPlayer = useMemo<TriadTriangle>(
     () => ({
       top: availableMonsters[0]?.cardNo || "006",
-      left: availablePlayable.find((card) => card.kind === "skill")?.cardNo || availablePlayable[1]?.cardNo || "016",
-      right: availablePlayable.find((card) => card.kind === "skill" && card.cardNo !== "016")?.cardNo || availablePlayable[2]?.cardNo || "017",
+      left: availableMonsters[1]?.cardNo || "007",
+      right: availableMonsters[2]?.cardNo || "008",
     }),
-    [availableMonsters, availablePlayable]
+    [availableMonsters]
   );
 
   const [player, setPlayer] = useState<TriadTriangle>(initialPlayer);
@@ -344,7 +343,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     const playerCards = [player.top, player.left, player.right].filter(Boolean);
     if (new Set(playerCards).size !== 3) return;
 
-    const bot = chooseBotTriangle(player, monsters, playable, usedSet);
+    const selectedCards = [player.top, player.left, player.right];
+    if (new Set(selectedCards).size !== 3) {
+      setBattleLog((current) => ["เลือกการ์ดซ้ำไม่ได้: 1 ใบใช้ได้ 1 ครั้งเท่านั้น", ...current]);
+      return;
+    }
+
+    const bot = chooseBotTriangle(player, monsters, usedSet);
     const turns = ([1, 2, 3] as TriadTurn[]).map((turn) =>
       resolveTriadTurn({ turn, player, opponent: bot })
     );
@@ -353,7 +358,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setActiveTurn(1);
     setRevealedTurns([]);
     setBattleLog((current) => [
-      `Fight ${fightNo}: bot analyzed your triangle and locked its counter play.`,
+      `Fight ${fightNo}: bot analyzed your 3 monster cards and locked its counter play.`,
       ...current,
     ]);
   };
@@ -365,6 +370,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     if (!result) return;
 
     setRevealedTurns((current) => [...current, activeTurn]);
+    if (result.winner !== "draw") {
+      setMatchScore((current) => ({
+        player: current.player + (result.winner === "player" ? 1 : 0),
+        bot: current.bot + (result.winner === "opponent" ? 1 : 0),
+      }));
+    }
     setBattleLog((current) => [
       `Turn ${activeTurn}: ${
         result.winner === "draw"
@@ -376,16 +387,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
       ...current,
     ]);
 
+  };
+
+  const nextTurn = () => {
     if (activeTurn < 3) {
       setActiveTurn((activeTurn + 1) as TriadTurn);
-      return;
     }
-
-    const score = getWinnerPoints(lockedFight.turns);
-    setMatchScore((current) => ({
-      player: current.player + score.player,
-      bot: current.bot + score.bot,
-    }));
   };
 
   const nextFight = () => {
@@ -402,16 +409,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     const nextUsed = Array.from(new Set([...usedCards, ...consumed]));
     const nextUsedSet = new Set(nextUsed);
     const nextMonsters = monsters.filter((card) => !nextUsedSet.has(card.cardNo));
-    const nextPlayable = playable.filter((card) => !nextUsedSet.has(card.cardNo));
     const nextPlayer = {
       top: nextMonsters[0]?.cardNo || "",
-      left: nextPlayable.find((card) => card.kind === "skill")?.cardNo || nextPlayable[0]?.cardNo || "",
-      right:
-        nextPlayable.find(
-          (card) => card.kind === "skill" && card.cardNo !== nextPlayable.find((item) => item.kind === "skill")?.cardNo
-        )?.cardNo ||
-        nextPlayable[1]?.cardNo ||
-        "",
+      left: nextMonsters[1]?.cardNo || "",
+      right: nextMonsters[2]?.cardNo || "",
     };
 
     setUsedCards(nextUsed);
@@ -471,8 +472,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             </div>
             <div className="space-y-3">
               <CardSelect label="Top monster" value={player.top} cards={availableMonsters} onChange={(top) => setPlayer((current) => ({ ...current, top }))} />
-              <CardSelect label="Turn 2 left" value={player.left} cards={availablePlayable} onChange={(left) => setPlayer((current) => ({ ...current, left }))} />
-              <CardSelect label="Turn 3 right" value={player.right} cards={availablePlayable} onChange={(right) => setPlayer((current) => ({ ...current, right }))} />
+              <CardSelect
+                label="Turn 2 monster"
+                value={player.left}
+                cards={availableMonsters.filter((card) => card.cardNo === player.left || (card.cardNo !== player.top && card.cardNo !== player.right))}
+                onChange={(left) => setPlayer((current) => ({ ...current, left }))}
+              />
+              <CardSelect
+                label="Turn 3 monster"
+                value={player.right}
+                cards={availableMonsters.filter((card) => card.cardNo === player.right || (card.cardNo !== player.top && card.cardNo !== player.left))}
+                onChange={(right) => setPlayer((current) => ({ ...current, right }))}
+              />
             </div>
             <button
               type="button"
@@ -513,7 +524,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
               <ScorePill label="Bot" value={matchScore.bot} tone="bot" />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 2xl:grid-cols-2">
               <TriangleArena
                 title="Admin Field"
                 triangle={lockedFight?.player || player}
@@ -560,7 +571,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                           : "Bot ได้ 1 คะแนน"}
                     </div>
                     <div className="text-sm font-semibold text-white/52">
-                      {currentResult.playerTotal.toLocaleString()} vs {currentResult.opponentTotal.toLocaleString()}
+                      ตา {activeTurn}: {currentResult.playerTotal.toLocaleString()} vs {currentResult.opponentTotal.toLocaleString()}
                     </div>
                   </div>
                 ) : (
@@ -595,6 +606,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100"
                   >
                     {fightNo >= 3 ? "Finish Match" : "Next Fight"}
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                ) : lockedFight && revealedTurns.includes(activeTurn) && activeTurn < 3 ? (
+                  <button
+                    type="button"
+                    onClick={nextTurn}
+                    className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100"
+                  >
+                    Next Turn
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 ) : (
