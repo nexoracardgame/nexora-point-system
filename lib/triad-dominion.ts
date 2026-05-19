@@ -372,54 +372,60 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn) {
 
 function applySkill(
   triangle: TriadTriangle,
-  score: ReturnType<typeof baseScore>,
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
   turn: TriadTurn
 ) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   const unresolved: TriadSkillRule[] = [];
-  if (!laneCard || laneCard.kind !== "skill") return { score, unresolved };
+  if (!laneCard || laneCard.kind !== "skill") return { unresolved };
 
   const rule = triadSkillRuleByNo.get(laneCard.cardNo);
-  if (!rule) return { score, unresolved };
+  if (!rule) return { unresolved };
 
   if (!rule.allowedTurns.includes(turn)) {
-    score.breakdown.push(`No.${rule.cardNo} ${rule.name}: สกิลไม่เข้าเงื่อนไขตานี้`);
-    return { score, unresolved };
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: สกิลไม่เข้าเงื่อนไขตานี้`);
+    return { unresolved };
   }
 
   if (rule.needsReview && rule.shape !== "stat") {
     unresolved.push(rule);
-    score.breakdown.push(`No.${rule.cardNo} ${rule.name}: รอยืนยันกติกาสกิลพิเศษ`);
-    return { score, unresolved };
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: รอยืนยันกติกาสกิลพิเศษ`);
+    return { unresolved };
   }
 
+  const targetScore =
+    rule.target.startsWith("opponent") || (rule.target === "any-one" && rule.effects.some((effect) => effect.delta < 0))
+      ? opponentScore
+      : ownScore;
+
   for (const effect of rule.effects) {
-    if (score.metric !== "total" && effect.metric === score.metric) {
-      score.total += effect.delta;
+    if (targetScore.metric !== "total" && effect.metric === targetScore.metric) {
+      targetScore.total += effect.delta;
       const label = effect.metric === "attack" ? "ATK" : "SUP";
-      score.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${effect.delta >= 0 ? "+" : ""}${effect.delta}`);
+      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${effect.delta >= 0 ? "+" : ""}${effect.delta}`);
     }
   }
 
-  return { score, unresolved };
+  return { unresolved };
 }
 
 export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const playerScore = baseScore(input.player, input.turn);
   const opponentScore = baseScore(input.opponent, input.turn);
-  const playerApplied = applySkill(input.player, playerScore, input.turn);
-  const opponentApplied = applySkill(input.opponent, opponentScore, input.turn);
-  const playerTotal = playerApplied.score.total;
-  const opponentTotal = opponentApplied.score.total;
+  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn);
+  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn);
+  const playerTotal = playerScore.total;
+  const opponentTotal = opponentScore.total;
 
   return {
     turn: input.turn,
-    metric: playerApplied.score.metric,
+    metric: playerScore.metric,
     playerTotal,
     opponentTotal,
     winner: playerTotal > opponentTotal ? "player" : opponentTotal > playerTotal ? "opponent" : "draw",
-    playerBreakdown: playerApplied.score.breakdown,
-    opponentBreakdown: opponentApplied.score.breakdown,
+    playerBreakdown: playerScore.breakdown,
+    opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: [...playerApplied.unresolved, ...opponentApplied.unresolved],
   };
 }

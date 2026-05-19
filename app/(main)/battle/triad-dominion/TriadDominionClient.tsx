@@ -148,11 +148,17 @@ function getUsedFromFights(fights: LockedFight[]) {
   );
 }
 
-function chooseBotDeck(monsters: CardView[], playerDeck: string[]) {
+function chooseBotDeck(cards: CardView[], playerDeck: string[]) {
   const blocked = new Set(playerDeck);
-  return monsters
-    .filter((card) => !blocked.has(card.cardNo))
-    .sort((a, b) => b.attack + b.support - (a.attack + a.support))
+  const candidates = cards.filter((card) => !blocked.has(card.cardNo) && card.kind !== "unknown");
+  const monsterCards = candidates
+    .filter((card) => card.kind === "monster")
+    .sort((a, b) => b.attack + b.support - (a.attack + a.support));
+  const skillCards = candidates
+    .filter((card) => card.kind === "skill")
+    .sort((a, b) => a.cardNo.localeCompare(b.cardNo));
+
+  return [...monsterCards.slice(0, 3), ...monsterCards.slice(3, 6), ...skillCards]
     .slice(0, DECK_SIZE)
     .map((card) => card.cardNo);
 }
@@ -207,10 +213,13 @@ function chooseBotCardForTurn({
 }) {
   const lane = laneForTurn(turn);
   const alreadyPlaced = new Set([bot.top, bot.left, bot.right].filter(Boolean));
+  const playableCards = botDeckCards.filter((card) => {
+    if (alreadyPlaced.has(card.cardNo)) return false;
+    return lane === "top" ? card.kind === "monster" : card.kind === "monster" || card.kind === "skill";
+  });
   let best: { cardNo: string; margin: number; total: number } | null = null;
 
-  for (const card of botDeckCards) {
-    if (alreadyPlaced.has(card.cardNo)) continue;
+  for (const card of playableCards) {
     const candidateBot = { ...bot, [lane]: card.cardNo };
     const result = resolveTriadTurn({ turn, player, opponent: candidateBot });
     const margin = result.opponentTotal - result.playerTotal;
@@ -219,7 +228,7 @@ function chooseBotCardForTurn({
     }
   }
 
-  return best?.cardNo || botDeckCards.find((card) => !alreadyPlaced.has(card.cardNo))?.cardNo || "";
+  return best?.cardNo || playableCards[0]?.cardNo || "";
 }
 
 function hiddenCard() {
@@ -296,8 +305,8 @@ function DeckCard({
       <div className="p-2.5">
         <div className="truncate text-xs font-black text-white">No.{card.cardNo} {card.name}</div>
         <div className="mt-1 truncate text-[11px] font-semibold text-white/58">{cardLabel(card)}</div>
-        <div className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black ${elementStyles[card.element]}`}>
-          {elementLabel[card.element]}
+        <div className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black ${card.kind === "skill" ? "border-violet-300/40 bg-violet-300/10 text-violet-100" : elementStyles[card.element]}`}>
+          {card.kind === "skill" ? "SKILL" : elementLabel[card.element]}
         </div>
       </div>
     </button>
@@ -538,6 +547,8 @@ function RevealSpotlight({
   const isScored = Boolean(result && showPlayer && showBot);
   const playerWins = result?.winner === "player";
   const botWins = result?.winner === "opponent";
+  const skillCard = [playerCard, botCard].find((card) => card?.kind === "skill");
+  const skillText = skillCard?.skillText || "";
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.16),rgba(0,0,0,0.48)_36%,rgba(0,0,0,0.76)_78%)] backdrop-blur-sm">
@@ -545,7 +556,8 @@ function RevealSpotlight({
       <div className="relative grid w-[min(760px,92%)] items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
         <div className={`mx-auto w-[clamp(92px,17vw,178px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
-            <div className="animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border border-red-200/70 bg-black p-1 shadow-[0_0_45px_rgba(248,113,113,0.55)]">
+            <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
+              {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
               <div className="relative aspect-[3/4] overflow-hidden rounded-[10px]">
                 <Image src={playerCard.sourceImage} alt={playerCard.name} fill sizes="180px" className="object-cover" />
               </div>
@@ -566,7 +578,8 @@ function RevealSpotlight({
 
         <div className={`mx-auto w-[clamp(92px,17vw,178px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
           {showBot && botCard ? (
-            <div className="animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border border-cyan-200/70 bg-black p-1 shadow-[0_0_45px_rgba(34,211,238,0.55)]">
+            <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
+              {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
               <div className="relative aspect-[3/4] overflow-hidden rounded-[10px]">
                 <Image src={botCard.sourceImage} alt={botCard.name} fill sizes="180px" className="object-cover" />
               </div>
@@ -574,6 +587,15 @@ function RevealSpotlight({
           ) : null}
         </div>
       </div>
+      {skillCard ? (
+        <div className="absolute bottom-[8%] max-w-[min(720px,88%)] animate-[triad-flash_900ms_ease-out] rounded-2xl border border-violet-200/35 bg-black/74 px-5 py-3 text-center shadow-[0_0_40px_rgba(168,85,247,0.35)]">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-200/70">Skill Activated</div>
+          <div className="mt-1 text-lg font-black text-white">{skillCard.name}</div>
+          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-white/68">
+            {skillText || "Special card effect is being resolved by Triad Dominion."}
+          </div>
+        </div>
+      ) : null}
       <style jsx>{`
         @keyframes triad-card-pop {
           0% { transform: translateY(24px) scale(0.82) rotate(-2deg); opacity: 0; filter: blur(8px); }
@@ -628,7 +650,7 @@ function BoardTriangle({
   ];
 
   return (
-    <div className="grid grid-cols-2 items-end justify-items-center gap-x-[clamp(12px,2vw,28px)] gap-y-1">
+    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(10px,1.5vw,22px)] gap-y-0 ${tone === "player" ? "-translate-y-5" : "translate-y-5"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         return (
@@ -880,7 +902,7 @@ function CompactBattleBoard({
         result={currentResult && revealed[activeTurn]?.scored ? currentResult : undefined}
       />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[9%_31%_1fr_31%_9%] px-[clamp(6px,1.4vw,20px)] py-[clamp(6px,1.1vw,14px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[8%_30%_1fr_30%_8%] px-[clamp(6px,1.4vw,20px)] py-[clamp(6px,1.1vw,14px)]">
         <div className="flex items-center justify-between gap-3">
           <div className="rounded-2xl border border-blue-300/18 bg-black/38 px-4 py-2">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">Opponent</div>
@@ -955,8 +977,8 @@ function emptyRevealState(): Record<TriadTurn, TurnReveal> {
 
 export default function TriadDominionClient({ cards, reviewSkills, summary }: Props) {
   const cardsByNo = useMemo(() => new Map(cards.map((card) => [card.cardNo, card])), [cards]);
-  const monsters = useMemo(
-    () => uniqueByNo(cards.filter((card) => card.kind === "monster")),
+  const deckCatalog = useMemo(
+    () => uniqueByNo(cards.filter((card) => card.kind === "monster" || card.kind === "skill")),
     [cards]
   );
 
@@ -1006,8 +1028,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
   const enterBattle = () => {
     if (playerDeck.length !== DECK_SIZE) return;
+    const monsterCount = playerDeckCards.filter((card) => card.kind === "monster").length;
+    if (monsterCount < 3) {
+      setBattleLog(["Deck needs at least 3 monster cards for the top card of each fight."]);
+      return;
+    }
 
-    const nextBotDeck = chooseBotDeck(monsters, playerDeck);
+    const nextBotDeck = chooseBotDeck(deckCatalog, playerDeck);
     setBotDeck(nextBotDeck);
     setPlayer({ top: "", left: "", right: "" });
     setPlacementLane("top");
@@ -1040,6 +1067,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
     if (turnLocked || matchDone || usedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;
+    const card = cardsByNo.get(cardNo);
+    if (lane === "top" && card?.kind !== "monster") {
+      setBattleLog((current) => ["Turn 1 top card must be a monster.", ...current]);
+      return;
+    }
+    if (lane !== "top" && card?.kind !== "monster" && card?.kind !== "skill") return;
     setPlayer((current) => {
       const next = { ...current };
       (["top", "left", "right"] as Lane[]).forEach((item) => {
@@ -1323,7 +1356,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
         <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-            {monsters.map((card) => {
+            {deckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
               const disabled = playerDeck.length >= DECK_SIZE && !selected;
               return (
