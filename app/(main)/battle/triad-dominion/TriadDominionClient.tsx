@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Bot,
   Brain,
@@ -611,7 +611,7 @@ function RevealSpotlight({
           </div>
         </div>
       ) : null}
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes triad-card-pop {
           0% { transform: translateY(24px) scale(0.82) rotate(-2deg); opacity: 0; filter: blur(8px); }
           65% { transform: translateY(-8px) scale(1.05) rotate(1deg); opacity: 1; filter: blur(0); }
@@ -633,6 +633,7 @@ function BoardTriangle({
   activeLane,
   tone,
   isVisible,
+  swapActive,
   onSlotClick,
   onDropCard,
   selectedLane,
@@ -642,6 +643,7 @@ function BoardTriangle({
   activeLane: Lane;
   tone: "player" | "bot";
   isVisible: (lane: Lane) => boolean;
+  swapActive?: boolean;
   onSlotClick?: (lane: Lane) => void;
   onDropCard?: (lane: Lane, cardNo: string) => void;
   selectedLane?: Lane;
@@ -682,9 +684,16 @@ function BoardTriangle({
               if (cardNo) onDropCard?.(lane, cardNo);
             }}
             disabled={!onSlotClick}
+            style={
+              swapActive && lane === "top"
+                ? ({ "--triad-swap-from": tone === "player" ? "220px" : "-220px" } as CSSProperties)
+                : undefined
+            }
             className={`${className} rounded-xl text-left transition ${
               selectedLane === lane ? "ring-2 ring-amber-300/80" : "ring-0"
-            } ${onSlotClick ? "hover:-translate-y-1 disabled:hover:translate-y-0" : ""}`}
+            } ${swapActive && lane === "top" ? "animate-[triad-swap-land_700ms_ease-out]" : ""} ${
+              onSlotClick ? "hover:-translate-y-1 disabled:hover:translate-y-0" : ""
+            }`}
           >
             <BoardCardSlot
               card={cardNo ? cardsByNo.get(cardNo) : undefined}
@@ -696,6 +705,13 @@ function BoardTriangle({
           </button>
         );
       })}
+      <style jsx>{`
+        @keyframes triad-swap-land {
+          0% { transform: translateX(var(--triad-swap-from, 0)) scale(0.86) rotate(-5deg); filter: blur(8px); opacity: 0.35; }
+          55% { transform: translateX(0) scale(1.12) rotate(2deg); filter: blur(0); opacity: 1; }
+          100% { transform: translateX(0) scale(1) rotate(0); filter: blur(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -972,6 +988,12 @@ function CompactBattleBoard({
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
+  const hasSwapResult = Boolean(currentResult?.skillEvents.some((event) => event.type === "swap-control"));
+  const showResolvedBoard = Boolean(currentResult && revealed[activeTurn]?.scored);
+  const displayPlayerTriangle =
+    showResolvedBoard && currentResult?.effectivePlayer ? currentResult.effectivePlayer : playerTriangle;
+  const displayBotTriangle =
+    showResolvedBoard && currentResult?.effectiveOpponent ? currentResult.effectiveOpponent : botTriangle;
   const botVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.bot);
   const playerVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.player);
   const canEditPlayerSlots = !turnLocked;
@@ -991,8 +1013,8 @@ function CompactBattleBoard({
       />
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
-        playerTop={playerTriangle.top ? cardsByNo.get(playerTriangle.top) : undefined}
-        botTop={botTriangle.top ? cardsByNo.get(botTriangle.top) : undefined}
+        playerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
+        botTop={displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined}
         selectedTarget={pendingSkillChoice?.selectedTarget || ""}
         timeLeft={timeLeft}
         onSelect={onSelectSkillTarget}
@@ -1015,10 +1037,11 @@ function CompactBattleBoard({
           <BoardPile label="Grave" sublabel={`${botGraveCards.length}`} tone="red" rotate cards={botGraveCards} />
           <BoardTriangle
             cardsByNo={cardsByNo}
-            triangle={botTriangle}
+            triangle={displayBotTriangle}
             activeLane={activeLane}
             tone="bot"
             isVisible={(lane) => botVisible(lane)}
+            swapActive={hasSwapResult && showResolvedBoard}
           />
           <BoardPile label="Deck" sublabel={`${botDeckLeft}`} tone="blue" rotate />
         </div>
@@ -1038,10 +1061,11 @@ function CompactBattleBoard({
           <BoardPile label="Deck" sublabel={`${playerDeckLeft}`} tone="blue" />
           <BoardTriangle
             cardsByNo={cardsByNo}
-            triangle={playerTriangle}
+            triangle={displayPlayerTriangle}
             activeLane={activeLane}
             tone="player"
             isVisible={() => true}
+            swapActive={hasSwapResult && showResolvedBoard}
             onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
             onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}

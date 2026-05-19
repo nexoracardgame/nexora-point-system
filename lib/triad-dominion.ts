@@ -97,6 +97,8 @@ export type TriadTurnResult = {
   playerTotal: number;
   opponentTotal: number;
   winner: "player" | "opponent" | "draw";
+  effectivePlayer: TriadTriangle;
+  effectiveOpponent: TriadTriangle;
   playerBreakdown: string[];
   opponentBreakdown: string[];
   unresolvedSkills: TriadSkillRule[];
@@ -472,6 +474,8 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     playerTotal,
     opponentTotal,
     winner: playerTotal > opponentTotal ? "player" : opponentTotal > playerTotal ? "opponent" : "draw",
+    effectivePlayer: preScore.player,
+    effectiveOpponent: preScore.opponent,
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: [...playerApplied.unresolved, ...opponentApplied.unresolved],
