@@ -330,6 +330,80 @@ function ScorePill({ label, value, tone }: { label: string; value: number; tone:
   );
 }
 
+function FighterPanel({
+  name,
+  score,
+  tone,
+  deckLeft,
+  side,
+}: {
+  name: string;
+  score: number;
+  tone: "player" | "bot";
+  deckLeft: number;
+  side: "left" | "right";
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl border bg-black/38 p-3 shadow-[0_18px_42px_rgba(0,0,0,0.32)] ${
+        tone === "player" ? "border-red-300/18" : "border-blue-300/18"
+      } ${side === "right" ? "xl:flex-row-reverse xl:text-right" : ""}`}
+    >
+      <div className="relative grid h-20 w-16 shrink-0 place-items-end overflow-hidden rounded-xl border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(0,0,0,0.3))]">
+        <Image src="/avatar.png" alt={name} width={72} height={72} className="h-16 w-16 object-contain" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-black text-white">{name}</div>
+        <div className="mt-1 flex items-center gap-2 text-xs font-bold text-white/48 xl:justify-start">
+          <span className="rounded-md border border-white/10 bg-black/30 px-2 py-1">DECK {deckLeft}</span>
+          <span className="rounded-md border border-white/10 bg-black/30 px-2 py-1">HP 200</span>
+        </div>
+        <div
+          className={`mt-3 h-2 rounded-full ${
+            tone === "player" ? "bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.5)]" : "bg-blue-500 shadow-[0_0_18px_rgba(59,130,246,0.5)]"
+          }`}
+        />
+      </div>
+      <div
+        className={`grid h-16 w-16 shrink-0 place-items-center rounded-full border-4 text-3xl font-black shadow-[0_12px_34px_rgba(0,0,0,0.35)] ${
+          tone === "player"
+            ? "border-red-200 bg-[radial-gradient(circle,#ef4444,#7f1d1d)] text-white"
+            : "border-blue-200 bg-[radial-gradient(circle,#60a5fa,#1d4ed8)] text-white"
+        }`}
+      >
+        {score}
+      </div>
+    </div>
+  );
+}
+
+function PhaseTrack({ activeTurn }: { activeTurn: TriadTurn }) {
+  const steps = [
+    ["SET", 0],
+    ["TURN 1", 1],
+    ["TURN 2", 2],
+    ["TURN 3", 3],
+    ["END", 4],
+  ] as const;
+
+  return (
+    <div className="rounded-xl border border-amber-200/14 bg-[#17110a]/84 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+      <div className="grid grid-cols-5 gap-1">
+        {steps.map(([label, value]) => (
+          <div
+            key={label}
+            className={`rounded-lg px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-xs ${
+              value === activeTurn ? "bg-amber-200 text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]" : "text-amber-100/32"
+            }`}
+          >
+            {label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function emptyRevealState(): Record<TriadTurn, TurnReveal> {
   return {
     1: { player: false, bot: false, scored: false },
@@ -690,7 +764,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </div>
       </section>
 
-      <section className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[340px_1fr_320px] xl:p-8">
+      <section className="grid gap-4 p-3 sm:p-5 xl:grid-cols-[320px_1fr_300px] xl:p-6">
         <aside className="space-y-4">
           <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-4 flex items-center gap-2">
@@ -747,41 +821,60 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </aside>
 
         <section className="space-y-4">
-          <div className="rounded-2xl border border-white/8 bg-[radial-gradient(circle_at_50%_20%,rgba(245,158,11,0.14),rgba(255,255,255,0.035)_42%,rgba(0,0,0,0.16)_100%)] p-3 sm:p-4">
-            <div className="mb-4 grid grid-cols-3 items-center gap-2">
-              <ScorePill label="Admin" value={matchScore.player} tone="player" />
-              <div className="text-center">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">
-                  Fight {Math.min(fightNo, 3)} / 3
-                </div>
-                <div className="mt-1 text-2xl font-black text-white">Turn {activeTurn}</div>
-                <div className="mt-1 text-xs font-bold text-white/42">
-                  {lockedFight ? `${fightScore.player}-${fightScore.bot} in this fight` : "waiting lock"}
+          <div className="relative overflow-hidden rounded-[28px] border border-amber-100/10 bg-[#251a0f] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.48)] sm:p-4">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_28%,rgba(124,58,237,0.28),transparent_13%),radial-gradient(circle_at_76%_26%,rgba(124,58,237,0.25),transparent_12%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_22%),repeating-radial-gradient(circle_at_50%_45%,rgba(0,0,0,0)_0,rgba(0,0,0,0)_42px,rgba(0,0,0,0.08)_43px,rgba(0,0,0,0.08)_54px)]" />
+            <div className="relative space-y-3">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px] xl:items-start">
+                <FighterPanel
+                  name="NEXORA BOT"
+                  score={matchScore.bot}
+                  tone="bot"
+                  deckLeft={Math.max(0, botDeck.length - usedBotCards.length)}
+                  side="left"
+                />
+                <div className="hidden xl:grid grid-cols-2 gap-2">
+                  <ScorePill label="Fight" value={Math.min(fightNo, 3)} tone="bot" />
+                  <ScorePill label="Turn" value={activeTurn} tone="player" />
                 </div>
               </div>
-              <ScorePill label="Bot" value={matchScore.bot} tone="bot" />
-            </div>
 
-            <div className="grid gap-4 2xl:grid-cols-2">
               <TriangleArena
-                title="Admin Field"
-                triangle={lockedFight?.player || player}
-                cardsByNo={cardsByNo}
-                activeTurn={activeTurn}
-                revealed={revealed}
-                side="player"
-              />
-              <TriangleArena
-                title="NEXORA BOT"
+                title="NEXORA BOT FIELD"
                 triangle={lockedFight?.bot || { top: "", left: "", right: "" }}
                 cardsByNo={cardsByNo}
                 activeTurn={activeTurn}
                 revealed={revealed}
                 side="bot"
               />
-            </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
+              <PhaseTrack activeTurn={activeTurn} />
+
+              <TriangleArena
+                title="ADMIN FIELD"
+                triangle={lockedFight?.player || player}
+                cardsByNo={cardsByNo}
+                activeTurn={activeTurn}
+                revealed={revealed}
+                side="player"
+              />
+
+              <div className="grid gap-3 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-end">
+                <div className="hidden xl:grid grid-cols-2 gap-2">
+                  <ScorePill label="Round" value={fightScore.player} tone="player" />
+                  <ScorePill label="Enemy" value={fightScore.bot} tone="bot" />
+                </div>
+                <FighterPanel
+                  name="ADMIN"
+                  score={matchScore.player}
+                  tone="player"
+                  deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)}
+                  side="right"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
               <div className="rounded-xl border border-white/8 bg-black/24 p-4">
                 {matchDone ? (
                   <div className="flex items-center gap-3">
@@ -868,7 +961,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                   </button>
                 )}
               </div>
-            </div>
           </div>
 
           {currentResult && activeTurnScored ? (
