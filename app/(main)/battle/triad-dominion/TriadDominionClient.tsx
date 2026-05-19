@@ -451,11 +451,13 @@ function BoardPile({
   sublabel,
   tone,
   rotate,
+  cards,
 }: {
   label: string;
   sublabel: string;
   tone: "red" | "blue" | "gold";
   rotate?: boolean;
+  cards?: CardView[];
 }) {
   const color =
     tone === "red"
@@ -466,18 +468,194 @@ function BoardPile({
 
   return (
     <div
-      className={`grid w-[clamp(54px,7vw,94px)] place-items-center rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] ${color} ${
+      className={`relative grid w-[clamp(54px,7vw,94px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] ${color} ${
         rotate ? "rotate-180" : ""
       }`}
       style={{ aspectRatio: "3 / 4" }}
     >
-      <div className="text-center">
+      {cards?.slice(-4).map((card, index) => (
+        <div
+          key={`${card.cardNo}-${index}`}
+          className="absolute inset-[8%] overflow-hidden rounded-md border border-white/14 bg-black shadow-[0_8px_18px_rgba(0,0,0,0.45)]"
+          style={{ transform: `translate(${index * 4}px, ${index * -4}px) rotate(${(index - 1.5) * 3}deg)` }}
+        >
+          <Image src={card.sourceImage} alt={card.name} fill sizes="94px" className="object-cover opacity-80" />
+        </div>
+      ))}
+      <div className="relative z-10 rounded-md bg-black/55 px-2 py-1 text-center backdrop-blur-sm">
         <div className="text-[clamp(0.55rem,1.1vw,0.9rem)] font-black uppercase leading-none text-white">
           {label}
         </div>
         <div className="mt-1 text-[clamp(0.45rem,0.9vw,0.72rem)] font-bold text-white/62">
           {sublabel}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function BoardTriangle({
+  cardsByNo,
+  triangle,
+  activeLane,
+  tone,
+  isVisible,
+  onSlotClick,
+  onDropCard,
+  selectedLane,
+}: {
+  cardsByNo: Map<string, CardView>;
+  triangle: TriadTriangle;
+  activeLane: Lane;
+  tone: "player" | "bot";
+  isVisible: (lane: Lane) => boolean;
+  onSlotClick?: (lane: Lane) => void;
+  onDropCard?: (lane: Lane, cardNo: string) => void;
+  selectedLane?: Lane;
+}) {
+  const lanes: { lane: Lane; label: string; className: string }[] = [
+    { lane: "top", label: "TOP", className: "col-span-2 mx-auto w-[clamp(70px,9vw,124px)] -translate-y-2" },
+    { lane: "left", label: "ATK", className: "w-[clamp(66px,8vw,116px)]" },
+    { lane: "right", label: "SUP", className: "w-[clamp(66px,8vw,116px)]" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 items-end justify-items-center gap-x-[clamp(12px,2vw,28px)] gap-y-1">
+      {lanes.map(({ lane, label, className }) => {
+        const cardNo = triangle[lane];
+        return (
+          <button
+            key={lane}
+            type="button"
+            onClick={() => onSlotClick?.(lane)}
+            onDragOver={(event) => {
+              if (onDropCard) event.preventDefault();
+            }}
+            onDrop={(event) => {
+              const cardNo = event.dataTransfer.getData("text/plain");
+              if (cardNo) onDropCard?.(lane, cardNo);
+            }}
+            disabled={!onSlotClick}
+            className={`${className} rounded-xl text-left transition ${
+              selectedLane === lane ? "ring-2 ring-amber-300/80" : "ring-0"
+            } ${onSlotClick ? "hover:-translate-y-1 disabled:hover:translate-y-0" : ""}`}
+          >
+            <BoardCardSlot
+              card={cardNo ? cardsByNo.get(cardNo) : undefined}
+              hidden={!isVisible(lane)}
+              active={activeLane === lane}
+              label={label}
+              tone={tone}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HandCard({
+  card,
+  used,
+  placedLane,
+  disabled,
+  onClick,
+}: {
+  card: CardView;
+  used: boolean;
+  placedLane?: Lane;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      draggable={!disabled && !used}
+      onDragStart={(event) => {
+        event.dataTransfer.setData("text/plain", card.cardNo);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      disabled={disabled || used}
+      className={`group relative min-w-[76px] flex-1 overflow-hidden rounded-xl border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+        used
+          ? "border-white/8 opacity-25"
+          : placedLane
+            ? "border-amber-300/70 opacity-55"
+            : "border-white/14 hover:-translate-y-2 hover:border-amber-200/70"
+      }`}
+    >
+      <div className="relative aspect-[3/4]">
+        <Image src={card.sourceImage} alt={card.name} fill sizes="110px" className="object-cover" />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-black/76 px-1.5 py-1">
+        <div className="truncate text-[9px] font-black text-white">No.{card.cardNo}</div>
+        <div className="text-[8px] font-bold uppercase text-white/54">
+          {used ? "GRAVE" : placedLane ? placedLane : elementLabel[card.element]}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function PlayerHand({
+  cards,
+  usedSet,
+  player,
+  placementLane,
+  locked,
+  onSelectLane,
+  onPlayCard,
+}: {
+  cards: CardView[];
+  usedSet: Set<string>;
+  player: TriadTriangle;
+  placementLane: Lane;
+  locked: boolean;
+  onSelectLane: (lane: Lane) => void;
+  onPlayCard: (cardNo: string) => void;
+}) {
+  const placedByNo = new Map<string, Lane>();
+  (["top", "left", "right"] as Lane[]).forEach((lane) => {
+    const cardNo = player[lane];
+    if (cardNo) placedByNo.set(cardNo, lane);
+  });
+
+  return (
+    <div className="rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)]">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
+          Admin Hand
+        </div>
+        <div className="flex gap-1">
+          {(["top", "left", "right"] as Lane[]).map((lane) => (
+            <button
+              key={lane}
+              type="button"
+              onClick={() => onSelectLane(lane)}
+              disabled={locked}
+              className={`h-7 rounded-lg border px-2 text-[10px] font-black uppercase transition ${
+                placementLane === lane
+                  ? "border-amber-300 bg-amber-300 text-black"
+                  : "border-white/10 bg-white/5 text-white/55 hover:border-amber-300/50"
+              } disabled:opacity-35`}
+            >
+              {lane === "top" ? "Top" : lane === "left" ? "Atk" : "Sup"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex min-h-0 gap-2 overflow-x-auto pb-1">
+        {cards.map((card) => (
+          <HandCard
+            key={card.cardNo}
+            card={card}
+            used={usedSet.has(card.cardNo)}
+            placedLane={placedByNo.get(card.cardNo)}
+            disabled={locked}
+            onClick={() => onPlayCard(card.cardNo)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -494,6 +672,11 @@ function CompactBattleBoard({
   fightScore,
   playerDeckLeft,
   botDeckLeft,
+  playerGraveCards,
+  botGraveCards,
+  placementLane,
+  onSelectLane,
+  onPlaceCard,
 }: {
   cardsByNo: Map<string, CardView>;
   lockedFight: LockedFight | null;
@@ -505,11 +688,17 @@ function CompactBattleBoard({
   fightScore: { player: number; bot: number };
   playerDeckLeft: number;
   botDeckLeft: number;
+  playerGraveCards: CardView[];
+  botGraveCards: CardView[];
+  placementLane: Lane;
+  onSelectLane: (lane: Lane) => void;
+  onPlaceCard: (lane: Lane, cardNo: string) => void;
 }) {
   const playerTriangle = lockedFight?.player || player;
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
   const botVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.bot);
+  const canEditPlayerSlots = !lockedFight;
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-[24px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
@@ -520,7 +709,10 @@ function CompactBattleBoard({
 
       <div className="relative grid h-full min-h-0 grid-rows-[15%_23%_1fr_23%_15%] px-[clamp(8px,2vw,28px)] py-[clamp(8px,1.5vw,18px)]">
         <div className="flex items-center justify-between gap-3">
-          <FighterPanel name="NEXORA BOT" score={matchScore.bot} tone="bot" deckLeft={botDeckLeft} side="left" />
+          <div className="rounded-2xl border border-blue-300/18 bg-black/38 px-4 py-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">Opponent</div>
+            <div className="text-lg font-black text-white">NEXORA BOT</div>
+          </div>
           <div className="hidden rounded-2xl border border-white/10 bg-black/38 px-4 py-2 text-center sm:block">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Fight</div>
             <div className="text-2xl font-black text-white">{Math.min(fightNo, 3)} / 3</div>
@@ -528,12 +720,14 @@ function CompactBattleBoard({
         </div>
 
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <BoardPile label="Grave" sublabel="bot" tone="red" rotate />
-          <div className="flex justify-center gap-[clamp(10px,2vw,28px)]">
-            <BoardCardSlot card={cardsByNo.get(botTriangle.top)} hidden={!botVisible("top")} active={activeLane === "top"} label="TOP" tone="bot" />
-            <BoardCardSlot card={botTriangle.left ? cardsByNo.get(botTriangle.left) : undefined} hidden={!botVisible("left")} active={activeLane === "left"} label="ATK" tone="bot" />
-            <BoardCardSlot card={botTriangle.right ? cardsByNo.get(botTriangle.right) : undefined} hidden={!botVisible("right")} active={activeLane === "right"} label="SUP" tone="bot" />
-          </div>
+          <BoardPile label="Grave" sublabel={`${botGraveCards.length}`} tone="red" rotate cards={botGraveCards} />
+          <BoardTriangle
+            cardsByNo={cardsByNo}
+            triangle={botTriangle}
+            activeLane={activeLane}
+            tone="bot"
+            isVisible={(lane) => botVisible(lane)}
+          />
           <BoardPile label="Deck" sublabel={`${botDeckLeft}`} tone="blue" rotate />
         </div>
 
@@ -548,18 +742,23 @@ function CompactBattleBoard({
             </div>
           </div>
           <div className="hidden sm:block">
-            <BoardPile label="Grave" sublabel="admin" tone="red" />
+            <BoardPile label="Grave" sublabel={`${playerGraveCards.length}`} tone="red" cards={playerGraveCards} />
           </div>
         </div>
 
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
           <BoardPile label="Deck" sublabel={`${playerDeckLeft}`} tone="blue" />
-          <div className="flex justify-center gap-[clamp(10px,2vw,28px)]">
-            <BoardCardSlot card={cardsByNo.get(playerTriangle.top)} active={activeLane === "top"} label="TOP" tone="player" />
-            <BoardCardSlot card={playerTriangle.left ? cardsByNo.get(playerTriangle.left) : undefined} active={activeLane === "left"} label="ATK" tone="player" />
-            <BoardCardSlot card={playerTriangle.right ? cardsByNo.get(playerTriangle.right) : undefined} active={activeLane === "right"} label="SUP" tone="player" />
-          </div>
-          <BoardPile label="Grave" sublabel="admin" tone="red" />
+          <BoardTriangle
+            cardsByNo={cardsByNo}
+            triangle={playerTriangle}
+            activeLane={activeLane}
+            tone="player"
+            isVisible={() => true}
+            onSlotClick={canEditPlayerSlots ? onSelectLane : undefined}
+            onDropCard={canEditPlayerSlots ? onPlaceCard : undefined}
+            selectedLane={canEditPlayerSlots ? placementLane : undefined}
+          />
+          <BoardPile label="Grave" sublabel={`${playerGraveCards.length}`} tone="red" cards={playerGraveCards} />
         </div>
 
         <div className="flex items-center justify-between gap-3">
@@ -567,7 +766,10 @@ function CompactBattleBoard({
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Turn</div>
             <div className="text-2xl font-black text-white">{activeTurn}</div>
           </div>
-          <FighterPanel name="ADMIN" score={matchScore.player} tone="player" deckLeft={playerDeckLeft} side="right" />
+          <div className="rounded-2xl border border-red-300/18 bg-black/38 px-4 py-2 text-right">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-red-100/52">Player</div>
+            <div className="text-lg font-black text-white">ADMIN</div>
+          </div>
         </div>
       </div>
     </div>
@@ -589,22 +791,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     [cards]
   );
 
-  const defaultDeck = useMemo(
-    () =>
-      monsters
-        .slice()
-        .sort((a, b) => b.attack + b.support - (a.attack + a.support))
-        .slice(0, DECK_SIZE)
-        .map((card) => card.cardNo),
-    [monsters]
-  );
-
   const [phase, setPhase] = useState<BattlePhase>("deck");
-  const [playerDeck, setPlayerDeck] = useState<string[]>(defaultDeck);
+  const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
   const [usedPlayerCards, setUsedPlayerCards] = useState<string[]>([]);
   const [usedBotCards, setUsedBotCards] = useState<string[]>([]);
   const [player, setPlayer] = useState<TriadTriangle>({ top: "", left: "", right: "" });
+  const [placementLane, setPlacementLane] = useState<Lane>("top");
   const [lockedFight, setLockedFight] = useState<LockedFight | null>(null);
   const [activeTurn, setActiveTurn] = useState<TriadTurn>(1);
   const [revealed, setRevealed] = useState<Record<TriadTurn, TurnReveal>>(emptyRevealState);
@@ -617,10 +810,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const botDeckCards = botDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const usedPlayerSet = new Set(usedPlayerCards);
   const usedBotSet = new Set(usedBotCards);
-  const availablePlayerCards = playerDeckCards.filter((card) => !usedPlayerSet.has(card.cardNo));
   const availableBotCards = botDeckCards.filter((card) => !usedBotSet.has(card.cardNo));
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
+  const finishedLockedFight = lockedFight && revealed[3]?.scored ? lockedFight : null;
+  const playerGraveNos = [
+    ...usedPlayerCards,
+    ...(finishedLockedFight ? [finishedLockedFight.player.top, finishedLockedFight.player.left, finishedLockedFight.player.right] : []),
+  ].filter((cardNo): cardNo is string => Boolean(cardNo));
+  const botGraveNos = [
+    ...usedBotCards,
+    ...(finishedLockedFight ? [finishedLockedFight.bot.top, finishedLockedFight.bot.left, finishedLockedFight.bot.right] : []),
+  ].filter((cardNo): cardNo is string => Boolean(cardNo));
+  const playerGraveCards = playerGraveNos.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
+  const botGraveCards = botGraveNos.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const matchDone = fightNo > 3;
   const winnerText =
     matchScore.player === matchScore.bot
@@ -641,21 +844,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     if (playerDeck.length !== DECK_SIZE) return;
 
     const nextBotDeck = chooseBotDeck(monsters, playerDeck);
-    const firstCards = playerDeck.slice(0, 3);
     setBotDeck(nextBotDeck);
-    setPlayer({ top: firstCards[0] || "", left: firstCards[1] || "", right: firstCards[2] || "" });
+    setPlayer({ top: "", left: "", right: "" });
+    setPlacementLane("top");
     setPhase("battle");
-    setBattleLog(["Deck locked. Entered the Triad Dominion arena."]);
+    setBattleLog(["Deck locked. Pick cards from your hand and place them into the pyramid."]);
   };
 
   const resetBattle = () => {
-    const nextDefault = defaultDeck;
     setPhase("deck");
-    setPlayerDeck(nextDefault);
+    setPlayerDeck([]);
     setBotDeck([]);
     setUsedPlayerCards([]);
     setUsedBotCards([]);
     setPlayer({ top: "", left: "", right: "" });
+    setPlacementLane("top");
     setLockedFight(null);
     setActiveTurn(1);
     setRevealed(emptyRevealState());
@@ -666,7 +869,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   };
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
-    setPlayer((current) => ({ ...current, [lane]: cardNo }));
+    if (lockedFight || matchDone || usedPlayerSet.has(cardNo)) return;
+    setPlayer((current) => {
+      const next = { ...current };
+      (["top", "left", "right"] as Lane[]).forEach((item) => {
+        if (next[item] === cardNo) next[item] = "";
+      });
+      next[lane] = cardNo;
+      return next;
+    });
+  };
+
+  const placeCardFromHand = (cardNo: string) => {
+    setPlayerLane(placementLane, cardNo);
+    if (placementLane === "top") setPlacementLane("left");
+    else if (placementLane === "left") setPlacementLane("right");
   };
 
   const lockFight = () => {
@@ -786,11 +1003,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setRevealed(emptyRevealState());
     setLastTurnWinner(null);
     setFightNo((current) => current + 1);
-    setPlayer({
-      top: nextAvailablePlayer[0]?.cardNo || "",
-      left: nextAvailablePlayer[1]?.cardNo || "",
-      right: nextAvailablePlayer[2]?.cardNo || "",
-    });
+    setPlayer({ top: "", left: "", right: "" });
+    setPlacementLane(nextAvailablePlayer.length > 0 ? "top" : placementLane);
   };
 
   const revealState = revealed[activeTurn];
@@ -934,63 +1148,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </div>
       </section>
 
-      <section className="grid h-full min-h-0 gap-3 p-2 sm:p-3 xl:grid-cols-[260px_minmax(0,1fr)_240px]">
-        <aside className="min-h-0 space-y-3 overflow-hidden">
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Layers3 className="h-5 w-5 text-amber-300" />
-              <div>
-                <div className="text-lg font-black">Choose Fight Cards</div>
-                <div className="text-sm font-semibold text-white/45">3 different cards from your deck</div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {(["top", "left", "right"] as Lane[]).map((lane, index) => (
-                <label key={lane} className="block">
-                  <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-white/42">
-                    {index === 0 ? "Turn 1 top" : index === 1 ? "Turn 2 attack" : "Turn 3 support"}
-                  </span>
-                  <select
-                    value={player[lane] || ""}
-                    onChange={(event) => setPlayerLane(lane, event.target.value)}
-                    disabled={Boolean(lockedFight) || matchDone}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#0b1017] px-3 text-sm font-bold text-white outline-none transition focus:border-amber-300/70 disabled:opacity-45"
-                  >
-                    {availablePlayerCards
-                      .filter((card) => card.cardNo === player[lane] || ![player.top, player.left, player.right].includes(card.cardNo))
-                      .map((card) => (
-                        <option key={card.cardNo} value={card.cardNo} className="bg-[#10141c]">
-                          No.{card.cardNo} {card.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={lockFight}
-              disabled={Boolean(lockedFight) || matchDone}
-              className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-amber-300 px-4 text-sm font-black text-black shadow-[0_18px_34px_rgba(245,158,11,0.22)] transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
-            >
-              <Brain className="h-4 w-4" />
-              Lock Fight vs AI
-            </button>
-          </div>
-
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
-              <Flame className="h-4 w-4 text-amber-300" />
-              Reveal Rule
-            </div>
-            <div className="space-y-2 text-sm font-semibold leading-6 text-white/56">
-              <p>Turn 1: both sides open together.</p>
-              <p>Turn 2-3: previous winner opens first. If draw, both open together.</p>
-            </div>
-          </div>
-        </aside>
-
-        <section className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3">
+      <section className="grid h-full min-h-0 gap-3 p-2 sm:p-3 xl:grid-cols-[minmax(0,1fr)_250px]">
+        <section className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto_auto] gap-3">
           <CompactBattleBoard
             cardsByNo={cardsByNo}
             lockedFight={lockedFight}
@@ -1002,6 +1161,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             fightScore={fightScore}
             playerDeckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)}
             botDeckLeft={Math.max(0, botDeck.length - usedBotCards.length)}
+            playerGraveCards={playerGraveCards}
+            botGraveCards={botGraveCards}
+            placementLane={placementLane}
+            onSelectLane={setPlacementLane}
+            onPlaceCard={(lane, cardNo) => {
+              setPlacementLane(lane);
+              setPlayerLane(lane, cardNo);
+            }}
+          />
+
+          <PlayerHand
+            cards={playerDeckCards}
+            usedSet={usedPlayerSet}
+            player={player}
+            placementLane={placementLane}
+            locked={Boolean(lockedFight) || matchDone}
+            onSelectLane={setPlacementLane}
+            onPlayCard={placeCardFromHand}
           />
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
@@ -1045,7 +1222,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     <div className="text-sm font-semibold text-white/52">
                       {lockedFight
                         ? revealButtonLabel
-                        : "Choose 3 cards and lock the fight before opening cards."}
+                        : "Click a slot, then click a card from your hand. You can swap cards until the fight is locked."}
                     </div>
                   </div>
                 )}
@@ -1080,15 +1257,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={revealNext}
-                    disabled={!lockedFight || activeTurnScored}
-                    className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
-                  >
-                    {revealButtonLabel}
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  <>
+                    {!lockedFight ? (
+                      <button
+                        type="button"
+                        onClick={lockFight}
+                        disabled={matchDone}
+                        className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                      >
+                        <Brain className="h-4 w-4" />
+                        Lock Fight
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={revealNext}
+                      disabled={!lockedFight || activeTurnScored}
+                      className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                    >
+                      {revealButtonLabel}
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </>
                 )}
               </div>
           </div>
@@ -1120,6 +1310,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </section>
 
         <aside className="space-y-4">
+          <FighterPanel name="NEXORA BOT" score={matchScore.bot} tone="bot" deckLeft={Math.max(0, botDeck.length - usedBotCards.length)} side="left" />
+          <FighterPanel name="ADMIN" score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
+
           <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Trophy className="h-4 w-4 text-amber-300" />
