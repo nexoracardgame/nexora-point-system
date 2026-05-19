@@ -22,6 +22,7 @@ type SourceCard = {
   rarity?: string;
   type?: string;
   rawText?: string;
+  notes?: string;
   sourceImage?: string;
   confidence?: string;
 };
@@ -133,11 +134,6 @@ function inferElementFromCardNo(cardNo: string): TriadElement {
 }
 
 function normalizeElement(value?: string, cardNo?: string): TriadElement {
-  if (cardNo) {
-    const elementFromNo = inferElementFromCardNo(cardNo);
-    if (elementFromNo !== "unknown") return elementFromNo;
-  }
-
   const raw = String(value || "").toLowerCase();
   if (/earth|stone|rock|sand|orange|triangle|ปฐพี|ดิน|หิน/.test(raw)) return "earth";
   if (/fire|flame|inferno|red|อัคคี|ไฟ/.test(raw)) return "fire";
@@ -163,7 +159,7 @@ export const triadCards: TriadCard[] = sourceCards.map((card) => ({
   kind: getKind(card),
   attack: parseNumber(card.atk),
   support: parseNumber(card.sup),
-  element: normalizeElement(`${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""} ${card.notes || ""}`, card.cardNo),
+  element: normalizeElement(`${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""}`),
   skillText: String(card.skill || "").replace(/\s+/g, " ").trim(),
   sourceImage: card.sourceImage || `/cards/${normalizeCardNo(card.cardNo)}.jpg`,
 }));
