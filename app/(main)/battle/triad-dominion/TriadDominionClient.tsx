@@ -814,7 +814,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
   if (phase === "deck") {
     return (
-      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-hidden rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
         <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(245,158,11,0.22),transparent_26%),radial-gradient(circle_at_80%_18%,rgba(34,211,238,0.18),transparent_24%),linear-gradient(180deg,#08111e,#050710)]" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -853,7 +853,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
         <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-            {monsters.slice(0, 90).map((card) => {
+            {monsters.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
               const disabled = playerDeck.length >= DECK_SIZE && !selected;
               return (
@@ -868,7 +868,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             })}
           </div>
 
-          <aside className="rounded-2xl border border-white/8 bg-white/[0.035] p-4">
+          <aside className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 lg:sticky lg:top-4 lg:self-start">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Sparkles className="h-4 w-4 text-amber-300" />
               Current Deck

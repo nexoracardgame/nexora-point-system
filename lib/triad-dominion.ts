@@ -143,13 +143,13 @@ function inferElementFromCardNo(cardNo: string): TriadElement {
   };
   if (specialElements[numeric]) return specialElements[numeric];
 
-  if (numeric >= 21 && numeric <= 60) return "earth";
-  if (numeric >= 61 && numeric <= 99) return "gold";
-  if (numeric >= 100 && numeric <= 138) return "water";
-  if (numeric >= 139 && numeric <= 176) return "fire";
+  if (numeric >= 21 && numeric <= 59) return "earth";
+  if (numeric >= 60 && numeric <= 98) return "gold";
+  if (numeric >= 99 && numeric <= 137) return "water";
+  if (numeric >= 138 && numeric <= 176) return "fire";
   if (numeric >= 177 && numeric <= 215) return "wood";
-  if (numeric >= 216 && numeric <= 233) return "earth";
-  if (numeric >= 234 && numeric <= 248) return "gold";
+  if (numeric >= 216 && numeric <= 232) return "earth";
+  if (numeric >= 233 && numeric <= 248) return "gold";
   if (numeric >= 249 && numeric <= 263) return "water";
   if (numeric >= 264 && numeric <= 278) return "fire";
   if (numeric >= 279 && numeric <= 293) return "wood";
