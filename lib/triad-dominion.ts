@@ -263,7 +263,8 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   if (card.kind !== "skill") return null;
 
   const effects = statEffects(card.skillText);
-  const shape = inferSkillShape(card.skillText, effects);
+  const inferredShape = inferSkillShape(card.skillText, effects);
+  const shape: TriadSkillShape = card.cardNo === "284" ? "swap-control" : inferredShape;
   const blockedMetric = /ATTACK/i.test(card.skillText)
     ? "attack"
     : /SUPPORT|SUP\b/i.test(card.skillText)

@@ -79,6 +79,13 @@ type TurnReveal = {
 const DECK_SIZE = 9;
 const TURN_SECONDS = 120;
 
+type PendingSkillChoice = {
+  side: Side;
+  lane: Lane;
+  cardNo: string;
+  selectedTarget: "player-top" | "bot-top" | "";
+};
+
 const elementStyles: Record<TriadElement, string> = {
   earth: "border-amber-500/40 bg-amber-500/10 text-amber-100",
   fire: "border-rose-500/40 bg-rose-500/10 text-rose-100",
@@ -229,6 +236,10 @@ function chooseBotCardForTurn({
   }
 
   return best?.cardNo || playableCards[0]?.cardNo || "";
+}
+
+function skillNeedsChoice(card?: CardView) {
+  return Boolean(card?.kind === "skill" && /เลือก|choose|target/i.test(card.skillText));
 }
 
 function hiddenCard() {
@@ -847,6 +858,73 @@ function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeT
   );
 }
 
+function SkillTargetOverlay({
+  card,
+  playerTop,
+  botTop,
+  selectedTarget,
+  timeLeft,
+  onSelect,
+  onConfirm,
+}: {
+  card?: CardView;
+  playerTop?: CardView;
+  botTop?: CardView;
+  selectedTarget: PendingSkillChoice["selectedTarget"];
+  timeLeft: number;
+  onSelect: (target: PendingSkillChoice["selectedTarget"]) => void;
+  onConfirm: () => void;
+}) {
+  if (!card) return null;
+
+  const targets = [
+    { id: "player-top" as const, label: "ADMIN MAIN", card: playerTop, tone: "border-red-300/60" },
+    { id: "bot-top" as const, label: "BOT MAIN", card: botTop, tone: "border-cyan-300/60" },
+  ];
+
+  return (
+    <div className="absolute inset-0 z-40 grid place-items-center bg-black/72 px-4 backdrop-blur-md">
+      <div className="w-[min(820px,94%)] rounded-3xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] sm:p-6">
+        <div className="text-center">
+          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-200/70">Choose Skill Target</div>
+          <div className="mt-1 text-2xl font-black uppercase text-white">{card.name}</div>
+          <div className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/62">{card.skillText}</div>
+          <div className="mt-3 text-lg font-black text-amber-200">
+            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {targets.map((target) => (
+            <button
+              key={target.id}
+              type="button"
+              onClick={() => onSelect(target.id)}
+              className={`rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
+                selectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
+              }`}
+            >
+              <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white/56">{target.label}</div>
+              <div className="mx-auto w-[clamp(90px,18vw,150px)]">
+                <BoardCardSlot card={target.card} label={target.label} tone={target.id === "player-top" ? "player" : "bot"} />
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={!selectedTarget}
+          className="mt-5 h-12 w-full rounded-2xl bg-violet-300 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/30"
+        >
+          Confirm Target
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CompactBattleBoard({
   cardsByNo,
   lockedFight,
@@ -863,6 +941,9 @@ function CompactBattleBoard({
   placementLane,
   timeLeft,
   turnLocked,
+  pendingSkillChoice,
+  onSelectSkillTarget,
+  onConfirmSkillTarget,
   onSelectLane,
   onPlaceCard,
 }: {
@@ -881,6 +962,9 @@ function CompactBattleBoard({
   placementLane: Lane;
   timeLeft: number;
   turnLocked: boolean;
+  pendingSkillChoice: PendingSkillChoice | null;
+  onSelectSkillTarget: (target: PendingSkillChoice["selectedTarget"]) => void;
+  onConfirmSkillTarget: () => void;
   onSelectLane: (lane: Lane) => void;
   onPlaceCard: (lane: Lane, cardNo: string) => void;
 }) {
@@ -893,7 +977,7 @@ function CompactBattleBoard({
   const canEditPlayerSlots = !turnLocked;
 
   return (
-    <div className="relative h-full min-h-[300px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[360px] xl:min-h-0">
+    <div className="relative h-full min-h-[340px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[430px] xl:min-h-0">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
@@ -905,8 +989,17 @@ function CompactBattleBoard({
         showBot={botVisible(activeLane)}
         result={currentResult && revealed[activeTurn]?.scored ? currentResult : undefined}
       />
+      <SkillTargetOverlay
+        card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
+        playerTop={playerTriangle.top ? cardsByNo.get(playerTriangle.top) : undefined}
+        botTop={botTriangle.top ? cardsByNo.get(botTriangle.top) : undefined}
+        selectedTarget={pendingSkillChoice?.selectedTarget || ""}
+        timeLeft={timeLeft}
+        onSelect={onSelectSkillTarget}
+        onConfirm={onConfirmSkillTarget}
+      />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[8%_30%_1fr_30%_8%] px-[clamp(6px,1.4vw,20px)] py-[clamp(6px,1.1vw,14px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[7%_31%_1fr_31%_7%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
         <div className="flex items-center justify-between gap-3">
           <div className="rounded-2xl border border-blue-300/18 bg-black/38 px-4 py-2">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">Opponent</div>
@@ -997,6 +1090,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const [placementLane, setPlacementLane] = useState<Lane>("top");
   const [lockedFight, setLockedFight] = useState<LockedFight | null>(null);
   const [turnLocked, setTurnLocked] = useState(false);
+  const [pendingSkillChoice, setPendingSkillChoice] = useState<PendingSkillChoice | null>(null);
   const [timeLeft, setTimeLeft] = useState(TURN_SECONDS);
   const [activeTurn, setActiveTurn] = useState<TriadTurn>(1);
   const [revealed, setRevealed] = useState<Record<TriadTurn, TurnReveal>>(emptyRevealState);
@@ -1043,6 +1137,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setPlayer({ top: "", left: "", right: "" });
     setPlacementLane("top");
     setTurnLocked(false);
+    setPendingSkillChoice(null);
     setTimeLeft(TURN_SECONDS);
     setPhase("battle");
     setBattleLog(["Deck locked. Pick cards from your hand and place them into the pyramid."]);
@@ -1060,6 +1155,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setPlacementLane("top");
     setLockedFight(null);
     setTurnLocked(false);
+    setPendingSkillChoice(null);
     setTimeLeft(TURN_SECONDS);
     setActiveTurn(1);
     setRevealed(emptyRevealState());
@@ -1106,6 +1202,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
       botDeckCards: availableBotCards,
     });
     const bot = { ...baseBot, [lane]: botCardNo };
+    const playerCard = cardsByNo.get(player[lane] || "");
+    if (playerCard && skillNeedsChoice(playerCard)) {
+      setLockedFight({ fightNo, player, bot, turns: lockedFight?.turns || [] });
+      setTurnLocked(true);
+      setPendingSkillChoice({ side: "player", lane, cardNo: playerCard.cardNo, selectedTarget: "" });
+      setTimeLeft(TURN_SECONDS);
+      setBattleLog((current) => [`${playerCard.name}: choose a target before resolving turn ${activeTurn}.`, ...current]);
+      return;
+    }
+
     const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot });
     const turns = [
       ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
@@ -1120,12 +1226,33 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     ]);
   };
 
+  const confirmSkillTarget = () => {
+    if (!pendingSkillChoice || !lockedFight || !pendingSkillChoice.selectedTarget) return;
+    const result = resolveTriadTurn({
+      turn: activeTurn,
+      player: lockedFight.player,
+      opponent: lockedFight.bot,
+    });
+    const turns = [
+      ...lockedFight.turns.filter((turn) => turn.turn !== activeTurn),
+      result,
+    ].sort((a, b) => a.turn - b.turn);
+
+    setLockedFight({ ...lockedFight, turns });
+    setPendingSkillChoice(null);
+    setBattleLog((current) => [
+      `Skill target confirmed: ${pendingSkillChoice.selectedTarget}. Resolving turn ${activeTurn}.`,
+      ...current,
+    ]);
+  };
+
   const timeoutTurn = () => {
-    if (matchDone || turnLocked) return;
+    if (matchDone || (turnLocked && !pendingSkillChoice)) return;
     const lane = laneForTurn(activeTurn);
 
     setMatchScore((current) => ({ ...current, bot: current.bot + 1 }));
     setLastTurnWinner("bot");
+    setPendingSkillChoice(null);
     setBattleLog((current) => [
       `Turn ${activeTurn}: time out. Admin loses 1 point, card returns to hand.`,
       ...current,
@@ -1134,6 +1261,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
     if (activeTurn < 3) {
       const nextActiveTurn = (activeTurn + 1) as TriadTurn;
+      setTurnLocked(false);
+      setPendingSkillChoice(null);
       setActiveTurn(nextActiveTurn);
       setPlacementLane(laneForTurn(nextActiveTurn));
       setTimeLeft(TURN_SECONDS);
@@ -1153,18 +1282,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
     setLockedFight(null);
     setTurnLocked(false);
+    setPendingSkillChoice(null);
     setTimeLeft(TURN_SECONDS);
     setActiveTurn(1);
     setRevealed(emptyRevealState());
-    setTurnLocked(false);
-    setTimeLeft(TURN_SECONDS);
     setFightNo((current) => current + 1);
     setPlayer({ top: "", left: "", right: "" });
     setPlacementLane("top");
   };
 
   useEffect(() => {
-    if (phase !== "battle" || matchDone || turnLocked) return;
+    if (phase !== "battle" || matchDone || (turnLocked && !pendingSkillChoice)) return;
 
     const timer = window.setInterval(() => {
       setTimeLeft((current) => {
@@ -1178,7 +1306,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [phase, matchDone, turnLocked, activeTurn, player, lockedFight]);
+  }, [phase, matchDone, turnLocked, pendingSkillChoice, activeTurn, player, lockedFight]);
 
   const scoreTurnIfReady = (
     turn: TriadTurn,
@@ -1211,7 +1339,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   };
 
   const revealNext = () => {
-    if (!lockedFight || !turnLocked) return;
+    if (!lockedFight || !turnLocked || pendingSkillChoice || !currentResult) return;
 
     setRevealed((current) => {
       const state = current[activeTurn];
@@ -1258,6 +1386,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setUsedBotCards((current) =>
       Array.from(new Set([...current, lockedFight.bot[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
     );
+    setPendingSkillChoice(null);
     setTurnLocked(false);
     setActiveTurn(nextActiveTurn);
     setPlacementLane(laneForTurn(nextActiveTurn));
@@ -1292,6 +1421,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setUsedPlayerCards(Array.from(new Set(nextUsedPlayer)));
     setUsedBotCards(Array.from(new Set(nextUsedBot)));
     setLockedFight(null);
+    setTurnLocked(false);
+    setPendingSkillChoice(null);
+    setTimeLeft(TURN_SECONDS);
     setActiveTurn(1);
     setRevealed(emptyRevealState());
     setLastTurnWinner(null);
@@ -1441,8 +1573,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </div>
       </section>
 
-      <section className="grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 xl:h-full xl:grid-cols-[minmax(0,1fr)_230px]">
-        <section className="grid min-h-0 grid-rows-[minmax(300px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(360px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(0,1fr)_auto_auto]">
+      <section className="grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 xl:h-full xl:grid-cols-[minmax(0,1fr)_210px]">
+        <section className="grid min-h-0 grid-rows-[minmax(340px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(430px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(0,1fr)_auto_auto]">
           <CompactBattleBoard
             cardsByNo={cardsByNo}
             lockedFight={lockedFight}
@@ -1459,6 +1591,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             placementLane={placementLane}
             timeLeft={timeLeft}
             turnLocked={turnLocked}
+            pendingSkillChoice={pendingSkillChoice}
+            onSelectSkillTarget={(target) =>
+              setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
+            }
+            onConfirmSkillTarget={confirmSkillTarget}
             onSelectLane={setPlacementLane}
             onPlaceCard={(lane, cardNo) => {
               setPlacementLane(lane);
