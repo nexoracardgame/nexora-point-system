@@ -548,7 +548,9 @@ function RevealSpotlight({
   const playerWins = result?.winner === "player";
   const botWins = result?.winner === "opponent";
   const skillCard = [playerCard, botCard].find((card) => card?.kind === "skill");
-  const skillText = skillCard?.skillText || "";
+  const skillEvent = result?.skillEvents?.[0];
+  const skillText = skillEvent?.summary || skillCard?.skillText || "";
+  const isSwapSkill = skillEvent?.type === "swap-control";
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.16),rgba(0,0,0,0.48)_36%,rgba(0,0,0,0.76)_78%)] backdrop-blur-sm">
@@ -567,7 +569,7 @@ function RevealSpotlight({
 
         <div className="text-center">
           <div className="animate-[triad-flash_900ms_ease-out] text-[clamp(2rem,5vw,4.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)]">
-            {isScored ? (result?.winner === "draw" ? "DRAW" : playerWins ? "ADMIN +1" : "BOT +1") : "REVEAL"}
+            {isSwapSkill ? "SWAP!" : isScored ? (result?.winner === "draw" ? "DRAW" : playerWins ? "ADMIN +1" : "BOT +1") : "REVEAL"}
           </div>
           {isScored ? (
             <div className="mt-2 rounded-full border border-amber-200/50 bg-black/70 px-4 py-2 text-[clamp(1rem,2vw,1.45rem)] font-black text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)]">
@@ -589,8 +591,10 @@ function RevealSpotlight({
       </div>
       {skillCard ? (
         <div className="absolute bottom-[8%] max-w-[min(720px,88%)] animate-[triad-flash_900ms_ease-out] rounded-2xl border border-violet-200/35 bg-black/74 px-5 py-3 text-center shadow-[0_0_40px_rgba(168,85,247,0.35)]">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-200/70">Skill Activated</div>
-          <div className="mt-1 text-lg font-black text-white">{skillCard.name}</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-200/70">
+            {isSwapSkill ? "Main Monster Swapped" : "Skill Activated"}
+          </div>
+          <div className="mt-1 text-lg font-black text-white">{skillEvent?.name || skillCard.name}</div>
           <div className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-white/68">
             {skillText || "Special card effect is being resolved by Triad Dominion."}
           </div>

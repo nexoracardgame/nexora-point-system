@@ -100,6 +100,16 @@ export type TriadTurnResult = {
   playerBreakdown: string[];
   opponentBreakdown: string[];
   unresolvedSkills: TriadSkillRule[];
+  skillEvents: TriadSkillEvent[];
+};
+
+export type TriadSkillEvent = {
+  cardNo: string;
+  name: string;
+  side: "player" | "opponent";
+  type: TriadSkillShape;
+  text: string;
+  summary: string;
 };
 
 const sourceCards = ((bundledCardSkillDbJson as { cards?: SourceCard[] }).cards || []).filter(
@@ -229,6 +239,7 @@ function inferAllowedTurns(text: string, shape: TriadSkillShape): TriadTurn[] {
 }
 
 function inferSkillShape(text: string, effects: TriadSkillEffect[]): TriadSkillShape {
+  if (/สลับตำแหน่ง|นำมาใช้งานในตานี้|swap/i.test(text)) return "swap-control";
   if (/ไม่สามารถเพิ่มค่า\s*ATTACK|cannot increase ATTACK/i.test(text)) return "block-stat-gain";
   if (/ไม่สามารถเพิ่มค่า\s*SUPPORT|ไม่สามารถเพิ่มค่า\s*SUP|cannot increase SUPPORT/i.test(text)) {
     return "block-stat-gain";
@@ -260,7 +271,6 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
       : undefined;
   const needsReview =
     shape === "unparsed" ||
-    shape === "swap-control" ||
     shape === "element-transform" ||
     /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText);
 
@@ -410,9 +420,46 @@ function applySkill(
   return { unresolved };
 }
 
+function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn) {
+  const laneCard = getCard(triangle[selectedLane(turn)]);
+  if (!laneCard || laneCard.kind !== "skill") return undefined;
+  return triadSkillRuleByNo.get(laneCard.cardNo);
+}
+
+function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn) {
+  const effectivePlayer = { ...player };
+  const effectiveOpponent = { ...opponent };
+  const events: TriadSkillEvent[] = [];
+
+  const swapSkills = [
+    { side: "player" as const, rule: getLaneSkillRule(player, turn) },
+    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn) },
+  ].filter(
+    (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
+      item.rule?.shape === "swap-control" && item.rule.allowedTurns.includes(turn)
+  );
+
+  for (const item of swapSkills) {
+    const playerTop = effectivePlayer.top;
+    effectivePlayer.top = effectiveOpponent.top;
+    effectiveOpponent.top = playerTop;
+    events.push({
+      cardNo: item.rule.cardNo,
+      name: item.rule.name,
+      side: item.side,
+      type: item.rule.shape,
+      text: item.rule.text,
+      summary: "สลับมอนสเตอร์หลักของทั้งสองฝ่ายในตานี้ แล้วค่อยคำนวณคะแนนจากมอนสเตอร์หลักหลังสลับ",
+    });
+  }
+
+  return { player: effectivePlayer, opponent: effectiveOpponent, events };
+}
+
 export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
-  const playerScore = baseScore(input.player, input.turn);
-  const opponentScore = baseScore(input.opponent, input.turn);
+  const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn);
+  const playerScore = baseScore(preScore.player, input.turn);
+  const opponentScore = baseScore(preScore.opponent, input.turn);
   const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn);
   const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn);
   const playerTotal = playerScore.total;
@@ -427,6 +474,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: [...playerApplied.unresolved, ...opponentApplied.unresolved],
+    skillEvents: preScore.events,
   };
 }
 
