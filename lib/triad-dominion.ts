@@ -119,6 +119,30 @@ function inferElementFromCardNo(cardNo: string): TriadElement {
   const numeric = Number.parseInt(normalizeCardNo(cardNo), 10);
   if (!Number.isFinite(numeric)) return "unknown";
 
+  const specialElements: Partial<Record<number, TriadElement>> = {
+    1: "earth",
+    2: "fire",
+    3: "gold",
+    4: "wood",
+    5: "water",
+    6: "fire",
+    7: "earth",
+    8: "water",
+    9: "wood",
+    10: "gold",
+    11: "earth",
+    12: "fire",
+    13: "gold",
+    14: "wood",
+    15: "water",
+    16: "earth",
+    17: "fire",
+    18: "gold",
+    19: "wood",
+    20: "water",
+  };
+  if (specialElements[numeric]) return specialElements[numeric];
+
   if (numeric >= 21 && numeric <= 60) return "earth";
   if (numeric >= 61 && numeric <= 99) return "gold";
   if (numeric >= 100 && numeric <= 138) return "water";
@@ -134,6 +158,11 @@ function inferElementFromCardNo(cardNo: string): TriadElement {
 }
 
 function normalizeElement(value?: string, cardNo?: string): TriadElement {
+  if (cardNo) {
+    const elementFromCardNo = inferElementFromCardNo(cardNo);
+    if (elementFromCardNo !== "unknown") return elementFromCardNo;
+  }
+
   const raw = String(value || "").toLowerCase();
   if (/earth|stone|rock|sand|orange|triangle|ปฐพี|ดิน|หิน/.test(raw)) return "earth";
   if (/fire|flame|inferno|red|อัคคี|ไฟ/.test(raw)) return "fire";
@@ -159,7 +188,10 @@ export const triadCards: TriadCard[] = sourceCards.map((card) => ({
   kind: getKind(card),
   attack: parseNumber(card.atk),
   support: parseNumber(card.sup),
-  element: normalizeElement(`${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""}`),
+  element: normalizeElement(
+    `${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""} ${card.notes || ""}`,
+    card.cardNo
+  ),
   skillText: String(card.skill || "").replace(/\s+/g, " ").trim(),
   sourceImage: card.sourceImage || `/cards/${normalizeCardNo(card.cardNo)}.jpg`,
 }));
