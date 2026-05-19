@@ -540,7 +540,7 @@ function RevealSpotlight({
   const botWins = result?.winner === "opponent";
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.16),rgba(0,0,0,0.08)_36%,rgba(0,0,0,0.58)_78%)]">
+    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.16),rgba(0,0,0,0.48)_36%,rgba(0,0,0,0.76)_78%)] backdrop-blur-sm">
       <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
       <div className="relative grid w-[min(760px,92%)] items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
         <div className={`mx-auto w-[clamp(92px,17vw,178px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
@@ -613,17 +613,17 @@ function BoardTriangle({
     {
       lane: "top",
       label: "TOP",
-      className: `col-span-2 mx-auto w-[clamp(70px,9vw,124px)] ${tone === "bot" ? "translate-y-6" : "-translate-y-6"}`,
+      className: `col-span-2 mx-auto w-[clamp(56px,7.6vw,104px)] ${tone === "bot" ? "translate-y-2" : "-translate-y-2"}`,
     },
     {
       lane: "left",
       label: "ATK",
-      className: `w-[clamp(66px,8vw,116px)] ${tone === "bot" ? "-translate-y-6" : "translate-y-6"}`,
+      className: `w-[clamp(54px,7vw,96px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
     },
     {
       lane: "right",
       label: "SUP",
-      className: `w-[clamp(66px,8vw,116px)] ${tone === "bot" ? "-translate-y-6" : "translate-y-6"}`,
+      className: `w-[clamp(54px,7vw,96px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
     },
   ];
 
@@ -635,6 +635,7 @@ function BoardTriangle({
           <button
             key={lane}
             type="button"
+            data-triad-lane={lane}
             onClick={() => onSlotClick?.(lane)}
             onDragOver={(event) => {
               if (onDropCard) event.preventDefault();
@@ -668,12 +669,14 @@ function HandCard({
   placedLane,
   disabled,
   onClick,
+  onDropToLane,
 }: {
   card: CardView;
   used: boolean;
   placedLane?: Lane;
   disabled: boolean;
   onClick: () => void;
+  onDropToLane: (lane: Lane, cardNo: string) => void;
 }) {
   return (
     <button
@@ -684,8 +687,16 @@ function HandCard({
         event.dataTransfer.setData("text/plain", card.cardNo);
         event.dataTransfer.effectAllowed = "move";
       }}
+      onPointerUp={(event) => {
+        if (disabled || used) return;
+        const target = document
+          .elementFromPoint(event.clientX, event.clientY)
+          ?.closest<HTMLElement>("[data-triad-lane]");
+        const lane = target?.dataset.triadLane as Lane | undefined;
+        if (lane) onDropToLane(lane, card.cardNo);
+      }}
       disabled={disabled || used}
-      className={`group relative min-w-[76px] flex-1 overflow-hidden rounded-xl border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+      className={`group relative min-w-[64px] flex-1 touch-none overflow-hidden rounded-xl border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition sm:min-w-[76px] ${
         used
           ? "border-white/8 opacity-25"
           : placedLane
@@ -714,6 +725,7 @@ function PlayerHand({
   locked,
   onSelectLane,
   onPlayCard,
+  onDropToLane,
 }: {
   cards: CardView[];
   usedSet: Set<string>;
@@ -723,6 +735,7 @@ function PlayerHand({
   locked: boolean;
   onSelectLane: (lane: Lane) => void;
   onPlayCard: (cardNo: string) => void;
+  onDropToLane: (lane: Lane, cardNo: string) => void;
 }) {
   const placedByNo = new Map<string, Lane>();
   (["top", "left", "right"] as Lane[]).forEach((lane) => {
@@ -763,6 +776,7 @@ function PlayerHand({
             placedLane={placedByNo.get(card.cardNo)}
             disabled={locked}
             onClick={() => onPlayCard(card.cardNo)}
+            onDropToLane={onDropToLane}
           />
         ))}
       </div>
@@ -853,7 +867,7 @@ function CompactBattleBoard({
   const canEditPlayerSlots = !turnLocked;
 
   return (
-    <div className="relative h-full min-h-[420px] overflow-hidden rounded-[24px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+    <div className="relative h-full min-h-[300px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[360px] xl:min-h-0">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
@@ -866,7 +880,7 @@ function CompactBattleBoard({
         result={currentResult && revealed[activeTurn]?.scored ? currentResult : undefined}
       />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[10%_29%_1fr_29%_10%] px-[clamp(10px,2vw,28px)] py-[clamp(10px,1.5vw,18px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[9%_31%_1fr_31%_9%] px-[clamp(6px,1.4vw,20px)] py-[clamp(6px,1.1vw,14px)]">
         <div className="flex items-center justify-between gap-3">
           <div className="rounded-2xl border border-blue-300/18 bg-black/38 px-4 py-2">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">Opponent</div>
@@ -951,6 +965,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const [botDeck, setBotDeck] = useState<string[]>([]);
   const [usedPlayerCards, setUsedPlayerCards] = useState<string[]>([]);
   const [usedBotCards, setUsedBotCards] = useState<string[]>([]);
+  const [gravePlayerCards, setGravePlayerCards] = useState<string[]>([]);
+  const [graveBotCards, setGraveBotCards] = useState<string[]>([]);
   const [player, setPlayer] = useState<TriadTriangle>({ top: "", left: "", right: "" });
   const [placementLane, setPlacementLane] = useState<Lane>("top");
   const [lockedFight, setLockedFight] = useState<LockedFight | null>(null);
@@ -970,17 +986,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const availableBotCards = botDeckCards.filter((card) => !usedBotSet.has(card.cardNo));
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
-  const currentScoredLane = turnLocked && revealed[activeTurn]?.scored ? laneForTurn(activeTurn) : null;
-  const playerGraveNos = [
-    ...usedPlayerCards,
-    ...(lockedFight && currentScoredLane ? [lockedFight.player[currentScoredLane]] : []),
-  ].filter((cardNo): cardNo is string => Boolean(cardNo));
-  const botGraveNos = [
-    ...usedBotCards,
-    ...(lockedFight && currentScoredLane ? [lockedFight.bot[currentScoredLane]] : []),
-  ].filter((cardNo): cardNo is string => Boolean(cardNo));
-  const playerGraveCards = playerGraveNos.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
-  const botGraveCards = botGraveNos.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
+  const playerGraveCards = gravePlayerCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
+  const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const matchDone = fightNo > 3;
   const winnerText =
     matchScore.player === matchScore.bot
@@ -1016,6 +1023,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setBotDeck([]);
     setUsedPlayerCards([]);
     setUsedBotCards([]);
+    setGravePlayerCards([]);
+    setGraveBotCards([]);
     setPlayer({ top: "", left: "", right: "" });
     setPlacementLane("top");
     setLockedFight(null);
@@ -1092,6 +1101,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
       setPlacementLane(laneForTurn(nextActiveTurn));
       setTimeLeft(TURN_SECONDS);
       return;
+    }
+
+    if (lockedFight) {
+      const completedPlayerCards = [lockedFight.player.top, lockedFight.player.left, lockedFight.player.right].filter(
+        (cardNo): cardNo is string => Boolean(cardNo)
+      );
+      const completedBotCards = [lockedFight.bot.top, lockedFight.bot.left, lockedFight.bot.right].filter(
+        (cardNo): cardNo is string => Boolean(cardNo)
+      );
+      setGravePlayerCards((current) => Array.from(new Set([...current, ...completedPlayerCards])));
+      setGraveBotCards((current) => Array.from(new Set([...current, ...completedBotCards])));
     }
 
     setLockedFight(null);
@@ -1224,6 +1244,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     ].filter(Boolean);
     const nextAvailablePlayer = playerDeckCards.filter((card) => !new Set(nextUsedPlayer).has(card.cardNo));
 
+    const completedPlayerCards = [lockedFight.player.top, lockedFight.player.left, lockedFight.player.right].filter(
+      (cardNo): cardNo is string => Boolean(cardNo)
+    );
+    const completedBotCards = [lockedFight.bot.top, lockedFight.bot.left, lockedFight.bot.right].filter(
+      (cardNo): cardNo is string => Boolean(cardNo)
+    );
+    setGravePlayerCards((current) => Array.from(new Set([...current, ...completedPlayerCards])));
+    setGraveBotCards((current) => Array.from(new Set([...current, ...completedBotCards])));
     setUsedPlayerCards(Array.from(new Set(nextUsedPlayer)));
     setUsedBotCards(Array.from(new Set(nextUsedBot)));
     setLockedFight(null);
@@ -1340,7 +1368,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   }
 
   return (
-    <main className="h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-hidden rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))]">
+    <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:min-h-0 xl:overflow-hidden">
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -1376,8 +1404,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </div>
       </section>
 
-      <section className="grid h-full min-h-0 gap-3 p-2 sm:p-3 xl:grid-cols-[minmax(0,1fr)_250px]">
-        <section className="grid min-h-0 grid-rows-[minmax(440px,1fr)_auto_auto] gap-3">
+      <section className="grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 xl:h-full xl:grid-cols-[minmax(0,1fr)_230px]">
+        <section className="grid min-h-0 grid-rows-[minmax(300px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(360px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(0,1fr)_auto_auto]">
           <CompactBattleBoard
             cardsByNo={cardsByNo}
             lockedFight={lockedFight}
@@ -1410,6 +1438,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             locked={turnLocked || matchDone}
             onSelectLane={setPlacementLane}
             onPlayCard={placeCardFromHand}
+            onDropToLane={(lane, cardNo) => {
+              setPlacementLane(lane);
+              setPlayerLane(lane, cardNo);
+            }}
           />
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
@@ -1545,7 +1577,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+          <div className="hidden rounded-xl border border-white/8 bg-white/[0.035] p-4 xl:block">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Bot className="h-4 w-4 text-cyan-200" />
               Bot Deck
@@ -1562,7 +1594,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             </div>
           </div>
 
-          <div className="mt-auto">
+          <div className="mt-auto pb-16 xl:pb-20">
             <FighterPanel name="ADMIN" score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
           </div>
         </aside>
