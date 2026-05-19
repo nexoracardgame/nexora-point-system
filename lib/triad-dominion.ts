@@ -114,7 +114,30 @@ function parseNumber(value?: string) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function normalizeElement(value?: string): TriadElement {
+function inferElementFromCardNo(cardNo: string): TriadElement {
+  const numeric = Number.parseInt(normalizeCardNo(cardNo), 10);
+  if (!Number.isFinite(numeric)) return "unknown";
+
+  if (numeric >= 21 && numeric <= 60) return "earth";
+  if (numeric >= 61 && numeric <= 99) return "gold";
+  if (numeric >= 100 && numeric <= 138) return "water";
+  if (numeric >= 139 && numeric <= 176) return "fire";
+  if (numeric >= 177 && numeric <= 215) return "wood";
+  if (numeric >= 216 && numeric <= 233) return "earth";
+  if (numeric >= 234 && numeric <= 248) return "gold";
+  if (numeric >= 249 && numeric <= 263) return "water";
+  if (numeric >= 264 && numeric <= 278) return "fire";
+  if (numeric >= 279 && numeric <= 293) return "wood";
+
+  return "unknown";
+}
+
+function normalizeElement(value?: string, cardNo?: string): TriadElement {
+  if (cardNo) {
+    const elementFromNo = inferElementFromCardNo(cardNo);
+    if (elementFromNo !== "unknown") return elementFromNo;
+  }
+
   const raw = String(value || "").toLowerCase();
   if (/earth|stone|rock|sand|orange|triangle|ปฐพี|ดิน|หิน/.test(raw)) return "earth";
   if (/fire|flame|inferno|red|อัคคี|ไฟ/.test(raw)) return "fire";
@@ -140,7 +163,7 @@ export const triadCards: TriadCard[] = sourceCards.map((card) => ({
   kind: getKind(card),
   attack: parseNumber(card.atk),
   support: parseNumber(card.sup),
-  element: normalizeElement(`${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""}`),
+  element: normalizeElement(`${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""} ${card.notes || ""}`, card.cardNo),
   skillText: String(card.skill || "").replace(/\s+/g, " ").trim(),
   sourceImage: card.sourceImage || `/cards/${normalizeCardNo(card.cardNo)}.jpg`,
 }));

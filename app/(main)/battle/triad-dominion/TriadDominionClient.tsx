@@ -404,6 +404,176 @@ function PhaseTrack({ activeTurn }: { activeTurn: TriadTurn }) {
   );
 }
 
+function BoardCardSlot({
+  card,
+  hidden,
+  active,
+  label,
+  tone,
+}: {
+  card?: CardView;
+  hidden?: boolean;
+  active?: boolean;
+  label: string;
+  tone: "player" | "bot" | "neutral";
+}) {
+  const border =
+    tone === "player"
+      ? "border-red-300/55"
+      : tone === "bot"
+        ? "border-cyan-300/55"
+        : "border-amber-300/55";
+
+  return (
+    <div
+      className={`relative w-[clamp(64px,9.2vw,128px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border}`}
+    >
+      <div className="relative aspect-[3/4]">
+        {card && !hidden ? (
+          <Image src={card.sourceImage} alt={card.name} fill sizes="128px" className="object-cover" />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_20%,rgba(251,191,36,0.14),rgba(5,5,8,1)_62%)]">
+            <div className="text-center text-[10px] font-black uppercase tracking-[0.16em] text-white/54">
+              {hidden ? "Hidden" : label}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-black/72 px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-[0.08em] text-white/74">
+        {card && !hidden ? `No.${card.cardNo}` : label}
+      </div>
+    </div>
+  );
+}
+
+function BoardPile({
+  label,
+  sublabel,
+  tone,
+  rotate,
+}: {
+  label: string;
+  sublabel: string;
+  tone: "red" | "blue" | "gold";
+  rotate?: boolean;
+}) {
+  const color =
+    tone === "red"
+      ? "border-red-500/70"
+      : tone === "blue"
+        ? "border-cyan-400/70"
+        : "border-amber-400/70";
+
+  return (
+    <div
+      className={`grid w-[clamp(54px,7vw,94px)] place-items-center rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] ${color} ${
+        rotate ? "rotate-180" : ""
+      }`}
+      style={{ aspectRatio: "3 / 4" }}
+    >
+      <div className="text-center">
+        <div className="text-[clamp(0.55rem,1.1vw,0.9rem)] font-black uppercase leading-none text-white">
+          {label}
+        </div>
+        <div className="mt-1 text-[clamp(0.45rem,0.9vw,0.72rem)] font-bold text-white/62">
+          {sublabel}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompactBattleBoard({
+  cardsByNo,
+  lockedFight,
+  player,
+  revealed,
+  activeTurn,
+  matchScore,
+  fightNo,
+  fightScore,
+  playerDeckLeft,
+  botDeckLeft,
+}: {
+  cardsByNo: Map<string, CardView>;
+  lockedFight: LockedFight | null;
+  player: TriadTriangle;
+  revealed: Record<TriadTurn, TurnReveal>;
+  activeTurn: TriadTurn;
+  matchScore: { player: number; bot: number };
+  fightNo: number;
+  fightScore: { player: number; bot: number };
+  playerDeckLeft: number;
+  botDeckLeft: number;
+}) {
+  const playerTriangle = lockedFight?.player || player;
+  const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
+  const activeLane = laneForTurn(activeTurn);
+  const botVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.bot);
+
+  return (
+    <div className="relative h-full min-h-0 overflow-hidden rounded-[24px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
+      <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
+      <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
+      <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
+
+      <div className="relative grid h-full min-h-0 grid-rows-[15%_23%_1fr_23%_15%] px-[clamp(8px,2vw,28px)] py-[clamp(8px,1.5vw,18px)]">
+        <div className="flex items-center justify-between gap-3">
+          <FighterPanel name="NEXORA BOT" score={matchScore.bot} tone="bot" deckLeft={botDeckLeft} side="left" />
+          <div className="hidden rounded-2xl border border-white/10 bg-black/38 px-4 py-2 text-center sm:block">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Fight</div>
+            <div className="text-2xl font-black text-white">{Math.min(fightNo, 3)} / 3</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <BoardPile label="Grave" sublabel="bot" tone="red" rotate />
+          <div className="flex justify-center gap-[clamp(10px,2vw,28px)]">
+            <BoardCardSlot card={cardsByNo.get(botTriangle.top)} hidden={!botVisible("top")} active={activeLane === "top"} label="TOP" tone="bot" />
+            <BoardCardSlot card={botTriangle.left ? cardsByNo.get(botTriangle.left) : undefined} hidden={!botVisible("left")} active={activeLane === "left"} label="ATK" tone="bot" />
+            <BoardCardSlot card={botTriangle.right ? cardsByNo.get(botTriangle.right) : undefined} hidden={!botVisible("right")} active={activeLane === "right"} label="SUP" tone="bot" />
+          </div>
+          <BoardPile label="Deck" sublabel={`${botDeckLeft}`} tone="blue" rotate />
+        </div>
+
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <div className="hidden sm:block">
+            <BoardPile label="Deck" sublabel={`${playerDeckLeft}`} tone="blue" />
+          </div>
+          <div className="mx-auto w-full max-w-[720px]">
+            <PhaseTrack activeTurn={activeTurn} />
+            <div className="mt-2 text-center text-xs font-black uppercase tracking-[0.16em] text-amber-100/58">
+              Match {matchScore.player}-{matchScore.bot} / Fight {fightScore.player}-{fightScore.bot}
+            </div>
+          </div>
+          <div className="hidden sm:block">
+            <BoardPile label="Grave" sublabel="admin" tone="red" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <BoardPile label="Deck" sublabel={`${playerDeckLeft}`} tone="blue" />
+          <div className="flex justify-center gap-[clamp(10px,2vw,28px)]">
+            <BoardCardSlot card={cardsByNo.get(playerTriangle.top)} active={activeLane === "top"} label="TOP" tone="player" />
+            <BoardCardSlot card={playerTriangle.left ? cardsByNo.get(playerTriangle.left) : undefined} active={activeLane === "left"} label="ATK" tone="player" />
+            <BoardCardSlot card={playerTriangle.right ? cardsByNo.get(playerTriangle.right) : undefined} active={activeLane === "right"} label="SUP" tone="player" />
+          </div>
+          <BoardPile label="Grave" sublabel="admin" tone="red" />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="hidden rounded-2xl border border-white/10 bg-black/38 px-4 py-2 text-center sm:block">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Turn</div>
+            <div className="text-2xl font-black text-white">{activeTurn}</div>
+          </div>
+          <FighterPanel name="ADMIN" score={matchScore.player} tone="player" deckLeft={playerDeckLeft} side="right" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function emptyRevealState(): Record<TriadTurn, TurnReveal> {
   return {
     1: { player: false, bot: false, scored: false },
@@ -728,8 +898,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   }
 
   return (
-    <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-hidden rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
-      <section className="relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
+    <main className="h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-hidden rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))]">
+      <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
@@ -764,8 +934,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
         </div>
       </section>
 
-      <section className="grid gap-4 p-3 sm:p-5 xl:grid-cols-[320px_1fr_300px] xl:p-6">
-        <aside className="space-y-4">
+      <section className="grid h-full min-h-0 gap-3 p-2 sm:p-3 xl:grid-cols-[260px_minmax(0,1fr)_240px]">
+        <aside className="min-h-0 space-y-3 overflow-hidden">
           <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-4 flex items-center gap-2">
               <Layers3 className="h-5 w-5 text-amber-300" />
@@ -820,59 +990,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
           </div>
         </aside>
 
-        <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-[28px] border border-amber-100/10 bg-[#251a0f] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.48)] sm:p-4">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_28%,rgba(124,58,237,0.28),transparent_13%),radial-gradient(circle_at_76%_26%,rgba(124,58,237,0.25),transparent_12%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_22%),repeating-radial-gradient(circle_at_50%_45%,rgba(0,0,0,0)_0,rgba(0,0,0,0)_42px,rgba(0,0,0,0.08)_43px,rgba(0,0,0,0.08)_54px)]" />
-            <div className="relative space-y-3">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px] xl:items-start">
-                <FighterPanel
-                  name="NEXORA BOT"
-                  score={matchScore.bot}
-                  tone="bot"
-                  deckLeft={Math.max(0, botDeck.length - usedBotCards.length)}
-                  side="left"
-                />
-                <div className="hidden xl:grid grid-cols-2 gap-2">
-                  <ScorePill label="Fight" value={Math.min(fightNo, 3)} tone="bot" />
-                  <ScorePill label="Turn" value={activeTurn} tone="player" />
-                </div>
-              </div>
-
-              <TriangleArena
-                title="NEXORA BOT FIELD"
-                triangle={lockedFight?.bot || { top: "", left: "", right: "" }}
-                cardsByNo={cardsByNo}
-                activeTurn={activeTurn}
-                revealed={revealed}
-                side="bot"
-              />
-
-              <PhaseTrack activeTurn={activeTurn} />
-
-              <TriangleArena
-                title="ADMIN FIELD"
-                triangle={lockedFight?.player || player}
-                cardsByNo={cardsByNo}
-                activeTurn={activeTurn}
-                revealed={revealed}
-                side="player"
-              />
-
-              <div className="grid gap-3 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-end">
-                <div className="hidden xl:grid grid-cols-2 gap-2">
-                  <ScorePill label="Round" value={fightScore.player} tone="player" />
-                  <ScorePill label="Enemy" value={fightScore.bot} tone="bot" />
-                </div>
-                <FighterPanel
-                  name="ADMIN"
-                  score={matchScore.player}
-                  tone="player"
-                  deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)}
-                  side="right"
-                />
-              </div>
-            </div>
-          </div>
+        <section className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3">
+          <CompactBattleBoard
+            cardsByNo={cardsByNo}
+            lockedFight={lockedFight}
+            player={player}
+            revealed={revealed}
+            activeTurn={activeTurn}
+            matchScore={matchScore}
+            fightNo={fightNo}
+            fightScore={fightScore}
+            playerDeckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)}
+            botDeckLeft={Math.max(0, botDeck.length - usedBotCards.length)}
+          />
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
               <div className="rounded-xl border border-white/8 bg-black/24 p-4">
