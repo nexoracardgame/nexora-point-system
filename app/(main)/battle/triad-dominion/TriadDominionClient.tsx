@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bot,
   Brain,
@@ -77,6 +77,7 @@ type TurnReveal = {
 };
 
 const DECK_SIZE = 9;
+const TURN_SECONDS = 120;
 
 const elementStyles: Record<TriadElement, string> = {
   earth: "border-amber-500/40 bg-amber-500/10 text-amber-100",
@@ -191,6 +192,34 @@ function chooseBotTriangle(player: TriadTriangle, botDeckCards: CardView[]): Tri
       right: candidates[2]?.cardNo || "",
     }
   );
+}
+
+function chooseBotCardForTurn({
+  turn,
+  player,
+  bot,
+  botDeckCards,
+}: {
+  turn: TriadTurn;
+  player: TriadTriangle;
+  bot: TriadTriangle;
+  botDeckCards: CardView[];
+}) {
+  const lane = laneForTurn(turn);
+  const alreadyPlaced = new Set([bot.top, bot.left, bot.right].filter(Boolean));
+  let best: { cardNo: string; margin: number; total: number } | null = null;
+
+  for (const card of botDeckCards) {
+    if (alreadyPlaced.has(card.cardNo)) continue;
+    const candidateBot = { ...bot, [lane]: card.cardNo };
+    const result = resolveTriadTurn({ turn, player, opponent: candidateBot });
+    const margin = result.opponentTotal - result.playerTotal;
+    if (!best || margin > best.margin || (margin === best.margin && result.opponentTotal > best.total)) {
+      best = { cardNo: card.cardNo, margin, total: result.opponentTotal };
+    }
+  }
+
+  return best?.cardNo || botDeckCards.find((card) => !alreadyPlaced.has(card.cardNo))?.cardNo || "";
 }
 
 function hiddenCard() {
@@ -439,9 +468,6 @@ function BoardCardSlot({
           </div>
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 bg-black/72 px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-[0.08em] text-white/74">
-        {card && !hidden ? `No.${card.cardNo}` : label}
-      </div>
     </div>
   );
 }
@@ -514,9 +540,21 @@ function BoardTriangle({
   selectedLane?: Lane;
 }) {
   const lanes: { lane: Lane; label: string; className: string }[] = [
-    { lane: "top", label: "TOP", className: "col-span-2 mx-auto w-[clamp(70px,9vw,124px)] -translate-y-2" },
-    { lane: "left", label: "ATK", className: "w-[clamp(66px,8vw,116px)]" },
-    { lane: "right", label: "SUP", className: "w-[clamp(66px,8vw,116px)]" },
+    {
+      lane: "top",
+      label: "TOP",
+      className: `col-span-2 mx-auto w-[clamp(70px,9vw,124px)] ${tone === "bot" ? "translate-y-6" : "-translate-y-6"}`,
+    },
+    {
+      lane: "left",
+      label: "ATK",
+      className: `w-[clamp(66px,8vw,116px)] ${tone === "bot" ? "-translate-y-6" : "translate-y-6"}`,
+    },
+    {
+      lane: "right",
+      label: "SUP",
+      className: `w-[clamp(66px,8vw,116px)] ${tone === "bot" ? "-translate-y-6" : "translate-y-6"}`,
+    },
   ];
 
   return (
@@ -588,12 +626,11 @@ function HandCard({
       <div className="relative aspect-[3/4]">
         <Image src={card.sourceImage} alt={card.name} fill sizes="110px" className="object-cover" />
       </div>
-      <div className="absolute inset-x-0 bottom-0 bg-black/76 px-1.5 py-1">
-        <div className="truncate text-[9px] font-black text-white">No.{card.cardNo}</div>
-        <div className="text-[8px] font-bold uppercase text-white/54">
-          {used ? "GRAVE" : placedLane ? placedLane : elementLabel[card.element]}
+      {placedLane ? (
+        <div className="absolute right-1 top-1 rounded-md bg-amber-300 px-1.5 py-0.5 text-[8px] font-black uppercase text-black">
+          {placedLane}
         </div>
-      </div>
+      ) : null}
     </button>
   );
 }
@@ -603,6 +640,7 @@ function PlayerHand({
   usedSet,
   player,
   placementLane,
+  activeLane,
   locked,
   onSelectLane,
   onPlayCard,
@@ -611,6 +649,7 @@ function PlayerHand({
   usedSet: Set<string>;
   player: TriadTriangle;
   placementLane: Lane;
+  activeLane: Lane;
   locked: boolean;
   onSelectLane: (lane: Lane) => void;
   onPlayCard: (cardNo: string) => void;
@@ -632,8 +671,8 @@ function PlayerHand({
             <button
               key={lane}
               type="button"
-              onClick={() => onSelectLane(lane)}
-              disabled={locked}
+              onClick={() => lane === activeLane && onSelectLane(lane)}
+              disabled={locked || lane !== activeLane}
               className={`h-7 rounded-lg border px-2 text-[10px] font-black uppercase transition ${
                 placementLane === lane
                   ? "border-amber-300 bg-amber-300 text-black"
@@ -675,6 +714,8 @@ function CompactBattleBoard({
   playerGraveCards,
   botGraveCards,
   placementLane,
+  timeLeft,
+  turnLocked,
   onSelectLane,
   onPlaceCard,
 }: {
@@ -691,6 +732,8 @@ function CompactBattleBoard({
   playerGraveCards: CardView[];
   botGraveCards: CardView[];
   placementLane: Lane;
+  timeLeft: number;
+  turnLocked: boolean;
   onSelectLane: (lane: Lane) => void;
   onPlaceCard: (lane: Lane, cardNo: string) => void;
 }) {
@@ -698,7 +741,7 @@ function CompactBattleBoard({
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
   const botVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.bot);
-  const canEditPlayerSlots = !lockedFight;
+  const canEditPlayerSlots = !turnLocked;
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-[24px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
@@ -707,7 +750,7 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[15%_23%_1fr_23%_15%] px-[clamp(8px,2vw,28px)] py-[clamp(8px,1.5vw,18px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[15%_25%_1fr_25%_15%] px-[clamp(8px,2vw,28px)] py-[clamp(8px,1.5vw,18px)]">
         <div className="flex items-center justify-between gap-3">
           <div className="rounded-2xl border border-blue-300/18 bg-black/38 px-4 py-2">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">Opponent</div>
@@ -731,19 +774,15 @@ function CompactBattleBoard({
           <BoardPile label="Deck" sublabel={`${botDeckLeft}`} tone="blue" rotate />
         </div>
 
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <div className="hidden sm:block">
-            <BoardPile label="Deck" sublabel={`${playerDeckLeft}`} tone="blue" />
-          </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div />
           <div className="mx-auto w-full max-w-[720px]">
             <PhaseTrack activeTurn={activeTurn} />
             <div className="mt-2 text-center text-xs font-black uppercase tracking-[0.16em] text-amber-100/58">
-              Match {matchScore.player}-{matchScore.bot} / Fight {fightScore.player}-{fightScore.bot}
+              Match {matchScore.player}-{matchScore.bot} / Fight {fightScore.player}-{fightScore.bot} / {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
             </div>
           </div>
-          <div className="hidden sm:block">
-            <BoardPile label="Grave" sublabel={`${playerGraveCards.length}`} tone="red" cards={playerGraveCards} />
-          </div>
+          <div />
         </div>
 
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
@@ -754,8 +793,8 @@ function CompactBattleBoard({
             activeLane={activeLane}
             tone="player"
             isVisible={() => true}
-            onSlotClick={canEditPlayerSlots ? onSelectLane : undefined}
-            onDropCard={canEditPlayerSlots ? onPlaceCard : undefined}
+            onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
+            onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}
           />
           <BoardPile label="Grave" sublabel={`${playerGraveCards.length}`} tone="red" cards={playerGraveCards} />
@@ -799,6 +838,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const [player, setPlayer] = useState<TriadTriangle>({ top: "", left: "", right: "" });
   const [placementLane, setPlacementLane] = useState<Lane>("top");
   const [lockedFight, setLockedFight] = useState<LockedFight | null>(null);
+  const [turnLocked, setTurnLocked] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(TURN_SECONDS);
   const [activeTurn, setActiveTurn] = useState<TriadTurn>(1);
   const [revealed, setRevealed] = useState<Record<TriadTurn, TurnReveal>>(emptyRevealState);
   const [lastTurnWinner, setLastTurnWinner] = useState<"player" | "bot" | "draw" | null>(null);
@@ -813,14 +854,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const availableBotCards = botDeckCards.filter((card) => !usedBotSet.has(card.cardNo));
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
-  const finishedLockedFight = lockedFight && revealed[3]?.scored ? lockedFight : null;
+  const currentScoredLane = turnLocked && revealed[activeTurn]?.scored ? laneForTurn(activeTurn) : null;
   const playerGraveNos = [
     ...usedPlayerCards,
-    ...(finishedLockedFight ? [finishedLockedFight.player.top, finishedLockedFight.player.left, finishedLockedFight.player.right] : []),
+    ...(lockedFight && currentScoredLane ? [lockedFight.player[currentScoredLane]] : []),
   ].filter((cardNo): cardNo is string => Boolean(cardNo));
   const botGraveNos = [
     ...usedBotCards,
-    ...(finishedLockedFight ? [finishedLockedFight.bot.top, finishedLockedFight.bot.left, finishedLockedFight.bot.right] : []),
+    ...(lockedFight && currentScoredLane ? [lockedFight.bot[currentScoredLane]] : []),
   ].filter((cardNo): cardNo is string => Boolean(cardNo));
   const playerGraveCards = playerGraveNos.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botGraveCards = botGraveNos.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -847,6 +888,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setBotDeck(nextBotDeck);
     setPlayer({ top: "", left: "", right: "" });
     setPlacementLane("top");
+    setTurnLocked(false);
+    setTimeLeft(TURN_SECONDS);
     setPhase("battle");
     setBattleLog(["Deck locked. Pick cards from your hand and place them into the pyramid."]);
   };
@@ -860,6 +903,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     setPlayer({ top: "", left: "", right: "" });
     setPlacementLane("top");
     setLockedFight(null);
+    setTurnLocked(false);
+    setTimeLeft(TURN_SECONDS);
     setActiveTurn(1);
     setRevealed(emptyRevealState());
     setLastTurnWinner(null);
@@ -869,7 +914,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   };
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
-    if (lockedFight || matchDone || usedPlayerSet.has(cardNo)) return;
+    if (turnLocked || matchDone || usedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;
     setPlayer((current) => {
       const next = { ...current };
       (["top", "left", "right"] as Lane[]).forEach((item) => {
@@ -882,31 +927,85 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
   const placeCardFromHand = (cardNo: string) => {
     setPlayerLane(placementLane, cardNo);
-    if (placementLane === "top") setPlacementLane("left");
-    else if (placementLane === "left") setPlacementLane("right");
   };
 
   const lockFight = () => {
-    const selectedCards = [player.top, player.left, player.right].filter(Boolean);
-    if (selectedCards.length !== 3 || new Set(selectedCards).size !== 3) {
-      setBattleLog((current) => ["Choose 3 different monster cards before locking the fight.", ...current]);
+    const lane = laneForTurn(activeTurn);
+    if (!player[lane]) {
+      setBattleLog((current) => [`Choose 1 card for turn ${activeTurn} before locking.`, ...current]);
       return;
     }
 
-    const bot = chooseBotTriangle(player, availableBotCards);
-    const turns = ([1, 2, 3] as TriadTurn[]).map((turn) =>
-      resolveTriadTurn({ turn, player, opponent: bot })
-    );
+    const baseBot = lockedFight?.bot || { top: "", left: "", right: "" };
+    const botCardNo = chooseBotCardForTurn({
+      turn: activeTurn,
+      player,
+      bot: baseBot,
+      botDeckCards: availableBotCards,
+    });
+    const bot = { ...baseBot, [lane]: botCardNo };
+    const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot });
+    const turns = [
+      ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
+      result,
+    ].sort((a, b) => a.turn - b.turn);
 
     setLockedFight({ fightNo, player, bot, turns });
-    setActiveTurn(1);
-    setRevealed(emptyRevealState());
-    setLastTurnWinner(null);
+    setTurnLocked(true);
     setBattleLog((current) => [
-      `Fight ${fightNo}: both sides locked 3 cards. Turn 1 opens together.`,
+      `Fight ${fightNo} turn ${activeTurn}: locked ${player[lane]}.`,
       ...current,
     ]);
   };
+
+  const timeoutTurn = () => {
+    if (matchDone || turnLocked) return;
+    const lane = laneForTurn(activeTurn);
+
+    setMatchScore((current) => ({ ...current, bot: current.bot + 1 }));
+    setLastTurnWinner("bot");
+    setBattleLog((current) => [
+      `Turn ${activeTurn}: time out. Admin loses 1 point, card returns to hand.`,
+      ...current,
+    ]);
+    setPlayer((current) => ({ ...current, [lane]: "" }));
+
+    if (activeTurn < 3) {
+      const nextActiveTurn = (activeTurn + 1) as TriadTurn;
+      setActiveTurn(nextActiveTurn);
+      setPlacementLane(laneForTurn(nextActiveTurn));
+      setTimeLeft(TURN_SECONDS);
+      return;
+    }
+
+    setLockedFight(null);
+    setTurnLocked(false);
+    setTimeLeft(TURN_SECONDS);
+    setActiveTurn(1);
+    setRevealed(emptyRevealState());
+    setTurnLocked(false);
+    setTimeLeft(TURN_SECONDS);
+    setFightNo((current) => current + 1);
+    setPlayer({ top: "", left: "", right: "" });
+    setPlacementLane("top");
+  };
+
+  useEffect(() => {
+    if (phase !== "battle" || matchDone || turnLocked) return;
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          setTimeout(timeoutTurn, 0);
+          return TURN_SECONDS;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [phase, matchDone, turnLocked, activeTurn, player, lockedFight]);
 
   const scoreTurnIfReady = (
     turn: TriadTurn,
@@ -939,7 +1038,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   };
 
   const revealNext = () => {
-    if (!lockedFight) return;
+    if (!lockedFight || !turnLocked) return;
 
     setRevealed((current) => {
       const state = current[activeTurn];
@@ -976,7 +1075,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   };
 
   const nextTurn = () => {
-    if (activeTurn < 3) setActiveTurn((activeTurn + 1) as TriadTurn);
+    if (!lockedFight || activeTurn >= 3) return;
+    const lane = laneForTurn(activeTurn);
+    const nextActiveTurn = (activeTurn + 1) as TriadTurn;
+
+    setUsedPlayerCards((current) =>
+      Array.from(new Set([...current, lockedFight.player[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
+    );
+    setUsedBotCards((current) =>
+      Array.from(new Set([...current, lockedFight.bot[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
+    );
+    setTurnLocked(false);
+    setActiveTurn(nextActiveTurn);
+    setPlacementLane(laneForTurn(nextActiveTurn));
+    setTimeLeft(TURN_SECONDS);
   };
 
   const nextFight = () => {
@@ -1016,8 +1128,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
     lastTurnWinner !== "draw" &&
     (revealState.player !== revealState.bot);
   const revealButtonLabel =
-    !lockedFight
-      ? "Lock cards first"
+    !turnLocked
+      ? "Lock turn first"
       : activeTurn === 1 || lastTurnWinner === null || lastTurnWinner === "draw"
         ? "Reveal Both"
         : needsSecondReveal
@@ -1164,6 +1276,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             playerGraveCards={playerGraveCards}
             botGraveCards={botGraveCards}
             placementLane={placementLane}
+            timeLeft={timeLeft}
+            turnLocked={turnLocked}
             onSelectLane={setPlacementLane}
             onPlaceCard={(lane, cardNo) => {
               setPlacementLane(lane);
@@ -1176,7 +1290,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             usedSet={usedPlayerSet}
             player={player}
             placementLane={placementLane}
-            locked={Boolean(lockedFight) || matchDone}
+            activeLane={laneForTurn(activeTurn)}
+            locked={turnLocked || matchDone}
             onSelectLane={setPlacementLane}
             onPlayCard={placeCardFromHand}
           />
@@ -1217,12 +1332,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                   <div>
                     <div className="mb-2 flex items-center gap-2 text-lg font-black">
                       <Flame className="h-5 w-5 text-amber-300" />
-                      {lockedFight ? "Ready to reveal" : "Waiting for lock"}
+                      {turnLocked ? "Ready to reveal" : `Waiting for turn ${activeTurn} lock`}
                     </div>
                     <div className="text-sm font-semibold text-white/52">
-                      {lockedFight
+                      {turnLocked
                         ? revealButtonLabel
-                        : "Click a slot, then click a card from your hand. You can swap cards until the fight is locked."}
+                        : "Pick one card for this turn. You can swap it until Lock Turn."}
                     </div>
                   </div>
                 )}
@@ -1238,7 +1353,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     <RotateCcw className="h-4 w-4" />
                     Restart
                   </button>
-                ) : lockedFight && revealed[3].scored ? (
+                ) : turnLocked && lockedFight && revealed[3].scored ? (
                   <button
                     type="button"
                     onClick={nextFight}
@@ -1247,7 +1362,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     {fightNo >= 3 ? "Finish Match" : "Next Fight"}
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                ) : lockedFight && activeTurnScored && activeTurn < 3 ? (
+                ) : turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
                   <button
                     type="button"
                     onClick={nextTurn}
@@ -1258,7 +1373,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                   </button>
                 ) : (
                   <>
-                    {!lockedFight ? (
+                    {!turnLocked ? (
                       <button
                         type="button"
                         onClick={lockFight}
@@ -1266,13 +1381,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                         className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                       >
                         <Brain className="h-4 w-4" />
-                        Lock Fight
+                        Lock Turn
                       </button>
                     ) : null}
                     <button
                       type="button"
                       onClick={revealNext}
-                      disabled={!lockedFight || activeTurnScored}
+                      disabled={!turnLocked || !lockedFight || activeTurnScored}
                       className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                     >
                       {revealButtonLabel}
