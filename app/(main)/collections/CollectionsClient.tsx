@@ -42,6 +42,7 @@ type RemoteCollectionsState = Partial<StoredCollectionsState> & {
 
 const STORAGE_KEY = "nexora:collections:v2";
 const PREVIEW_CARD_LIMIT = 8;
+const OWNED_CARD_COLLAPSED_LIMIT = 60;
 const emptyCalculator: CalculatorState = { bronze: 0, silver: 0, gold: 0 };
 
 function formatCardNo(cardId: number) {
@@ -117,6 +118,7 @@ export default function CollectionsClient() {
   const [hydrated, setHydrated] = useState(false);
   const [remoteSynced, setRemoteSynced] = useState(false);
   const [showAllPreviewCards, setShowAllPreviewCards] = useState(false);
+  const [showAllOwnedCards, setShowAllOwnedCards] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -222,6 +224,7 @@ export default function CollectionsClient() {
       setCalculator(stored.calculator);
       setSelectedSetId(stored.selectedSetId);
       setShowAllPreviewCards(false);
+      setShowAllOwnedCards(false);
     };
 
     window.addEventListener("storage", handleStorage);
@@ -263,6 +266,13 @@ export default function CollectionsClient() {
 
   const activeStat =
     setStats.find((item) => item.set.id === selectedSetId) || setStats[0];
+  const displayedOwnedCards = showAllOwnedCards
+    ? ownedCards
+    : ownedCards.slice(0, OWNED_CARD_COLLAPSED_LIMIT);
+  const hiddenOwnedCardCount = Math.max(
+    ownedCards.length - displayedOwnedCards.length,
+    0
+  );
 
   const nearComplete = useMemo(
     () =>
@@ -532,7 +542,7 @@ export default function CollectionsClient() {
                   </div>
                 ) : (
                   <>
-                    {ownedCards.slice(0, 60).map((cardId) => (
+                    {displayedOwnedCards.map((cardId) => (
                       <button
                         key={cardId}
                         type="button"
@@ -542,10 +552,17 @@ export default function CollectionsClient() {
                         #{formatCardNo(cardId)}
                       </button>
                     ))}
-                    {ownedCards.length > 60 ? (
-                      <div className="rounded-full bg-[#f3f1ea] px-3 py-1.5 text-xs font-black text-black/48">
-                        +{(ownedCards.length - 60).toLocaleString("th-TH")}
-                      </div>
+                    {ownedCards.length > OWNED_CARD_COLLAPSED_LIMIT ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllOwnedCards((current) => !current)}
+                        className="rounded-full bg-[#f3f1ea] px-3 py-1.5 text-xs font-black text-black/60 ring-1 ring-black/5 transition hover:bg-black hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                        aria-expanded={showAllOwnedCards}
+                      >
+                        {showAllOwnedCards
+                          ? "ย่อรายการ"
+                          : `+${hiddenOwnedCardCount.toLocaleString("th-TH")}`}
+                      </button>
                     ) : null}
                   </>
                 )}
