@@ -39,7 +39,7 @@ export async function GET() {
   const { error } = await requireAdminActor();
   if (error) return error;
 
-  return noStoreJson({ rooms: listTriadRooms() });
+  return noStoreJson({ rooms: await listTriadRooms() });
 }
 
 export async function POST(request: Request) {
@@ -51,50 +51,50 @@ export async function POST(request: Request) {
   const participant = participantFromBody(body, actor.name || actor.lineId);
 
   if (!participant.id) {
-    return noStoreJson({ error: "participant_required", rooms: listTriadRooms() }, { status: 400 });
+    return noStoreJson({ error: "participant_required", rooms: await listTriadRooms() }, { status: 400 });
   }
 
   if (action === "create") {
     const access: TriadRoomAccess = body.access === "private" ? "private" : "public";
     const password = cleanText(body.password);
     if (access === "private" && password.length < 4) {
-      return noStoreJson({ error: "password_too_short", rooms: listTriadRooms() }, { status: 400 });
+      return noStoreJson({ error: "password_too_short", rooms: await listTriadRooms() }, { status: 400 });
     }
-    const room = createTriadRoom({ access, password, participant });
-    return noStoreJson({ room, rooms: listTriadRooms() });
+    const room = await createTriadRoom({ access, password, participant });
+    return noStoreJson({ room, rooms: await listTriadRooms() });
   }
 
   if (action === "join") {
-    const result = joinTriadRoom({
+    const result = await joinTriadRoom({
       code: cleanText(body.code),
       password: cleanText(body.password),
       participant,
       forceSpectator: Boolean(body.forceSpectator),
     });
     const status = result.ok ? 200 : result.reason === "wrong_password" ? 403 : result.reason === "not_found" ? 404 : 409;
-    return noStoreJson({ ...result, rooms: listTriadRooms() }, { status });
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status });
   }
 
   if (action === "spectate") {
-    const result = moveTriadParticipantToSpectator(cleanText(body.code), participant);
-    return noStoreJson({ ...result, rooms: listTriadRooms() }, { status: result.ok ? 200 : 409 });
+    const result = await moveTriadParticipantToSpectator(cleanText(body.code), participant);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
   }
 
   if (action === "take-slot") {
     const slot: TriadRoomSlot = body.slot === "host" ? "host" : "challenger";
-    const result = takeTriadRoomSlot(cleanText(body.code), slot, participant);
-    return noStoreJson({ ...result, rooms: listTriadRooms() }, { status: result.ok ? 200 : 409 });
+    const result = await takeTriadRoomSlot(cleanText(body.code), slot, participant);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
   }
 
   if (action === "start") {
-    const result = startTriadRoom(cleanText(body.code), participant.id);
-    return noStoreJson({ ...result, rooms: listTriadRooms() }, { status: result.ok ? 200 : 409 });
+    const result = await startTriadRoom(cleanText(body.code), participant.id);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
   }
 
   if (action === "leave") {
-    const result = leaveTriadRoom(cleanText(body.code), participant.id);
-    return noStoreJson({ ...result, rooms: listTriadRooms() });
+    const result = await leaveTriadRoom(cleanText(body.code), participant.id);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() });
   }
 
-  return noStoreJson({ error: "unknown_action", rooms: listTriadRooms() }, { status: 400 });
+  return noStoreJson({ error: "unknown_action", rooms: await listTriadRooms() }, { status: 400 });
 }

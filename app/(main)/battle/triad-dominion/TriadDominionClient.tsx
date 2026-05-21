@@ -1529,10 +1529,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     void syncRooms().catch(() => null);
     const timer = window.setInterval(() => {
       void syncRooms().catch(() => null);
-    }, 2500);
+    }, 1000);
+    const syncOnFocus = () => void syncRooms().catch(() => null);
+    const syncOnVisibility = () => {
+      if (!document.hidden) void syncRooms().catch(() => null);
+    };
+    window.addEventListener("focus", syncOnFocus);
+    document.addEventListener("visibilitychange", syncOnVisibility);
 
     return () => {
       window.clearInterval(timer);
+      window.removeEventListener("focus", syncOnFocus);
+      document.removeEventListener("visibilitychange", syncOnVisibility);
     };
   }, [participant.id]);
 
