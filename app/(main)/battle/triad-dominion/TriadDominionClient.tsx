@@ -7,18 +7,25 @@ import {
   Brain,
   Check,
   ChevronRight,
+  Eye,
   Flame,
+  KeyRound,
   Layers3,
   Lock,
+  Plus,
   RotateCcw,
+  Search,
   Shield,
   Sparkles,
   Swords,
   Trophy,
+  UserCheck,
+  Users,
   Zap,
 } from "lucide-react";
 import {
   resolveTriadTurn,
+  triadSkillRuleByNo,
   type TriadCardKind,
   type TriadElement,
   type TriadTriangle,
@@ -57,11 +64,39 @@ type Props = {
   cards: CardView[];
   reviewSkills: ReviewSkill[];
   summary: Summary;
+  currentUser: {
+    id: string;
+    name: string;
+    image: string;
+  };
 };
 
-type BattlePhase = "deck" | "battle";
+type BattlePhase = "lobby" | "room" | "deck" | "battle";
 type Side = "player" | "bot";
 type Lane = "top" | "left" | "right";
+type RoomAccess = "public" | "private";
+type RoomStatus = "waiting" | "playing";
+
+type RoomParticipant = {
+  id: string;
+  name: string;
+  image: string;
+  joinedAt: number;
+};
+
+type TriadRoom = {
+  code: string;
+  access: RoomAccess;
+  password: string;
+  status: RoomStatus;
+  hostId: string;
+  createdAt: number;
+  seats: {
+    host: RoomParticipant | null;
+    challenger: RoomParticipant | null;
+  };
+  spectators: RoomParticipant[];
+};
 
 type LockedFight = {
   fightNo: number;
@@ -78,6 +113,9 @@ type TurnReveal = {
 
 const DECK_SIZE = 9;
 const TURN_SECONDS = 120;
+const SPECTATOR_LIMIT = 10;
+const ROOM_STORAGE_KEY = "nexora:triad-dominion:rooms:v1";
+const ROOM_BROADCAST_KEY = "nexora:triad-dominion:rooms";
 
 type PendingSkillChoice = {
   side: Side;
@@ -85,6 +123,8 @@ type PendingSkillChoice = {
   cardNo: string;
   selectedTarget: "player-top" | "bot-top" | "";
 };
+
+type SkillTargetId = Exclude<PendingSkillChoice["selectedTarget"], "">;
 
 const elementStyles: Record<TriadElement, string> = {
   earth: "border-amber-500/40 bg-amber-500/10 text-amber-100",
@@ -111,6 +151,94 @@ function uniqueByNo(cards: CardView[]) {
     seen.add(card.cardNo);
     return true;
   });
+}
+
+function safeText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function getParticipantId(baseId: string) {
+  if (typeof window === "undefined") return baseId || "triad-local-player";
+  const key = "nexora:triad-dominion:participant-id";
+  const existing = window.sessionStorage.getItem(key);
+  if (existing) return existing;
+  const next = `${baseId || "triad"}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  window.sessionStorage.setItem(key, next);
+  return next;
+}
+
+function makeParticipant(user: Props["currentUser"]): RoomParticipant {
+  return {
+    id: getParticipantId(user.id),
+    name: safeText(user.name) || "ADMIN",
+    image: safeText(user.image) || "/avatar.png",
+    joinedAt: Date.now(),
+  };
+}
+
+function readStoredRooms(): TriadRoom[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROOM_STORAGE_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((room): TriadRoom => {
+        const access: RoomAccess = room?.access === "private" ? "private" : "public";
+        const status: RoomStatus = room?.status === "playing" ? "playing" : "waiting";
+        return {
+          code: safeText(room?.code),
+          access,
+          password: safeText(room?.password),
+          status,
+          hostId: safeText(room?.hostId),
+          createdAt: Number(room?.createdAt || Date.now()),
+          seats: {
+            host: room?.seats?.host || null,
+            challenger: room?.seats?.challenger || null,
+          },
+          spectators: Array.isArray(room?.spectators) ? room.spectators.slice(0, SPECTATOR_LIMIT) : [],
+        };
+      })
+      .filter((room) => room.code.length === 6);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredRooms(rooms: TriadRoom[]) {
+  if (typeof window === "undefined") return;
+  const nextRooms = rooms.slice(-30);
+  window.localStorage.setItem(ROOM_STORAGE_KEY, JSON.stringify(nextRooms));
+  window.dispatchEvent(new Event(ROOM_BROADCAST_KEY));
+}
+
+function makeRoomCode(existing: TriadRoom[]) {
+  const used = new Set(existing.map((room) => room.code));
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    if (!used.has(code)) return code;
+  }
+  return String(Date.now()).slice(-6);
+}
+
+function participantInRoom(room: TriadRoom | undefined, participantId: string) {
+  if (!room) return false;
+  return (
+    room.seats.host?.id === participantId ||
+    room.seats.challenger?.id === participantId ||
+    room.spectators.some((viewer) => viewer.id === participantId)
+  );
+}
+
+function removeParticipant(room: TriadRoom, participantId: string): TriadRoom {
+  return {
+    ...room,
+    seats: {
+      host: room.seats.host?.id === participantId ? null : room.seats.host,
+      challenger: room.seats.challenger?.id === participantId ? null : room.seats.challenger,
+    },
+    spectators: room.spectators.filter((viewer) => viewer.id !== participantId),
+  };
 }
 
 function laneForTurn(turn: TriadTurn): Lane {
@@ -240,6 +368,19 @@ function chooseBotCardForTurn({
 
 function skillNeedsChoice(card?: CardView) {
   return Boolean(card?.kind === "skill" && /เลือก|choose|target/i.test(card.skillText));
+}
+
+function getSelectableSkillTargetIds(card?: CardView, side: Side = "player"): SkillTargetId[] {
+  const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
+  const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
+  const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
+
+  if (!rule) return [ownTarget];
+  if (rule.target.startsWith("own")) return [ownTarget];
+  if (rule.target.startsWith("opponent")) return [opponentTarget];
+  if (rule.target === "any-one" || rule.target === "all") return [ownTarget, opponentTarget];
+
+  return [ownTarget];
 }
 
 function hiddenCard() {
@@ -837,6 +978,107 @@ function PlayerHand({
   );
 }
 
+function RoomSeatCard({
+  label,
+  participant,
+  tone,
+  emptyText,
+  canTake,
+  onTake,
+}: {
+  label: string;
+  participant: RoomParticipant | null;
+  tone: "host" | "challenger";
+  emptyText: string;
+  canTake: boolean;
+  onTake: () => void;
+}) {
+  const toneClass =
+    tone === "host"
+      ? "border-amber-300/28 bg-amber-300/[0.08]"
+      : "border-cyan-300/24 bg-cyan-300/[0.07]";
+
+  return (
+    <div className={`min-h-[170px] rounded-xl border p-4 ${toneClass}`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</div>
+        <Swords className={`h-4 w-4 ${tone === "host" ? "text-amber-200" : "text-cyan-200"}`} />
+      </div>
+      {participant ? (
+        <div className="flex items-center gap-3">
+          <Image src={participant.image || "/avatar.png"} alt={participant.name} width={54} height={54} className="h-14 w-14 rounded-xl object-cover" />
+          <div className="min-w-0">
+            <div className="truncate text-lg font-black text-white">{participant.name}</div>
+            <div className="mt-1 text-xs font-bold text-white/42">Ready slot</div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="text-lg font-black text-white/58">{emptyText}</div>
+          <div className="mt-2 text-sm font-semibold leading-5 text-white/42">A spectator can move here after the field slot is empty.</div>
+          {canTake ? (
+            <button
+              type="button"
+              onClick={onTake}
+              className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-100"
+            >
+              <UserCheck className="h-4 w-4" />
+              Take Slot
+            </button>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpectatorPanel({
+  spectators,
+  currentId,
+  canWatch,
+  onWatch,
+}: {
+  spectators: RoomParticipant[];
+  currentId: string;
+  canWatch: boolean;
+  onWatch: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-black text-white">
+          <Eye className="h-4 w-4 text-violet-200" />
+          Spectators {spectators.length}/{SPECTATOR_LIMIT}
+        </div>
+        {canWatch ? (
+          <button
+            type="button"
+            onClick={onWatch}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-violet-200/30 bg-violet-200/10 px-3 text-xs font-black text-violet-100 transition hover:border-violet-100/60"
+          >
+            Sit Watch
+          </button>
+        ) : null}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+        {Array.from({ length: SPECTATOR_LIMIT }).map((_, index) => {
+          const spectator = spectators[index];
+          return (
+            <div key={spectator?.id || index} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/8 bg-black/22 px-3">
+              <div className={`grid h-6 w-6 place-items-center rounded-md text-[10px] font-black ${spectator ? "bg-violet-200 text-black" : "bg-white/8 text-white/28"}`}>
+                {index + 1}
+              </div>
+              <div className="min-w-0 truncate text-sm font-bold text-white/64">
+                {spectator ? `${spectator.name}${spectator.id === currentId ? " (You)" : ""}` : "Empty"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeTurn: TriadTurn }) {
   const title =
     result.winner === "draw"
@@ -876,6 +1118,7 @@ function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeT
 
 function SkillTargetOverlay({
   card,
+  side,
   playerTop,
   botTop,
   selectedTarget,
@@ -884,19 +1127,21 @@ function SkillTargetOverlay({
   onConfirm,
 }: {
   card?: CardView;
+  side: Side;
   playerTop?: CardView;
   botTop?: CardView;
   selectedTarget: PendingSkillChoice["selectedTarget"];
   timeLeft: number;
-  onSelect: (target: PendingSkillChoice["selectedTarget"]) => void;
+  onSelect: (target: SkillTargetId) => void;
   onConfirm: () => void;
 }) {
   if (!card) return null;
 
+  const selectableTargetIds = new Set(getSelectableSkillTargetIds(card, side));
   const targets = [
     { id: "player-top" as const, label: "ADMIN MAIN", card: playerTop, tone: "border-red-300/60" },
     { id: "bot-top" as const, label: "BOT MAIN", card: botTop, tone: "border-cyan-300/60" },
-  ];
+  ].filter((target) => selectableTargetIds.has(target.id));
 
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-black/72 px-4 backdrop-blur-md">
@@ -958,6 +1203,7 @@ function CompactBattleBoard({
   timeLeft,
   turnLocked,
   pendingSkillChoice,
+  revealAllCards = false,
   onSelectSkillTarget,
   onConfirmSkillTarget,
   onSelectLane,
@@ -979,6 +1225,7 @@ function CompactBattleBoard({
   timeLeft: number;
   turnLocked: boolean;
   pendingSkillChoice: PendingSkillChoice | null;
+  revealAllCards?: boolean;
   onSelectSkillTarget: (target: PendingSkillChoice["selectedTarget"]) => void;
   onConfirmSkillTarget: () => void;
   onSelectLane: (lane: Lane) => void;
@@ -994,9 +1241,9 @@ function CompactBattleBoard({
     showResolvedBoard && currentResult?.effectivePlayer ? currentResult.effectivePlayer : playerTriangle;
   const displayBotTriangle =
     showResolvedBoard && currentResult?.effectiveOpponent ? currentResult.effectiveOpponent : botTriangle;
-  const botVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.bot);
-  const playerVisible = (lane: Lane) => Boolean(revealed[turnForLane(lane)]?.player);
-  const canEditPlayerSlots = !turnLocked;
+  const botVisible = (lane: Lane) => revealAllCards || Boolean(revealed[turnForLane(lane)]?.bot);
+  const playerVisible = (lane: Lane) => revealAllCards || Boolean(revealed[turnForLane(lane)]?.player);
+  const canEditPlayerSlots = !turnLocked && !revealAllCards;
 
   return (
     <div className="relative h-full min-h-[340px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[430px] xl:min-h-0">
@@ -1013,11 +1260,17 @@ function CompactBattleBoard({
       />
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
+        side={pendingSkillChoice?.side || "player"}
         playerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
         botTop={displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined}
         selectedTarget={pendingSkillChoice?.selectedTarget || ""}
         timeLeft={timeLeft}
-        onSelect={onSelectSkillTarget}
+        onSelect={(target) => {
+          if (!pendingSkillChoice) return;
+          const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
+          if (!getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side).includes(target)) return;
+          onSelectSkillTarget(target);
+        }}
         onConfirm={onConfirmSkillTarget}
       />
 
@@ -1096,14 +1349,22 @@ function emptyRevealState(): Record<TriadTurn, TurnReveal> {
   };
 }
 
-export default function TriadDominionClient({ cards, reviewSkills, summary }: Props) {
+export default function TriadDominionClient({ cards, reviewSkills, summary, currentUser }: Props) {
   const cardsByNo = useMemo(() => new Map(cards.map((card) => [card.cardNo, card])), [cards]);
   const deckCatalog = useMemo(
     () => uniqueByNo(cards.filter((card) => card.kind === "monster" || card.kind === "skill")),
     [cards]
   );
 
-  const [phase, setPhase] = useState<BattlePhase>("deck");
+  const [participant] = useState(() => makeParticipant(currentUser));
+  const [phase, setPhase] = useState<BattlePhase>("lobby");
+  const [rooms, setRooms] = useState<TriadRoom[]>([]);
+  const [activeRoomCode, setActiveRoomCode] = useState("");
+  const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
+  const [roomPassword, setRoomPassword] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [joinPassword, setJoinPassword] = useState("");
+  const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
   const [usedPlayerCards, setUsedPlayerCards] = useState<string[]>([]);
@@ -1133,12 +1394,155 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
   const playerGraveCards = gravePlayerCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const matchDone = fightNo > 3;
+  const currentRoom = rooms.find((room) => room.code === activeRoomCode);
+  const isRoomHost = Boolean(currentRoom && currentRoom.hostId === participant.id);
+  const isSpectator = Boolean(currentRoom?.spectators.some((viewer) => viewer.id === participant.id));
+  const isFieldPlayer = Boolean(
+    currentRoom?.seats.host?.id === participant.id || currentRoom?.seats.challenger?.id === participant.id
+  );
   const winnerText =
     matchScore.player === matchScore.bot
       ? "MATCH DRAW"
       : matchScore.player > matchScore.bot
         ? "ADMIN WINS"
         : "NEXORA BOT WINS";
+
+  const commitRooms = (updater: (current: TriadRoom[]) => TriadRoom[]) => {
+    setRooms((current) => {
+      const next = updater(current);
+      writeStoredRooms(next);
+      return next;
+    });
+  };
+
+  const createRoom = () => {
+    const access = roomAccess;
+    const password = access === "private" ? roomPassword.trim() : "";
+    if (access === "private" && password.length < 4) {
+      setLobbyMessage("Private room needs at least 4 characters.");
+      return;
+    }
+
+    const code = makeRoomCode(rooms);
+    const room: TriadRoom = {
+      code,
+      access,
+      password,
+      status: "waiting",
+      hostId: participant.id,
+      createdAt: Date.now(),
+      seats: { host: participant, challenger: null },
+      spectators: [],
+    };
+
+    commitRooms((current) => [...current.filter((item) => item.code !== code), room]);
+    setActiveRoomCode(code);
+    setLobbyMessage("");
+    setPhase("room");
+  };
+
+  const enterRoom = (codeInput = joinCode, forceSpectator = false) => {
+    const code = codeInput.replace(/\D/g, "").slice(0, 6);
+    const room = rooms.find((item) => item.code === code);
+    if (!room) {
+      setLobbyMessage("Room not found.");
+      return;
+    }
+    if (room.access === "private" && room.password !== joinPassword.trim() && room.hostId !== participant.id) {
+      setLobbyMessage("Wrong private room password.");
+      return;
+    }
+
+    const cleanRoom = removeParticipant(room, participant.id);
+    const mustSpectate = forceSpectator || cleanRoom.status === "playing" || Boolean(cleanRoom.seats.challenger);
+    if (mustSpectate) {
+      if (cleanRoom.spectators.length >= SPECTATOR_LIMIT) {
+        setLobbyMessage("Spectator slots are full.");
+        return;
+      }
+      cleanRoom.spectators = [...cleanRoom.spectators, participant].slice(0, SPECTATOR_LIMIT);
+    } else if (!cleanRoom.seats.host) {
+      cleanRoom.seats.host = participant;
+    } else {
+      cleanRoom.seats.challenger = participant;
+    }
+
+    commitRooms((current) => current.map((item) => (item.code === cleanRoom.code ? cleanRoom : item)));
+    setActiveRoomCode(cleanRoom.code);
+    setLobbyMessage(mustSpectate ? "Joined as spectator." : "");
+    setPhase("room");
+  };
+
+  const moveToSpectator = () => {
+    if (!currentRoom || isSpectator || currentRoom.status === "playing") return;
+    const cleanRoom = removeParticipant(currentRoom, participant.id);
+    if (cleanRoom.spectators.length >= SPECTATOR_LIMIT) {
+      setLobbyMessage("Spectator slots are full.");
+      return;
+    }
+    cleanRoom.spectators = [...cleanRoom.spectators, participant];
+    commitRooms((current) => current.map((room) => (room.code === cleanRoom.code ? cleanRoom : room)));
+  };
+
+  const takeFieldSlot = (slot: "host" | "challenger") => {
+    if (!currentRoom || currentRoom.status === "playing" || currentRoom.seats[slot]) return;
+    const cleanRoom = removeParticipant(currentRoom, participant.id);
+    cleanRoom.seats[slot] = participant;
+    commitRooms((current) => current.map((room) => (room.code === cleanRoom.code ? cleanRoom : room)));
+  };
+
+  const startRoomGame = () => {
+    if (!currentRoom || !isRoomHost || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    commitRooms((current) =>
+      current.map((room) => (room.code === currentRoom.code ? { ...room, status: "playing" } : room))
+    );
+    resetBattle();
+    setPhase("deck");
+  };
+
+  const leaveRoom = () => {
+    if (currentRoom) {
+      const cleanRoom = removeParticipant(currentRoom, participant.id);
+      const nextRoom =
+        cleanRoom.seats.host || cleanRoom.seats.challenger || cleanRoom.spectators.length > 0
+          ? cleanRoom
+          : null;
+      commitRooms((current) =>
+        nextRoom
+          ? current.map((room) => (room.code === currentRoom.code ? nextRoom : room))
+          : current.filter((room) => room.code !== currentRoom.code)
+      );
+    }
+    setActiveRoomCode("");
+    setPhase("lobby");
+  };
+
+  useEffect(() => {
+    setRooms(readStoredRooms());
+
+    const syncRooms = () => setRooms(readStoredRooms());
+    const channel =
+      typeof window !== "undefined" && "BroadcastChannel" in window
+        ? new BroadcastChannel(ROOM_BROADCAST_KEY)
+        : null;
+    channel?.addEventListener("message", syncRooms);
+    window.addEventListener("storage", syncRooms);
+    window.addEventListener(ROOM_BROADCAST_KEY, syncRooms);
+
+    return () => {
+      channel?.removeEventListener("message", syncRooms);
+      channel?.close();
+      window.removeEventListener("storage", syncRooms);
+      window.removeEventListener(ROOM_BROADCAST_KEY, syncRooms);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
+    if (currentRoom.status === "playing" && phase === "room") {
+      setPhase(isSpectator ? "battle" : "deck");
+    }
+  }, [currentRoom, isSpectator, participant.id, phase]);
 
   const toggleDeckCard = (cardNo: string) => {
     setPlayerDeck((current) => {
@@ -1252,6 +1656,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
 
   const confirmSkillTarget = () => {
     if (!pendingSkillChoice || !lockedFight || !pendingSkillChoice.selectedTarget) return;
+    const selectedTarget = pendingSkillChoice.selectedTarget;
+    const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
+    const selectableTargetIds = new Set(getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side));
+    if (!selectableTargetIds.has(selectedTarget)) {
+      setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: "" } : current));
+      setBattleLog((current) => [
+        `Invalid skill target blocked: ${selectedTarget}. Choose a valid target for ${skillCard?.name || pendingSkillChoice.cardNo}.`,
+        ...current,
+      ]);
+      return;
+    }
+
     const result = resolveTriadTurn({
       turn: activeTurn,
       player: lockedFight.player,
@@ -1475,6 +1891,270 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             ? "Bot Opens"
             : "Admin Opens";
 
+  if (phase === "lobby") {
+    const publicRooms = rooms
+      .filter((room) => room.access === "public")
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 8);
+
+    return (
+      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#05070d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+        <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(245,158,11,0.2),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(34,211,238,0.18),transparent_24%),linear-gradient(180deg,#07111d,#05070d)]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
+                <Swords className="h-3.5 w-3.5" />
+                Triad Dominion Rooms
+              </div>
+              <h1 className="text-[clamp(2.1rem,8vw,5.8rem)] font-black uppercase leading-[0.9] tracking-normal">
+                Battle Lobby
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/60 sm:text-base">
+                Create a public or private room, join by 6-digit code, or sit in a spectator slot before the duel begins.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:min-w-[420px]">
+              {[
+                ["ROOMS", rooms.length],
+                ["PUBLIC", rooms.filter((room) => room.access === "public").length],
+                ["LIVE", rooms.filter((room) => room.status === "playing").length],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-white/10 bg-black/28 p-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">{label}</div>
+                  <div className="mt-1 text-2xl font-black text-white">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[360px_1fr] lg:p-8">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+              <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
+                <Plus className="h-4 w-4 text-amber-300" />
+                Create Room
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["public", "private"] as RoomAccess[]).map((access) => (
+                  <button
+                    key={access}
+                    type="button"
+                    onClick={() => setRoomAccess(access)}
+                    className={`h-11 rounded-xl border text-xs font-black uppercase tracking-[0.12em] transition ${
+                      roomAccess === access
+                        ? "border-amber-300 bg-amber-300 text-black"
+                        : "border-white/10 bg-black/28 text-white/58 hover:border-amber-300/40"
+                    }`}
+                  >
+                    {access}
+                  </button>
+                ))}
+              </div>
+              {roomAccess === "private" ? (
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">Room Password</span>
+                  <input
+                    value={roomPassword}
+                    onChange={(event) => setRoomPassword(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-white/10 bg-black/36 px-3 text-sm font-bold text-white outline-none transition focus:border-amber-300/70"
+                    placeholder="At least 4 characters"
+                  />
+                </label>
+              ) : null}
+              <button
+                type="button"
+                onClick={createRoom}
+                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-300 text-sm font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
+              >
+                <Plus className="h-4 w-4" />
+                Create
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+              <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
+                <Search className="h-4 w-4 text-cyan-200" />
+                Find Room
+              </div>
+              <input
+                value={joinCode}
+                onChange={(event) => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="h-12 w-full rounded-xl border border-white/10 bg-black/36 px-3 text-center font-mono text-xl font-black tracking-[0.2em] text-white outline-none transition focus:border-cyan-200/70"
+                placeholder="000000"
+                inputMode="numeric"
+              />
+              <label className="mt-3 block">
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">Private Password</span>
+                <input
+                  value={joinPassword}
+                  onChange={(event) => setJoinPassword(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-white/10 bg-black/36 px-3 text-sm font-bold text-white outline-none transition focus:border-cyan-200/70"
+                  placeholder="Only for private rooms"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => enterRoom()}
+                disabled={joinCode.length !== 6}
+                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-black uppercase tracking-[0.12em] text-black transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
+              >
+                <KeyRound className="h-4 w-4" />
+                Join
+              </button>
+            </div>
+            {lobbyMessage ? (
+              <div className="rounded-xl border border-rose-300/20 bg-rose-300/10 p-3 text-sm font-bold text-rose-100">
+                {lobbyMessage}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-black text-white">
+                <Users className="h-4 w-4 text-emerald-200" />
+                Public Rooms
+              </div>
+              <div className="text-xs font-bold text-white/38">Join as challenger if a field slot is open</div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {publicRooms.length > 0 ? publicRooms.map((room) => (
+                <div key={room.code} className="rounded-xl border border-white/8 bg-black/24 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-mono text-2xl font-black tracking-[0.18em] text-white">{room.code}</div>
+                      <div className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/38">
+                        {room.status} • {room.seats.challenger ? "2 players" : "1 player"}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-emerald-200/20 bg-emerald-200/10 px-2 py-1 text-[10px] font-black uppercase text-emerald-100">
+                      Public
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => enterRoom(room.code)}
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-emerald-100"
+                  >
+                    Enter Room
+                  </button>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-white/8 bg-black/24 p-6 text-sm font-semibold text-white/42">
+                  No public rooms yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (phase === "room") {
+    if (!currentRoom) {
+      return (
+        <main className="grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center rounded-[24px] border border-white/8 bg-[#05070d] p-6 text-white">
+          <button type="button" onClick={() => setPhase("lobby")} className="rounded-xl bg-white px-5 py-3 text-sm font-black text-black">
+            Back to Lobby
+          </button>
+        </main>
+      );
+    }
+
+    const canStart = isRoomHost && Boolean(currentRoom.seats.host && currentRoom.seats.challenger);
+    const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
+
+    return (
+      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#05070d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+        <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(245,158,11,0.2),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(124,58,237,0.16),transparent_24%),linear-gradient(180deg,#07111d,#05070d)]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                <KeyRound className="h-3.5 w-3.5" />
+                Room {currentRoom.code}
+              </div>
+              <h1 className="font-mono text-[clamp(2.4rem,9vw,6rem)] font-black leading-none tracking-[0.14em]">
+                {currentRoom.code}
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/60">
+                Host controls the start button. Anyone entering after the game starts is placed into spectator seats automatically.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={leaveRoom}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-black/28 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-white/30"
+              >
+                Leave
+              </button>
+              <button
+                type="button"
+                onClick={startRoomGame}
+                disabled={!canStart}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
+              >
+                <Swords className="h-4 w-4" />
+                Start Game
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[1fr_320px] xl:p-8">
+          <div className="grid gap-4 md:grid-cols-2">
+            <RoomSeatCard
+              label="Creator Side"
+              participant={currentRoom.seats.host}
+              tone="host"
+              emptyText="Creator slot empty"
+              canTake={currentIsSpectator && !currentRoom.seats.host}
+              onTake={() => takeFieldSlot("host")}
+            />
+            <RoomSeatCard
+              label="Challenger Side"
+              participant={currentRoom.seats.challenger}
+              tone="challenger"
+              emptyText="Waiting challenger"
+              canTake={currentIsSpectator && !currentRoom.seats.challenger}
+              onTake={() => takeFieldSlot("challenger")}
+            />
+            <div className="md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
+              <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">Room Rules</div>
+              <div className="grid gap-2 text-sm font-semibold leading-6 text-white/58 sm:grid-cols-2">
+                <div>Second entrant fills the challenger field slot automatically.</div>
+                <div>Players can move to spectator before the game starts.</div>
+                <div>Spectators can take an empty field slot only after it is free.</div>
+                <div>After start, all late entrants become spectators.</div>
+              </div>
+              {isFieldPlayer && currentRoom.status === "waiting" ? (
+                <button
+                  type="button"
+                  onClick={moveToSpectator}
+                  className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-violet-200/30 bg-violet-200/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-violet-100 transition hover:border-violet-100/60"
+                >
+                  <Eye className="h-4 w-4" />
+                  Move to Spectator
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <SpectatorPanel
+            spectators={currentRoom.spectators}
+            currentId={participant.id}
+            canWatch={!currentIsSpectator && currentRoom.status === "waiting"}
+            onWatch={moveToSpectator}
+          />
+        </section>
+      </main>
+    );
+  }
+
   if (phase === "deck") {
     return (
       <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
@@ -1616,6 +2296,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             timeLeft={timeLeft}
             turnLocked={turnLocked}
             pendingSkillChoice={pendingSkillChoice}
+            revealAllCards={isSpectator}
             onSelectSkillTarget={(target) =>
               setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
             }
@@ -1627,20 +2308,32 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
             }}
           />
 
-          <PlayerHand
-            cards={playerDeckCards}
-            usedSet={usedPlayerSet}
-            player={player}
-            placementLane={placementLane}
-            activeLane={laneForTurn(activeTurn)}
-            locked={turnLocked || matchDone}
-            onSelectLane={setPlacementLane}
-            onPlayCard={placeCardFromHand}
-            onDropToLane={(lane, cardNo) => {
-              setPlacementLane(lane);
-              setPlayerLane(lane, cardNo);
-            }}
-          />
+          {isSpectator ? (
+            <div className="rounded-xl border border-violet-200/18 bg-violet-200/[0.06] p-4">
+              <div className="flex items-center gap-2 text-sm font-black text-violet-100">
+                <Eye className="h-4 w-4" />
+                Spectator View
+              </div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-white/54">
+                You are watching this room. Card visibility is unlocked for both sides and all play controls are disabled.
+              </div>
+            </div>
+          ) : (
+            <PlayerHand
+              cards={playerDeckCards}
+              usedSet={usedPlayerSet}
+              player={player}
+              placementLane={placementLane}
+              activeLane={laneForTurn(activeTurn)}
+              locked={turnLocked || matchDone}
+              onSelectLane={setPlacementLane}
+              onPlayCard={placeCardFromHand}
+              onDropToLane={(lane, cardNo) => {
+                setPlacementLane(lane);
+                setPlayerLane(lane, cardNo);
+              }}
+            />
+          )}
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
               <div className="rounded-xl border border-white/8 bg-black/24 p-4">
@@ -1681,7 +2374,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     <RotateCcw className="h-4 w-4" />
                     Restart
                   </button>
-                ) : turnLocked && lockedFight && revealed[3].scored ? (
+                ) : !isSpectator && turnLocked && lockedFight && revealed[3].scored ? (
                   <button
                     type="button"
                     onClick={nextFight}
@@ -1690,7 +2383,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     {fightNo >= 3 ? "Finish Match" : "Next Fight"}
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                ) : turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
+                ) : !isSpectator && turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
                   <button
                     type="button"
                     onClick={nextTurn}
@@ -1705,7 +2398,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                       <button
                         type="button"
                         onClick={lockFight}
-                        disabled={matchDone}
+                        disabled={matchDone || isSpectator}
                         className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                       >
                         <Brain className="h-4 w-4" />
@@ -1715,7 +2408,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary }: Pr
                     <button
                       type="button"
                       onClick={revealNext}
-                      disabled={!turnLocked || !lockedFight || activeTurnScored}
+                      disabled={isSpectator || !turnLocked || !lockedFight || activeTurnScored}
                       className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                     >
                       {revealButtonLabel}

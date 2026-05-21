@@ -38,5 +38,16 @@ export default async function TriadDominionPage() {
       reviewReason: rule.reviewReason || "",
     }));
 
-  return <TriadDominionClient cards={cards} reviewSkills={reviewSkills} summary={summary} />;
+  return (
+    <TriadDominionClient
+      cards={cards}
+      reviewSkills={reviewSkills}
+      summary={summary}
+      currentUser={{
+        id: String(session?.user?.id || session?.user?.email || session?.user?.name || "admin"),
+        name: String(session?.user?.name || "ADMIN"),
+        image: String(session?.user?.image || "/avatar.png"),
+      }}
+    />
+  );
 }
