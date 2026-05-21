@@ -92,6 +92,7 @@ type TriadRoom = {
   status: RoomStatus;
   hostId: string;
   createdAt: number;
+  updatedAt: number;
   seats: {
     host: RoomParticipant | null;
     challenger: RoomParticipant | null;
@@ -106,6 +107,7 @@ type RoomGame = {
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
   fightNo: number;
+  turnStartedAt: number;
 };
 
 type LockedFight = {
@@ -218,6 +220,7 @@ function normalizeApiRooms(value: unknown): TriadRoom[] {
         status,
         hostId: safeText(room?.hostId),
         createdAt: Number(room?.createdAt || Date.now()),
+        updatedAt: Number(room?.updatedAt || Date.now()),
         seats: {
           host: room?.seats?.host || null,
           challenger: room?.seats?.challenger || null,
@@ -246,7 +249,8 @@ function normalizeRoomGame(value: unknown): RoomGame {
     },
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
-    fightNo: Math.max(1, Math.min(3, Number(raw.fightNo || 1))),
+    fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
+    turnStartedAt: Number(raw.turnStartedAt || Date.now()),
   };
 }
 
@@ -254,6 +258,11 @@ function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
   if (!room?.code) return rooms;
   const exists = rooms.some((item) => item.code === room.code);
   return exists ? rooms.map((item) => (item.code === room.code ? room : item)) : [room, ...rooms];
+}
+
+function roomTurnSecondsLeft(room: TriadRoom) {
+  const elapsedSeconds = Math.floor((Date.now() - room.game.turnStartedAt) / 1000);
+  return Math.max(0, TURN_SECONDS - elapsedSeconds);
 }
 
 function flipTriadResult(result: TriadTurnResult): TriadTurnResult {
@@ -1466,14 +1475,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const response = await fetch(`${ROOM_API_PATH}?ts=${Date.now()}`, { cache: "no-store" });
     const payload = await response.json().catch(() => ({}));
     const nextRooms = normalizeApiRooms(payload.rooms);
-    setRooms((current) => {
-      const activeCode = activeRoomCodeRef.current;
-      const activeFallback =
-        activeRoomSnapshotRef.current || current.find((room) => room.code === activeCode) || null;
-      return activeCode && activeFallback && !nextRooms.some((room) => room.code === activeCode)
-        ? mergeRoomByCode(nextRooms, activeFallback)
-        : nextRooms;
-    });
+    const activeCode = activeRoomCodeRef.current;
+    if (activeCode && !nextRooms.some((room) => room.code === activeCode)) {
+      activeRoomCodeRef.current = "";
+      activeRoomSnapshotRef.current = null;
+      setActiveRoomCode("");
+      setActiveRoomSnapshot(null);
+      setPhase("lobby");
+      setLobbyMessage("Room closed.");
+    }
+    setRooms(nextRooms);
     return nextRooms;
   };
 
@@ -1486,12 +1497,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
     const payload = await response.json().catch(() => ({}));
     const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
-    setRooms((current) =>
-      mergeRoomByCode(normalizeApiRooms(payload.rooms), actionRoom || current.find((room) => room.code === activeRoomCodeRef.current))
-    );
+    const nextRooms = normalizeApiRooms(payload.rooms);
+    setRooms(actionRoom ? mergeRoomByCode(nextRooms, actionRoom) : nextRooms);
     if (actionRoom) {
       activeRoomSnapshotRef.current = actionRoom;
       setActiveRoomSnapshot(actionRoom);
+    } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
+      activeRoomCodeRef.current = "";
+      activeRoomSnapshotRef.current = null;
+      setActiveRoomCode("");
+      setActiveRoomSnapshot(null);
+      setPhase("lobby");
     }
     return { ok: response.ok, status: response.status, payload };
   };
@@ -1593,6 +1609,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPhase("lobby");
   };
 
+  const continueRoomBattle = async () => {
+    if (!currentRoom || !isRoomHost) return;
+    const result = await postRoomAction({ action: "continue", code: currentRoom.code });
+    if (!result.ok) {
+      setLobbyMessage("Cannot continue this room.");
+      return;
+    }
+    resetBattle();
+    setPhase("room");
+  };
+
+  const disbandRoom = async () => {
+    if (!currentRoom || !isRoomHost) return;
+    await postRoomAction({ action: "disband", code: currentRoom.code });
+    activeRoomCodeRef.current = "";
+    activeRoomSnapshotRef.current = null;
+    setActiveRoomCode("");
+    setActiveRoomSnapshot(null);
+    setPhase("lobby");
+    setLobbyMessage("Room disbanded.");
+  };
+
   useEffect(() => {
     void syncRooms().catch(() => null);
     const timer = window.setInterval(() => {
@@ -1622,6 +1660,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
+    if (currentRoom.status === "waiting" && (phase === "deck" || phase === "battle")) {
+      resetBattle();
+      setPhase("room");
+      return;
+    }
     if (currentRoom.status === "playing" && phase === "room") {
       setPhase(isSpectator ? "battle" : "deck");
     }
@@ -1635,6 +1678,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPendingSkillChoice(null);
       setTimeLeft(TURN_SECONDS);
       setRevealed(emptyRevealState());
+      setLockedFight(null);
     }
     pvpTurnKeyRef.current = turnKey;
     const ownDeck = currentRoom.game.decks[roomPlayerSide];
@@ -1643,6 +1687,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (enemyDeck.length === DECK_SIZE) setBotDeck(enemyDeck);
     const serverPlayerTriangle = currentRoom.game.triangles[roomPlayerSide];
     const activeLane = laneForTurn(currentRoom.game.activeTurn);
+    setTurnLocked(Boolean(serverPlayerTriangle[activeLane]));
+    setTimeLeft(roomTurnSecondsLeft(currentRoom));
     setPlayer((current) => {
       const next = { ...serverPlayerTriangle };
       if (!serverPlayerTriangle[activeLane] && current[activeLane]) {
@@ -1857,8 +1903,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const timeoutTurn = () => {
-    if (matchDone || (turnLocked && !pendingSkillChoice)) return;
+    if (matchDone || (!isPvpRoom && turnLocked && !pendingSkillChoice)) return;
     const lane = laneForTurn(activeTurn);
+
+    if (currentRoom && roomPlayerSide && opponentSide) {
+      void postRoomAction({ action: "timeout-turn", code: currentRoom.code }).then((result) => {
+        if (result.ok) {
+          setBattleLog((current) => [`PvP turn ${activeTurn}: time out resolved by room server.`, ...current]);
+        }
+      });
+      return;
+    }
 
     setMatchScore((current) => ({ ...current, bot: current.bot + 1 }));
     setLastTurnWinner("bot");
@@ -1902,7 +1957,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   useEffect(() => {
-    if (phase !== "battle" || matchDone || (turnLocked && !pendingSkillChoice)) return;
+    const pvpTurnResolved = Boolean(isPvpRoom && currentResult);
+    if (phase !== "battle" || matchDone || pvpTurnResolved || (!isPvpRoom && turnLocked && !pendingSkillChoice)) return;
 
     const timer = window.setInterval(() => {
       setTimeLeft((current) => {
@@ -1916,7 +1972,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [phase, matchDone, turnLocked, pendingSkillChoice, activeTurn, player, lockedFight]);
+  }, [phase, matchDone, turnLocked, pendingSkillChoice, activeTurn, player, lockedFight, isPvpRoom, currentResult, currentRoom?.code, roomPlayerSide, opponentSide]);
 
   const scoreTurnIfReady = (
     turn: TriadTurn,
@@ -1949,7 +2005,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const revealNext = () => {
-    if (!lockedFight || !turnLocked || pendingSkillChoice || !currentResult) return;
+    if (!lockedFight || !canRevealTurn || pendingSkillChoice || !currentResult) return;
 
     setRevealed((current) => {
       const state = current[activeTurn];
@@ -2050,6 +2106,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const revealState = revealed[activeTurn];
   const activeTurnScored = Boolean(revealState?.scored);
+  const canRevealTurn = turnLocked || Boolean(isPvpRoom && currentResult);
   const needsSecondReveal =
     lockedFight &&
     activeTurn > 1 &&
@@ -2057,7 +2114,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     lastTurnWinner !== "draw" &&
     (revealState.player !== revealState.bot);
   const revealButtonLabel =
-    !turnLocked
+    !canRevealTurn
       ? "Lock turn first"
       : activeTurn === 1 || lastTurnWinner === null || lastTurnWinner === "draw"
         ? "Reveal Both"
@@ -2427,6 +2484,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 Enter Arena
                 <ChevronRight className="h-4 w-4" />
               </button>
+              {currentRoom ? (
+                <button
+                  type="button"
+                  onClick={leaveRoom}
+                  className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-black/28 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-white/30"
+                >
+                  Leave Room
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -2478,7 +2544,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:min-h-0 xl:overflow-hidden">
+    <main className="relative min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:min-h-0 xl:overflow-hidden">
+      {currentRoom ? (
+        <button
+          type="button"
+          onClick={leaveRoom}
+          className="absolute right-4 top-4 z-20 inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-black/45 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/70 backdrop-blur transition hover:border-white/30"
+        >
+          Leave
+        </button>
+      ) : null}
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -2590,10 +2665,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   <div>
                     <div className="mb-2 flex items-center gap-2 text-lg font-black">
                       <Flame className="h-5 w-5 text-amber-300" />
-                      {turnLocked ? "Ready to reveal" : `Waiting for turn ${activeTurn} lock`}
+                      {canRevealTurn ? "Ready to reveal" : `Waiting for turn ${activeTurn} lock`}
                     </div>
                     <div className="text-sm font-semibold text-white/52">
-                      {turnLocked
+                      {canRevealTurn
                         ? revealButtonLabel
                         : "Pick one card for this turn. You can swap it until Lock Turn."}
                     </div>
@@ -2603,14 +2678,36 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
               <div className="flex gap-2">
                 {matchDone ? (
-                  <button
-                    type="button"
-                    onClick={resetBattle}
-                    className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Restart
-                  </button>
+                  isPvpRoom ? (
+                    <div className="grid min-w-[220px] grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={continueRoomBattle}
+                        disabled={!isRoomHost}
+                        className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Fight Again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={disbandRoom}
+                        disabled={!isRoomHost}
+                        className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                      >
+                        Disband
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={resetBattle}
+                      className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Restart
+                    </button>
+                  )
                 ) : !isSpectator && (!isPvpRoom || isRoomHost) && turnLocked && lockedFight && revealed[3].scored ? (
                   <button
                     type="button"
@@ -2631,7 +2728,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   </button>
                 ) : (
                   <>
-                    {!turnLocked ? (
+                    {!turnLocked && !currentResult ? (
                       <button
                         type="button"
                         onClick={lockFight}
@@ -2645,7 +2742,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     <button
                       type="button"
                       onClick={revealNext}
-                      disabled={isSpectator || !turnLocked || !lockedFight || activeTurnScored}
+                      disabled={isSpectator || !canRevealTurn || !lockedFight || activeTurnScored}
                       className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                     >
                       {revealButtonLabel}

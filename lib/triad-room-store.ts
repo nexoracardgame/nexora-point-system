@@ -24,6 +24,7 @@ export type StoredTriadRoom = {
   status: TriadRoomStatus;
   hostId: string;
   createdAt: number;
+  updatedAt: number;
   seats: {
     host: TriadRoomParticipant | null;
     challenger: TriadRoomParticipant | null;
@@ -44,6 +45,7 @@ export type TriadRoomGame = {
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
   fightNo: number;
+  turnStartedAt: number;
 };
 
 export type PublicTriadRoom = Omit<StoredTriadRoom, "password"> & {
@@ -57,12 +59,16 @@ type TriadRoomRow = {
   status: string;
   hostId: string;
   createdAt: Date | string;
+  updatedAt: Date | string;
   seats: unknown;
   spectators: unknown;
   game: unknown;
 };
 
 const SPECTATOR_LIMIT = 10;
+const TURN_TIMEOUT_MS = 120_000;
+const WAITING_ROOM_TTL_MS = 15 * 60_000;
+const PLAYING_ROOM_TTL_MS = 30 * 60_000;
 
 const globalForTriadRooms = globalThis as {
   nexoraTriadRooms?: StoredTriadRoom[];
@@ -138,7 +144,8 @@ function normalizeGame(value: unknown): TriadRoomGame {
     },
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
-    fightNo: Math.max(1, Math.min(3, Number(raw.fightNo || 1))),
+    fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
+    turnStartedAt: Number(raw.turnStartedAt || Date.now()),
   };
 }
 
@@ -150,6 +157,7 @@ function rowToRoom(row: TriadRoomRow): StoredTriadRoom {
     status: normalizeStatus(row.status),
     hostId: cleanText(row.hostId),
     createdAt: new Date(row.createdAt).getTime(),
+    updatedAt: new Date(row.updatedAt || row.createdAt).getTime(),
     seats: normalizeSeats(row.seats),
     spectators: normalizeSpectators(row.spectators),
     game: normalizeGame(row.game),
@@ -187,14 +195,14 @@ async function ensureTriadRoomSchema() {
           "hostId" TEXT NOT NULL,
           "seats" JSONB NOT NULL DEFAULT '{"host":null,"challenger":null}'::jsonb,
           "spectators" JSONB NOT NULL DEFAULT '[]'::jsonb,
-          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1}'::jsonb,
+          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb,
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_status_idx" ON "TriadRoom" ("status")`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_createdAt_idx" ON "TriadRoom" ("createdAt" DESC)`);
-      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1}'::jsonb`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb`);
     })().catch((error) => {
       globalForTriadRooms.nexoraTriadRoomSchemaPromise = undefined;
       throw error;
@@ -214,6 +222,7 @@ async function dbListRooms() {
       "status",
       "hostId",
       "createdAt",
+      "updatedAt",
       "seats",
       "spectators"
       ,"game"
@@ -235,6 +244,7 @@ async function dbGetRoom(code: string) {
         "status",
         "hostId",
         "createdAt",
+        "updatedAt",
         "seats",
         "spectators"
         ,"game"
@@ -298,6 +308,7 @@ function memoryListRooms() {
 
 function memoryUpsertRoom(room: StoredTriadRoom) {
   const current = memoryRooms();
+  room.updatedAt = Date.now();
   const index = current.findIndex((item) => item.code === room.code);
   if (index >= 0) current[index] = room;
   else current.push(room);
@@ -325,6 +336,7 @@ async function getStoredRoom(code: string) {
 }
 
 async function upsertStoredRoom(room: StoredTriadRoom) {
+  room.updatedAt = Date.now();
   await withRoomStore(
     "write",
     async () => {
@@ -352,9 +364,34 @@ async function deleteStoredRoom(code: string) {
   );
 }
 
+function roomIsEmpty(room: StoredTriadRoom) {
+  return !room.seats.host && !room.seats.challenger && room.spectators.length === 0;
+}
+
+function roomExpired(room: StoredTriadRoom, now = Date.now()) {
+  if (roomIsEmpty(room)) return true;
+  const idleMs = now - Number(room.updatedAt || room.createdAt);
+  if (room.status === "waiting") return idleMs > WAITING_ROOM_TTL_MS;
+  return idleMs > PLAYING_ROOM_TTL_MS;
+}
+
+async function pruneExpiredRooms(rooms: StoredTriadRoom[]) {
+  const now = Date.now();
+  const alive: StoredTriadRoom[] = [];
+  for (const room of rooms) {
+    if (roomExpired(room, now)) {
+      await deleteStoredRoom(room.code);
+    } else {
+      alive.push(room);
+    }
+  }
+  return alive;
+}
+
 export async function listTriadRooms() {
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
-  return storedRooms.map(publicRoom);
+  const aliveRooms = await pruneExpiredRooms(storedRooms);
+  return aliveRooms.map(publicRoom);
 }
 
 export async function createTriadRoom(input: {
@@ -371,6 +408,7 @@ export async function createTriadRoom(input: {
     status: "waiting",
     hostId: input.participant.id,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
     seats: {
       host: input.participant,
       challenger: null,
@@ -389,10 +427,24 @@ function sideForParticipant(room: StoredTriadRoom, participantId: string): "host
   return null;
 }
 
+function participantInStoredRoom(room: StoredTriadRoom, participantId: string) {
+  return Boolean(sideForParticipant(room, participantId) || room.spectators.some((viewer) => viewer.id === participantId));
+}
+
 function laneForTurn(turn: TriadTurn): keyof TriadTriangle {
   if (turn === 1) return "top";
   if (turn === 2) return "left";
   return "right";
+}
+
+function metricForTurn(turn: TriadTurn): TriadTurnResult["metric"] {
+  if (turn === 1) return "total";
+  if (turn === 2) return "attack";
+  return "support";
+}
+
+function freshGame(): TriadRoomGame {
+  return normalizeGame({ turnStartedAt: Date.now() });
 }
 
 function resolveIfBothLocked(room: StoredTriadRoom) {
@@ -406,6 +458,44 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     opponent: room.game.triangles[opener === "host" ? "challenger" : "host"],
   });
   const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
+  room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
+}
+
+function resolveTimeout(room: StoredTriadRoom) {
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  const hostLocked = Boolean(room.game.triangles.host[lane]);
+  const challengerLocked = Boolean(room.game.triangles.challenger[lane]);
+  if (room.game.turns.some((item) => item.turn === turn)) return;
+  if (hostLocked && challengerLocked) {
+    resolveIfBothLocked(room);
+    return;
+  }
+
+  const winner = hostLocked && !challengerLocked ? "player" : challengerLocked && !hostLocked ? "opponent" : "draw";
+  const hostTotal = winner === "player" ? 1 : 0;
+  const challengerTotal = winner === "opponent" ? 1 : 0;
+  const result: TriadTurnResult = {
+    turn,
+    metric: metricForTurn(turn),
+    playerTotal: hostTotal,
+    opponentTotal: challengerTotal,
+    winner,
+    effectivePlayer: room.game.triangles.host,
+    effectiveOpponent: room.game.triangles.challenger,
+    playerBreakdown: [
+      hostLocked
+        ? "Card locked before timeout. Waiting side wins this turn."
+        : "No card locked before timeout.",
+    ],
+    opponentBreakdown: [
+      challengerLocked
+        ? "Card locked before timeout. Waiting side wins this turn."
+        : "No card locked before timeout.",
+    ],
+    unresolvedSkills: [],
+    skillEvents: [],
+  };
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
 }
 
@@ -445,8 +535,12 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   room.game.decks[side] = normalizeDeck(deck);
+  const bothReady = room.game.decks.host.length === 9 && room.game.decks.challenger.length === 9;
+  if (bothReady && !room.game.triangles.host.top && !room.game.triangles.challenger.top && room.game.turns.length === 0) {
+    room.game.turnStartedAt = Date.now();
+  }
   await upsertStoredRoom(room);
-  return { ok: true as const, room: publicRoom(room), bothReady: room.game.decks.host.length === 9 && room.game.decks.challenger.length === 9 };
+  return { ok: true as const, room: publicRoom(room), bothReady };
 }
 
 export async function lockTriadRoomCard(code: string, participantId: string, cardNo: string) {
@@ -488,14 +582,37 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
   }
   if (room.game.activeTurn < 3) {
     room.game.activeTurn = (room.game.activeTurn + 1) as TriadTurn;
+    room.game.turnStartedAt = Date.now();
   } else {
-    room.game.fightNo = Math.min(3, room.game.fightNo + 1);
+    room.game.fightNo = Math.min(4, room.game.fightNo + 1);
     room.game.activeTurn = 1;
     room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
     room.game.turns = [];
+    room.game.turnStartedAt = Date.now();
   }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
+}
+
+export async function timeoutTriadRoomTurn(code: string, participantId: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  if (!participantId || !participantInStoredRoom(room, participantId)) {
+    return { ok: false as const, reason: "not_in_room" as const, room: publicRoom(room) };
+  }
+  if (room.status !== "playing" || room.game.decks.host.length !== 9 || room.game.decks.challenger.length !== 9) {
+    return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
+  }
+  if (room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {
+    return { ok: true as const, room: publicRoom(room), resolved: true };
+  }
+  if (Date.now() - room.game.turnStartedAt < TURN_TIMEOUT_MS) {
+    return { ok: false as const, reason: "too_early" as const, room: publicRoom(room) };
+  }
+
+  resolveTimeout(room);
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room), resolved: true };
 }
 
 export async function joinTriadRoom(input: {
@@ -549,6 +666,7 @@ export async function takeTriadRoomSlot(code: string, slot: TriadRoomSlot, parti
 
   const cleanRoom = removeParticipant(room, participant.id);
   cleanRoom.seats[slot] = participant;
+  if (slot === "host") cleanRoom.hostId = participant.id;
   await upsertStoredRoom(cleanRoom);
   return { ok: true as const, room: publicRoom(cleanRoom) };
 }
@@ -562,8 +680,27 @@ export async function startTriadRoom(code: string, participantId: string) {
   }
 
   room.status = "playing";
+  room.game = freshGame();
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
+}
+
+export async function resetTriadRoomBattle(code: string, participantId: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  room.status = "waiting";
+  room.game = freshGame();
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room) };
+}
+
+export async function disbandTriadRoom(code: string, participantId: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: true as const };
+  if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  await deleteStoredRoom(room.code);
+  return { ok: true as const, disbanded: true as const };
 }
 
 export async function leaveTriadRoom(code: string, participantId: string) {
@@ -573,6 +710,17 @@ export async function leaveTriadRoom(code: string, participantId: string) {
   if (!cleanRoom.seats.host && !cleanRoom.seats.challenger && cleanRoom.spectators.length === 0) {
     await deleteStoredRoom(room.code);
     return { ok: true as const };
+  }
+  if (!cleanRoom.seats.host && cleanRoom.seats.challenger) {
+    cleanRoom.seats.host = cleanRoom.seats.challenger;
+    cleanRoom.seats.challenger = null;
+    cleanRoom.hostId = cleanRoom.seats.host.id;
+  } else if (cleanRoom.seats.host) {
+    cleanRoom.hostId = cleanRoom.seats.host.id;
+  }
+  if (cleanRoom.status === "playing" && (!cleanRoom.seats.host || !cleanRoom.seats.challenger)) {
+    cleanRoom.status = "waiting";
+    cleanRoom.game = freshGame();
   }
   await upsertStoredRoom(cleanRoom);
   return { ok: true as const, room: publicRoom(cleanRoom) };

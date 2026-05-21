@@ -3,14 +3,17 @@ import { requireAdminActor } from "@/lib/admin-auth";
 import {
   createTriadRoom,
   advanceTriadRoomTurn,
+  disbandTriadRoom,
   joinTriadRoom,
   leaveTriadRoom,
   listTriadRooms,
   lockTriadRoomCard,
   moveTriadParticipantToSpectator,
+  resetTriadRoomBattle,
   setTriadRoomDeck,
   startTriadRoom,
   takeTriadRoomSlot,
+  timeoutTriadRoomTurn,
   type TriadRoomAccess,
   type TriadRoomParticipant,
   type TriadRoomSlot,
@@ -107,6 +110,21 @@ export async function POST(request: Request) {
 
   if (action === "advance-turn") {
     const result = await advanceTriadRoomTurn(cleanText(body.code), participant.id);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "timeout-turn") {
+    const result = await timeoutTriadRoomTurn(cleanText(body.code), participant.id);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "continue") {
+    const result = await resetTriadRoomBattle(cleanText(body.code), participant.id);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "disband") {
+    const result = await disbandTriadRoom(cleanText(body.code), participant.id);
     return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
   }
 
