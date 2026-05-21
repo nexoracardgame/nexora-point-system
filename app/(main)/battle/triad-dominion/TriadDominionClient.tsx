@@ -76,6 +76,7 @@ type Side = "player" | "bot";
 type Lane = "top" | "left" | "right";
 type RoomAccess = "public" | "private";
 type RoomStatus = "waiting" | "playing";
+type RoomPlayerSide = "host" | "challenger";
 
 type RoomParticipant = {
   id: string;
@@ -96,6 +97,15 @@ type TriadRoom = {
     challenger: RoomParticipant | null;
   };
   spectators: RoomParticipant[];
+  game: RoomGame;
+};
+
+type RoomGame = {
+  decks: Record<RoomPlayerSide, string[]>;
+  triangles: Record<RoomPlayerSide, TriadTriangle>;
+  turns: TriadTurnResult[];
+  activeTurn: TriadTurn;
+  fightNo: number;
 };
 
 type LockedFight = {
@@ -213,15 +223,59 @@ function normalizeApiRooms(value: unknown): TriadRoom[] {
           challenger: room?.seats?.challenger || null,
         },
         spectators: Array.isArray(room?.spectators) ? room.spectators.slice(0, SPECTATOR_LIMIT) : [],
+        game: normalizeRoomGame(room?.game),
       };
     })
     .filter((room) => room.code.length === 6);
+}
+
+function normalizeRoomGame(value: unknown): RoomGame {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
+  const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
+  const activeTurn = Number(raw.activeTurn || 1);
+  const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
+  return {
+    decks: {
+      host: cleanDeck(decks.host),
+      challenger: cleanDeck(decks.challenger),
+    },
+    triangles: {
+      host: { top: "", left: "", right: "", ...((triangles.host as TriadTriangle | undefined) || {}) },
+      challenger: { top: "", left: "", right: "", ...((triangles.challenger as TriadTriangle | undefined) || {}) },
+    },
+    turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
+    activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
+    fightNo: Math.max(1, Math.min(3, Number(raw.fightNo || 1))),
+  };
 }
 
 function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
   if (!room?.code) return rooms;
   const exists = rooms.some((item) => item.code === room.code);
   return exists ? rooms.map((item) => (item.code === room.code ? room : item)) : [room, ...rooms];
+}
+
+function flipTriadResult(result: TriadTurnResult): TriadTurnResult {
+  return {
+    ...result,
+    playerTotal: result.opponentTotal,
+    opponentTotal: result.playerTotal,
+    winner:
+      result.winner === "player"
+        ? "opponent"
+        : result.winner === "opponent"
+          ? "player"
+          : "draw",
+    effectivePlayer: result.effectiveOpponent,
+    effectiveOpponent: result.effectivePlayer,
+    playerBreakdown: result.opponentBreakdown,
+    opponentBreakdown: result.playerBreakdown,
+    skillEvents: result.skillEvents.map((event) => ({
+      ...event,
+      side: event.side === "player" ? "opponent" : "player",
+    })),
+  };
 }
 
 function laneForTurn(turn: TriadTurn): Lane {
@@ -1351,6 +1405,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
   const activeRoomCodeRef = useRef("");
   const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
+  const pvpTurnKeyRef = useRef("");
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
@@ -1387,12 +1442,25 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const isFieldPlayer = Boolean(
     currentRoom?.seats.host?.id === participant.id || currentRoom?.seats.challenger?.id === participant.id
   );
+  const roomPlayerSide: RoomPlayerSide | null = currentRoom?.seats.host?.id === participant.id
+    ? "host"
+    : currentRoom?.seats.challenger?.id === participant.id
+      ? "challenger"
+      : null;
+  const opponentSide: RoomPlayerSide | null = roomPlayerSide === "host" ? "challenger" : roomPlayerSide === "challenger" ? "host" : null;
+  const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
+  const playerLabel = roomPlayerSide
+    ? currentRoom?.seats[roomPlayerSide]?.name || "YOU"
+    : "ADMIN";
+  const opponentLabel = opponentSide
+    ? currentRoom?.seats[opponentSide]?.name || "OPPONENT"
+    : "NEXORA BOT";
   const winnerText =
     matchScore.player === matchScore.bot
       ? "MATCH DRAW"
       : matchScore.player > matchScore.bot
-        ? "ADMIN WINS"
-        : "NEXORA BOT WINS";
+        ? `${playerLabel} WINS`
+        : `${opponentLabel} WINS`;
 
   const syncRooms = async () => {
     const response = await fetch(`${ROOM_API_PATH}?ts=${Date.now()}`, { cache: "no-store" });
@@ -1559,6 +1627,41 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
   }, [currentRoom, isSpectator, participant.id, phase]);
 
+  useEffect(() => {
+    if (!currentRoom || !roomPlayerSide || !opponentSide) return;
+    const turnKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}`;
+    if (pvpTurnKeyRef.current && pvpTurnKeyRef.current !== turnKey) {
+      setTurnLocked(false);
+      setPendingSkillChoice(null);
+      setTimeLeft(TURN_SECONDS);
+      setRevealed(emptyRevealState());
+    }
+    pvpTurnKeyRef.current = turnKey;
+    const ownDeck = currentRoom.game.decks[roomPlayerSide];
+    const enemyDeck = currentRoom.game.decks[opponentSide];
+    if (ownDeck.length === DECK_SIZE) setPlayerDeck(ownDeck);
+    if (enemyDeck.length === DECK_SIZE) setBotDeck(enemyDeck);
+    setPlayer(currentRoom.game.triangles[roomPlayerSide]);
+    setActiveTurn(currentRoom.game.activeTurn);
+    setFightNo(currentRoom.game.fightNo);
+    const mappedTurns = roomPlayerSide === "host"
+      ? currentRoom.game.turns
+      : currentRoom.game.turns.map(flipTriadResult);
+    setLockedFight((current) => {
+      if (mappedTurns.length === 0) return current;
+      return {
+        fightNo: currentRoom.game.fightNo,
+        player: currentRoom.game.triangles[roomPlayerSide],
+        bot: currentRoom.game.triangles[opponentSide],
+        turns: mappedTurns,
+      };
+    });
+    if (phase === "deck" && ownDeck.length === DECK_SIZE && enemyDeck.length === DECK_SIZE) {
+      setPhase("battle");
+      setBattleLog((current) => current.length ? current : ["Both decks are locked. PvP battle is live."]);
+    }
+  }, [currentRoom, opponentSide, phase, roomPlayerSide]);
+
   const toggleDeckCard = (cardNo: string) => {
     setPlayerDeck((current) => {
       if (current.includes(cardNo)) return current.filter((item) => item !== cardNo);
@@ -1567,11 +1670,34 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
   };
 
-  const enterBattle = () => {
+  const enterBattle = async () => {
     if (playerDeck.length !== DECK_SIZE) return;
     const monsterCount = playerDeckCards.filter((card) => card.kind === "monster").length;
     if (monsterCount < 3) {
       setBattleLog(["Deck needs at least 3 monster cards for the top card of each fight."]);
+      return;
+    }
+
+    if (currentRoom && roomPlayerSide && opponentSide) {
+      const result = await postRoomAction({
+        action: "set-deck",
+        code: currentRoom.code,
+        deck: playerDeck,
+      });
+      if (!result.ok) {
+        setBattleLog(["Cannot lock deck into this PvP room."]);
+        return;
+      }
+      const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || currentRoom;
+      const ownDeck = room.game.decks[roomPlayerSide];
+      const enemyDeck = room.game.decks[opponentSide];
+      setBotDeck(enemyDeck);
+      if (ownDeck.length === DECK_SIZE && enemyDeck.length === DECK_SIZE) {
+        setPhase("battle");
+        setBattleLog(["PvP decks locked. Fight the player across the room, not the bot."]);
+      } else {
+        setBattleLog(["Deck locked. Waiting for the other player to lock their deck."]);
+      }
       return;
     }
 
@@ -1634,6 +1760,27 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const lane = laneForTurn(activeTurn);
     if (!player[lane]) {
       setBattleLog((current) => [`Choose 1 card for turn ${activeTurn} before locking.`, ...current]);
+      return;
+    }
+
+    if (currentRoom && roomPlayerSide && opponentSide) {
+      void postRoomAction({
+        action: "lock-card",
+        code: currentRoom.code,
+        cardNo: player[lane],
+      }).then((result) => {
+        if (!result.ok) {
+          setBattleLog((current) => ["Cannot lock card into this PvP room.", ...current]);
+          return;
+        }
+        setTurnLocked(true);
+        setBattleLog((current) => [
+          result.payload?.resolved
+            ? `PvP turn ${activeTurn}: both players locked.`
+            : `PvP turn ${activeTurn}: card locked, waiting for opponent.`,
+          ...current,
+        ]);
+      });
       return;
     }
 
@@ -1832,6 +1979,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const nextTurn = () => {
     if (!lockedFight || activeTurn >= 3) return;
+    if (currentRoom && isRoomHost) {
+      void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+    }
     const lane = laneForTurn(activeTurn);
     const nextActiveTurn = (activeTurn + 1) as TriadTurn;
 
@@ -1850,6 +2000,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const nextFight = () => {
     if (!lockedFight) return;
+    if (currentRoom && isRoomHost) {
+      void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+    }
 
     const nextUsedPlayer = [
       ...usedPlayerCards,
@@ -1903,8 +2056,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         : needsSecondReveal
           ? "Reveal Counter"
           : lastTurnWinner === "bot"
-            ? "Bot Opens"
-            : "Admin Opens";
+            ? `${opponentLabel} Opens`
+            : `${playerLabel} Opens`;
 
   if (phase === "lobby") {
     const visibleRooms = rooms
@@ -2450,7 +2603,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     <RotateCcw className="h-4 w-4" />
                     Restart
                   </button>
-                ) : !isSpectator && turnLocked && lockedFight && revealed[3].scored ? (
+                ) : !isSpectator && (!isPvpRoom || isRoomHost) && turnLocked && lockedFight && revealed[3].scored ? (
                   <button
                     type="button"
                     onClick={nextFight}
@@ -2459,7 +2612,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     {fightNo >= 3 ? "Finish Match" : "Next Fight"}
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                ) : !isSpectator && turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
+                ) : !isSpectator && (!isPvpRoom || isRoomHost) && turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
                   <button
                     type="button"
                     onClick={nextTurn}
@@ -2522,7 +2675,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </section>
 
         <aside className="flex min-h-0 flex-col gap-4 overflow-hidden">
-          <FighterPanel name="NEXORA BOT" score={matchScore.bot} tone="bot" deckLeft={Math.max(0, botDeck.length - usedBotCards.length)} side="left" />
+          <FighterPanel name={opponentLabel} score={matchScore.bot} tone="bot" deckLeft={Math.max(0, botDeck.length - usedBotCards.length)} side="left" />
 
           <div className="min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
@@ -2547,7 +2700,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           <div className="hidden rounded-xl border border-white/8 bg-white/[0.035] p-4 xl:block">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Bot className="h-4 w-4 text-cyan-200" />
-              Bot Deck
+              Opponent Deck
             </div>
             <div className="grid grid-cols-3 gap-2">
               {botDeckCards.map((card) => {
@@ -2562,7 +2715,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
 
           <div className="mt-auto pb-16 xl:pb-20">
-            <FighterPanel name="ADMIN" score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
+            <FighterPanel name={playerLabel} score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
           </div>
         </aside>
       </section>

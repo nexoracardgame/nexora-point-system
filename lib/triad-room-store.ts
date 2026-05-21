@@ -1,4 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import {
+  resolveTriadTurn,
+  type TriadTriangle,
+  type TriadTurn,
+  type TriadTurnResult,
+} from "@/lib/triad-dominion";
 
 export type TriadRoomAccess = "public" | "private";
 export type TriadRoomStatus = "waiting" | "playing";
@@ -23,6 +29,21 @@ export type StoredTriadRoom = {
     challenger: TriadRoomParticipant | null;
   };
   spectators: TriadRoomParticipant[];
+  game: TriadRoomGame;
+};
+
+export type TriadRoomGame = {
+  decks: {
+    host: string[];
+    challenger: string[];
+  };
+  triangles: {
+    host: TriadTriangle;
+    challenger: TriadTriangle;
+  };
+  turns: TriadTurnResult[];
+  activeTurn: TriadTurn;
+  fightNo: number;
 };
 
 export type PublicTriadRoom = Omit<StoredTriadRoom, "password"> & {
@@ -38,6 +59,7 @@ type TriadRoomRow = {
   createdAt: Date | string;
   seats: unknown;
   spectators: unknown;
+  game: unknown;
 };
 
 const SPECTATOR_LIMIT = 10;
@@ -92,6 +114,34 @@ function normalizeSeats(value: unknown): StoredTriadRoom["seats"] {
   };
 }
 
+function emptyTriangle(): TriadTriangle {
+  return { top: "", left: "", right: "" };
+}
+
+function normalizeDeck(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => cleanText(item)).filter(Boolean).slice(0, 9) : [];
+}
+
+function normalizeGame(value: unknown): TriadRoomGame {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
+  const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
+  const activeTurn = Number(raw.activeTurn || 1);
+  return {
+    decks: {
+      host: normalizeDeck(decks.host),
+      challenger: normalizeDeck(decks.challenger),
+    },
+    triangles: {
+      host: { ...emptyTriangle(), ...((triangles.host as TriadTriangle | undefined) || {}) },
+      challenger: { ...emptyTriangle(), ...((triangles.challenger as TriadTriangle | undefined) || {}) },
+    },
+    turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
+    activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
+    fightNo: Math.max(1, Math.min(3, Number(raw.fightNo || 1))),
+  };
+}
+
 function rowToRoom(row: TriadRoomRow): StoredTriadRoom {
   return {
     code: cleanText(row.code),
@@ -102,6 +152,7 @@ function rowToRoom(row: TriadRoomRow): StoredTriadRoom {
     createdAt: new Date(row.createdAt).getTime(),
     seats: normalizeSeats(row.seats),
     spectators: normalizeSpectators(row.spectators),
+    game: normalizeGame(row.game),
   };
 }
 
@@ -136,12 +187,14 @@ async function ensureTriadRoomSchema() {
           "hostId" TEXT NOT NULL,
           "seats" JSONB NOT NULL DEFAULT '{"host":null,"challenger":null}'::jsonb,
           "spectators" JSONB NOT NULL DEFAULT '[]'::jsonb,
+          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1}'::jsonb,
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_status_idx" ON "TriadRoom" ("status")`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_createdAt_idx" ON "TriadRoom" ("createdAt" DESC)`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1}'::jsonb`);
     })().catch((error) => {
       globalForTriadRooms.nexoraTriadRoomSchemaPromise = undefined;
       throw error;
@@ -163,6 +216,7 @@ async function dbListRooms() {
       "createdAt",
       "seats",
       "spectators"
+      ,"game"
     FROM "TriadRoom"
     ORDER BY "createdAt" DESC
     LIMIT 80
@@ -183,6 +237,7 @@ async function dbGetRoom(code: string) {
         "createdAt",
         "seats",
         "spectators"
+        ,"game"
       FROM "TriadRoom"
       WHERE "code" = $1
       LIMIT 1
@@ -196,8 +251,8 @@ async function dbUpsertRoom(room: StoredTriadRoom) {
   await ensureTriadRoomSchema();
   await prisma.$executeRawUnsafe(
     `
-      INSERT INTO "TriadRoom" ("code", "access", "password", "status", "hostId", "seats", "spectators", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, to_timestamp($8 / 1000.0), NOW())
+      INSERT INTO "TriadRoom" ("code", "access", "password", "status", "hostId", "seats", "spectators", "game", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, to_timestamp($9 / 1000.0), NOW())
       ON CONFLICT ("code") DO UPDATE SET
         "access" = EXCLUDED."access",
         "password" = EXCLUDED."password",
@@ -205,6 +260,7 @@ async function dbUpsertRoom(room: StoredTriadRoom) {
         "hostId" = EXCLUDED."hostId",
         "seats" = EXCLUDED."seats",
         "spectators" = EXCLUDED."spectators",
+        "game" = EXCLUDED."game",
         "updatedAt" = NOW()
     `,
     room.code,
@@ -214,6 +270,7 @@ async function dbUpsertRoom(room: StoredTriadRoom) {
     room.hostId,
     JSON.stringify(room.seats),
     JSON.stringify(room.spectators),
+    JSON.stringify(room.game),
     room.createdAt
   );
 }
@@ -319,10 +376,77 @@ export async function createTriadRoom(input: {
       challenger: null,
     },
     spectators: [],
+    game: normalizeGame(null),
   };
 
   await upsertStoredRoom(room);
   return publicRoom(room);
+}
+
+function sideForParticipant(room: StoredTriadRoom, participantId: string): "host" | "challenger" | null {
+  if (room.seats.host?.id === participantId) return "host";
+  if (room.seats.challenger?.id === participantId) return "challenger";
+  return null;
+}
+
+function laneForTurn(turn: TriadTurn): keyof TriadTriangle {
+  if (turn === 1) return "top";
+  if (turn === 2) return "left";
+  return "right";
+}
+
+function resolveIfBothLocked(room: StoredTriadRoom) {
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  if (!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) return;
+  const result = resolveTriadTurn({
+    turn,
+    player: room.game.triangles.host,
+    opponent: room.game.triangles.challenger,
+  });
+  room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
+}
+
+export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  room.game.decks[side] = normalizeDeck(deck);
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room), bothReady: room.game.decks.host.length === 9 && room.game.decks.challenger.length === 9 };
+}
+
+export async function lockTriadRoomCard(code: string, participantId: string, cardNo: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  const lane = laneForTurn(room.game.activeTurn);
+  room.game.triangles[side][lane] = cleanText(cardNo);
+  resolveIfBothLocked(room);
+  await upsertStoredRoom(room);
+  return {
+    ok: true as const,
+    room: publicRoom(room),
+    resolved: room.game.turns.some((turn) => turn.turn === room.game.activeTurn),
+  };
+}
+
+export async function advanceTriadRoomTurn(code: string, participantId: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  if (room.game.activeTurn < 3) {
+    room.game.activeTurn = (room.game.activeTurn + 1) as TriadTurn;
+  } else {
+    room.game.fightNo = Math.min(3, room.game.fightNo + 1);
+    room.game.activeTurn = 1;
+    room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
+    room.game.turns = [];
+  }
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room) };
 }
 
 export async function joinTriadRoom(input: {

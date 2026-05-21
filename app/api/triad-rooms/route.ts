@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { requireAdminActor } from "@/lib/admin-auth";
 import {
   createTriadRoom,
+  advanceTriadRoomTurn,
   joinTriadRoom,
   leaveTriadRoom,
   listTriadRooms,
+  lockTriadRoomCard,
   moveTriadParticipantToSpectator,
+  setTriadRoomDeck,
   startTriadRoom,
   takeTriadRoomSlot,
   type TriadRoomAccess,
@@ -88,6 +91,22 @@ export async function POST(request: Request) {
 
   if (action === "start") {
     const result = await startTriadRoom(cleanText(body.code), participant.id);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "set-deck") {
+    const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
+    const result = await setTriadRoomDeck(cleanText(body.code), participant.id, deck);
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "lock-card") {
+    const result = await lockTriadRoomCard(cleanText(body.code), participant.id, cleanText(body.cardNo));
+    return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "advance-turn") {
+    const result = await advanceTriadRoomTurn(cleanText(body.code), participant.id);
     return noStoreJson({ ...result, rooms: await listTriadRooms() }, { status: result.ok ? 200 : 409 });
   }
 
