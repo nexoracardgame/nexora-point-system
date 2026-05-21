@@ -133,6 +133,18 @@ const ACTIVE_ROOM_SYNC_MS = 220;
 const HIDDEN_SYNC_MS = 1200;
 const MIN_SYNC_GAP_MS = 80;
 
+const rankFrames = [
+  { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
+  { name: "เหล็กดำ", aura: "from-slate-300/30 via-slate-800/20 to-black/20", ring: "border-slate-300/55 shadow-[0_0_24px_rgba(148,163,184,0.22)]", badge: "bg-slate-200 text-black" },
+  { name: "ทองแดง", aura: "from-orange-300/38 via-amber-900/22 to-black/20", ring: "border-orange-300/60 shadow-[0_0_28px_rgba(251,146,60,0.26)]", badge: "bg-orange-300 text-black" },
+  { name: "เงิน", aura: "from-white/42 via-cyan-200/18 to-black/20", ring: "border-white/70 shadow-[0_0_30px_rgba(226,232,240,0.3)]", badge: "bg-white text-black" },
+  { name: "ทอง", aura: "from-amber-200/55 via-yellow-500/24 to-black/20", ring: "border-amber-200/80 shadow-[0_0_34px_rgba(251,191,36,0.38)]", badge: "bg-amber-200 text-black" },
+  { name: "เพลิงแดง", aura: "from-red-300/58 via-rose-600/30 to-black/24", ring: "border-red-300/85 shadow-[0_0_38px_rgba(248,113,113,0.42)]", badge: "bg-red-400 text-white" },
+  { name: "มรกต", aura: "from-emerald-200/58 via-emerald-500/26 to-black/24", ring: "border-emerald-200/85 shadow-[0_0_40px_rgba(52,211,153,0.38)]", badge: "bg-emerald-300 text-black" },
+  { name: "เพชรฟ้า", aura: "from-cyan-100/65 via-sky-400/32 to-black/24", ring: "border-cyan-100/90 shadow-[0_0_44px_rgba(125,211,252,0.45)]", badge: "bg-cyan-200 text-black" },
+  { name: "ราชันออร่า", aura: "from-yellow-100/75 via-rose-400/34 to-violet-500/24", ring: "border-yellow-100 shadow-[0_0_58px_rgba(250,204,21,0.58)]", badge: "bg-gradient-to-r from-yellow-200 to-rose-300 text-black" },
+] as const;
+
 type PendingSkillChoice = {
   side: Side;
   lane: Lane;
@@ -190,6 +202,90 @@ function makeParticipant(user: Props["currentUser"]): RoomParticipant {
     image: safeText(user.image) || "/avatar.png",
     joinedAt: Date.now(),
   };
+}
+
+function rankIndexForParticipant(participant?: Pick<RoomParticipant, "id"> | null) {
+  const seed = participant?.id || "empty";
+  return seed.split("").reduce((total, letter) => total + letter.charCodeAt(0), 0) % rankFrames.length;
+}
+
+function RankAvatar({
+  participant,
+  name,
+  image,
+  rankIndex,
+  size = "md",
+  crown,
+}: {
+  participant?: RoomParticipant | null;
+  name?: string;
+  image?: string;
+  rankIndex?: number;
+  size?: "sm" | "md" | "lg" | "xl";
+  crown?: boolean;
+}) {
+  const frame = rankFrames[rankIndex ?? rankIndexForParticipant(participant)];
+  const sizeClass = {
+    sm: "h-10 w-10 p-[3px]",
+    md: "h-14 w-14 p-1",
+    lg: "h-24 w-24 p-1.5",
+    xl: "h-32 w-32 p-2",
+  }[size];
+  const imageSize = size === "xl" ? 112 : size === "lg" ? 84 : size === "md" ? 52 : 36;
+  const label = name || participant?.name || "ว่าง";
+
+  return (
+    <div className={`relative grid shrink-0 place-items-center rounded-full border ${sizeClass} ${frame.ring}`}>
+      <div className={`absolute -inset-3 rounded-full bg-gradient-to-br ${frame.aura} blur-xl`} />
+      <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_20deg,rgba(255,255,255,0.5),rgba(0,0,0,0.15),rgba(251,191,36,0.55),rgba(0,0,0,0.2),rgba(255,255,255,0.35))] opacity-80" />
+      <div className="relative h-full w-full overflow-hidden rounded-full border border-black/70 bg-[#07080b]">
+        <Image src={image || participant?.image || "/avatar.png"} alt={label} width={imageSize} height={imageSize} className="h-full w-full object-cover" />
+      </div>
+      {crown ? (
+        <span className="absolute -right-1 -top-1 grid h-7 w-7 place-items-center rounded-full border border-amber-100/70 bg-amber-300 text-black shadow-[0_0_24px_rgba(251,191,36,0.55)]">
+          <Crown className="h-4 w-4" />
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function RankFramePicker({
+  selected,
+  onSelect,
+}: {
+  selected: number;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <div className="rounded-[18px] border border-amber-200/16 bg-black/36 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/48">กรอบแรงค์ทดลอง</div>
+          <div className="mt-1 text-sm font-black text-white">{rankFrames[selected]?.name}</div>
+        </div>
+        <div className="rounded-full border border-red-300/35 bg-red-500/16 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-red-100">
+          9 ระดับ
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {rankFrames.map((frame, index) => (
+          <button
+            key={frame.name}
+            type="button"
+            onClick={() => onSelect(index)}
+            className={`group rounded-xl border p-2 text-left transition ${
+              selected === index ? "border-red-300 bg-red-500/18" : "border-white/10 bg-white/[0.035] hover:border-amber-200/42"
+            }`}
+            title={frame.name}
+          >
+            <div className={`mx-auto h-9 w-9 rounded-full border bg-gradient-to-br ${frame.aura} ${frame.ring}`} />
+            <div className="mt-2 truncate text-center text-[10px] font-black text-white/70">{index + 1}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function participantInRoom(room: TriadRoom | undefined, participantId: string) {
@@ -1085,6 +1181,8 @@ function RoomSeatCard({
   emptyText,
   canTake,
   onTake,
+  currentId,
+  selectedFrameIndex,
 }: {
   label: string;
   participant: RoomParticipant | null;
@@ -1093,42 +1191,50 @@ function RoomSeatCard({
   emptyText: string;
   canTake: boolean;
   onTake: () => void;
+  currentId: string;
+  selectedFrameIndex: number;
 }) {
   const toneClass =
     tone === "host"
-      ? "border-amber-300/28 bg-amber-300/[0.08]"
-      : "border-cyan-300/24 bg-cyan-300/[0.07]";
+      ? "border-amber-300/45 from-amber-300/18 via-[#120806]/82 to-black"
+      : "border-red-300/45 from-red-500/18 via-[#120608]/82 to-black";
+  const isCurrent = participant?.id === currentId;
 
   return (
-    <div className={`min-h-[170px] rounded-xl border p-4 ${toneClass}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</div>
-        <Swords className={`h-4 w-4 ${tone === "host" ? "text-amber-200" : "text-cyan-200"}`} />
+    <div className={`relative min-h-[320px] overflow-hidden rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
+      <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.1),transparent)] opacity-30" />
+      <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/60 to-transparent" />
+      <div className="relative mb-4 flex items-center justify-between gap-3">
+        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/52">{label}</div>
+        <Swords className={`h-4 w-4 ${tone === "host" ? "text-amber-200" : "text-red-200"}`} />
       </div>
       {participant ? (
-        <div className="flex items-center gap-3">
-          <Image src={participant.image || "/avatar.png"} alt={participant.name} width={54} height={54} className="h-14 w-14 rounded-xl object-cover" />
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="truncate text-lg font-black text-white">{participant.name}</div>
-              {isLeader ? (
-                <span className="inline-grid h-7 w-7 shrink-0 place-items-center rounded-full border border-amber-200/45 bg-amber-300 text-black shadow-[0_0_22px_rgba(251,191,36,0.35)]" title="หัวห้อง">
-                  <Crown className="h-4 w-4" />
-                </span>
-              ) : null}
+        <div className="relative flex min-h-[248px] flex-col items-center justify-center text-center">
+          <RankAvatar participant={participant} size="xl" crown={isLeader} rankIndex={isCurrent ? selectedFrameIndex : undefined} />
+          <div className="mt-5 w-full border-y border-white/10 bg-black/34 px-3 py-3">
+            <div className="truncate text-2xl font-black uppercase tracking-normal text-white">{participant.name}</div>
+            <div className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-amber-100/62">
+              {rankFrames[isCurrent ? selectedFrameIndex : rankIndexForParticipant(participant)].name}
             </div>
-            <div className="mt-1 text-xs font-bold text-white/42">พร้อมลงสนาม</div>
+          </div>
+          <div className="mt-3 rounded-full border border-emerald-200/25 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
+            พร้อมลงสนาม
           </div>
         </div>
       ) : (
-        <div>
-          <div className="text-lg font-black text-white/58">{emptyText}</div>
-          <div className="mt-2 text-sm font-semibold leading-5 text-white/42">ถ้าช่องว่าง ผู้ชมสามารถลงมาเล่นแทนได้</div>
+        <div className="relative grid min-h-[248px] place-items-center text-center">
+          <div>
+            <div className="mx-auto grid h-28 w-28 place-items-center rounded-full border border-dashed border-white/18 bg-black/42 text-3xl font-black text-white/20">
+              ?
+            </div>
+            <div className="mt-5 text-xl font-black text-white/68">{emptyText}</div>
+            <div className="mt-2 text-sm font-semibold leading-5 text-white/42">ถ้าช่องว่าง ผู้ชมสามารถลงมาเล่นแทนได้</div>
+          </div>
           {canTake ? (
             <button
               type="button"
               onClick={onTake}
-              className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-100"
+              className="absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_30px_rgba(239,68,68,0.28)] transition hover:bg-red-400"
             >
               <UserCheck className="h-4 w-4" />
               ลงสนาม
@@ -1152,7 +1258,7 @@ function SpectatorPanel({
   onWatch: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+    <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-black text-white">
           <Eye className="h-4 w-4 text-violet-200" />
@@ -1162,7 +1268,7 @@ function SpectatorPanel({
           <button
             type="button"
             onClick={onWatch}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-violet-200/30 bg-violet-200/10 px-3 text-xs font-black text-violet-100 transition hover:border-violet-100/60"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-red-200/35 bg-red-500/14 px-3 text-xs font-black text-red-100 transition hover:border-red-100/60"
           >
             นั่งชม
           </button>
@@ -1172,10 +1278,14 @@ function SpectatorPanel({
         {Array.from({ length: SPECTATOR_LIMIT }).map((_, index) => {
           const spectator = spectators[index];
           return (
-            <div key={spectator?.id || index} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/8 bg-black/22 px-3">
-              <div className={`grid h-6 w-6 place-items-center rounded-md text-[10px] font-black ${spectator ? "bg-violet-200 text-black" : "bg-white/8 text-white/28"}`}>
-                {index + 1}
-              </div>
+            <div key={spectator?.id || index} className="flex min-h-14 items-center gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3">
+              {spectator ? (
+                <RankAvatar participant={spectator} size="sm" />
+              ) : (
+                <div className="grid h-10 w-10 place-items-center rounded-full border border-dashed border-white/12 bg-black/35 text-[10px] font-black text-white/24">
+                  {index + 1}
+                </div>
+              )}
               <div className="min-w-0 truncate text-sm font-bold text-white/64">
                 {spectator ? `${spectator.name}${spectator.id === currentId ? " (คุณ)" : ""}` : "ว่าง"}
               </div>
@@ -1490,6 +1600,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [joinPassword, setJoinPassword] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
   const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState(4);
   const activeRoomCodeRef = useRef("");
   const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
   const pvpTurnKeyRef = useRef("");
@@ -2264,7 +2375,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       .slice(0, 8);
 
     return (
-      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#05070d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
         {passwordRoom ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
             <div className="w-[min(420px,94vw)] rounded-2xl border border-amber-200/28 bg-[#090b12] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
@@ -2306,15 +2417,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </div>
         ) : null}
-        <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(245,158,11,0.2),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(34,211,238,0.18),transparent_24%),linear-gradient(180deg,#07111d,#05070d)]" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
+        <section className="relative min-h-[320px] overflow-hidden border-b border-amber-200/12 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_16%,rgba(248,113,113,0.28),transparent_24%),radial-gradient(circle_at_76%_24%,rgba(251,191,36,0.22),transparent_26%),radial-gradient(circle_at_50%_100%,rgba(239,68,68,0.24),transparent_32%),linear-gradient(135deg,#131015,#050507_62%,#0f0805)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:54px_54px]" />
+          <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full border border-red-300/14 bg-red-500/10 blur-2xl" />
+          <div className="relative flex min-h-[280px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-black/34 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
                 <Swords className="h-3.5 w-3.5" />
                 ห้องแบทเทิลการ์ด
               </div>
-              <h1 className="text-[clamp(2.1rem,8vw,5.8rem)] font-black uppercase leading-[0.9] tracking-normal">
+              <h1 className="text-[clamp(2.4rem,9vw,6.4rem)] font-black uppercase leading-[0.86] tracking-normal drop-shadow-[0_0_34px_rgba(248,113,113,0.2)]">
                 ล็อบบี้ต่อสู้
               </h1>
               <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/60 sm:text-base">
@@ -2327,7 +2440,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 ["ล็อก", rooms.filter((room) => room.access === "private").length],
                 ["กำลังสู้", rooms.filter((room) => room.status === "playing").length],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-white/10 bg-black/28 p-3">
+                <div key={label} className="rounded-xl border border-amber-200/14 bg-black/42 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                   <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">{label}</div>
                   <div className="mt-1 text-2xl font-black text-white">{value}</div>
                 </div>
@@ -2336,9 +2449,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </section>
 
-        <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[360px_1fr] lg:p-8">
+        <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[380px_1fr] lg:p-8">
           <div className="space-y-4">
-            <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+            <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
               <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
                 <Plus className="h-4 w-4 text-amber-300" />
                 สร้างห้อง
@@ -2351,7 +2464,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     onClick={() => setRoomAccess(access)}
                     className={`h-11 rounded-xl border text-xs font-black uppercase tracking-[0.12em] transition ${
                       roomAccess === access
-                        ? "border-amber-300 bg-amber-300 text-black"
+                        ? "border-red-300 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,0.28)]"
                         : "border-white/10 bg-black/28 text-white/58 hover:border-amber-300/40"
                     }`}
                   >
@@ -2365,7 +2478,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   <input
                     value={roomPassword}
                     onChange={(event) => setRoomPassword(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-white/10 bg-black/36 px-3 text-sm font-bold text-white outline-none transition focus:border-amber-300/70"
+                    className="h-11 w-full rounded-xl border border-amber-200/12 bg-black/50 px-3 text-sm font-bold text-white outline-none transition focus:border-red-300/70"
                     placeholder="อย่างน้อย 4 ตัว"
                   />
                 </label>
@@ -2373,14 +2486,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <button
                 type="button"
                 onClick={createRoom}
-                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-300 text-sm font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
+                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.32)] transition hover:bg-red-400"
               >
                 <Plus className="h-4 w-4" />
                 สร้าง
               </button>
             </div>
 
-            <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+            <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
               <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
                 <Search className="h-4 w-4 text-cyan-200" />
                 ค้นหาห้อง
@@ -2388,7 +2501,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <input
                 value={joinCode}
                 onChange={(event) => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="h-12 w-full rounded-xl border border-white/10 bg-black/36 px-3 text-center font-mono text-xl font-black tracking-[0.2em] text-white outline-none transition focus:border-cyan-200/70"
+                className="h-12 w-full rounded-xl border border-amber-200/12 bg-black/50 px-3 text-center font-mono text-xl font-black tracking-[0.2em] text-white outline-none transition focus:border-red-300/70"
                 placeholder="000000"
                 inputMode="numeric"
               />
@@ -2396,7 +2509,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 type="button"
                 onClick={() => enterRoom()}
                 disabled={joinCode.length !== 6}
-                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-black uppercase tracking-[0.12em] text-black transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
+                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.26)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
               >
                 <KeyRound className="h-4 w-4" />
                 เข้าห้อง
@@ -2407,9 +2520,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 {lobbyMessage}
               </div>
             ) : null}
+            <RankFramePicker selected={selectedFrameIndex} onSelect={setSelectedFrameIndex} />
           </div>
 
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4">
+          <div className="rounded-[18px] border border-amber-200/16 bg-black/36 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-black text-white">
                 <Users className="h-4 w-4 text-emerald-200" />
@@ -2419,12 +2533,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {visibleRooms.length > 0 ? visibleRooms.map((room) => (
-                <div key={room.code} className="rounded-xl border border-white/8 bg-black/24 p-4">
+                <div key={room.code} className="relative overflow-hidden rounded-[18px] border border-amber-200/14 bg-[linear-gradient(135deg,rgba(255,255,255,0.055),rgba(0,0,0,0.4))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-200/70 to-transparent" />
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <RankAvatar participant={room.seats.host} size="md" />
+                      <div className="min-w-0">
                       <div className="font-mono text-2xl font-black tracking-[0.18em] text-white">{room.code}</div>
                       <div className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/38">
                         {room.status === "playing" ? "กำลังสู้" : "รอเริ่ม"} • {room.seats.challenger ? "ผู้เล่น 2 คน" : "ผู้เล่น 1 คน"}
+                      </div>
+                      <div className="mt-1 truncate text-xs font-bold text-amber-100/55">
+                        หัวห้อง: {room.seats.host?.name || "ไม่มี"}
+                      </div>
                       </div>
                     </div>
                     <div className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black uppercase ${
@@ -2439,7 +2560,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   <button
                     type="button"
                     onClick={() => (room.access === "private" && room.hostId !== participant.id ? setPasswordRoom(room) : enterRoom(room.code))}
-                    className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-emerald-100"
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-red-500 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_28px_rgba(239,68,68,0.26)] transition hover:bg-red-400"
                   >
                     เข้าห้อง
                   </button>
@@ -2496,9 +2617,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
 
     return (
-      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#05070d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
-        <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(245,158,11,0.2),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(124,58,237,0.16),transparent_24%),linear-gradient(180deg,#07111d,#05070d)]" />
+      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
+        <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(245,158,11,0.24),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(239,68,68,0.24),transparent_24%),linear-gradient(180deg,#130d0b,#050507)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:54px_54px]" />
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/70">
@@ -2516,7 +2638,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <button
                 type="button"
                 onClick={leaveRoom}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-black/28 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-white/30"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-black/38 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-white/30"
               >
                 ออกห้อง
               </button>
@@ -2524,7 +2646,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 type="button"
                 onClick={startRoomGame}
                 disabled={!canStart}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.3)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
               >
                 <Swords className="h-4 w-4" />
                 เริ่มเกม
@@ -2543,6 +2665,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               emptyText="ช่องเจ้าของห้องว่าง"
               canTake={currentIsSpectator && !currentRoom.seats.host}
               onTake={() => takeFieldSlot("host")}
+              currentId={participant.id}
+              selectedFrameIndex={selectedFrameIndex}
             />
             <RoomSeatCard
               label="ฝั่งผู้ท้าชิง"
@@ -2552,6 +2676,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               emptyText="รอผู้ท้าชิง"
               canTake={currentIsSpectator && !currentRoom.seats.challenger}
               onTake={() => takeFieldSlot("challenger")}
+              currentId={participant.id}
+              selectedFrameIndex={selectedFrameIndex}
             />
             <div className="md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
               <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">กติกาห้อง</div>
@@ -2574,12 +2700,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </div>
 
-          <SpectatorPanel
-            spectators={currentRoom.spectators}
-            currentId={participant.id}
-            canWatch={!currentIsSpectator && currentRoom.status === "waiting"}
-            onWatch={moveToSpectator}
-          />
+          <aside className="space-y-4">
+            <SpectatorPanel
+              spectators={currentRoom.spectators}
+              currentId={participant.id}
+              canWatch={!currentIsSpectator && currentRoom.status === "waiting"}
+              onWatch={moveToSpectator}
+            />
+            <RankFramePicker selected={selectedFrameIndex} onSelect={setSelectedFrameIndex} />
+          </aside>
         </section>
       </main>
     );
