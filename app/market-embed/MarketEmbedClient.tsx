@@ -51,7 +51,7 @@ export default function MarketEmbedClient({ items }: Props) {
 
         {centerHero ? (
           <div className="pointer-events-none relative z-10 p-3 sm:p-5">
-            <section className="relative overflow-hidden rounded-[30px] border border-white/75 bg-[#edf2fb] px-4 py-6 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.16)] ring-1 ring-black/5 sm:rounded-[38px] sm:px-8 sm:py-10">
+            <section className="relative overflow-hidden rounded-[26px] border border-white/75 bg-[#edf2fb] px-4 py-5 text-[#09090b] shadow-[0_24px_70px_rgba(20,20,30,0.14)] ring-1 ring-black/5 sm:rounded-[34px] sm:px-7 sm:py-8">
               <div className="absolute inset-0">
                 <div
                   className="absolute inset-0 bg-cover bg-center opacity-100"
@@ -66,7 +66,7 @@ export default function MarketEmbedClient({ items }: Props) {
                   <div className="text-[10px] font-black uppercase tracking-[0.42em] text-black/36">
                     NEXORA ELITE MARKET
                   </div>
-                  <h2 className="mt-2 text-3xl font-black tracking-[-0.06em] sm:text-5xl">
+                  <h2 className="mt-2 text-2xl font-black tracking-[-0.06em] sm:text-4xl">
                     FEATURED TOP 3
                   </h2>
                 </div>
@@ -75,7 +75,7 @@ export default function MarketEmbedClient({ items }: Props) {
                 </div>
               </div>
 
-              <div className="relative mt-7 grid gap-3 sm:mt-10 sm:grid-cols-[0.72fr_1fr_0.72fr] sm:items-end sm:gap-4">
+              <div className="relative mt-5 grid grid-cols-3 items-end gap-2 sm:mt-8 sm:grid-cols-[0.82fr_1fr_0.82fr] sm:gap-4">
                 {leftHero ? (
                   <FeaturedCard item={leftHero} rank="02" compact tilt="left" />
                 ) : null}
@@ -166,11 +166,17 @@ function FeaturedCard({
 
   return (
     <article
-      className={`relative overflow-hidden rounded-[28px] border border-white/20 bg-black shadow-[0_28px_90px_rgba(0,0,0,0.32)] ${
+      className={`relative overflow-hidden rounded-[18px] border border-white/20 bg-black shadow-[0_20px_64px_rgba(0,0,0,0.28)] sm:rounded-[26px] ${
         compact ? compactTiltClass : ""
       }`}
     >
-      <div className={featured ? "aspect-[4/5] sm:aspect-[3/4]" : "aspect-[3/4]"}>
+      <div
+        className={
+          featured
+            ? "h-[210px] sm:h-[360px] lg:h-[420px]"
+            : "h-[150px] sm:h-[285px] lg:h-[330px]"
+        }
+      >
         <SafeCardImage
           cardNo={item.cardNo}
           imageUrl={item.image}
@@ -180,22 +186,22 @@ function FeaturedCard({
           className="h-full w-full object-cover"
         />
       </div>
-      <div className="absolute left-3 top-3 rounded-full border border-amber-300/35 bg-black/60 px-3 py-1 text-xs font-black tracking-[0.14em] text-amber-100 backdrop-blur">
+      <div className="absolute left-2 top-2 rounded-full border border-amber-300/35 bg-black/60 px-2 py-1 text-[9px] font-black tracking-[0.12em] text-amber-100 backdrop-blur sm:left-3 sm:top-3 sm:px-3 sm:text-xs">
         TOP {rank}
       </div>
-      <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.92))] p-4">
-        <div className="line-clamp-2 text-lg font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+      <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.92))] p-2 sm:p-4">
+        <div className="line-clamp-2 text-[11px] font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)] sm:text-base lg:text-lg">
           {item.name}
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <span className="text-xl font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+        <div className="mt-1 flex items-center justify-between gap-2 sm:mt-2 sm:gap-3">
+          <span className="text-xs font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)] sm:text-lg lg:text-xl">
             {item.price}
           </span>
-          <span className="rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">
+          <span className="hidden rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[10px] font-black text-white/70 sm:inline-flex">
             {item.likes.toLocaleString("th-TH")}
           </span>
         </div>
-        <div className="mt-2 truncate text-xs font-bold text-white/58">
+        <div className="mt-1 truncate text-[9px] font-bold text-white/58 sm:mt-2 sm:text-xs">
           {item.sellerName || "NEXORA Seller"}
         </div>
       </div>
