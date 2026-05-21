@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Brain,
@@ -216,6 +216,12 @@ function normalizeApiRooms(value: unknown): TriadRoom[] {
       };
     })
     .filter((room) => room.code.length === 6);
+}
+
+function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
+  if (!room?.code) return rooms;
+  const exists = rooms.some((item) => item.code === room.code);
+  return exists ? rooms.map((item) => (item.code === room.code ? room : item)) : [room, ...rooms];
 }
 
 function laneForTurn(turn: TriadTurn): Lane {
@@ -1342,6 +1348,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
+  const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
+  const activeRoomCodeRef = useRef("");
+  const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
@@ -1372,7 +1381,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const playerGraveCards = gravePlayerCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const matchDone = fightNo > 3;
-  const currentRoom = rooms.find((room) => room.code === activeRoomCode);
+  const currentRoom = rooms.find((room) => room.code === activeRoomCode) || activeRoomSnapshot;
   const isRoomHost = Boolean(currentRoom && currentRoom.hostId === participant.id);
   const isSpectator = Boolean(currentRoom?.spectators.some((viewer) => viewer.id === participant.id));
   const isFieldPlayer = Boolean(
@@ -1389,7 +1398,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const response = await fetch(`${ROOM_API_PATH}?ts=${Date.now()}`, { cache: "no-store" });
     const payload = await response.json().catch(() => ({}));
     const nextRooms = normalizeApiRooms(payload.rooms);
-    setRooms(nextRooms);
+    setRooms((current) => {
+      const activeCode = activeRoomCodeRef.current;
+      const activeFallback =
+        activeRoomSnapshotRef.current || current.find((room) => room.code === activeCode) || null;
+      return activeCode && activeFallback && !nextRooms.some((room) => room.code === activeCode)
+        ? mergeRoomByCode(nextRooms, activeFallback)
+        : nextRooms;
+    });
     return nextRooms;
   };
 
@@ -1401,7 +1417,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       body: JSON.stringify({ ...body, participant }),
     });
     const payload = await response.json().catch(() => ({}));
-    setRooms(normalizeApiRooms(payload.rooms));
+    const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
+    setRooms((current) =>
+      mergeRoomByCode(normalizeApiRooms(payload.rooms), actionRoom || current.find((room) => room.code === activeRoomCodeRef.current))
+    );
+    if (actionRoom) {
+      activeRoomSnapshotRef.current = actionRoom;
+      setActiveRoomSnapshot(actionRoom);
+    }
     return { ok: response.ok, status: response.status, payload };
   };
 
@@ -1419,11 +1442,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       password,
     });
 
-    const room = result.payload?.room as TriadRoom | undefined;
+    const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
     if (!result.ok || !room?.code) {
       setLobbyMessage("Create room failed.");
       return;
     }
+    setActiveRoomSnapshot(room);
+    activeRoomSnapshotRef.current = room;
+    activeRoomCodeRef.current = room.code;
     setActiveRoomCode(room.code);
     setLobbyMessage("");
     setPhase("room");
@@ -1456,6 +1482,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     setPasswordRoom(null);
     setJoinPassword("");
+    const joinedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || room;
+    setActiveRoomSnapshot(joinedRoom);
+    activeRoomSnapshotRef.current = joinedRoom;
+    activeRoomCodeRef.current = code;
     setActiveRoomCode(code);
     setLobbyMessage(result.payload?.joinedAs === "spectator" ? "Joined as spectator." : "");
     setPhase("room");
@@ -1488,7 +1518,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (currentRoom) {
       await postRoomAction({ action: "leave", code: currentRoom.code });
     }
+    activeRoomCodeRef.current = "";
+    activeRoomSnapshotRef.current = null;
     setActiveRoomCode("");
+    setActiveRoomSnapshot(null);
     setPhase("lobby");
   };
 
@@ -1502,6 +1535,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       window.clearInterval(timer);
     };
   }, [participant.id]);
+
+  useEffect(() => {
+    activeRoomCodeRef.current = activeRoomCode;
+  }, [activeRoomCode]);
+
+  useEffect(() => {
+    activeRoomSnapshotRef.current = activeRoomSnapshot;
+  }, [activeRoomSnapshot]);
 
   useEffect(() => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
@@ -2059,9 +2100,34 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (!currentRoom) {
       return (
         <main className="grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center rounded-[24px] border border-white/8 bg-[#05070d] p-6 text-white">
-          <button type="button" onClick={() => setPhase("lobby")} className="rounded-xl bg-white px-5 py-3 text-sm font-black text-black">
-            Back to Lobby
-          </button>
+          <div className="w-[min(420px,94vw)] rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-center">
+            <div className="text-lg font-black text-white">Reconnecting room</div>
+            <div className="mt-2 text-sm font-semibold leading-6 text-white/50">
+              The room snapshot is being refreshed. You can return to the lobby if it was closed.
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void syncRooms().catch(() => null)}
+                className="h-11 rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black"
+              >
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  activeRoomCodeRef.current = "";
+                  activeRoomSnapshotRef.current = null;
+                  setActiveRoomCode("");
+                  setActiveRoomSnapshot(null);
+                  setPhase("lobby");
+                }}
+                className="h-11 rounded-xl bg-white text-xs font-black uppercase tracking-[0.12em] text-black"
+              >
+                Lobby
+              </button>
+            </div>
+          </div>
         </main>
       );
     }
