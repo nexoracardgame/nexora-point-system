@@ -479,9 +479,16 @@ function battleDecksReady(room: StoredTriadRoom) {
   return Boolean(room.game.deckReady.host && room.game.deckReady.challenger);
 }
 
-function finalizeDeckSelection(room: StoredTriadRoom) {
-  if (battleDecksReady(room)) return false;
+function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
+  if (battleDecksReady(room) && !force) return false;
   room.game.deckReady = { host: true, challenger: true };
+  room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
+  room.game.turns = [];
+  room.game.activeTurn = 1;
+  room.game.fightNo = 1;
+  room.game.matchWinner = "";
+  room.game.surrenderedBy = "";
+  room.game.matchEndedAt = 0;
   room.game.turnStartedAt = Date.now();
   return true;
 }
@@ -578,7 +585,7 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
   }
   room.game.decks[side] = normalizeDeck(deck);
   if (deckSelectExpired(room)) {
-    finalizeDeckSelection(room);
+    finalizeDeckSelection(room, true);
   }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
@@ -589,12 +596,13 @@ export async function readyTriadRoomDeck(code: string, participantId: string, de
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  const wasBattleReady = battleDecksReady(room);
   if (!room.game.deckReady[side]) {
     room.game.decks[side] = normalizeDeck(deck);
     room.game.deckReady[side] = true;
   }
-  if (battleDecksReady(room) || deckSelectExpired(room)) {
-    finalizeDeckSelection(room);
+  if ((!wasBattleReady && battleDecksReady(room)) || deckSelectExpired(room)) {
+    finalizeDeckSelection(room, true);
   }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
