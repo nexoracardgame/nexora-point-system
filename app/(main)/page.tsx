@@ -29,7 +29,7 @@ function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
       className={`pointer-events-auto overflow-hidden border border-amber-300/22 bg-[#030407] text-white shadow-[0_30px_90px_rgba(0,0,0,0.45),0_0_42px_rgba(245,158,11,0.16)] ${
         mobile
           ? "relative z-20 mt-5 rounded-[24px]"
-          : "absolute left-1/2 top-[44%] z-40 hidden w-[min(66vw,1040px)] -translate-x-1/2 -translate-y-1/2 rounded-[30px] sm:block"
+          : "absolute right-[clamp(1rem,3.5vw,4rem)] top-[58%] z-40 hidden w-[min(38vw,760px)] -translate-y-1/2 rounded-[30px] sm:block"
       }`}
     >
       <div className="relative">
