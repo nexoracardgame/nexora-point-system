@@ -715,6 +715,11 @@ export async function leaveTriadRoom(code: string, participantId: string) {
     cleanRoom.seats.host = cleanRoom.seats.challenger;
     cleanRoom.seats.challenger = null;
     cleanRoom.hostId = cleanRoom.seats.host.id;
+  } else if (!cleanRoom.seats.host && cleanRoom.spectators.length > 0) {
+    const [nextHost, ...remainingSpectators] = cleanRoom.spectators;
+    cleanRoom.seats.host = nextHost;
+    cleanRoom.spectators = remainingSpectators;
+    cleanRoom.hostId = nextHost.id;
   } else if (cleanRoom.seats.host) {
     cleanRoom.hostId = cleanRoom.seats.host.id;
   }
