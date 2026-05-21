@@ -387,28 +387,48 @@ function applySkill(
   triangle: TriadTriangle,
   ownScore: ReturnType<typeof baseScore>,
   opponentScore: ReturnType<typeof baseScore>,
-  turn: TriadTurn
+  turn: TriadTurn,
+  side: "player" | "opponent"
 ) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   const unresolved: TriadSkillRule[] = [];
-  if (!laneCard || laneCard.kind !== "skill") return { unresolved };
+  const events: TriadSkillEvent[] = [];
+  if (!laneCard || laneCard.kind !== "skill") return { unresolved, events };
 
   const rule = triadSkillRuleByNo.get(laneCard.cardNo);
-  if (!rule) return { unresolved };
+  if (!rule) return { unresolved, events };
 
   if (!rule.allowedTurns.includes(turn)) {
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: สกิลไม่เข้าเงื่อนไขตานี้`);
-    return { unresolved };
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "สกิลนี้ยังไม่ทำงานในตานี้",
+    });
+    return { unresolved, events };
   }
 
   if (rule.needsReview && rule.shape !== "stat") {
     unresolved.push(rule);
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: รอยืนยันกติกาสกิลพิเศษ`);
-    return { unresolved };
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "สกิลพิเศษนี้รอตรวจสอบกติกา จึงยังไม่เปลี่ยนคะแนน",
+    });
+    return { unresolved, events };
   }
 
+  const targetIsOpponent =
+    rule.target.startsWith("opponent") || (rule.target === "any-one" && rule.effects.some((effect) => effect.delta < 0));
   const targetScore =
-    rule.target.startsWith("opponent") || (rule.target === "any-one" && rule.effects.some((effect) => effect.delta < 0))
+    targetIsOpponent
       ? opponentScore
       : ownScore;
 
@@ -417,10 +437,32 @@ function applySkill(
       targetScore.total += effect.delta;
       const label = effect.metric === "attack" ? "ATK" : "SUP";
       targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${effect.delta >= 0 ? "+" : ""}${effect.delta}`);
+      const metricLabel = effect.metric === "attack" ? "โจมตี" : "ช่วยเหลือ";
+      const directionLabel = effect.delta >= 0 ? "เพิ่ม" : "ลด";
+      const targetLabel = targetIsOpponent ? "ฝั่งตรงข้าม" : "ฝั่งผู้ใช้สกิล";
+      events.push({
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `${targetLabel} ${directionLabel}${metricLabel} ${Math.abs(effect.delta).toLocaleString()} แต้ม`,
+      });
     }
   }
 
-  return { unresolved };
+  if (events.length === 0) {
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "สกิลทำงานแล้ว แต่ไม่ตรงค่าสถานะที่ใช้คิดคะแนนในตานี้",
+    });
+  }
+
+  return { unresolved, events };
 }
 
 function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn) {
@@ -463,8 +505,8 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn);
   const playerScore = baseScore(preScore.player, input.turn);
   const opponentScore = baseScore(preScore.opponent, input.turn);
-  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn);
-  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn);
+  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn, "player");
+  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn, "opponent");
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
 
@@ -479,7 +521,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: [...playerApplied.unresolved, ...opponentApplied.unresolved],
-    skillEvents: preScore.events,
+    skillEvents: [...preScore.events, ...playerApplied.events, ...opponentApplied.events],
   };
 }
 

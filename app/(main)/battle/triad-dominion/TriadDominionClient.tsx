@@ -573,12 +573,14 @@ function ScorePill({ label, value, tone }: { label: string; value: number; tone:
 
 function FighterPanel({
   name,
+  image,
   score,
   tone,
   deckLeft,
   side,
 }: {
   name: string;
+  image: string;
   score: number;
   tone: "player" | "bot";
   deckLeft: number;
@@ -591,7 +593,7 @@ function FighterPanel({
       } ${side === "right" ? "xl:flex-row-reverse xl:text-right" : ""}`}
     >
       <div className="relative grid h-20 w-16 shrink-0 place-items-end overflow-hidden rounded-xl border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(0,0,0,0.3))]">
-        <Image src="/avatar.png" alt={name} width={72} height={72} className="h-16 w-16 object-contain" />
+        <Image src={image || "/avatar.png"} alt={name} width={72} height={72} className="h-16 w-16 object-contain" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-black text-white">{name}</div>
@@ -667,7 +669,7 @@ function BoardCardSlot({
 
   return (
     <div
-      className={`relative w-[clamp(64px,9.2vw,128px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border}`}
+      className={`relative w-[clamp(74px,10.8vw,158px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border}`}
     >
       <div className="relative aspect-[3/4]">
         {card && !hidden ? (
@@ -706,7 +708,7 @@ function BoardPile({
 
   return (
     <div
-      className={`relative grid w-[clamp(54px,7vw,94px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] ${color} ${
+      className={`relative grid w-[clamp(60px,8vw,112px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] ${color} ${
         rotate ? "rotate-180" : ""
       }`}
       style={{ aspectRatio: "3 / 4" }}
@@ -738,33 +740,53 @@ function RevealSpotlight({
   showPlayer,
   showBot,
   result,
+  playerName,
+  botName,
 }: {
   playerCard?: CardView;
   botCard?: CardView;
   showPlayer: boolean;
   showBot: boolean;
   result?: TriadTurnResult;
+  playerName: string;
+  botName: string;
 }) {
   if (!showPlayer && !showBot) return null;
 
   const isScored = Boolean(result && showPlayer && showBot);
   const playerWins = result?.winner === "player";
   const botWins = result?.winner === "opponent";
+  const skillEvents = result?.skillEvents || [];
   const skillCard = [playerCard, botCard].find((card) => card?.kind === "skill");
-  const skillEvent = result?.skillEvents?.[0];
+  const skillEvent = skillEvents[0];
   const skillText = skillEvent?.summary || skillCard?.skillText || "";
   const isSwapSkill = skillEvent?.type === "swap-control";
+  const scoreText = result ? `${result.playerTotal.toLocaleString()} ปะทะ ${result.opponentTotal.toLocaleString()}` : "";
+  const winnerText = result?.winner === "draw" ? "เสมอ" : playerWins ? `${playerName} ได้แต้ม` : `${botName} ได้แต้ม`;
+  const timeline =
+    skillEvents.length > 0
+      ? skillEvents
+      : [
+          {
+            cardNo: "",
+            name: "ปะทะโดยตรง",
+            side: "player" as const,
+            type: "stat" as const,
+            text: "",
+            summary: "ไม่มีสกิลพิเศษในตานี้ คิดคะแนนจากการปะทะของการ์ดทั้งสองฝั่ง",
+          },
+        ];
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.16),rgba(0,0,0,0.48)_36%,rgba(0,0,0,0.76)_78%)] backdrop-blur-sm">
       <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
-      <div className="relative grid w-[min(760px,92%)] items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
-        <div className={`mx-auto w-[clamp(92px,17vw,178px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
+      <div className="relative grid w-[min(980px,94%)] items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
+        <div className={`mx-auto w-[clamp(106px,18vw,210px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
               {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
               <div className="relative aspect-[3/4] overflow-hidden rounded-[10px]">
-                <Image src={playerCard.sourceImage} alt={playerCard.name} fill sizes="180px" className="object-cover" />
+                <Image src={playerCard.sourceImage} alt={playerCard.name} fill sizes="210px" className="object-cover" />
               </div>
             </div>
           ) : null}
@@ -772,34 +794,56 @@ function RevealSpotlight({
 
         <div className="text-center">
           <div className="animate-[triad-flash_900ms_ease-out] text-[clamp(2rem,5vw,4.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)]">
-            {isSwapSkill ? "สลับ!" : isScored ? (result?.winner === "draw" ? "เสมอ" : playerWins ? "เรา +1" : "คู่แข่ง +1") : "เปิดการ์ด"}
+            {isSwapSkill ? "สลับ!" : isScored ? winnerText : "เปิดการ์ด"}
           </div>
           {isScored ? (
             <div className="mt-2 rounded-full border border-amber-200/50 bg-black/70 px-4 py-2 text-[clamp(1rem,2vw,1.45rem)] font-black text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)]">
-              {result?.playerTotal.toLocaleString()} <span className="text-white/45">ปะทะ</span> {result?.opponentTotal.toLocaleString()}
+              {scoreText}
             </div>
           ) : null}
         </div>
 
-        <div className={`mx-auto w-[clamp(92px,17vw,178px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(106px,18vw,210px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
           {showBot && botCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
               {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
               <div className="relative aspect-[3/4] overflow-hidden rounded-[10px]">
-                <Image src={botCard.sourceImage} alt={botCard.name} fill sizes="180px" className="object-cover" />
+                <Image src={botCard.sourceImage} alt={botCard.name} fill sizes="210px" className="object-cover" />
               </div>
             </div>
           ) : null}
         </div>
       </div>
-      {skillCard ? (
-        <div className="absolute bottom-[8%] max-w-[min(720px,88%)] animate-[triad-flash_900ms_ease-out] rounded-2xl border border-violet-200/35 bg-black/74 px-5 py-3 text-center shadow-[0_0_40px_rgba(168,85,247,0.35)]">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-200/70">
-            {isSwapSkill ? "สลับมอนสเตอร์หลักแล้ว" : "สกิลทำงานแล้ว"}
-          </div>
-          <div className="mt-1 text-lg font-black text-white">{skillEvent?.name || skillCard.name}</div>
-          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-white/68">
-            {skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
+      {isScored ? (
+        <div className="absolute bottom-[5%] grid w-[min(760px,90%)] gap-2">
+          {timeline.map((event, index) => (
+            <div
+              key={`${event.cardNo || "basic"}-${index}`}
+              className="animate-[triad-effect-step_720ms_ease-out_both] rounded-2xl border border-violet-200/35 bg-black/78 px-4 py-3 shadow-[0_0_40px_rgba(168,85,247,0.26)] backdrop-blur-md"
+              style={{ animationDelay: `${index * 160}ms` }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200/70">
+                    {event.cardNo ? `${event.side === "player" ? playerName : botName} ใช้สกิล No.${event.cardNo}` : "ผลการปะทะ"}
+                  </div>
+                  <div className="mt-1 truncate text-base font-black text-white">{event.name}</div>
+                </div>
+                <div className="shrink-0 rounded-full border border-amber-200/30 bg-amber-200/10 px-3 py-1 text-xs font-black text-amber-100">
+                  {index + 1}/{timeline.length}
+                </div>
+              </div>
+              <div className="mt-2 text-sm font-semibold leading-5 text-white/72">
+                {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
+              </div>
+            </div>
+          ))}
+          <div
+            className="animate-[triad-effect-step_720ms_ease-out_both] rounded-2xl border border-amber-200/40 bg-amber-200/12 px-4 py-3 text-center shadow-[0_0_42px_rgba(251,191,36,0.24)]"
+            style={{ animationDelay: `${timeline.length * 160}ms` }}
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/70">สรุปคะแนนตานี้</div>
+            <div className="mt-1 text-xl font-black text-white">{scoreText} • {winnerText}</div>
           </div>
         </div>
       ) : null}
@@ -813,6 +857,10 @@ function RevealSpotlight({
           0% { transform: scale(0.7); opacity: 0; text-shadow: 0 0 0 rgba(255,255,255,0); }
           40% { transform: scale(1.08); opacity: 1; text-shadow: 0 0 34px rgba(255,255,255,0.9); }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes triad-effect-step {
+          0% { transform: translateY(18px) scale(0.96); opacity: 0; filter: blur(6px); }
+          100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
         }
       `}</style>
     </div>
@@ -844,17 +892,17 @@ function BoardTriangle({
     {
       lane: "top",
       label: "หลัก",
-      className: `col-span-2 mx-auto w-[clamp(56px,7.6vw,104px)] ${tone === "bot" ? "translate-y-2" : "-translate-y-2"}`,
+      className: `col-span-2 mx-auto w-[clamp(72px,9.5vw,132px)] ${tone === "bot" ? "translate-y-2" : "-translate-y-2"}`,
     },
     {
       lane: "left",
       label: "โจมตี",
-      className: `w-[clamp(54px,7vw,96px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
+      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
     },
     {
       lane: "right",
       label: "ช่วย",
-      className: `w-[clamp(54px,7vw,96px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
+      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
     },
   ];
 
@@ -1259,6 +1307,10 @@ function CompactBattleBoard({
   botDeckLeft,
   playerGraveCards,
   botGraveCards,
+  playerName,
+  botName,
+  playerImage,
+  botImage,
   placementLane,
   timeLeft,
   turnLocked,
@@ -1281,6 +1333,10 @@ function CompactBattleBoard({
   botDeckLeft: number;
   playerGraveCards: CardView[];
   botGraveCards: CardView[];
+  playerName: string;
+  botName: string;
+  playerImage: string;
+  botImage: string;
   placementLane: Lane;
   timeLeft: number;
   turnLocked: boolean;
@@ -1306,7 +1362,7 @@ function CompactBattleBoard({
   const canEditPlayerSlots = !turnLocked && !revealAllCards;
 
   return (
-    <div className="relative h-full min-h-[340px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[430px] xl:min-h-0">
+    <div className="relative h-full min-h-[430px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[560px] xl:min-h-0">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
@@ -1317,6 +1373,8 @@ function CompactBattleBoard({
         showPlayer={playerVisible(activeLane)}
         showBot={botVisible(activeLane)}
         result={currentResult && revealed[activeTurn]?.scored ? currentResult : undefined}
+        playerName={playerName}
+        botName={botName}
       />
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
@@ -1334,11 +1392,14 @@ function CompactBattleBoard({
         onConfirm={onConfirmSkillTarget}
       />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[7%_31%_1fr_31%_7%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[9%_32%_1fr_32%_9%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
         <div className="flex items-center justify-between gap-3">
-          <div className="rounded-2xl border border-blue-300/18 bg-black/38 px-4 py-2">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">คู่แข่ง</div>
-            <div className="text-lg font-black text-white">คู่แข่ง</div>
+          <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-blue-300/18 bg-black/42 px-3 py-2">
+            <Image src={botImage || "/avatar.png"} alt={botName} width={42} height={42} className="h-10 w-10 shrink-0 rounded-xl border border-white/10 object-contain" />
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-100/52">คู่แข่ง</div>
+              <div className="truncate text-lg font-black text-white">{botName}</div>
+            </div>
           </div>
           <div className="hidden rounded-2xl border border-white/10 bg-black/38 px-4 py-2 text-center sm:block">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">รอบสู้</div>
@@ -1391,9 +1452,12 @@ function CompactBattleBoard({
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">ตา</div>
             <div className="text-2xl font-black text-white">{activeTurn}</div>
           </div>
-          <div className="rounded-2xl border border-red-300/18 bg-black/38 px-4 py-2 text-right">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-red-100/52">เรา</div>
-            <div className="text-lg font-black text-white">เรา</div>
+          <div className="ml-auto flex min-w-0 items-center gap-3 rounded-2xl border border-red-300/18 bg-black/42 px-3 py-2 text-right">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-red-100/52">เรา</div>
+              <div className="truncate text-lg font-black text-white">{playerName}</div>
+            </div>
+            <Image src={playerImage || "/avatar.png"} alt={playerName} width={42} height={42} className="h-10 w-10 shrink-0 rounded-xl border border-white/10 object-contain" />
           </div>
         </div>
       </div>
@@ -1481,6 +1545,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const opponentLabel = opponentSide
     ? currentRoom?.seats[opponentSide]?.name || "คู่แข่ง"
     : "คู่แข่ง";
+  const playerImage = roomPlayerSide
+    ? currentRoom?.seats[roomPlayerSide]?.image || participant.image || "/avatar.png"
+    : participant.image || "/avatar.png";
+  const opponentImage = opponentSide
+    ? currentRoom?.seats[opponentSide]?.image || "/avatar.png"
+    : "/avatar.png";
   const winnerText =
     matchScore.player === matchScore.bot
       ? "เสมอกัน"
@@ -2655,8 +2725,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       </section>
 
-      <section className="grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 xl:h-full xl:grid-cols-[minmax(0,1fr)_210px]">
-        <section className="grid min-h-0 grid-rows-[minmax(340px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(430px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(0,1fr)_auto_auto]">
+      <section className="grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 xl:h-full xl:grid-cols-[minmax(0,1fr)_240px]">
+        <section className="grid min-h-0 grid-rows-[minmax(430px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(560px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(0,1fr)_auto_auto]">
           <CompactBattleBoard
             cardsByNo={cardsByNo}
             lockedFight={lockedFight}
@@ -2670,6 +2740,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             botDeckLeft={Math.max(0, botDeck.length - usedBotCards.length)}
             playerGraveCards={playerGraveCards}
             botGraveCards={botGraveCards}
+            playerName={playerLabel}
+            botName={opponentLabel}
+            playerImage={playerImage}
+            botImage={opponentImage}
             placementLane={placementLane}
             timeLeft={timeLeft}
             turnLocked={turnLocked}
@@ -2846,7 +2920,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </section>
 
         <aside className="flex min-h-0 flex-col gap-4 overflow-hidden">
-          <FighterPanel name={opponentLabel} score={matchScore.bot} tone="bot" deckLeft={Math.max(0, botDeck.length - usedBotCards.length)} side="left" />
+          <FighterPanel name={opponentLabel} image={opponentImage} score={matchScore.bot} tone="bot" deckLeft={Math.max(0, botDeck.length - usedBotCards.length)} side="left" />
 
           <div className="min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
@@ -2886,7 +2960,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
 
           <div className="mt-auto pb-16 xl:pb-20">
-            <FighterPanel name={playerLabel} score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
+            <FighterPanel name={playerLabel} image={playerImage} score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
           </div>
         </aside>
       </section>
