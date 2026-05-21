@@ -10,6 +10,7 @@ import {
   lockTriadRoomCard,
   moveTriadParticipantToSpectator,
   resetTriadRoomBattle,
+  readyTriadRoomDeck,
   setTriadRoomDeck,
   startTriadRoom,
   takeTriadRoomSlot,
@@ -100,6 +101,12 @@ export async function POST(request: Request) {
   if (action === "set-deck") {
     const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
     const result = await setTriadRoomDeck(cleanText(body.code), participant.id, deck);
+    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "ready-deck") {
+    const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
+    const result = await readyTriadRoomDeck(cleanText(body.code), participant.id, deck);
     return noStoreJson(result, { status: result.ok ? 200 : 409 });
   }
 

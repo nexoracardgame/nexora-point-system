@@ -104,6 +104,8 @@ type TriadRoom = {
 
 type RoomGame = {
   decks: Record<RoomPlayerSide, string[]>;
+  deckReady: Record<RoomPlayerSide, boolean>;
+  deckStartedAt: number;
   triangles: Record<RoomPlayerSide, TriadTriangle>;
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
@@ -336,6 +338,7 @@ function normalizeApiRooms(value: unknown): TriadRoom[] {
 function normalizeRoomGame(value: unknown): RoomGame {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
+  const deckReady = raw.deckReady && typeof raw.deckReady === "object" ? (raw.deckReady as Record<string, unknown>) : {};
   const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
   const activeTurn = Number(raw.activeTurn || 1);
   const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
@@ -344,6 +347,11 @@ function normalizeRoomGame(value: unknown): RoomGame {
       host: cleanDeck(decks.host),
       challenger: cleanDeck(decks.challenger),
     },
+    deckReady: {
+      host: Boolean(deckReady.host),
+      challenger: Boolean(deckReady.challenger),
+    },
+    deckStartedAt: Number(raw.deckStartedAt || Date.now()),
     triangles: {
       host: { top: "", left: "", right: "", ...((triangles.host as TriadTriangle | undefined) || {}) },
       challenger: { top: "", left: "", right: "", ...((triangles.challenger as TriadTriangle | undefined) || {}) },
@@ -364,6 +372,11 @@ function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
 function roomTurnSecondsLeft(room: TriadRoom) {
   const elapsedSeconds = Math.floor((Date.now() - room.game.turnStartedAt) / 1000);
   return Math.max(0, TURN_SECONDS - elapsedSeconds);
+}
+
+function roomDeckSecondsLeft(room: TriadRoom) {
+  const elapsedSeconds = Math.floor((Date.now() - room.game.deckStartedAt) / 1000);
+  return Math.max(0, 5 * 60 - elapsedSeconds);
 }
 
 function flipTriadResult(result: TriadTurnResult): TriadTurnResult {
@@ -1620,6 +1633,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [turnLocked, setTurnLocked] = useState(false);
   const [pendingSkillChoice, setPendingSkillChoice] = useState<PendingSkillChoice | null>(null);
   const [timeLeft, setTimeLeft] = useState(TURN_SECONDS);
+  const [deckTimeLeft, setDeckTimeLeft] = useState(5 * 60);
   const [activeTurn, setActiveTurn] = useState<TriadTurn>(1);
   const [revealed, setRevealed] = useState<Record<TriadTurn, TurnReveal>>(emptyRevealState);
   const [lastTurnWinner, setLastTurnWinner] = useState<"player" | "bot" | "draw" | null>(null);
@@ -1662,6 +1676,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const opponentImage = opponentSide
     ? currentRoom?.seats[opponentSide]?.image || "/avatar.png"
     : "/avatar.png";
+  const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
+  const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
+  const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
   const winnerText =
     matchScore.player === matchScore.bot
       ? "เสมอกัน"
@@ -1909,14 +1926,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setTurnLocked(false);
       setPendingSkillChoice(null);
       setTimeLeft(TURN_SECONDS);
-      setRevealed(emptyRevealState());
-      setLockedFight(null);
+      if (currentRoom.game.activeTurn === 1 && currentRoom.game.turns.length === 0) {
+        setRevealed(emptyRevealState());
+        setLockedFight(null);
+      }
     }
     pvpTurnKeyRef.current = turnKey;
     const ownDeck = currentRoom.game.decks[roomPlayerSide];
     const enemyDeck = currentRoom.game.decks[opponentSide];
-    if (ownDeck.length === DECK_SIZE) setPlayerDeck(ownDeck);
-    if (enemyDeck.length === DECK_SIZE) setBotDeck(enemyDeck);
+    if (ownDeckReady || phase !== "deck") setPlayerDeck(ownDeck);
+    setBotDeck(enemyDeck);
     const serverPlayerTriangle = currentRoom.game.triangles[roomPlayerSide];
     const activeLane = laneForTurn(currentRoom.game.activeTurn);
     setTurnLocked(Boolean(serverPlayerTriangle[activeLane]));
@@ -1942,50 +1961,63 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         turns: mappedTurns,
       };
     });
-    if (phase === "deck" && ownDeck.length === DECK_SIZE && enemyDeck.length === DECK_SIZE) {
+    setDeckTimeLeft(roomDeckSecondsLeft(currentRoom));
+    if (phase === "deck" && currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger) {
       setPhase("battle");
       setBattleLog((current) => current.length ? current : ["ทั้งสองฝั่งล็อกเด็คแล้ว เริ่มสู้กันได้เลย"]);
     }
-  }, [currentRoom, opponentSide, phase, roomPlayerSide]);
+  }, [currentRoom, opponentSide, ownDeckReady, phase, roomPlayerSide]);
 
   const toggleDeckCard = (cardNo: string) => {
-    setPlayerDeck((current) => {
-      if (current.includes(cardNo)) return current.filter((item) => item !== cardNo);
-      if (current.length >= DECK_SIZE) return current;
-      return [...current, cardNo];
-    });
+    if (ownDeckReady) return;
+    const nextDeck = playerDeck.includes(cardNo)
+      ? playerDeck.filter((item) => item !== cardNo)
+      : playerDeck.length >= DECK_SIZE
+        ? playerDeck
+        : [...playerDeck, cardNo];
+    setPlayerDeck(nextDeck);
+    if (currentRoom && roomPlayerSide && opponentSide) {
+      void postRoomAction({
+        action: "set-deck",
+        code: currentRoom.code,
+        deck: nextDeck,
+      });
+    }
   };
 
   const enterBattle = async () => {
-    if (playerDeck.length !== DECK_SIZE) return;
+    if (ownDeckReady) return;
     const monsterCount = playerDeckCards.filter((card) => card.kind === "monster").length;
-    if (monsterCount < 3) {
+    if (!currentRoom && monsterCount < 3) {
       setBattleLog(["เด็คต้องมีมอนสเตอร์อย่างน้อย 3 ใบ เพื่อใช้เป็นการ์ดหลักของแต่ละรอบ"]);
       return;
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
       const result = await postRoomAction({
-        action: "set-deck",
+        action: "ready-deck",
         code: currentRoom.code,
         deck: playerDeck,
       });
       if (!result.ok) {
-        setBattleLog(["ล็อกเด็คเข้าห้อง PvP ไม่ได้"]);
+        setBattleLog(["กดพร้อมเด็คเข้าห้อง PvP ไม่ได้"]);
         return;
       }
       const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || currentRoom;
       const ownDeck = room.game.decks[roomPlayerSide];
       const enemyDeck = room.game.decks[opponentSide];
       setBotDeck(enemyDeck);
-      if (ownDeck.length === DECK_SIZE && enemyDeck.length === DECK_SIZE) {
+      setPlayerDeck(ownDeck);
+      if (room.game.deckReady.host && room.game.deckReady.challenger) {
         setPhase("battle");
-        setBattleLog(["ล็อกเด็คแล้ว สู้กับผู้เล่นอีกฝั่งได้เลย"]);
+        setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
-        setBattleLog(["ล็อกเด็คแล้ว รออีกฝ่ายล็อกเด็ค"]);
+        setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
       }
       return;
     }
+
+    if (playerDeck.length !== DECK_SIZE) return;
 
     const nextBotDeck = chooseBotDeck(deckCatalog, playerDeck);
     setBotDeck(nextBotDeck);
@@ -1997,6 +2029,30 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPhase("battle");
     setBattleLog(["ล็อกเด็คแล้ว เลือกการ์ดจากมือไปวางบนสนาม"]);
   };
+
+  useEffect(() => {
+    if (phase !== "deck" || !currentRoom) return;
+    const timer = window.setInterval(() => {
+      const nextLeft = roomDeckSecondsLeft(currentRoom);
+      setDeckTimeLeft(nextLeft);
+      if (nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady) {
+        void postRoomAction({
+          action: "ready-deck",
+          code: currentRoom.code,
+          deck: playerDeck,
+        }).then((result) => {
+          if (result.ok) {
+            const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
+            if (room?.game.deckReady.host && room.game.deckReady.challenger) {
+              setPhase("battle");
+              setBattleLog(["หมดเวลาเลือกเด็ค ระบบล็อกเด็คเท่าที่เลือกไว้แล้ว"]);
+            }
+          }
+        });
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [currentRoom, opponentSide, ownDeckReady, phase, playerDeck, roomPlayerSide]);
 
   const resetBattle = () => {
     setPhase("deck");
@@ -2715,6 +2771,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   if (phase === "deck") {
+    const deckReadyDisabled = currentRoom ? ownDeckReady : playerDeck.length !== DECK_SIZE;
+    const deckReadyLabel = ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
+    const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
       <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
         <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
@@ -2735,18 +2794,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">
-                เลือกแล้ว
+                {currentRoom ? "เวลาเลือกเด็ค" : "เลือกแล้ว"}
               </div>
               <div className="mt-1 text-5xl font-black text-white">
-                {playerDeck.length}/{DECK_SIZE}
+                {currentRoom ? deckTimerText : `${playerDeck.length}/${DECK_SIZE}`}
+              </div>
+              <div className="mt-2 text-xs font-bold text-white/48">
+                เลือกแล้ว {playerDeck.length}/{DECK_SIZE} • {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}
               </div>
               <button
                 type="button"
                 onClick={enterBattle}
-                disabled={playerDeck.length !== DECK_SIZE}
-                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                disabled={deckReadyDisabled}
+                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-[0_0_32px_rgba(239,68,68,0.28)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
               >
-                เข้าสนาม
+                {deckReadyLabel}
                 <ChevronRight className="h-4 w-4" />
               </button>
               {currentRoom ? (
@@ -2766,7 +2828,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {deckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
-              const disabled = playerDeck.length >= DECK_SIZE && !selected;
+              const disabled = ownDeckReady || (playerDeck.length >= DECK_SIZE && !selected);
               return (
                 <DeckCard
                   key={card.cardNo}
@@ -2804,6 +2866,26 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </aside>
         </section>
+        {currentRoom ? (
+          <div className="fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-red-200/35 bg-black/78 p-3 shadow-[0_0_44px_rgba(239,68,68,0.28)] backdrop-blur-md xl:bottom-5">
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-red-100/62">
+                ล็อกเด็คอัตโนมัติใน {deckTimerText}
+              </div>
+              <div className="mt-1 truncate text-sm font-bold text-white/70">
+                {ownDeckReady ? "เด็คคุณล็อกแล้ว รออีกฝ่าย" : `เลือกไว้ ${playerDeck.length}/${DECK_SIZE} ใบ กดพร้อมแล้วจะแก้ไม่ได้`}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={enterBattle}
+              disabled={ownDeckReady}
+              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-red-500 px-6 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.34)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+            >
+              {ownDeckReady ? "พร้อมแล้ว" : "พร้อม"}
+            </button>
+          </div>
+        ) : null}
       </main>
     );
   }

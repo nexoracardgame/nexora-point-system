@@ -38,6 +38,11 @@ export type TriadRoomGame = {
     host: string[];
     challenger: string[];
   };
+  deckReady: {
+    host: boolean;
+    challenger: boolean;
+  };
+  deckStartedAt: number;
   triangles: {
     host: TriadTriangle;
     challenger: TriadTriangle;
@@ -67,6 +72,7 @@ type TriadRoomRow = {
 
 const SPECTATOR_LIMIT = 10;
 const TURN_TIMEOUT_MS = 120_000;
+const DECK_SELECT_TIMEOUT_MS = 5 * 60_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
 const PLAYING_ROOM_TTL_MS = 30 * 60_000;
 
@@ -131,6 +137,7 @@ function normalizeDeck(value: unknown) {
 function normalizeGame(value: unknown): TriadRoomGame {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
+  const deckReady = raw.deckReady && typeof raw.deckReady === "object" ? (raw.deckReady as Record<string, unknown>) : {};
   const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
   const activeTurn = Number(raw.activeTurn || 1);
   return {
@@ -138,6 +145,11 @@ function normalizeGame(value: unknown): TriadRoomGame {
       host: normalizeDeck(decks.host),
       challenger: normalizeDeck(decks.challenger),
     },
+    deckReady: {
+      host: Boolean(deckReady.host),
+      challenger: Boolean(deckReady.challenger),
+    },
+    deckStartedAt: Number(raw.deckStartedAt || Date.now()),
     triangles: {
       host: { ...emptyTriangle(), ...((triangles.host as TriadTriangle | undefined) || {}) },
       challenger: { ...emptyTriangle(), ...((triangles.challenger as TriadTriangle | undefined) || {}) },
@@ -195,14 +207,14 @@ async function ensureTriadRoomSchema() {
           "hostId" TEXT NOT NULL,
           "seats" JSONB NOT NULL DEFAULT '{"host":null,"challenger":null}'::jsonb,
           "spectators" JSONB NOT NULL DEFAULT '[]'::jsonb,
-          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb,
+          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb,
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_status_idx" ON "TriadRoom" ("status")`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_createdAt_idx" ON "TriadRoom" ("createdAt" DESC)`);
-      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb`);
     })().catch((error) => {
       globalForTriadRooms.nexoraTriadRoomSchemaPromise = undefined;
       throw error;
@@ -391,6 +403,11 @@ async function pruneExpiredRooms(rooms: StoredTriadRoom[]) {
 export async function listTriadRooms() {
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
+  for (const room of aliveRooms) {
+    if (deckSelectExpired(room) && finalizeDeckSelection(room)) {
+      await upsertStoredRoom(room);
+    }
+  }
   return aliveRooms.map(publicRoom);
 }
 
@@ -444,7 +461,23 @@ function metricForTurn(turn: TriadTurn): TriadTurnResult["metric"] {
 }
 
 function freshGame(): TriadRoomGame {
-  return normalizeGame({ turnStartedAt: Date.now() });
+  const now = Date.now();
+  return normalizeGame({ deckStartedAt: now, turnStartedAt: now });
+}
+
+function deckSelectExpired(room: StoredTriadRoom, now = Date.now()) {
+  return room.status === "playing" && now - Number(room.game.deckStartedAt || room.createdAt) >= DECK_SELECT_TIMEOUT_MS;
+}
+
+function battleDecksReady(room: StoredTriadRoom) {
+  return Boolean(room.game.deckReady.host && room.game.deckReady.challenger);
+}
+
+function finalizeDeckSelection(room: StoredTriadRoom) {
+  if (battleDecksReady(room)) return false;
+  room.game.deckReady = { host: true, challenger: true };
+  room.game.turnStartedAt = Date.now();
+  return true;
 }
 
 function resolveIfBothLocked(room: StoredTriadRoom) {
@@ -534,13 +567,31 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  if (room.game.deckReady[side]) {
+    return { ok: false as const, reason: "deck_locked" as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+  }
   room.game.decks[side] = normalizeDeck(deck);
-  const bothReady = room.game.decks.host.length === 9 && room.game.decks.challenger.length === 9;
-  if (bothReady && !room.game.triangles.host.top && !room.game.triangles.challenger.top && room.game.turns.length === 0) {
-    room.game.turnStartedAt = Date.now();
+  if (deckSelectExpired(room)) {
+    finalizeDeckSelection(room);
   }
   await upsertStoredRoom(room);
-  return { ok: true as const, room: publicRoom(room), bothReady };
+  return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+}
+
+export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[]) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  if (!room.game.deckReady[side]) {
+    room.game.decks[side] = normalizeDeck(deck);
+    room.game.deckReady[side] = true;
+  }
+  if (battleDecksReady(room) || deckSelectExpired(room)) {
+    finalizeDeckSelection(room);
+  }
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
 }
 
 export async function lockTriadRoomCard(code: string, participantId: string, cardNo: string) {
