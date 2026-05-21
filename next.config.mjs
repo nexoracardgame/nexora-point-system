@@ -128,13 +128,7 @@ const nextConfig = {
       },
       {
         source: "/((?!(?:blaze-embed|market-embed)(?:/|$)).*)",
-        headers: [
-          ...commonSecurityHeaders,
-          {
-            key: "Content-Security-Policy",
-            value: "frame-ancestors 'none'",
-          },
-        ],
+        headers: commonSecurityHeaders,
       },
     ];
   },
