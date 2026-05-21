@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
+import { listingIsFoil } from "@/lib/card-finish";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
 
 const BUY_WISHLIST_KEY = "nexora_buy_wishlist";
@@ -512,6 +513,11 @@ export default function BuyMarketClient({
                           className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/10 to-transparent" />
+                        {listingIsFoil(listing.cardNo, listing.rarity) ? (
+                          <div className="absolute right-3 top-14 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)]">
+                            Foil
+                          </div>
+                        ) : null}
                         <div className="absolute left-2 top-2 flex flex-col items-start gap-1 sm:left-3 sm:top-3">
                           {isFreshListing ? (
                             <span className="rounded-full border border-emerald-200/50 bg-emerald-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(110,231,183,0.45)]">

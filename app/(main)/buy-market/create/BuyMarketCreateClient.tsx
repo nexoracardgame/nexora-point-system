@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { BadgeDollarSign, Check, Loader2 } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
+import {
+  canChooseCardFinish,
+  isForcedFoilCard,
+  type MarketCardFinish,
+} from "@/lib/card-finish";
 
 function normalizeCardNo(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -16,10 +21,18 @@ export default function BuyMarketCreateClient() {
   const [cardNo, setCardNo] = useState("");
   const [cardName, setCardName] = useState("");
   const [offerPrice, setOfferPrice] = useState("");
+  const [cardFinish, setCardFinish] = useState<MarketCardFinish>("normal");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const normalizedCardNo = useMemo(() => normalizeCardNo(cardNo), [cardNo]);
+  const canChooseFinish = canChooseCardFinish(normalizedCardNo);
+  const forcedFoil = isForcedFoilCard(normalizedCardNo);
+  const selectedFinish: MarketCardFinish = forcedFoil
+    ? "foil"
+    : canChooseFinish
+    ? cardFinish
+    : "normal";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +62,7 @@ export default function BuyMarketCreateClient() {
           cardNo: normalizedCardNo,
           cardName,
           rarity: null,
+          cardFinish: selectedFinish,
           offerPrice: price,
         }),
       });
@@ -94,13 +108,18 @@ export default function BuyMarketCreateClient() {
         className="grid gap-5 rounded-[28px] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ring-1 ring-black/5 lg:grid-cols-[360px_minmax(0,1fr)] sm:p-5"
       >
         <div className="overflow-hidden rounded-[24px] border border-black/8 bg-[#f4f4f5]">
-          <div className="aspect-[2.5/3.45]">
+          <div className="relative aspect-[2.5/3.45]">
             <SafeCardImage
               cardNo={normalizedCardNo || "001"}
               imageUrl={normalizedCardNo ? `/cards/${normalizedCardNo}.jpg` : undefined}
               alt={cardName || `Card #${normalizedCardNo || "001"}`}
               className="h-full w-full object-cover"
             />
+            {selectedFinish === "foil" ? (
+              <div className="absolute right-3 top-3 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)]">
+                Foil
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -117,6 +136,36 @@ export default function BuyMarketCreateClient() {
               className="w-full rounded-[18px] border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none transition focus:border-black/35"
             />
           </label>
+
+          {canChooseFinish ? (
+            <div>
+              <div className="mb-2 block text-xs font-black text-black/62">
+                ประเภทการ์ดใบนี้
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["normal", "foil"] as MarketCardFinish[]).map((finish) => (
+                  <button
+                    key={finish}
+                    type="button"
+                    onClick={() => setCardFinish(finish)}
+                    className={`min-h-[46px] rounded-[16px] border px-3 text-sm font-black transition ${
+                      selectedFinish === finish
+                        ? finish === "foil"
+                          ? "border-amber-300 bg-amber-300 text-black shadow-[0_0_24px_rgba(251,191,36,0.24)]"
+                          : "border-black bg-black text-white"
+                        : "border-black/10 bg-white text-black/50 hover:border-black/25"
+                    }`}
+                  >
+                    {finish === "foil" ? "ฟอยล์" : "ธรรมดา"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : forcedFoil ? (
+            <div className="rounded-[18px] border border-amber-300/35 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+              ใบนี้เป็นฟอยล์บังคับจาก Master ระบบจะติดป้าย Foil ให้เอง
+            </div>
+          ) : null}
 
           <label className="block">
             <span className="mb-2 block text-xs font-black text-black/62">

@@ -6,6 +6,7 @@ import {
   getAuctionRooms,
   isAuctionBlacklisted,
 } from "@/lib/auction-store";
+import { decorateRarityWithFinish, normalizeMarketCardFinish } from "@/lib/card-finish";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +85,12 @@ export async function POST(req: NextRequest) {
     const cardNo = normalizeCardNo(body.cardNo);
     const cardName =
       String(body.cardName || "").trim() || `NEXORA Card #${cardNo}`;
-    const rarity = String(body.rarity || "Legendary").trim() || "Legendary";
+    const finish = normalizeMarketCardFinish(cardNo, body.cardFinish);
+    const rarity = decorateRarityWithFinish(
+      cardNo,
+      String(body.rarity || "Legendary").trim() || "Legendary",
+      finish
+    );
     const imageUrl = String(body.imageUrl || "").trim();
     const openingPrice = parsePrice(body.openingPrice);
     const minBidStep = parsePrice(body.minBidStep);
@@ -134,4 +140,3 @@ export async function POST(req: NextRequest) {
     return badRequest("สร้างห้องประมูลไม่สำเร็จ", 500);
   }
 }
-

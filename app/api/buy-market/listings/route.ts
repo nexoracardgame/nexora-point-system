@@ -6,6 +6,7 @@ import {
 } from "@/lib/buy-market";
 import { getBuyMarketCurrentUser } from "@/lib/buy-market-auth";
 import { resolveCardDisplayImage } from "@/lib/card-image";
+import { decorateRarityWithFinish, normalizeMarketCardFinish } from "@/lib/card-finish";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -61,7 +62,12 @@ export async function POST(req: NextRequest) {
     const cardNo = normalizeCardNo(body?.cardNo);
     const offerPrice = Number(body?.offerPrice);
     const cardName = String(body?.cardName || "").trim() || null;
-    const rarity = String(body?.rarity || "").trim() || null;
+    const finish = normalizeMarketCardFinish(cardNo, body?.cardFinish);
+    const rawRarity = String(body?.rarity || "").trim();
+    const rarity =
+      finish === "foil"
+        ? decorateRarityWithFinish(cardNo, rawRarity || null, finish)
+        : rawRarity || null;
     const imageUrl =
       String(body?.imageUrl || "").trim() || resolveCardDisplayImage(cardNo, null);
 

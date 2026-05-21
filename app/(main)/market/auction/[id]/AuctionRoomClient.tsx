@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
+import { listingIsFoil } from "@/lib/card-finish";
 import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
 
 type AuctionRoom = {
@@ -126,6 +127,14 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function FoilBadge() {
+  return (
+    <div className="rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)]">
+      Foil
+    </div>
+  );
 }
 
 function formatTime(value: string) {
@@ -1452,6 +1461,11 @@ export default function AuctionRoomClient({
               <h1 className="mt-4 break-words text-3xl font-black leading-tight text-amber-50 sm:text-5xl">
                 {room.cardName}
               </h1>
+              {listingIsFoil(room.cardNo, room.rarity) ? (
+                <div className="mt-3">
+                  <FoilBadge />
+                </div>
+              ) : null}
               <div className="mt-2 text-sm font-bold text-white/46">
                 No.{room.cardNo} • {room.rarity}
               </div>

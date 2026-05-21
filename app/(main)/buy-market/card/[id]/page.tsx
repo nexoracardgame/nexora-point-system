@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, BadgeDollarSign, UserRound } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
+import { listingIsFoil } from "@/lib/card-finish";
 import { getBuyMarketListingById } from "@/lib/buy-market";
 import BuyMarketFollowButton from "./BuyMarketFollowButton";
 import SellToBuyerButton from "./SellToBuyerButton";
@@ -26,18 +27,27 @@ export default async function BuyMarketCardPage({
     notFound();
   }
 
+  const isFoil = listingIsFoil(listing.cardNo, listing.rarity);
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 text-black">
       <section className="overflow-hidden rounded-[28px] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.20)] ring-1 ring-black/5">
         <div className="grid gap-0 lg:grid-cols-[420px_minmax(0,1fr)]">
           <div className="bg-[#f4f4f5] p-4 sm:p-5">
             <div className="overflow-hidden rounded-[26px] border border-black/8 bg-white">
-              <SafeCardImage
-                cardNo={listing.cardNo}
-                imageUrl={listing.imageUrl || undefined}
-                alt={listing.cardName || `Card #${listing.cardNo}`}
-                className="aspect-[2.5/3.45] w-full object-cover"
-              />
+              <div className="relative">
+                <SafeCardImage
+                  cardNo={listing.cardNo}
+                  imageUrl={listing.imageUrl || undefined}
+                  alt={listing.cardName || `Card #${listing.cardNo}`}
+                  className="aspect-[2.5/3.45] w-full object-cover"
+                />
+                {isFoil ? (
+                  <div className="absolute right-3 top-3 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)]">
+                    Foil
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -55,6 +65,11 @@ export default async function BuyMarketCardPage({
                 <BadgeDollarSign className="h-3.5 w-3.5" />
                 BUY REQUEST
               </div>
+              {isFoil ? (
+                <div className="mt-3 inline-flex rounded-full border border-amber-200/65 bg-amber-200 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.24)]">
+                  Foil
+                </div>
+              ) : null}
 
               <h1 className="mt-4 text-3xl font-black leading-tight sm:text-5xl">
                 {listing.cardName || `Card #${listing.cardNo}`}

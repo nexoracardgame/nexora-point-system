@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Heart, Trash2 } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
+import { listingIsFoil } from "@/lib/card-finish";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
 
 const BUY_WISHLIST_KEY = "nexora_buy_wishlist";
@@ -72,6 +73,11 @@ export default function BuyWishlistPage() {
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+                  {listingIsFoil(item.cardNo, item.rarity) ? (
+                    <div className="absolute left-3 top-3 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)]">
+                      Foil
+                    </div>
+                  ) : null}
                   <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                     <div className="text-[11px] font-black uppercase tracking-[0.16em] text-white/50">
                       รับซื้อ

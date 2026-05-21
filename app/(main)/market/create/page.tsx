@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SafeCardImage from "@/components/SafeCardImage";
 import MarketFeatureNav from "@/components/MarketFeatureNav";
 import {
@@ -18,44 +18,98 @@ type CardData = {
   imageUrl?: string;
 };
 
+function normalizeCardNoInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? digits.padStart(3, "0").slice(-3) : "";
+}
+
 export default function CreateListingConsole() {
   const [cardNo, setCardNo] = useState("");
   const [serialNo, setSerialNo] = useState("");
   const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cardLoading, setCardLoading] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
   const [cardFinish, setCardFinish] = useState<MarketCardFinish>("normal");
+  const lastLookupRef = useRef("");
+  const lookupSeqRef = useRef(0);
   const canChooseFinish = card ? canChooseCardFinish(card.cardNo) : false;
   const forcedFoil = card ? isForcedFoilCard(card.cardNo) : false;
 
-  const fetchCard = async () => {
-    if (loading) return;
+  const fetchCard = useCallback(async (options?: { silent?: boolean; value?: string }) => {
+    const normalizedCardNo = normalizeCardNoInput(options?.value ?? cardNo);
 
-    if (!cardNo.trim()) {
+    if (!normalizedCardNo) {
+      setCard(null);
+      setCardFinish("normal");
+      lastLookupRef.current = "";
+      if (options?.silent) {
+        return;
+      }
       alert("กรอกเลขการ์ดก่อน");
       return;
     }
 
-    try {
-      setLoading(true);
+    if (lastLookupRef.current === normalizedCardNo && card?.cardNo === normalizedCardNo) {
+      return;
+    }
 
-      const res = await fetch(`/api/card?cardNo=${encodeURIComponent(cardNo)}`);
+    const lookupSeq = lookupSeqRef.current + 1;
+    lookupSeqRef.current = lookupSeq;
+    lastLookupRef.current = normalizedCardNo;
+
+    try {
+      setCardLoading(true);
+
+      const res = await fetch(`/api/card?cardNo=${encodeURIComponent(normalizedCardNo)}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
 
-      const normalizedCardNo = String(cardNo).padStart(3, "0");
+      if (lookupSeqRef.current !== lookupSeq) {
+        return;
+      }
+
       setCard({
         cardNo: normalizedCardNo,
-        cardName: data.card_name || `CARD ${cardNo}`,
+        cardName: data.card_name || data.cardName || `CARD ${normalizedCardNo}`,
         rarity: data.rarity || "Unknown",
-        imageUrl: data.image_url || `/cards/${normalizedCardNo}.jpg`,
+        imageUrl: data.image_url || data.imageUrl || `/cards/${normalizedCardNo}.jpg`,
       });
       setCardFinish(isForcedFoilCard(normalizedCardNo) ? "foil" : "normal");
     } catch {
+      if (lookupSeqRef.current !== lookupSeq) {
+        return;
+      }
+      setCard(null);
+      setCardFinish("normal");
+      if (options?.silent) {
+        return;
+      }
       alert("ค้นหาการ์ดไม่สำเร็จ");
     } finally {
-      setLoading(false);
+      if (lookupSeqRef.current === lookupSeq) {
+        setCardLoading(false);
+      }
     }
-  };
+  }, [card?.cardNo, cardNo]);
+
+  useEffect(() => {
+    const normalizedCardNo = normalizeCardNoInput(cardNo);
+
+    if (!normalizedCardNo) {
+      setCard(null);
+      setCardFinish("normal");
+      lastLookupRef.current = "";
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchCard({ silent: true, value: normalizedCardNo });
+    }, 260);
+
+    return () => window.clearTimeout(timer);
+  }, [cardNo, fetchCard]);
 
   const createListing = async () => {
     if (loading) return;
@@ -217,8 +271,8 @@ export default function CreateListingConsole() {
                 />
                 <button
                   type="button"
-                  onClick={fetchCard}
-                  disabled={loading}
+                  onClick={() => void fetchCard()}
+                  disabled={cardLoading}
                   className="min-h-[52px] rounded-[18px] bg-gradient-to-r from-amber-300 to-yellow-500 px-5 text-sm font-black text-black shadow-[0_12px_32px_rgba(251,191,36,0.20)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {loading ? "..." : "ค้นหาการ์ด"}

@@ -20,6 +20,12 @@ import {
 } from "lucide-react";
 import SafeCardImage from "@/components/SafeCardImage";
 import MarketFeatureNav from "@/components/MarketFeatureNav";
+import {
+  canChooseCardFinish,
+  isForcedFoilCard,
+  listingIsFoil,
+  type MarketCardFinish,
+} from "@/lib/card-finish";
 import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
 
 type CardData = {
@@ -75,6 +81,18 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function FoilBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)] ${
+        compact ? "px-2 py-1 text-[9px]" : "px-3 py-1 text-[10px]"
+      }`}
+    >
+      Foil
+    </div>
+  );
 }
 
 function toLocalDateTimeValue(date: Date) {
@@ -373,6 +391,7 @@ export default function AuctionClient({
   const [cardNo, setCardNo] = useState("");
   const [cardLoading, setCardLoading] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
+  const [cardFinish, setCardFinish] = useState<MarketCardFinish>("normal");
   const [openingPrice, setOpeningPrice] = useState("");
   const [minBidStep, setMinBidStep] = useState("");
   const [startsAt, setStartsAt] = useState(() => toLocalDateTimeValue(new Date()));
@@ -386,6 +405,13 @@ export default function AuctionClient({
   const latestFetchSeqRef = useRef(0);
   const roomsFetchInFlightRef = useRef(false);
   const adminCanDelete = isAdminRoleClient(session?.user?.role);
+  const canChooseFinish = card ? canChooseCardFinish(card.cardNo) : false;
+  const forcedFoil = card ? isForcedFoilCard(card.cardNo) : false;
+  const selectedCardFinish: MarketCardFinish = forcedFoil
+    ? "foil"
+    : canChooseFinish
+    ? cardFinish
+    : "normal";
   const sessionUser = session?.user as
     | { id?: string | null; lineId?: string | null }
     | undefined;
@@ -560,6 +586,7 @@ export default function AuctionClient({
 
     if (!normalized) {
       setCard(null);
+      setCardFinish("normal");
       lastCardLookupRef.current = "";
       return;
     }
@@ -583,6 +610,7 @@ export default function AuctionClient({
           rarity: data.rarity || data.value || "Legendary",
           imageUrl: data.image_url || data.imageUrl || `/cards/${normalized}.jpg`,
         });
+        setCardFinish(isForcedFoilCard(normalized) ? "foil" : "normal");
       } catch {
         setCard({
           cardNo: normalized,
@@ -590,6 +618,7 @@ export default function AuctionClient({
           rarity: "Legendary",
           imageUrl: `/cards/${normalized}.jpg`,
         });
+        setCardFinish(isForcedFoilCard(normalized) ? "foil" : "normal");
       } finally {
         setCardLoading(false);
       }
@@ -633,6 +662,7 @@ export default function AuctionClient({
           cardName: card.cardName,
           imageUrl: card.imageUrl,
           rarity: card.rarity,
+          cardFinish: selectedCardFinish,
           openingPrice,
           minBidStep,
           startsAt: new Date(startsAt).toISOString(),
@@ -804,6 +834,11 @@ export default function AuctionClient({
                       <div className="mt-2 break-words text-xl font-black text-white">
                         {card.cardName}
                       </div>
+                      {selectedCardFinish === "foil" ? (
+                        <div className="mt-3">
+                          <FoilBadge />
+                        </div>
+                      ) : null}
                       <div className="mt-1 text-sm font-bold text-white/48">
                         No.{card.cardNo} • {card.rarity}
                       </div>
@@ -822,6 +857,36 @@ export default function AuctionClient({
                   </div>
                 )}
               </div>
+
+              {canChooseFinish ? (
+                <div>
+                  <div className="mb-2 text-sm font-black text-white/72">
+                    ประเภทการ์ดใบนี้
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["normal", "foil"] as MarketCardFinish[]).map((finish) => (
+                      <button
+                        key={finish}
+                        type="button"
+                        onClick={() => setCardFinish(finish)}
+                        className={`min-h-[48px] rounded-[16px] border px-3 text-sm font-black transition ${
+                          selectedCardFinish === finish
+                            ? finish === "foil"
+                              ? "border-amber-200 bg-amber-300 text-black shadow-[0_0_26px_rgba(251,191,36,0.24)]"
+                              : "border-white/70 bg-white text-black"
+                            : "border-white/10 bg-black/24 text-white/58 hover:border-white/28"
+                        }`}
+                      >
+                        {finish === "foil" ? "ฟอยล์" : "ธรรมดา"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : forcedFoil ? (
+                <div className="rounded-[18px] border border-amber-200/24 bg-amber-300/10 p-3 text-sm font-bold leading-6 text-amber-100">
+                  ใบนี้เป็นฟอยล์บังคับจาก Master ระบบจะติดป้าย Foil ให้เอง
+                </div>
+              ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block">
@@ -1006,6 +1071,11 @@ export default function AuctionClient({
                         {isFreshRoom ? (
                           <div className="absolute right-3 top-14 z-30 rounded-full border border-amber-300/30 bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_22px_rgba(251,191,36,0.35)]">
                             NEW
+                          </div>
+                        ) : null}
+                        {listingIsFoil(room.cardNo, room.rarity) ? (
+                          <div className="absolute right-3 bottom-3 z-30">
+                            <FoilBadge compact />
                           </div>
                         ) : null}
                       </div>

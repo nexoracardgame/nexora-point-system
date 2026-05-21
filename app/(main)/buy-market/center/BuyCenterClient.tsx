@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import BuyMarketFeatureNav from "@/components/BuyMarketFeatureNav";
 import SafeCardImage from "@/components/SafeCardImage";
+import { listingIsFoil } from "@/lib/card-finish";
 import type { BuyMarketListing } from "@/lib/buy-market-types";
 
 type Dialog =
@@ -174,12 +175,19 @@ export default function BuyCenterClient({
                   href={`/buy-market/card/${listing.id}`}
                   className="flex min-w-0 flex-1 items-center gap-3"
                 >
-                  <SafeCardImage
-                    cardNo={listing.cardNo}
-                    imageUrl={listing.imageUrl || undefined}
-                    alt={listing.cardName || `Card #${listing.cardNo}`}
-                    className="h-20 w-14 shrink-0 rounded-[16px] object-cover"
-                  />
+                  <div className="relative h-20 w-14 shrink-0">
+                    <SafeCardImage
+                      cardNo={listing.cardNo}
+                      imageUrl={listing.imageUrl || undefined}
+                      alt={listing.cardName || `Card #${listing.cardNo}`}
+                      className="h-full w-full rounded-[16px] object-cover"
+                    />
+                    {listingIsFoil(listing.cardNo, listing.rarity) ? (
+                      <div className="absolute -right-1 -top-1 rounded-full border border-amber-100/55 bg-amber-300 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.08em] text-black shadow-[0_0_16px_rgba(251,191,36,0.28)]">
+                        Foil
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="min-w-0">
                     <div className="truncate text-lg font-black">
                       {listing.cardName || `Card #${listing.cardNo}`}
