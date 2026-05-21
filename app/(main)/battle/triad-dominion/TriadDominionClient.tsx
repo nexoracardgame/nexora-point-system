@@ -7,6 +7,7 @@ import {
   Brain,
   Check,
   ChevronRight,
+  Crosshair,
   Crown,
   Eye,
   Flame,
@@ -967,6 +968,18 @@ function RevealSpotlight({
                   {index + 1}/{timeline.length}
                 </div>
               </div>
+              {event.targetLabel ? (
+                <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-red-300/32 bg-red-500/12 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-100">
+                  <Crosshair className="h-3 w-3 shrink-0" />
+                  <span className="truncate">ล็อกเป้า: {event.targetLabel}</span>
+                </div>
+              ) : null}
+              {event.blocked ? (
+                <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-300/32 bg-amber-300/12 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100">
+                  <Lock className="h-3 w-3 shrink-0" />
+                  <span className="truncate">บัฟถูกบล็อก</span>
+                </div>
+              ) : null}
               <div className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-white/72">
                 {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
               </div>
@@ -1684,7 +1697,7 @@ function CompactBattleBoard({
             isVisible={(lane) => botVisible(lane)}
             swapActive={hasSwapResult && showResolvedBoard}
           />
-          <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate onClick={onDrawRandomCard} />
+          <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -1699,7 +1712,7 @@ function CompactBattleBoard({
         </div>
 
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" onClick={onDrawRandomCard} />
+          <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" />
           <BoardTriangle
             cardsByNo={cardsByNo}
             triangle={displayPlayerTriangle}
@@ -2375,6 +2388,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (playerCard && skillNeedsChoice(playerCard)) {
+      const targets = getSelectableSkillTargetIds(playerCard, "player");
+      if (targets.length === 1) {
+        const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot });
+        const turns = [
+          ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
+          result,
+        ].sort((a, b) => a.turn - b.turn);
+        setLockedFight({ fightNo, player, bot, turns });
+        setTurnLocked(true);
+        setBattleLog((current) => [
+          `${playerCard.name}: เลือกเป้าหมายอัตโนมัติแล้ว (${targets[0] === "bot-top" ? "มอนสเตอร์หลักฝั่งตรงข้าม" : "มอนสเตอร์หลักฝั่งเรา"})`,
+          ...current,
+        ]);
+        return;
+      }
       setLockedFight({ fightNo, player, bot, turns: lockedFight?.turns || [] });
       setTurnLocked(true);
       setPendingSkillChoice({ side: "player", lane, cardNo: playerCard.cardNo, selectedTarget: "" });
