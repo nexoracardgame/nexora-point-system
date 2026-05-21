@@ -817,12 +817,14 @@ function BoardPile({
   tone,
   rotate,
   cards,
+  onClick,
 }: {
   label: string;
   sublabel: string;
   tone: "red" | "blue" | "gold";
   rotate?: boolean;
   cards?: CardView[];
+  onClick?: () => void;
 }) {
   const color =
     tone === "red"
@@ -831,9 +833,13 @@ function BoardPile({
         ? "border-cyan-400/70"
         : "border-amber-400/70";
 
+  const Comp = onClick ? "button" : "div";
+
   return (
-    <div
-      className={`relative grid w-[clamp(60px,8vw,112px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] ${color} ${
+    <Comp
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`relative grid w-[clamp(60px,8vw,112px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${onClick ? "hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-200/70" : ""} ${color} ${
         rotate ? "rotate-180" : ""
       }`}
       style={{ aspectRatio: "3 / 4" }}
@@ -855,40 +861,7 @@ function BoardPile({
           {sublabel}
         </div>
       </div>
-    </div>
-  );
-}
-
-function RandomDrawPile({
-  lastCard,
-  onDraw,
-}: {
-  lastCard?: CardView | null;
-  onDraw: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onDraw}
-      className="absolute left-3 top-1/2 z-20 grid w-[clamp(58px,6.5vw,96px)] -translate-y-1/2 gap-2 text-center transition hover:-translate-y-[52%] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
-      title="สุ่มการ์ดจากกองกลาง"
-    >
-      <div className="relative aspect-[3/4] rounded-lg border border-amber-200/45 bg-[#07070a] shadow-[0_0_28px_rgba(251,191,36,0.22)]">
-        <div className="absolute inset-1 rounded-md border border-white/10 bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.22),rgba(0,0,0,0.95)_62%)]" />
-        <div className="absolute inset-x-2 top-3 h-px bg-amber-100/40" />
-        <div className="absolute inset-0 grid place-items-center px-2">
-          <div>
-            <div className="text-[clamp(0.58rem,1vw,0.8rem)] font-black text-white">สุ่ม</div>
-            <div className="mt-1 text-[clamp(0.48rem,0.8vw,0.65rem)] font-black text-amber-100/70">293 ใบ</div>
-          </div>
-        </div>
-      </div>
-      {lastCard ? (
-        <div className="rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-[10px] font-black text-white/72 backdrop-blur">
-          No.{lastCard.cardNo}
-        </div>
-      ) : null}
-    </button>
+    </Comp>
   );
 }
 
@@ -937,9 +910,12 @@ function RevealSpotlight({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
+      {isScored ? (
+        <div className="absolute inset-0 bg-black/42 backdrop-blur-[5px]" />
+      ) : null}
       <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
       <div className="relative grid w-[min(820px,88%)] items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
-        <div className={`mx-auto w-[clamp(86px,12vw,156px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(96px,13vw,174px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
               {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -951,7 +927,7 @@ function RevealSpotlight({
         </div>
 
         <div className="text-center">
-          <div className="animate-[triad-flash_900ms_ease-out] text-[clamp(1.55rem,3.6vw,3.2rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)]">
+          <div className="animate-[triad-flash_900ms_ease-out] rounded-3xl bg-black/34 px-4 py-2 text-[clamp(1.65rem,3.9vw,3.6rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)] backdrop-blur-sm">
             {isSwapSkill ? "สลับ!" : isScored ? winnerText : "เปิดการ์ด"}
           </div>
           {isScored ? (
@@ -961,7 +937,7 @@ function RevealSpotlight({
           ) : null}
         </div>
 
-        <div className={`mx-auto w-[clamp(86px,12vw,156px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(96px,13vw,174px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
           {showBot && botCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
               {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -973,7 +949,7 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="absolute right-2 top-1/2 grid max-h-[82%] w-[min(340px,32vw)] -translate-y-1/2 gap-2 overflow-hidden sm:right-4">
+        <div className="absolute right-2 top-1/2 grid max-h-[82%] w-[min(380px,32vw)] -translate-y-1/2 gap-2 overflow-hidden sm:right-4">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -1043,22 +1019,22 @@ function BoardTriangle({
     {
       lane: "top",
       label: "หลัก",
-      className: `col-span-2 mx-auto w-[clamp(72px,9.5vw,132px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-8"}`,
+      className: `col-span-2 mx-auto w-[clamp(72px,9.5vw,132px)] ${tone === "bot" ? "-translate-y-8" : "-translate-y-12"}`,
     },
     {
       lane: "left",
       label: "โจมตี",
-      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "-translate-y-5"}`,
+      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-10" : "-translate-y-9"}`,
     },
     {
       lane: "right",
       label: "ช่วย",
-      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "-translate-y-5"}`,
+      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-10" : "-translate-y-9"}`,
     },
   ];
 
   return (
-    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(10px,1.5vw,22px)] gap-y-0 ${tone === "player" ? "-translate-y-14 sm:-translate-y-16" : "translate-y-4"}`}>
+    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(10px,1.5vw,22px)] gap-y-0 ${tone === "player" ? "-translate-y-20 sm:-translate-y-24" : "-translate-y-10 sm:-translate-y-14"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         return (
@@ -1244,19 +1220,19 @@ function PlayerHand({
 function CardHoverPreview({ card }: { card: CardView | null }) {
   if (!card) return null;
   return (
-    <div className="pointer-events-none fixed bottom-[calc(var(--app-mobile-nav-height)+150px)] left-1/2 z-[80] w-[min(300px,72vw)] -translate-x-1/2 rounded-2xl border border-amber-100/45 bg-black/88 p-3 shadow-[0_0_70px_rgba(251,191,36,0.34)] backdrop-blur-md xl:bottom-40 xl:left-[48%] xl:w-[260px]">
-      <div className="grid grid-cols-[104px_1fr] gap-3">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-white/14 bg-black">
-          <Image src={card.sourceImage} alt={card.name} fill sizes="160px" className="object-cover" />
+    <div className="pointer-events-none fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px]">
+      <div className="w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]">
+        <div className="relative mx-auto aspect-[3/4] w-[min(330px,70vw)] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)]">
+          <Image src={card.sourceImage} alt={card.name} fill sizes="360px" className="object-cover" />
         </div>
-        <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-100/58">No.{card.cardNo}</div>
-          <div className="mt-1 line-clamp-2 text-lg font-black leading-tight text-white">{card.name}</div>
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/58">No.{card.cardNo}</div>
+          <div className="mt-1 line-clamp-2 text-xl font-black leading-tight text-white">{card.name}</div>
           <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-black text-black">
             <span className="rounded-md bg-amber-200 px-2 py-1">ATK {card.attack.toLocaleString()}</span>
             <span className="rounded-md bg-cyan-200 px-2 py-1">SUP {card.support.toLocaleString()}</span>
           </div>
-          <div className="mt-2 line-clamp-5 text-xs font-semibold leading-5 text-white/70">
+          <div className="mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
             {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
           </div>
         </div>
@@ -1650,7 +1626,6 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
-      <RandomDrawPile lastCard={randomCard} onDraw={onDrawRandomCard} />
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
         botCard={botTriangle[activeLane] ? cardsByNo.get(botTriangle[activeLane]) : undefined}
@@ -1676,7 +1651,7 @@ function CompactBattleBoard({
         onConfirm={onConfirmSkillTarget}
       />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[10%_30%_1fr_25%_8%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[7%_32%_1fr_25%_7%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-blue-300/18 bg-black/42 px-3 py-2">
             <Image src={botImage || "/avatar.png"} alt={botName} width={42} height={42} className="h-10 w-10 shrink-0 rounded-xl border border-white/10 object-contain" />
@@ -1701,7 +1676,7 @@ function CompactBattleBoard({
             isVisible={(lane) => botVisible(lane)}
             swapActive={hasSwapResult && showResolvedBoard}
           />
-          <BoardPile label="เด็ค" sublabel={`${botDeckLeft}`} tone="blue" rotate />
+          <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate onClick={onDrawRandomCard} />
         </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -1716,7 +1691,7 @@ function CompactBattleBoard({
         </div>
 
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <BoardPile label="เด็ค" sublabel={`${playerDeckLeft}`} tone="blue" />
+          <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" onClick={onDrawRandomCard} />
           <BoardTriangle
             cardsByNo={cardsByNo}
             triangle={displayPlayerTriangle}
