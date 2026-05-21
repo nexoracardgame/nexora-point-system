@@ -87,7 +87,7 @@ type RoomParticipant = {
 type TriadRoom = {
   code: string;
   access: RoomAccess;
-  password: string;
+  hasPassword: boolean;
   status: RoomStatus;
   hostId: string;
   createdAt: number;
@@ -114,8 +114,7 @@ type TurnReveal = {
 const DECK_SIZE = 9;
 const TURN_SECONDS = 120;
 const SPECTATOR_LIMIT = 10;
-const ROOM_STORAGE_KEY = "nexora:triad-dominion:rooms:v1";
-const ROOM_BROADCAST_KEY = "nexora:triad-dominion:rooms";
+const ROOM_API_PATH = "/api/triad-rooms";
 
 type PendingSkillChoice = {
   side: Side;
@@ -176,51 +175,6 @@ function makeParticipant(user: Props["currentUser"]): RoomParticipant {
   };
 }
 
-function readStoredRooms(): TriadRoom[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(ROOM_STORAGE_KEY) || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((room): TriadRoom => {
-        const access: RoomAccess = room?.access === "private" ? "private" : "public";
-        const status: RoomStatus = room?.status === "playing" ? "playing" : "waiting";
-        return {
-          code: safeText(room?.code),
-          access,
-          password: safeText(room?.password),
-          status,
-          hostId: safeText(room?.hostId),
-          createdAt: Number(room?.createdAt || Date.now()),
-          seats: {
-            host: room?.seats?.host || null,
-            challenger: room?.seats?.challenger || null,
-          },
-          spectators: Array.isArray(room?.spectators) ? room.spectators.slice(0, SPECTATOR_LIMIT) : [],
-        };
-      })
-      .filter((room) => room.code.length === 6);
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredRooms(rooms: TriadRoom[]) {
-  if (typeof window === "undefined") return;
-  const nextRooms = rooms.slice(-30);
-  window.localStorage.setItem(ROOM_STORAGE_KEY, JSON.stringify(nextRooms));
-  window.dispatchEvent(new Event(ROOM_BROADCAST_KEY));
-}
-
-function makeRoomCode(existing: TriadRoom[]) {
-  const used = new Set(existing.map((room) => room.code));
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    if (!used.has(code)) return code;
-  }
-  return String(Date.now()).slice(-6);
-}
-
 function participantInRoom(room: TriadRoom | undefined, participantId: string) {
   if (!room) return false;
   return (
@@ -239,6 +193,29 @@ function removeParticipant(room: TriadRoom, participantId: string): TriadRoom {
     },
     spectators: room.spectators.filter((viewer) => viewer.id !== participantId),
   };
+}
+
+function normalizeApiRooms(value: unknown): TriadRoom[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((room): TriadRoom => {
+      const access: RoomAccess = room?.access === "private" ? "private" : "public";
+      const status: RoomStatus = room?.status === "playing" ? "playing" : "waiting";
+      return {
+        code: safeText(room?.code),
+        access,
+        hasPassword: Boolean(room?.hasPassword || access === "private"),
+        status,
+        hostId: safeText(room?.hostId),
+        createdAt: Number(room?.createdAt || Date.now()),
+        seats: {
+          host: room?.seats?.host || null,
+          challenger: room?.seats?.challenger || null,
+        },
+        spectators: Array.isArray(room?.spectators) ? room.spectators.slice(0, SPECTATOR_LIMIT) : [],
+      };
+    })
+    .filter((room) => room.code.length === 6);
 }
 
 function laneForTurn(turn: TriadTurn): Lane {
@@ -1364,6 +1341,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [roomPassword, setRoomPassword] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
+  const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
@@ -1407,15 +1385,27 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         ? "ADMIN WINS"
         : "NEXORA BOT WINS";
 
-  const commitRooms = (updater: (current: TriadRoom[]) => TriadRoom[]) => {
-    setRooms((current) => {
-      const next = updater(current);
-      writeStoredRooms(next);
-      return next;
-    });
+  const syncRooms = async () => {
+    const response = await fetch(`${ROOM_API_PATH}?ts=${Date.now()}`, { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    const nextRooms = normalizeApiRooms(payload.rooms);
+    setRooms(nextRooms);
+    return nextRooms;
   };
 
-  const createRoom = () => {
+  const postRoomAction = async (body: Record<string, unknown>) => {
+    const response = await fetch(ROOM_API_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ ...body, participant }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setRooms(normalizeApiRooms(payload.rooms));
+    return { ok: response.ok, status: response.status, payload };
+  };
+
+  const createRoom = async () => {
     const access = roomAccess;
     const password = access === "private" ? roomPassword.trim() : "";
     if (access === "private" && password.length < 4) {
@@ -1423,119 +1413,95 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
-    const code = makeRoomCode(rooms);
-    const room: TriadRoom = {
-      code,
+    const result = await postRoomAction({
+      action: "create",
       access,
       password,
-      status: "waiting",
-      hostId: participant.id,
-      createdAt: Date.now(),
-      seats: { host: participant, challenger: null },
-      spectators: [],
-    };
+    });
 
-    commitRooms((current) => [...current.filter((item) => item.code !== code), room]);
-    setActiveRoomCode(code);
+    const room = result.payload?.room as TriadRoom | undefined;
+    if (!result.ok || !room?.code) {
+      setLobbyMessage("Create room failed.");
+      return;
+    }
+    setActiveRoomCode(room.code);
     setLobbyMessage("");
     setPhase("room");
   };
 
-  const enterRoom = (codeInput = joinCode, forceSpectator = false) => {
+  const enterRoom = async (codeInput = joinCode, forceSpectator = false, passwordInput = joinPassword) => {
     const code = codeInput.replace(/\D/g, "").slice(0, 6);
     const room = rooms.find((item) => item.code === code);
     if (!room) {
       setLobbyMessage("Room not found.");
       return;
     }
-    if (room.access === "private" && room.password !== joinPassword.trim() && room.hostId !== participant.id) {
-      setLobbyMessage("Wrong private room password.");
+    if (room.access === "private" && !passwordInput.trim() && room.hostId !== participant.id) {
+      setPasswordRoom(room);
+      setLobbyMessage("");
       return;
     }
 
-    const cleanRoom = removeParticipant(room, participant.id);
-    const mustSpectate = forceSpectator || cleanRoom.status === "playing" || Boolean(cleanRoom.seats.challenger);
-    if (mustSpectate) {
-      if (cleanRoom.spectators.length >= SPECTATOR_LIMIT) {
-        setLobbyMessage("Spectator slots are full.");
-        return;
-      }
-      cleanRoom.spectators = [...cleanRoom.spectators, participant].slice(0, SPECTATOR_LIMIT);
-    } else if (!cleanRoom.seats.host) {
-      cleanRoom.seats.host = participant;
-    } else {
-      cleanRoom.seats.challenger = participant;
+    const result = await postRoomAction({
+      action: "join",
+      code,
+      password: passwordInput.trim(),
+      forceSpectator,
+    });
+
+    if (!result.ok) {
+      setLobbyMessage(result.payload?.reason === "wrong_password" ? "Wrong private room password." : "Cannot join this room.");
+      return;
     }
 
-    commitRooms((current) => current.map((item) => (item.code === cleanRoom.code ? cleanRoom : item)));
-    setActiveRoomCode(cleanRoom.code);
-    setLobbyMessage(mustSpectate ? "Joined as spectator." : "");
+    setPasswordRoom(null);
+    setJoinPassword("");
+    setActiveRoomCode(code);
+    setLobbyMessage(result.payload?.joinedAs === "spectator" ? "Joined as spectator." : "");
     setPhase("room");
   };
 
-  const moveToSpectator = () => {
+  const moveToSpectator = async () => {
     if (!currentRoom || isSpectator || currentRoom.status === "playing") return;
-    const cleanRoom = removeParticipant(currentRoom, participant.id);
-    if (cleanRoom.spectators.length >= SPECTATOR_LIMIT) {
-      setLobbyMessage("Spectator slots are full.");
+    const result = await postRoomAction({ action: "spectate", code: currentRoom.code });
+    if (!result.ok) setLobbyMessage("Cannot move to spectator.");
+  };
+
+  const takeFieldSlot = async (slot: "host" | "challenger") => {
+    if (!currentRoom || currentRoom.status === "playing" || currentRoom.seats[slot]) return;
+    const result = await postRoomAction({ action: "take-slot", code: currentRoom.code, slot });
+    if (!result.ok) setLobbyMessage("Cannot take this slot.");
+  };
+
+  const startRoomGame = async () => {
+    if (!currentRoom || !isRoomHost || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    const result = await postRoomAction({ action: "start", code: currentRoom.code });
+    if (!result.ok) {
+      setLobbyMessage("Only the room creator can start after both player slots are filled.");
       return;
     }
-    cleanRoom.spectators = [...cleanRoom.spectators, participant];
-    commitRooms((current) => current.map((room) => (room.code === cleanRoom.code ? cleanRoom : room)));
-  };
-
-  const takeFieldSlot = (slot: "host" | "challenger") => {
-    if (!currentRoom || currentRoom.status === "playing" || currentRoom.seats[slot]) return;
-    const cleanRoom = removeParticipant(currentRoom, participant.id);
-    cleanRoom.seats[slot] = participant;
-    commitRooms((current) => current.map((room) => (room.code === cleanRoom.code ? cleanRoom : room)));
-  };
-
-  const startRoomGame = () => {
-    if (!currentRoom || !isRoomHost || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
-    commitRooms((current) =>
-      current.map((room) => (room.code === currentRoom.code ? { ...room, status: "playing" } : room))
-    );
     resetBattle();
     setPhase("deck");
   };
 
-  const leaveRoom = () => {
+  const leaveRoom = async () => {
     if (currentRoom) {
-      const cleanRoom = removeParticipant(currentRoom, participant.id);
-      const nextRoom =
-        cleanRoom.seats.host || cleanRoom.seats.challenger || cleanRoom.spectators.length > 0
-          ? cleanRoom
-          : null;
-      commitRooms((current) =>
-        nextRoom
-          ? current.map((room) => (room.code === currentRoom.code ? nextRoom : room))
-          : current.filter((room) => room.code !== currentRoom.code)
-      );
+      await postRoomAction({ action: "leave", code: currentRoom.code });
     }
     setActiveRoomCode("");
     setPhase("lobby");
   };
 
   useEffect(() => {
-    setRooms(readStoredRooms());
-
-    const syncRooms = () => setRooms(readStoredRooms());
-    const channel =
-      typeof window !== "undefined" && "BroadcastChannel" in window
-        ? new BroadcastChannel(ROOM_BROADCAST_KEY)
-        : null;
-    channel?.addEventListener("message", syncRooms);
-    window.addEventListener("storage", syncRooms);
-    window.addEventListener(ROOM_BROADCAST_KEY, syncRooms);
+    void syncRooms().catch(() => null);
+    const timer = window.setInterval(() => {
+      void syncRooms().catch(() => null);
+    }, 2500);
 
     return () => {
-      channel?.removeEventListener("message", syncRooms);
-      channel?.close();
-      window.removeEventListener("storage", syncRooms);
-      window.removeEventListener(ROOM_BROADCAST_KEY, syncRooms);
+      window.clearInterval(timer);
     };
-  }, []);
+  }, [participant.id]);
 
   useEffect(() => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
@@ -1892,13 +1858,53 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             : "Admin Opens";
 
   if (phase === "lobby") {
-    const publicRooms = rooms
-      .filter((room) => room.access === "public")
+    const visibleRooms = rooms
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 8);
 
     return (
       <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#05070d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+        {passwordRoom ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
+            <div className="w-[min(420px,94vw)] rounded-2xl border border-amber-200/28 bg-[#090b12] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-amber-200/25 bg-amber-200/10">
+                <KeyRound className="h-6 w-6 text-amber-200" />
+              </div>
+              <div className="mt-4 text-center">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/42">Private Room</div>
+                <div className="mt-1 font-mono text-3xl font-black tracking-[0.18em] text-white">{passwordRoom.code}</div>
+              </div>
+              <label className="mt-5 block">
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">Password</span>
+                <input
+                  value={joinPassword}
+                  onChange={(event) => setJoinPassword(event.target.value)}
+                  className="h-12 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-center text-base font-bold text-white outline-none transition focus:border-amber-300/70"
+                  autoFocus
+                />
+              </label>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordRoom(null);
+                    setJoinPassword("");
+                  }}
+                  className="h-11 rounded-xl border border-white/10 bg-white/5 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-white/30"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => enterRoom(passwordRoom.code, false, joinPassword)}
+                  className="h-11 rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(245,158,11,0.2),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(34,211,238,0.18),transparent_24%),linear-gradient(180deg,#07111d,#05070d)]" />
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1917,7 +1923,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <div className="grid grid-cols-3 gap-2 sm:min-w-[420px]">
               {[
                 ["ROOMS", rooms.length],
-                ["PUBLIC", rooms.filter((room) => room.access === "public").length],
+                ["PRIVATE", rooms.filter((room) => room.access === "private").length],
                 ["LIVE", rooms.filter((room) => room.status === "playing").length],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-xl border border-white/10 bg-black/28 p-3">
@@ -1985,15 +1991,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 placeholder="000000"
                 inputMode="numeric"
               />
-              <label className="mt-3 block">
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">Private Password</span>
-                <input
-                  value={joinPassword}
-                  onChange={(event) => setJoinPassword(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-black/36 px-3 text-sm font-bold text-white outline-none transition focus:border-cyan-200/70"
-                  placeholder="Only for private rooms"
-                />
-              </label>
               <button
                 type="button"
                 onClick={() => enterRoom()}
@@ -2015,12 +2012,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-black text-white">
                 <Users className="h-4 w-4 text-emerald-200" />
-                Public Rooms
+                Battle Rooms
               </div>
-              <div className="text-xs font-bold text-white/38">Join as challenger if a field slot is open</div>
+              <div className="text-xs font-bold text-white/38">Public and private rooms are visible</div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {publicRooms.length > 0 ? publicRooms.map((room) => (
+              {visibleRooms.length > 0 ? visibleRooms.map((room) => (
                 <div key={room.code} className="rounded-xl border border-white/8 bg-black/24 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -2029,13 +2026,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                         {room.status} • {room.seats.challenger ? "2 players" : "1 player"}
                       </div>
                     </div>
-                    <div className="rounded-lg border border-emerald-200/20 bg-emerald-200/10 px-2 py-1 text-[10px] font-black uppercase text-emerald-100">
-                      Public
+                    <div className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black uppercase ${
+                      room.access === "private"
+                        ? "border-amber-200/24 bg-amber-200/10 text-amber-100"
+                        : "border-emerald-200/20 bg-emerald-200/10 text-emerald-100"
+                    }`}>
+                      {room.access === "private" ? <Lock className="h-3 w-3" /> : null}
+                      {room.access}
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => enterRoom(room.code)}
+                    onClick={() => (room.access === "private" && room.hostId !== participant.id ? setPasswordRoom(room) : enterRoom(room.code))}
                     className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-emerald-100"
                   >
                     Enter Room
@@ -2043,7 +2045,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 </div>
               )) : (
                 <div className="rounded-xl border border-white/8 bg-black/24 p-6 text-sm font-semibold text-white/42">
-                  No public rooms yet.
+                  No rooms yet.
                 </div>
               )}
             </div>
