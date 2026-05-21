@@ -399,12 +399,44 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
   if (!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) return;
-  const result = resolveTriadTurn({
+  const opener = getOpeningSide(room);
+  const rawResult = resolveTriadTurn({
     turn,
-    player: room.game.triangles.host,
-    opponent: room.game.triangles.challenger,
+    player: room.game.triangles[opener],
+    opponent: room.game.triangles[opener === "host" ? "challenger" : "host"],
   });
+  const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
+}
+
+function getOpeningSide(room: StoredTriadRoom): "host" | "challenger" {
+  if (room.game.activeTurn === 1) return "host";
+  const previousTurn = (room.game.activeTurn - 1) as TriadTurn;
+  const previousResult = room.game.turns.find((turn) => turn.turn === previousTurn);
+  if (!previousResult || previousResult.winner === "draw") return "host";
+  return previousResult.winner === "player" ? "host" : "challenger";
+}
+
+function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
+  return {
+    ...result,
+    playerTotal: result.opponentTotal,
+    opponentTotal: result.playerTotal,
+    winner:
+      result.winner === "player"
+        ? "opponent"
+        : result.winner === "opponent"
+          ? "player"
+          : "draw",
+    effectivePlayer: result.effectiveOpponent,
+    effectiveOpponent: result.effectivePlayer,
+    playerBreakdown: result.opponentBreakdown,
+    opponentBreakdown: result.playerBreakdown,
+    skillEvents: result.skillEvents.map((event) => ({
+      ...event,
+      side: event.side === "player" ? "opponent" : "player",
+    })),
+  };
 }
 
 export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
@@ -423,6 +455,20 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   const lane = laneForTurn(room.game.activeTurn);
+  const existingCard = room.game.triangles[side][lane];
+  const turnResolved = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
+  if (existingCard) {
+    const sameCard = existingCard === cleanText(cardNo);
+    return {
+      ok: sameCard,
+      reason: sameCard ? undefined : ("already_locked" as const),
+      room: publicRoom(room),
+      resolved: turnResolved,
+    };
+  }
+  if (turnResolved) {
+    return { ok: false as const, reason: "already_resolved" as const, room: publicRoom(room), resolved: true };
+  }
   room.game.triangles[side][lane] = cleanText(cardNo);
   resolveIfBothLocked(room);
   await upsertStoredRoom(room);
@@ -437,6 +483,9 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  if (!room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {
+    return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
+  }
   if (room.game.activeTurn < 3) {
     room.game.activeTurn = (room.game.activeTurn + 1) as TriadTurn;
   } else {
