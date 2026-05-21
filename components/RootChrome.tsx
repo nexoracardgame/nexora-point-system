@@ -13,7 +13,8 @@ export default function RootChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() || "";
-  const isEmbedRoute = pathname.startsWith("/blaze-embed");
+  const isEmbedRoute =
+    pathname.startsWith("/blaze-embed") || pathname.startsWith("/market-embed");
 
   if (isEmbedRoute) {
     return children;

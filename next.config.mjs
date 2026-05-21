@@ -117,7 +117,17 @@ const nextConfig = {
         ],
       },
       {
-        source: "/((?!blaze-embed(?:/|$)).*)",
+        source: "/market-embed/:path*",
+        headers: [
+          ...commonSecurityHeaders,
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors *",
+          },
+        ],
+      },
+      {
+        source: "/((?!(?:blaze-embed|market-embed)(?:/|$)).*)",
         headers: [
           ...commonSecurityHeaders,
           {
