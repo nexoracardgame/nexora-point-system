@@ -20,6 +20,56 @@ const notoSansThai = Noto_Sans_Thai({
 const heroPills = ["สะสม +", "ต่อสู้ +", "แลกเปลี่ยน +", "รับรางวัล +"];
 
 const showDownloadStoreButtons = false;
+const youtubeArenaEmbedUrl =
+  "https://www.youtube.com/embed/eQQeMip8JIQ?autoplay=1&mute=0&controls=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1";
+
+function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <div
+      className={`pointer-events-auto overflow-hidden border border-amber-300/22 bg-[#030407] text-white shadow-[0_30px_90px_rgba(0,0,0,0.45),0_0_42px_rgba(245,158,11,0.16)] ${
+        mobile
+          ? "relative z-20 mt-3 rounded-[24px]"
+          : "absolute right-[clamp(1rem,3vw,3.5rem)] top-[43%] z-40 hidden w-[min(33vw,520px)] min-w-[300px] -translate-y-1/2 rounded-[28px] sm:block lg:min-w-[330px]"
+      }`}
+    >
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] ring-1 ring-inset ring-white/10" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-[linear-gradient(180deg,rgba(251,191,36,0.22),transparent)]" />
+        <div className="flex items-center justify-between border-b border-white/10 bg-black px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_14px_rgba(239,68,68,0.9)]" />
+            <span className="truncate text-[11px] font-black uppercase tracking-[0.24em] text-amber-200">
+              NEXORA ARENA
+            </span>
+          </div>
+          <div className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
+            LIVE
+          </div>
+        </div>
+        <div className="relative aspect-video bg-black">
+          <iframe
+            className="absolute inset-0 h-full w-full"
+            src={youtubeArenaEmbedUrl}
+            title="NEXORA Arena YouTube"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[linear-gradient(90deg,#050608,#11100a)] px-3 py-2">
+          <div className="min-w-0">
+            <div className="truncate text-xs font-black uppercase tracking-[0.16em] text-white">
+              Esport Broadcast
+            </div>
+            <div className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+              Powered by NEXORA
+            </div>
+          </div>
+          <div className="h-7 w-16 rounded-full border border-amber-300/25 bg-[linear-gradient(90deg,rgba(251,191,36,0.16),rgba(255,255,255,0.06))] shadow-[0_0_22px_rgba(251,191,36,0.12)]" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function NexoraLuxuryHome() {
   const { data: session } = useSession();
@@ -128,6 +178,8 @@ export default function NexoraLuxuryHome() {
           />
         </div>
 
+        <YouTubeArenaPanel mobile />
+
         <div className="relative z-10 -mt-2 rounded-[26px] border border-black/8 bg-white/86 p-4 shadow-[0_22px_52px_rgba(0,0,0,0.12)] backdrop-blur-xl">
           <div className="text-[12px] font-extrabold leading-5 tracking-[0.06em] text-amber-800">
             สะสม ต่อสู้ แลกเปลี่ยน และรับรางวัลในจักรวาล NEXORA
@@ -162,6 +214,8 @@ export default function NexoraLuxuryHome() {
       <div className="absolute right-4 top-4 z-30 hidden max-w-[170px] text-right text-[1rem] font-bold leading-[1.08] tracking-[0.02em] text-black/56 sm:right-8 sm:top-8 sm:block lg:max-w-[230px] lg:text-[1.35rem]">
         ประสบการณ์ระดับเวิลด์คลาส
       </div>
+
+      <YouTubeArenaPanel />
 
       <div className="absolute left-8 top-[33%] z-30 hidden max-w-[620px] flex-wrap gap-3 text-sm font-black tracking-[0.12em] text-black/74 sm:flex">
         {heroPills.map((item) => (
