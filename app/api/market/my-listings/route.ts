@@ -41,6 +41,7 @@ export async function GET() {
           cardName: true,
           serialNo: true,
           price: true,
+          rarity: true,
         },
       });
 
@@ -52,6 +53,7 @@ export async function GET() {
           cardName: item.cardName,
           serialNo: item.serialNo,
           price: Number(item.price || 0),
+          rarity: item.rarity || null,
         })),
       });
     } catch {
