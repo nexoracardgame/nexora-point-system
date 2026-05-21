@@ -7,6 +7,9 @@ type Props = {
   items: MarketViewItem[];
 };
 
+const TOP3_BACKGROUND_URL =
+  "https://r4.wallpaperflare.com/wallpaper/976/74/465/multiple-display-mountains-snow-nature-wallpaper-c1b4ba2a902ec5b27032d3c4aefe604d.jpg";
+
 function openMarketLogin() {
   const target = new URL(
     "/login?callbackUrl=%2Fmarket",
@@ -17,6 +20,9 @@ function openMarketLogin() {
 }
 
 export default function MarketEmbedClient({ items }: Props) {
+  const top3 = items.slice(0, 3);
+  const [centerHero, leftHero, rightHero] = top3;
+
   return (
     <main className="min-h-[100dvh] bg-[#050608] text-white">
       <button
@@ -42,6 +48,45 @@ export default function MarketEmbedClient({ items }: Props) {
             </div>
           </div>
         </div>
+
+        {centerHero ? (
+          <div className="pointer-events-none relative z-10 p-3 sm:p-5">
+            <section className="relative overflow-hidden rounded-[30px] border border-white/75 bg-[#edf2fb] px-4 py-6 text-[#09090b] shadow-[0_30px_90px_rgba(20,20,30,0.16)] ring-1 ring-black/5 sm:rounded-[38px] sm:px-8 sm:py-10">
+              <div className="absolute inset-0">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-100"
+                  style={{ backgroundImage: `url(${TOP3_BACKGROUND_URL})` }}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.46),rgba(237,242,251,0.62))]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.44),transparent_25%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.20),transparent_36%)]" />
+              </div>
+
+              <div className="relative flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.42em] text-black/36">
+                    NEXORA ELITE MARKET
+                  </div>
+                  <h2 className="mt-2 text-3xl font-black tracking-[-0.06em] sm:text-5xl">
+                    FEATURED TOP 3
+                  </h2>
+                </div>
+                <div className="hidden rounded-full border border-black/10 bg-white/72 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-black/58 shadow-[0_16px_34px_rgba(20,20,30,0.10)] sm:block">
+                  Latest Listings
+                </div>
+              </div>
+
+              <div className="relative mt-7 grid gap-3 sm:mt-10 sm:grid-cols-[0.72fr_1fr_0.72fr] sm:items-end sm:gap-4">
+                {leftHero ? (
+                  <FeaturedCard item={leftHero} rank="02" compact tilt="left" />
+                ) : null}
+                <FeaturedCard item={centerHero} rank="01" featured />
+                {rightHero ? (
+                  <FeaturedCard item={rightHero} rank="03" compact tilt="right" />
+                ) : null}
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         <div className="pointer-events-none relative z-10 grid grid-cols-2 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(170px,1fr))] sm:gap-4 sm:p-5 xl:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
           {items.length > 0 ? (
@@ -96,5 +141,64 @@ export default function MarketEmbedClient({ items }: Props) {
         </div>
       </section>
     </main>
+  );
+}
+
+function FeaturedCard({
+  item,
+  rank,
+  compact = false,
+  featured = false,
+  tilt = "none",
+}: {
+  item: MarketViewItem;
+  rank: string;
+  compact?: boolean;
+  featured?: boolean;
+  tilt?: "left" | "right" | "none";
+}) {
+  const compactTiltClass =
+    tilt === "left"
+      ? "hidden sm:block sm:-mb-3 sm:rotate-[-4deg]"
+      : tilt === "right"
+        ? "hidden sm:block sm:-mb-3 sm:rotate-[4deg]"
+        : "hidden sm:block sm:-mb-3";
+
+  return (
+    <article
+      className={`relative overflow-hidden rounded-[28px] border border-white/20 bg-black shadow-[0_28px_90px_rgba(0,0,0,0.32)] ${
+        compact ? compactTiltClass : ""
+      }`}
+    >
+      <div className={featured ? "aspect-[4/5] sm:aspect-[3/4]" : "aspect-[3/4]"}>
+        <SafeCardImage
+          cardNo={item.cardNo}
+          imageUrl={item.image}
+          alt={item.name}
+          loading={featured ? "eager" : "lazy"}
+          fetchPriority={featured ? "high" : "auto"}
+          className="h-full w-full object-cover"
+        />
+      </div>
+      <div className="absolute left-3 top-3 rounded-full border border-amber-300/35 bg-black/60 px-3 py-1 text-xs font-black tracking-[0.14em] text-amber-100 backdrop-blur">
+        TOP {rank}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.92))] p-4">
+        <div className="line-clamp-2 text-lg font-black leading-tight text-white [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+          {item.name}
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="text-xl font-black text-amber-300 [text-shadow:0_4px_18px_rgba(0,0,0,0.92)]">
+            {item.price}
+          </span>
+          <span className="rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">
+            {item.likes.toLocaleString("th-TH")}
+          </span>
+        </div>
+        <div className="mt-2 truncate text-xs font-bold text-white/58">
+          {item.sellerName || "NEXORA Seller"}
+        </div>
+      </div>
+    </article>
   );
 }
