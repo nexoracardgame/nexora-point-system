@@ -1,4 +1,5 @@
 import { resolveCardDisplayImage } from "@/lib/card-image";
+import { listingIsFoil } from "@/lib/card-finish";
 
 export type MarketViewItem = {
   id: string;
@@ -12,6 +13,7 @@ export type MarketViewItem = {
   sellerId?: string;
   sellerName?: string;
   sellerImage?: string;
+  isFoil?: boolean;
 };
 
 type MarketListingLike = {
@@ -62,6 +64,7 @@ export function normalizeMarketListingView(
     }`,
     likes: Number(item.likes || 0),
     rarity: item.rarity || "Legendary",
+    isFoil: listingIsFoil(paddedCardNo, item.rarity),
     image: resolveCardDisplayImage(
       paddedCardNo,
       item.image_url || item.imageUrl

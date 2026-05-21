@@ -3,6 +3,11 @@
 import { useState } from "react";
 import SafeCardImage from "@/components/SafeCardImage";
 import MarketFeatureNav from "@/components/MarketFeatureNav";
+import {
+  canChooseCardFinish,
+  isForcedFoilCard,
+  type MarketCardFinish,
+} from "@/lib/card-finish";
 import { emitMarketSync } from "@/lib/market-sync";
 import { nexoraAlert } from "@/lib/nexora-dialog";
 
@@ -19,6 +24,9 @@ export default function CreateListingConsole() {
   const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(false);
   const [card, setCard] = useState<CardData | null>(null);
+  const [cardFinish, setCardFinish] = useState<MarketCardFinish>("normal");
+  const canChooseFinish = card ? canChooseCardFinish(card.cardNo) : false;
+  const forcedFoil = card ? isForcedFoilCard(card.cardNo) : false;
 
   const fetchCard = async () => {
     if (loading) return;
@@ -34,12 +42,14 @@ export default function CreateListingConsole() {
       const res = await fetch(`/api/card?cardNo=${encodeURIComponent(cardNo)}`);
       const data = await res.json();
 
+      const normalizedCardNo = String(cardNo).padStart(3, "0");
       setCard({
-        cardNo: String(cardNo).padStart(3, "0"),
+        cardNo: normalizedCardNo,
         cardName: data.card_name || `CARD ${cardNo}`,
         rarity: data.rarity || "Unknown",
-        imageUrl: data.image_url || `/cards/${String(cardNo).padStart(3, "0")}.jpg`,
+        imageUrl: data.image_url || `/cards/${normalizedCardNo}.jpg`,
       });
+      setCardFinish(isForcedFoilCard(normalizedCardNo) ? "foil" : "normal");
     } catch {
       alert("ค้นหาการ์ดไม่สำเร็จ");
     } finally {
@@ -82,6 +92,7 @@ export default function CreateListingConsole() {
           cardName: card.cardName,
           imageUrl: card.imageUrl,
           rarity: card.rarity,
+          cardFinish,
         }),
       });
 
@@ -159,6 +170,11 @@ export default function CreateListingConsole() {
                   <div className="text-sm text-zinc-400">
                     No.{card.cardNo} • {card.rarity}
                   </div>
+                  {(cardFinish === "foil" || forcedFoil) ? (
+                    <div className="mx-auto mt-2 w-fit rounded-full border border-amber-200/45 bg-amber-300/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.22)]">
+                      Foil
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : (
@@ -221,6 +237,36 @@ export default function CreateListingConsole() {
                 className="min-h-[52px] w-full min-w-0 rounded-[18px] border border-white/10 bg-black/24 px-4 py-3 text-center text-base font-bold outline-none transition placeholder:text-white/28 focus:border-amber-300/35 focus:ring-2 focus:ring-amber-300/10 min-[420px]:text-left"
               />
             </div>
+
+            {canChooseFinish ? (
+              <div>
+                <label className="mb-2 block text-sm font-bold text-white/80">
+                  ประเภทการ์ดใบนี้
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["normal", "foil"] as MarketCardFinish[]).map((finish) => (
+                    <button
+                      key={finish}
+                      type="button"
+                      onClick={() => setCardFinish(finish)}
+                      className={`min-h-[48px] rounded-[16px] border px-3 text-sm font-black transition ${
+                        cardFinish === finish
+                          ? finish === "foil"
+                            ? "border-amber-200 bg-amber-300 text-black shadow-[0_0_26px_rgba(251,191,36,0.24)]"
+                            : "border-white/70 bg-white text-black"
+                          : "border-white/10 bg-black/24 text-white/58 hover:border-white/28"
+                      }`}
+                    >
+                      {finish === "foil" ? "ฟอยล์" : "ธรรมดา"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : forcedFoil ? (
+              <div className="rounded-[18px] border border-amber-200/24 bg-amber-300/10 p-3 text-sm font-bold leading-6 text-amber-100">
+                ใบนี้เป็นฟอยล์บังคับจากเซ็ตพิเศษ ระบบจะติดป้าย Foil ให้อัตโนมัติ
+              </div>
+            ) : null}
 
             <div>
               <label className="mb-2 block text-sm font-bold text-white/80">

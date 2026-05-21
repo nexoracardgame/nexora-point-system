@@ -82,6 +82,16 @@ function rarityClasses(rarity: string) {
   }
 }
 
+function FoilBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`absolute left-3 top-3 z-20 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] font-black uppercase tracking-[0.16em] text-black shadow-[0_0_28px_rgba(251,191,36,0.36)] ${
+      compact ? "px-2 py-1 text-[9px]" : "px-3 py-1.5 text-[10px]"
+    }`}>
+      Foil
+    </div>
+  );
+}
+
 function getCreatedAtValue(dateString?: string) {
   const value = new Date(dateString || 0).getTime();
   return Number.isNaN(value) ? 0 : value;
@@ -737,6 +747,7 @@ export default function MarketDashboardTFT({
                 fetchPriority="high"
                 className="h-[300px] w-full object-cover"
               />
+              {centerHero.isFoil ? <FoilBadge /> : null}
 
               <button
                 onClick={(e) => {
@@ -811,6 +822,7 @@ export default function MarketDashboardTFT({
                     alt={card.name}
                     className="h-[180px] w-full object-cover"
                   />
+                  {card.isFoil ? <FoilBadge compact /> : null}
 
                   <button
                     onClick={(e) => {
@@ -932,6 +944,7 @@ export default function MarketDashboardTFT({
                   fetchPriority="high"
                   className="h-[380px] w-[260px] rotate-[-10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
                 />
+                {leftHero.isFoil ? <FoilBadge compact /> : null}
 
                 <button
                   onClick={(e) => {
@@ -1001,6 +1014,7 @@ export default function MarketDashboardTFT({
                 fetchPriority="high"
                 className="h-[560px] w-full object-cover"
               />
+              {centerHero.isFoil ? <FoilBadge /> : null}
 
               <button
                 onClick={(e) => {
@@ -1071,6 +1085,7 @@ export default function MarketDashboardTFT({
                   fetchPriority="high"
                   className="h-[380px] w-[260px] rotate-[10deg] rounded-[28px] object-cover shadow-[0_20px_80px_rgba(0,0,0,0.35)] transition hover:scale-105"
                 />
+                {rightHero.isFoil ? <FoilBadge compact /> : null}
 
                 <button
                   onClick={(e) => {
@@ -1227,6 +1242,7 @@ export default function MarketDashboardTFT({
                       fetchPriority={index < 8 ? "high" : "auto"}
                       className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                     />
+                    {card.isFoil ? <FoilBadge compact /> : null}
 
                     <button
                       onClick={(e) => {

@@ -1,4 +1,5 @@
 import { resolveCardDisplayImage } from "@/lib/card-image";
+import { listingIsFoil } from "@/lib/card-finish";
 import { getMarketListings, type MarketListingRecord } from "@/lib/market-listings";
 import {
   normalizeMarketListingView,
@@ -12,6 +13,7 @@ export type MarketListingFeedItem = Omit<
   cardName: string;
   imageUrl: string;
   rarity: string;
+  isFoil: boolean;
 };
 
 function getCreatedAtTime(value?: string | Date | null) {
@@ -50,6 +52,7 @@ export function toMarketListingFeedItem(
     cardName: item.cardName || `Card #${cardNo.padStart(3, "0")}`,
     imageUrl: resolveCardDisplayImage(cardNo, item.imageUrl),
     rarity: item.rarity || "Legendary",
+    isFoil: listingIsFoil(cardNo, item.rarity),
     sellerName: item.sellerName || "Unknown Seller",
     sellerImage: item.sellerImage || "/default-avatar.png",
   };

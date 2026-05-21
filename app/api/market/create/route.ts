@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { sanitizeCardImageUrl } from "@/lib/card-image";
+import { decorateRarityWithFinish, normalizeMarketCardFinish } from "@/lib/card-finish";
 import { prisma } from "@/lib/prisma";
 import { resolveUserIdentity } from "@/lib/user-identity";
 
@@ -221,12 +222,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { cardNo, serialNo, price, cardName, imageUrl, rarity } =
+    const { cardNo, serialNo, price, cardName, imageUrl, rarity, cardFinish } =
       await req.json();
 
     const normalizedCardNo = normalizeCardNo(cardNo);
     const normalizedSerialNo = normalizeSerialNo(serialNo);
     const numericPrice = Number(price);
+    const normalizedFinish = normalizeMarketCardFinish(normalizedCardNo, cardFinish);
 
     if (
       !normalizedCardNo ||
@@ -247,7 +249,7 @@ export async function POST(req: NextRequest) {
       price: numericPrice,
       cardName: String(cardName || "").trim() || null,
       imageUrl: sanitizeCardImageUrl(imageUrl),
-      rarity: String(rarity || "").trim() || null,
+      rarity: decorateRarityWithFinish(normalizedCardNo, rarity, normalizedFinish),
     });
 
     return NextResponse.json({

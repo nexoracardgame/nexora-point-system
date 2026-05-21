@@ -19,6 +19,14 @@ function openMarketLogin() {
   window.open(target, "_blank", "noopener,noreferrer");
 }
 
+function FoilBadge() {
+  return (
+    <div className="absolute left-3 top-3 z-20 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-black shadow-[0_0_24px_rgba(251,191,36,0.34)]">
+      Foil
+    </div>
+  );
+}
+
 export default function MarketEmbedClient({ items }: Props) {
   const top3 = items.slice(0, 3);
   const [centerHero, leftHero, rightHero] = top3;
@@ -122,6 +130,7 @@ export default function MarketEmbedClient({ items }: Props) {
                     alt={item.name}
                     className="h-full w-full object-cover"
                   />
+                  {item.isFoil ? <FoilBadge /> : null}
                   <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.78))] p-3">
                     <div className="w-fit rounded-full border border-amber-300/35 bg-black/52 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100">
                       {item.rarity}
@@ -208,7 +217,8 @@ function FeaturedCard({
           className="h-full w-full object-cover"
         />
       </div>
-      <div className="absolute left-3 top-3 rounded-full border border-amber-300/35 bg-black/60 px-3 py-1 text-xs font-black tracking-[0.14em] text-amber-100 backdrop-blur">
+      {item.isFoil ? <FoilBadge /> : null}
+      <div className={`absolute left-3 rounded-full border border-amber-300/35 bg-black/60 px-3 py-1 text-xs font-black tracking-[0.14em] text-amber-100 backdrop-blur ${item.isFoil ? "top-10" : "top-3"}`}>
         TOP {rank}
       </div>
       <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.92))] p-3 sm:p-4">

@@ -6,6 +6,7 @@ import { Coins, Eye, Pencil, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DeleteListingButton from "@/components/DeleteListingButton";
 import SafeCardImage from "@/components/SafeCardImage";
+import { listingIsFoil } from "@/lib/card-finish";
 import {
   readClientViewCache,
   writeClientViewCache,
@@ -18,6 +19,7 @@ type SellerListing = {
   cardName: string | null;
   serialNo: string | null;
   price: number;
+  rarity?: string | null;
 };
 
 function normalizeListing(item: Partial<SellerListing>): SellerListing {
@@ -28,6 +30,7 @@ function normalizeListing(item: Partial<SellerListing>): SellerListing {
     cardName: item.cardName || null,
     serialNo: item.serialNo || null,
     price: Number(item.price || 0),
+    rarity: item.rarity || null,
   };
 }
 
@@ -165,6 +168,11 @@ export default function SellerCenterClient({
                   alt={`Card ${item.cardNo}`}
                   className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                 />
+                {listingIsFoil(item.cardNo, item.rarity) ? (
+                  <div className="absolute right-2 top-2 rounded-full border border-amber-100/55 bg-[linear-gradient(135deg,rgba(255,246,196,0.96),rgba(251,191,36,0.82),rgba(255,255,255,0.74))] px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-black shadow-[0_0_24px_rgba(251,191,36,0.32)] sm:right-4 sm:top-4 sm:px-3 sm:text-[10px]">
+                    Foil
+                  </div>
+                ) : null}
 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/12 to-transparent" />
 
