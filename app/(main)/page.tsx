@@ -28,8 +28,8 @@ function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
     <div
       className={`pointer-events-auto overflow-hidden border border-amber-300/22 bg-[#030407] text-white shadow-[0_30px_90px_rgba(0,0,0,0.45),0_0_42px_rgba(245,158,11,0.16)] ${
         mobile
-          ? "relative z-20 mt-3 rounded-[24px]"
-          : "absolute right-[clamp(1rem,3vw,3.5rem)] top-[43%] z-40 hidden w-[min(33vw,520px)] min-w-[300px] -translate-y-1/2 rounded-[28px] sm:block lg:min-w-[330px]"
+          ? "relative z-20 mt-5 rounded-[24px]"
+          : "absolute left-1/2 top-[44%] z-40 hidden w-[min(66vw,1040px)] -translate-x-1/2 -translate-y-1/2 rounded-[30px] sm:block"
       }`}
     >
       <div className="relative">
@@ -41,9 +41,6 @@ function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
             <span className="truncate text-[11px] font-black uppercase tracking-[0.24em] text-amber-200">
               NEXORA ARENA
             </span>
-          </div>
-          <div className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
-            LIVE
           </div>
         </div>
         <div className="relative aspect-video bg-black">
@@ -58,7 +55,7 @@ function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
         <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[linear-gradient(90deg,#050608,#11100a)] px-3 py-2">
           <div className="min-w-0">
             <div className="truncate text-xs font-black uppercase tracking-[0.16em] text-white">
-              Esport Broadcast
+              NEXORA Broadcast
             </div>
             <div className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
               Powered by NEXORA
@@ -166,7 +163,9 @@ export default function NexoraLuxuryHome() {
       </div>
 
       <div className="relative z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+112px)] sm:hidden">
-        <div className="relative mt-1 flex min-h-[210px] items-end justify-center overflow-hidden">
+        <YouTubeArenaPanel mobile />
+
+        <div className="relative mt-3 flex min-h-[190px] items-end justify-center overflow-hidden">
           <Image
             src="https://s.imgz.io/2026/03/24/033-97ca7d23f8ddf07a.png"
             alt="Nexora hero"
@@ -174,11 +173,9 @@ export default function NexoraLuxuryHome() {
             height={1093}
             priority
             sizes="90vw"
-            className="h-[31svh] max-h-[300px] min-h-[205px] w-auto translate-x-[5%] object-contain drop-shadow-[0_18px_44px_rgba(0,0,0,0.18)]"
+            className="h-[28svh] max-h-[270px] min-h-[185px] w-auto translate-x-[5%] object-contain drop-shadow-[0_18px_44px_rgba(0,0,0,0.18)]"
           />
         </div>
-
-        <YouTubeArenaPanel mobile />
 
         <div className="relative z-10 -mt-2 rounded-[26px] border border-black/8 bg-white/86 p-4 shadow-[0_22px_52px_rgba(0,0,0,0.12)] backdrop-blur-xl">
           <div className="text-[12px] font-extrabold leading-5 tracking-[0.06em] text-amber-800">
