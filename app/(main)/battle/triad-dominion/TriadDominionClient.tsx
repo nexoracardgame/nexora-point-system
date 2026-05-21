@@ -111,6 +111,9 @@ type RoomGame = {
   activeTurn: TriadTurn;
   fightNo: number;
   turnStartedAt: number;
+  matchWinner: RoomPlayerSide | "";
+  surrenderedBy: RoomPlayerSide | "";
+  matchEndedAt: number;
 };
 
 type LockedFight = {
@@ -361,6 +364,9 @@ function normalizeRoomGame(value: unknown): RoomGame {
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
     turnStartedAt: Number(raw.turnStartedAt || Date.now()),
+    matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
+    surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
+    matchEndedAt: Number(raw.matchEndedAt || 0),
   };
 }
 
@@ -1341,6 +1347,43 @@ function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeT
   );
 }
 
+function MatchFinalOverlay({
+  winner,
+  surrendered,
+  score,
+}: {
+  winner: string;
+  surrendered?: string;
+  score: { player: number; bot: number };
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(251,191,36,0.22),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.9)_100%)] backdrop-blur-sm">
+      <div className="relative w-[min(760px,92vw)] overflow-hidden rounded-[28px] border border-amber-100/45 bg-black/82 p-6 text-center shadow-[0_0_90px_rgba(251,191,36,0.34)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-200 to-transparent" />
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.12),transparent)] opacity-40" />
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-100/70 bg-amber-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.55)]">
+            <Trophy className="h-8 w-8" />
+          </div>
+          <div className="mt-5 text-[clamp(2.2rem,8vw,5.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.65)]">
+            ชนะที่แท้จริง
+          </div>
+          <div className="mt-4 text-[clamp(1.35rem,4vw,2.5rem)] font-black text-amber-100">{winner}</div>
+          {surrendered ? (
+            <div className="mt-2 text-sm font-bold text-white/58">{surrendered} ยอมแพ้ การต่อสู้จบลงทันที</div>
+          ) : null}
+          <div className="mx-auto mt-5 w-fit rounded-full border border-red-200/35 bg-red-500/16 px-5 py-2 text-xl font-black text-white">
+            คะแนนรวม {score.player}-{score.bot}
+          </div>
+          <div className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/42">
+            กำลังพาทุกคนกลับห้องรอ
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkillTargetOverlay({
   card,
   side,
@@ -1646,8 +1689,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
   const playerGraveCards = gravePlayerCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
-  const matchDone = fightNo > 3;
   const currentRoom = rooms.find((room) => room.code === activeRoomCode) || activeRoomSnapshot;
+  const forcedWinnerSide = currentRoom?.game.matchWinner || "";
+  const surrenderedSide = currentRoom?.game.surrenderedBy || "";
+  const matchDone = fightNo > 3 || Boolean(forcedWinnerSide);
   const isRoomHost = Boolean(currentRoom && currentRoom.hostId === participant.id);
   const isSpectator = Boolean(currentRoom?.spectators.some((viewer) => viewer.id === participant.id));
   const isFieldPlayer = Boolean(
@@ -1675,12 +1720,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
+  const forcedWinnerLabel = forcedWinnerSide ? currentRoom?.seats[forcedWinnerSide]?.name || "ผู้ชนะ" : "";
+  const surrenderedLabel = surrenderedSide ? currentRoom?.seats[surrenderedSide]?.name || "ผู้ยอมแพ้" : "";
   const winnerText =
-    matchScore.player === matchScore.bot
+    forcedWinnerLabel
+      ? `${forcedWinnerLabel} ชนะ`
+      : matchScore.player === matchScore.bot
       ? "เสมอกัน"
       : matchScore.player > matchScore.bot
         ? `${playerLabel} ชนะ`
         : `${opponentLabel} ชนะ`;
+
+  const finalMatchScore = forcedWinnerSide
+    ? forcedWinnerSide === roomPlayerSide
+      ? { player: Math.max(matchScore.player, matchScore.bot + 1), bot: matchScore.bot }
+      : forcedWinnerSide === opponentSide
+        ? { player: matchScore.player, bot: Math.max(matchScore.bot, matchScore.player + 1) }
+        : matchScore
+    : matchScore;
 
   const syncRooms = async (options: { force?: boolean } = {}) => {
     const now = Date.now();
@@ -1864,6 +1921,22 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setLobbyMessage("ยุบห้องแล้ว");
   };
 
+  const surrenderBattle = async () => {
+    if (!currentRoom || !isFieldPlayer || matchDone) return;
+    const result = await postRoomAction({ action: "surrender", code: currentRoom.code });
+    if (!result.ok) {
+      setBattleLog((current) => ["ยอมแพ้ไม่สำเร็จ ลองกดใหม่อีกครั้ง", ...current]);
+      return;
+    }
+    const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
+    if (room) {
+      activeRoomSnapshotRef.current = room;
+      setActiveRoomSnapshot(room);
+      setRooms((current) => mergeRoomByCode(current, room));
+    }
+    setBattleLog((current) => ["ยอมแพ้แล้ว ระบบสรุปผู้ชนะทันที", ...current]);
+  };
+
   useEffect(() => {
     let stopped = false;
     let timer = 0;
@@ -1914,6 +1987,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase(isSpectator ? "battle" : "deck");
     }
   }, [currentRoom, isSpectator, participant.id, phase]);
+
+  useEffect(() => {
+    if (!currentRoom?.game.matchWinner || !currentRoom.game.matchEndedAt || !isRoomHost) return;
+    const delay = Math.max(0, 6500 - (Date.now() - currentRoom.game.matchEndedAt));
+    const timer = window.setTimeout(() => {
+      void postRoomAction({ action: "continue", code: currentRoom.code });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, isRoomHost]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -2926,6 +3008,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   return (
     <main className="relative min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:min-h-0 xl:overflow-hidden">
+      {currentRoom && isFieldPlayer && !matchDone ? (
+        <button
+          type="button"
+          onClick={surrenderBattle}
+          className="absolute right-4 top-16 z-20 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200/35 bg-red-500 px-4 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_30px_rgba(239,68,68,0.28)] backdrop-blur transition hover:bg-red-400 sm:right-36 sm:top-4"
+        >
+          <Swords className="h-4 w-4" />
+          ยอมแพ้
+        </button>
+      ) : null}
+      {matchDone && forcedWinnerLabel ? (
+        <MatchFinalOverlay winner={forcedWinnerLabel} surrendered={surrenderedLabel} score={finalMatchScore} />
+      ) : null}
       {currentRoom ? (
         <button
           type="button"

@@ -51,6 +51,9 @@ export type TriadRoomGame = {
   activeTurn: TriadTurn;
   fightNo: number;
   turnStartedAt: number;
+  matchWinner: TriadRoomSlot | "";
+  surrenderedBy: TriadRoomSlot | "";
+  matchEndedAt: number;
 };
 
 export type PublicTriadRoom = Omit<StoredTriadRoom, "password"> & {
@@ -158,6 +161,9 @@ function normalizeGame(value: unknown): TriadRoomGame {
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
     turnStartedAt: Number(raw.turnStartedAt || Date.now()),
+    matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
+    surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
+    matchEndedAt: Number(raw.matchEndedAt || 0),
   };
 }
 
@@ -207,14 +213,14 @@ async function ensureTriadRoomSchema() {
           "hostId" TEXT NOT NULL,
           "seats" JSONB NOT NULL DEFAULT '{"host":null,"challenger":null}'::jsonb,
           "spectators" JSONB NOT NULL DEFAULT '[]'::jsonb,
-          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb,
+          "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0,"matchWinner":"","surrenderedBy":"","matchEndedAt":0}'::jsonb,
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_status_idx" ON "TriadRoom" ("status")`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_createdAt_idx" ON "TriadRoom" ("createdAt" DESC)`);
-      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0}'::jsonb`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0,"matchWinner":"","surrenderedBy":"","matchEndedAt":0}'::jsonb`);
     })().catch((error) => {
       globalForTriadRooms.nexoraTriadRoomSchemaPromise = undefined;
       throw error;
@@ -666,6 +672,22 @@ export async function timeoutTriadRoomTurn(code: string, participantId: string) 
   return { ok: true as const, room: publicRoom(room), resolved: true };
 }
 
+export async function surrenderTriadRoom(code: string, participantId: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  if (room.status !== "playing") return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
+
+  const winner: TriadRoomSlot = side === "host" ? "challenger" : "host";
+  room.game.surrenderedBy = side;
+  room.game.matchWinner = winner;
+  room.game.matchEndedAt = Date.now();
+  room.game.fightNo = 4;
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room), surrenderedBy: side, winner };
+}
+
 export async function joinTriadRoom(input: {
   code: string;
   password?: string;
@@ -752,6 +774,15 @@ export async function disbandTriadRoom(code: string, participantId: string) {
   if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
   await deleteStoredRoom(room.code);
   return { ok: true as const, disbanded: true as const };
+}
+
+export async function clearTriadRooms() {
+  const rooms = await withRoomStore("list", dbListRooms, memoryListRooms);
+  for (const room of rooms) {
+    await deleteStoredRoom(room.code);
+  }
+  globalForTriadRooms.nexoraTriadRooms = [];
+  return { ok: true as const, cleared: rooms.length };
 }
 
 export async function leaveTriadRoom(code: string, participantId: string) {

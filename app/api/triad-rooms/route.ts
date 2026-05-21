@@ -3,6 +3,7 @@ import { requireAdminActor } from "@/lib/admin-auth";
 import {
   createTriadRoom,
   advanceTriadRoomTurn,
+  clearTriadRooms,
   disbandTriadRoom,
   joinTriadRoom,
   leaveTriadRoom,
@@ -13,6 +14,7 @@ import {
   readyTriadRoomDeck,
   setTriadRoomDeck,
   startTriadRoom,
+  surrenderTriadRoom,
   takeTriadRoomSlot,
   timeoutTriadRoomTurn,
   type TriadRoomAccess,
@@ -55,6 +57,12 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const action = cleanText(body.action);
+
+  if (action === "clear-all") {
+    const result = await clearTriadRooms();
+    return noStoreJson(result);
+  }
+
   const participant = participantFromBody(body, actor.name || actor.lineId);
 
   if (!participant.id) {
@@ -122,6 +130,11 @@ export async function POST(request: Request) {
 
   if (action === "timeout-turn") {
     const result = await timeoutTriadRoomTurn(cleanText(body.code), participant.id);
+    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+  }
+
+  if (action === "surrender") {
+    const result = await surrenderTriadRoom(cleanText(body.code), participant.id);
     return noStoreJson(result, { status: result.ok ? 200 : 409 });
   }
 
