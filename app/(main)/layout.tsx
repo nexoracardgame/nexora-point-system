@@ -1090,16 +1090,6 @@ export default function MainLayout({
         icon: FolderKanban,
         active: pathname.startsWith("/collections"),
       },
-      ...(isAdminModeUser
-        ? [
-            {
-              href: "/battle/triad-dominion",
-              label: "Triad",
-              icon: Swords,
-              active: pathname.startsWith("/battle"),
-            },
-          ]
-        : []),
       {
         href: "/community",
         label: t("layout.nav.community"),
@@ -1125,7 +1115,7 @@ export default function MainLayout({
         active: pathname.startsWith("/profile"),
       },
     ],
-    [isAdminModeUser, ownProfileHref, pathname, t]
+    [ownProfileHref, pathname, t]
   );
 
   const drawerLinks = [
