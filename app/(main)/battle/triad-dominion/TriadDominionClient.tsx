@@ -1043,22 +1043,22 @@ function BoardTriangle({
     {
       lane: "top",
       label: "หลัก",
-      className: `col-span-2 mx-auto w-[clamp(72px,9.5vw,132px)] ${tone === "bot" ? "translate-y-2" : "-translate-y-2"}`,
+      className: `col-span-2 mx-auto w-[clamp(72px,9.5vw,132px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-8"}`,
     },
     {
       lane: "left",
       label: "โจมตี",
-      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
+      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "-translate-y-5"}`,
     },
     {
       lane: "right",
       label: "ช่วย",
-      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "translate-y-2"}`,
+      className: `w-[clamp(68px,8.6vw,124px)] ${tone === "bot" ? "-translate-y-2" : "-translate-y-5"}`,
     },
   ];
 
   return (
-    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(10px,1.5vw,22px)] gap-y-0 ${tone === "player" ? "-translate-y-5" : "translate-y-5"}`}>
+    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(10px,1.5vw,22px)] gap-y-0 ${tone === "player" ? "-translate-y-14 sm:-translate-y-16" : "translate-y-4"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         return (
@@ -1114,6 +1114,8 @@ function HandCard({
   disabled,
   onClick,
   onDropToLane,
+  onPreview,
+  onPreviewEnd,
 }: {
   card: CardView;
   used: boolean;
@@ -1121,11 +1123,17 @@ function HandCard({
   disabled: boolean;
   onClick: () => void;
   onDropToLane: (lane: Lane, cardNo: string) => void;
+  onPreview: (card: CardView) => void;
+  onPreviewEnd: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={() => !used && onPreview(card)}
+      onMouseLeave={onPreviewEnd}
+      onFocus={() => !used && onPreview(card)}
+      onBlur={onPreviewEnd}
       draggable={!disabled && !used}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", card.cardNo);
@@ -1133,6 +1141,7 @@ function HandCard({
       }}
       onPointerUp={(event) => {
         if (disabled || used) return;
+        onPreview(card);
         const target = document
           .elementFromPoint(event.clientX, event.clientY)
           ?.closest<HTMLElement>("[data-triad-lane]");
@@ -1181,6 +1190,7 @@ function PlayerHand({
   onPlayCard: (cardNo: string) => void;
   onDropToLane: (lane: Lane, cardNo: string) => void;
 }) {
+  const [previewCard, setPreviewCard] = useState<CardView | null>(null);
   const placedByNo = new Map<string, Lane>();
   (["top", "left", "right"] as Lane[]).forEach((lane) => {
     const cardNo = player[lane];
@@ -1189,6 +1199,7 @@ function PlayerHand({
 
   return (
     <div className="rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)]">
+      <CardHoverPreview card={previewCard} />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
           การ์ดในมือ
@@ -1221,8 +1232,34 @@ function PlayerHand({
             disabled={locked}
             onClick={() => onPlayCard(card.cardNo)}
             onDropToLane={onDropToLane}
+            onPreview={setPreviewCard}
+            onPreviewEnd={() => setPreviewCard(null)}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CardHoverPreview({ card }: { card: CardView | null }) {
+  if (!card) return null;
+  return (
+    <div className="pointer-events-none fixed bottom-[calc(var(--app-mobile-nav-height)+150px)] left-1/2 z-[80] w-[min(300px,72vw)] -translate-x-1/2 rounded-2xl border border-amber-100/45 bg-black/88 p-3 shadow-[0_0_70px_rgba(251,191,36,0.34)] backdrop-blur-md xl:bottom-40 xl:left-[48%] xl:w-[260px]">
+      <div className="grid grid-cols-[104px_1fr] gap-3">
+        <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-white/14 bg-black">
+          <Image src={card.sourceImage} alt={card.name} fill sizes="160px" className="object-cover" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-100/58">No.{card.cardNo}</div>
+          <div className="mt-1 line-clamp-2 text-lg font-black leading-tight text-white">{card.name}</div>
+          <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-black text-black">
+            <span className="rounded-md bg-amber-200 px-2 py-1">ATK {card.attack.toLocaleString()}</span>
+            <span className="rounded-md bg-cyan-200 px-2 py-1">SUP {card.support.toLocaleString()}</span>
+          </div>
+          <div className="mt-2 line-clamp-5 text-xs font-semibold leading-5 text-white/70">
+            {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1639,7 +1676,7 @@ function CompactBattleBoard({
         onConfirm={onConfirmSkillTarget}
       />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[10%_29%_1fr_29%_10%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[10%_30%_1fr_25%_8%] px-[clamp(6px,1.2vw,18px)] py-[clamp(5px,0.9vw,12px)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-blue-300/18 bg-black/42 px-3 py-2">
             <Image src={botImage || "/avatar.png"} alt={botName} width={42} height={42} className="h-10 w-10 shrink-0 rounded-xl border border-white/10 object-contain" />
