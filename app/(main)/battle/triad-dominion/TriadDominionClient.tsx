@@ -1641,7 +1641,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const enemyDeck = currentRoom.game.decks[opponentSide];
     if (ownDeck.length === DECK_SIZE) setPlayerDeck(ownDeck);
     if (enemyDeck.length === DECK_SIZE) setBotDeck(enemyDeck);
-    setPlayer(currentRoom.game.triangles[roomPlayerSide]);
+    const serverPlayerTriangle = currentRoom.game.triangles[roomPlayerSide];
+    const activeLane = laneForTurn(currentRoom.game.activeTurn);
+    setPlayer((current) => {
+      const next = { ...serverPlayerTriangle };
+      if (!serverPlayerTriangle[activeLane] && current[activeLane]) {
+        next[activeLane] = current[activeLane];
+      }
+      return next;
+    });
     setActiveTurn(currentRoom.game.activeTurn);
     setFightNo(currentRoom.game.fightNo);
     const mappedTurns = roomPlayerSide === "host"
