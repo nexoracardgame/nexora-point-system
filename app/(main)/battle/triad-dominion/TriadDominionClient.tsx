@@ -34,6 +34,12 @@ import {
   type TriadTurn,
   type TriadTurnResult,
 } from "@/lib/triad-dominion";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import {
+  TRIAD_ROOM_REALTIME_CHANNEL,
+  TRIAD_ROOM_REALTIME_EVENT,
+  type TriadRoomRealtimePayload,
+} from "@/lib/triad-room-realtime";
 
 type CardView = {
   cardNo: string;
@@ -201,6 +207,14 @@ function safeText(value: unknown) {
   return String(value || "").trim();
 }
 
+function safeTimeMs(value: unknown, fallback = Date.now()) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function getParticipantId(baseId: string) {
   if (typeof window === "undefined") return baseId || "triad-local-player";
   const key = "nexora:triad-dominion:participant-id";
@@ -336,8 +350,8 @@ function normalizeApiRooms(value: unknown): TriadRoom[] {
         hasPassword: Boolean(room?.hasPassword || access === "private"),
         status,
         hostId: safeText(room?.hostId),
-        createdAt: Number(room?.createdAt || Date.now()),
-        updatedAt: Number(room?.updatedAt || Date.now()),
+        createdAt: safeTimeMs(room?.createdAt),
+        updatedAt: safeTimeMs(room?.updatedAt),
         seats: {
           host: room?.seats?.host || null,
           challenger: room?.seats?.challenger || null,
@@ -756,13 +770,14 @@ function PhaseTrack({ activeTurn }: { activeTurn: TriadTurn }) {
   ] as const;
 
   return (
-    <div className="rounded-xl border border-amber-200/14 bg-[#17110a]/84 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+    <div className="relative overflow-hidden rounded-[18px] border border-amber-100/24 bg-[linear-gradient(180deg,rgba(30,21,9,0.94),rgba(9,7,5,0.88))] p-1.5 shadow-[0_16px_46px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
+      <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/55 to-transparent" />
       <div className="grid grid-cols-5 gap-1">
         {steps.map(([label, value]) => (
           <div
             key={label}
-            className={`rounded-lg px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-xs ${
-              value === activeTurn ? "bg-amber-200 text-black shadow-[0_0_22px_rgba(251,191,36,0.28)]" : "text-amber-100/32"
+            className={`rounded-xl px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-xs ${
+              value === activeTurn ? "bg-amber-200 text-black shadow-[0_0_26px_rgba(251,191,36,0.34)]" : "text-amber-100/38"
             }`}
           >
             {label}
@@ -795,7 +810,7 @@ function BoardCardSlot({
 
   return (
     <div
-      className={`relative w-[clamp(66px,9.2vw,140px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border}`}
+      className={`relative w-[clamp(58px,8.4vw,126px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border}`}
     >
       <div className="relative aspect-[3/4]">
         {card && !hidden ? (
@@ -840,7 +855,7 @@ function BoardPile({
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`relative grid w-[clamp(60px,8vw,112px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${onClick ? "hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-200/70" : ""} ${color} ${
+      className={`relative grid w-[clamp(54px,7.2vw,104px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${onClick ? "hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-200/70" : ""} ${color} ${
         rotate ? "rotate-180" : ""
       }`}
       style={{ aspectRatio: "3 / 4" }}
@@ -1032,22 +1047,22 @@ function BoardTriangle({
     {
       lane: "top",
       label: "หลัก",
-      className: `col-span-2 mx-auto w-[clamp(66px,8.8vw,124px)] ${tone === "bot" ? "-translate-y-1" : "-translate-y-6"}`,
+      className: `col-span-2 mx-auto w-[clamp(62px,8.2vw,116px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-1"}`,
     },
     {
       lane: "left",
       label: "โจมตี",
-      className: `w-[clamp(62px,8vw,116px)] ${tone === "bot" ? "-translate-y-2" : "-translate-y-5"}`,
+      className: `w-[clamp(58px,7.5vw,108px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-1"}`,
     },
     {
       lane: "right",
       label: "ช่วย",
-      className: `w-[clamp(62px,8vw,116px)] ${tone === "bot" ? "-translate-y-2" : "-translate-y-5"}`,
+      className: `w-[clamp(58px,7.5vw,108px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-1"}`,
     },
   ];
 
   return (
-    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(8px,1.2vw,18px)] gap-y-0 ${tone === "player" ? "-translate-y-8 sm:-translate-y-10" : "translate-y-1"}`}>
+    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(8px,1.2vw,18px)] gap-y-0 ${tone === "player" ? "-translate-y-2 sm:-translate-y-3" : "translate-y-3"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         return (
@@ -1684,7 +1699,7 @@ function CompactBattleBoard({
         onConfirm={onConfirmSkillTarget}
       />
 
-      <div className="relative grid h-full min-h-0 grid-rows-[0px_minmax(132px,1fr)_auto_minmax(132px,1fr)_0px] px-[clamp(6px,1.2vw,18px)] py-[clamp(8px,1.1vw,16px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[8px_minmax(126px,1fr)_auto_minmax(126px,1fr)_8px] gap-y-1 px-[clamp(6px,1.2vw,18px)] py-[clamp(8px,1.1vw,16px)]">
         <div />
 
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
@@ -1700,11 +1715,11 @@ function CompactBattleBoard({
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="relative z-30 grid -translate-y-1 grid-cols-[1fr_auto_1fr] items-center gap-3">
           <div />
-          <div className="mx-auto w-full max-w-[720px]">
+          <div className="mx-auto w-full max-w-[620px]">
             <PhaseTrack activeTurn={activeTurn} />
-            <div className="mt-2 text-center text-xs font-black uppercase tracking-[0.16em] text-amber-100/58">
+            <div className="mt-1.5 rounded-full border border-amber-100/14 bg-black/32 px-3 py-1 text-center text-xs font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
               เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
             </div>
           </div>
@@ -2094,6 +2109,80 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [participant.id]);
 
   useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase.channel(TRIAD_ROOM_REALTIME_CHANNEL, {
+      config: {
+        broadcast: {
+          self: false,
+        },
+      },
+    });
+
+    channel.on("broadcast", { event: TRIAD_ROOM_REALTIME_EVENT }, ({ payload }) => {
+      const event = (payload || {}) as TriadRoomRealtimePayload;
+      const room = normalizeApiRooms(event.room ? [event.room] : [])[0] || null;
+      const code = safeText(event.code || room?.code);
+
+      if (event.refresh) {
+        void syncRooms({ force: true }).catch(() => null);
+        return;
+      }
+
+      if (event.deleted && code) {
+        setRooms((current) => current.filter((item) => item.code !== code));
+        if (activeRoomCodeRef.current === code) {
+          activeRoomCodeRef.current = "";
+          activeRoomSnapshotRef.current = null;
+          setActiveRoomCode("");
+          setActiveRoomSnapshot(null);
+          setPhase("lobby");
+        }
+        return;
+      }
+
+      if (!room) {
+        void syncRooms({ force: true }).catch(() => null);
+        return;
+      }
+
+      setRooms((current) => mergeRoomByCode(current, room));
+
+      const roomIncludesMe = participantInRoom(room, participant.id);
+      if (activeRoomCodeRef.current === room.code || roomIncludesMe) {
+        activeRoomSnapshotRef.current = room;
+        setActiveRoomSnapshot(room);
+      }
+
+      if (!activeRoomCodeRef.current && roomIncludesMe) {
+        activeRoomCodeRef.current = room.code;
+        setActiveRoomCode(room.code);
+      }
+
+      if (roomIncludesMe) {
+        const spectator = room.spectators.some((viewer) => viewer.id === participant.id);
+        const decksReady = Boolean(room.game.deckReady.host && room.game.deckReady.challenger);
+        setPhase((currentPhase) => {
+          if (room.status === "playing") return spectator || decksReady ? "battle" : "deck";
+          if (currentPhase === "deck" || currentPhase === "battle" || currentPhase === "lobby") return "room";
+          return currentPhase;
+        });
+      }
+    });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        void syncRooms({ force: true }).catch(() => null);
+      }
+    });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [participant.id]);
+
+  useEffect(() => {
     activeRoomCodeRef.current = activeRoomCode;
   }, [activeRoomCode]);
 
@@ -2277,7 +2366,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return () => window.clearInterval(timer);
   }, [currentRoom, opponentSide, ownDeckReady, phase, playerDeck, roomPlayerSide]);
 
-  const resetBattle = () => {
+  function resetBattle() {
     setPhase("deck");
     setPlayerDeck([]);
     setBotDeck([]);
@@ -2300,7 +2389,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setMatchScore({ player: 0, bot: 0 });
     setRandomDrawCardNo("");
     setBattleLog([]);
-  };
+  }
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
     if (turnLocked || matchDone || usedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;

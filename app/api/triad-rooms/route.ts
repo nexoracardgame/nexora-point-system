@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminActor } from "@/lib/admin-auth";
+import { getServerSupabaseClient } from "@/lib/supabase-server";
 import {
   createTriadRoom,
   advanceTriadRoomTurn,
@@ -21,6 +22,11 @@ import {
   type TriadRoomParticipant,
   type TriadRoomSlot,
 } from "@/lib/triad-room-store";
+import {
+  TRIAD_ROOM_REALTIME_CHANNEL,
+  TRIAD_ROOM_REALTIME_EVENT,
+  type TriadRoomRealtimePayload,
+} from "@/lib/triad-room-realtime";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +38,55 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 function cleanText(value: unknown) {
   return String(value || "").trim();
+}
+
+function getPayloadRoomCode(value: unknown) {
+  const payload = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const room = payload.room && typeof payload.room === "object" ? (payload.room as Record<string, unknown>) : {};
+  return cleanText(room.code);
+}
+
+async function publishTriadRoomRealtime(payload: TriadRoomRealtimePayload) {
+  const supabase = getServerSupabaseClient();
+  if (!supabase) return;
+
+  const channel = supabase.channel(TRIAD_ROOM_REALTIME_CHANNEL, {
+    config: {
+      broadcast: {
+        ack: false,
+        self: false,
+      },
+    },
+  });
+
+  try {
+    await channel.send(
+      {
+        type: "broadcast",
+        event: TRIAD_ROOM_REALTIME_EVENT,
+        payload: {
+          ...payload,
+          at: Date.now(),
+        } satisfies TriadRoomRealtimePayload,
+      },
+      { timeout: 500 }
+    );
+  } catch {
+    // Realtime is an acceleration path; HTTP polling remains the fallback.
+  } finally {
+    void supabase.removeChannel(channel);
+  }
+}
+
+async function roomActionJson(
+  body: unknown,
+  init?: ResponseInit,
+  realtime?: TriadRoomRealtimePayload | null
+) {
+  if (realtime) {
+    await publishTriadRoomRealtime(realtime);
+  }
+  return noStoreJson(body, init);
 }
 
 function participantFromBody(body: Record<string, unknown>, fallbackName: string): TriadRoomParticipant {
@@ -60,7 +115,7 @@ export async function POST(request: Request) {
 
   if (action === "clear-all") {
     const result = await clearTriadRooms();
-    return noStoreJson(result);
+    return roomActionJson(result, undefined, { action, refresh: true });
   }
 
   const participant = participantFromBody(body, actor.name || actor.lineId);
@@ -76,7 +131,7 @@ export async function POST(request: Request) {
       return noStoreJson({ error: "password_too_short" }, { status: 400 });
     }
     const room = await createTriadRoom({ access, password, participant });
-    return noStoreJson({ room });
+    return roomActionJson({ room }, undefined, { action, code: room.code, room });
   }
 
   if (action === "join") {
@@ -87,70 +142,127 @@ export async function POST(request: Request) {
       forceSpectator: Boolean(body.forceSpectator),
     });
     const status = result.ok ? 200 : result.reason === "wrong_password" ? 403 : result.reason === "not_found" ? 404 : 409;
-    return noStoreJson(result, { status });
+    return roomActionJson(
+      result,
+      { status },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "spectate") {
     const result = await moveTriadParticipantToSpectator(cleanText(body.code), participant);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "take-slot") {
     const slot: TriadRoomSlot = body.slot === "host" ? "host" : "challenger";
     const result = await takeTriadRoomSlot(cleanText(body.code), slot, participant);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "start") {
     const result = await startTriadRoom(cleanText(body.code), participant.id);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "set-deck") {
     const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
     const result = await setTriadRoomDeck(cleanText(body.code), participant.id, deck);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "ready-deck") {
     const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
     const result = await readyTriadRoomDeck(cleanText(body.code), participant.id, deck);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "lock-card") {
     const result = await lockTriadRoomCard(cleanText(body.code), participant.id, cleanText(body.cardNo));
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "advance-turn") {
     const result = await advanceTriadRoomTurn(cleanText(body.code), participant.id);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "timeout-turn") {
     const result = await timeoutTriadRoomTurn(cleanText(body.code), participant.id);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "surrender") {
     const result = await surrenderTriadRoom(cleanText(body.code), participant.id);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "continue") {
     const result = await resetTriadRoomBattle(cleanText(body.code), participant.id);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
   }
 
   if (action === "disband") {
-    const result = await disbandTriadRoom(cleanText(body.code), participant.id);
-    return noStoreJson(result, { status: result.ok ? 200 : 409 });
+    const code = cleanText(body.code);
+    const result = await disbandTriadRoom(code, participant.id);
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code, deleted: true } : null
+    );
   }
 
   if (action === "leave") {
-    const result = await leaveTriadRoom(cleanText(body.code), participant.id);
-    return noStoreJson(result);
+    const code = cleanText(body.code);
+    const result = await leaveTriadRoom(code, participant.id);
+    const room = "room" in result ? result.room : null;
+    return roomActionJson(
+      result,
+      undefined,
+      room
+        ? { action, code: getPayloadRoomCode(result), room }
+        : { action, code, deleted: true }
+    );
   }
 
   return noStoreJson({ error: "unknown_action" }, { status: 400 });
