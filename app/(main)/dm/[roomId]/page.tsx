@@ -25,6 +25,11 @@ import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
 import { useChatTyping } from "@/lib/chat-typing-client";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import {
+  CHAT_MESSAGE_BROADCAST_EVENT,
+  getChatRoomBroadcastTopic,
+  type ChatRealtimeBroadcastPayload,
+} from "@/lib/chat-realtime-broadcast";
 import { formatThaiTime } from "@/lib/thai-time";
 
 type DMRoomCacheMeta = {
@@ -49,9 +54,9 @@ type DirectChatPage = {
   nextCursor: string | null;
 };
 
-const CHAT_SYNC_POLL_TICK_MS = 1000;
+const CHAT_SYNC_POLL_TICK_MS = 500;
 const CHAT_SYNC_REALTIME_FALLBACK_MS = 15000;
-const CHAT_SYNC_CONNECTING_FALLBACK_MS = 1800;
+const CHAT_SYNC_CONNECTING_FALLBACK_MS = 700;
 
 function buildDirectReadRoomId(userA?: string | null, userB?: string | null) {
   return [String(userA || "").trim(), String(userB || "").trim()]
@@ -511,10 +516,9 @@ function DMRoomContent({
     }
   });
 
-  const applyRealtimeEventMessage = useEffectEvent((detail?: Partial<DMMessage> & {
-    isMine?: boolean | null;
-    roomIds?: Array<string | null | undefined> | null;
-  }) => {
+  const applyRealtimeEventMessage = useEffectEvent((
+    detail?: ChatRealtimeBroadcastPayload | null
+  ) => {
     const messageId = String(detail?.id || "").trim();
     if (!messageId || !roomId || roomClosed) {
       return;
@@ -891,6 +895,7 @@ function DMRoomContent({
     }
 
     const channel = supabase.channel(`dm-room-${roomId}-${Date.now()}`);
+    const broadcastChannel = supabase.channel(getChatRoomBroadcastTopic(roomId));
     const handleDeletedMessage = (payload: { old?: unknown }) => {
       const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
       if (!deletedId) {
@@ -948,6 +953,18 @@ function DMRoomContent({
       }
     );
 
+    broadcastChannel.on(
+      "broadcast",
+      { event: CHAT_MESSAGE_BROADCAST_EVENT },
+      ({ payload }) => {
+        if (activeRoomIdRef.current !== roomId) {
+          return;
+        }
+
+        applyRealtimeEventMessage(payload as ChatRealtimeBroadcastPayload);
+      }
+    );
+
     channel.on(
       "postgres_changes",
       { event: "DELETE", schema: "public", table: "dmMessage" },
@@ -970,10 +987,16 @@ function DMRoomContent({
         void syncLatestMessages();
       }
     });
+    broadcastChannel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        realtimeConnectedRef.current = true;
+      }
+    });
 
     return () => {
       realtimeConnectedRef.current = false;
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [roomClosed, roomId]);
 

@@ -26,6 +26,11 @@ import {
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { useChatTyping } from "@/lib/chat-typing-client";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import {
+  CHAT_MESSAGE_BROADCAST_EVENT,
+  getChatRoomBroadcastTopic,
+  type ChatRealtimeBroadcastPayload,
+} from "@/lib/chat-realtime-broadcast";
 import { formatThaiTime } from "@/lib/thai-time";
 
 type DealCardInfo = {
@@ -69,9 +74,9 @@ type DealChatPage = {
   nextCursor: string | null;
 };
 
-const CHAT_SYNC_POLL_TICK_MS = 1000;
+const CHAT_SYNC_POLL_TICK_MS = 500;
 const CHAT_SYNC_REALTIME_FALLBACK_MS = 15000;
-const CHAT_SYNC_CONNECTING_FALLBACK_MS = 1800;
+const CHAT_SYNC_CONNECTING_FALLBACK_MS = 700;
 
 function getDealReadRoomIds(targetRoomId: string, dealId: string) {
   return Array.from(
@@ -451,6 +456,62 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     }
   });
 
+  const applyRealtimeEventMessage = useEffectEvent(
+    (detail?: ChatRealtimeBroadcastPayload | null) => {
+      const currentRoomId = String(activeRoomIdRef.current || roomId).trim();
+      const messageId = String(detail?.id || "").trim();
+      if (!messageId || !currentRoomId || roomClosed) {
+        return;
+      }
+
+      const eventRoomIds = Array.from(
+        new Set(
+          [
+            detail?.roomId,
+            ...(Array.isArray(detail?.roomIds) ? detail.roomIds : []),
+          ]
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+        )
+      );
+      const acceptedRoomIds = new Set(getDealReadRoomIds(currentRoomId, dealId));
+      const matchesRoom = eventRoomIds.some((item) => acceptedRoomIds.has(item));
+
+      if (!matchesRoom) {
+        return;
+      }
+
+      const senderId = String(detail?.senderId || "").trim();
+      const eventIsMine = Boolean(detail?.isMine) || senderId === me?.id;
+      const incoming = normalizeChatMessage(
+        {
+          id: messageId,
+          roomId: currentRoomId,
+          senderId,
+          content: detail?.content || null,
+          imageUrl: detail?.imageUrl || null,
+          createdAt: detail?.createdAt || new Date().toISOString(),
+          seenAt: detail?.seenAt || null,
+          senderName: detail?.senderName || null,
+          senderImage: detail?.senderImage || null,
+          sender: detail?.sender,
+          optimistic: Boolean(detail?.optimistic),
+        },
+        currentRoomId,
+        me,
+        other
+      );
+
+      setMessages((prev) =>
+        mergeSingleChatMessage(prev, incoming, currentRoomId, me, other)
+      );
+
+      if (!eventIsMine && document.visibilityState === "visible") {
+        void markLoadedRoomSeen(currentRoomId, [incoming], me);
+      }
+    }
+  );
+
   const scheduleOlderPrefetch = useEffectEvent(() => {
     if (!roomId || roomClosed || !hasMore || !nextCursor || loadingOlderRef.current) {
       return;
@@ -692,6 +753,30 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       return;
     }
 
+    const onChatMessageReceived = (event: Event) => {
+      applyRealtimeEventMessage(
+        (event as CustomEvent<ChatRealtimeBroadcastPayload>).detail
+      );
+    };
+
+    window.addEventListener(
+      "nexora:chat-message-received",
+      onChatMessageReceived as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "nexora:chat-message-received",
+        onChatMessageReceived as EventListener
+      );
+    };
+  }, [dealId, roomClosed]);
+
+  useEffect(() => {
+    if (!dealId || roomClosed) {
+      return;
+    }
+
     let rafId = 0;
     let timeoutA = 0;
     let timeoutB = 0;
@@ -760,6 +845,9 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     }
 
     const channel = supabase.channel(`deal-room-${dealId}-${Date.now()}`);
+    const broadcastChannel = supabase.channel(
+      getChatRoomBroadcastTopic(currentRoomId)
+    );
     const handleDeletedMessage = (payload: { old?: unknown }) => {
       const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
       if (!deletedId) {
@@ -813,6 +901,18 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       }
     );
 
+    broadcastChannel.on(
+      "broadcast",
+      { event: CHAT_MESSAGE_BROADCAST_EVENT },
+      ({ payload }) => {
+        if (activeRoomIdRef.current !== currentRoomId) {
+          return;
+        }
+
+        applyRealtimeEventMessage(payload as ChatRealtimeBroadcastPayload);
+      }
+    );
+
     channel.on(
       "postgres_changes",
       { event: "DELETE", schema: "public", table: "dmMessage" },
@@ -843,10 +943,16 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         void syncLatestMessages();
       }
     });
+    broadcastChannel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        realtimeConnectedRef.current = true;
+      }
+    });
 
     return () => {
       realtimeConnectedRef.current = false;
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [dealId, me, other, roomClosed, roomId]);
 

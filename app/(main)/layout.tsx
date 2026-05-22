@@ -16,6 +16,11 @@ import { listenProfileSync } from "@/lib/profile-sync";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { cacheRealtimeDmMessage } from "@/lib/dm-room-fast-cache";
 import {
+  CHAT_MESSAGE_BROADCAST_EVENT,
+  getChatUserBroadcastTopic,
+  type ChatRealtimeBroadcastPayload,
+} from "@/lib/chat-realtime-broadcast";
+import {
   readClientViewCache,
   writeClientViewCache,
 } from "@/lib/client-view-cache";
@@ -541,6 +546,7 @@ export default function MainLayout({
     let realtimeConnected = false;
     const burstTimers: ReturnType<typeof setTimeout>[] = [];
     const processedChatReadKeys = new Set<string>();
+    const processedChatMessageIds = new Set<string>();
     const recentChatReadRooms = new Map<string, number>();
     const currentUserId = String(session?.user?.id || "").trim();
     const currentLineId = String(session?.user?.lineId || "").trim();
@@ -549,6 +555,12 @@ export default function MainLayout({
     const channel = supabase
       ? supabase.channel(`layout-chat-unread-${Date.now()}`)
       : null;
+    const broadcastChannels = supabase
+      ? Array.from(new Set([currentUserId, currentLineId].filter(Boolean)))
+          .map((userId) => getChatUserBroadcastTopic(userId))
+          .filter(Boolean)
+          .map((topic) => supabase.channel(topic))
+      : [];
 
     const syncChatUnread = async () => {
       if (pathname === "/dm") return;
@@ -609,6 +621,93 @@ export default function MainLayout({
       );
     };
 
+    const rememberChatMessage = (messageId?: string | number | null) => {
+      const key = String(messageId || "").trim();
+      if (!key) {
+        return false;
+      }
+
+      if (processedChatMessageIds.has(key)) {
+        return true;
+      }
+
+      processedChatMessageIds.add(key);
+      if (processedChatMessageIds.size > 600) {
+        const oldestKey = processedChatMessageIds.values().next().value;
+        if (oldestKey) {
+          processedChatMessageIds.delete(oldestKey);
+        }
+      }
+
+      return false;
+    };
+
+    const processIncomingChatMessage = (
+      nextMessage?: ChatRealtimeBroadcastPayload | null
+    ) => {
+      const roomId = String(nextMessage?.roomId || "").trim();
+      if (!roomId || !nextMessage) {
+        return false;
+      }
+
+      if (rememberChatMessage(nextMessage.id)) {
+        return false;
+      }
+
+      const senderId = String(nextMessage.senderId || "").trim();
+      const isMine = Boolean(
+        senderId &&
+          (senderId === currentUserId ||
+            (currentLineId ? senderId === currentLineId : false))
+      );
+      const isDealRoom = roomId.startsWith("deal:");
+      const eventRoomIds = Array.from(
+        new Set(
+          [
+            roomId,
+            ...(Array.isArray(nextMessage.roomIds) ? nextMessage.roomIds : []),
+          ]
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+        )
+      );
+      const directRoomId =
+        !isDealRoom && !isMine && currentUserId && senderId
+          ? buildDirectRealtimeRoomId(currentUserId, senderId)
+          : "";
+      const fastRoomIds = Array.from(
+        new Set([...eventRoomIds, directRoomId].filter(Boolean))
+      );
+      const isOpenRoom =
+        roomId === openChatRoomId || fastRoomIds.includes(openChatRoomId);
+
+      dispatchChatMessageRealtime({
+        ...nextMessage,
+        id: nextMessage.id,
+        roomId,
+        roomIds: fastRoomIds,
+        senderId,
+        senderName: nextMessage.senderName || null,
+        senderImage: nextMessage.senderImage || null,
+        content: nextMessage.content || null,
+        imageUrl: nextMessage.imageUrl || null,
+        createdAt: nextMessage.createdAt || new Date().toISOString(),
+        isMine,
+        isOpenRoom,
+      });
+
+      if (!isMine && !isOpenRoom) {
+        setChatUnreadCount((current) => {
+          const nextCount = Math.max(0, current + 1);
+          latestChatUnreadCount = nextCount;
+          dispatchChatUnreadCount(nextCount);
+          return nextCount;
+        });
+      }
+
+      return true;
+    };
+
     channel?.on(
       "postgres_changes",
       { event: "*", schema: "public", table: "dmMessage" },
@@ -637,30 +736,7 @@ export default function MainLayout({
             (currentLineId ? senderId === currentLineId : false));
 
         if (eventType === "INSERT" && roomId && nextMessage) {
-          const isDealRoom = roomId.startsWith("deal:");
-          const fastRoomIds = [roomId];
-          const directRoomId =
-            !isDealRoom && !isMine && currentUserId && senderId
-              ? buildDirectRealtimeRoomId(currentUserId, senderId)
-              : "";
-
-          if (directRoomId) {
-            fastRoomIds.push(directRoomId);
-          }
-
-          dispatchChatMessageRealtime({
-            id: nextMessage.id,
-            roomId,
-            roomIds: fastRoomIds,
-            senderId,
-            senderName: nextMessage.senderName || null,
-            senderImage: nextMessage.senderImage || null,
-            content: nextMessage.content || null,
-            imageUrl: nextMessage.imageUrl || null,
-            createdAt: nextMessage.createdAt || new Date().toISOString(),
-            isMine,
-            isOpenRoom: roomId === openChatRoomId,
-          });
+          processIncomingChatMessage(nextMessage);
         }
 
         if (eventType === "UPDATE" && roomId && nextMessage?.seenAt && isMine) {
@@ -672,20 +748,6 @@ export default function MainLayout({
             senderId,
             readAt: nextMessage.seenAt,
             seenAt: nextMessage.seenAt,
-          });
-        }
-
-        if (
-          eventType === "INSERT" &&
-          roomId &&
-          !isMine &&
-          roomId !== openChatRoomId
-        ) {
-          setChatUnreadCount((current) => {
-            const nextCount = Math.max(0, current + 1);
-            latestChatUnreadCount = nextCount;
-            dispatchChatUnreadCount(nextCount);
-            return nextCount;
           });
         }
 
@@ -708,6 +770,27 @@ export default function MainLayout({
         queueChatUnreadSync();
       }
     );
+
+    for (const broadcastChannel of broadcastChannels) {
+      broadcastChannel
+        .on(
+          "broadcast",
+          { event: CHAT_MESSAGE_BROADCAST_EVENT },
+          ({ payload }) => {
+            const processed = processIncomingChatMessage(
+              payload as ChatRealtimeBroadcastPayload
+            );
+            if (processed) {
+              queueChatUnreadSync();
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            queueChatUnreadSync();
+          }
+        });
+    }
 
     channel?.subscribe((status) => {
       realtimeConnected = status === "SUBSCRIBED";
@@ -824,6 +907,11 @@ export default function MainLayout({
       document.removeEventListener("visibilitychange", handleVisibility);
       if (supabase && channel) {
         void supabase.removeChannel(channel);
+      }
+      if (supabase) {
+        for (const broadcastChannel of broadcastChannels) {
+          void supabase.removeChannel(broadcastChannel);
+        }
       }
     };
   }, [pathname, session?.user?.id, session?.user?.lineId]);

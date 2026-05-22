@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { mkdir, writeFile } from "fs/promises";
 import crypto from "crypto";
 import path from "path";
@@ -12,6 +12,12 @@ import { prisma } from "@/lib/prisma";
 import { sendPushNotificationToUser } from "@/lib/push-notification-store";
 import { resolveUserIdentity } from "@/lib/user-identity";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
+import {
+  CHAT_MESSAGE_BROADCAST_EVENT,
+  getChatRoomBroadcastTopic,
+  getChatUserBroadcastTopic,
+  type ChatRealtimeBroadcastPayload,
+} from "@/lib/chat-realtime-broadcast";
 
 type SendPayload = {
   roomId: string;
@@ -19,6 +25,8 @@ type SendPayload = {
   imageUrl: string;
   file: File | null;
 };
+
+type SuccessfulDmAccess = Extract<DmAccessResult, { ok: true }>;
 
 function getImageExtension(contentType: string) {
   if (contentType === "image/png") return ".png";
@@ -69,6 +77,65 @@ async function getChatPushHref(access: Extract<DmAccessResult, { ok: true }>) {
     return `${basePath}/${encodeURIComponent(access.dealId)}`;
   } catch {
     return `/market/deals/chat/${encodeURIComponent(access.dealId)}`;
+  }
+}
+
+function uniqueText(values: Array<string | number | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function getBroadcastRoomIds(access: SuccessfulDmAccess) {
+  return uniqueText([
+    access.roomId,
+    access.kind === "deal" ? `deal:${access.dealId}` : null,
+  ]);
+}
+
+async function broadcastChatMessage({
+  supabase,
+  payload,
+  userIds,
+}: {
+  supabase: SupabaseClient;
+  payload: ChatRealtimeBroadcastPayload;
+  userIds: Array<string | null | undefined>;
+}) {
+  const topics = uniqueText([
+    payload.roomId,
+    ...(Array.isArray(payload.roomIds) ? payload.roomIds : []),
+  ])
+    .map((roomId) => getChatRoomBroadcastTopic(roomId))
+    .concat(userIds.map((userId) => getChatUserBroadcastTopic(userId)))
+    .filter(Boolean);
+  const uniqueTopics = Array.from(new Set(topics));
+
+  if (!uniqueTopics.length) {
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    uniqueTopics.map((topic) =>
+      supabase
+        .channel(topic)
+        .httpSend(CHAT_MESSAGE_BROADCAST_EVENT, payload, { timeout: 900 })
+    )
+  );
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error("SEND DM BROADCAST ERROR:", result.reason);
+      continue;
+    }
+
+    if (!result.value.success) {
+      console.error("SEND DM BROADCAST ERROR:", result.value);
+    }
   }
 }
 
@@ -234,31 +301,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "send failed" }, { status: 500 });
   }
 
-  await sendPushNotificationToUser(access.otherUserId, {
-    id: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
-    title: identity.name,
-    body: buildMessagePreview(content, imageUrl),
-    href: await getChatPushHref(access),
-    icon: identity.image,
-    image: identity.image,
-    tag: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
-    type: "chat",
-  }).catch((pushError) => {
-    console.error("SEND DM PUSH NOTIFICATION ERROR:", pushError);
+  const now = new Date().toISOString();
+  const insertedMessage = {
+    ...data,
+    imageUrl: data?.imageUrl || imageUrl || null,
+  };
+  const roomIds = getBroadcastRoomIds(access);
+  const broadcastPayload: ChatRealtimeBroadcastPayload = {
+    ...insertedMessage,
+    id: insertedMessage.id,
+    roomId: access.roomId,
+    roomIds,
+    senderId,
+    senderName: identity.name,
+    senderImage: identity.image,
+    content: contentForDb,
+    imageUrl: insertedMessage.imageUrl,
+    createdAt: insertedMessage.createdAt || now,
+    seenAt: insertedMessage.seenAt || null,
+    source: "send-route-broadcast",
+  };
+
+  await broadcastChatMessage({
+    supabase,
+    payload: broadcastPayload,
+    userIds: uniqueText([senderId, lineId, access.otherUserId]),
   });
 
-  void supabase
-    .from("dm_room")
-    .update({ updatedat: new Date().toISOString() })
-    .eq("roomid", access.roomId)
-    .then(({ error: touchRoomError }) => {
+  after(async () => {
+    const notifyUser = async () => {
+      try {
+        await sendPushNotificationToUser(access.otherUserId, {
+          id: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
+          title: identity.name,
+          body: buildMessagePreview(content, imageUrl),
+          href: await getChatPushHref(access),
+          icon: identity.image,
+          image: identity.image,
+          tag: `${access.kind === "deal" ? "deal-chat" : "chat"}-${data.id}`,
+          type: "chat",
+        });
+      } catch (pushError) {
+        console.error("SEND DM PUSH NOTIFICATION ERROR:", pushError);
+      }
+    };
+
+    const touchRoom = async () => {
+      const { error: touchRoomError } = await supabase
+        .from("dm_room")
+        .update({ updatedat: now })
+        .eq("roomid", access.roomId);
+
       if (touchRoomError) {
         console.error("TOUCH DM ROOM AFTER SEND ERROR:", touchRoomError);
       }
-    });
+    };
 
-  return NextResponse.json({
-    ...data,
-    imageUrl: data?.imageUrl || imageUrl || null,
+    await Promise.allSettled([notifyUser(), touchRoom()]);
   });
+
+  return NextResponse.json(insertedMessage);
 }
