@@ -25,6 +25,7 @@ begin
     execute 'create index if not exists "dmMessage_roomId_createdAt_desc_idx" on public."dmMessage" ("roomId", "createdAt" desc)';
     execute 'create index if not exists "dmMessage_roomId_seenAt_senderId_idx" on public."dmMessage" ("roomId", "seenAt", "senderId")';
     execute 'create index if not exists "dmMessage_unread_room_createdAt_idx" on public."dmMessage" ("roomId", "createdAt" desc) where "seenAt" is null';
+    execute 'create index if not exists "dmMessage_unread_room_sender_created_idx" on public."dmMessage" ("roomId", "senderId", "createdAt" desc) where "seenAt" is null';
     execute 'create index if not exists "dmMessage_senderId_createdAt_idx" on public."dmMessage" ("senderId", "createdAt" desc)';
   end if;
 
@@ -46,6 +47,17 @@ begin
 
   if to_regclass('public."DealRequest"') is not null then
     execute 'create index if not exists "DealRequest_participant_status_idx" on public."DealRequest" ("status", "buyerId", "sellerId")';
+  end if;
+end $$;
+
+do $$
+begin
+  if to_regclass('public."dmMessage"') is not null then
+    execute 'analyze public."dmMessage"';
+  end if;
+
+  if to_regclass('public.dm_room') is not null then
+    execute 'analyze public.dm_room';
   end if;
 end $$;
 
@@ -109,3 +121,25 @@ begin
     end if;
   end if;
 end $$;
+
+select 'publication' as section, tablename as item, 'ok' as status
+from pg_publication_tables
+where pubname = 'supabase_realtime'
+  and schemaname = 'public'
+  and tablename in ('dmMessage', 'dm_room')
+union all
+select 'index' as section, indexname as item, 'ok' as status
+from pg_indexes
+where schemaname = 'public'
+  and tablename in ('dmMessage', 'dm_room')
+  and indexname in (
+    'dmMessage_roomId_createdAt_desc_idx',
+    'dmMessage_roomId_seenAt_senderId_idx',
+    'dmMessage_unread_room_createdAt_idx',
+    'dmMessage_unread_room_sender_created_idx',
+    'dmMessage_senderId_createdAt_idx',
+    'dm_room_usera_updatedat_idx',
+    'dm_room_userb_updatedat_idx',
+    'dm_room_pair_idx'
+  )
+order by section, item;

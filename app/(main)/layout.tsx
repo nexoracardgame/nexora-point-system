@@ -57,9 +57,27 @@ const CHAT_UNREAD_POLL_TICK_MS = 1000;
 const CHAT_UNREAD_REALTIME_FALLBACK_MS = 15000;
 const CHAT_UNREAD_CONNECTING_FALLBACK_MS = 1800;
 const CHAT_UNREAD_CONFIRM_REFRESH_MS = 550;
-const WALLET_UNREAD_POLL_TICK_MS = 1000;
-const WALLET_UNREAD_REALTIME_FALLBACK_MS = 15000;
-const WALLET_UNREAD_CONNECTING_FALLBACK_MS = 2500;
+const WALLET_UNREAD_POLL_TICK_MS = 2000;
+const WALLET_UNREAD_REALTIME_FALLBACK_MS = 30000;
+const WALLET_UNREAD_CONNECTING_FALLBACK_MS = 12000;
+
+type NavigatorWithConnection = Navigator & {
+  connection?: {
+    effectiveType?: string;
+    saveData?: boolean;
+  };
+};
+
+function shouldUseLightWarmups() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const connection = (navigator as NavigatorWithConnection).connection;
+  const effectiveType = String(connection?.effectiveType || "").toLowerCase();
+
+  return Boolean(connection?.saveData || effectiveType === "slow-2g" || effectiveType === "2g");
+}
 
 function dispatchChatUnreadCount(count: number, source = "layout") {
   if (typeof window === "undefined") {
@@ -218,6 +236,7 @@ export default function MainLayout({
   const profileVersionRef = useRef("");
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
+  const chatUnreadCountRef = useRef(chatUnreadCount);
   const ownProfileHref = session?.user?.id
     ? `/profile/${session.user.id}`
     : "/profile/me";
@@ -245,6 +264,10 @@ export default function MainLayout({
 
     return () => window.clearTimeout(timeoutId);
   }, [session?.user?.coin, session?.user?.nexPoint]);
+
+  useEffect(() => {
+    chatUnreadCountRef.current = chatUnreadCount;
+  }, [chatUnreadCount]);
 
   useEffect(() => {
     const handleBalanceUpdate = (
@@ -513,7 +536,7 @@ export default function MainLayout({
     let inFlight = false;
     let queued = false;
     let unreadSyncPauseUntil = 0;
-    let latestChatUnreadCount = chatUnreadCount;
+    let latestChatUnreadCount = chatUnreadCountRef.current;
     let lastUnreadSyncAt = 0;
     let realtimeConnected = false;
     const burstTimers: ReturnType<typeof setTimeout>[] = [];
@@ -808,6 +831,8 @@ export default function MainLayout({
   useEffect(() => {
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let inFlight = false;
+    let queued = false;
     let lastWalletSyncAt = 0;
     let realtimeConnected = false;
     const supabase = getBrowserSupabaseClient();
@@ -817,7 +842,12 @@ export default function MainLayout({
 
     const syncWalletUnread = async () => {
       if (cancelled) return;
+      if (inFlight) {
+        queued = true;
+        return;
+      }
 
+      inFlight = true;
       lastWalletSyncAt = Date.now();
       try {
         const res = await fetch(`/api/wallet/notifications?ts=${Date.now()}`, {
@@ -832,6 +862,13 @@ export default function MainLayout({
         setWalletUnreadCount(Math.max(0, Number(data?.count || 0)));
       } catch {
         return;
+      } finally {
+        inFlight = false;
+
+        if (queued && !cancelled) {
+          queued = false;
+          void syncWalletUnread();
+        }
       }
     };
 
@@ -959,23 +996,50 @@ export default function MainLayout({
       }
     };
 
-    const warmRoutes = () => {
-      importantRoutes.forEach((route) => router.prefetch(route));
-      void warmCommunityFriends();
-    };
-
     if (typeof window === "undefined") return;
 
+    const warmTimers: number[] = [];
+    let idleId: number | null = null;
+
+    const warmRoutes = () => {
+      const lightWarmup = shouldUseLightWarmups();
+      const routes = lightWarmup ? importantRoutes.slice(0, 7) : importantRoutes;
+
+      routes.forEach((route, index) => {
+        warmTimers.push(
+          window.setTimeout(() => {
+            router.prefetch(route);
+          }, index * 80)
+        );
+      });
+
+      if (!lightWarmup) {
+        warmTimers.push(
+          window.setTimeout(() => {
+            void warmCommunityFriends();
+          }, routes.length * 80 + 160)
+        );
+      }
+    };
+
     if ("requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(() => warmRoutes(), {
+      idleId = window.requestIdleCallback(() => warmRoutes(), {
         timeout: 1200,
       });
 
-      return () => window.cancelIdleCallback(idleId);
+      return () => {
+        if (idleId !== null) {
+          window.cancelIdleCallback(idleId);
+        }
+        warmTimers.forEach((timerId) => window.clearTimeout(timerId));
+      };
     }
 
     const timeoutId = globalThis.setTimeout(warmRoutes, 250);
-    return () => globalThis.clearTimeout(timeoutId);
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+      warmTimers.forEach((timerId) => window.clearTimeout(timerId));
+    };
   }, [isAdminModeUser, ownProfileHref, router, session?.user?.id]);
 
   useEffect(() => {

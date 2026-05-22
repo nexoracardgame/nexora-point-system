@@ -115,7 +115,8 @@ type BlazeChatMessage = {
   imagePreviewUrl?: string;
 };
 
-const LIST_REFRESH_MS = 8500;
+const LIST_REFRESH_OPEN_MS = 8500;
+const LIST_REFRESH_BACKGROUND_MS = 30000;
 const ROOM_SYNC_MS = 2500;
 const ROOM_CACHE_TTL_MS = 90000;
 const ROOM_PERSISTED_HISTORY_TTL_MS = 6 * 60 * 60 * 1000;
@@ -633,13 +634,16 @@ export default function FloatingChatDock({
   });
 
   const currentUserId = safeText(session?.user?.id);
+  const sessionUserEmail = safeText(session?.user?.email);
+  const sessionUserImage = safeText(session?.user?.image);
+  const sessionUserName = safeText(session?.user?.name);
   const blazeSessionStorageKey = useMemo(
-    () => getBlazeSessionStorageKey(currentUserId || session?.user?.email),
-    [currentUserId, session?.user?.email]
+    () => getBlazeSessionStorageKey(currentUserId || sessionUserEmail),
+    [currentUserId, sessionUserEmail]
   );
   const roomListStorageKey = useMemo(
-    () => getRoomListStorageKey(currentUserId || session?.user?.email),
-    [currentUserId, session?.user?.email]
+    () => getRoomListStorageKey(currentUserId || sessionUserEmail),
+    [currentUserId, sessionUserEmail]
   );
   const badgeCount = Math.max(
     0,
@@ -721,23 +725,27 @@ export default function FloatingChatDock({
     warmPrefetchKeyRef.current = "";
     loadingRoomKeyRef.current = "";
 
-    if (cachedRooms?.length) {
-      roomsRef.current = cachedRooms;
-      setRooms(cachedRooms);
-      setLocalUnreadCount(
-        cachedRooms.reduce(
-          (total, room) => total + Math.max(0, Number(room.unread || 0)),
-          0
-        )
-      );
-      setRoomsLoading(false);
-    } else {
-      roomsRef.current = [];
-      setRooms([]);
-      setLocalUnreadCount(0);
-    }
+    const hydrateTimerId = window.setTimeout(() => {
+      if (cachedRooms?.length) {
+        roomsRef.current = cachedRooms;
+        setRooms(cachedRooms);
+        setLocalUnreadCount(
+          cachedRooms.reduce(
+            (total, room) => total + Math.max(0, Number(room.unread || 0)),
+            0
+          )
+        );
+        setRoomsLoading(false);
+      } else {
+        roomsRef.current = [];
+        setRooms([]);
+        setLocalUnreadCount(0);
+      }
 
-    setRoomsHydratedStorageKey(roomListStorageKey);
+      setRoomsHydratedStorageKey(roomListStorageKey);
+    }, 0);
+
+    return () => window.clearTimeout(hydrateTimerId);
   }, [roomListStorageKey, status]);
 
   useEffect(() => {
@@ -763,9 +771,13 @@ export default function FloatingChatDock({
       : [BLAZE_WELCOME_MESSAGE];
 
     blazeMessagesRef.current = nextMessages;
-    setBlazeMessages(nextMessages);
-    setBlazeDraft(snapshot?.draft || "");
-    setBlazeHydratedStorageKey(blazeSessionStorageKey);
+    const hydrateTimerId = window.setTimeout(() => {
+      setBlazeMessages(nextMessages);
+      setBlazeDraft(snapshot?.draft || "");
+      setBlazeHydratedStorageKey(blazeSessionStorageKey);
+    }, 0);
+
+    return () => window.clearTimeout(hydrateTimerId);
   }, [blazeSessionStorageKey]);
 
   useEffect(() => {
@@ -996,8 +1008,8 @@ export default function FloatingChatDock({
           cachedActive?.me ||
           buildChatUser(
             currentUserId,
-            session?.user?.name,
-            session?.user?.image,
+            sessionUserName,
+            sessionUserImage,
             "You"
           ),
         other:
@@ -1010,7 +1022,7 @@ export default function FloatingChatDock({
         deal: cachedActive?.deal || fallbackDeal,
       };
     },
-    [currentUserId, session?.user?.image, session?.user?.name]
+    [currentUserId, sessionUserImage, sessionUserName]
   );
 
   const readPersistedRoomCache = useCallback(
@@ -1720,8 +1732,8 @@ export default function FloatingChatDock({
         id: `local-${Date.now()}`,
         roomId: active.actualRoomId,
         senderId: safeText(active.me?.id || currentUserId),
-        senderName: active.me?.name || session?.user?.name || "You",
-        senderImage: active.me?.image || session?.user?.image || "/avatar.png",
+        senderName: active.me?.name || sessionUserName || "You",
+        senderImage: active.me?.image || sessionUserImage || "/avatar.png",
         content: text || null,
         imageUrl: null,
         createdAt: new Date().toISOString(),
@@ -1858,8 +1870,8 @@ export default function FloatingChatDock({
     loadRooms,
     scrollToBottom,
     sending,
-    session?.user?.image,
-    session?.user?.name,
+    sessionUserImage,
+    sessionUserName,
     updateRoomCache,
   ]);
 
@@ -1939,7 +1951,7 @@ export default function FloatingChatDock({
         body: JSON.stringify({
           message: text,
           history,
-          clientId: currentUserId || session?.user?.email || "nexora-web",
+          clientId: currentUserId || sessionUserEmail || "nexora-web",
           imagePayload,
         }),
       });
@@ -1987,7 +1999,7 @@ export default function FloatingChatDock({
     blazeSending,
     currentUserId,
     scrollBlazeToBottom,
-    session?.user?.email,
+    sessionUserEmail,
   ]);
 
   useEffect(() => {
@@ -2000,13 +2012,13 @@ export default function FloatingChatDock({
     }, 0);
     const intervalId = window.setInterval(() => {
       void loadRooms();
-    }, LIST_REFRESH_MS);
+    }, open ? LIST_REFRESH_OPEN_MS : LIST_REFRESH_BACKGROUND_MS);
 
     return () => {
       window.clearTimeout(initialLoadId);
       window.clearInterval(intervalId);
     };
-  }, [loadRooms, status]);
+  }, [loadRooms, open, status]);
 
   useEffect(() => {
     if (status !== "authenticated" || rooms.length === 0) {
@@ -2336,8 +2348,12 @@ export default function FloatingChatDock({
   }, []);
 
   useEffect(() => {
-    setMessageMenuId("");
+    const timerId = window.setTimeout(() => {
+      setMessageMenuId("");
+    }, 0);
     stopMessageLongPress();
+
+    return () => window.clearTimeout(timerId);
   }, [activeRoom?.key, stopMessageLongPress]);
 
   useEffect(() => {
