@@ -227,6 +227,7 @@ export default function MainLayout({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileChatComposerActive, setMobileChatComposerActive] = useState(false);
   const [profileImage, setProfileImage] = useState("");
   const [profileName, setProfileName] = useState("");
   const [avatarReady, setAvatarReady] = useState(false);
@@ -1022,6 +1023,34 @@ export default function MainLayout({
 
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
   const isAdminModeUser = isAdminRole(session?.user?.role);
+  const hideMobileBottomNav = isChatRoomPage || mobileChatComposerActive;
+
+  useEffect(() => {
+    const handleChatComposerState = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean | null }>).detail;
+      setMobileChatComposerActive(Boolean(detail?.active));
+    };
+
+    window.addEventListener(
+      "nexora:mobile-chat-composer",
+      handleChatComposerState as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "nexora:mobile-chat-composer",
+        handleChatComposerState as EventListener
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setMobileChatComposerActive(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pathname]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -1350,7 +1379,11 @@ export default function MainLayout({
         {/* MAIN */}
         <div className="relative z-0 flex min-w-0 flex-1 flex-col xl:ml-[92px]">
           {/* TOPBAR */}
-          <header className="sticky top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl">
+          <header
+            className={`top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl ${
+              isChatRoomPage ? "hidden xl:sticky xl:block" : "sticky"
+            }`}
+          >
             <div className="flex h-[74px] items-center justify-between gap-2 px-3 sm:px-5 xl:px-6">
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                 <button
@@ -1589,7 +1622,7 @@ export default function MainLayout({
             <div
               className={`${
                 isChatRoomPage
-                  ? "h-[calc(var(--app-shell-height)-var(--app-header-height))] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none"
+                  ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(var(--app-shell-height)-var(--app-header-height))]"
                   : "min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height-sm))] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:p-6"
               }`}
             >
@@ -1746,7 +1779,7 @@ export default function MainLayout({
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      {!isChatRoomPage && (
+      {!hideMobileBottomNav && (
         <nav className="fixed inset-x-0 bottom-0 z-[1100] overflow-hidden rounded-t-[24px] border-x-0 border-b-0 border-t border-white/10 bg-[#030406]/96 px-1.5 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-1.5 shadow-[0_-18px_52px_rgba(0,0,0,0.72)] backdrop-blur-3xl xl:hidden">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.01)_34%,rgba(0,0,0,0)_100%)]" />
           <div className="relative mx-auto grid w-full max-w-[760px] grid-cols-7 gap-0.5 sm:gap-1.5">

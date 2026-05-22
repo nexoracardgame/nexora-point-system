@@ -597,6 +597,7 @@ export default function FloatingChatDock({
   const [file, setFile] = useState<File | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [error, setError] = useState("");
+  const [mobileComposerActive, setMobileComposerActive] = useState(false);
   const [localUnreadCount, setLocalUnreadCount] = useState(0);
   const [mobileListVisible, setMobileListVisible] = useState(true);
   const [messageMenuId, setMessageMenuId] = useState("");
@@ -633,6 +634,7 @@ export default function FloatingChatDock({
   const messagesRef = useRef<ChatMessage[]>(messages);
   const roomBroadcastChannelRef = useRef<ChatBroadcastChannel | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
+  const mobileComposerBlurTimerRef = useRef<number | null>(null);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
   const lastComposerSeenRef = useRef<{ roomKey: string; markedAt: number }>({
@@ -671,6 +673,9 @@ export default function FloatingChatDock({
     [blazeFile]
   );
   const canSend = Boolean(safeText(draft) || file) && !!activeRoom?.actualRoomId;
+  const mobileChatFocusMode = Boolean(
+    open && dockMode === "chat" && mobileComposerActive
+  );
   const activeProfileHref = activeRoom?.other?.id
     ? `/profile/${encodeURIComponent(activeRoom.other.id)}`
     : activeRoom?.otherUserId
@@ -837,6 +842,65 @@ export default function FloatingChatDock({
       blazeBottomRef.current?.scrollIntoView({ block: "end", behavior });
     });
   }, []);
+
+  const publishMobileComposerState = useCallback((active: boolean) => {
+    if (mobileComposerBlurTimerRef.current) {
+      window.clearTimeout(mobileComposerBlurTimerRef.current);
+      mobileComposerBlurTimerRef.current = null;
+    }
+
+    setMobileComposerActive(active);
+    window.dispatchEvent(
+      new CustomEvent("nexora:mobile-chat-composer", {
+        detail: { active },
+      })
+    );
+  }, []);
+
+  const activateMobileComposer = useCallback(() => {
+    publishMobileComposerState(true);
+  }, [publishMobileComposerState]);
+
+  const releaseMobileComposerSoon = useCallback(() => {
+    if (mobileComposerBlurTimerRef.current) {
+      window.clearTimeout(mobileComposerBlurTimerRef.current);
+    }
+
+    mobileComposerBlurTimerRef.current = window.setTimeout(() => {
+      publishMobileComposerState(false);
+    }, 180);
+  }, [publishMobileComposerState]);
+
+  useEffect(() => {
+    return () => {
+      if (mobileComposerBlurTimerRef.current) {
+        window.clearTimeout(mobileComposerBlurTimerRef.current);
+      }
+      window.dispatchEvent(
+        new CustomEvent("nexora:mobile-chat-composer", {
+          detail: { active: false },
+        })
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (open && dockMode === "chat" && activeRoom?.actualRoomId && !mobileListVisible) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      publishMobileComposerState(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeRoom?.actualRoomId,
+    dockMode,
+    mobileListVisible,
+    open,
+    publishMobileComposerState,
+  ]);
 
   const loadRooms = useCallback(async () => {
     if (status !== "authenticated") {
@@ -2497,6 +2561,13 @@ export default function FloatingChatDock({
     );
   }
 
+  const chatShellClass = mobileChatFocusMode
+    ? "fixed inset-x-0 bottom-0 top-[env(safe-area-inset-top)] z-[1120] overflow-hidden border-y border-white/10 bg-[#050608]/98 text-white shadow-none backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] sm:rounded-[24px] sm:border sm:shadow-[0_30px_100px_rgba(0,0,0,0.62)] lg:w-[820px] xl:bottom-6 xl:right-6"
+    : "fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-white/12 bg-[#050608]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] lg:w-[820px] xl:bottom-6 xl:right-6";
+  const chatDockHeaderClass = mobileChatFocusMode
+    ? "hidden shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/64 px-3 py-3 sm:flex sm:px-4"
+    : "flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/64 px-3 py-3 sm:px-4";
+
   if (dockMode === "ai") {
     return (
       <section className="blaze-floating-ai fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-amber-200/24 bg-[#050403]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.66),0_0_54px_rgba(251,191,36,0.22)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[620px] xl:bottom-6 xl:right-6">
@@ -2817,9 +2888,9 @@ export default function FloatingChatDock({
 
   return (
     <>
-    <section className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-white/12 bg-[#050608]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] lg:w-[820px] xl:bottom-6 xl:right-6">
+    <section className={chatShellClass}>
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/64 px-3 py-3 sm:px-4">
+        <div className={chatDockHeaderClass}>
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-black shadow-[0_0_28px_rgba(255,255,255,0.14)]">
               <MessagesSquare className="h-5 w-5" />
@@ -2890,6 +2961,8 @@ export default function FloatingChatDock({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  onFocus={activateMobileComposer}
+                  onBlur={releaseMobileComposerSoon}
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
                   placeholder="ค้นหาแชท"
                 />
@@ -3374,7 +3447,11 @@ export default function FloatingChatDock({
                     <input
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
-                      onFocus={markActiveRoomSeenNow}
+                      onFocus={() => {
+                        activateMobileComposer();
+                        markActiveRoomSeenNow();
+                      }}
+                      onBlur={releaseMobileComposerSoon}
                       onPointerDown={markActiveRoomSeenNow}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" && !event.shiftKey) {
