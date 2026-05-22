@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Image as ImageIcon, MoreHorizontal, Send, Smile, X } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
@@ -1073,20 +1074,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       }
     };
 
-    setShowEmoji(false);
-    clearDraft();
-
-    if (selectedFile) {
-      try {
-        uploadFile = await prepareChatImageFile(selectedFile);
-      } catch (error) {
-        console.error("DEAL CHAT UPLOAD ERROR:", error);
-        restoreDraft();
-        alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
-        return;
-      }
-    }
-
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMessage: DealMessage = {
       id: optimisticId,
@@ -1110,12 +1097,20 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       optimistic: true,
     };
 
-    setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
-    scrollToBottom("smooth");
+    flushSync(() => {
+      setShowEmoji(false);
+      clearDraft();
+      setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
+    });
+    requestAnimationFrame(() => scrollToBottom("auto"));
 
     let res: Response;
 
     try {
+      if (selectedFile) {
+        uploadFile = await prepareChatImageFile(selectedFile);
+      }
+
       if (uploadFile) {
         const formData = new FormData();
         formData.append("roomId", roomId);

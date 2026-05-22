@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Send, ArrowLeft, Image as ImageIcon, Smile, X, MoreHorizontal } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
@@ -1100,20 +1101,6 @@ function DMRoomContent({
       }
     };
 
-    setShowEmoji(false);
-    clearDraft();
-
-    if (selectedFile) {
-      try {
-        uploadFile = await prepareChatImageFile(selectedFile);
-      } catch (error) {
-        console.error("UPLOAD ERROR:", error);
-        restoreDraft();
-        alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
-        return;
-      }
-    }
-
     const optimisticId = `temp-${Date.now()}`;
     const optimisticMessage: DMMessage = {
       id: optimisticId,
@@ -1137,12 +1124,20 @@ function DMRoomContent({
       optimistic: true,
     };
 
-    setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
-    scrollToBottom("smooth");
+    flushSync(() => {
+      setShowEmoji(false);
+      clearDraft();
+      setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
+    });
+    requestAnimationFrame(() => scrollToBottom("auto"));
 
     let res: Response;
 
     try {
+      if (selectedFile) {
+        uploadFile = await prepareChatImageFile(selectedFile);
+      }
+
       if (uploadFile) {
         const formData = new FormData();
         formData.append("roomId", roomId);

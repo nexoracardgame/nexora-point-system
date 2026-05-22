@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
@@ -1743,49 +1744,51 @@ export default function FloatingChatDock({
       active.other
     );
 
-    setError("");
-    setShowEmoji(false);
-    draftRef.current = "";
-    fileRef.current = null;
-    setDraft("");
-    setFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    setMessages((current) => {
-      const nextMessages = mergeSingleChatMessage(
-        current,
-        optimistic,
-        active.actualRoomId,
-        active.me,
-        active.other
+    flushSync(() => {
+      setError("");
+      setShowEmoji(false);
+      draftRef.current = "";
+      fileRef.current = null;
+      setDraft("");
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      setMessages((current) => {
+        const nextMessages = mergeSingleChatMessage(
+          current,
+          optimistic,
+          active.actualRoomId,
+          active.me,
+          active.other
+        );
+        updateRoomCache(active.key, active, nextMessages);
+        return nextMessages;
+      });
+      setRooms((current) =>
+        current
+          .map((room) =>
+            room.key === active.key
+              ? {
+                  ...room,
+                  lastMessage: buildMessagePreview(
+                    text,
+                    selectedFile ? "local-image" : optimistic.imageUrl
+                  ),
+                  lastMessageAt: optimistic.createdAt || new Date().toISOString(),
+                  createdAt: optimistic.createdAt || room.createdAt,
+                  unread: 0,
+                }
+              : room
+          )
+          .sort((a, b) => {
+            const aTime = new Date(a.lastMessageAt || a.createdAt || 0).getTime();
+            const bTime = new Date(b.lastMessageAt || b.createdAt || 0).getTime();
+            return bTime - aTime;
+          })
       );
-      updateRoomCache(active.key, active, nextMessages);
-      return nextMessages;
     });
-    setRooms((current) =>
-      current
-        .map((room) =>
-          room.key === active.key
-            ? {
-                ...room,
-                lastMessage: buildMessagePreview(
-                  text,
-                  selectedFile ? "local-image" : optimistic.imageUrl
-                ),
-                lastMessageAt: optimistic.createdAt || new Date().toISOString(),
-                createdAt: optimistic.createdAt || room.createdAt,
-                unread: 0,
-              }
-            : room
-        )
-        .sort((a, b) => {
-          const aTime = new Date(a.lastMessageAt || a.createdAt || 0).getTime();
-          const bTime = new Date(b.lastMessageAt || b.createdAt || 0).getTime();
-          return bTime - aTime;
-        })
-    );
-    scrollToBottom("smooth");
+    requestAnimationFrame(() => scrollToBottom("auto"));
 
     try {
       let res: Response | null = null;
