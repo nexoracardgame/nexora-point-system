@@ -35,6 +35,8 @@
 html {
   min-height: 100%;
   background: var(--background);
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -50,6 +52,16 @@ body {
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+a,
+button,
+[role="button"],
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
 }
 
 /* ================== SCROLLBAR ================== */
@@ -246,6 +258,34 @@ body {
 @media (max-width: 768px) {
   .shine::after {
     animation: none;
+  }
+}
+
+/* ของมือถือควรติดนิ้ว: ลด hover/blur/float ที่ไม่คุ้ม GPU */
+@media (hover: none) and (pointer: coarse) {
+  html,
+  body {
+    scroll-behavior: auto;
+  }
+
+  .home-hero-float,
+  .home-float-card,
+  .home-float-card-delay,
+  .home-marquee {
+    animation: none;
+  }
+
+  a:hover,
+  button:hover,
+  [role="button"]:hover {
+    transform: none !important;
+  }
+
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
 }
 

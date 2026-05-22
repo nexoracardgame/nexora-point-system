@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Heart, Handshake, Plus, Rows3, ShieldCheck } from "lucide-react";
+import PrefetchLink from "@/components/PrefetchLink";
 
 const MARKET_ACTIONS = [
   {
@@ -65,7 +65,7 @@ export default function MarketFeatureNav({
         const active = isActivePath(pathname, matchHref);
 
         return (
-          <Link
+          <PrefetchLink
             key={href}
             href={href}
             className={`group rounded-[24px] border p-4 shadow-[0_18px_54px_rgba(0,0,0,0.20)] transition duration-300 hover:-translate-y-1 md:rounded-[30px] md:p-5 ${
@@ -93,7 +93,7 @@ export default function MarketFeatureNav({
             >
               {subtitle}
             </div>
-          </Link>
+          </PrefetchLink>
         );
       })}
     </section>

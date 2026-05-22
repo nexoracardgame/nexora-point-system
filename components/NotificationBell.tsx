@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import PrefetchLink from "@/components/PrefetchLink";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { cacheRealtimeDmMessage } from "@/lib/dm-room-fast-cache";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
@@ -43,9 +43,9 @@ type NotificationResponse = {
 };
 
 const DELIVERED_NOTIFICATION_STORAGE_KEY = "nexora:system-notifications:delivered";
-const NOTIFICATION_POLL_TICK_MS = 1000;
-const NOTIFICATION_REALTIME_FALLBACK_MS = 15000;
-const NOTIFICATION_CONNECTING_FALLBACK_MS = 1800;
+const NOTIFICATION_POLL_TICK_MS = 2000;
+const NOTIFICATION_REALTIME_FALLBACK_MS = 30000;
+const NOTIFICATION_CONNECTING_FALLBACK_MS = 8000;
 const NOTIFICATION_CONFIRM_REFRESH_MS = 550;
 
 function getBrowserClockMs() {
@@ -557,6 +557,7 @@ export default function NotificationBell() {
       : "/market/auction";
     markNotificationRead(notificationId);
     setOpen(false);
+    router.prefetch(nextHref);
     router.push(nextHref);
   };
 
@@ -994,7 +995,7 @@ export default function NotificationBell() {
                           </div>
                         ) : (
                           <div className="mt-3">
-                            <Link
+                            <PrefetchLink
                               href={item.href}
                               onClick={() => {
                                 const roomId = getChatNotificationRoomId(item);
@@ -1024,7 +1025,7 @@ export default function NotificationBell() {
                             >
                               เปิดดู
                               <ChevronRight className="h-3.5 w-3.5" />
-                            </Link>
+                            </PrefetchLink>
                           </div>
                         )}
                       </div>

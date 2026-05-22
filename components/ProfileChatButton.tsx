@@ -182,6 +182,7 @@ export default function ProfileChatButton({
       <button
         type="button"
         onClick={openChat}
+        onPointerDown={warmChat}
         onMouseEnter={warmChat}
         onTouchStart={warmChat}
         onFocus={warmChat}

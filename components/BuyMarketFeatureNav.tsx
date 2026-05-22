@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, HandCoins, Heart, Rows3, Settings2 } from "lucide-react";
+import PrefetchLink from "@/components/PrefetchLink";
 
 const BUY_MARKET_ACTIONS = [
   {
@@ -65,7 +65,7 @@ export default function BuyMarketFeatureNav({
         const active = isActivePath(pathname, matchHref);
 
         return (
-          <Link
+          <PrefetchLink
             key={href}
             href={href}
             className={`group rounded-[24px] border p-4 shadow-[0_18px_54px_rgba(0,0,0,0.20)] transition duration-300 hover:-translate-y-1 md:rounded-[30px] md:p-5 ${
@@ -93,7 +93,7 @@ export default function BuyMarketFeatureNav({
             >
               {subtitle}
             </div>
-          </Link>
+          </PrefetchLink>
         );
       })}
     </section>
