@@ -135,7 +135,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
-  const [sending, setSending] = useState(false);
   const [messageMenuId, setMessageMenuId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -145,7 +144,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const draftTextRef = useRef(text);
   const draftFileRef = useRef<File | null>(file);
-  const sendInFlightRef = useRef(false);
   const isComposingRef = useRef(false);
   const hasInitialScrolledRef = useRef(false);
   const hasMarkedSeenRef = useRef(false);
@@ -1041,7 +1039,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   };
 
   const send = async () => {
-    if (sendInFlightRef.current || sending || !me?.id || !other?.id || !roomId || roomClosed) {
+    if (!me?.id || !other?.id || !roomId || roomClosed) {
       return;
     }
 
@@ -1075,8 +1073,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       }
     };
 
-    sendInFlightRef.current = true;
-    setSending(true);
     setShowEmoji(false);
     clearDraft();
 
@@ -1086,8 +1082,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       } catch (error) {
         console.error("DEAL CHAT UPLOAD ERROR:", error);
         restoreDraft();
-        setSending(false);
-        sendInFlightRef.current = false;
         alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
@@ -1148,8 +1142,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       console.error("SEND DEAL CHAT ERROR:", error);
       setMessages((prev) => removeChatMessage(prev, optimisticId));
       restoreDraft();
-      setSending(false);
-      sendInFlightRef.current = false;
       return;
     }
 
@@ -1164,8 +1156,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         String(errorPayload?.error || "").trim() ||
           "ส่งข้อความไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
       );
-      setSending(false);
-      sendInFlightRef.current = false;
       return;
     }
 
@@ -1184,8 +1174,6 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
         detail: insertedMessage,
       })
     );
-    setSending(false);
-    sendInFlightRef.current = false;
     scrollToBottom("smooth");
   };
 
@@ -1651,8 +1639,8 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
 
               <button
                 onClick={() => void send()}
-                disabled={sending}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"
+                disabled={!me?.id || !other?.id || roomClosed || (!text.trim() && !file)}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <Send size={18} />
               </button>

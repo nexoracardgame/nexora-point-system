@@ -589,7 +589,6 @@ export default function FloatingChatDock({
   const [draft, setDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [localUnreadCount, setLocalUnreadCount] = useState(0);
   const [mobileListVisible, setMobileListVisible] = useState(true);
@@ -663,7 +662,7 @@ export default function FloatingChatDock({
     () => (blazeFile ? URL.createObjectURL(blazeFile) : ""),
     [blazeFile]
   );
-  const canSend = Boolean(safeText(draft) || file) && !sending && !!activeRoom?.actualRoomId;
+  const canSend = Boolean(safeText(draft) || file) && !!activeRoom?.actualRoomId;
   const activeProfileHref = activeRoom?.other?.id
     ? `/profile/${encodeURIComponent(activeRoom.other.id)}`
     : activeRoom?.otherUserId
@@ -1723,7 +1722,7 @@ export default function FloatingChatDock({
     const text = safeText(draftRef.current);
     const selectedFile = fileRef.current;
 
-    if (!active?.actualRoomId || (!text && !selectedFile) || sending) {
+    if (!active?.actualRoomId || (!text && !selectedFile)) {
       return;
     }
 
@@ -1744,9 +1743,10 @@ export default function FloatingChatDock({
       active.other
     );
 
-    setSending(true);
     setError("");
     setShowEmoji(false);
+    draftRef.current = "";
+    fileRef.current = null;
     setDraft("");
     setFile(null);
     if (fileInputRef.current) {
@@ -1857,19 +1857,29 @@ export default function FloatingChatDock({
       void loadRooms();
       scrollToBottom("smooth");
     } catch (err) {
+      setMessages((current) => {
+        const nextMessages = removeChatMessage(current, optimistic.id);
+        updateRoomCache(active.key, active, nextMessages);
+        return nextMessages;
+      });
+      if (!safeText(draftRef.current)) {
+        draftRef.current = text;
+        setDraft(text);
+      }
+      if (selectedFile && !fileRef.current) {
+        fileRef.current = selectedFile;
+        setFile(selectedFile);
+      }
       setError(
         err instanceof Error && err.message
           ? err.message
           : "ส่งข้อความไม่สำเร็จ"
       );
-    } finally {
-      setSending(false);
     }
   }, [
     currentUserId,
     loadRooms,
     scrollToBottom,
-    sending,
     sessionUserImage,
     sessionUserName,
     updateRoomCache,
@@ -3219,7 +3229,7 @@ export default function FloatingChatDock({
                                     mine ? "text-right" : "text-left"
                                   }`}
                                 >
-                                  {message.optimistic ? "กำลังส่ง..." : formatActivityTime(message.createdAt)}
+                                  {formatActivityTime(message.createdAt)}
                                 </div>
                                 {mine && lastSeenMineId === message.id && message.seenAt ? (
                                   <div className="mt-1 px-1 text-[10px] text-emerald-400/80">
@@ -3343,11 +3353,7 @@ export default function FloatingChatDock({
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_0_22px_rgba(255,255,255,0.16)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45"
                       aria-label="ส่งข้อความ"
                     >
-                      {sending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
+                      <Send className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

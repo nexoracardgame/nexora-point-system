@@ -154,7 +154,6 @@ function DMRoomContent({
   const [preview, setPreview] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
-  const [sending, setSending] = useState(false);
   const [messageMenuId, setMessageMenuId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -164,7 +163,6 @@ function DMRoomContent({
   const bottomRef = useRef<HTMLDivElement>(null);
   const draftTextRef = useRef(text);
   const draftFileRef = useRef<File | null>(file);
-  const sendInFlightRef = useRef(false);
   const isComposingRef = useRef(false);
   const hasInitialScrolledRef = useRef(false);
   const hasMarkedSeenRef = useRef(false);
@@ -1070,7 +1068,7 @@ function DMRoomContent({
   }, [messages, me?.id]);
 
   const send = async () => {
-    if (sendInFlightRef.current || sending || !me?.id || !roomId || roomClosed) return;
+    if (!me?.id || !roomId || roomClosed) return;
 
     const draftText = draftTextRef.current;
     const msg = draftText.trim();
@@ -1102,8 +1100,6 @@ function DMRoomContent({
       }
     };
 
-    sendInFlightRef.current = true;
-    setSending(true);
     setShowEmoji(false);
     clearDraft();
 
@@ -1113,8 +1109,6 @@ function DMRoomContent({
       } catch (error) {
         console.error("UPLOAD ERROR:", error);
         restoreDraft();
-        setSending(false);
-        sendInFlightRef.current = false;
         alert(error instanceof Error ? error.message : "อัปโหลดรูปไม่สำเร็จ");
         return;
       }
@@ -1175,8 +1169,6 @@ function DMRoomContent({
       console.error("SEND DM ERROR:", error);
       setMessages((prev) => removeChatMessage(prev, optimisticId));
       restoreDraft();
-      setSending(false);
-      sendInFlightRef.current = false;
       return;
     }
 
@@ -1191,8 +1183,6 @@ function DMRoomContent({
         String(errorPayload?.error || "").trim() ||
           "ส่งข้อความไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
       );
-      setSending(false);
-      sendInFlightRef.current = false;
       return;
     }
 
@@ -1211,8 +1201,6 @@ function DMRoomContent({
         detail: insertedMessage,
       })
     );
-    setSending(false);
-    sendInFlightRef.current = false;
     scrollToBottom("smooth");
   };
 
@@ -1630,8 +1618,8 @@ function DMRoomContent({
 
               <button
                 onClick={() => void send()}
-                disabled={sending}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"
+                disabled={!me?.id || roomClosed || (!text.trim() && !file)}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.22)] transition hover:scale-[1.02] hover:bg-yellow-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <Send size={18} />
               </button>
