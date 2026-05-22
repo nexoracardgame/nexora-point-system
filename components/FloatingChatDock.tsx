@@ -30,6 +30,14 @@ import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { useChatTyping } from "@/lib/chat-typing-client";
 import {
+  broadcastOptimisticChatMessage,
+  type ChatBroadcastChannel,
+} from "@/lib/chat-realtime-client";
+import {
+  CHAT_MESSAGE_BROADCAST_EVENT,
+  getChatRoomBroadcastTopic,
+} from "@/lib/chat-realtime-broadcast";
+import {
   buildChatUser,
   mergeChatMessages,
   mergeSingleChatMessage,
@@ -515,23 +523,23 @@ function sameRoomEvent(active: ActiveFloatingRoom, detail: RealtimeChatDetail) {
   const primaryRoomId = safeText(detail.roomId);
   const primaryIsDeal = primaryRoomId.startsWith("deal:");
   const activeRoomIds = getReadRoomIds(active, active.actualRoomId);
+  const incomingRoomIds = new Set(
+    [detail.roomId, ...(detail.roomIds || [])]
+      .map((item) => safeText(item))
+      .filter(Boolean)
+  );
 
   if (primaryIsDeal) {
     return active.kind === "deal" && activeRoomIds.includes(primaryRoomId);
   }
 
   if (active.kind === "deal") {
-    return false;
+    return activeRoomIds.some((item) => incomingRoomIds.has(item));
   }
 
-  const incomingRoomIds = new Set(
-    [detail.roomId, ...(detail.roomIds || [])]
-      .map((item) => safeText(item))
-      .filter((item) => !item.startsWith("deal:"))
-      .filter(Boolean)
-  );
-
-  return activeRoomIds.some((item) => incomingRoomIds.has(item));
+  return activeRoomIds
+    .filter((item) => !item.startsWith("deal:"))
+    .some((item) => incomingRoomIds.has(item));
 }
 
 function getRealtimeRoomIds(detail: RealtimeChatDetail) {
@@ -557,18 +565,16 @@ function roomMatchesRealtimeDetail(room: FloatingRoom, detail: RealtimeChatDetai
     return room.kind === "deal" && roomCandidates.includes(primaryRoomId);
   }
 
-  if (room.kind === "deal") {
-    return false;
-  }
-
   const roomIds = getRealtimeRoomIds(detail);
   if (roomIds.size === 0) {
     return false;
   }
 
-  return roomCandidates
-    .filter((item) => !item.startsWith("deal:"))
-    .some((item) => roomIds.has(item));
+  return roomCandidates.some((item) =>
+    room.kind === "deal"
+      ? roomIds.has(item)
+      : !item.startsWith("deal:") && roomIds.has(item)
+  );
 }
 
 export default function FloatingChatDock({
@@ -625,6 +631,7 @@ export default function FloatingChatDock({
   const blazeMessagesRef = useRef<BlazeChatMessage[]>(blazeMessages);
   const blazeFileRef = useRef<File | null>(blazeFile);
   const messagesRef = useRef<ChatMessage[]>(messages);
+  const roomBroadcastChannelRef = useRef<ChatBroadcastChannel | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const draftRef = useRef(draft);
   const fileRef = useRef<File | null>(file);
@@ -1788,6 +1795,19 @@ export default function FloatingChatDock({
           })
       );
     });
+    broadcastOptimisticChatMessage(
+      {
+        ...optimistic,
+        roomId:
+          active.kind === "deal" && active.dealId
+            ? `deal:${active.dealId}`
+            : active.actualRoomId,
+        imageUrl: null,
+        roomIds: getReadRoomIds(active, active.actualRoomId),
+      },
+      roomBroadcastChannelRef.current,
+      active.actualRoomId
+    );
     requestAnimationFrame(() => scrollToBottom("auto"));
 
     try {
@@ -2117,6 +2137,8 @@ export default function FloatingChatDock({
 
     const roomId = activeRoom.actualRoomId;
     const channel = supabase.channel(`floating-dm-room-${roomId}-${Date.now()}`);
+    const broadcastChannel = supabase.channel(getChatRoomBroadcastTopic(roomId));
+    roomBroadcastChannelRef.current = broadcastChannel;
     const handleDeletedMessage = (payload: { old?: unknown }) => {
       const oldRow = payload.old as { id?: string; roomId?: string } | null;
       const deletedId = safeText(oldRow?.id);
@@ -2137,14 +2159,31 @@ export default function FloatingChatDock({
       handleDeletedMessage
     );
 
+    broadcastChannel.on(
+      "broadcast",
+      { event: CHAT_MESSAGE_BROADCAST_EVENT },
+      ({ payload }) => {
+        window.dispatchEvent(
+          new CustomEvent("nexora:chat-message-received", {
+            detail: payload as RealtimeChatDetail,
+          })
+        );
+      }
+    );
+
     channel.subscribe((realtimeStatus) => {
       if (realtimeStatus === "SUBSCRIBED") {
         void syncActiveRoom();
       }
     });
+    broadcastChannel.subscribe();
 
     return () => {
+      if (roomBroadcastChannelRef.current === broadcastChannel) {
+        roomBroadcastChannelRef.current = null;
+      }
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [
     activeRoom?.actualRoomId,

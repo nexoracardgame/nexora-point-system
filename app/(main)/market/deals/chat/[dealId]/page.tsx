@@ -26,6 +26,10 @@ import {
 } from "@/lib/chat-room-types";
 import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { useChatTyping } from "@/lib/chat-typing-client";
+import {
+  broadcastOptimisticChatMessage,
+  type ChatBroadcastChannel,
+} from "@/lib/chat-realtime-client";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
   CHAT_MESSAGE_BROADCAST_EVENT,
@@ -155,6 +159,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
   const activeRoomIdRef = useRef(String(cachedRoom?.meta?.roomId || ""));
   const lastSyncAtRef = useRef(0);
   const realtimeConnectedRef = useRef(false);
+  const roomBroadcastChannelRef = useRef<ChatBroadcastChannel | null>(null);
   const loadingOlderRef = useRef(false);
   const olderTimerRef = useRef<number | null>(null);
   const olderIdleRef = useRef<number | null>(null);
@@ -847,6 +852,7 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
     const broadcastChannel = supabase.channel(
       getChatRoomBroadcastTopic(currentRoomId)
     );
+    roomBroadcastChannelRef.current = broadcastChannel;
     const handleDeletedMessage = (payload: { old?: unknown }) => {
       const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
       if (!deletedId) {
@@ -950,6 +956,9 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
 
     return () => {
       realtimeConnectedRef.current = false;
+      if (roomBroadcastChannelRef.current === broadcastChannel) {
+        roomBroadcastChannelRef.current = null;
+      }
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastChannel);
     };
@@ -1102,6 +1111,14 @@ function DealChatRoomContent({ dealId }: { dealId: string }) {
       clearDraft();
       setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
     });
+    broadcastOptimisticChatMessage(
+      {
+        ...optimisticMessage,
+        imageUrl: null,
+        roomIds: getDealReadRoomIds(roomId, dealId),
+      },
+      roomBroadcastChannelRef.current
+    );
     requestAnimationFrame(() => scrollToBottom("auto"));
 
     let res: Response;

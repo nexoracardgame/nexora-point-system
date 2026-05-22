@@ -25,6 +25,10 @@ import { dispatchClientChatRead } from "@/lib/chat-read-sync";
 import { readChatHistoryCache, writeChatHistoryCache } from "@/lib/chat-history-cache";
 import { readDmRoomSeed } from "@/lib/dm-room-seed";
 import { useChatTyping } from "@/lib/chat-typing-client";
+import {
+  broadcastOptimisticChatMessage,
+  type ChatBroadcastChannel,
+} from "@/lib/chat-realtime-client";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
   CHAT_MESSAGE_BROADCAST_EVENT,
@@ -173,6 +177,7 @@ function DMRoomContent({
   const activeRoomIdRef = useRef(roomId);
   const lastSyncAtRef = useRef(0);
   const realtimeConnectedRef = useRef(false);
+  const roomBroadcastChannelRef = useRef<ChatBroadcastChannel | null>(null);
   const meRef = useRef<ChatUser | null>(me);
   const otherRef = useRef<ChatUser | null>(other);
   const loadingOlderRef = useRef(false);
@@ -895,6 +900,7 @@ function DMRoomContent({
 
     const channel = supabase.channel(`dm-room-${roomId}-${Date.now()}`);
     const broadcastChannel = supabase.channel(getChatRoomBroadcastTopic(roomId));
+    roomBroadcastChannelRef.current = broadcastChannel;
     const handleDeletedMessage = (payload: { old?: unknown }) => {
       const deletedId = String((payload.old as { id?: string } | null)?.id || "").trim();
       if (!deletedId) {
@@ -994,6 +1000,9 @@ function DMRoomContent({
 
     return () => {
       realtimeConnectedRef.current = false;
+      if (roomBroadcastChannelRef.current === broadcastChannel) {
+        roomBroadcastChannelRef.current = null;
+      }
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastChannel);
     };
@@ -1129,6 +1138,14 @@ function DMRoomContent({
       clearDraft();
       setMessages((prev) => mergeSingleChatMessage(prev, optimisticMessage, roomId, me, other));
     });
+    broadcastOptimisticChatMessage(
+      {
+        ...optimisticMessage,
+        imageUrl: null,
+        roomIds: getDirectReadRoomIds(roomId, me, other),
+      },
+      roomBroadcastChannelRef.current
+    );
     requestAnimationFrame(() => scrollToBottom("auto"));
 
     let res: Response;
