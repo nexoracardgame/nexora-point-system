@@ -6,9 +6,11 @@ import {
   getActiveLiveBroadcastBan,
   getActiveLiveBroadcast,
   isLiveModeratorRole,
+  resolveLiveSourceUrl,
   stopLiveBroadcast,
   touchLiveBroadcast,
 } from "@/lib/live-broadcast";
+import { publishLiveRealtime } from "@/lib/live-realtime-server";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +71,13 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const sourceUrl = String(body?.url || body?.sourceUrl || "").trim();
+    const rawSourceUrl = String(body?.url || body?.sourceUrl || "").trim();
 
-    if (!sourceUrl) {
+    if (!rawSourceUrl) {
       return noStoreJson({ error: "empty_url" }, { status: 400 });
     }
 
+    const sourceUrl = await resolveLiveSourceUrl(rawSourceUrl);
     buildLiveEmbed(sourceUrl);
 
     const result = await createLiveBroadcast({
@@ -96,6 +99,14 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+
+    await publishLiveRealtime({
+      action: "started",
+      liveId: result.active?.id,
+      ownerUserId: result.active?.ownerUserId,
+      active: result.active,
+      refresh: true,
+    });
 
     return noStoreJson({ active: result.active });
   } catch (error) {
@@ -135,6 +146,14 @@ export async function DELETE() {
         { status: 403 }
       );
     }
+
+    await publishLiveRealtime({
+      action: "ended",
+      liveId: result.active?.id,
+      ownerUserId: result.active?.ownerUserId,
+      active: result.active,
+      refresh: true,
+    });
 
     return noStoreJson({ active: result.active });
   } catch (error) {

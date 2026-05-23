@@ -5,6 +5,7 @@ import {
   getActiveLiveBroadcastBan,
   unbanLiveBroadcaster,
 } from "@/lib/live-broadcast";
+import { publishLiveRealtime } from "@/lib/live-realtime-server";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,13 @@ export async function POST(request: Request) {
       );
     }
 
+    await publishLiveRealtime({
+      action: "banned",
+      ownerUserId: targetUserId,
+      active: result.active,
+      refresh: true,
+    });
+
     return noStoreJson({
       ban: result.ban,
       active: result.active,
@@ -75,6 +83,13 @@ export async function DELETE(request: Request) {
         { status: statusForReason(result.reason) }
       );
     }
+
+    await publishLiveRealtime({
+      action: "unbanned",
+      ownerUserId: targetUserId,
+      active: result.active,
+      refresh: true,
+    });
 
     return noStoreJson({
       ban: await getActiveLiveBroadcastBan(targetUserId),

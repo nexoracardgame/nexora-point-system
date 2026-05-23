@@ -12,6 +12,11 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import {
+  LIVE_REALTIME_CHANNEL,
+  LIVE_REALTIME_EVENT,
+} from "@/lib/live-realtime";
 
 type ActiveLive = {
   id: string;
@@ -37,11 +42,15 @@ function setMuteParam(rawUrl: string, muted: boolean) {
   try {
     const url = new URL(rawUrl);
     if (url.hostname.includes("facebook.com")) {
+      url.searchParams.set("autoplay", "true");
       url.searchParams.set("mute", muted ? "true" : "false");
+    } else if (url.hostname.includes("tiktok.com")) {
+      url.searchParams.set("autoplay", "1");
+      url.searchParams.set("muted", muted ? "1" : "0");
     } else {
+      url.searchParams.set("autoplay", "1");
       url.searchParams.set("mute", muted ? "1" : "0");
     }
-    url.searchParams.set("autoplay", "1");
     url.searchParams.set("playsinline", "1");
     return url.toString();
   } catch {
@@ -67,9 +76,15 @@ export default function LiveFloatingPlayer() {
   const [active, setActive] = useState<ActiveLive | null>(null);
   const [hiddenLiveId, setHiddenLiveId] = useState("");
   const [collapsed, setCollapsed] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [embedFallbackLiveId, setEmbedFallbackLiveId] = useState("");
+  const loadActiveInFlightRef = useRef(false);
   const lastActiveIdRef = useRef("");
   const hasActiveLive = !!active;
+  const activeId = active?.id || "";
+  const activeOwnerUserId = active?.ownerUserId || "";
+  const activePlatform = active?.platform || "";
+  const showEmbedFallback = embedFallbackLiveId === activeId;
   const canStopGlobal =
     !!active &&
     (active.ownerUserId === session?.user?.id ||
@@ -78,8 +93,14 @@ export default function LiveFloatingPlayer() {
       ));
 
   const loadActive = useCallback(async () => {
+    if (loadActiveInFlightRef.current) {
+      return;
+    }
+
+    loadActiveInFlightRef.current = true;
+
     try {
-      const res = await fetch(`/api/live?ts=${Date.now()}`, {
+      const res = await fetch("/api/live", {
         cache: "no-store",
       });
 
@@ -96,17 +117,19 @@ export default function LiveFloatingPlayer() {
         lastActiveIdRef.current = nextActive.id;
         setHiddenLiveId("");
         setCollapsed(false);
-        setMuted(false);
+        setMuted(true);
       }
 
       if (!nextActive) {
         lastActiveIdRef.current = "";
         setHiddenLiveId("");
         setCollapsed(false);
-        setMuted(false);
+        setMuted(true);
       }
     } catch {
       return;
+    } finally {
+      loadActiveInFlightRef.current = false;
     }
   }, []);
 
@@ -120,7 +143,7 @@ export default function LiveFloatingPlayer() {
     };
 
     tick();
-    const intervalId = window.setInterval(tick, hasActiveLive ? 650 : 1400);
+    const intervalId = window.setInterval(tick, hasActiveLive ? 10000 : 4500);
     const handleFocus = () => tick();
     const handleVisibility = () => tick();
     const handleLiveStatus = () => tick();
@@ -146,7 +169,50 @@ export default function LiveFloatingPlayer() {
   }, [hasActiveLive, loadActive]);
 
   useEffect(() => {
-    if (!active || active.ownerUserId !== session?.user?.id) {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase.channel(LIVE_REALTIME_CHANNEL, {
+      config: {
+        broadcast: {
+          self: false,
+        },
+      },
+    });
+
+    channel.on("broadcast", { event: LIVE_REALTIME_EVENT }, () => {
+      void loadActive();
+    });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        void loadActive();
+      }
+    });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [loadActive]);
+
+  useEffect(() => {
+    if (
+      !activeId ||
+      (activePlatform !== "facebook" && activePlatform !== "tiktok")
+    ) {
+      return;
+    }
+
+    const fallbackDelay = activePlatform === "facebook" ? 4200 : 1800;
+    const timeoutId = window.setTimeout(() => {
+      setEmbedFallbackLiveId(activeId);
+    }, fallbackDelay);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeId, activePlatform]);
+
+  useEffect(() => {
+    if (!activeId || activeOwnerUserId !== session?.user?.id) {
       return;
     }
 
@@ -161,7 +227,7 @@ export default function LiveFloatingPlayer() {
     touchLive();
     const intervalId = window.setInterval(touchLive, 5000);
     return () => window.clearInterval(intervalId);
-  }, [active?.id, active?.ownerUserId, session?.user?.id]);
+  }, [activeId, activeOwnerUserId, session?.user?.id]);
 
   const closeFloatingPlayer = async () => {
     if (!active) return;
@@ -199,6 +265,7 @@ export default function LiveFloatingPlayer() {
     return setMuteParam(active.embedUrl, muted);
   }, [active, muted]);
   const isTikTok = active?.platform === "tiktok";
+  const isFacebook = active?.platform === "facebook";
 
   if (!active || hiddenLiveId === active.id || pathname.startsWith("/live")) {
     return null;
@@ -290,10 +357,23 @@ export default function LiveFloatingPlayer() {
           key={`${active.id}-${muted ? "muted" : "sound"}`}
           src={playerSrc}
           title={active.title}
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen"
           allowFullScreen
+          loading="eager"
+          referrerPolicy="origin-when-cross-origin"
           className="h-full w-full"
         />
+
+        {isFacebook && showEmbedFallback ? (
+          <a
+            href={active.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/10 bg-black/74 px-3 py-2 text-center text-[11px] font-black text-white shadow-[0_18px_36px_rgba(0,0,0,0.4)] backdrop-blur-xl transition hover:bg-black"
+          >
+            หาก Facebook ไม่แสดง แตะเพื่อเปิดไลฟ์ต้นทาง
+          </a>
+        ) : null}
 
         {isTikTok ? (
           <a

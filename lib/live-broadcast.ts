@@ -144,7 +144,15 @@ function extractFirstLiveUrl(rawValue: string) {
 
 function unwrapSharedUrl(url: URL) {
   const host = cleanHost(url.hostname);
-  const redirectParamNames = ["u", "url", "q", "target", "redirect", "redirect_url"];
+  const redirectParamNames = [
+    "u",
+    "url",
+    "q",
+    "target",
+    "redirect",
+    "redirect_url",
+    "next",
+  ];
 
   if (
     host.endsWith("facebook.com") ||
@@ -168,6 +176,169 @@ function unwrapSharedUrl(url: URL) {
   }
 
   return url;
+}
+
+function isFacebookHost(host: string) {
+  return host.endsWith("facebook.com") || host === "fb.watch";
+}
+
+function keepOnlySearchParams(url: URL, paramNames: string[]) {
+  const nextParams = new URLSearchParams();
+  for (const paramName of paramNames) {
+    const value = url.searchParams.get(paramName);
+    if (value) {
+      nextParams.set(paramName, value);
+    }
+  }
+  url.search = nextParams.toString();
+}
+
+function normalizeFacebookSourceUrl(url: URL) {
+  const normalized = new URL(url.toString());
+  const host = cleanHost(normalized.hostname);
+
+  if (
+    host.endsWith("facebook.com") &&
+    normalized.pathname === "/plugins/video.php"
+  ) {
+    const href = normalized.searchParams.get("href");
+    if (href) {
+      try {
+        return normalizeFacebookSourceUrl(toSafeUrl(href));
+      } catch {
+        return normalized;
+      }
+    }
+  }
+
+  normalized.protocol = "https:";
+
+  if (host === "fb.watch") {
+    return normalized;
+  }
+
+  if (!host.endsWith("facebook.com")) {
+    return normalized;
+  }
+
+  normalized.hostname = "www.facebook.com";
+
+  if (normalized.pathname === "/video.php" && normalized.searchParams.get("v")) {
+    normalized.pathname = "/watch/";
+    keepOnlySearchParams(normalized, ["v"]);
+    return normalized;
+  }
+
+  const parts = normalized.pathname.split("/").filter(Boolean);
+  const firstPart = String(parts[0] || "").toLowerCase();
+
+  if (firstPart === "watch" && normalized.searchParams.get("v")) {
+    normalized.pathname = "/watch/";
+    keepOnlySearchParams(normalized, ["v"]);
+    return normalized;
+  }
+
+  if (firstPart === "story.php" || firstPart === "permalink.php") {
+    keepOnlySearchParams(normalized, ["story_fbid", "id", "fbid"]);
+    return normalized;
+  }
+
+  if (parts.some((part) => part.toLowerCase() === "videos")) {
+    normalized.search = "";
+    return normalized;
+  }
+
+  if (parts.some((part) => part.toLowerCase() === "live")) {
+    normalized.search = "";
+  }
+
+  return normalized;
+}
+
+function normalizeLiveSourceUrl(url: URL) {
+  const host = cleanHost(url.hostname);
+  if (isFacebookHost(host)) {
+    return normalizeFacebookSourceUrl(url);
+  }
+
+  return url;
+}
+
+function shouldResolveLiveRedirect(url: URL) {
+  const host = cleanHost(url.hostname);
+  if (host === "fb.watch") {
+    return true;
+  }
+
+  if (!host.endsWith("facebook.com")) {
+    return false;
+  }
+
+  const firstPart = String(url.pathname.split("/").filter(Boolean)[0] || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    firstPart === "share" ||
+    firstPart === "shareable" ||
+    host === "l.facebook.com" ||
+    host === "lm.facebook.com"
+  );
+}
+
+async function fetchResolvedLiveUrl(url: URL, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      redirect: "follow",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
+      },
+    });
+
+    if (response.body) {
+      await response.body.cancel().catch(() => undefined);
+    }
+
+    if (!response.url) {
+      return null;
+    }
+
+    const resolved = unwrapSharedUrl(new URL(response.url));
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") {
+      return null;
+    }
+
+    return resolved;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function resolveLiveSourceUrl(
+  rawUrl: string,
+  options?: { timeoutMs?: number }
+) {
+  const sourceUrl = normalizeLiveSourceUrl(toSafeUrl(rawUrl));
+  if (!shouldResolveLiveRedirect(sourceUrl)) {
+    return sourceUrl.toString();
+  }
+
+  const resolvedUrl = await fetchResolvedLiveUrl(
+    sourceUrl,
+    options?.timeoutMs ?? 2500
+  );
+
+  return normalizeLiveSourceUrl(resolvedUrl || sourceUrl).toString();
 }
 
 function getYoutubeId(url: URL) {
@@ -237,7 +408,7 @@ function withTikTokPlayerParams(url: URL) {
 }
 
 export function buildLiveEmbed(rawUrl: string) {
-  const sourceUrl = toSafeUrl(rawUrl);
+  const sourceUrl = normalizeLiveSourceUrl(toSafeUrl(rawUrl));
   const host = cleanHost(sourceUrl.hostname);
 
   if (
@@ -283,8 +454,12 @@ export function buildLiveEmbed(rawUrl: string) {
     embedUrl.searchParams.set("href", sourceUrl.toString());
     embedUrl.searchParams.set("show_text", "false");
     embedUrl.searchParams.set("autoplay", "true");
-    embedUrl.searchParams.set("mute", "false");
-    embedUrl.searchParams.set("width", "560");
+    embedUrl.searchParams.set("mute", "true");
+    embedUrl.searchParams.set("allowfullscreen", "true");
+    embedUrl.searchParams.set("container_width", "1280");
+    embedUrl.searchParams.set("locale", "th_TH");
+    embedUrl.searchParams.set("sdk", "joey");
+    embedUrl.searchParams.set("width", "1280");
 
     return {
       platform: "facebook" as const,
@@ -345,13 +520,27 @@ function normalizeLiveRow(row: unknown): LiveBroadcastRecord | null {
 
   const source = row as Record<string, unknown>;
   const createdAt = serializeDate(rowValue(source, "createdAt")) || new Date().toISOString();
+  let platform = String(rowValue(source, "platform") || "youtube") as LivePlatform;
+  let sourceUrl = String(rowValue(source, "sourceUrl") || "");
+  let embedUrl = String(rowValue(source, "embedUrl") || "");
+  let title = String(rowValue(source, "title") || "Live");
+
+  try {
+    const refreshedEmbed = buildLiveEmbed(sourceUrl || embedUrl);
+    platform = refreshedEmbed.platform;
+    sourceUrl = refreshedEmbed.sourceUrl;
+    embedUrl = refreshedEmbed.embedUrl;
+    title = refreshedEmbed.title;
+  } catch {
+    // Keep legacy rows readable even if an old source URL is no longer valid.
+  }
 
   return {
     id: String(rowValue(source, "id") || ""),
-    platform: String(rowValue(source, "platform") || "youtube") as LivePlatform,
-    sourceUrl: String(rowValue(source, "sourceUrl") || ""),
-    embedUrl: String(rowValue(source, "embedUrl") || ""),
-    title: String(rowValue(source, "title") || "Live"),
+    platform,
+    sourceUrl,
+    embedUrl,
+    title,
     ownerUserId: String(rowValue(source, "ownerUserId") || ""),
     ownerName: String(rowValue(source, "ownerName") || "NEXORA"),
     status: String(rowValue(source, "status") || ACTIVE_STATUS) as LiveStatus,
@@ -628,7 +817,38 @@ export async function getActiveLiveBroadcast(
     ACTIVE_STATUS
   );
 
-  return normalizeLiveRow(rows[0]);
+  const active = normalizeLiveRow(rows[0]);
+  if (!active) {
+    return null;
+  }
+
+  const source = rows[0] as Record<string, unknown>;
+  const storedPlatform = String(rowValue(source, "platform") || "");
+  const storedSourceUrl = String(rowValue(source, "sourceUrl") || "");
+  const storedEmbedUrl = String(rowValue(source, "embedUrl") || "");
+  const storedTitle = String(rowValue(source, "title") || "");
+
+  if (
+    active.platform !== storedPlatform ||
+    active.sourceUrl !== storedSourceUrl ||
+    active.embedUrl !== storedEmbedUrl ||
+    active.title !== storedTitle
+  ) {
+    await db.$executeRawUnsafe(
+      `
+        UPDATE "LiveBroadcast"
+        SET "platform" = $1, "sourceUrl" = $2, "embedUrl" = $3, "title" = $4
+        WHERE "id" = $5
+      `,
+      active.platform,
+      active.sourceUrl,
+      active.embedUrl,
+      active.title,
+      active.id
+    );
+  }
+
+  return active;
 }
 
 export async function createLiveBroadcast(input: {

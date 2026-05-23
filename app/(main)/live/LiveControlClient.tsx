@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   AlertCircle,
@@ -18,6 +18,11 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import {
+  LIVE_REALTIME_CHANNEL,
+  LIVE_REALTIME_EVENT,
+} from "@/lib/live-realtime";
 
 type ActiveLive = {
   id: string;
@@ -107,15 +112,19 @@ function formatTime(value: string) {
   }
 }
 
-function forceSoundUrl(rawUrl: string) {
+function withLiveAutoplayParams(rawUrl: string) {
   try {
     const url = new URL(rawUrl);
     if (url.hostname.includes("facebook.com")) {
-      url.searchParams.set("mute", "false");
+      url.searchParams.set("autoplay", "true");
+      url.searchParams.set("mute", "true");
+    } else if (url.hostname.includes("tiktok.com")) {
+      url.searchParams.set("autoplay", "1");
+      url.searchParams.set("muted", "1");
     } else {
-      url.searchParams.set("mute", "0");
+      url.searchParams.set("autoplay", "1");
+      url.searchParams.set("mute", "1");
     }
-    url.searchParams.set("autoplay", "1");
     url.searchParams.set("playsinline", "1");
     return url.toString();
   } catch {
@@ -137,6 +146,7 @@ function broadcastLiveStatusChanged() {
 
 export default function LiveControlClient() {
   const { data: session } = useSession();
+  const loadActiveInFlightRef = useRef(false);
   const [url, setUrl] = useState("");
   const [active, setActive] = useState<ActiveLive | null>(null);
   const [viewerBan, setViewerBan] = useState<LiveBan | null>(null);
@@ -155,8 +165,13 @@ export default function LiveControlClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [embedFallbackLiveId, setEmbedFallbackLiveId] = useState("");
   const hasActiveLive = !!active;
   const isTikTokLive = active?.platform === "tiktok";
+  const isFacebookLive = active?.platform === "facebook";
+  const activeId = active?.id || "";
+  const activePlatform = active?.platform || "";
+  const showEmbedFallback = embedFallbackLiveId === activeId;
 
   const canStop = useMemo(() => {
     return (
@@ -166,10 +181,15 @@ export default function LiveControlClient() {
   }, [active, canModerateLive, session?.user?.id]);
 
   const loadActive = useCallback(async (silent = false) => {
+    if (loadActiveInFlightRef.current) {
+      return;
+    }
+
+    loadActiveInFlightRef.current = true;
     if (!silent) setLoading(true);
 
     try {
-      const res = await fetch(`/api/live?ts=${Date.now()}`, {
+      const res = await fetch("/api/live", {
         cache: "no-store",
       });
       const payload = (await res.json().catch(() => null)) as {
@@ -190,6 +210,7 @@ export default function LiveControlClient() {
         setError("โหลดสถานะไลฟ์ไม่สำเร็จ ลองรีเฟรชอีกครั้ง");
       }
     } finally {
+      loadActiveInFlightRef.current = false;
       if (!silent) setLoading(false);
     }
   }, []);
@@ -208,7 +229,7 @@ export default function LiveControlClient() {
         void loadActive(false);
       }
     }, 0);
-    const intervalId = window.setInterval(tick, hasActiveLive ? 700 : 1600);
+    const intervalId = window.setInterval(tick, hasActiveLive ? 10000 : 4500);
     const handleFocus = () => tick();
     const handleVisibility = () => tick();
     const handleLiveStatus = () => tick();
@@ -233,6 +254,49 @@ export default function LiveControlClient() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [hasActiveLive, loadActive]);
+
+  useEffect(() => {
+    if (
+      !activeId ||
+      (activePlatform !== "facebook" && activePlatform !== "tiktok")
+    ) {
+      return;
+    }
+
+    const fallbackDelay = activePlatform === "facebook" ? 4200 : 1800;
+    const timeoutId = window.setTimeout(() => {
+      setEmbedFallbackLiveId(activeId);
+    }, fallbackDelay);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeId, activePlatform]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase.channel(LIVE_REALTIME_CHANNEL, {
+      config: {
+        broadcast: {
+          self: false,
+        },
+      },
+    });
+
+    channel.on("broadcast", { event: LIVE_REALTIME_EVENT }, () => {
+      void loadActive(true);
+    });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        void loadActive(true);
+      }
+    });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [loadActive]);
 
   async function startLive(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -557,12 +621,24 @@ export default function LiveControlClient() {
                     }
                   >
                     <iframe
-                      src={forceSoundUrl(active.embedUrl)}
+                      src={withLiveAutoplayParams(active.embedUrl)}
                       title={active.title}
-                      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen"
                       allowFullScreen
+                      loading="eager"
+                      referrerPolicy="origin-when-cross-origin"
                       className="h-full w-full"
                     />
+                    {isFacebookLive && showEmbedFallback ? (
+                      <a
+                        href={active.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/10 bg-black/74 px-3 py-2 text-center text-[11px] font-black text-white shadow-[0_18px_36px_rgba(0,0,0,0.4)] backdrop-blur-xl transition hover:bg-black"
+                      >
+                        หาก Facebook ไม่แสดง แตะเพื่อเปิดไลฟ์ต้นทาง
+                      </a>
+                    ) : null}
                     {isTikTokLive ? (
                       <a
                         href={active.sourceUrl}
