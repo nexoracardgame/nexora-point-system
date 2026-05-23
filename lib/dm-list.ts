@@ -17,6 +17,13 @@ export type DMRoomListItem = {
   otherUserId?: string;
   dealId?: string;
   lastMessage: string;
+  lastMessageId?: string;
+  lastMessageContent?: string;
+  lastMessageImageUrl?: string;
+  lastMessageSenderId?: string;
+  lastMessageSenderName?: string;
+  lastMessageSenderImage?: string;
+  lastMessageSeenAt?: string | null;
   createdAt: string;
   lastMessageAt?: string;
   otherName: string;
@@ -41,6 +48,30 @@ function buildPreview(content?: string | null, imageUrl?: string | null) {
   if (text) return text;
   if (imageUrl) return "รูปภาพ";
   return "เริ่มแชท";
+}
+
+function buildLatestMessageFields(message?: {
+  id?: string | number | null;
+  content?: string | null;
+  imageUrl?: string | null;
+  senderId?: string | null;
+  senderName?: string | null;
+  senderImage?: string | null;
+  seenAt?: string | null;
+} | null) {
+  if (!message) {
+    return {};
+  }
+
+  return {
+    lastMessageId: String(message.id || "").trim() || undefined,
+    lastMessageContent: String(message.content || "").trim() || undefined,
+    lastMessageImageUrl: String(message.imageUrl || "").trim() || undefined,
+    lastMessageSenderId: String(message.senderId || "").trim() || undefined,
+    lastMessageSenderName: String(message.senderName || "").trim() || undefined,
+    lastMessageSenderImage: String(message.senderImage || "").trim() || undefined,
+    lastMessageSeenAt: message.seenAt ? String(message.seenAt || "").trim() : null,
+  };
 }
 
 function latestTime(value?: string | null) {
@@ -148,7 +179,7 @@ export async function getDmRoomsForUser(
       supabase
         .from("dmMessage")
         .select(
-          "roomId,senderId,senderName,senderImage,content,imageUrl,createdAt"
+          "id,roomId,senderId,senderName,senderImage,content,imageUrl,createdAt,seenAt"
         )
         .in("roomId", roomIds)
         .order("createdAt", { ascending: false })
@@ -362,6 +393,7 @@ export async function getDmRoomsForUser(
       lastMessage: latestMessage
         ? buildPreview(latestMessage.content, latestMessage.imageUrl)
         : "เริ่มแชท",
+      ...buildLatestMessageFields(latestMessage),
       otherName:
         profile?.displayName ||
         (roomUserAIsMe ? room.userbname : room.useraname) ||
@@ -430,6 +462,7 @@ export async function getDmRoomsForUser(
       lastMessage: latestMessage
         ? buildPreview(latestMessage.content, latestMessage.imageUrl)
         : "เริ่มคุยห้องดีล",
+      ...buildLatestMessageFields(latestMessage),
       otherName: other.displayName || other.name || "User",
       otherImage: safeImage(other.image),
       unread: unreadCountByRoom.get(roomId) || 0,
@@ -456,6 +489,7 @@ export async function getDmRoomsForUser(
         lastMessage: latestMessage
           ? buildPreview(latestMessage.content, latestMessage.imageUrl)
           : seed.lastMessage,
+        ...buildLatestMessageFields(latestMessage),
         unread: unreadCountByRoom.get(seed.roomId) || 0,
       };
     });

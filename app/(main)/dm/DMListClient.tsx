@@ -43,6 +43,7 @@ type DmMessageRealtimeRow = {
   content?: string | null;
   imageUrl?: string | null;
   createdAt?: string | null;
+  seenAt?: string | null;
 };
 
 type LocalDmClearMap = Map<string, string>;
@@ -205,6 +206,26 @@ function normalizeRoom(room: Partial<DMRoomListItem>): DMRoomListItem | null {
     otherName: String(room.otherName || "User"),
     otherImage: String(room.otherImage || "/avatar.png"),
     lastMessage: String(room.lastMessage || ""),
+    lastMessageId: room.lastMessageId ? String(room.lastMessageId) : undefined,
+    lastMessageContent: room.lastMessageContent
+      ? String(room.lastMessageContent)
+      : undefined,
+    lastMessageImageUrl: room.lastMessageImageUrl
+      ? String(room.lastMessageImageUrl)
+      : undefined,
+    lastMessageSenderId: room.lastMessageSenderId
+      ? String(room.lastMessageSenderId)
+      : undefined,
+    lastMessageSenderName: room.lastMessageSenderName
+      ? String(room.lastMessageSenderName)
+      : undefined,
+    lastMessageSenderImage: room.lastMessageSenderImage
+      ? String(room.lastMessageSenderImage)
+      : undefined,
+    lastMessageSeenAt:
+      room.lastMessageSeenAt === null || room.lastMessageSeenAt === undefined
+        ? room.lastMessageSeenAt
+        : String(room.lastMessageSeenAt),
     createdAt: String(room.createdAt || ""),
     lastMessageAt: room.lastMessageAt ? String(room.lastMessageAt) : "",
     unread: Number(room.unread || 0),
@@ -243,6 +264,34 @@ function buildRealtimeMessageKey(message: DmMessageRealtimeRow) {
     String(message.content || "").trim(),
     String(message.imageUrl || "").trim(),
   ].join("|");
+}
+
+function buildRoomPreviewCacheMessage(
+  room: DMRoomListItem,
+  roomId: string
+): DmMessageRealtimeRow | null {
+  const id = String(room.lastMessageId || "").trim();
+  const createdAt = String(room.lastMessageAt || room.createdAt || "").trim();
+  const imageUrl = String(room.lastMessageImageUrl || "").trim();
+  const content = String(
+    room.lastMessageContent || (imageUrl ? "" : room.lastMessage) || ""
+  ).trim();
+
+  if (!id || !createdAt || (!content && !imageUrl)) {
+    return null;
+  }
+
+  return {
+    id,
+    roomId,
+    senderId: String(room.lastMessageSenderId || "").trim(),
+    senderName: String(room.lastMessageSenderName || "").trim() || null,
+    senderImage: String(room.lastMessageSenderImage || "").trim() || null,
+    content: content || null,
+    imageUrl: imageUrl || null,
+    createdAt,
+    seenAt: room.lastMessageSeenAt || null,
+  };
 }
 
 function sortRoomsByActivity(list: DMRoomListItem[]) {
@@ -436,7 +485,7 @@ export default function DMListClient({
     const safeRoomId = String(roomId || "").trim();
     if (!safeRoomId) return;
 
-    primeDmRoomFastCache(safeRoomId, {
+    const meta = {
       ...(currentMe
         ? {
             me: {
@@ -451,7 +500,13 @@ export default function DMListClient({
         name: String(room.otherName || "").trim() || "User",
         image: String(room.otherImage || "").trim() || "/avatar.png",
       },
-    });
+    };
+    primeDmRoomFastCache(safeRoomId, meta);
+
+    const previewMessage = buildRoomPreviewCacheMessage(room, safeRoomId);
+    if (previewMessage) {
+      cacheRealtimeDmMessage([room.roomId, safeRoomId], previewMessage, meta);
+    }
   }, [currentMe]);
 
   const seedDirectRoom = useCallback((roomId: string, room: DMRoomListItem) => {
@@ -909,6 +964,13 @@ export default function DMListClient({
         return {
           ...room,
           lastMessage: preview,
+          lastMessageId: String(message?.id || "").trim() || room.lastMessageId,
+          lastMessageContent: String(message?.content || "").trim() || undefined,
+          lastMessageImageUrl: String(message?.imageUrl || "").trim() || undefined,
+          lastMessageSenderId: String(message?.senderId || "").trim() || undefined,
+          lastMessageSenderName: String(message?.senderName || "").trim() || undefined,
+          lastMessageSenderImage: String(message?.senderImage || "").trim() || undefined,
+          lastMessageSeenAt: message?.seenAt || null,
           lastMessageAt: createdAt,
           createdAt,
           unread: isMine ? room.unread : room.unread + 1,

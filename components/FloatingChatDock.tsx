@@ -420,6 +420,16 @@ function normalizeRoom(room: DMRoomListItem): FloatingRoom | null {
     otherName: safeText(room.otherName) || "User",
     otherImage: safeText(room.otherImage) || "/avatar.png",
     lastMessage: safeText(room.lastMessage) || "เริ่มแชท",
+    lastMessageId: safeText(room.lastMessageId) || undefined,
+    lastMessageContent: safeText(room.lastMessageContent) || undefined,
+    lastMessageImageUrl: safeText(room.lastMessageImageUrl) || undefined,
+    lastMessageSenderId: safeText(room.lastMessageSenderId) || undefined,
+    lastMessageSenderName: safeText(room.lastMessageSenderName) || undefined,
+    lastMessageSenderImage: safeText(room.lastMessageSenderImage) || undefined,
+    lastMessageSeenAt:
+      room.lastMessageSeenAt === null || room.lastMessageSeenAt === undefined
+        ? room.lastMessageSeenAt
+        : safeText(room.lastMessageSeenAt) || null,
     createdAt: safeText(room.createdAt) || new Date().toISOString(),
     unread: Math.max(0, Number(room.unread || 0)),
     auctionDeal: Boolean(room.auctionDeal),
@@ -519,10 +529,20 @@ function getReadRoomIds(room: ActiveFloatingRoom | FloatingRoom, actualRoomId: s
   );
 }
 
-function sameRoomEvent(active: ActiveFloatingRoom, detail: RealtimeChatDetail) {
+function sameRoomEvent(
+  active: ActiveFloatingRoom,
+  detail: RealtimeChatDetail,
+  currentUserId?: string | null,
+  sessionUserLineId?: string | null
+) {
   const primaryRoomId = safeText(detail.roomId);
   const primaryIsDeal = primaryRoomId.startsWith("deal:");
-  const activeRoomIds = getReadRoomIds(active, active.actualRoomId);
+  const activeRoomIds = Array.from(
+    new Set([
+      ...getReadRoomIds(active, active.actualRoomId),
+      ...getFloatingRoomRealtimeIds(active, currentUserId, sessionUserLineId),
+    ])
+  );
   const incomingRoomIds = new Set(
     [detail.roomId, ...(detail.roomIds || [])]
       .map((item) => safeText(item))
@@ -550,16 +570,123 @@ function getRealtimeRoomIds(detail: RealtimeChatDetail) {
   );
 }
 
-function roomMatchesRealtimeDetail(room: FloatingRoom, detail: RealtimeChatDetail) {
-  const primaryRoomId = safeText(detail.roomId);
-  const primaryIsDeal = primaryRoomId.startsWith("deal:");
-  const roomCandidates = [
+function getFloatingRoomRealtimeIds(
+  room: FloatingRoom,
+  currentUserId?: string | null,
+  sessionUserLineId?: string | null
+) {
+  const roomIds = [
     room.key,
     room.roomId,
     room.kind === "deal" && room.dealId ? `deal:${room.dealId}` : "",
-  ]
-    .map((item) => safeText(item))
-    .filter(Boolean);
+  ];
+
+  if (room.kind !== "deal") {
+    const otherUserId = safeText(room.otherUserId);
+    const userIds = [currentUserId, sessionUserLineId]
+      .map((item) => safeText(item))
+      .filter(Boolean);
+
+    for (const userId of userIds) {
+      if (otherUserId) {
+        roomIds.push(buildDirectRoomId(userId, otherUserId));
+      }
+    }
+  }
+
+  return Array.from(new Set(roomIds.map((item) => safeText(item)).filter(Boolean)));
+}
+
+function buildRoomPreviewMessage(
+  room: FloatingRoom,
+  actualRoomId: string,
+  me?: ChatUser | null,
+  other?: ChatUser | null
+) {
+  const id = safeText(room.lastMessageId);
+  const createdAt = safeText(room.lastMessageAt || room.createdAt);
+  const imageUrl = safeText(room.lastMessageImageUrl);
+  const content = safeText(
+    room.lastMessageContent || (imageUrl ? "" : room.lastMessage)
+  );
+
+  if (!id || !createdAt || (!content && !imageUrl)) {
+    return null;
+  }
+
+  return normalizeChatMessage(
+    {
+      id,
+      roomId: actualRoomId,
+      senderId: safeText(room.lastMessageSenderId),
+      senderName: safeText(room.lastMessageSenderName) || null,
+      senderImage: safeText(room.lastMessageSenderImage) || null,
+      content: content || null,
+      imageUrl: imageUrl || null,
+      createdAt,
+      seenAt: room.lastMessageSeenAt || null,
+    },
+    actualRoomId,
+    me,
+    other
+  );
+}
+
+function buildRoomFromRealtimeDetail(detail: RealtimeChatDetail) {
+  const roomIds = Array.from(getRealtimeRoomIds(detail));
+  const primaryRoomId = safeText(detail.roomId);
+  const isDealRoom =
+    primaryRoomId.startsWith("deal:") ||
+    roomIds.some((roomId) => roomId.startsWith("deal:"));
+  const roomId =
+    roomIds.find((candidate) =>
+      isDealRoom ? candidate.startsWith("deal:") : !candidate.startsWith("deal:")
+    ) || primaryRoomId;
+  const id = safeText(detail.id);
+  const createdAt = safeText(detail.createdAt) || new Date().toISOString();
+
+  if (!roomId || !id) {
+    return null;
+  }
+
+  const senderId = safeText(detail.senderId);
+  const dealId = isDealRoom ? roomId.replace(/^deal:/, "") : undefined;
+
+  return normalizeRoom({
+    kind: isDealRoom ? "deal" : "direct",
+    roomId,
+    dealId,
+    otherUserId: senderId || undefined,
+    otherName: safeText(detail.senderName) || "User",
+    otherImage: safeText(detail.senderImage) || "/avatar.png",
+    lastMessage: buildMessagePreview(detail.content, detail.imageUrl),
+    lastMessageId: id,
+    lastMessageContent: safeText(detail.content) || undefined,
+    lastMessageImageUrl: safeText(detail.imageUrl) || undefined,
+    lastMessageSenderId: senderId || undefined,
+    lastMessageSenderName: safeText(detail.senderName) || undefined,
+    lastMessageSenderImage: safeText(detail.senderImage) || undefined,
+    lastMessageSeenAt: detail.seenAt || null,
+    createdAt,
+    lastMessageAt: createdAt,
+    unread: detail.isMine ? 0 : 1,
+    dealMode: "sell",
+  });
+}
+
+function roomMatchesRealtimeDetail(
+  room: FloatingRoom,
+  detail: RealtimeChatDetail,
+  currentUserId?: string | null,
+  sessionUserLineId?: string | null
+) {
+  const primaryRoomId = safeText(detail.roomId);
+  const primaryIsDeal = primaryRoomId.startsWith("deal:");
+  const roomCandidates = getFloatingRoomRealtimeIds(
+    room,
+    currentUserId,
+    sessionUserLineId
+  );
 
   if (primaryIsDeal) {
     return room.kind === "deal" && roomCandidates.includes(primaryRoomId);
@@ -643,6 +770,9 @@ export default function FloatingChatDock({
   });
 
   const currentUserId = safeText(session?.user?.id);
+  const sessionUserLineId = safeText(
+    (session?.user as { lineId?: string | null } | undefined)?.lineId
+  );
   const sessionUserEmail = safeText(session?.user?.email);
   const sessionUserImage = safeText(session?.user?.image);
   const sessionUserName = safeText(session?.user?.name);
@@ -1318,15 +1448,68 @@ export default function FloatingChatDock({
       isOpen: boolean
     ) => {
       const room = roomsRef.current.find((item) =>
-        roomMatchesRealtimeDetail(item, detail)
+        roomMatchesRealtimeDetail(
+          item,
+          detail,
+          currentUserId,
+          sessionUserLineId
+        )
       );
 
       if (!room) {
+        const provisionalRoom = detail.isMine
+          ? null
+          : buildRoomFromRealtimeDetail(detail);
+        if (provisionalRoom) {
+          const provisionalShell = buildRoomShell(provisionalRoom, false);
+          const messageCreatedAt =
+            safeText(detail.createdAt) || new Date().toISOString();
+          const incoming = normalizeChatMessage(
+            {
+              id: safeText(detail.id),
+              roomId: provisionalShell.actualRoomId,
+              senderId: safeText(detail.senderId),
+              senderName: detail.senderName || null,
+              senderImage: detail.senderImage || null,
+              content: detail.content || null,
+              imageUrl: detail.imageUrl || null,
+              createdAt: messageCreatedAt,
+              seenAt: detail.seenAt || null,
+              optimistic: Boolean(detail.optimistic),
+            },
+            provisionalShell.actualRoomId,
+            provisionalShell.me,
+            provisionalShell.other
+          );
+
+          setRooms((current) => {
+            const withoutDuplicate = current.filter(
+              (item) =>
+                !roomMatchesRealtimeDetail(
+                  item,
+                  detail,
+                  currentUserId,
+                  sessionUserLineId
+                )
+            );
+            return [provisionalRoom, ...withoutDuplicate].sort((a, b) => {
+              const aTime = new Date(a.lastMessageAt || a.createdAt || 0).getTime();
+              const bTime = new Date(b.lastMessageAt || b.createdAt || 0).getTime();
+              return bTime - aTime;
+            });
+          });
+          setLocalUnreadCount((current) =>
+            Math.max(0, current + Math.max(1, Number(provisionalRoom.unread || 1)))
+          );
+          updateRoomCache(provisionalRoom.key, provisionalShell, [incoming]);
+        }
         void loadRooms();
         return;
       }
 
-      const activeMatches = active ? sameRoomEvent(active, detail) : false;
+      const activeMatches = active
+        ? sameRoomEvent(active, detail, currentUserId, sessionUserLineId)
+        : false;
       const shouldIncrementUnread =
         !detail.isMine && !(isOpen && activeMatches);
       const messageCreatedAt = safeText(detail.createdAt) || new Date().toISOString();
@@ -1339,6 +1522,13 @@ export default function FloatingChatDock({
               ? {
                   ...item,
                   lastMessage: preview,
+                  lastMessageId: safeText(detail.id) || item.lastMessageId,
+                  lastMessageContent: safeText(detail.content) || undefined,
+                  lastMessageImageUrl: safeText(detail.imageUrl) || undefined,
+                  lastMessageSenderId: safeText(detail.senderId) || undefined,
+                  lastMessageSenderName: safeText(detail.senderName) || undefined,
+                  lastMessageSenderImage: safeText(detail.senderImage) || undefined,
+                  lastMessageSeenAt: detail.seenAt || null,
                   lastMessageAt: messageCreatedAt,
                   createdAt: messageCreatedAt || item.createdAt,
                   unread: detail.isMine
@@ -1391,7 +1581,7 @@ export default function FloatingChatDock({
       );
       updateRoomCache(room.key, shell, nextCachedMessages);
     },
-    [buildRoomShell, loadRooms, updateRoomCache]
+    [buildRoomShell, currentUserId, loadRooms, sessionUserLineId, updateRoomCache]
   );
 
   const openRoom = useCallback(
@@ -1402,20 +1592,35 @@ export default function FloatingChatDock({
       if (cached) {
         roomCacheRef.current.set(key, cached);
       }
-      const cachedMessages = cached?.messages || [];
       const shell = buildRoomShell(room, !cached, cached?.active);
+      const previewMessage = cached?.messages?.length
+        ? null
+        : buildRoomPreviewMessage(room, shell.actualRoomId, shell.me, shell.other);
+      const cachedMessages = cached?.messages?.length
+        ? cached.messages
+        : previewMessage
+          ? [previewMessage]
+          : [];
+      const instantShell =
+        cachedMessages.length > 0 ? { ...shell, loading: false } : shell;
 
       loadingRoomKeyRef.current = key;
       setError("");
       setPreviewImage(null);
       setMobileListVisible(false);
       setShowEmoji(false);
-      setActiveRoom(shell);
+      setActiveRoom(instantShell);
       setMessages(cachedMessages);
 
       if (cachedMessages.length > 0) {
+        updateRoomCache(key, instantShell, cachedMessages);
         scrollToBottom("auto");
-        void markRoomSeen(shell, shell.actualRoomId, cachedMessages, shell.me);
+        void markRoomSeen(
+          instantShell,
+          instantShell.actualRoomId,
+          cachedMessages,
+          instantShell.me
+        );
       }
 
       try {
@@ -1846,6 +2051,13 @@ export default function FloatingChatDock({
                     text,
                     selectedFile ? "local-image" : optimistic.imageUrl
                   ),
+                  lastMessageId: optimistic.id,
+                  lastMessageContent: text || undefined,
+                  lastMessageImageUrl: optimistic.imageUrl || undefined,
+                  lastMessageSenderId: optimistic.senderId,
+                  lastMessageSenderName: optimistic.senderName || undefined,
+                  lastMessageSenderImage: optimistic.senderImage || undefined,
+                  lastMessageSeenAt: optimistic.seenAt || null,
                   lastMessageAt: optimistic.createdAt || new Date().toISOString(),
                   createdAt: optimistic.createdAt || room.createdAt,
                   unread: 0,
@@ -1929,6 +2141,13 @@ export default function FloatingChatDock({
               ? {
                   ...room,
                   lastMessage: text || (sentMessage.imageUrl ? "รูปภาพ" : room.lastMessage),
+                  lastMessageId: sentMessage.id,
+                  lastMessageContent: text || undefined,
+                  lastMessageImageUrl: sentMessage.imageUrl || undefined,
+                  lastMessageSenderId: sentMessage.senderId,
+                  lastMessageSenderName: sentMessage.senderName || undefined,
+                  lastMessageSenderImage: sentMessage.senderImage || undefined,
+                  lastMessageSeenAt: sentMessage.seenAt || null,
                   lastMessageAt: sentMessage.createdAt || new Date().toISOString(),
                   createdAt: sentMessage.createdAt || room.createdAt,
                   unread: 0,
@@ -2273,7 +2492,10 @@ export default function FloatingChatDock({
 
       updateRoomListFromMessage(detail, active, open);
 
-      if (!active || !sameRoomEvent(active, detail)) {
+      if (
+        !active ||
+        !sameRoomEvent(active, detail, currentUserId, sessionUserLineId)
+      ) {
         return;
       }
 
@@ -2316,7 +2538,15 @@ export default function FloatingChatDock({
       const detail = (event as CustomEvent<ChatSeenDetail>).detail;
       const active = activeRoomRef.current;
 
-      if (!active || !sameRoomEvent(active, detail as RealtimeChatDetail)) {
+      if (
+        !active ||
+        !sameRoomEvent(
+          active,
+          detail as RealtimeChatDetail,
+          currentUserId,
+          sessionUserLineId
+        )
+      ) {
         return;
       }
 
@@ -2386,6 +2616,7 @@ export default function FloatingChatDock({
     open,
     removeFloatingChatMessage,
     scrollToBottom,
+    sessionUserLineId,
     syncActiveRoom,
     updateRoomCache,
     updateRoomListFromMessage,
