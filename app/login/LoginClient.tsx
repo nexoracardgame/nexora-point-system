@@ -47,14 +47,6 @@ function resolveCallbackPath(rawCallbackUrl?: string | null, depth = 0): string 
   }
 }
 
-function resolveCallbackUrl(rawCallbackUrl?: string | null) {
-  if (typeof window === "undefined") {
-    return DEFAULT_CALLBACK_PATH;
-  }
-
-  return new URL(resolveCallbackPath(rawCallbackUrl), window.location.origin).toString();
-}
-
 function isNativeAppRuntime() {
   if (typeof window === "undefined") {
     return false;
@@ -217,7 +209,7 @@ export default function LoginClient({
       setLoginError(
         "ระบบยังไม่พาไปหน้าล็อกอิน กรุณาตรวจอินเทอร์เน็ตแล้วกดอีกครั้ง"
       );
-    }, 20000);
+    }, isNativeAppRuntime() ? 120000 : 20000);
 
     return () => window.clearTimeout(timer);
   }, [pendingProvider]);
@@ -336,7 +328,7 @@ export default function LoginClient({
         ))}
       </div>
 
-      <div className="relative z-10 flex items-center justify-between px-4 py-5 md:px-10">
+      <div className="relative z-10 flex items-center justify-between px-4 pb-5 pt-[calc(var(--app-safe-top)+18px)] md:px-10">
         <div className="text-lg font-black tracking-[0.25em] md:text-2xl">
           NEXORA
         </div>
@@ -350,7 +342,7 @@ export default function LoginClient({
         </button>
       </div>
 
-      <div className="relative z-10 flex min-h-[calc(var(--app-shell-height)-72px)] flex-col items-center justify-center px-5 text-center md:px-10">
+      <div className="relative z-10 flex min-h-[calc(var(--app-shell-height)-var(--app-header-height))] flex-col items-center justify-center px-5 pb-[calc(var(--app-safe-bottom)+18px)] text-center md:px-10">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}

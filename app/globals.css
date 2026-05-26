@@ -4,10 +4,14 @@
 :root {
   --background: #050507;
   --foreground: #ffffff;
+  --app-native-safe-top: 0px;
+  --app-safe-top: env(safe-area-inset-top);
+  --app-safe-bottom: env(safe-area-inset-bottom);
   --app-shell-height: 100vh;
-  --app-header-height: 74px;
-  --app-mobile-nav-height: 92px;
-  --app-mobile-nav-height-sm: 96px;
+  --app-header-base-height: 74px;
+  --app-header-height: calc(var(--app-header-base-height) + var(--app-safe-top));
+  --app-mobile-nav-height: calc(92px + var(--app-safe-bottom));
+  --app-mobile-nav-height-sm: calc(96px + var(--app-safe-bottom));
   --app-desktop-chrome-height: 122px;
 
   --color-background: var(--background);

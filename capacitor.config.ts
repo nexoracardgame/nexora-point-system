@@ -12,18 +12,7 @@ const config: CapacitorConfig = {
   server: {
     url: productionUrl,
     cleartext: false,
-    allowNavigation: [
-      "nexora-point-system.vercel.app",
-      "line.me",
-      "*.line.me",
-      "*.linecorp.com",
-      "*.line-scdn.net",
-      "accounts.google.com",
-      "*.google.com",
-      "*.googleapis.com",
-      "*.gstatic.com",
-      "*.googleusercontent.com",
-    ],
+    allowNavigation: ["nexora-point-system.vercel.app"],
     errorPath: "offline.html",
   },
   android: {

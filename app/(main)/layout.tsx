@@ -1384,7 +1384,7 @@ export default function MainLayout({
               isChatRoomPage ? "hidden xl:sticky xl:block" : "sticky"
             }`}
           >
-            <div className="flex h-[74px] items-center justify-between gap-2 px-3 sm:px-5 xl:px-6">
+            <div className="flex min-h-[var(--app-header-height)] items-center justify-between gap-2 px-3 pb-2 pt-[calc(var(--app-safe-top)+8px)] sm:px-5 xl:min-h-[74px] xl:px-6 xl:py-0">
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                 <button
                   type="button"
@@ -1404,11 +1404,11 @@ export default function MainLayout({
                   <Gem className="h-5 w-5" />
                 </PrefetchLink>
 
-                <div className="min-w-0 max-[430px]:max-w-[108px]">
+                <div className="min-w-0 max-[430px]:max-w-[148px] max-[360px]:max-w-[116px]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35 max-[430px]:hidden sm:text-[11px]">
                     {t("layout.command")}
                   </div>
-                  <div className="line-clamp-2 text-base font-black leading-[1.05] sm:text-2xl sm:leading-none">
+                  <div className="line-clamp-2 text-[15px] font-black leading-[1.08] sm:text-2xl sm:leading-none">
                     {pageContext}
                   </div>
                 </div>
@@ -1652,7 +1652,7 @@ export default function MainLayout({
 
         <div
           ref={mobileDrawerRef}
-          className={`absolute left-0 top-0 h-full w-[88%] max-w-[380px] border-r border-amber-300/10 bg-[linear-gradient(180deg,#0d0f14_0%,#090b0f_100%)] p-4 shadow-[0_30px_100px_rgba(0,0,0,0.55)] transition-transform duration-300 ${
+          className={`absolute left-0 top-0 h-full w-[88%] max-w-[380px] border-r border-amber-300/10 bg-[linear-gradient(180deg,#0d0f14_0%,#090b0f_100%)] px-4 pb-4 pt-[calc(var(--app-safe-top)+16px)] shadow-[0_30px_100px_rgba(0,0,0,0.55)] transition-transform duration-300 ${
             mobileNavOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >

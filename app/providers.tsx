@@ -2,6 +2,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import SessionKillSwitch from "@/components/SessionKillSwitch";
+import NativeViewportBridge from "@/components/NativeViewportBridge";
 import { LanguageProvider } from "@/lib/i18n";
 
 export default function Providers({
@@ -11,6 +12,7 @@ export default function Providers({
 }) {
   return (
     <SessionProvider refetchInterval={10} refetchOnWindowFocus>
+      <NativeViewportBridge />
       <SessionKillSwitch />
       <LanguageProvider>{children}</LanguageProvider>
     </SessionProvider>
