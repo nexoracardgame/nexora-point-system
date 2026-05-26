@@ -8,6 +8,17 @@ public class MainActivity extends BridgeActivity {
     private static final String APP_ORIGIN = "https://nexora-point-system.vercel.app";
 
     @Override
+    protected void load() {
+        super.load();
+
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().setWebViewClient(
+                new NexoraWebViewClient(getBridge(), this)
+            );
+        }
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handleNativeAuthIntent(intent);
