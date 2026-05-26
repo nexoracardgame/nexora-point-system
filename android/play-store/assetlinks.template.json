@@ -5,7 +5,7 @@
     ],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.nexora.point",
+      "package_name": "com.nexora.tcg",
       "sha256_cert_fingerprints": [
         "REPLACE_WITH_PLAY_APP_SIGNING_SHA256_OR_UPLOAD_KEY_SHA256"
       ]

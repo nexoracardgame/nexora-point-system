@@ -1,4 +1,4 @@
-package com.nexora.point;
+package com.nexora.tcg;
 
 import com.getcapacitor.BridgeActivity;
 
