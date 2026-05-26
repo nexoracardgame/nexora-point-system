@@ -4,7 +4,7 @@
 !define MUI_PROGRESSBAR "smooth"
 
 !macro customHeader
-  BrandingText "NEXORA POINT"
+  BrandingText "NEXORA TCG"
   ShowInstDetails nevershow
   ShowUninstDetails nevershow
 !macroend

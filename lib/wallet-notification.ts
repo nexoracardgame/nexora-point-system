@@ -36,9 +36,9 @@ export async function createWalletReceivedNotification({
     userId: safeUserId,
     type: "wallet",
     title: `ได้รับ ${amountLabel} ${asset}`,
-    body: `${asset} ถูกเพิ่มเข้ากระเป๋า NEX POINT แล้ว กดดูยอดล่าสุดได้ที่ Wallet`,
+    body: `${asset} ถูกเพิ่มเข้ากระเป๋า NEXORA TCG แล้ว กดดูยอดล่าสุดได้ที่ Wallet`,
     href: "/wallet",
-    image: image || "/icon-512-nex-point.png",
+    image: image || "/icon-512.png",
     meta: {
       asset,
       amount: safeAmount,

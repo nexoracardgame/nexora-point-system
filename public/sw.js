@@ -6,8 +6,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-const DEFAULT_NOTIFICATION_ICON = "/icon-512-nex-point.png";
-const DEFAULT_NOTIFICATION_BADGE = "/icon-192-nex-point.png";
+const DEFAULT_NOTIFICATION_ICON = "/icon-512.png";
+const DEFAULT_NOTIFICATION_BADGE = "/icon-192.png";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -41,7 +41,7 @@ async function readPushPayload(event) {
 }
 
 async function showPushNotification(payload) {
-  const title = String(payload.title || "NEX POINT").trim() || "NEX POINT";
+  const title = String(payload.title || "NEXORA TCG").trim() || "NEXORA TCG";
   const body = String(payload.body || "").trim();
   const id = String(payload.id || "").trim();
   const href = String(payload.href || "/").trim() || "/";

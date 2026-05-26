@@ -1,5 +1,5 @@
 {
-  "name": "nexora-point",
+  "name": "nexora-tcg",
   "version": "0.1.1",
   "private": true,
   "main": "desktop/main.cjs",
@@ -70,8 +70,8 @@
     "typescript": "^5"
   },
   "build": {
-    "appId": "com.nexora.point",
-    "productName": "NEXORA POINT",
+    "appId": "com.nexora.tcg",
+    "productName": "NEXORA TCG",
     "copyright": "Copyright (c) 2026 NEXORA",
     "compression": "maximum",
     "npmRebuild": false,
@@ -88,7 +88,7 @@
       "**/*"
     ],
     "asar": false,
-    "artifactName": "NEXORA-Point-Setup-${version}.${ext}",
+    "artifactName": "NEXORA-TCG-Setup-${version}.${ext}",
     "win": {
       "icon": "desktop/assets/icon.ico",
       "signAndEditExecutable": false,
@@ -119,8 +119,8 @@
       "include": "desktop/assets/installer.nsh",
       "packElevateHelper": false,
       "runAfterFinish": true,
-      "shortcutName": "NEXORA POINT",
-      "uninstallDisplayName": "NEXORA POINT"
+      "shortcutName": "NEXORA TCG",
+      "uninstallDisplayName": "NEXORA TCG"
     },
     "publish": [
       {

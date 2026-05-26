@@ -39,7 +39,7 @@ export default function WindowsDownloadButton() {
 
   return (
     <a
-      href="/downloads/windows/NEXORA-Point-Setup.exe"
+      href="/downloads/windows/NEXORA-TCG-Setup.exe"
       download
       className="pointer-events-auto group inline-flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[22px] border border-black/12 bg-[linear-gradient(180deg,#111318_0%,#050507_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_20px_46px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_26px_62px_rgba(0,0,0,0.30)]"
     >

@@ -7,8 +7,8 @@ const publicDownloadDir = path.join(rootDir, "public", "downloads", "windows");
 const packageJson = JSON.parse(
   await readFile(path.join(rootDir, "package.json"), "utf8")
 );
-const setupName = `NEXORA-Point-Setup-${packageJson.version}.exe`;
-const stableSetupName = "NEXORA-Point-Setup.exe";
+const setupName = `NEXORA-TCG-Setup-${packageJson.version}.exe`;
+const stableSetupName = "NEXORA-TCG-Setup.exe";
 
 async function exists(filePath) {
   try {

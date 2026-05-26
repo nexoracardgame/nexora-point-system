@@ -44,7 +44,7 @@ const toneConfig: Record<
   }
 > = {
   info: {
-    eyebrow: "NEX POINT",
+    eyebrow: "NEXORA TCG",
     iconClass: "border-cyan-200/20 bg-cyan-400/12 text-cyan-100",
     confirmClass:
       "border-cyan-200/20 bg-cyan-300 text-black shadow-[0_18px_44px_rgba(103,232,249,0.22)]",

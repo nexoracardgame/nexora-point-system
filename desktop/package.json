@@ -1,9 +1,9 @@
 {
-  "name": "nexora-point-desktop",
+  "name": "nexora-tcg-desktop",
   "version": "0.1.1",
   "private": true,
   "author": "NEXORA",
-  "description": "NEXORA POINT Windows desktop shell",
+  "description": "NEXORA TCG Windows desktop shell",
   "main": "main.cjs",
   "dependencies": {
     "electron-updater": "^6.8.3"

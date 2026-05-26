@@ -1,8 +1,8 @@
 version: 0.1.1
 files:
-  - url: NEXORA-Point-Setup-0.1.1.exe
-    sha512: sXVdtnpRdWbriBbGmpOz41FueYqIxFAvIfGNBnOjMz3UWYW1DBODsCMZXjFrHYa2i9HV7A7x4GFfFrK8M703Dw==
-    size: 100120748
-path: NEXORA-Point-Setup-0.1.1.exe
-sha512: sXVdtnpRdWbriBbGmpOz41FueYqIxFAvIfGNBnOjMz3UWYW1DBODsCMZXjFrHYa2i9HV7A7x4GFfFrK8M703Dw==
-releaseDate: '2026-05-02T04:45:56.213Z'
+  - url: NEXORA-TCG-Setup-0.1.1.exe
+    sha512: IlXb2Fu89nrQ3UU1Fg8hXzhfzENWvX+XWda8uYSx17+3PYBc/YjjljLqvXLpRJSYnKFY3RVqjrmsFgbuHiu6nw==
+    size: 100791568
+path: NEXORA-TCG-Setup-0.1.1.exe
+sha512: IlXb2Fu89nrQ3UU1Fg8hXzhfzENWvX+XWda8uYSx17+3PYBc/YjjljLqvXLpRJSYnKFY3RVqjrmsFgbuHiu6nw==
+releaseDate: '2026-05-26T04:06:13.410Z'

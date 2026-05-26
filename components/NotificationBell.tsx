@@ -315,8 +315,8 @@ export default function NotificationBell() {
 
       const notificationOptions: NotificationOptions & { image?: string } = {
         body: item.body,
-        icon: "/icon-512-nex-point.png",
-        badge: "/icon-192-nex-point.png",
+        icon: "/icon-512.png",
+        badge: "/icon-192.png",
         image: item.image || undefined,
         tag: item.id,
         data: {

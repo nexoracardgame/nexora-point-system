@@ -4,8 +4,8 @@ const productionUrl =
   process.env.NEXORA_APP_URL || "https://nexora-point-system.vercel.app";
 
 const config: CapacitorConfig = {
-  appId: "com.nexora.point",
-  appName: "NEXORA POINT",
+  appId: "com.nexora.tcg",
+  appName: "NEXORA TCG",
   webDir: "android-web",
   backgroundColor: "#0B0A09",
   loggingBehavior: "debug",

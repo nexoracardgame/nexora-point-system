@@ -35,7 +35,7 @@ export default function MarketEmbedClient({ items }: Props) {
     <main className="min-h-[100dvh] bg-[#050608] text-white">
       <button
         type="button"
-        aria-label="Open NEX POINT market in a new tab"
+        aria-label="Open NEXORA TCG market in a new tab"
         onClick={openMarketLogin}
         className="fixed inset-0 z-30 cursor-pointer bg-transparent"
       />
@@ -162,7 +162,7 @@ export default function MarketEmbedClient({ items }: Props) {
                   Market preview is loading
                 </div>
                 <div className="mt-2 text-sm font-bold text-white/45">
-                  Tap to open NEX POINT Marketplace
+                  Tap to open NEXORA TCG Marketplace
                 </div>
               </div>
             </div>

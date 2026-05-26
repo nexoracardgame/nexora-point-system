@@ -1,10 +1,10 @@
-# NEXORA POINT iOS App Store Release
+# NEXORA TCG iOS App Store Release
 
 ## App Identity
 
-- App name: `NEXORA POINT`
-- Bundle ID: `com.nexora.point`
-- URL scheme: `nexorapoint://`
+- App name: `NEXORA TCG`
+- Bundle ID: `com.nexora.tcg`
+- URL scheme: `nexoratcg://`
 - Web app URL: `https://nexora-point-system.vercel.app`
 - Version: `0.1.0`
 - Build: `1`
@@ -24,9 +24,9 @@ Starting April 28, 2026, iOS and iPadOS uploads to App Store Connect must be bui
 Create a new app record:
 
 - Platform: iOS
-- Name: `NEXORA POINT`
-- Bundle ID: `com.nexora.point`
-- SKU: `nexora-point-ios`
+- Name: `NEXORA TCG`
+- Bundle ID: `com.nexora.tcg`
+- SKU: `nexora-tcg-ios`
 
 After the app record exists, App Store Connect will assign an Apple ID. Use it to replace the website App Store button URL with:
 
@@ -47,7 +47,7 @@ In Xcode:
 
 1. Select the `App` project and `App` target.
 2. Set Team to your Apple Developer team.
-3. Confirm Bundle Identifier is `com.nexora.point`.
+3. Confirm Bundle Identifier is `com.nexora.tcg`.
 4. Enable Associated Domains if Xcode asks, keeping `applinks:nexora-point-system.vercel.app`.
 5. Choose Any iOS Device.
 6. Product > Archive.
@@ -62,9 +62,9 @@ This repo includes `codemagic.yaml` for a cloud Mac build.
 3. Add this repository as an app.
 4. In App Store Connect, create an API key with App Manager access.
 5. Add that API key to Codemagic with the integration name `codemagic`.
-6. Create the App Store Connect app record for bundle ID `com.nexora.point`.
+6. Create the App Store Connect app record for bundle ID `com.nexora.tcg`.
 7. Replace `REPLACE_WITH_APP_STORE_APPLE_ID` in `codemagic.yaml` after App Store Connect gives the app an Apple ID.
-8. Start the `NEXORA POINT iOS TestFlight` workflow.
+8. Start the `NEXORA TCG iOS TestFlight` workflow.
 
 Codemagic will use a Mac machine in the cloud, sign the app, build an `.ipa`, and upload it to TestFlight.
 

@@ -367,10 +367,10 @@ export async function sendPushNotificationToUser(
   const body = JSON.stringify({
     ...payload,
     id: safeString(payload.id) || `push-${Date.now()}`,
-    title: safeString(payload.title) || "NEX POINT",
+    title: safeString(payload.title) || "NEXORA TCG",
     body: safeString(payload.body),
     href: safeString(payload.href) || "/",
-    icon: safeString(payload.icon || payload.image) || "/icon-512-nex-point.png",
+    icon: safeString(payload.icon || payload.image) || "/icon-512.png",
     tag: safeString(payload.tag || payload.id) || undefined,
   });
   const topic = safeString(payload.id)

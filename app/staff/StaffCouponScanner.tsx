@@ -415,7 +415,7 @@ export default function StaffCouponScanner({
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65 sm:text-base sm:leading-7">
-                สแกน QR CODE จากคูปองรางวัลใน NEX POINT หรือกรอกรหัสคูปองตรงนี้ ระบบจะดึงคูปองจริงขึ้นมาให้ตรวจสอบก่อนใช้งาน
+                สแกน QR CODE จากคูปองรางวัลใน NEXORA TCG หรือกรอกรหัสคูปองตรงนี้ ระบบจะดึงคูปองจริงขึ้นมาให้ตรวจสอบก่อนใช้งาน
                 QR อื่นที่ไม่ใช่คูปองของระบบจะไม่ถูกนำไปใช้
               </p>
             </div>
@@ -527,7 +527,7 @@ export default function StaffCouponScanner({
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-white/8 px-4 py-3 text-sm text-white/60">
-                  <span>กำลังมองหา QR CODE คูปอง NEX POINT...</span>
+                  <span>กำลังมองหา QR CODE คูปอง NEXORA TCG...</span>
                   <button
                     type="button"
                     onClick={() => void stopCamera()}

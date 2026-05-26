@@ -1,4 +1,4 @@
-# NEXORA POINT Desktop
+# NEXORA TCG Desktop
 
 This Electron shell loads the live NEXORA web app from:
 
@@ -33,9 +33,9 @@ npm run desktop:release
 
 This creates the Windows installer in `dist/desktop` and copies the current release files to `public/downloads/windows`:
 
-- `NEXORA-Point-Setup.exe`
-- `NEXORA-Point-Setup-<version>.exe`
-- `NEXORA-Point-Setup-<version>.exe.blockmap`
+- `NEXORA-TCG-Setup.exe`
+- `NEXORA-TCG-Setup-<version>.exe`
+- `NEXORA-TCG-Setup-<version>.exe.blockmap`
 - `latest.yml`
 
 Deploy the web app after staging so `/downloads/windows/latest.yml` and the installer are available to users and to `electron-updater`.

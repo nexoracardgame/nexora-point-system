@@ -4,12 +4,12 @@
     "details": [
       {
         "appIDs": [
-          "TEAMID.com.nexora.point"
+          "TEAMID.com.nexora.tcg"
         ],
         "components": [
           {
             "/": "*",
-            "comment": "Open NEXORA POINT web links in the iOS app"
+            "comment": "Open NEXORA TCG web links in the iOS app"
           }
         ]
       }

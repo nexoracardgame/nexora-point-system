@@ -18,21 +18,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NEX POINT",
-  description: "NEXORA CARDGAME Marketplace",
-  applicationName: "NEX POINT",
-  manifest: "/manifest.webmanifest?version=nex-point-20260506",
+  title: "NEXORA TCG",
+  description: "NEXORA TCG Marketplace",
+  applicationName: "NEXORA TCG",
+  manifest: "/manifest.webmanifest?version=nexora-tcg-20260526",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NEX POINT",
+    title: "NEXORA TCG",
   },
   icons: {
     icon: [
-      { url: "/icon-192-nex-point.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512-nex-point.png", sizes: "512x512", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/icon-192-nex-point.png",
+    apple: "/icon-192.png",
   },
 };
 

@@ -3,6 +3,7 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session } = require("e
 const { autoUpdater } = require("electron-updater");
 
 const DEFAULT_APP_URL = "https://nexora-point-system.vercel.app";
+const APP_NAME = "NEXORA TCG";
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 4;
 
 let mainWindow = null;
@@ -36,7 +37,7 @@ function buildOfflineHtml(appUrl) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NEXORA POINT</title>
+    <title>NEXORA TCG</title>
     <style>
       body {
         margin: 0;
@@ -108,16 +109,14 @@ async function loadAppUrl() {
 }
 
 function createWindow() {
-  const windowIconPath = app.isPackaged
-    ? undefined
-    : path.join(__dirname, "assets", "icon.ico");
+  const windowIconPath = path.join(__dirname, "assets", "icon.ico");
 
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 1024,
     minHeight: 680,
-    title: "NEXORA POINT",
+    title: APP_NAME,
     backgroundColor: "#050507",
     ...(windowIconPath ? { icon: windowIconPath } : {}),
     show: false,
@@ -131,7 +130,14 @@ function createWindow() {
 
   mainWindow.once("ready-to-show", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.setTitle(APP_NAME);
     mainWindow.show();
+  });
+
+  mainWindow.on("page-title-updated", (event) => {
+    event.preventDefault();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.setTitle(APP_NAME);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -233,6 +239,9 @@ function registerIpcHandlers() {
   });
 }
 
+app.setName(APP_NAME);
+app.setAppUserModelId("com.nexora.tcg");
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   configurePermissions();
@@ -251,7 +260,7 @@ app.on("window-all-closed", () => {
 
 process.on("uncaughtException", (error) => {
   dialog.showErrorBox(
-    "NEXORA POINT",
+    "NEXORA TCG",
     error instanceof Error ? error.message : String(error)
   );
 });

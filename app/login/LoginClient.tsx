@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -80,9 +80,11 @@ export default function LoginClient({
 }) {
   const router = useRouter();
   const { status } = useSession();
+  const loginInFlightRef = useRef(false);
   const [pendingProvider, setPendingProvider] = useState<
     "line" | "google" | "session" | null
   >(null);
+  const [loginError, setLoginError] = useState("");
   const BG_IMAGE =
     "https://s.imgz.io/2026/04/03/NEXORA496971ca3675ceb2ca.png";
   const callbackPath = useMemo(
@@ -94,10 +96,13 @@ export default function LoginClient({
     [rawCallbackUrl]
   );
   const authErrorMessage = getAuthErrorMessage(authError);
+  const sessionChecking = status === "loading";
   const isRedirecting =
-    pendingProvider !== null || status === "authenticated";
+    sessionChecking || pendingProvider !== null || status === "authenticated";
   const pendingLabel =
-    pendingProvider === "google"
+    sessionChecking
+      ? "กำลังตรวจสอบสถานะบัญชี..."
+      : pendingProvider === "google"
       ? "กำลังเชื่อมต่อบัญชี Google..."
       : pendingProvider === "line"
         ? "กำลังเชื่อมต่อบัญชี LINE..."
@@ -105,11 +110,13 @@ export default function LoginClient({
 
   const startLogin = useCallback(
     async (provider: "line" | "google") => {
-      if (pendingProvider || status === "authenticated") {
+      if (loginInFlightRef.current || isRedirecting) {
         return;
       }
 
+      loginInFlightRef.current = true;
       setPendingProvider(provider);
+      setLoginError("");
 
       try {
         await signIn(provider, {
@@ -118,10 +125,14 @@ export default function LoginClient({
         });
       } catch (error) {
         console.error("AUTH SIGN IN ERROR:", error);
+        loginInFlightRef.current = false;
         setPendingProvider(null);
+        setLoginError(
+          "ล็อกอินไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง"
+        );
       }
     },
-    [callbackUrl, pendingProvider, status]
+    [callbackUrl, isRedirecting]
   );
 
   const handleLineLogin = () => startLogin("line");
@@ -133,10 +144,51 @@ export default function LoginClient({
       return;
     }
 
+    loginInFlightRef.current = true;
     setPendingProvider("session");
     router.replace(callbackPath);
-    router.refresh();
+
+    const refreshTimer = window.setTimeout(() => {
+      router.refresh();
+    }, 50);
+    const hardRedirectTimer = window.setTimeout(() => {
+      if (window.location.pathname === "/login") {
+        window.location.replace(callbackPath);
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.clearTimeout(hardRedirectTimer);
+    };
   }, [callbackPath, router, status]);
+
+  useEffect(() => {
+    if (!pendingProvider || pendingProvider === "session") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (window.location.pathname !== "/login") {
+        return;
+      }
+
+      loginInFlightRef.current = false;
+      setPendingProvider(null);
+      setLoginError(
+        "ระบบยังไม่พาไปหน้าล็อกอิน กรุณาตรวจอินเทอร์เน็ตแล้วกดอีกครั้ง"
+      );
+    }, 20000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingProvider]);
+
+  useEffect(() => {
+    void fetch("/api/auth/providers", { cache: "no-store" }).catch(
+      () => undefined
+    );
+    void fetch("/api/auth/csrf", { cache: "no-store" }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     async function warmLineClient() {
@@ -171,7 +223,7 @@ export default function LoginClient({
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/78 px-5 text-center backdrop-blur-xl">
           <div className="w-full max-w-sm rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_top,#171717,#050505_72%)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/18 border-t-[#06C755]" />
-            <div className="mt-5 text-xl font-black">กำลังเข้าสู่ NEX POINT</div>
+            <div className="mt-5 text-xl font-black">กำลังเข้าสู่ NEXORA TCG</div>
             <p className="mt-2 text-sm font-semibold leading-6 text-white/62">
               {pendingLabel} กรุณารอสักครู่ ไม่ต้องกดซ้ำ
             </p>
@@ -322,9 +374,9 @@ export default function LoginClient({
           </motion.button>
         </div>
 
-        {authErrorMessage ? (
+        {authErrorMessage || loginError ? (
           <div className="mt-4 rounded-2xl border border-red-300/30 bg-red-500/12 px-4 py-3 text-sm font-bold text-red-100 shadow-[0_18px_38px_rgba(220,38,38,0.16)] backdrop-blur-xl">
-            {authErrorMessage}
+            {authErrorMessage || loginError}
           </div>
         ) : null}
 
