@@ -24,6 +24,10 @@ allprojects {
     }
 }
 
+subprojects {
+    buildDir = new File(rootProject.buildDir, name)
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
