@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nexora.tcg",
+      "sha256_cert_fingerprints": [
+        "96:33:DB:D2:7D:48:82:AC:BE:83:D9:E8:AE:A6:2B:B6:84:41:08:79:C2:51:EC:B5:0A:78:07:B7:19:3F:AE:6A"
+      ]
+    }
+  }
+]

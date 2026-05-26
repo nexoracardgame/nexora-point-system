@@ -55,6 +55,45 @@ function resolveCallbackUrl(rawCallbackUrl?: string | null) {
   return new URL(resolveCallbackPath(rawCallbackUrl), window.location.origin).toString();
 }
 
+function isNativeAppRuntime() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const capacitor = (
+    window as typeof window & {
+      Capacitor?: {
+        getPlatform?: () => string;
+        isNativePlatform?: () => boolean;
+      };
+    }
+  ).Capacitor;
+
+  return Boolean(
+    capacitor?.isNativePlatform?.() ||
+      ["android", "ios"].includes(capacitor?.getPlatform?.() || "")
+  );
+}
+
+function resolveLoginCallbackUrl(rawCallbackUrl?: string | null) {
+  if (typeof window === "undefined") {
+    return DEFAULT_CALLBACK_PATH;
+  }
+
+  const callbackPath = resolveCallbackPath(rawCallbackUrl);
+
+  if (!isNativeAppRuntime()) {
+    return new URL(callbackPath, window.location.origin).toString();
+  }
+
+  const nativeIssueUrl = new URL(
+    "/api/auth/native/issue",
+    window.location.origin
+  );
+  nativeIssueUrl.searchParams.set("callbackUrl", callbackPath);
+  return nativeIssueUrl.toString();
+}
+
 function getAuthErrorMessage(error?: string | null) {
   if (!error) {
     return "";
@@ -92,7 +131,7 @@ export default function LoginClient({
     [rawCallbackUrl]
   );
   const callbackUrl = useMemo(
-    () => resolveCallbackUrl(rawCallbackUrl),
+    () => resolveLoginCallbackUrl(rawCallbackUrl),
     [rawCallbackUrl]
   );
   const authErrorMessage = getAuthErrorMessage(authError);

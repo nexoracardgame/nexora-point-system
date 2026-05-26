@@ -68,7 +68,10 @@ type DbUserSnapshot = {
 const DEFAULT_AUTH_REDIRECT_PATH = "/";
 
 function isUnsafeAuthRedirectPath(pathname: string) {
-  return pathname === "/login" || pathname.startsWith("/api/auth");
+  return (
+    pathname === "/login" ||
+    (pathname.startsWith("/api/auth") && pathname !== "/api/auth/native/issue")
+  );
 }
 
 function resolveAuthRedirectUrl(url: string, baseUrl: string, depth = 0): string {
