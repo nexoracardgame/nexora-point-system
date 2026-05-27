@@ -35,7 +35,10 @@ public class NexoraWebViewClient extends BridgeWebViewClient {
         }
 
         String host = url.getHost().toLowerCase();
-        return host.equals("accounts.google.com")
+        String path = url.getPath() == null ? "" : url.getPath();
+        return (host.equals("nexora-point-system.vercel.app")
+                    && path.equals("/api/auth/native/start"))
+                || host.equals("accounts.google.com")
                 || host.endsWith(".google.com")
                 || host.equals("access.line.me")
                 || host.equals("line.me")

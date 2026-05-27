@@ -86,6 +86,23 @@ function resolveLoginCallbackUrl(rawCallbackUrl?: string | null) {
   return nativeIssueUrl.toString();
 }
 
+function resolveNativeSignInStartUrl(
+  provider: "line" | "google",
+  rawCallbackUrl?: string | null
+) {
+  if (typeof window === "undefined") {
+    return DEFAULT_CALLBACK_PATH;
+  }
+
+  const nativeStartUrl = new URL(
+    "/api/auth/native/start",
+    window.location.origin
+  );
+  nativeStartUrl.searchParams.set("provider", provider);
+  nativeStartUrl.searchParams.set("callbackUrl", resolveCallbackPath(rawCallbackUrl));
+  return nativeStartUrl.toString();
+}
+
 function getAuthErrorMessage(error?: string | null) {
   if (!error) {
     return "";
@@ -150,6 +167,11 @@ export default function LoginClient({
       setLoginError("");
 
       try {
+        if (isNativeAppRuntime()) {
+          window.location.assign(resolveNativeSignInStartUrl(provider, rawCallbackUrl));
+          return;
+        }
+
         await signIn(provider, {
           redirect: true,
           callbackUrl,
@@ -163,7 +185,7 @@ export default function LoginClient({
         );
       }
     },
-    [callbackUrl, isRedirecting]
+    [callbackUrl, isRedirecting, rawCallbackUrl]
   );
 
   const handleLineLogin = () => startLogin("line");

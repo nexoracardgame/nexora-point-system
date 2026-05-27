@@ -15,12 +15,14 @@ public class MainActivity extends BridgeActivity {
             getBridge().getWebView().setWebViewClient(
                 new NexoraWebViewClient(getBridge(), this)
             );
+            handleNativeAuthIntent(getIntent());
         }
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);
         handleNativeAuthIntent(intent);
     }
 
@@ -30,7 +32,14 @@ public class MainActivity extends BridgeActivity {
         }
 
         Uri uri = intent.getData();
-        if (!"nexoratcg".equals(uri.getScheme()) || !"auth".equals(uri.getHost())) {
+        boolean customSchemeCallback =
+            "nexoratcg".equals(uri.getScheme()) && "auth".equals(uri.getHost());
+        boolean appLinkCallback =
+            "https".equals(uri.getScheme())
+                && "nexora-point-system.vercel.app".equals(uri.getHost())
+                && "/api/auth/native/consume".equals(uri.getPath());
+
+        if (!customSchemeCallback && !appLinkCallback) {
             return;
         }
 
