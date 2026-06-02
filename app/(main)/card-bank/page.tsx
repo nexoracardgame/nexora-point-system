@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CircleDollarSign,
   FileText,
+  Layers3,
   Landmark,
   LockKeyhole,
   PackageCheck,
@@ -34,11 +35,22 @@ type PawnCard = BankCard & {
   lateDays: number;
 };
 
+type BulkAssetPool = {
+  id: string;
+  label: string;
+  nexBalance: number;
+  coinBalance: number;
+  pileCount: number;
+  updatedAt: string;
+};
+
 const depositedCards: BankCard[] = [];
 const pawnedCards: PawnCard[] = [];
+const pooledAssets: BulkAssetPool[] = [];
 
 const hasBankCards = depositedCards.length > 0;
 const hasPawnCards = pawnedCards.length > 0;
+const hasPooledAssets = pooledAssets.length > 0;
 
 const bankTerms = [
   "ระบบธนาคารการ์ดจะแสดงข้อมูลเฉพาะการ์ดจริงที่ลูกค้านำมาฝาก และแอดมินคีย์เข้าหลังบ้านแล้วเท่านั้น",
@@ -109,19 +121,22 @@ export default function CardBankPage() {
             <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
               <Metric label="การ์ดในธนาคาร" value={`${depositedCards.length} ใบ`} />
               <Metric label="การ์ดจำนำอยู่" value={`${pawnedCards.length} ใบ`} />
-              <Metric label="สถานะข้อมูล" value={hasBankCards ? "พร้อมใช้งาน" : "ยังว่าง"} />
+              <Metric label="สถานะข้อมูล" value={hasBankCards || hasPooledAssets ? "พร้อมใช้งาน" : "ยังว่าง"} />
             </div>
           </div>
         </div>
       </section>
 
-      {!hasBankCards && !hasPawnCards ? (
+      {!hasBankCards && !hasPawnCards && !hasPooledAssets ? (
         <EmptyBankNotice />
       ) : (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-          <CardList title="การ์ดที่ฝากในธนาคาร" cards={depositedCards} />
-          <PawnList cards={pawnedCards} />
-        </section>
+        <div className="space-y-4">
+          {hasPooledAssets ? <BulkPoolView pools={pooledAssets} /> : null}
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+            <CardList title="การ์ดที่ฝากในธนาคาร" cards={depositedCards} />
+            <PawnList cards={pawnedCards} />
+          </section>
+        </div>
       )}
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -276,6 +291,76 @@ function PawnList({ cards }: { cards: PawnCard[] }) {
             </div>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function BulkPoolView({ pools }: { pools: BulkAssetPool[] }) {
+  const totalNex = pools.reduce((sum, pool) => sum + pool.nexBalance, 0);
+  const totalCoin = pools.reduce((sum, pool) => sum + pool.coinBalance, 0);
+  const totalPiles = pools.reduce((sum, pool) => sum + pool.pileCount, 0);
+
+  return (
+    <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#f4f4f5_0%,#111_28%,#030303_100%)] p-[1px] shadow-[0_20px_80px_rgba(0,0,0,0.38)]">
+      <div className="rounded-[27px] bg-[radial-gradient(circle_at_12%_16%,rgba(255,255,255,0.14),transparent_24%),linear-gradient(135deg,#101010,#050505_70%,#000)] p-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(380px,1.05fr)]">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.055] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.22em] text-white/55">
+              <Layers3 className="h-3.5 w-3.5" />
+              Bulk Card Pool
+            </div>
+            <h2 className="mt-4 text-2xl font-black text-white sm:text-3xl">
+              กองการ์ดแบบไม่ระบุเลข
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-white/58">
+              รายการนี้แอดมินคีย์เป็นยอดรวม NEX / COIN โดยไม่แยกเลขการ์ด
+              ลูกค้าจะไม่เห็นการ์ดรายใบ แต่จะเห็นยอดกองรวมและสถานะการใช้งานแทน
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <Metric label="กองการ์ด" value={`${totalPiles.toLocaleString("th-TH")} กอง`} />
+              <Metric label="NEX รวม" value={totalNex.toLocaleString("th-TH")} />
+              <Metric label="COIN รวม" value={totalCoin.toLocaleString("th-TH")} />
+            </div>
+          </div>
+
+          <div className="relative min-h-[260px] overflow-hidden rounded-[24px] border border-white/10 bg-black/30 p-5">
+            <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.08),transparent_35%,rgba(255,255,255,0.04))]" />
+            <div className="relative flex min-h-[220px] items-center justify-center">
+              <div className="relative h-[168px] w-[230px]">
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="absolute left-1/2 top-1/2 h-[138px] w-[96px] rounded-[16px] border border-white/16 bg-[linear-gradient(160deg,#f7f7f7,#232323_34%,#050505_100%)] shadow-[0_18px_45px_rgba(0,0,0,0.55)]"
+                    style={{
+                      transform: `translate(-50%, -50%) translateX(${(index - 3) * 18}px) rotate(${(index - 3) * 7}deg)`,
+                      opacity: 1 - index * 0.04,
+                    }}
+                  >
+                    <div className="m-3 h-8 rounded-full border border-white/12 bg-white/[0.06]" />
+                    <div className="mx-3 mt-4 h-16 rounded-[12px] border border-white/10 bg-black/35" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {pools.map((pool) => (
+            <div key={pool.id} className="rounded-[20px] border border-white/10 bg-black/26 p-4">
+              <div className="font-black text-white">{pool.label}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <RuleLine label="NEX" value={pool.nexBalance.toLocaleString("th-TH")} />
+                <RuleLine label="COIN" value={pool.coinBalance.toLocaleString("th-TH")} />
+              </div>
+              <div className="mt-3 text-xs font-bold text-white/42">
+                อัพเดทล่าสุด {pool.updatedAt}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

@@ -16,6 +16,10 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
+import {
+  canChooseCardFinish,
+  isForcedFoilCard,
+} from "@/lib/card-finish";
 
 type UserRow = {
   id: string;
@@ -197,6 +201,14 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
   const selectedUsername = String(selectedUser?.username || "").trim().replace(/^@+/, "");
   const totalSpecificCards = items.reduce((sum, item) => sum + item.quantity, 0);
+  const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
+  const forcedFoil = isForcedFoilCard(previewCardNo);
+
+  useEffect(() => {
+    if (forcedFoil && cardType !== "foil") {
+      setCardType("foil");
+    }
+  }, [cardType, forcedFoil]);
 
   const openQuantityModal = () => {
     if (!cardPreview) return;
@@ -212,14 +224,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       return;
     }
 
-    const itemId = `${cardPreview.cardNo}-${cardType}-${Date.now()}`;
+    const safeCardType = isForcedFoilCard(cardPreview.cardNo) ? "foil" : cardType;
+    const itemId = `${cardPreview.cardNo}-${safeCardType}-${Date.now()}`;
     setItems((current) => [
       ...current,
       {
         id: itemId,
         cardNo: cardPreview.cardNo,
         cardName: cardPreview.cardName,
-        cardType,
+        cardType: safeCardType,
         quantity,
         imageUrl: cardPreview.imageUrl,
       },
@@ -408,6 +421,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               <SpecificCardForm
                 cardType={cardType}
                 setCardType={setCardType}
+                forcedFoil={forcedFoil}
                 cardQuery={cardQuery}
                 setCardQuery={setCardQuery}
                 cardPreview={cardPreview}
@@ -439,6 +453,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               ) : (
                 <BulkSummary bulkNex={bulkNex} bulkCoin={bulkCoin} />
               )}
+
+              <SecurityLogPanel />
 
               <button
                 type="button"
@@ -547,6 +563,7 @@ function IntakeModeButton({
 function SpecificCardForm({
   cardType,
   setCardType,
+  forcedFoil,
   cardQuery,
   setCardQuery,
   cardPreview,
@@ -556,6 +573,7 @@ function SpecificCardForm({
 }: {
   cardType: CardType;
   setCardType: (type: CardType) => void;
+  forcedFoil: boolean;
   cardQuery: string;
   setCardQuery: (value: string) => void;
   cardPreview: CardPreview | null;
@@ -563,26 +581,55 @@ function SpecificCardForm({
   cardError: string;
   onEnterCard: () => void;
 }) {
+  const cardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
+  const selectableFoil = canChooseCardFinish(cardNo);
+  const finishStatus = forcedFoil
+    ? "การ์ดเลขนี้เป็นฟอยล์เวอร์ชั่นเก่า ระบบล็อกเป็น Foil อัตโนมัติ"
+    : selectableFoil
+      ? "การ์ดเลขนี้เลือกระหว่างธรรมดาและฟอยล์ได้"
+      : "การ์ดเลขนี้ใช้การ์ดธรรมดาเป็นค่าเริ่มต้น";
+
   return (
     <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0d0d0e,#050505)] p-4 sm:p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_230px]">
         <div className="space-y-4">
           <div>
-            <div className="text-sm font-black text-white">ประเภทการ์ด</div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm font-black text-white">ประเภทการ์ด</div>
+              <div
+                className={`rounded-full border px-3 py-1 text-xs font-black ${
+                  forcedFoil
+                    ? "border-red-300/25 bg-red-500/12 text-red-100"
+                    : "border-white/10 bg-white/[0.045] text-white/45"
+                }`}
+              >
+                {finishStatus}
+              </div>
+            </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <CardTypeButton
                 active={cardType === "normal"}
                 title="การ์ดธรรมดา"
                 icon={BadgeCheck}
+                disabled={forcedFoil}
+                lockReason="ฟอยล์เก่าบังคับ ระบบห้ามเลือกธรรมดา"
                 onClick={() => setCardType("normal")}
               />
               <CardTypeButton
-                active={cardType === "foil"}
+                active={forcedFoil || cardType === "foil"}
                 title="การ์ดฟอยล์"
                 icon={Sparkles}
+                disabled={forcedFoil}
+                lockReason="ฟอยล์เก่าบังคับ ระบบล็อกเป็นฟอยล์ให้อัตโนมัติ"
                 onClick={() => setCardType("foil")}
               />
             </div>
+            {forcedFoil ? (
+              <div className="mt-3 rounded-[18px] border border-red-300/18 bg-red-500/10 p-3 text-sm font-bold leading-6 text-red-100/82">
+                เลขนี้อยู่ใน Master แบบฟอยล์เวอร์ชั่นเก่า ปุ่มเลือกประเภทจึงถูกล็อกทั้งคู่
+                เพื่อกันแอดมินคีย์ผิด รายการที่จะบันทึกจะเป็น Foil เท่านั้น
+              </div>
+            ) : null}
           </div>
 
           <div>
@@ -647,26 +694,72 @@ function CardTypeButton({
   active,
   title,
   icon: Icon,
+  disabled = false,
+  lockReason = "",
   onClick,
 }: {
   active: boolean;
   title: string;
   icon: typeof BadgeCheck;
+  disabled?: boolean;
+  lockReason?: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
+      title={disabled ? lockReason : title}
       onClick={onClick}
       className={`flex items-center gap-3 rounded-[18px] border px-4 py-3 text-sm font-black transition ${
-        active
-          ? "border-white/34 bg-white/[0.1] text-white"
-          : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.055]"
+        disabled
+          ? "cursor-not-allowed border-red-300/18 bg-zinc-900/80 text-white/28 hover:border-red-300/24"
+          : active
+            ? "border-white/34 bg-white/[0.1] text-white"
+            : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.055]"
       }`}
     >
       <Icon className="h-4 w-4" />
-      {title}
+      <span className="min-w-0 flex-1 text-left">{title}</span>
+      {disabled ? (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-red-300/30 bg-red-500/12 text-[12px] text-red-200">
+          <AlertTriangle className="h-3.5 w-3.5" />
+        </span>
+      ) : null}
     </button>
+  );
+}
+
+function SecurityLogPanel() {
+  const rows = [
+    "บันทึกผู้ทำรายการ, role, userId ลูกค้า, IP/device, เวลา และ session id",
+    "เก็บ before/after snapshot ทุกครั้งที่รับฝาก แก้ไข ย้ายเข้าโรงรับจำนำ หรือแปลงเป็น NEX / COIN",
+    "รายการแบบกองรวมต้องมีคำยืนยันจากลูกค้าและเหตุผลของแอดมินก่อนบันทึก",
+    "รายการ forced foil ต้องล็อก finish เป็น foil และบันทึกเหตุผลว่าเป็น Master forced-foil",
+  ];
+
+  return (
+    <div className="mt-4 rounded-[24px] border border-white/10 bg-black/24 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.055]">
+          <ShieldCheck className="h-5 w-5 text-white/70" />
+        </div>
+        <div>
+          <div className="text-base font-black text-white">Security Logs ที่ต้องบันทึก</div>
+          <div className="mt-1 text-sm leading-6 text-white/50">
+            UI นี้เตรียมข้อมูลสำหรับ audit ระดับละเอียด ก่อนต่อ API บันทึกจริง
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2">
+        {rows.map((row) => (
+          <div key={row} className="flex gap-2 text-sm leading-6 text-white/58">
+            <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-white/60" />
+            <span>{row}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

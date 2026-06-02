@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   DatabaseZap,
   FileCheck2,
+  FileText,
   Landmark,
   LockKeyhole,
   PackageCheck,
@@ -93,6 +94,39 @@ const schemaItems = [
   "PawnLoan: assetId, principal, monthlyInterest 10%, startedAt, dueDate, lateDays, status",
   "PaymentLedger: แยก storage fee, pawn interest, penalty, wallet/NEX/COIN movement",
   "AdminAuditLog: staffId, role, reason, IP/device, snapshot ก่อนและหลังทุก action",
+];
+
+const auditLogRows = [
+  {
+    event: "Deposit Created",
+    scope: "Card Bank",
+    detail: "รับฝากการ์ด, userId, lineId, cardNo/finish/quantity, รูปหลักฐาน, staffId, timestamp",
+  },
+  {
+    event: "Finish Locked",
+    scope: "Forced Foil",
+    detail: "เลขฟอยล์เวอร์ชั่นเก่าต้องบันทึกว่า forced foil และห้ามแก้เป็น normal",
+  },
+  {
+    event: "Bulk Pool Created",
+    scope: "NEX / COIN Pool",
+    detail: "ยอดรวม NEX/COIN, คำยืนยันลูกค้า, เหตุผลแอดมิน, ห้ามผูกเลขการ์ดรายใบ",
+  },
+  {
+    event: "Pawn Started",
+    scope: "Pawn Desk",
+    detail: "assetId, มูลค่าหลักประกัน, ดอก 10%, dueDate, grace window, ผู้อนุมัติ",
+  },
+  {
+    event: "Payment / Overdue",
+    scope: "Billing",
+    detail: "รอบบิล, วันชำระ, lateDays, ฟรี 3 วันแรก, เกิน 7 วันเข้าสถานะ forfeit",
+  },
+  {
+    event: "Forfeit / Convert",
+    scope: "Permanent Lock",
+    detail: "ล็อกถาวรหลังหลุดหรือแปลงเป็น NEX/COIN พร้อม before/after snapshot",
+  },
 ];
 
 export default function AdminCardBankPage() {
@@ -212,6 +246,52 @@ export default function AdminCardBankPage() {
                   </span>
                 </div>
                 <div className="leading-6 text-white/52">{queue.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#101010,#050505)] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
+              Security Audit
+            </div>
+            <h2 className="mt-2 text-2xl font-black">Logs ที่ต้องบันทึกแบบละเอียด</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-white/55">
+              ระบบจริงต้องบันทึกทุก movement แบบ immutable audit trail:
+              ใครทำ, ทำเมื่อไร, ทำจากเครื่องไหน, ก่อน/หลังเป็นอะไร, เหตุผลคืออะไร
+              และ action นี้กระทบธนาคารการ์ด จำนำ หรือกองรวม NEX / COIN อย่างไร
+            </p>
+          </div>
+          <div className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-black text-white/55">
+            Tamper-resistant ledger
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-x-auto rounded-[22px] border border-white/10">
+          <div className="min-w-[860px]">
+            <div className="grid grid-cols-[180px_160px_1fr] bg-white/[0.045] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+              <div>Event</div>
+              <div>Scope</div>
+              <div>Required Payload</div>
+            </div>
+            {auditLogRows.map((row) => (
+              <div
+                key={`${row.scope}-${row.event}`}
+                className="grid grid-cols-[180px_160px_1fr] items-center border-t border-white/8 px-4 py-4 text-sm"
+              >
+                <div className="flex items-center gap-2 font-black text-white">
+                  <FileText className="h-4 w-4 text-white/52" />
+                  {row.event}
+                </div>
+                <div>
+                  <span className="rounded-full border border-white/12 bg-white/[0.055] px-3 py-1 text-xs font-black text-white/64">
+                    {row.scope}
+                  </span>
+                </div>
+                <div className="leading-6 text-white/56">{row.detail}</div>
               </div>
             ))}
           </div>
