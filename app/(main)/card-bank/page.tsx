@@ -1,254 +1,396 @@
-import Image from "next/image";
 import {
+  AlertTriangle,
   ArrowRightLeft,
-  Coins,
-  Gem,
+  BadgeCheck,
+  Banknote,
+  CalendarClock,
+  CircleDollarSign,
+  FileText,
   Landmark,
   LockKeyhole,
   PackageCheck,
+  ReceiptText,
   ShieldCheck,
-  Undo2,
+  WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const depositedCards = [
-  {
-    no: "010",
-    name: "Varek Auron",
-    rarity: "Diamond",
-    type: "Monster",
-    custody: "Vault A-02",
-    serial: "NX-010-REAL-8841",
-    nex: 100000,
-    coin: 6200,
-    status: "พร้อมแปลง",
-    image: "/cards/010.jpg",
-  },
-  {
-    no: "090",
-    name: "Auralith Warden",
-    rarity: "Gold",
-    type: "Skill",
-    custody: "Vault B-11",
-    serial: "NX-090-REAL-2165",
-    nex: 25000,
-    coin: 1800,
-    status: "ถอนได้",
-    image: "/cards/090.jpg",
-  },
-  {
-    no: "200",
-    name: "No.200 Verified Asset",
-    rarity: "Legendary",
-    type: "Monster",
-    custody: "Vault C-04",
-    serial: "NX-200-REAL-4420",
-    nex: 80000,
-    coin: 5400,
-    status: "รออนุมัติ",
-    image: "/cards/200.jpg",
-  },
+type BankCard = {
+  id: string;
+  cardNo: string;
+  name: string;
+  tier: string;
+  valueTHB: number;
+  status: "stored" | "pawned";
+  nextFeeDate: string;
+};
+
+type PawnCard = BankCard & {
+  pawnStartedAt: string;
+  interestDueDate: string;
+  monthlyInterestTHB: number;
+  lateDays: number;
+};
+
+const depositedCards: BankCard[] = [];
+const pawnedCards: PawnCard[] = [];
+
+const hasBankCards = depositedCards.length > 0;
+const hasPawnCards = pawnedCards.length > 0;
+
+const bankTerms = [
+  "ระบบธนาคารการ์ดจะแสดงข้อมูลเฉพาะการ์ดจริงที่ลูกค้านำมาฝาก และแอดมินคีย์เข้าหลังบ้านแล้วเท่านั้น",
+  "การ์ดที่ฝากในธนาคารมีค่าฝากรายเดือน แยกจากดอกเบี้ยของโหมดโรงรับจำนำ",
+  "ลูกค้าสามารถเลือกการ์ดในธนาคารเพื่อโยกย้ายไปแปลงเป็น NEX / COIN หรือเข้าโหมดจำนำได้เอง เมื่อระบบหลังบ้านเปิดใช้งานครบ",
+  "ถ้าแปลงการ์ดเป็น NEX / COIN แล้ว การ์ดใบนั้นจะถูกตัดออกจากธนาคารทันทีและไม่สามารถไถ่ถอนคืนได้",
 ];
 
-const workflow = [
+const pawnTerms = [
+  "โรงรับจำนำใช้ได้เฉพาะการ์ดที่อยู่ในระบบธนาคารการ์ดแล้วเท่านั้น",
+  "ดอกเบี้ยรายเดือนคิด 10% ของมูลค่าการ์ด และครบกำหนดทุกเดือนตามวันที่นำการ์ดเข้าโหมดจำนำ",
+  "ล่าช้า 1-3 วันแรกไม่คิดค่าปรับเพิ่ม แต่ยังขึ้นสถานะแจ้งเตือนให้ชำระ",
+  "ล่าช้าได้สูงสุดไม่เกิน 7 วัน หากเกิน 7 วัน การ์ดจะหลุดถาวรและไม่สามารถไถ่ถอนได้",
+];
+
+const processSteps = [
   {
     title: "ฝากการ์ดจริง",
-    desc: "ลูกค้านำการ์ดตัวจริงให้บริษัทตรวจรับ พร้อมบันทึก Serial, รูป, สภาพ, เจ้าของ และช่องทางติดต่อ",
+    desc: "ลูกค้านำการ์ดจริงเข้าบริษัท พร้อมยืนยันเจ้าของและหลักฐานรับฝาก",
     icon: PackageCheck,
   },
   {
-    title: "คีย์เข้าธนาคาร",
-    desc: "แอดมินบันทึกเลขการ์ด ประเภท ระดับ มูลค่า NEX/COIN สถานะถอนได้ และตำแหน่งเก็บจริง",
-    icon: Landmark,
+    title: "แอดมินตรวจและคีย์",
+    desc: "แอดมินตรวจสภาพ ประเภท มูลค่า รูปหลักฐาน แล้วคีย์เข้าระบบธนาคาร",
+    icon: ShieldCheck,
   },
   {
-    title: "ลูกค้าจัดการเอง",
-    desc: "เจ้าของดูสินทรัพย์แบบเรียลไทม์ และเลือกแปลงการ์ดเป็น NEX หรือ COIN ได้จากหน้า PC",
+    title: "ลูกค้าเช็คเรียลไทม์",
+    desc: "หลังคีย์แล้ว ลูกค้าจะเห็นการ์ดของตัวเอง พร้อมสถานะ ค่าฝาก และตัวเลือกจัดการ",
+    icon: WalletCards,
+  },
+  {
+    title: "โยกย้ายสินทรัพย์",
+    desc: "เลือกถอนจริง แปลงเป็น NEX / COIN หรือเข้าโหมดจำนำตามเงื่อนไขของระบบ",
     icon: ArrowRightLeft,
-  },
-  {
-    title: "แลกแล้วล็อกทันที",
-    desc: "เมื่อแปลงเป็น NEX/COIN การ์ดใบนั้นถูกตัดออกจากธนาคารและไม่สามารถขอถอนได้อีก",
-    icon: LockKeyhole,
   },
 ];
 
-function formatNumber(value: number) {
-  return value.toLocaleString("th-TH");
+function formatTHB(value: number) {
+  return value.toLocaleString("th-TH", {
+    style: "currency",
+    currency: "THB",
+    maximumFractionDigits: 0,
+  });
 }
 
 export default function CardBankPage() {
-  const totalNex = depositedCards.reduce((sum, card) => sum + card.nex, 0);
-  const totalCoin = depositedCards.reduce((sum, card) => sum + card.coin, 0);
-
   return (
-    <>
-      <div className="xl:hidden">
-        <section className="rounded-[24px] border border-amber-200/14 bg-[#08090d] p-5 text-center shadow-[0_22px_70px_rgba(0,0,0,0.42)]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] border border-amber-200/18 bg-amber-300/10 text-amber-200">
-            <Landmark className="h-6 w-6" />
-          </div>
-          <h1 className="mt-4 text-2xl font-black text-white">ธนาคารการ์ด</h1>
-          <p className="mt-3 text-sm leading-7 text-white/62">
-            เมนูนี้เปิดให้ใช้งานเฉพาะหน้าจอ PC เพื่อให้จัดการสินทรัพย์การ์ดจริงได้แม่นยำและตรวจสอบข้อมูลครบก่อนแปลงเป็น NEX หรือ COIN
-          </p>
-        </section>
-      </div>
-
-      <div className="hidden space-y-5 xl:block">
-        <section className="relative overflow-hidden rounded-[30px] border border-amber-200/18 bg-[linear-gradient(135deg,rgba(251,191,36,0.14),rgba(255,255,255,0.045)_34%,rgba(0,0,0,0.42))] p-6 shadow-[0_30px_110px_rgba(0,0,0,0.5)]">
-          <div className="relative grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/20 bg-black/24 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-amber-100">
+    <div className="min-h-full space-y-4 text-white sm:space-y-5">
+      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#f8fafc_0%,#d4d4d8_36%,#09090b_37%,#030303_100%)] p-[1px] shadow-[0_24px_100px_rgba(0,0,0,0.52)]">
+        <div className="rounded-[27px] bg-[radial-gradient(circle_at_16%_18%,rgba(255,255,255,0.16),transparent_28%),linear-gradient(135deg,#101113_0%,#050506_62%,#000_100%)] p-4 sm:p-6 lg:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.06] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.24em] text-white/72">
                 <Landmark className="h-3.5 w-3.5" />
-                NEXORA Card Bank
+                Card Bank & Pawn Desk
               </div>
-              <h1 className="mt-4 text-5xl font-black leading-none text-white">
+              <h1 className="mt-4 text-3xl font-black leading-tight text-white sm:text-5xl">
                 ธนาคารการ์ด
               </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/66">
-                พื้นที่ตรวจสอบการ์ดจริงที่ฝากไว้กับบริษัท ลูกค้าเห็นรายการสินทรัพย์ สถานะการเก็บรักษา มูลค่า NEX/COIN และเลือกโยกย้ายการ์ดที่ฝากไว้เป็นแต้มได้เองอย่างโปร่งใส
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/64 sm:text-base">
+                ศูนย์จัดการการ์ดจริงของลูกค้า สำหรับฝาก ตรวจสอบ โยกย้าย
+                แปลงเป็น NEX / COIN และนำการ์ดที่ฝากแล้วเข้าโหมดโรงรับจำนำ
+                ด้วยกติกาที่ชัดเจนและตรวจสอบได้
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              <StatTile label="การ์ดในธนาคาร" value={`${depositedCards.length} ใบ`} icon={PackageCheck} />
-              <StatTile label="มูลค่า NEX พร้อมแปลง" value={formatNumber(totalNex)} icon={Gem} />
-              <StatTile label="มูลค่า COIN พร้อมแปลง" value={formatNumber(totalCoin)} icon={Coins} />
+            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
+              <Metric label="การ์ดในธนาคาร" value={`${depositedCards.length} ใบ`} />
+              <Metric label="การ์ดจำนำอยู่" value={`${pawnedCards.length} ใบ`} />
+              <Metric label="สถานะข้อมูล" value={hasBankCards ? "พร้อมใช้งาน" : "ยังว่าง"} />
             </div>
           </div>
+        </div>
+      </section>
+
+      {!hasBankCards && !hasPawnCards ? (
+        <EmptyBankNotice />
+      ) : (
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+          <CardList title="การ์ดที่ฝากในธนาคาร" cards={depositedCards} />
+          <PawnList cards={pawnedCards} />
         </section>
+      )}
 
-        <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-          <div className="rounded-[26px] border border-white/8 bg-white/[0.035] p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
-                  Deposited Assets
-                </div>
-                <h2 className="mt-2 text-2xl font-black text-white">การ์ดที่ฝากไว้</h2>
-              </div>
-              <div className="rounded-full border border-emerald-300/18 bg-emerald-400/10 px-3 py-1.5 text-xs font-black text-emerald-200">
-                Real-time custody view
-              </div>
+      <section className="grid gap-4 xl:grid-cols-2">
+        <ModePanel
+          title="โหมดธนาคารการ์ด"
+          subtitle="ฝากสินทรัพย์จริงไว้กับบริษัท"
+          icon={Landmark}
+          items={bankTerms}
+          action="ยังไม่มีการ์ดให้จัดการ"
+        />
+        <ModePanel
+          title="โหมดโรงรับจำนำ"
+          subtitle="ใช้การ์ดในธนาคารเป็นหลักประกัน"
+          icon={Banknote}
+          items={pawnTerms}
+          action="ต้องมีการ์ดในธนาคารก่อน"
+        />
+      </section>
+
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
+              Customer Flow
             </div>
+            <h2 className="mt-2 text-2xl font-black text-white">
+              ขั้นตอนการใช้งานที่ลูกค้าจะเห็น
+            </h2>
+          </div>
+          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-white/55">
+            ไม่มีการ์ด = อ่านเงื่อนไขอย่างเดียว
+          </div>
+        </div>
 
-            <div className="mt-5 grid gap-3">
-              {depositedCards.map((card) => (
-                <article
-                  key={card.serial}
-                  className="grid gap-4 rounded-[22px] border border-white/8 bg-black/24 p-4 lg:grid-cols-[88px_minmax(0,1fr)_260px]"
-                >
-                  <div className="relative aspect-[815/1110] overflow-hidden rounded-[16px] border border-amber-200/14 bg-[#111318]">
-                    <Image src={card.image} alt={card.name} fill sizes="88px" className="object-cover" />
-                  </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {processSteps.map((step) => (
+            <StepCard key={step.title} {...step} />
+          ))}
+        </div>
+      </section>
 
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-200">
-                        No.{card.no}
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold text-white/68">
-                        {card.rarity} / {card.type}
-                      </span>
-                      <span className="rounded-full border border-cyan-200/14 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">
-                        {card.status}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-xl font-black text-white">{card.name}</h3>
-                    <div className="mt-3 grid gap-2 text-sm text-white/62 sm:grid-cols-2">
-                      <div>Serial: <span className="font-bold text-white/82">{card.serial}</span></div>
-                      <div>ตำแหน่งเก็บ: <span className="font-bold text-white/82">{card.custody}</span></div>
-                      <div>NEX Value: <span className="font-black text-amber-200">{formatNumber(card.nex)}</span></div>
-                      <div>COIN Value: <span className="font-black text-cyan-200">{formatNumber(card.coin)}</span></div>
-                    </div>
-                  </div>
-
-                  <div className="grid content-center gap-2">
-                    <button className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-amber-200/22 bg-amber-300/12 px-4 py-3 text-sm font-black text-amber-100 transition hover:bg-amber-300/18">
-                      <Gem className="h-4 w-4" />
-                      แปลงเป็น NEX
-                    </button>
-                    <button className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-cyan-200/18 bg-cyan-300/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/16">
-                      <Coins className="h-4 w-4" />
-                      แปลงเป็น COIN
-                    </button>
-                    <button className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-white/70 transition hover:bg-white/[0.07]">
-                      <Undo2 className="h-4 w-4" />
-                      ขอถอนการ์ด
-                    </button>
-                  </div>
-                </article>
-              ))}
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="rounded-[28px] border border-white/10 bg-[#050505] p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/12 bg-white/[0.055]">
+              <CalendarClock className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-white">ตารางกำหนดชำระ</h2>
+              <p className="mt-2 text-sm leading-7 text-white/58">
+                ค่าฝากธนาคารและดอกเบี้ยจำนำเป็นคนละรายการ ระบบควรออกบิลแยก
+                พร้อมวันครบกำหนด สถานะล่าช้า และประวัติการชำระครบทุกเดือน
+              </p>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <section className="rounded-[26px] border border-amber-200/14 bg-[#0b0d10] p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] border border-amber-200/16 bg-amber-300/10 text-amber-200">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
-                    Conversion Rule
-                  </div>
-                  <h2 className="text-xl font-black text-white">กติกาแปลงสินทรัพย์</h2>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3 text-sm leading-7 text-white/66">
-                <p>การ์ดที่ยังอยู่ในธนาคารสามารถขอถอนได้ตามสถานะการตรวจรับและเงื่อนไขบริษัท</p>
-                <p className="rounded-[18px] border border-red-300/16 bg-red-400/10 p-4 font-bold text-red-100">
-                  หากแปลงเป็น NEX หรือ COIN แล้ว การ์ดใบนั้นจะถูกตัดออกจากธนาคารทันที และไม่สามารถไถ่ถอนกลับเป็นการ์ดจริงได้
-                </p>
-              </div>
-            </section>
-
-            <section className="rounded-[26px] border border-white/8 bg-white/[0.035] p-5">
-              <h2 className="text-xl font-black text-white">Flow มาตรฐาน</h2>
-              <div className="mt-4 grid gap-3">
-                {workflow.map((step, index) => {
-                  const Icon = step.icon;
-                  return (
-                    <div key={step.title} className="grid grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-[18px] border border-white/8 bg-black/20 p-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-amber-200/14 bg-amber-300/10 text-amber-200">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-black text-white">{index + 1}. {step.title}</div>
-                        <div className="mt-1 text-xs leading-6 text-white/55">{step.desc}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+          <div className="mt-5 space-y-3">
+            <RuleLine label="ค่าฝากรายเดือน" value="กำหนดเรทในหลังบ้าน" />
+            <RuleLine label="ดอกเบี้ยจำนำ" value="10% ต่อเดือนของมูลค่าการ์ด" />
+            <RuleLine label="ครบกำหนด" value="วันเดียวกับวันที่เข้าโหมดจำนำของทุกเดือน" />
+            <RuleLine label="หลุดถาวร" value="เกินกำหนดชำระมากกว่า 7 วัน" danger />
           </div>
-        </section>
-      </div>
-    </>
+        </div>
+
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/12 bg-white/[0.055]">
+              <LockKeyhole className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-white">กติกาป้องกันความผิดพลาด</h2>
+              <p className="mt-2 text-sm leading-7 text-white/58">
+                ทุกการโยกย้ายต้องมี log: ผู้ทำรายการ เวลา มูลค่าเดิม มูลค่าใหม่
+                สถานะก่อน/หลัง และเหตุผล เพื่อให้ลูกค้าและแอดมินตรวจย้อนหลังได้
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <SafetyCard icon={ReceiptText} title="ใบรับฝาก" desc="ผูกกับเจ้าของ การ์ด รูปหลักฐาน serial และวันที่รับเข้า" />
+            <SafetyCard icon={CircleDollarSign} title="มูลค่าการ์ด" desc="ใช้เป็นฐานคิด NEX / COIN / เงินสด และดอกเบี้ยจำนำ" />
+            <SafetyCard icon={AlertTriangle} title="สถานะหลุด" desc="เกิน 7 วันต้องล็อกถาวร ถอนหรือย้ายกลับไม่ได้" />
+            <SafetyCard icon={FileText} title="Audit Log" desc="บันทึกทุก action เพื่อกันข้อมูลคลาดเคลื่อน" />
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
-function StatTile({
+function EmptyBankNotice() {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0b0b0c,#030303)] p-5 text-center shadow-[0_20px_80px_rgba(0,0,0,0.35)] sm:p-8">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/12 bg-white/[0.055] text-white">
+        <WalletCards className="h-7 w-7" />
+      </div>
+      <h2 className="mt-5 text-2xl font-black text-white sm:text-3xl">
+        ยังไม่มีการ์ดระบบธนาคารของท่าน
+      </h2>
+      <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-white/58 sm:text-base">
+        เมื่อท่านนำการ์ดจริงมาฝากกับบริษัท และแอดมินตรวจสอบพร้อมคีย์เข้าหลังบ้านแล้ว
+        รายการการ์ดของท่านจะแสดงในหน้านี้แบบเรียลไทม์
+      </p>
+      <div className="mx-auto mt-5 grid max-w-4xl gap-3 text-left md:grid-cols-3">
+        <InfoPill title="ยังจัดการไม่ได้" desc="ยังไม่มีการ์ดให้ถอน แปลง หรือจำนำ" />
+        <InfoPill title="อ่านเงื่อนไขก่อน" desc="ดูค่าฝาก ดอกเบี้ย และกติกาหลุดถาวรได้ด้านล่าง" />
+        <InfoPill title="รอหลังบ้านยืนยัน" desc="ข้อมูลจะขึ้นเมื่อแอดมินคีย์การ์ดเข้าระบบแล้ว" />
+      </div>
+    </section>
+  );
+}
+
+function CardList({ title, cards }: { title: string; cards: BankCard[] }) {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+      <h2 className="text-xl font-black text-white">{title}</h2>
+      <div className="mt-4 space-y-3">
+        {cards.map((card) => (
+          <div key={card.id} className="rounded-[20px] border border-white/10 bg-black/30 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-white/38">
+                  {card.cardNo}
+                </div>
+                <div className="mt-1 text-lg font-black text-white">{card.name}</div>
+                <div className="mt-1 text-sm text-white/52">{card.tier}</div>
+              </div>
+              <div className="text-left sm:text-right">
+                <div className="text-lg font-black text-white">{formatTHB(card.valueTHB)}</div>
+                <div className="mt-1 text-xs text-white/45">ค่าฝากถัดไป {card.nextFeeDate}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PawnList({ cards }: { cards: PawnCard[] }) {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+      <h2 className="text-xl font-black text-white">รายการโรงรับจำนำ</h2>
+      <div className="mt-4 space-y-3">
+        {cards.map((card) => (
+          <div key={card.id} className="rounded-[20px] border border-white/10 bg-black/30 p-4">
+            <div className="font-black text-white">{card.name}</div>
+            <div className="mt-2 grid gap-2 text-sm text-white/58">
+              <RuleLine label="ดอกเบี้ยเดือนนี้" value={formatTHB(card.monthlyInterestTHB)} />
+              <RuleLine label="ครบกำหนด" value={card.interestDueDate} />
+              <RuleLine label="ล่าช้า" value={`${card.lateDays} วัน`} danger={card.lateDays > 7} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModePanel({
+  title,
+  subtitle,
+  icon: Icon,
+  items,
+  action,
+}: {
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  items: string[];
+  action: string;
+}) {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
+            {subtitle}
+          </div>
+          <h2 className="mt-2 text-2xl font-black text-white">{title}</h2>
+        </div>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/12 bg-white/[0.055]">
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+      <div className="mt-5 space-y-3">
+        {items.map((item) => (
+          <div key={item} className="flex gap-3 text-sm leading-7 text-white/62">
+            <BadgeCheck className="mt-1 h-4 w-4 shrink-0 text-white/72" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled
+        className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-white/36"
+      >
+        {action}
+      </button>
+    </section>
+  );
+}
+
+function StepCard({ title, desc, icon: Icon }: { title: string; desc: string; icon: LucideIcon }) {
+  return (
+    <div className="rounded-[22px] border border-white/10 bg-black/24 p-4">
+      <div className="flex h-11 w-11 items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.055]">
+        <Icon className="h-5 w-5 text-white" />
+      </div>
+      <div className="mt-4 text-base font-black text-white">{title}</div>
+      <div className="mt-2 text-sm leading-6 text-white/55">{desc}</div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[20px] border border-white/10 bg-black/34 p-4">
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/38">
+        {label}
+      </div>
+      <div className="mt-3 text-xl font-black text-white">{value}</div>
+    </div>
+  );
+}
+
+function InfoPill({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div className="rounded-[20px] border border-white/10 bg-white/[0.035] p-4">
+      <div className="font-black text-white">{title}</div>
+      <div className="mt-2 text-sm leading-6 text-white/52">{desc}</div>
+    </div>
+  );
+}
+
+function RuleLine({
   label,
   value,
-  icon: Icon,
+  danger = false,
 }: {
   label: string;
   value: string;
-  icon: typeof Landmark;
+  danger?: boolean;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-black/28 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] font-black uppercase tracking-[0.2em] text-white/38">
-          {label}
-        </div>
-        <Icon className="h-4 w-4 text-amber-200" />
-      </div>
-      <div className="mt-3 text-2xl font-black text-white">{value}</div>
+    <div className="flex items-center justify-between gap-3 rounded-[16px] border border-white/8 bg-white/[0.03] px-3 py-2">
+      <span className="text-sm text-white/48">{label}</span>
+      <span className={`text-right text-sm font-black ${danger ? "text-red-200" : "text-white"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SafetyCard({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/10 bg-black/24 p-4">
+      <Icon className="h-5 w-5 text-white/72" />
+      <div className="mt-3 font-black text-white">{title}</div>
+      <div className="mt-2 text-sm leading-6 text-white/52">{desc}</div>
     </div>
   );
 }

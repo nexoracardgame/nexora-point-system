@@ -1309,7 +1309,7 @@ export default function MainLayout({
   );
 
   const drawerLinks = [
-    ...sideItems.filter((item) => item.href !== "/card-bank"),
+    ...sideItems,
     {
       href: "/wallet",
       label: t("layout.nav.wallet"),
