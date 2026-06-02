@@ -184,6 +184,7 @@ export default function ExchangeCalculatorClient() {
   const [quantityBySet, setQuantityBySet] = useState<Record<string, string>>({});
   const [foilBonusBySet, setFoilBonusBySet] = useState<Record<string, boolean>>({});
   const [setItems, setSetItems] = useState<SetItem[]>([]);
+  const [setPickerOpen, setSetPickerOpen] = useState(false);
   const [rewardName, setRewardName] = useState("");
   const [rewardValue, setRewardValue] = useState("");
 
@@ -240,6 +241,23 @@ export default function ExchangeCalculatorClient() {
 
     return () => window.clearTimeout(timer);
   }, [cardQuery]);
+
+  useEffect(() => {
+    if (!setPickerOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSetPickerOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [setPickerOpen]);
 
   const updateNexInput = (key: keyof typeof emptyNexInputs, value: string) => {
     setNexInputs((current) => ({ ...current, [key]: value }));
@@ -477,92 +495,165 @@ export default function ExchangeCalculatorClient() {
         </div>
       </section>
 
+      {setPickerOpen ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/78 p-3 backdrop-blur-xl sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="collection-set-picker-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setSetPickerOpen(false)}
+            aria-label="ปิดหน้าต่างเลือกเซ็ต"
+          />
+          <div className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[26px] border border-white/10 bg-[#111113] shadow-[0_30px_110px_rgba(0,0,0,0.65)]">
+            <div className="flex items-start justify-between gap-4 border-b border-white/8 p-4 sm:p-5">
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35">
+                  Collection Sets
+                </div>
+                <h3 id="collection-set-picker-title" className="mt-1 text-2xl font-black text-white">
+                  เลือกเซ็ตการ์ด 40 เซ็ต
+                </h3>
+                <p className="mt-2 text-sm font-bold leading-6 text-white/52">
+                  ระบุจำนวนเซ็ตข้างปุ่มเพิ่ม และติ๊กเงื่อนไขฟอยล์เมื่อเซ็ตนั้นมีเงื่อนไขพิเศษ
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSetPickerOpen(false)}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.06] text-white transition hover:bg-white/[0.12]"
+                aria-label="ปิดหน้าต่างเลือกเซ็ต"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 overflow-y-auto p-4 sm:p-5 xl:grid-cols-2">
+              {allSets.map((set) => {
+                const quantityValue = quantityBySet[set.id] ?? "1";
+                const withFoilBonus = Boolean(foilBonusBySet[set.id]);
+                const baseValue = parseNexReward(set.reward, false);
+                const activeValue = parseNexReward(set.reward, withFoilBonus);
+                const conditionText = getSetConditionText(set);
+                const cardTotal = set.officialTotal || getCollectionCardIds(set).length;
+
+                return (
+                  <div key={set.id} className="rounded-[22px] border border-white/10 bg-black/28 p-3 sm:p-4">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_176px] lg:items-center">
+                      <div className="min-w-0">
+                        <div className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/[0.08] text-sm font-black text-white">
+                            {set.order}
+                          </span>
+                          <div className="min-w-0 break-words text-base font-black leading-6 text-white">
+                            {set.name}
+                          </div>
+                          <span className="rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-1 text-[11px] font-black text-white/52">
+                            {cardTotal} ใบ
+                          </span>
+                        </div>
+                        <div className="mt-3 line-clamp-2 text-sm leading-6 text-white/52">
+                          {set.reward}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
+                          <span className="rounded-full border border-emerald-200/15 bg-emerald-400/15 px-3 py-1 text-emerald-50">
+                            {baseValue > 0 ? `${formatNumber(baseValue)} NEX` : "รางวัลพิเศษ"}
+                          </span>
+                          {withFoilBonus && activeValue !== baseValue ? (
+                            <span className="rounded-full border border-white/16 bg-white/[0.12] px-3 py-1 text-white">
+                              เพิ่มเป็น {formatNumber(activeValue)} NEX
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-[minmax(82px,1fr)_96px] gap-2">
+                        <input
+                          value={quantityValue}
+                          onChange={(event) =>
+                            setQuantityBySet((current) => ({
+                              ...current,
+                              [set.id]: event.target.value,
+                            }))
+                          }
+                          inputMode="numeric"
+                          aria-label={`จำนวนเซ็ต ${set.order}`}
+                          className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-black/55 px-3 text-center text-base font-black text-white outline-none focus:border-white/35"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addSetItem(set, Number(quantityValue || 1), withFoilBonus)
+                          }
+                          className="inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
+                        >
+                          <PackagePlus className="h-4 w-4" />
+                          เพิ่ม
+                        </button>
+                      </div>
+                    </div>
+
+                    {conditionText ? (
+                      <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[18px] border border-white/10 bg-white/[0.055] p-3 text-sm leading-6 text-white/82">
+                        <input
+                          type="checkbox"
+                          checked={withFoilBonus}
+                          onChange={(event) =>
+                            setFoilBonusBySet((current) => ({
+                              ...current,
+                              [set.id]: event.target.checked,
+                            }))
+                          }
+                          className="mt-1 h-4 w-4 shrink-0 accent-white"
+                        />
+                        <span className="min-w-0">ใช้เงื่อนไขฟอยล์เพิ่ม: {conditionText}</span>
+                      </label>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-white/8 bg-[#111113]/95 p-3 sm:p-4">
+              <button
+                type="button"
+                onClick={() => setSetPickerOpen(false)}
+                className="flex h-12 w-full items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.06] text-sm font-black text-white transition hover:bg-white/[0.12]"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
         <PanelHeader icon={Trophy} kicker="Collection Sets" title="คำนวณเซ็ตสะสม 40 เซ็ต" />
-        <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-          <div className="grid max-h-[720px] gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
-            {allSets.map((set) => {
-              const quantityValue = quantityBySet[set.id] ?? "1";
-              const withFoilBonus = Boolean(foilBonusBySet[set.id]);
-              const baseValue = parseNexReward(set.reward, false);
-              const activeValue = parseNexReward(set.reward, withFoilBonus);
-              const conditionText = getSetConditionText(set);
-              const cardTotal = set.officialTotal || getCollectionCardIds(set).length;
-
-              return (
-                <div key={set.id} className="flex min-h-full flex-col rounded-[22px] border border-white/10 bg-black/24 p-3 sm:p-4">
-                  <div className="flex flex-1 flex-col gap-3">
-                    <div className="min-w-0">
-                      <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-3 sm:grid-cols-[44px_minmax(0,1fr)_auto]">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.06] text-sm font-black text-white">
-                          {set.order}
-                        </span>
-                        <span className="min-w-0 break-words text-base font-black leading-6 text-white">
-                          {set.name}
-                        </span>
-                        <span className="col-start-2 w-fit rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-black text-white/52 sm:col-start-auto">
-                          {cardTotal} ใบ
-                        </span>
-                      </div>
-                      <div className="mt-2 line-clamp-3 text-sm leading-6 text-white/52">
-                        {set.reward}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
-                        <span className="max-w-full rounded-full border border-white/10 bg-white px-3 py-1 text-black">
-                          {baseValue > 0 ? `${formatNumber(baseValue)} NEX` : "รางวัลพิเศษ"}
-                        </span>
-                        {withFoilBonus && activeValue !== baseValue ? (
-                          <span className="max-w-full rounded-full border border-white/16 bg-white/[0.12] px-3 py-1 text-white">
-                            เพิ่มเป็น {formatNumber(activeValue)} NEX
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-[minmax(84px,1fr)_112px]">
-                      <input
-                        value={quantityValue}
-                        onChange={(event) =>
-                          setQuantityBySet((current) => ({
-                            ...current,
-                            [set.id]: event.target.value,
-                          }))
-                        }
-                        inputMode="numeric"
-                        aria-label={`จำนวนเซ็ต ${set.order}`}
-                        className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-base font-black text-white outline-none focus:border-white/35"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          addSetItem(set, Number(quantityValue || 1), withFoilBonus)
-                        }
-                        className="inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
-                      >
-                        <PackagePlus className="h-4 w-4" />
-                        เพิ่ม
-                      </button>
-                    </div>
-                  </div>
-                  {conditionText ? (
-                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[18px] border border-white/10 bg-white/[0.055] p-3 text-sm leading-6 text-white/82">
-                      <input
-                        type="checkbox"
-                        checked={withFoilBonus}
-                        onChange={(event) =>
-                          setFoilBonusBySet((current) => ({
-                            ...current,
-                            [set.id]: event.target.checked,
-                          }))
-                        }
-                        className="mt-1 h-4 w-4 shrink-0 accent-white"
-                      />
-                      <span className="min-w-0">ใช้เงื่อนไขฟอยล์เพิ่ม: {conditionText}</span>
-                    </label>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+          <button
+            type="button"
+            onClick={() => setSetPickerOpen(true)}
+            className="group flex min-h-[210px] flex-col justify-between rounded-[24px] border border-white/10 bg-black/28 p-4 text-left transition hover:border-white/22 hover:bg-white/[0.055] sm:p-5"
+          >
+            <span>
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-black transition group-hover:bg-zinc-200">
+                <PackagePlus className="h-5 w-5" />
+              </span>
+              <span className="mt-5 block text-2xl font-black text-white">
+                เพิ่มเซ็ตสะสม
+              </span>
+              <span className="mt-2 block max-w-2xl text-sm font-bold leading-7 text-white/52">
+                เปิดหน้าต่างเลือกเซ็ตทั้งหมด 40 เซ็ต ใส่จำนวน และเลือกเงื่อนไขฟอยล์ได้ในที่เดียว
+              </span>
+            </span>
+            <span className="mt-6 inline-flex h-12 w-fit items-center gap-2 rounded-[16px] bg-white px-5 text-sm font-black text-black transition group-hover:bg-zinc-200">
+              <PackagePlus className="h-4 w-4" />
+              เลือกเซ็ต
+            </span>
+          </button>
           <div className="rounded-[24px] border border-white/10 bg-black/28 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
