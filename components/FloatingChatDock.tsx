@@ -2733,7 +2733,7 @@ export default function FloatingChatDock({
 
   if (!open) {
     return (
-      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+104px)] right-3 z-[1110] flex max-w-[calc(100vw-24px)] items-center justify-end gap-2 xl:bottom-6 xl:right-6">
+      <div className="fixed bottom-[var(--app-floating-button-bottom)] right-4 z-[1110] flex max-w-[calc(100vw-24px)] items-center justify-end gap-2 xl:bottom-6 xl:right-6">
         <button
           type="button"
           onPointerEnter={warmFloatingChat}
@@ -2745,18 +2745,18 @@ export default function FloatingChatDock({
             setMobileListVisible(!activeRoom);
             warmFloatingChat();
           }}
-          className="flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-black/90 px-3.5 py-3 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition hover:scale-[1.02] hover:bg-[#111318] active:scale-[0.98] xl:px-4"
+          className="flex h-14 w-14 min-w-0 items-center justify-center gap-0 rounded-full border border-white/12 bg-black p-0 text-left text-white shadow-[0_16px_44px_rgba(0,0,0,0.48)] transition active:scale-95 xl:h-auto xl:w-auto xl:gap-2 xl:bg-black/90 xl:px-4 xl:py-3 xl:shadow-[0_18px_48px_rgba(0,0,0,0.45)] xl:backdrop-blur-2xl xl:hover:scale-[1.02] xl:hover:bg-[#111318] xl:active:scale-[0.98]"
           aria-label="เปิดแชท"
         >
-          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.22)]">
-            <MessageCircle className="h-4 w-4" />
+          <span className="relative flex h-full w-full shrink-0 items-center justify-center rounded-full bg-black text-white xl:h-9 xl:w-9 xl:bg-white xl:text-black xl:shadow-[0_0_24px_rgba(255,255,255,0.22)]">
+            <MessageCircle className="h-6 w-6 xl:h-4 xl:w-4" />
             {badgeCount > 0 ? (
               <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full border-2 border-black bg-red-500 px-1 text-center text-[10px] font-black leading-4 text-white">
                 {badgeCount > 99 ? "99+" : badgeCount}
               </span>
             ) : null}
           </span>
-          <span className="min-w-0">
+          <span className="hidden min-w-0 xl:block">
             <span className="block truncate text-sm font-black">Chat</span>
             <span className="block truncate text-[11px] font-bold text-white/55">
               {badgeCount > 0 ? "มีข้อความใหม่" : "พร้อมคุย"}
@@ -2772,7 +2772,7 @@ export default function FloatingChatDock({
             setShowEmoji(false);
             setMobileListVisible(false);
           }}
-          className="group relative flex min-h-[58px] min-w-0 max-w-[210px] items-center gap-2 overflow-hidden rounded-full border border-amber-200/35 bg-[linear-gradient(135deg,#fff3b0_0%,#d8a83c_44%,#5d3d10_100%)] px-3 py-2.5 text-left text-black shadow-[0_0_34px_rgba(251,191,36,0.45),0_18px_48px_rgba(0,0,0,0.48)] transition hover:scale-[1.02] active:scale-[0.98] max-[380px]:max-w-[185px]"
+          className="group relative hidden min-h-[58px] min-w-0 max-w-[210px] items-center gap-2 overflow-hidden rounded-full border border-amber-200/35 bg-[linear-gradient(135deg,#fff3b0_0%,#d8a83c_44%,#5d3d10_100%)] px-3 py-2.5 text-left text-black shadow-[0_0_34px_rgba(251,191,36,0.45),0_18px_48px_rgba(0,0,0,0.48)] transition hover:scale-[1.02] active:scale-[0.98] xl:flex"
           aria-label="คุยกับท่านเบลซ AI"
         >
           <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.62),transparent_34%),linear-gradient(90deg,transparent,rgba(255,255,255,0.20),transparent)] opacity-70 transition group-hover:opacity-100" />
@@ -2793,15 +2793,15 @@ export default function FloatingChatDock({
   }
 
   const chatShellClass = mobileChatFocusMode
-    ? "fixed inset-x-0 bottom-0 top-[env(safe-area-inset-top)] z-[1120] overflow-hidden border-y border-white/10 bg-[#050608]/98 text-white shadow-none backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] sm:rounded-[24px] sm:border sm:shadow-[0_30px_100px_rgba(0,0,0,0.62)] lg:w-[820px] xl:bottom-6 xl:right-6"
-    : "fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-white/12 bg-[#050608]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.62)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] lg:w-[820px] xl:bottom-6 xl:right-6";
+    ? "fixed inset-x-0 bottom-0 top-[var(--app-safe-top)] z-[1120] overflow-hidden border-y border-white/10 bg-[#050608]/98 text-white shadow-none backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] sm:rounded-[24px] sm:border sm:shadow-[0_30px_100px_rgba(0,0,0,0.62)] lg:w-[820px] xl:bottom-6 xl:right-6"
+    : "fixed inset-x-0 bottom-0 top-[var(--app-safe-top)] z-[1120] overflow-hidden border-y border-white/10 bg-[#050608]/98 text-white shadow-none backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[760px] sm:rounded-[24px] sm:border sm:shadow-[0_30px_100px_rgba(0,0,0,0.62)] lg:w-[820px] xl:bottom-6 xl:right-6";
   const chatDockHeaderClass = mobileChatFocusMode
     ? "hidden shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/64 px-3 py-3 sm:flex sm:px-4"
     : "flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/64 px-3 py-3 sm:px-4";
 
   if (dockMode === "ai") {
     return (
-      <section className="blaze-floating-ai fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+86px)] top-[calc(env(safe-area-inset-top)+72px)] z-[1120] overflow-hidden rounded-[24px] border border-amber-200/24 bg-[#050403]/96 text-white shadow-[0_30px_100px_rgba(0,0,0,0.66),0_0_54px_rgba(251,191,36,0.22)] backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[620px] xl:bottom-6 xl:right-6">
+      <section className="blaze-floating-ai fixed inset-x-0 bottom-0 top-[var(--app-safe-top)] z-[1120] overflow-hidden border-y border-amber-200/18 bg-[#050403]/98 text-white shadow-none backdrop-blur-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:top-auto sm:h-[min(720px,calc(100dvh-40px))] sm:w-[620px] sm:rounded-[24px] sm:border sm:shadow-[0_30px_100px_rgba(0,0,0,0.66),0_0_54px_rgba(251,191,36,0.22)] xl:bottom-6 xl:right-6">
         <style>{`
           .blaze-floating-ai-title {
             color: transparent;
@@ -3010,7 +3010,7 @@ export default function FloatingChatDock({
               </div>
 
               <form
-                className="relative shrink-0 border-t border-amber-200/14 bg-[linear-gradient(180deg,rgba(5,4,3,0.20),rgba(5,4,3,0.96))] p-3"
+                className="relative shrink-0 border-t border-amber-200/14 bg-[linear-gradient(180deg,rgba(5,4,3,0.20),rgba(5,4,3,0.96))] px-3 pb-[calc(var(--app-safe-bottom)+12px)] pt-3 sm:p-3"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void sendBlazeMessage();
@@ -3135,6 +3135,18 @@ export default function FloatingChatDock({
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setDockMode("ai");
+                setShowEmoji(false);
+                setMobileListVisible(false);
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-200/20 bg-amber-300/10 text-amber-200 transition hover:bg-amber-300/16 hover:text-amber-100"
+              aria-label="เธเธธเธขเธเธฑเธเธ—เนเธฒเธเน€เธเธฅเธ AI"
+            >
+              <Flame className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -3600,7 +3612,7 @@ export default function FloatingChatDock({
 
                 <div
                   ref={emojiRootRef}
-                  className="relative shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.24),rgba(5,6,8,0.96))] p-3"
+                  className="relative shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,6,8,0.24),rgba(5,6,8,0.96))] px-3 pb-[calc(var(--app-safe-bottom)+12px)] pt-3 sm:p-3"
                 >
                   {error ? (
                     <div className="mb-2 rounded-2xl border border-red-300/15 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200">

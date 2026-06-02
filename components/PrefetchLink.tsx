@@ -87,9 +87,7 @@ export default function PrefetchLink({
   href,
   onMouseEnter,
   onFocus,
-  onTouchStart,
   onPointerEnter,
-  onPointerDown,
   children,
   ...rest
 }: PrefetchLinkProps) {
@@ -115,14 +113,10 @@ export default function PrefetchLink({
   return (
     <Link
       href={href}
-      prefetch={true}
+      prefetch="auto"
       onPointerEnter={(event) => {
         prefetchRoute();
         onPointerEnter?.(event);
-      }}
-      onPointerDown={(event) => {
-        prefetchRoute();
-        onPointerDown?.(event);
       }}
       onMouseEnter={(event) => {
         prefetchRoute();
@@ -131,10 +125,6 @@ export default function PrefetchLink({
       onFocus={(event) => {
         prefetchRoute();
         onFocus?.(event);
-      }}
-      onTouchStart={(event) => {
-        prefetchRoute();
-        onTouchStart?.(event);
       }}
       {...rest}
     >

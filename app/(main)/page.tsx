@@ -23,6 +23,22 @@ const showDownloadStoreButtons = false;
 const youtubeArenaEmbedUrl =
   "https://www.youtube.com/embed/eQQeMip8JIQ?autoplay=1&mute=0&controls=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1";
 
+function useHomeViewportMode() {
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(media.matches);
+
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isMobile;
+}
+
 function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
   return (
     <div
@@ -72,6 +88,7 @@ export default function NexoraLuxuryHome() {
   const { data: session } = useSession();
   const showBattleTest = isAdminRole(session?.user?.role);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
+  const isMobileViewport = useHomeViewportMode();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -163,7 +180,7 @@ export default function NexoraLuxuryHome() {
       </div>
 
       <div className="relative z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+112px)] sm:hidden">
-        <YouTubeArenaPanel mobile />
+        {isMobileViewport === true ? <YouTubeArenaPanel mobile /> : null}
 
         <div className="relative mt-3 flex min-h-[190px] items-end justify-center overflow-hidden">
           <Image
@@ -212,7 +229,7 @@ export default function NexoraLuxuryHome() {
         ประสบการณ์ระดับเวิลด์คลาส
       </div>
 
-      <YouTubeArenaPanel />
+      {isMobileViewport === false ? <YouTubeArenaPanel /> : null}
 
       <div className="absolute left-8 top-[33%] z-30 hidden max-w-[620px] flex-wrap gap-3 text-sm font-black tracking-[0.12em] text-black/74 sm:flex">
         {heroPills.map((item) => (

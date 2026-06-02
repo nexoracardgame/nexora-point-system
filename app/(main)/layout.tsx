@@ -1616,7 +1616,7 @@ export default function MainLayout({
             className={`relative z-0 min-w-0 flex-1 bg-[#07080b] ${
               isChatRoomPage
                 ? "overflow-hidden p-0 pb-0"
-                : "p-3 pb-[calc(env(safe-area-inset-bottom)+90px)] sm:p-4 sm:pb-[calc(env(safe-area-inset-bottom)+100px)] xl:p-6 xl:pb-6"
+                : "p-3 pb-[var(--app-content-bottom-gap)] sm:p-4 sm:pb-[calc(var(--app-mobile-nav-height-sm)+14px)] xl:p-6 xl:pb-6"
             }`}
           >
             <div
@@ -1780,7 +1780,7 @@ export default function MainLayout({
 
       {/* MOBILE BOTTOM NAV */}
       {!hideMobileBottomNav && (
-        <nav className="fixed inset-x-0 bottom-0 z-[1100] overflow-hidden rounded-t-[24px] border-x-0 border-b-0 border-t border-white/10 bg-[#030406]/96 px-1.5 pb-[calc(env(safe-area-inset-bottom)+7px)] pt-1.5 shadow-[0_-18px_52px_rgba(0,0,0,0.72)] backdrop-blur-3xl xl:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-[1100] min-h-[var(--app-mobile-nav-height)] overflow-hidden rounded-t-[22px] border-x-0 border-b-0 border-t border-white/10 bg-[#030406]/96 px-1.5 pb-[calc(var(--app-safe-bottom)+7px)] pt-1.5 shadow-[0_-18px_52px_rgba(0,0,0,0.72)] backdrop-blur-3xl xl:hidden">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.01)_34%,rgba(0,0,0,0)_100%)]" />
           <div className="relative mx-auto grid w-full max-w-[760px] grid-cols-7 gap-0.5 sm:gap-1.5">
             {mobileBottomItems.map((item) => {
@@ -1791,7 +1791,7 @@ export default function MainLayout({
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileNavOpen(false)}
-                  className={`relative flex min-h-[62px] flex-col items-center justify-center overflow-hidden rounded-[19px] border px-0.5 transition-all duration-200 ${
+                  className={`relative flex min-h-[56px] flex-col items-center justify-center overflow-hidden rounded-[17px] border px-0.5 transition-all duration-200 sm:min-h-[62px] sm:rounded-[19px] ${
                     item.active
                       ? "border-amber-300/28 bg-[linear-gradient(180deg,rgba(251,191,36,0.18),rgba(251,191,36,0.055))] text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_24px_rgba(251,191,36,0.14)]"
                       : "border-transparent bg-[#090a0d]/72 text-white/42 hover:bg-white/[0.055] hover:text-white/70"
