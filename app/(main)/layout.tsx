@@ -46,6 +46,7 @@ import {
   BadgeDollarSign,
   ShieldCheck,
   Swords,
+  Landmark,
 } from "lucide-react";
 import { isAdminRole } from "@/lib/staff-auth";
 
@@ -1069,6 +1070,7 @@ export default function MainLayout({
       "/market",
       "/buy-market",
       "/box-market",
+      "/card-bank",
       "/market/deals",
       "/rewards",
       "/redeem",
@@ -1173,6 +1175,7 @@ export default function MainLayout({
   const pageContext = useMemo(() => {
     if (pathname.startsWith("/buy-market")) return "ตลาดรับซื้อการ์ดใบเดียว";
     if (pathname.startsWith("/box-market")) return "ร้านขายซอง/กล่องการ์ดแท้";
+    if (pathname.startsWith("/card-bank")) return "ธนาคารการ์ด";
     if (pathname.startsWith("/battle")) return "Triad Dominion";
     if (pathname.startsWith("/market")) return t("layout.page.market");
     if (pathname.startsWith("/collections")) return t("layout.page.collections");
@@ -1205,6 +1208,12 @@ export default function MainLayout({
         label: "ซอง/กล่องแท้",
         icon: PackageOpen,
         active: pathname.startsWith("/box-market"),
+      },
+      {
+        href: "/card-bank",
+        label: "ธนาคารการ์ด",
+        icon: Landmark,
+        active: pathname.startsWith("/card-bank"),
       },
       {
         href: "/rewards",
@@ -1300,7 +1309,7 @@ export default function MainLayout({
   );
 
   const drawerLinks = [
-    ...sideItems,
+    ...sideItems.filter((item) => item.href !== "/card-bank"),
     {
       href: "/wallet",
       label: t("layout.nav.wallet"),

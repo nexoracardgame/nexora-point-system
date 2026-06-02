@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NEXORA | ตรวจสอบสมาชิก</title>
+
+  <style>
+    :root{
+      --gold: rgba(216,180,90,.95);
+      --text:#fff;
+      --muted:#bdbdbd;
+
+      --bg-img: url("https://s.imgz.io/2026/01/14/094--copy1babc9ea9546f209.jpg");
+      --bg-opacity: .30;
+      --dark-opacity: .55;
+
+      --ui-scale: 1;
+    }
+
+    *{ box-sizing:border-box; }
+    html, body { height: 100%; }
+
+    body{
+      margin:0;
+      min-height:100svh;
+      font-family: Arial, sans-serif;
+      color:var(--text);
+      background:#000;
+
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+
+      padding: 18px 18px 40px;
+      position: relative;
+
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ✅ โหมดกลางจอ */
+    body.center-mode{
+      align-items:center;
+    }
+
+    @media (max-width: 430px){
+      body{ padding: 12px 12px 18px; }
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background-image: var(--bg-img);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--bg-opacity);
+      z-index:-2;
+      pointer-events:none;
+    }
+
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:#000;
+      opacity: var(--dark-opacity);
+      z-index:-1;
+      pointer-events:none;
+    }
+
+    .wrap{
+      width: 520px;
+      max-width: 92vw;
+      background: rgba(0,0,0,.55);
+      border-radius: 22px;
+      padding: 22px;
+
+      border: 1px solid rgba(216,180,90,.45);
+      box-shadow:
+        0 25px 80px rgba(0,0,0,.85),
+        inset 0 0 0 1px rgba(255,255,255,.05);
+
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+
+      margin-top: env(safe-area-inset-top, 0px);
+
+      transform: scale(var(--ui-scale));
+      transform-origin: top center;
+      will-change: transform;
+    }
+
+    .title{ padding-top: 6px; }
+
+    .wrap::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius: 24px;
+      padding:2px;
+      background: linear-gradient(
+        135deg,
+        rgba(216,180,90,.95),
+        rgba(255,255,255,.18),
+        rgba(216,180,90,.45),
+        rgba(0,0,0,0)
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events:none;
+      opacity: .95;
+      z-index: 0;
+    }
+    .wrap > *{ position: relative; z-index: 1; }
+
+    .title{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+    .title h1{
+      margin:0;
+      font-size: 22px;
+      letter-spacing:.3px;
+    }
+    .title .sub{
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .searchbar{ margin-top:12px; }
+
+    .searchShell{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px;
+      border-radius:18px;
+      background: rgba(0,0,0,.40);
+      border: 1px solid rgba(216,180,90,.35);
+      box-shadow:
+        0 18px 55px rgba(0,0,0,.55),
+        inset 0 0 0 1px rgba(255,255,255,.05);
+      position: relative;
+      overflow:hidden;
+    }
+
+    .searchShell::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius:20px;
+      padding:2px;
+      background: linear-gradient(135deg,
+        rgba(216,180,90,.85),
+        rgba(255,255,255,.12),
+        rgba(216,180,90,.35),
+        rgba(0,0,0,0)
+      );
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events:none;
+      opacity:.9;
+    }
+
+    .sIcon{
+      width:40px; height:40px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:14px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      color: rgba(216,180,90,.95);
+      font-weight:900;
+      user-select:none;
+      flex: 0 0 auto;
+    }
+
+    .searchShell input{
+      flex:1;
+      min-width: 160px;
+      padding: 12px 10px;
+      border:0;
+      outline:0;
+      background: transparent;
+      color:#fff;
+      font-size:16px;
+      letter-spacing:.3px;
+    }
+    .searchShell input::placeholder{ color: rgba(255,255,255,.45); }
+
+    /* ✅ COUNTER STYLE */
+    .counterLine{
+      margin-top:10px;
+      text-align:left;
+      font-size:12px;
+      color:rgba(255,255,255,.7);
+    }
+    .counterLine b{
+      color:rgba(216,180,90,.95);
+      font-weight:900;
+    }
+
+    .btnRow{
+      display:flex;
+      justify-content:center;
+      margin-top:12px;
+    }
+    .btnCheck{
+      padding: 12px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(216,180,90,.55);
+      background: linear-gradient(180deg, rgba(216,180,90,.28), rgba(216,180,90,.10));
+      color:#fff;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 12px 30px rgba(216,180,90,.10);
+      white-space: nowrap;
+      min-width: 120px;
+    }
+    .btnCheck:hover{
+      transform: translateY(-1px);
+      box-shadow: 0 18px 40px rgba(216,180,90,.16);
+    }
+    .btnCheck:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    .hint{
+      margin-top:10px;
+      color:#bdbdbd;
+      font-size:13px;
+      line-height:1.55;
+    }
+
+    .msg{
+      margin-top:12px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.02);
+      display:none;
+      white-space:pre-line;
+    }
+    .msg.ok{ border-color: rgba(0,255,153,.30); }
+    .msg.warn{ border-color: rgba(255,165,0,.30); }
+    .msg.err{ border-color: rgba(255,68,68,.30); }
+
+    .result{
+      margin-top: 16px;
+      display:none;
+      justify-content:center;
+      align-items:center;
+    }
+
+    .idcard{
+      width: 360px;
+      max-width: 100%;
+      border-radius: 22px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(216,180,90,.55);
+
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-image: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.75));
+
+      box-shadow:
+        0 18px 60px rgba(0,0,0,.65),
+        inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+
+    .idcard::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius: 24px;
+      padding:2px;
+      background: linear-gradient(135deg,
+        rgba(216,180,90,.85),
+        rgba(255,255,255,.10),
+        rgba(216,180,90,.35),
+        rgba(0,0,0,0)
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events:none;
+      opacity:.9;
+      z-index: 3;
+    }
+
+    .watermark{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      letter-spacing: 4px;
+      font-size: 44px;
+      color: rgba(255,255,255,.06);
+      transform: rotate(-18deg);
+      user-select:none;
+      pointer-events:none;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .idhead{
+      padding: 16px 16px 10px 16px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.25);
+      position: relative;
+      z-index: 2;
+    }
+
+    .brand{
+      font-weight:900;
+      letter-spacing: 1px;
+      font-size: 16px;
+    }
+    .brand span{ color: rgba(216,180,90,.95); }
+    .tag{
+      font-size:11px;
+      color:#d8d8d8;
+      opacity:.85;
+      margin-top:3px;
+    }
+
+    .statusPill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      font-weight:900;
+      font-size:12px;
+      background: rgba(0,0,0,.35);
+      text-transform: uppercase;
+      white-space: nowrap;
+      position: relative;
+      z-index: 2;
+    }
+
+    .dot{
+      width:8px; height:8px; border-radius:999px;
+      background:#777;
+      box-shadow: 0 0 16px rgba(255,255,255,.08);
+    }
+    .ACTIVE .dot{ background:#00ff99; box-shadow: 0 0 18px rgba(0,255,153,.35); }
+    .INACTIVE .dot{ background:#aaaaaa; }
+    .SUSPENDED .dot{ background:#ff4444; box-shadow: 0 0 18px rgba(255,68,68,.35); }
+    .EXPIRED .dot{ background:orange; box-shadow: 0 0 18px rgba(255,165,0,.35); }
+
+    .idbody{ padding: 16px; position: relative; z-index: 2; }
+
+    .photoBox{
+      width: 96px;
+      height: 96px;
+      border-radius: 999px;
+      border: 1px solid rgba(216,180,90,.55);
+      background: rgba(0,0,0,.25);
+      box-shadow:
+        0 10px 30px rgba(0,0,0,.45),
+        inset 0 0 0 1px rgba(255,255,255,.06);
+      overflow: hidden;
+      flex: 0 0 auto;
+
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color: rgba(255,255,255,.65);
+      font-weight: 900;
+      letter-spacing: 2px;
+      user-select: none;
+    }
+
+    .topInfo{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      margin-bottom: 14px;
+    }
+
+    .bigId{ font-size: 20px; font-weight: 900; letter-spacing: .6px; margin: 2px 0 6px 0; }
+    .nick{ font-size: 16px; font-weight: 900; color: rgba(216,180,90,.95); margin: 0; }
+
+    .kvs{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+      margin-top: 10px;
+    }
+    .kv{
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(0,0,0,.22);
+    }
+    .k{
+      font-size: 11px;
+      color: #bdbdbd;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+    }
+    .v{ margin-top: 6px; font-size: 15px; font-weight: 900; word-break: break-word; }
+
+    .idfoot{
+      padding: 12px 16px 16px 16px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      background: rgba(0,0,0,.20);
+      position: relative;
+      z-index: 2;
+    }
+
+    .fine{ font-size:11px; color:#bdbdbd; line-height:1.35; }
+
+    .qr{
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      border: 1px solid rgba(216,180,90,.35);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight: 900;
+      color: rgba(255,255,255,.55);
+      letter-spacing: 2px;
+      user-select:none;
+    }
+  </style>
+</head>
+
+<body class="center-mode">
+  <div class="wrap">
+    <div class="title">
+      <div>
+        <h1>ตรวจสอบสมาชิกตัวแทนจำหน่าย</h1>
+        <div class="sub">NEXORA Authorized Dealer Verification</div>
+      </div>
+      <div class="sub" style="text-align:right">
+        โหมดตรวจสอบปลอดภัย • Secure Check
+      </div>
+    </div>
+
+    <form id="frm" class="searchbar">
+      <div class="searchShell">
+        <span class="sIcon">⌕</span>
+        <input id="memberId" placeholder="กรอกรหัสสมาชิก เช่น N-Boss9999" autocomplete="off" />
+      </div>
+
+      <!-- ✅ COUNTER ใต้กล่องค้นหา -->
+      <div class="counterLine">
+        👁️ ผู้เข้าชมหน้านี้ทั้งหมด: <b id="nxCounterNum">…</b>
+      </div>
+
+      <div class="btnRow">
+        <button id="btn" type="submit" class="btnCheck">ตรวจสอบ</button>
+      </div>
+    </form>
+
+    <div class="hint">
+      • กดปุ่ม “ตรวจสอบ” หรือกดปุ่ม “Enter” ได้<br>
+      • หากสถานะไม่ใช่ ACTIVE ระบบจะซ่อนข้อมูลติดต่อ (เบอร์/ไลน์)<br>
+      • หากหมดอายุ ระบบจะเปลี่ยนเป็น EXPIRED อัตโนมัติ
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <div id="result" class="result">
+      <div id="idcard" class="idcard">
+        <div class="watermark">NEXORA</div>
+
+        <div class="idhead">
+          <div>
+            <div class="brand">NEXORA <span>MEMBER</span></div>
+            <div class="tag">AUTHORIZED DEALER CARD</div>
+          </div>
+
+          <div id="statusPill" class="statusPill INACTIVE">
+            <span class="dot"></span>
+            <span id="statusText">INACTIVE</span>
+          </div>
+        </div>
+
+        <div class="idbody">
+          <div class="topInfo">
+            <div class="photoBox" id="photoBox">ID</div>
+            <div style="flex:1">
+              <div class="k" style="letter-spacing:.8px">รหัสสมาชิก</div>
+              <div class="bigId" id="mid">-</div>
+              <div class="k" style="letter-spacing:.8px">ชื่อเล่น</div>
+              <p class="nick" id="nick">-</p>
+            </div>
+          </div>
+
+          <div class="kvs">
+            <div class="kv">
+              <div class="k">เบอร์โทร</div>
+              <div class="v" id="phone">-</div>
+            </div>
+
+            <div class="kv">
+              <div class="k">ไลน์</div>
+              <div class="v" id="line">-</div>
+            </div>
+
+            <div class="kv">
+              <div class="k">วันหมดอายุบัตร</div>
+              <div class="v" id="expiry">-</div>
+            </div>
+
+            <div class="kv">
+              <div class="k">ยอดขาย</div>
+              <div class="v" id="sales">-</div>
+            </div>
+
+            <div class="kv">
+              <div class="k">Rank</div>
+              <div class="v" id="rank" style="color:rgba(216,180,90,.95);font-weight:900;">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="idfoot">
+          <div class="fine">
+            ระบบนี้ใช้เพื่อ “ยืนยันตัวตนตัวแทน” เท่านั้น<br>
+            ถ้าสถานะไม่ใช่ ACTIVE ระบบจะจำกัดการแสดงข้อมูลติดต่อ
+          </div>
+          <div class="qr">QR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+
+    // ===== iframe height sync =====
+    function sendHeight(){
+      const h = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      window.parent.postMessage({ type:"NX_HEIGHT", height:h }, "*");
+    }
+    function sendHeightBurst(){
+      sendHeight();
+      setTimeout(sendHeight, 120);
+      setTimeout(sendHeight, 350);
+      setTimeout(sendHeight, 800);
+      setTimeout(sendHeight, 1400);
+    }
+
+    // ===== AUTO FIT (กันหน้าขาว) =====
+    (function(){
+      const wrap = document.querySelector(".wrap");
+      if(!wrap) return;
+
+      let rafLock = 0;
+
+      function fitToViewport(){
+        if(rafLock) cancelAnimationFrame(rafLock);
+        rafLock = requestAnimationFrame(() => {
+          wrap.style.setProperty("--ui-scale", 1);
+          wrap.classList.remove("scrollable");
+          wrap.style.maxHeight = "";
+
+          const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+          const bodyStyle = getComputedStyle(document.body);
+          const padTop = parseFloat(bodyStyle.paddingTop) || 0;
+          const padBot = parseFloat(bodyStyle.paddingBottom) || 0;
+          const available = vh - padTop - padBot;
+
+          const wrapH = wrap.scrollHeight || wrap.getBoundingClientRect().height || 1;
+          const ratio = available / wrapH;
+
+          // ถ้าเนื้อหาสูงเกินจอ -> ย่อด้วย scale แทนการทำกรอบเลื่อน
+let scale = 1;
+
+// ratio = available / wrapH
+if (ratio < 1) {
+  // กันย่อจนเล็กเกินไป ปรับขั้นต่ำได้ เช่น 0.82
+  scale = Math.max(ratio, 0.82);
+}
+
+wrap.style.setProperty("--ui-scale", scale);
+wrap.classList.remove("scrollable");
+wrap.style.maxHeight = ""; // ไม่ต้องจำกัดความสูงให้เกิดสกอล์ในกล่อง
+
+          sendHeightBurst();
+        });
+      }
+
+      window.NX_FIT = fitToViewport;
+
+      window.addEventListener("load", fitToViewport);
+      window.addEventListener("resize", fitToViewport);
+      if (window.visualViewport){
+        window.visualViewport.addEventListener("resize", fitToViewport);
+      }
+
+      const mo = new MutationObserver(() => fitToViewport());
+      mo.observe(wrap, { childList:true, subtree:true });
+
+    })();
+
+    // ===== center-mode helpers =====
+    function setCenterMode(on){
+      document.body.classList.toggle("center-mode", !!on);
+    }
+
+    function setMsg(text, type){
+      const m = el("msg");
+      if(!text){
+        m.style.display = "none";
+        m.className = "msg";
+        m.innerText = "";
+        sendHeightBurst();
+        if(window.NX_FIT) window.NX_FIT();
+        return;
+      }
+      m.style.display = "block";
+      m.className = "msg " + (type || "");
+      m.innerText = text;
+      sendHeightBurst();
+      if(window.NX_FIT) window.NX_FIT();
+    }
+
+    function setLoading(on){
+      const btn = el("btn");
+      const inp = el("memberId");
+      btn.disabled = on;
+      inp.disabled = on;
+      btn.innerText = on ? "กำลังตรวจสอบ..." : "ตรวจสอบ";
+      sendHeightBurst();
+      if(window.NX_FIT) window.NX_FIT();
+    }
+
+    function setStatusPill(status){
+      const st = (status || "INACTIVE").toUpperCase();
+      const pill = el("statusPill");
+      pill.className = "statusPill " + st;
+      el("statusText").innerText = st;
+      sendHeightBurst();
+      if(window.NX_FIT) window.NX_FIT();
+    }
+
+    function preloadImage(url, ok, fail){
+      const img = new Image();
+      img.onload = () => ok && ok();
+      img.onerror = () => fail && fail();
+      img.src = url;
+    }
+
+    function setCardBackground(bgUrl){
+      const card = el("idcard");
+      const t = 0.55, b = 0.78;
+      const url = (bgUrl || "").trim();
+
+      if (url.startsWith("http")) {
+        preloadImage(url,
+          () => {
+            card.style.backgroundImage =
+              `linear-gradient(180deg, rgba(0,0,0,${t}), rgba(0,0,0,${b})), url('${url}')`;
+            sendHeightBurst();
+            if(window.NX_FIT) window.NX_FIT();
+          },
+          () => {
+            card.style.backgroundImage =
+              `linear-gradient(180deg, rgba(0,0,0,${t}), rgba(0,0,0,${b}))`;
+            sendHeightBurst();
+            if(window.NX_FIT) window.NX_FIT();
+          }
+        );
+      } else {
+        card.style.backgroundImage =
+          `linear-gradient(180deg, rgba(0,0,0,${t}), rgba(0,0,0,${b}))`;
+        sendHeightBurst();
+        if(window.NX_FIT) window.NX_FIT();
+      }
+    }
+
+    function setPhotoCircle(bgUrl){
+      const photo = el("photoBox");
+      const url = (bgUrl || "").trim();
+
+      if (url.startsWith("http")) {
+        preloadImage(url,
+          () => {
+            photo.style.backgroundImage = `url("${url}")`;
+            photo.style.filter = "none";   // ✅ ไม่จ้า
+            photo.textContent = "";
+            sendHeightBurst();
+            if(window.NX_FIT) window.NX_FIT();
+          },
+          () => {
+            photo.style.backgroundImage = "none";
+            photo.style.filter = "none";
+            photo.textContent = "ID";
+            sendHeightBurst();
+            if(window.NX_FIT) window.NX_FIT();
+          }
+        );
+      } else {
+        photo.style.backgroundImage = "none";
+        photo.style.filter = "none";
+        photo.textContent = "ID";
+        sendHeightBurst();
+        if(window.NX_FIT) window.NX_FIT();
+      }
+    }
+
+    function showCard(res){
+      el("result").style.display = "flex";
+
+      el("mid").innerText   = res.member_id || "-";
+      el("nick").innerText  = res.nickname || "-";
+      el("phone").innerText = res.phone || "-";
+      el("line").innerText  = res.line || "-";
+      el("expiry").innerText= res.expiry || "-";
+      el("sales").innerText = res.sales ?? "-";
+      el("rank").innerText  = res.rank || "-";
+
+      setStatusPill(res.status);
+      setCardBackground(res.bgImage);
+      setPhotoCircle(res.bgImage);
+
+      sendHeightBurst();
+      if(window.NX_FIT) window.NX_FIT();
+    }
+
+    function doCheck(){
+      const id = (el("memberId").value || "").trim();
+      if(!id){
+        el("result").style.display = "none";
+        setCenterMode(true);
+        setMsg("กรุณากรอกรหัสสมาชิก", "warn");
+        return;
+      }
+
+      setLoading(true);
+      setMsg("กำลังตรวจสอบข้อมูล...", "");
+      el("result").style.display = "none";
+      setCenterMode(true);
+
+      sendHeightBurst();
+      if(window.NX_FIT) window.NX_FIT();
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          setLoading(false);
+
+          if(!res || !res.found){
+            setCenterMode(true);
+            setMsg((res && res.note) ? res.note : "ไม่พบข้อมูลสมาชิก", "err");
+            return;
+          }
+
+          setCenterMode(false);
+
+          const st = (res.status || "").toUpperCase();
+          if (st === "ACTIVE"){
+            setMsg("ตรวจสอบสำเร็จ: สมาชิกสถานะ ACTIVE", "ok");
+          } else if (st === "EXPIRED"){
+            setMsg("คำเตือน: บัตรหมดอายุแล้ว (ระบบตั้งเป็น EXPIRED อัตโนมัติ)", "warn");
+          } else {
+            setMsg("คำเตือน: สถานะไม่ใช่ ACTIVE ระบบจำกัดการแสดงข้อมูลติดต่อ", "warn");
+          }
+
+          showCard(res);
+        })
+        .withFailureHandler((err) => {
+          setLoading(false);
+          el("result").style.display = "none";
+          setCenterMode(true);
+          setMsg("เกิดข้อผิดพลาดในการตรวจสอบ\n" + (err && err.message ? err.message : "ไม่ทราบสาเหตุ"), "err");
+        })
+        .checkMember(id);
+    }
+
+    el("frm").addEventListener("submit", function(e){
+      e.preventDefault();
+      doCheck();
+    });
+
+    window.addEventListener("load", () => {
+      setCenterMode(true);
+      sendHeightBurst();
+      if(window.NX_FIT) window.NX_FIT();
+    });
+  </script>
+
+  <!-- ✅ COUNTER CALL (ครั้งเดียว) -->
+  <script>
+    google.script.run
+      .withSuccessHandler(function(n){
+        const el = document.getElementById("nxCounterNum");
+        if(el) el.textContent = Number(n).toLocaleString("th-TH");
+      })
+      .withFailureHandler(err => console.error("COUNTER ERROR", err))
+      .increaseCounter();
+  </script>
+</body>
+</html>

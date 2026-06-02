@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Gift,
+  Landmark,
   Menu,
   ScanLine,
   ScrollText,
@@ -21,6 +22,7 @@ const items = [
   { href: "/admin/rewards", label: "Rewards", icon: Gift },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/point-logs", label: "Point Logs", icon: ScrollText },
+  { href: "/admin/card-bank", label: "Card Bank", icon: Landmark },
   { href: "/admin/staff-scan", label: "Staff Scan", icon: ScanLine },
 ];
 
