@@ -479,8 +479,8 @@ export default function ExchangeCalculatorClient() {
 
       <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
         <PanelHeader icon={Trophy} kicker="Collection Sets" title="คำนวณเซ็ตสะสม 40 เซ็ต" />
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-          <div className="grid max-h-[680px] gap-3 overflow-y-auto pr-1 lg:grid-cols-2">
+        <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+          <div className="grid max-h-[720px] gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
             {allSets.map((set) => {
               const quantityValue = quantityBySet[set.id] ?? "1";
               const withFoilBonus = Boolean(foilBonusBySet[set.id]);
@@ -490,35 +490,35 @@ export default function ExchangeCalculatorClient() {
               const cardTotal = set.officialTotal || getCollectionCardIds(set).length;
 
               return (
-                <div key={set.id} className="flex min-h-full flex-col rounded-[22px] border border-white/10 bg-black/24 p-3">
+                <div key={set.id} className="flex min-h-full flex-col rounded-[22px] border border-white/10 bg-black/24 p-3 sm:p-4">
                   <div className="flex flex-1 flex-col gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-9 min-w-9 items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.06] px-2 text-sm font-black text-white">
+                      <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-3 sm:grid-cols-[44px_minmax(0,1fr)_auto]">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.06] text-sm font-black text-white">
                           {set.order}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-base font-black text-white">
+                        <span className="min-w-0 break-words text-base font-black leading-6 text-white">
                           {set.name}
                         </span>
-                        <span className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-black text-white/52">
+                        <span className="col-start-2 w-fit rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-black text-white/52 sm:col-start-auto">
                           {cardTotal} ใบ
                         </span>
                       </div>
-                      <div className="mt-2 line-clamp-2 text-sm leading-6 text-white/52">
+                      <div className="mt-2 line-clamp-3 text-sm leading-6 text-white/52">
                         {set.reward}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
-                        <span className="rounded-full border border-white/10 bg-white px-3 py-1 text-black">
+                        <span className="max-w-full rounded-full border border-white/10 bg-white px-3 py-1 text-black">
                           {baseValue > 0 ? `${formatNumber(baseValue)} NEX` : "รางวัลพิเศษ"}
                         </span>
                         {withFoilBonus && activeValue !== baseValue ? (
-                          <span className="rounded-full border border-white/16 bg-white/[0.12] px-3 py-1 text-white">
+                          <span className="max-w-full rounded-full border border-white/16 bg-white/[0.12] px-3 py-1 text-white">
                             เพิ่มเป็น {formatNumber(activeValue)} NEX
                           </span>
                         ) : null}
                       </div>
                     </div>
-                    <div className="grid grid-cols-[minmax(72px,1fr)_100px] gap-2">
+                    <div className="grid gap-2 sm:grid-cols-[minmax(84px,1fr)_112px]">
                       <input
                         value={quantityValue}
                         onChange={(event) =>
@@ -536,7 +536,7 @@ export default function ExchangeCalculatorClient() {
                         onClick={() =>
                           addSetItem(set, Number(quantityValue || 1), withFoilBonus)
                         }
-                        className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
+                        className="inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
                       >
                         <PackagePlus className="h-4 w-4" />
                         เพิ่ม
