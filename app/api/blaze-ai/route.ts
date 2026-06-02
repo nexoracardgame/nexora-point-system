@@ -8,6 +8,11 @@ import {
   nexoraCollectionSets,
   NEXORA_COLLECTION_SOURCE_URL,
 } from "@/lib/nexora-collection-sets";
+import {
+  nexoraCoinRewards,
+  nexoraSingleCardNexRewards,
+  NEXORA_SINGLE_CARD_REWARD_SOURCE_URL,
+} from "@/lib/nexora-card-rewards";
 import bundledCardSkillDbJson from "@/public/cards/card-skill-db.json";
 
 export const runtime = "nodejs";
@@ -319,6 +324,7 @@ const COLLECTION_SETS: CollectionSetRecord[] = nexoraCollectionSets.map((set) =>
 });
 
 const BLAZE_COLLECTION_REWARD_INDEX = buildCollectionCanonicalIndex();
+const BLAZE_CARD_REWARD_INDEX = buildCardRewardCanonicalIndex();
 
 function sanitizeText(value: unknown) {
   return String(value || "").trim();
@@ -509,6 +515,27 @@ function buildCollectionCanonicalIndex() {
     "- Canonical update: Set 40 is the special 36-copy foil rule: choose one eligible foil card number, then collect that exact same foil card number repeatedly until reaching 36 copies. Do not treat the number 36 as a card number.",
     "- Canonical rule: ถ้าถามว่าเซ็ตใดตรงกับรางวัลใด ให้ใช้ดัชนีนี้ก่อน DATA/web snippet เสมอ และตอบครบทุกเซ็ตที่ match",
     "- Canonical rule: ถ้าถามภาพรวมชุดสะสม ให้ตอบจำนวนเซ็ตและชื่อ/เลขเซ็ตก่อน ไม่ต้องยกตัวอย่างการ์ด เว้นแต่ผู้ใช้ถามรายละเอียดหรือถามว่าในเซ็ตมีการ์ดอะไร",
+  ].join("\n");
+}
+
+function buildCardRewardCanonicalIndex() {
+  const coinLines = nexoraCoinRewards.map(
+    (reward) =>
+      `- No.${reward.cardNo} ${reward.cardName}: ${reward.coinValue.toLocaleString("th-TH")} COIN (${reward.confidence})`
+  );
+  const singleCardLines = nexoraSingleCardNexRewards.map(
+    (reward) =>
+      `- No.${reward.cardNo}: ${reward.nexValue.toLocaleString("th-TH")} NEX`
+  );
+
+  return [
+    "NEXORA canonical card reward index:",
+    `- COIN card count: ${nexoraCoinRewards.length}`,
+    "- COIN rule: coin values are printed at the upper-left coin marker on the physical card image. Use this canonical index before guessing from card text.",
+    ...coinLines,
+    `- Single-card NEX reward source: ${NEXORA_SINGLE_CARD_REWARD_SOURCE_URL}`,
+    `- Single-card NEX reward count: ${nexoraSingleCardNexRewards.length}`,
+    ...singleCardLines,
   ].join("\n");
 }
 
@@ -3621,11 +3648,19 @@ async function buildCardDbKnowledgeContext(
   const selectedRows = exact ? [exact] : matches.length ? matches : rows.slice(0, 293);
   const lines = selectedRows.map((row) => {
     const kind = getCardKind(row);
+    const coinReward = nexoraCoinRewards.find((reward) => reward.cardNo === row.cardNo);
+    const singleCardReward = nexoraSingleCardNexRewards.find(
+      (reward) => reward.cardNo === row.cardNo
+    );
     return [
       `- ${row.cardNo} | ${row.cardName}`,
       `ประเภท: ${formatCardKind(kind)}`,
       formatCardElementLine(row),
       `ระดับ: ${row.value || "-"}`,
+      coinReward ? `COIN: ${coinReward.coinValue.toLocaleString("th-TH")}` : "",
+      singleCardReward
+        ? `รางวัลใบเดียว: ${singleCardReward.nexValue.toLocaleString("th-TH")} NEX`
+        : "",
       isSkillCard(row) && row.skill ? `สกิล/ความสามารถ: ${row.skill}` : "",
       isMonsterCard(row) && row.atk ? `ATK: ${row.atk}` : "",
       isMonsterCard(row) && row.sup ? `SUP: ${row.sup}` : "",
@@ -4011,6 +4046,7 @@ const BLAZE_CORE_KNOWLEDGE = [
 function buildSystemPrompt(userName: string, knowledgeContext: string) {
   const productContext = [
     knowledgeContext || BLAZE_CORE_KNOWLEDGE,
+    BLAZE_CARD_REWARD_INDEX,
     process.env.BLAZE_PRODUCT_CONTEXT || "",
   ]
     .filter(Boolean)
@@ -4419,6 +4455,7 @@ function buildScriptBridgeMessage({
       ? "คำตอบก่อนหน้าผิดเพราะกล่าวถึงสิ่งที่ผู้ใช้ไม่ได้ส่ง รอบนี้ต้องตอบใหม่จากข้อความจริงเท่านั้น"
       : "",
     BLAZE_RESPONSE_POLICY,
+    BLAZE_CARD_REWARD_INDEX,
     "",
     knowledgeContext || BLAZE_CORE_KNOWLEDGE,
     "",

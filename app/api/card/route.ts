@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getNexoraCoinReward,
+  getNexoraSingleCardNexReward,
+  normalizeNexoraCardNo,
+} from "@/lib/nexora-card-rewards";
 
 type CacheEntry = {
   data: any;
@@ -11,6 +16,7 @@ const CACHE_TTL = 60 * 1000; // 60 วิ
 
 export async function GET(req: NextRequest) {
   const cardNo = req.nextUrl.searchParams.get("cardNo");
+  const normalizedCardNo = normalizeNexoraCardNo(cardNo || "");
 
   if (!cardNo) {
     return NextResponse.json(
@@ -25,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     if (cached && cached.expires > Date.now()) {
       return NextResponse.json({
-        ...cached.data,
+        ...mergeCanonicalCardRewards(cached.data, normalizedCardNo),
         cached: true,
       });
     }
@@ -48,13 +54,15 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
 
     // 💾 3) เก็บ cache 60 วิ
+    const mergedData = mergeCanonicalCardRewards(data, normalizedCardNo);
+
     memoryCache.set(cardNo, {
-      data,
+      data: mergedData,
       expires: Date.now() + CACHE_TTL,
     });
 
     return NextResponse.json({
-      ...data,
+      ...mergedData,
       cached: false,
     });
   } catch (error: any) {
@@ -65,9 +73,25 @@ export async function GET(req: NextRequest) {
 
     if (fallback) {
       return NextResponse.json({
-        ...fallback.data,
+        ...mergeCanonicalCardRewards(fallback.data, normalizedCardNo),
         cached: true,
         stale: true,
+      });
+    }
+
+    const canonicalOnly = mergeCanonicalCardRewards(
+      {
+        cardNo: normalizedCardNo || cardNo,
+        imageUrl: normalizedCardNo ? `/cards/${normalizedCardNo}.jpg` : "",
+      },
+      normalizedCardNo
+    );
+
+    if (normalizedCardNo && (canonicalOnly.coinValue || canonicalOnly.singleCardNexValue)) {
+      return NextResponse.json({
+        ...canonicalOnly,
+        cached: false,
+        canonicalOnly: true,
       });
     }
 
@@ -79,4 +103,20 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function mergeCanonicalCardRewards(data: any, cardNo: string) {
+  const coinReward = getNexoraCoinReward(cardNo);
+  const singleCardReward = getNexoraSingleCardNexReward(cardNo);
+
+  return {
+    ...data,
+    cardNo: data?.cardNo || cardNo,
+    card_no: data?.card_no || cardNo,
+    coinValue: coinReward?.coinValue ?? data?.coinValue ?? data?.coin ?? 0,
+    coin: coinReward?.coinValue ?? data?.coin ?? data?.coinValue ?? 0,
+    coinReward,
+    singleCardNexValue: singleCardReward?.nexValue ?? data?.singleCardNexValue ?? 0,
+    singleCardNexReward: singleCardReward || data?.singleCardNexReward || null,
+  };
 }

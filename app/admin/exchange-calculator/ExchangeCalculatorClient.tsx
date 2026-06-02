@@ -19,6 +19,10 @@ import {
   nexoraCollectionSets,
   type NexoraCollectionSet,
 } from "@/lib/nexora-collection-sets";
+import {
+  getNexoraCoinReward,
+  getNexoraSingleCardNexReward,
+} from "@/lib/nexora-card-rewards";
 
 type CoinCard = {
   id: string;
@@ -46,7 +50,17 @@ type CardPreview = {
   cardName: string;
   imageUrl: string;
   coinValue: number;
+  singleCardNexValue: number;
   rawReward: string;
+};
+
+type SingleCardNexItem = {
+  id: string;
+  cardNo: string;
+  cardName: string;
+  imageUrl: string;
+  nexValue: number;
+  quantity: number;
 };
 
 const emptyNexInputs = {
@@ -135,6 +149,24 @@ function parseCoinValue(source: Record<string, unknown>) {
   return toNumber(coinMatch?.[1] || thaiCoinMatch?.[1] || "");
 }
 
+function parseSingleCardNexValue(source: Record<string, unknown>, cardNo: string) {
+  const directFields = [
+    "singleCardNexValue",
+    "single_card_nex_value",
+    "nexValue",
+    "nex_value",
+    "jackpotNex",
+    "jackpot_nex",
+  ];
+
+  for (const field of directFields) {
+    const numeric = toNumber(String(source[field] || ""));
+    if (numeric > 0) return numeric;
+  }
+
+  return getNexoraSingleCardNexReward(cardNo)?.nexValue || 0;
+}
+
 function resolveCardPreview(data: Record<string, unknown>, fallbackCardNo: string): CardPreview {
   const nested =
     (data.card as Record<string, unknown> | undefined) ||
@@ -160,6 +192,8 @@ function resolveCardPreview(data: Record<string, unknown>, fallbackCardNo: strin
     nested.reward || nested.rewardText || nested.value || nested.rarity || ""
   ).trim();
 
+  const canonicalCoin = getNexoraCoinReward(cardNo)?.coinValue || 0;
+
   return {
     cardNo,
     cardName: String(
@@ -170,7 +204,8 @@ function resolveCardPreview(data: Record<string, unknown>, fallbackCardNo: strin
         `NEXORA Card No.${cardNo}`
     ),
     imageUrl,
-    coinValue: parseCoinValue(nested),
+    coinValue: canonicalCoin || parseCoinValue(nested),
+    singleCardNexValue: parseSingleCardNexValue(nested, cardNo),
     rawReward,
   };
 }
@@ -181,6 +216,11 @@ export default function ExchangeCalculatorClient() {
   const [cardQuantity, setCardQuantity] = useState("1");
   const [cardPreview, setCardPreview] = useState<CardPreview | null>(null);
   const [coinItems, setCoinItems] = useState<CoinCard[]>([]);
+  const [singleCardQuery, setSingleCardQuery] = useState("");
+  const [singleCardPreview, setSingleCardPreview] = useState<CardPreview | null>(null);
+  const [singleCardItems, setSingleCardItems] = useState<SingleCardNexItem[]>([]);
+  const [pendingSingleCard, setPendingSingleCard] = useState<CardPreview | null>(null);
+  const [singleCardQuantity, setSingleCardQuantity] = useState("1");
   const [quantityBySet, setQuantityBySet] = useState<Record<string, string>>({});
   const [foilBonusBySet, setFoilBonusBySet] = useState<Record<string, boolean>>({});
   const [setItems, setSetItems] = useState<SetItem[]>([]);
@@ -194,6 +234,10 @@ export default function ExchangeCalculatorClient() {
     toCount(nexInputs.gold) * 2;
   const totalCoin = coinItems.reduce(
     (sum, item) => sum + item.coinValue * item.quantity,
+    0
+  );
+  const totalSingleCardNex = singleCardItems.reduce(
+    (sum, item) => sum + item.nexValue * item.quantity,
     0
   );
   const totalSetNex = setItems.reduce(
@@ -221,7 +265,8 @@ export default function ExchangeCalculatorClient() {
       cardNo,
       cardName: `NEXORA Card No.${cardNo}`,
       imageUrl: `/cards/${cardNo}.jpg`,
-      coinValue: 0,
+      coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
+      singleCardNexValue: getNexoraSingleCardNexReward(cardNo)?.nexValue || 0,
       rawReward: "",
     };
     setCardPreview(localPreview);
@@ -241,6 +286,40 @@ export default function ExchangeCalculatorClient() {
 
     return () => window.clearTimeout(timer);
   }, [cardQuery]);
+
+  useEffect(() => {
+    const cardNo = normalizeCardNo(singleCardQuery);
+    if (!cardNo) {
+      setSingleCardPreview(null);
+      return;
+    }
+
+    const reward = getNexoraSingleCardNexReward(cardNo);
+    const localPreview: CardPreview = {
+      cardNo,
+      cardName: `NEXORA Card No.${cardNo}`,
+      imageUrl: `/cards/${cardNo}.jpg`,
+      coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
+      singleCardNexValue: reward?.nexValue || 0,
+      rawReward: reward ? `${formatNumber(reward.nexValue)} NEX` : "",
+    };
+    setSingleCardPreview(localPreview);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/card?cardNo=${encodeURIComponent(cardNo)}`, {
+          cache: "no-store",
+        });
+        const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!response.ok || data.error) return;
+        setSingleCardPreview(resolveCardPreview(data, cardNo));
+      } catch {
+        setSingleCardPreview(localPreview);
+      }
+    }, 220);
+
+    return () => window.clearTimeout(timer);
+  }, [singleCardQuery]);
 
   useEffect(() => {
     if (!setPickerOpen) return;
@@ -274,7 +353,8 @@ export default function ExchangeCalculatorClient() {
         cardNo,
         cardName: `NEXORA Card No.${cardNo}`,
         imageUrl: `/cards/${cardNo}.jpg`,
-        coinValue: 0,
+        coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
+        singleCardNexValue: getNexoraSingleCardNexReward(cardNo)?.nexValue || 0,
         rawReward: "",
       } satisfies CardPreview);
 
@@ -292,6 +372,52 @@ export default function ExchangeCalculatorClient() {
     setCardQuery("");
     setCardQuantity("1");
     setCardPreview(null);
+  };
+
+  const requestAddSingleCard = () => {
+    const cardNo = singleCardPreview?.cardNo || normalizeCardNo(singleCardQuery);
+    if (!cardNo) return;
+
+    const reward = getNexoraSingleCardNexReward(cardNo);
+    if (!reward) return;
+
+    const preview =
+      singleCardPreview ||
+      ({
+        cardNo,
+        cardName: `NEXORA Card No.${cardNo}`,
+        imageUrl: `/cards/${cardNo}.jpg`,
+        coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
+        singleCardNexValue: reward.nexValue,
+        rawReward: `${formatNumber(reward.nexValue)} NEX`,
+      } satisfies CardPreview);
+
+    setPendingSingleCard({
+      ...preview,
+      singleCardNexValue: reward.nexValue,
+    });
+    setSingleCardQuantity("1");
+  };
+
+  const confirmAddSingleCard = () => {
+    if (!pendingSingleCard || pendingSingleCard.singleCardNexValue <= 0) return;
+    const quantity = Math.max(1, toCount(singleCardQuantity || "1"));
+
+    setSingleCardItems((current) => [
+      ...current,
+      {
+        id: `${pendingSingleCard.cardNo}-${Date.now()}`,
+        cardNo: pendingSingleCard.cardNo,
+        cardName: pendingSingleCard.cardName,
+        imageUrl: pendingSingleCard.imageUrl,
+        nexValue: pendingSingleCard.singleCardNexValue,
+        quantity,
+      },
+    ]);
+    setPendingSingleCard(null);
+    setSingleCardQuery("");
+    setSingleCardPreview(null);
+    setSingleCardQuantity("1");
   };
 
   const addSetItem = (
@@ -335,9 +461,10 @@ export default function ExchangeCalculatorClient() {
               สำหรับใช้หน้าเคาน์เตอร์แบบเร็วและตรวจซ้ำง่าย
             </p>
           </div>
-          <div className="grid gap-3 bg-[#f6f6f3] p-4 sm:grid-cols-3 sm:p-5 lg:grid-cols-1 xl:grid-cols-3">
+          <div className="grid gap-3 bg-[#f6f6f3] p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-1 xl:grid-cols-2">
             <HeroMetric label="NEX จากการ์ด" value={formatNumber(nexTotal, 1)} unit="NEX" />
             <HeroMetric label="COIN จากเลขการ์ด" value={formatNumber(totalCoin)} unit="COIN" />
+            <HeroMetric label="NEX รางวัลใบเดียว" value={formatNumber(totalSingleCardNex)} unit="NEX" />
             <HeroMetric label="NEX จากเซ็ต" value={formatNumber(totalSetNex)} unit="NEX" />
           </div>
         </div>
@@ -494,6 +621,172 @@ export default function ExchangeCalculatorClient() {
           </div>
         </div>
       </section>
+
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+        <PanelHeader icon={BadgePercent} kicker="Single Card Reward" title="รางวัลใบเดียว NEX" />
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="grid gap-3">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                value={singleCardQuery}
+                onChange={(event) => setSingleCardQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    requestAddSingleCard();
+                  }
+                }}
+                placeholder="กรอกเลขการ์ดรางวัลใบเดียว เช่น 009, 170"
+                inputMode="numeric"
+                className="h-14 rounded-[18px] border border-white/10 bg-black/35 px-4 text-base font-black text-white outline-none placeholder:text-white/30 focus:border-white/30"
+              />
+              <button
+                type="button"
+                onClick={requestAddSingleCard}
+                disabled={!singleCardPreview?.singleCardNexValue}
+                className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] bg-white px-5 text-sm font-black text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/35"
+              >
+                <PackagePlus className="h-4 w-4" />
+                ยืนยัน
+              </button>
+            </div>
+            <SingleCardPreviewPanel preview={singleCardPreview} />
+          </div>
+
+          <div className="rounded-[22px] border border-white/10 bg-black/24 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-black text-white/72">รายการรางวัลใบเดียว</div>
+              <button
+                type="button"
+                onClick={() => setSingleCardItems([])}
+                className="inline-flex h-9 items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 text-xs font-black text-white/70"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                ล้าง
+              </button>
+            </div>
+            <div className="mt-3 grid max-h-[320px] gap-2 overflow-y-auto pr-1">
+              {singleCardItems.length === 0 ? (
+                <div className="rounded-[18px] border border-dashed border-white/12 bg-white/[0.025] p-4 text-sm font-bold text-white/40">
+                  ยังไม่มีรายการ ใส่เลขการ์ดที่มีรางวัลใบเดียว แล้วกด Enter หรือยืนยัน
+                </div>
+              ) : (
+                singleCardItems.map((item) => (
+                  <div key={item.id} className="grid grid-cols-[48px_minmax(0,1fr)_auto] gap-3 rounded-[18px] border border-white/8 bg-white/[0.04] p-2">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.cardName}
+                      loading="lazy"
+                      className="h-16 w-11 rounded-[10px] object-cover"
+                      onError={(event) => {
+                        event.currentTarget.src = `/cards/${item.cardNo}.jpg`;
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black text-white">
+                        No.{item.cardNo} {item.cardName}
+                      </div>
+                      <div className="mt-1 text-xs font-bold text-white/45">
+                        {formatNumber(item.nexValue)} NEX x {formatNumber(item.quantity)} ใบ
+                      </div>
+                      <div className="mt-1 text-sm font-black text-white">
+                        {formatNumber(item.nexValue * item.quantity)} NEX
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSingleCardItems((current) => current.filter((row) => row.id !== item.id))
+                      }
+                      className="flex h-9 w-9 items-center justify-center rounded-[14px] border border-red-300/20 bg-red-500/10 text-red-100"
+                      aria-label="ลบรางวัลใบเดียว"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-3 rounded-[20px] bg-white p-4 text-black">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-black/40">
+                Total Single Card NEX
+              </div>
+              <div className="mt-1 text-3xl font-black">{formatNumber(totalSingleCardNex)} NEX</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {pendingSingleCard ? (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/76 p-4 backdrop-blur-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="single-card-quantity-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setPendingSingleCard(null)}
+            aria-label="ปิดหน้าต่างจำนวน"
+          />
+          <div className="relative w-full max-w-md rounded-[26px] border border-white/10 bg-[#111113] p-5 text-white shadow-[0_30px_110px_rgba(0,0,0,0.65)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">
+                  Quantity
+                </div>
+                <h3 id="single-card-quantity-title" className="mt-1 text-2xl font-black">
+                  จำนวนการ์ดใบนี้
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingSingleCard(null)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.06] text-white"
+                aria-label="ปิดหน้าต่างจำนวน"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 grid grid-cols-[64px_minmax(0,1fr)] gap-3 rounded-[20px] border border-white/10 bg-black/30 p-3">
+              <img
+                src={pendingSingleCard.imageUrl}
+                alt={pendingSingleCard.cardName}
+                className="h-24 w-16 rounded-[12px] object-cover"
+              />
+              <div className="min-w-0">
+                <div className="truncate text-base font-black">
+                  No.{pendingSingleCard.cardNo} {pendingSingleCard.cardName}
+                </div>
+                <div className="mt-2 text-sm font-bold text-white/52">
+                  {formatNumber(pendingSingleCard.singleCardNexValue)} NEX / ใบ
+                </div>
+              </div>
+            </div>
+            <input
+              value={singleCardQuantity}
+              onChange={(event) => setSingleCardQuantity(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  confirmAddSingleCard();
+                }
+              }}
+              inputMode="numeric"
+              className="mt-4 h-14 w-full rounded-[18px] border border-white/10 bg-black/40 px-4 text-center text-xl font-black text-white outline-none focus:border-white/35"
+            />
+            <button
+              type="button"
+              onClick={confirmAddSingleCard}
+              className="mt-3 inline-flex h-14 w-full items-center justify-center gap-2 rounded-[18px] bg-white px-5 text-sm font-black text-black transition hover:bg-zinc-200"
+            >
+              <PackagePlus className="h-4 w-4" />
+              เพิ่มเข้าคำนวณ
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {setPickerOpen ? (
         <div
@@ -838,6 +1131,42 @@ function CardPreviewPanel({ preview }: { preview: CardPreview | null }) {
       </div>
       <div className="mt-3 rounded-[16px] bg-white px-3 py-2 text-center text-lg font-black text-black">
         {formatNumber(preview.coinValue)} COIN / ใบ
+      </div>
+    </div>
+  );
+}
+
+function SingleCardPreviewPanel({ preview }: { preview: CardPreview | null }) {
+  if (!preview) {
+    return (
+      <div className="grid min-h-[220px] place-items-center rounded-[22px] border border-dashed border-white/12 bg-black/24 p-4 text-center text-sm font-bold text-white/40">
+        รูปและมูลค่า NEX จะขึ้นทันทีหลังกรอกเลขการ์ดรางวัลใบเดียว
+      </div>
+    );
+  }
+
+  const hasReward = preview.singleCardNexValue > 0;
+
+  return (
+    <div className={`grid gap-4 rounded-[22px] border p-3 sm:grid-cols-[150px_minmax(0,1fr)] ${hasReward ? "border-emerald-200/20 bg-emerald-400/10" : "border-white/10 bg-black/24"}`}>
+      <img
+        src={preview.imageUrl}
+        alt={preview.cardName}
+        className="mx-auto aspect-[5/7] max-h-[220px] w-full max-w-[150px] rounded-[18px] object-cover"
+        onError={(event) => {
+          event.currentTarget.src = `/cards/${preview.cardNo}.jpg`;
+        }}
+      />
+      <div className="min-w-0 self-center">
+        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">
+          Card Preview
+        </div>
+        <div className="mt-2 break-words text-xl font-black text-white">
+          No.{preview.cardNo} {preview.cardName}
+        </div>
+        <div className={`mt-4 rounded-[18px] px-4 py-3 text-2xl font-black ${hasReward ? "bg-white text-black" : "border border-white/10 bg-white/[0.05] text-white/45"}`}>
+          {hasReward ? `${formatNumber(preview.singleCardNexValue)} NEX / ใบ` : "ไม่มีรางวัลใบเดียว"}
+        </div>
       </div>
     </div>
   );
