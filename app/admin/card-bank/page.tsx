@@ -15,6 +15,7 @@ import {
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -133,12 +134,12 @@ export default function AdminCardBankPage() {
               </div>
               <h2 className="mt-2 text-2xl font-black">เมนูทำงานของแอดมิน</h2>
             </div>
-            <button
-              type="button"
+            <Link
+              href="/admin/card-bank/create"
               className="rounded-[18px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-black text-white transition hover:bg-white/[0.09]"
             >
               เพิ่มรายการรับฝาก
-            </button>
+            </Link>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
