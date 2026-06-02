@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   Check,
   CircleDollarSign,
+  Layers3,
   Landmark,
   Loader2,
   PackagePlus,
@@ -20,6 +21,11 @@ import {
   canChooseCardFinish,
   isForcedFoilCard,
 } from "@/lib/card-finish";
+import {
+  getCollectionCardIds,
+  nexoraCollectionSets,
+  type NexoraCollectionSet,
+} from "@/lib/nexora-collection-sets";
 
 type UserRow = {
   id: string;
@@ -49,8 +55,20 @@ type DepositItem = {
   imageUrl: string;
 };
 
+type DepositSetItem = {
+  id: string;
+  setId: string;
+  order: number;
+  setName: string;
+  quantity: number;
+  nexValue: number;
+  reward: string;
+  withFoilBonus: boolean;
+  cardTotal: number;
+};
+
 type EntryMode = "bank" | "pawn";
-type IntakeMode = "specific" | "bulk";
+type IntakeMode = "specific" | "sets" | "bulk";
 type CardType = "normal" | "foil";
 
 function normalizeSearch(value: string) {
@@ -65,6 +83,30 @@ function normalizeCardNo(value: string) {
 
 function formatNumber(value: number) {
   return value.toLocaleString("th-TH");
+}
+
+function parseNexReward(reward: string, withFoilBonus: boolean) {
+  const amounts = Array.from(reward.matchAll(/([\d,]+)\s*Nex/gi))
+    .map((match) => Number(match[1].replace(/,/g, "")))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (amounts.length === 0) return 0;
+  return withFoilBonus ? Math.max(...amounts) : amounts[0];
+}
+
+function hasFoilBonusOption(set: NexoraCollectionSet) {
+  const text = `${set.reward} ${set.story}`.toLowerCase();
+  return (
+    /foil/.test(text) ||
+    /ฟอยล์/.test(text) ||
+    /เธเธญเธขเธฅ/.test(text)
+  );
+}
+
+function getSetConditionText(set: NexoraCollectionSet) {
+  if (!hasFoilBonusOption(set)) return "";
+  const parts = set.reward.split(";").map((part) => part.trim()).filter(Boolean);
+  return parts.find((part) => /foil|ฟอยล์|เธเธญเธขเธฅ/i.test(part)) || set.story;
 }
 
 function getDisplayName(user: UserRow) {
@@ -119,8 +161,10 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const [cardLoading, setCardLoading] = useState(false);
   const [cardError, setCardError] = useState("");
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
+  const [setModalOpen, setSetModalOpen] = useState(false);
   const [quantityInput, setQuantityInput] = useState("1");
   const [items, setItems] = useState<DepositItem[]>([]);
+  const [cardSetItems, setCardSetItems] = useState<DepositSetItem[]>([]);
   const [bulkNex, setBulkNex] = useState("");
   const [bulkCoin, setBulkCoin] = useState("");
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -201,6 +245,11 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
   const selectedUsername = String(selectedUser?.username || "").trim().replace(/^@+/, "");
   const totalSpecificCards = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalSetCount = cardSetItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalSetNex = cardSetItems.reduce(
+    (sum, item) => sum + item.quantity * item.nexValue,
+    0
+  );
   const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const forcedFoil = isForcedFoilCard(previewCardNo);
 
@@ -242,6 +291,30 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     setCardPreview(null);
   };
 
+  const addSetItem = (
+    set: NexoraCollectionSet,
+    quantity: number,
+    withFoilBonus: boolean
+  ) => {
+    const safeQuantity = Math.max(1, Math.floor(quantity));
+    if (!Number.isFinite(safeQuantity) || safeQuantity <= 0) return;
+
+    setCardSetItems((current) => [
+      ...current,
+      {
+        id: `${set.id}-${withFoilBonus ? "foil" : "base"}-${Date.now()}`,
+        setId: set.id,
+        order: set.order,
+        setName: set.name,
+        quantity: safeQuantity,
+        nexValue: parseNexReward(set.reward, withFoilBonus),
+        reward: set.reward,
+        withFoilBonus,
+        cardTotal: set.officialTotal || getCollectionCardIds(set).length,
+      },
+    ]);
+  };
+
   const submitDraft = () => {
     if (!selectedUser || !entryMode) {
       alert("เลือกยูสเซอร์และประเภทรายการก่อน");
@@ -250,6 +323,11 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
     if (intakeMode === "specific" && items.length === 0) {
       alert("เพิ่มรายการการ์ดอย่างน้อย 1 รายการก่อน");
+      return;
+    }
+
+    if (intakeMode === "sets" && cardSetItems.length === 0) {
+      alert("เลือกเซ็ตการ์ดอย่างน้อย 1 รายการก่อน");
       return;
     }
 
@@ -401,12 +479,18 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="mt-5 grid gap-3 lg:grid-cols-3">
                 <IntakeModeButton
                   active={intakeMode === "specific"}
                   title="ระบุการ์ดเป็นใบ"
                   desc="เลือกฟอยล์/ธรรมดา ค้นเลขการ์ด และระบุจำนวน"
                   onClick={() => setIntakeMode("specific")}
+                />
+                <IntakeModeButton
+                  active={intakeMode === "sets"}
+                  title="เซ็ตการ์ด"
+                  desc="ลูกค้าจัดเซ็ตมาครบจากบ้าน เลือกเซ็ตและจำนวนเพื่อรับมูลค่า NEX ตามดาต้า"
+                  onClick={() => setIntakeMode("sets")}
                 />
                 <IntakeModeButton
                   active={intakeMode === "bulk"}
@@ -429,6 +513,13 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 cardError={cardError}
                 onEnterCard={openQuantityModal}
               />
+            ) : intakeMode === "sets" ? (
+              <CardSetForm
+                setItems={cardSetItems}
+                totalSetCount={totalSetCount}
+                totalSetNex={totalSetNex}
+                onOpenSetModal={() => setSetModalOpen(true)}
+              />
             ) : (
               <BulkValueForm
                 bulkNex={bulkNex}
@@ -444,12 +535,16 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-black text-white/55">
                   {intakeMode === "specific"
                     ? `${totalSpecificCards} ใบ`
-                    : "กองรวม"}
+                    : intakeMode === "sets"
+                      ? `${formatNumber(totalSetCount)} เซ็ต`
+                      : "กองรวม"}
                 </span>
               </div>
 
               {intakeMode === "specific" ? (
                 <SpecificSummary items={items} setItems={setItems} />
+              ) : intakeMode === "sets" ? (
+                <CardSetSummary items={cardSetItems} setItems={setCardSetItems} />
               ) : (
                 <BulkSummary bulkNex={bulkNex} bulkCoin={bulkCoin} />
               )}
@@ -478,6 +573,13 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
           inputRef={quantityInputRef}
           cardPreview={cardPreview}
           cardType={cardType}
+        />
+      ) : null}
+
+      {setModalOpen ? (
+        <CardSetModal
+          onClose={() => setSetModalOpen(false)}
+          onAddSet={addSetItem}
         />
       ) : null}
     </div>
@@ -763,6 +865,72 @@ function SecurityLogPanel() {
   );
 }
 
+function CardSetForm({
+  setItems,
+  totalSetCount,
+  totalSetNex,
+  onOpenSetModal,
+}: {
+  setItems: DepositSetItem[];
+  totalSetCount: number;
+  totalSetNex: number;
+  onOpenSetModal: () => void;
+}) {
+  return (
+    <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0d0d0e,#050505)] p-4 sm:p-5">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-black text-white">เซ็ตการ์ด</div>
+              <p className="mt-2 text-sm leading-7 text-white/55">
+                ใช้สำหรับลูกค้าที่จัดเซ็ตครบมาเองจากบ้าน ระบบจะตีมูลค่า NEX ตามชุดในดาต้าเซ็ตทันที
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenSetModal}
+              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-[18px] border border-white/14 bg-white text-sm font-black text-black transition hover:bg-zinc-200"
+            >
+              <Layers3 className="h-4 w-4" />
+              เลือกเซ็ต
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-[20px] border border-white/10 bg-black/24 p-4 text-sm leading-7 text-white/58">
+            ลูกค้าที่ไม่ได้จัดเซ็ตมา ยังใช้โหมดกองรวม NEX / COIN ได้เหมือนเดิม ส่วนลูกค้าที่จัดเซ็ตครบจะได้มูลค่าสูงตามเซ็ตนั้นทันที
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+          <div className="rounded-[20px] border border-white/10 bg-black/24 p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
+              Sets
+            </div>
+            <div className="mt-1 text-2xl font-black text-white">
+              {formatNumber(totalSetCount)}
+            </div>
+          </div>
+          <div className="rounded-[20px] border border-white/10 bg-black/24 p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
+              NEX Value
+            </div>
+            <div className="mt-1 text-2xl font-black text-white">
+              {formatNumber(totalSetNex)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {setItems.length > 0 ? (
+        <div className="mt-4 text-xs font-bold text-white/38">
+          เลือกแล้ว {formatNumber(setItems.length)} รายการ กดสรุปด้านล่างเพื่อตรวจอีกครั้งก่อนบันทึก
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BulkValueForm({
   bulkNex,
   setBulkNex,
@@ -866,6 +1034,218 @@ function SpecificSummary({
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+function CardSetSummary({
+  items,
+  setItems,
+}: {
+  items: DepositSetItem[];
+  setItems: (value: DepositSetItem[]) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 p-4 text-sm font-bold text-white/42">
+        ยังไม่มีเซ็ตการ์ดในรายการ กดปุ่มเลือกเซ็ตแล้วระบุจำนวนชุดที่ลูกค้าจัดมา
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      {items.map((item) => (
+        <div key={item.id} className="rounded-[20px] border border-white/10 bg-black/24 p-3">
+          <div className="flex gap-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.055] text-sm font-black text-white">
+              {item.order}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                Set {item.order} • {item.cardTotal} cards
+              </div>
+              <div className="mt-1 truncate font-black text-white">{item.setName}</div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
+                <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-white/62">
+                  {formatNumber(item.quantity)} เซ็ต
+                </span>
+                <span className="rounded-full border border-emerald-200/18 bg-emerald-400/10 px-3 py-1 text-emerald-100">
+                  {formatNumber(item.nexValue * item.quantity)} NEX
+                </span>
+                {item.withFoilBonus ? (
+                  <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-amber-100">
+                    รวมเงื่อนไขฟอยล์
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setItems(items.filter((current) => current.id !== item.id))}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] border border-red-300/20 bg-red-500/10 text-red-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-3 rounded-[16px] border border-white/8 bg-black/22 p-3 text-xs font-bold leading-6 text-white/48">
+            {item.reward}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CardSetModal({
+  onClose,
+  onAddSet,
+}: {
+  onClose: () => void;
+  onAddSet: (
+    set: NexoraCollectionSet,
+    quantity: number,
+    withFoilBonus: boolean
+  ) => void;
+}) {
+  const [quantityBySet, setQuantityBySet] = useState<Record<string, string>>({});
+  const [foilBonusBySet, setFoilBonusBySet] = useState<Record<string, boolean>>({});
+  const allSets = useMemo(
+    () => [...nexoraCollectionSets].sort((a, b) => a.order - b.order),
+    []
+  );
+
+  return (
+    <div className="fixed inset-0 z-[1400] flex items-center justify-center p-3 sm:p-5">
+      <button
+        type="button"
+        aria-label="ปิดหน้าต่างเลือกเซ็ต"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/78 backdrop-blur-md"
+      />
+      <div className="relative flex max-h-[92dvh] w-full max-w-[980px] flex-col overflow-hidden rounded-[30px] border border-white/14 bg-[linear-gradient(180deg,#141414,#050505)] shadow-[0_35px_140px_rgba(0,0,0,0.72)]">
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
+          <div className="min-w-0">
+            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
+              Collection Sets
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-white">เลือกเซ็ตการ์ด 40 เซ็ต</h2>
+            <p className="mt-2 text-sm leading-6 text-white/55">
+              ระบุจำนวนเซ็ตข้างปุ่มเพิ่ม และติ๊กเงื่อนไขฟอยล์เมื่อชุดนั้นจัดครบตามกติกาเสริม
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.055] text-white/70"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
+          <div className="grid gap-3">
+            {allSets.map((set) => {
+              const quantityValue = quantityBySet[set.id] || "1";
+              const withFoilBonus = Boolean(foilBonusBySet[set.id]);
+              const baseValue = parseNexReward(set.reward, false);
+              const activeValue = parseNexReward(set.reward, withFoilBonus);
+              const conditionText = getSetConditionText(set);
+              const cardTotal = set.officialTotal || getCollectionCardIds(set).length;
+
+              return (
+                <div
+                  key={set.id}
+                  className="rounded-[22px] border border-white/10 bg-black/24 p-3 sm:p-4"
+                >
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="flex h-9 min-w-9 items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.06] px-2 text-sm font-black text-white">
+                          {set.order}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-base font-black text-white">
+                          {set.name}
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] font-black text-white/52">
+                          {cardTotal} ใบ
+                        </span>
+                      </div>
+                      <div className="mt-2 line-clamp-2 text-sm leading-6 text-white/52">
+                        {set.reward}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
+                        <span className="rounded-full border border-emerald-200/16 bg-emerald-400/10 px-3 py-1 text-emerald-100">
+                          {baseValue > 0 ? `${formatNumber(baseValue)} NEX` : "รางวัลพิเศษ"}
+                        </span>
+                        {withFoilBonus && activeValue !== baseValue ? (
+                          <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-amber-100">
+                            เพิ่มเป็น {formatNumber(activeValue)} NEX
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[minmax(84px,1fr)_112px] gap-2">
+                      <input
+                        value={quantityValue}
+                        onChange={(event) =>
+                          setQuantityBySet((current) => ({
+                            ...current,
+                            [set.id]: event.target.value,
+                          }))
+                        }
+                        inputMode="numeric"
+                        aria-label={`จำนวนเซ็ต ${set.order}`}
+                        className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-base font-black text-white outline-none placeholder:text-white/25 focus:border-white/35"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAddSet(set, Number(quantityValue || 1), withFoilBonus)
+                        }
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
+                      >
+                        <PackagePlus className="h-4 w-4" />
+                        เพิ่ม
+                      </button>
+                    </div>
+                  </div>
+
+                  {conditionText ? (
+                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[18px] border border-amber-200/14 bg-amber-300/[0.06] p-3 text-sm leading-6 text-amber-50/82">
+                      <input
+                        type="checkbox"
+                        checked={withFoilBonus}
+                        onChange={(event) =>
+                          setFoilBonusBySet((current) => ({
+                            ...current,
+                            [set.id]: event.target.checked,
+                          }))
+                        }
+                        className="mt-1 h-4 w-4 shrink-0 accent-amber-200"
+                      />
+                      <span className="min-w-0">
+                        ใช้เงื่อนไขฟอยล์เพิ่ม: {conditionText}
+                      </span>
+                    </label>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-white/10 p-3 sm:p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-12 w-full items-center justify-center rounded-[18px] border border-white/12 bg-white/[0.06] text-sm font-black text-white transition hover:bg-white/[0.1]"
+          >
+            ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
