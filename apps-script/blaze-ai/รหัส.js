@@ -43,6 +43,17 @@ const BLAZE_RESPONSE_POLICY = [
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
 ].join("\n");
 
+const BLAZE_FORMATTING_POLICY = [
+  "Blaze formatting policy:",
+  "- Always make long answers easy to scan. Put the direct answer in the first 1-2 lines, then split details into short labeled sections.",
+  "- For card answers, use this plain-text structure when relevant: ข้อมูลการ์ด, ค่าสเตตัส, รางวัล/ชุดสะสม, สกิล/วิธีใช้, หมายเหตุ.",
+  "- Put each field on its own line. Never pack card number, name, type, element, rarity, ATK, SUP, rewards, and sets into one long paragraph.",
+  "- For lists, put one item per line with a simple number like 1. 2. 3. or a hyphen. Do not separate many items with commas in one paragraph.",
+  "- For collection/set answers, list each set on its own line with set number, name when known, card count/rarity when useful, and reward.",
+  "- Keep paragraphs under 2 short sentences. Add blank lines between major sections.",
+  "- Do not use Markdown styling characters such as **, *, #, or code fences. Plain text with line breaks is the standard.",
+].join("\n");
+
 const BLAZE_COLLECTION_REWARD_INDEX = [
   "NEXORA official collection reward index:",
   "- Set 1 / ชุดการ์ดสะสมที่ 1 / The Five Concordants: Mythic 5-star, 15 cards, reward 1,500,000 silver.",
@@ -680,6 +691,25 @@ function hasExplicitCardNumberReference(message) {
   return /(?:no\.?|card\s*#|card\s*no|เลขการ์ด|หมายเลขการ์ด|การ์ด\s*เลข|การ์ด\s*หมายเลข|เบอร์การ์ด|#)\s*[0-9๐-๙]{1,3}/i.test(text);
 }
 
+function getExactCardNumberQuery(message) {
+  const text = sanitizeText(message).toLowerCase();
+  if (!text) return "";
+
+  if (hasExplicitCardNumberReference(text)) {
+    return normalizeCardNumber(text);
+  }
+
+  const compact = text
+    .replace(/(?:card\s*no|card|no\.?|#)/g, "")
+    .replace(/[\s._:\-]/g, "");
+
+  if (/^[0-9]{1,3}$/.test(compact)) {
+    return normalizeCardNumber(compact);
+  }
+
+  return "";
+}
+
 function isCollectionOrRewardOverviewQuestion(message) {
   const text = normalizeThaiText(message);
   const asksCollection =
@@ -782,8 +812,54 @@ function stripLineContactForNonSales(reply, message) {
     .trim();
 }
 
+function formatBlazeReplyLayout(reply) {
+  let text = sanitizeText(reply)
+    .replace(/^\s*\*\s+/gm, "- ")
+    .replace(/\s+\|\s+/g, "\n")
+    .replace(/\s+(?=(?:ข้อมูลการ์ด|ค่าสเตตัส|รางวัล\/ชุดสะสม|สกิล\/วิธีใช้|หมายเหตุ):)/g, "\n\n")
+    .replace(/\s+(?=(?:ชื่อ|ประเภท|ธาตุ|ระดับ|ATK|SUP|สกิล|ความสามารถ|รางวัล|เงื่อนไขแลกรับ|ชุดสะสมที่เกี่ยวข้อง|อยู่ในชุดสะสม):)/g, "\n")
+    .replace(/\s+(?=No\.\d{1,3}\b)/g, "\n")
+    .replace(/\s+(?=Set\s+\d+\b)/gi, "\n")
+    .replace(/\s+(?=\d+\.\s+)/g, "\n");
+
+  const lines = text
+    .split("\n")
+    .map(function(line) {
+      return line.replace(/[ \t]{2,}/g, " ").trim();
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  const formatted = [];
+  lines.forEach(function(line, index) {
+    const previous = formatted[formatted.length - 1] || "";
+    const startsMajorSection =
+      /^(?:ข้อมูลการ์ด|ค่าสเตตัส|รางวัล\/ชุดสะสม|สกิล\/วิธีใช้|หมายเหตุ):/.test(line);
+    const startsList = /^(?:-|\d+\.)\s+/.test(line) || /^Set\s+\d+\b/i.test(line);
+
+    if (
+      index > 0 &&
+      (startsMajorSection ||
+        (!startsList && previous.length > 120) ||
+        (/^(?:-|\d+\.)\s+/.test(line) && !/^(?:-|\d+\.)\s+/.test(previous)))
+    ) {
+      formatted.push("");
+    }
+
+    formatted.push(line);
+  });
+
+  return formatted
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function polishBlazeReply(reply, message) {
-  return stripLineContactForNonSales(trimListAnswerOutro(reply, message), message);
+  return formatBlazeReplyLayout(
+    stripLineContactForNonSales(trimListAnswerOutro(reply, message), message)
+  );
 }
 
 function searchGoogle(query) {
@@ -812,14 +888,19 @@ function searchGoogle(query) {
 function searchCardsFromMessage(message, limit) {
   const q = normalizeThaiText(message);
   const maxResults = limit || CARD_DB_MAX_RESULTS;
-  const queryCardNumber = hasExplicitCardNumberReference(message)
-    ? normalizeCardNumber(message)
-    : "";
+  const queryCardNumber = getExactCardNumberQuery(message);
 
   if (!q && !queryCardNumber) return [];
 
   const rows = getCardDbRows();
   if (!rows.length) return [];
+
+  if (queryCardNumber) {
+    return rows
+      .map(raw => normalizeCardRow(raw))
+      .filter(row => sanitizeText(row.card_no_normalized) === queryCardNumber)
+      .slice(0, 1);
+  }
 
   const tokens = q
     .split(/[\s,|/\\\-()]+/)
@@ -837,20 +918,11 @@ function searchCardsFromMessage(message, limit) {
 
     let score = 0;
 
-    if (queryCardNumber) {
-      if (cardNoNormalized === queryCardNumber) score += 2000;
-      else if (cardNo.includes(queryCardNumber)) score += 700;
-      else if (normalizeCardNumber(cardNo) === queryCardNumber) score += 1500;
-    }
-
     if (cardName && q === cardName) score += 500;
     if (cardName && q.includes(cardName)) score += 250;
-    if (cardNo && q === cardNo) score += 600;
-    if (cardNo && q.includes(cardNo)) score += 300;
 
     tokens.forEach(token => {
       if (!token) return;
-      if (cardNo.includes(token)) score += 40;
       if (cardName.includes(token)) score += 35;
       if (value.includes(token)) score += 15;
       if (reward.includes(token)) score += 12;
@@ -883,6 +955,10 @@ function searchCardsFromMessage(message, limit) {
     .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, maxResults);
+}
+
+function searchCards(query) {
+  return searchCardsFromMessage(query, CARD_DB_MAX_RESULTS);
 }
 
 function buildCardDatabaseContext(message) {
@@ -1270,6 +1346,7 @@ function buildSystemPrompt(db, memorySummary, decisionInstruction) {
 
     "- เวลาตอบในแชท ห้ามใช้ Markdown เช่น **, *, #, ```\n" +
     "- ให้ตอบเป็นข้อความธรรมดา อ่านง่าย\n\n" +
+    BLAZE_FORMATTING_POLICY + "\n\n" +
     BLAZE_RESPONSE_POLICY + "\n\n" +
 
     (decisionInstruction || "") + "\n" +

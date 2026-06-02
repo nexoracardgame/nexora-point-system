@@ -236,6 +236,17 @@ const BLAZE_RESPONSE_POLICY = [
   "- Prefer complete factual answers over short marketing summaries. Use as much length as needed to be complete.",
 ].join("\n");
 
+const BLAZE_FORMATTING_POLICY = [
+  "Blaze formatting policy:",
+  "- Always make long answers easy to scan. Put the direct answer in the first 1-2 lines, then split details into short labeled sections.",
+  "- For card answers, use this plain-text structure when relevant: ข้อมูลการ์ด, ค่าสเตตัส, รางวัล/ชุดสะสม, สกิล/วิธีใช้, หมายเหตุ.",
+  "- Put each field on its own line. Never pack card number, name, type, element, rarity, ATK, SUP, rewards, and sets into one long paragraph.",
+  "- For lists, put one item per line with a simple number like 1. 2. 3. or a hyphen. Do not separate many items with commas in one paragraph.",
+  "- For collection/set answers, list each set on its own line with set number, name when known, card count/rarity when useful, and reward.",
+  "- Keep paragraphs under 2 short sentences. Add blank lines between major sections.",
+  "- Do not use Markdown styling characters such as **, *, #, or code fences. Plain text with line breaks is the standard.",
+].join("\n");
+
 const POINT_REDEMPTION_LOCATION_URL = "https://maps.app.goo.gl/oUfs7y5LtNaBTSzm7";
 
 function createRewardAliases(amount: string, ...extraAliases: string[]) {
@@ -4015,6 +4026,7 @@ function buildSystemPrompt(userName: string, knowledgeContext: string) {
     "ถ้าผู้ใช้ถามเรื่องทั่วไป ให้ตอบตรงคำถามก่อน แล้วยังคงบุคลิกท่านเบลซ",
     "ถ้าเป็นข้อมูลปัจจุบัน ข่าว ราคา หุ้น ทอง อากาศ ตารางแข่ง หรือเรื่องที่เปลี่ยนเร็ว ห้ามเดาเอง ให้บอกว่าควรตรวจสอบข้อมูลล่าสุดก่อน",
     "เวลาตอบในแชท ห้ามใช้ Markdown เช่น **, *, #, ``` ให้ตอบเป็นข้อความธรรมดาอ่านง่าย",
+    BLAZE_FORMATTING_POLICY,
     "ถ้าคำถามกำกวมหรือสั้น ให้ตอบจากบริบทก่อน ถ้าเดาไม่ได้จริงค่อยถามกลับสั้นๆ",
     BLAZE_RESPONSE_POLICY,
     `ชื่อผู้ใช้ในระบบ: ${userName || "NEXORA User"}`,
@@ -4317,8 +4329,52 @@ function stripLineContactForNonSales(reply: string, message: string) {
     .trim();
 }
 
+function formatBlazeReplyLayout(reply: string) {
+  let text = sanitizeText(reply)
+    .replace(/^\s*\*\s+/gm, "- ")
+    .replace(/\s+\|\s+/g, "\n")
+    .replace(/\s+(?=(?:ข้อมูลการ์ด|ค่าสเตตัส|รางวัล\/ชุดสะสม|สกิล\/วิธีใช้|หมายเหตุ):)/g, "\n\n")
+    .replace(/\s+(?=(?:ชื่อ|ประเภท|ธาตุ|ระดับ|ATK|SUP|สกิล|ความสามารถ|รางวัล|เงื่อนไขแลกรับ|ชุดสะสมที่เกี่ยวข้อง|อยู่ในชุดสะสม):)/g, "\n")
+    .replace(/\s+(?=No\.\d{1,3}\b)/g, "\n")
+    .replace(/\s+(?=Set\s+\d+\b)/gi, "\n")
+    .replace(/\s+(?=\d+\.\s+)/g, "\n");
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trim())
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  const formatted: string[] = [];
+  lines.forEach((line, index) => {
+    const previous = formatted[formatted.length - 1] || "";
+    const startsMajorSection =
+      /^(?:ข้อมูลการ์ด|ค่าสเตตัส|รางวัล\/ชุดสะสม|สกิล\/วิธีใช้|หมายเหตุ):/.test(line);
+    const startsList = /^(?:-|\d+\.)\s+/.test(line) || /^Set\s+\d+\b/i.test(line);
+
+    if (
+      index > 0 &&
+      (startsMajorSection ||
+        (!startsList && previous.length > 120) ||
+        (/^(?:-|\d+\.)\s+/.test(line) && !/^(?:-|\d+\.)\s+/.test(previous)))
+    ) {
+      formatted.push("");
+    }
+
+    formatted.push(line);
+  });
+
+  return formatted
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function polishBlazeReply(reply: string, message: string) {
-  return stripLineContactForNonSales(trimListAnswerOutro(reply, message), message);
+  return formatBlazeReplyLayout(
+    stripLineContactForNonSales(trimListAnswerOutro(reply, message), message)
+  );
 }
 
 function buildBlazeSafeFallbackReply(message: string, knowledgeContext = "") {
