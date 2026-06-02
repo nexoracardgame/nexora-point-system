@@ -11,6 +11,8 @@ export type CollectionCardGroup = {
   cardIds: number[];
 };
 
+export type CollectionCardFinish = "normal" | "foil";
+
 export type NexoraCollectionSet = {
   id: string;
   order: number;
@@ -21,6 +23,8 @@ export type NexoraCollectionSet = {
   stars: string;
   officialTotal: number;
   story: string;
+  finish?: CollectionCardFinish;
+  appVisible?: boolean;
   groups: CollectionCardGroup[];
 };
 
@@ -42,6 +46,126 @@ const group = (
 
 const nexReward = (amount: string) =>
   `รับแลกเปลี่ยนเป็น จำนวน ${amount} Nex`;
+
+const foilReward = (amount: string) => `รับแลกเปลี่ยนเป็น จำนวน ${amount} Nex`;
+
+function foilSet(
+  order: number,
+  reward: string,
+  stars: string,
+  groups: CollectionCardGroup[],
+  story = "ชุดการ์ดสะสมแบบฟอยล์พิเศษจากหน้าชุดคอลเลกชั่นทางการ",
+  appVisible = true
+): NexoraCollectionSet {
+  return {
+    id: `foil-set-${order}`,
+    order,
+    name: `Foil Collection Set ${order}`,
+    subtitle: `ชุดการ์ดสะสมแบบฟอยล์ที่ ${order}`,
+    reward,
+    tier: "Legendary",
+    stars,
+    officialTotal: Array.from(new Set(groups.flatMap((item) => item.cardIds))).length,
+    story,
+    finish: "foil",
+    appVisible,
+    groups,
+  };
+}
+
+const foilCollectionSets: NexoraCollectionSet[] = [
+  foilSet(20, `${foilReward("2,500")}; ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม 20 แบบ รับเพิ่มทั้งหมดเป็น 5,000 Nex`, "3 ดาว", [
+    group("gold", "การ์ดทอง 2 แบบ", [2, 94]),
+    group("bronze", "การ์ดธรรมดา 3 แบบ", [105, 179, 285]),
+  ]),
+  foilSet(21, `${foilReward("10,000")}; ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม 20 แบบ รับเพิ่มทั้งหมดเป็น 14,000 Nex`, "4 ดาว", [
+    group("gold", "การ์ดทอง 5 แบบ", [5, 84, 94, 131, 214]),
+    group("silver", "การ์ดเงิน 2 แบบ", [193, 200]),
+    group("bronze", "การ์ดธรรมดา 5 แบบ", [68, 178, 260, 262, 292]),
+  ]),
+  foilSet(22, `${foilReward("2,500")}; ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม 20 แบบ รับเพิ่มทั้งหมดเป็น 3,500 Nex`, "3 ดาว", [
+    group("gold", "การ์ดทอง 1 แบบ", [205]),
+    group("bronze", "การ์ดธรรมดา 2 แบบ", [65, 236]),
+  ]),
+  foilSet(23, `${foilReward("2,500")}; ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม 60 แบบ รับเพิ่มทั้งหมดเป็น 20,000 Nex`, "2 ดาว", [
+    group("silver", "การ์ดเงิน 2 แบบ", [200, 202]),
+  ]),
+  foilSet(24, `${foilReward("2,500")}; ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม 20 แบบ รับเพิ่มทั้งหมดเป็น 7,000 Nex`, "4 ดาว", [
+    group("gold", "การ์ดทอง 1 แบบ", [214]),
+    group("silver", "การ์ดเงิน 1 แบบ", [200]),
+    group("bronze", "การ์ดธรรมดา 3 แบบ", [68, 69, 293]),
+  ]),
+  foilSet(25, foilReward("80,000"), "4 ดาว", [
+    group("gold", "การ์ดทอง 1 แบบ", [214]),
+    group("silver", "การ์ดเงิน 1 แบบ", [200]),
+    group("bronze", "การ์ดธรรมดา 3 แบบ", [68, 69, 293]),
+  ], "ใช้การ์ดหลัก 5 ใบ + ใช้การ์ดฟอยล์ไม่ซ้ำกันเพิ่ม 80 แบบ"),
+  foilSet(26, foilReward("80,000"), "4 ดาว", [
+    group("silver", "การ์ดเงิน 2 แบบ", [193, 202]),
+    group("bronze", "การ์ดธรรมดา 3 แบบ", [68, 236, 260]),
+  ]),
+  foilSet(27, foilReward("19,000"), "4 ดาว", [
+    group("gold", "การ์ดทอง 2 แบบ", [80, 205]),
+    group("silver", "การ์ดเงิน 6 แบบ", [77, 78, 81, 202, 203, 204]),
+  ]),
+  foilSet(28, foilReward("4,500"), "4 ดาว", [
+    group("gold", "การ์ดทอง 1 แบบ", [20]),
+    group("silver", "การ์ดเงิน 1 แบบ", [202]),
+    group("bronze", "การ์ดธรรมดา 10 แบบ", seq(21, 30)),
+  ]),
+  foilSet(29, foilReward("4,000"), "4 ดาว", [
+    group("gold", "การ์ดทอง 7 แบบ", [205, 207, 208, 211, 212, 213, 214]),
+    group("silver", "การ์ดเงิน 1 แบบ", [215]),
+    group("bronze", "การ์ดธรรมดา 14 แบบ", seq(216, 229)),
+  ]),
+  foilSet(30, foilReward("3,200"), "4 ดาว", [
+    group("gold", "การ์ดทอง 1 แบบ", [176]),
+    group("bronze", "การ์ดธรรมดา 7 แบบ", seq(177, 183)),
+  ]),
+  foilSet(31, foilReward("65,000"), "4 ดาว", [
+    group("gold", "การ์ดทอง 5 แบบ", [119, 126, 129, 130, 135]),
+    group("silver", "การ์ดเงิน 13 แบบ", [115, 116, 117, 118, 120, 121, 122, 123, 124, 125, 127, 128, 134]),
+    group("bronze", "การ์ดธรรมดา 1 แบบ", [68]),
+  ]),
+  foilSet(32, `${foilReward("3,000")}; ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม 30 แบบ รับเพิ่มทั้งหมดเป็น 6,000 Nex`, "5 ดาว", [
+    group("gold", "การ์ดทอง 6 แบบ", [168, 171, 172, 173, 174, 176]),
+    group("silver", "การ์ดเงิน 4 แบบ", [167, 175, 195, 201]),
+    group("bronze", "การ์ดธรรมดา 11 แบบ", [177, 178, 179, 231, 232, 233, 234, 237, 238, 239, 266]),
+  ]),
+  foilSet(33, foilReward("90,000"), "4 ดาว", [
+    group("gold", "การ์ดทอง 1 แบบ", [205]),
+    group("silver", "การ์ดเงิน 1 แบบ", [215]),
+    group("bronze", "การ์ดธรรมดา 2 แบบ", [105, 284]),
+  ]),
+  foilSet(34, foilReward("25,000"), "5 ดาว", [
+    group("bronze", "การ์ดธรรมดา 22 แบบ", [241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 290, 291]),
+  ]),
+  foilSet(35, foilReward("12,000"), "4 ดาว", [
+    group("silver", "การ์ดเงิน 13 แบบ", [43, 187, 188, 191, 192, 195, 196, 197, 198, 199, 200, 201, 202]),
+    group("bronze", "การ์ดธรรมดา 3 แบบ", [184, 185, 186]),
+  ]),
+  foilSet(36, foilReward("4,000"), "4 ดาว", [
+    group("silver", "การ์ดเงิน 1 แบบ", [98]),
+    group("bronze", "การ์ดธรรมดา 8 แบบ", [99, 100, 101, 102, 103, 104, 105, 106]),
+  ]),
+  foilSet(37, foilReward("3,000"), "4 ดาว", [
+    group("gold", "การ์ดทอง 5 แบบ", [54, 55, 56, 57, 59]),
+    group("silver", "การ์ดเงิน 2 แบบ", [48, 58]),
+  ]),
+  foilSet(38, foilReward("79,000"), "4 ดาว", [
+    group("silver", "การ์ดเงิน 15 แบบ", [31, 32, 33, 34, 35, 37, 38, 39, 44, 45, 46, 47, 48, 49, 50]),
+  ]),
+  foilSet(39, foilReward("35,000"), "5 ดาว", [
+    group("gold", "การ์ดทอง 9 แบบ", [51, 52, 84, 91, 94, 95, 96, 97, 160]),
+    group("silver", "การ์ดเงิน 8 แบบ", [82, 83, 92, 93, 98, 161, 162, 163]),
+    group("bronze", "การ์ดธรรมดา 11 แบบ", [60, 62, 99, 107, 110, 112, 113, 114, 115, 158, 159]),
+  ]),
+  foilSet(40, foilReward("15,000"), "5 ดาว", [
+    group("gold", "การ์ดทองที่เลือกได้", [4, 5, 41, 169, 174]),
+    group("silver", "การ์ดเงินที่เลือกได้", [36, 40, 42, 50, 89, 156, 159, 163, 193, 200, 206, 215]),
+    group("bronze", "การ์ดธรรมดาที่เลือกได้", [63, 64, 65, 67, 69, 105, 140, 141, 142, 236, 244, 263, 264, 265, 268, 272, 278, 279, 284, 285, 288, 293]),
+  ], "เซ็ต 40 เป็นกติกาพิเศษ: เลือกการ์ดฟอยล์ 1 แบบจากรายการที่กำหนด แล้วสะสมหมายเลขนั้นซ้ำให้ครบ 36 ใบ จึงแลกได้ 15,000 Nex", false),
+];
 
 export const rarityStyles: Record<
   CollectionRarityKey,
@@ -417,7 +541,12 @@ export const nexoraCollectionSets: NexoraCollectionSet[] = [
       group("bronze", "การ์ดธรรมดา 6 แบบ", [178, 179, 241, 242, 255, 256]),
     ],
   },
+  ...foilCollectionSets,
 ];
+
+export const nexoraCollectionSetsForApp = nexoraCollectionSets.filter(
+  (set) => set.appVisible !== false
+);
 
 export function getCollectionCardIds(set: NexoraCollectionSet) {
   return Array.from(

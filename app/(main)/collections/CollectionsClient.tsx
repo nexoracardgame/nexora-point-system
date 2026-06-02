@@ -18,9 +18,10 @@ import {
   X,
 } from "lucide-react";
 import {
+  CollectionCardFinish,
   getCollectionCardIds,
   NEXORA_COLLECTION_SOURCE_URL,
-  nexoraCollectionSets,
+  nexoraCollectionSetsForApp,
   rarityStyles,
 } from "@/lib/nexora-collection-sets";
 
@@ -32,8 +33,10 @@ type CalculatorState = {
 
 type StoredCollectionsState = {
   ownedCards: number[];
+  ownedFoilCards: number[];
   calculator: CalculatorState;
   selectedSetId: string;
+  cardFinishMode: CollectionCardFinish;
 };
 
 type RemoteCollectionsState = Partial<StoredCollectionsState> & {
@@ -44,6 +47,10 @@ const STORAGE_KEY = "nexora:collections:v2";
 const PREVIEW_CARD_LIMIT = 8;
 const OWNED_CARD_COLLAPSED_LIMIT = 60;
 const emptyCalculator: CalculatorState = { bronze: 0, silver: 0, gold: 0 };
+const cardFinishOptions: { value: CollectionCardFinish; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "foil", label: "Foil" },
+];
 
 function formatCardNo(cardId: number) {
   return String(cardId).padStart(3, "0");
@@ -79,6 +86,10 @@ function normalizeCalculatorState(value: unknown): CalculatorState {
   };
 }
 
+function normalizeCardFinish(value: unknown): CollectionCardFinish {
+  return value === "foil" ? "foil" : "normal";
+}
+
 function hasCalculatorValue(value: CalculatorState) {
   return value.bronze > 0 || value.silver > 0 || value.gold > 0;
 }
@@ -95,11 +106,15 @@ function readStoredState(): StoredCollectionsState | null {
       ownedCards: Array.isArray(parsed.ownedCards)
         ? parseCardNumbers(parsed.ownedCards.join(","))
         : [],
+      ownedFoilCards: Array.isArray(parsed.ownedFoilCards)
+        ? parseCardNumbers(parsed.ownedFoilCards.join(","))
+        : [],
       calculator: normalizeCalculatorState(parsed.calculator),
       selectedSetId:
         String(parsed.selectedSetId || "").trim() ||
-        nexoraCollectionSets[0]?.id ||
+        nexoraCollectionSetsForApp[0]?.id ||
         "",
+      cardFinishMode: normalizeCardFinish(parsed.cardFinishMode),
     };
   } catch {
     return null;
@@ -108,11 +123,14 @@ function readStoredState(): StoredCollectionsState | null {
 
 export default function CollectionsClient() {
   const [ownedCards, setOwnedCards] = useState<number[]>([]);
+  const [ownedFoilCards, setOwnedFoilCards] = useState<number[]>([]);
   const [calculator, setCalculator] = useState<CalculatorState>(emptyCalculator);
+  const [cardFinishMode, setCardFinishMode] =
+    useState<CollectionCardFinish>("normal");
   const [cardInput, setCardInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSetId, setSelectedSetId] = useState(
-    nexoraCollectionSets[0]?.id || ""
+    nexoraCollectionSetsForApp[0]?.id || ""
   );
   const [message, setMessage] = useState("");
   const [hydrated, setHydrated] = useState(false);
@@ -125,8 +143,10 @@ export default function CollectionsClient() {
       const stored = readStoredState();
       if (stored) {
         setOwnedCards(stored.ownedCards);
+        setOwnedFoilCards(stored.ownedFoilCards);
         setCalculator(stored.calculator);
         setSelectedSetId(stored.selectedSetId);
+        setCardFinishMode(stored.cardFinishMode);
       }
       setHydrated(true);
     }, 0);
@@ -141,11 +161,20 @@ export default function CollectionsClient() {
       STORAGE_KEY,
       JSON.stringify({
         ownedCards,
+        ownedFoilCards,
         calculator,
         selectedSetId,
+        cardFinishMode,
       } satisfies StoredCollectionsState)
     );
-  }, [calculator, hydrated, ownedCards, selectedSetId]);
+  }, [
+    calculator,
+    cardFinishMode,
+    hydrated,
+    ownedCards,
+    ownedFoilCards,
+    selectedSetId,
+  ]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -176,6 +205,20 @@ export default function CollectionsClient() {
           );
         }
 
+        if (
+          Array.isArray(state.ownedFoilCards) &&
+          state.ownedFoilCards.length > 0
+        ) {
+          const remoteOwnedFoil = parseCardNumbers(
+            state.ownedFoilCards.join(",")
+          );
+          setOwnedFoilCards((current) =>
+            Array.from(new Set([...current, ...remoteOwnedFoil])).sort(
+              (a, b) => a - b
+            )
+          );
+        }
+
         const remoteCalculator = normalizeCalculatorState(state.calculator);
         if (hasCalculatorValue(remoteCalculator)) {
           setCalculator(remoteCalculator);
@@ -184,11 +227,15 @@ export default function CollectionsClient() {
         const remoteSelectedSetId = String(state.selectedSetId || "").trim();
         if (
           remoteSelectedSetId &&
-          nexoraCollectionSets.some((set) => set.id === remoteSelectedSetId)
+          nexoraCollectionSetsForApp.some(
+            (set) => set.id === remoteSelectedSetId
+          )
         ) {
           setSelectedSetId(remoteSelectedSetId);
           setShowAllPreviewCards(false);
         }
+
+        setCardFinishMode(normalizeCardFinish(state.cardFinishMode));
       } finally {
         if (!cancelled) setRemoteSynced(true);
       }
@@ -208,12 +255,26 @@ export default function CollectionsClient() {
       void fetch("/api/collections/state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ownedCards, calculator, selectedSetId }),
+        body: JSON.stringify({
+          ownedCards,
+          ownedFoilCards,
+          calculator,
+          selectedSetId,
+          cardFinishMode,
+        }),
       }).catch(() => undefined);
     }, 450);
 
     return () => window.clearTimeout(timeoutId);
-  }, [calculator, hydrated, ownedCards, remoteSynced, selectedSetId]);
+  }, [
+    calculator,
+    cardFinishMode,
+    hydrated,
+    ownedCards,
+    ownedFoilCards,
+    remoteSynced,
+    selectedSetId,
+  ]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -221,8 +282,10 @@ export default function CollectionsClient() {
       const stored = readStoredState();
       if (!stored) return;
       setOwnedCards(stored.ownedCards);
+      setOwnedFoilCards(stored.ownedFoilCards);
       setCalculator(stored.calculator);
       setSelectedSetId(stored.selectedSetId);
+      setCardFinishMode(stored.cardFinishMode);
       setShowAllPreviewCards(false);
       setShowAllOwnedCards(false);
     };
@@ -232,19 +295,23 @@ export default function CollectionsClient() {
   }, []);
 
   const ownedSet = useMemo(() => new Set(ownedCards), [ownedCards]);
+  const ownedFoilSet = useMemo(() => new Set(ownedFoilCards), [ownedFoilCards]);
 
   const setStats = useMemo(
     () =>
-      nexoraCollectionSets.map((set) => {
+      nexoraCollectionSetsForApp.map((set) => {
+        const finish = set.finish || "normal";
+        const ownedSource = finish === "foil" ? ownedFoilSet : ownedSet;
         const cardIds = getCollectionCardIds(set);
-        const owned = cardIds.filter((cardId) => ownedSet.has(cardId));
-        const missing = cardIds.filter((cardId) => !ownedSet.has(cardId));
+        const owned = cardIds.filter((cardId) => ownedSource.has(cardId));
+        const missing = cardIds.filter((cardId) => !ownedSource.has(cardId));
         const progress = cardIds.length
           ? Math.round((owned.length / cardIds.length) * 100)
           : 0;
 
         return {
           set,
+          finish,
           cardIds,
           displayTotal: set.officialTotal || cardIds.length,
           owned,
@@ -252,7 +319,7 @@ export default function CollectionsClient() {
           progress,
         };
       }),
-    [ownedSet]
+    [ownedFoilSet, ownedSet]
   );
 
   const filteredStats = useMemo(() => {
@@ -266,11 +333,21 @@ export default function CollectionsClient() {
 
   const activeStat =
     setStats.find((item) => item.set.id === selectedSetId) || setStats[0];
+  const ownedCardEntries = useMemo(
+    () =>
+      [
+        ...ownedCards.map((cardId) => ({ cardId, finish: "normal" as const })),
+        ...ownedFoilCards.map((cardId) => ({ cardId, finish: "foil" as const })),
+      ].sort(
+        (a, b) => a.cardId - b.cardId || a.finish.localeCompare(b.finish)
+      ),
+    [ownedCards, ownedFoilCards]
+  );
   const displayedOwnedCards = showAllOwnedCards
-    ? ownedCards
-    : ownedCards.slice(0, OWNED_CARD_COLLAPSED_LIMIT);
+    ? ownedCardEntries
+    : ownedCardEntries.slice(0, OWNED_CARD_COLLAPSED_LIMIT);
   const hiddenOwnedCardCount = Math.max(
-    ownedCards.length - displayedOwnedCards.length,
+    ownedCardEntries.length - displayedOwnedCards.length,
     0
   );
 
@@ -289,6 +366,8 @@ export default function CollectionsClient() {
   );
 
   const completedCount = setStats.filter((item) => item.progress >= 100).length;
+  const appSetCount = nexoraCollectionSetsForApp.length;
+  const totalOwnedCount = ownedCards.length + ownedFoilCards.length;
   const totalTrackedCards = useMemo(
     () =>
       new Set(setStats.flatMap((item) => item.cardIds)).size,
@@ -315,15 +394,25 @@ export default function CollectionsClient() {
       return;
     }
 
-    setOwnedCards((prev) =>
+    const updateOwned =
+      cardFinishMode === "foil" ? setOwnedFoilCards : setOwnedCards;
+    updateOwned((prev) =>
       Array.from(new Set([...prev, ...parsed])).sort((a, b) => a - b)
     );
     setCardInput("");
-    setMessage(`เพิ่ม ${parsed.length.toLocaleString("th-TH")} ใบแล้ว`);
+    setMessage(
+      `เพิ่ม ${cardFinishMode === "foil" ? "Foil" : "Normal"} ${parsed.length.toLocaleString(
+        "th-TH"
+      )} ใบแล้ว`
+    );
   };
 
-  const toggleCard = (cardId: number) => {
-    setOwnedCards((prev) => {
+  const toggleCard = (
+    cardId: number,
+    finish: CollectionCardFinish = cardFinishMode
+  ) => {
+    const updateOwned = finish === "foil" ? setOwnedFoilCards : setOwnedCards;
+    updateOwned((prev) => {
       const next = new Set(prev);
       if (next.has(cardId)) {
         next.delete(cardId);
@@ -336,7 +425,9 @@ export default function CollectionsClient() {
 
   const markSetComplete = () => {
     if (!activeStat) return;
-    setOwnedCards((prev) =>
+    const updateOwned =
+      activeStat.finish === "foil" ? setOwnedFoilCards : setOwnedCards;
+    updateOwned((prev) =>
       Array.from(new Set([...prev, ...activeStat.cardIds])).sort((a, b) => a - b)
     );
     setMessage(`มาร์กชุด ${activeStat.set.order} ครบแล้ว`);
@@ -345,7 +436,9 @@ export default function CollectionsClient() {
   const clearSet = () => {
     if (!activeStat) return;
     const setCardIds = new Set(activeStat.cardIds);
-    setOwnedCards((prev) => prev.filter((cardId) => !setCardIds.has(cardId)));
+    const updateOwned =
+      activeStat.finish === "foil" ? setOwnedFoilCards : setOwnedCards;
+    updateOwned((prev) => prev.filter((cardId) => !setCardIds.has(cardId)));
     setMessage(`ล้างการ์ดของชุด ${activeStat.set.order} แล้ว`);
   };
 
@@ -374,7 +467,7 @@ export default function CollectionsClient() {
               <div className="relative">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-black shadow-[0_18px_40px_rgba(0,0,0,0.24)]">
                   <Layers3 className="h-3.5 w-3.5" />
-                  19 Official Sets
+                  {appSetCount} Official Sets
                 </div>
                 <h1 className="mt-5 text-5xl font-black leading-[0.9] tracking-[-0.09em] sm:text-7xl lg:text-8xl">
                   COLLECTIONS
@@ -389,7 +482,7 @@ export default function CollectionsClient() {
                       Owned
                     </div>
                     <div className="mt-2 text-3xl font-black">
-                      {ownedCards.length.toLocaleString("th-TH")}
+                      {totalOwnedCount.toLocaleString("th-TH")}
                     </div>
                   </div>
                   <div className="rounded-[24px] bg-white/10 p-4 ring-1 ring-white/10">
@@ -507,6 +600,27 @@ export default function CollectionsClient() {
                 <WalletCards className="h-7 w-7 text-black/60" />
               </div>
 
+              <div className="mt-4 grid grid-cols-2 gap-2 rounded-[20px] bg-[#f3f1ea] p-1.5 ring-1 ring-black/5">
+                {cardFinishOptions.map((option) => {
+                  const isActive = cardFinishMode === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setCardFinishMode(option.value)}
+                      className={`h-11 rounded-[16px] text-sm font-black transition ${
+                        isActive
+                          ? "bg-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
+                          : "bg-transparent text-black/55 hover:bg-white"
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="mt-4 flex min-h-[58px] items-center gap-2 rounded-[20px] bg-black p-2 pl-4 text-white">
                 <Search className="h-5 w-5 shrink-0 text-white/55" />
                 <input
@@ -536,23 +650,27 @@ export default function CollectionsClient() {
               ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {ownedCards.length === 0 ? (
+                {ownedCardEntries.length === 0 ? (
                   <div className="rounded-[18px] bg-[#f3f1ea] px-4 py-3 text-sm font-bold text-black/45">
                     ยังไม่มีเลขการ์ดในคอลเลกชัน
                   </div>
                 ) : (
                   <>
-                    {displayedOwnedCards.map((cardId) => (
+                    {displayedOwnedCards.map(({ cardId, finish }) => (
                       <button
-                        key={cardId}
+                        key={`${finish}-${cardId}`}
                         type="button"
-                        onClick={() => toggleCard(cardId)}
-                        className="rounded-full bg-black px-3 py-1.5 text-xs font-black text-white transition hover:bg-red-500"
+                        onClick={() => toggleCard(cardId, finish)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-black transition hover:bg-red-500 hover:text-white ${
+                          finish === "foil"
+                            ? "bg-[#f5c542] text-black"
+                            : "bg-black text-white"
+                        }`}
                       >
-                        #{formatCardNo(cardId)}
+                        {finish === "foil" ? "Foil " : ""}#{formatCardNo(cardId)}
                       </button>
                     ))}
-                    {ownedCards.length > OWNED_CARD_COLLAPSED_LIMIT ? (
+                    {ownedCardEntries.length > OWNED_CARD_COLLAPSED_LIMIT ? (
                       <button
                         type="button"
                         onClick={() => setShowAllOwnedCards((current) => !current)}
@@ -571,7 +689,10 @@ export default function CollectionsClient() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setOwnedCards([])}
+                  onClick={() => {
+                    setOwnedCards([]);
+                    setOwnedFoilCards([]);
+                  }}
                   className="inline-flex h-11 items-center gap-2 rounded-full bg-red-50 px-4 text-sm font-black text-red-600 ring-1 ring-red-100 transition hover:bg-red-100"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -766,13 +887,16 @@ export default function CollectionsClient() {
 
                       <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-4 xl:gap-3">
                         {previewCards.map((cardId, index) => {
-                          const isOwned = ownedSet.has(cardId);
+                          const isOwned =
+                            activeStat.finish === "foil"
+                              ? ownedFoilSet.has(cardId)
+                              : ownedSet.has(cardId);
 
                           return (
                             <button
                               key={cardId}
                               type="button"
-                              onClick={() => toggleCard(cardId)}
+                              onClick={() => toggleCard(cardId, activeStat.finish)}
                               className={`group relative aspect-[5/7] overflow-hidden rounded-[16px] bg-white/10 text-left ring-1 transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f5c542] ${
                                 isOwned
                                   ? "scale-[1.02] ring-[#f5c542] shadow-[0_0_0_2px_rgba(245,197,66,0.42),0_0_28px_rgba(245,197,66,0.56),0_16px_34px_rgba(0,0,0,0.42)]"
@@ -919,7 +1043,7 @@ export default function CollectionsClient() {
                                 <button
                                   key={cardId}
                                   type="button"
-                                  onClick={() => toggleCard(cardId)}
+                                  onClick={() => toggleCard(cardId, activeStat.finish)}
                                   className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-black text-white"
                                 >
                                   #{formatCardNo(cardId)}
@@ -946,7 +1070,7 @@ export default function CollectionsClient() {
                                 <button
                                   key={cardId}
                                   type="button"
-                                  onClick={() => toggleCard(cardId)}
+                                  onClick={() => toggleCard(cardId, activeStat.finish)}
                                   className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-black ring-1 ring-black/8 transition hover:bg-black hover:text-white"
                                 >
                                   #{formatCardNo(cardId)}

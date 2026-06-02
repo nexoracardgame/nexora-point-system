@@ -20,6 +20,16 @@ function ensureCollectionStateSchema() {
       .$executeRawUnsafe(
         'CREATE TABLE IF NOT EXISTS "CollectionState" ("userId" TEXT PRIMARY KEY, "ownedCards" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "calculator" JSONB NOT NULL DEFAULT \'{}\'::jsonb, "selectedSetId" TEXT, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
       )
+      .then(() =>
+        prisma.$executeRawUnsafe(
+          'ALTER TABLE "CollectionState" ADD COLUMN IF NOT EXISTS "ownedFoilCards" JSONB NOT NULL DEFAULT \'[]\'::jsonb'
+        )
+      )
+      .then(() =>
+        prisma.$executeRawUnsafe(
+          'ALTER TABLE "CollectionState" ADD COLUMN IF NOT EXISTS "cardFinishMode" TEXT NOT NULL DEFAULT \'normal\''
+        )
+      )
       .then(() => undefined);
   }
 
@@ -52,20 +62,32 @@ function normalizeCalculator(value: unknown): CalculatorState {
   };
 }
 
+function normalizeCardFinish(value: unknown) {
+  return value === "foil" ? "foil" : "normal";
+}
+
 function normalizeRow(row?: Record<string, unknown> | null) {
   if (!row) {
     return {
       ownedCards: [],
+      ownedFoilCards: [],
       calculator: { bronze: 0, silver: 0, gold: 0 },
       selectedSetId: "",
+      cardFinishMode: "normal",
       updatedAt: null,
     };
   }
 
   return {
     ownedCards: normalizeOwnedCards(row.ownedCards || row.ownedcards),
+    ownedFoilCards: normalizeOwnedCards(
+      row.ownedFoilCards || row.ownedfoilcards
+    ),
     calculator: normalizeCalculator(row.calculator),
     selectedSetId: String(row.selectedSetId || row.selectedsetid || "").trim(),
+    cardFinishMode: normalizeCardFinish(
+      row.cardFinishMode || row.cardfinishmode
+    ),
     updatedAt: row.updatedAt || row.updatedat || null,
   };
 }
@@ -80,7 +102,7 @@ export async function GET() {
 
   await ensureCollectionStateSchema();
   const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-    'SELECT "ownedCards", "calculator", "selectedSetId", "updatedAt" FROM "CollectionState" WHERE "userId" = $1 LIMIT 1',
+    'SELECT "ownedCards", "ownedFoilCards", "calculator", "selectedSetId", "cardFinishMode", "updatedAt" FROM "CollectionState" WHERE "userId" = $1 LIMIT 1',
     userId
   );
 
@@ -100,16 +122,20 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const ownedCards = normalizeOwnedCards(body?.ownedCards);
+  const ownedFoilCards = normalizeOwnedCards(body?.ownedFoilCards);
   const calculator = normalizeCalculator(body?.calculator);
   const selectedSetId = String(body?.selectedSetId || "").trim();
+  const cardFinishMode = normalizeCardFinish(body?.cardFinishMode);
 
   await ensureCollectionStateSchema();
   const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-    'INSERT INTO "CollectionState" ("userId", "ownedCards", "calculator", "selectedSetId", "updatedAt") VALUES ($1, $2::jsonb, $3::jsonb, $4, NOW()) ON CONFLICT ("userId") DO UPDATE SET "ownedCards" = EXCLUDED."ownedCards", "calculator" = EXCLUDED."calculator", "selectedSetId" = EXCLUDED."selectedSetId", "updatedAt" = NOW() RETURNING "ownedCards", "calculator", "selectedSetId", "updatedAt"',
+    'INSERT INTO "CollectionState" ("userId", "ownedCards", "ownedFoilCards", "calculator", "selectedSetId", "cardFinishMode", "updatedAt") VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5, $6, NOW()) ON CONFLICT ("userId") DO UPDATE SET "ownedCards" = EXCLUDED."ownedCards", "ownedFoilCards" = EXCLUDED."ownedFoilCards", "calculator" = EXCLUDED."calculator", "selectedSetId" = EXCLUDED."selectedSetId", "cardFinishMode" = EXCLUDED."cardFinishMode", "updatedAt" = NOW() RETURNING "ownedCards", "ownedFoilCards", "calculator", "selectedSetId", "cardFinishMode", "updatedAt"',
     userId,
     JSON.stringify(ownedCards),
+    JSON.stringify(ownedFoilCards),
     JSON.stringify(calculator),
-    selectedSetId
+    selectedSetId,
+    cardFinishMode
   );
 
   return NextResponse.json(
