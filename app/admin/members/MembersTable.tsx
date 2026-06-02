@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
 import { nexoraAlert } from "@/lib/nexora-dialog";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
 type UserRow = {
   id: string;
   name: string | null;
+  image: string | null;
   displayName: string | null;
   username: string | null;
   lineId: string;
@@ -66,6 +68,14 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
   const [nexInputs, setNexInputs] = useState<Record<string, string>>({});
   const [coinInputs, setCoinInputs] = useState<Record<string, string>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      router.refresh();
+    }, 20_000);
+
+    return () => window.clearInterval(interval);
+  }, [router]);
 
   const filteredUsers = useMemo(() => {
     const keyword = normalizeSearch(query);
@@ -176,19 +186,22 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
         return (
         <div key={user.id} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Link href={`/admin/members/${user.id}`} className="text-lg font-black text-white hover:text-amber-300">
-                {displayName}
-              </Link>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <div className="break-all rounded-full bg-white/[0.05] px-3 py-1 text-sm font-bold text-white/50 ring-1 ring-white/10">
-                  {user.lineId}
-                </div>
-                {username ? (
-                  <div className="break-all rounded-full bg-amber-300/12 px-3 py-1 text-sm font-black text-amber-200 ring-1 ring-amber-300/20">
-                    @{username}
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <AdminUserAvatar src={user.image} name={displayName} size="md" />
+              <div className="min-w-0">
+                <Link href={`/admin/members/${user.id}`} className="text-lg font-black text-white hover:text-amber-300">
+                  {displayName}
+                </Link>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="break-all rounded-full bg-white/[0.05] px-3 py-1 text-sm font-bold text-white/50 ring-1 ring-white/10">
+                    {user.lineId}
                   </div>
-                ) : null}
+                  {username ? (
+                    <div className="break-all rounded-full bg-amber-300/12 px-3 py-1 text-sm font-black text-amber-200 ring-1 ring-amber-300/20">
+                      @{username}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-right">

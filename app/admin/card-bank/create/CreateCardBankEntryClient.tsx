@@ -26,10 +26,13 @@ import {
   nexoraCollectionSets,
   type NexoraCollectionSet,
 } from "@/lib/nexora-collection-sets";
+import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
+import { useRouter } from "next/navigation";
 
 type UserRow = {
   id: string;
   name: string | null;
+  image: string | null;
   displayName: string | null;
   username: string | null;
   lineId: string;
@@ -151,6 +154,7 @@ function resolveApiCard(data: Record<string, unknown>, fallbackCardNo: string): 
 }
 
 export default function CreateCardBankEntryClient({ users }: { users: UserRow[] }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [entryMode, setEntryMode] = useState<EntryMode | null>(null);
@@ -242,6 +246,14 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     const timer = window.setTimeout(() => quantityInputRef.current?.focus(), 40);
     return () => window.clearTimeout(timer);
   }, [quantityModalOpen]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      router.refresh();
+    }, 20_000);
+
+    return () => window.clearInterval(interval);
+  }, [router]);
 
   const selectedUsername = String(selectedUser?.username || "").trim().replace(/^@+/, "");
   const totalSpecificCards = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -388,22 +400,29 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     }`}
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="truncate text-lg font-black text-white">
-                            {getDisplayName(user)}
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <AdminUserAvatar
+                          src={user.image}
+                          name={getDisplayName(user)}
+                          size="md"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="truncate text-lg font-black text-white">
+                              {getDisplayName(user)}
+                            </div>
+                            {active ? <Check className="h-4 w-4 text-emerald-200" /> : null}
                           </div>
-                          {active ? <Check className="h-4 w-4 text-emerald-200" /> : null}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {username ? (
-                            <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-xs font-black text-white/70">
-                              @{username}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {username ? (
+                              <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-xs font-black text-white/70">
+                                @{username}
+                              </span>
+                            ) : null}
+                            <span className="break-all rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold text-white/48">
+                              {user.lineId}
                             </span>
-                          ) : null}
-                          <span className="break-all rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold text-white/48">
-                            {user.lineId}
-                          </span>
+                          </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-right">
@@ -421,11 +440,16 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         {selectedUser ? (
           <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#101010,#050505)] p-4 sm:p-5">
             <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.055]">
-                <UserCheck className="h-5 w-5" />
-              </div>
+              <AdminUserAvatar
+                src={selectedUser.image}
+                name={getDisplayName(selectedUser)}
+                size="sm"
+              />
               <div>
-                <h2 className="text-xl font-black">{getDisplayName(selectedUser)}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-black">{getDisplayName(selectedUser)}</h2>
+                  <UserCheck className="h-4 w-4 text-emerald-200" />
+                </div>
                 <p className="mt-2 text-sm leading-6 text-white/55">
                   {selectedUsername ? `@${selectedUsername} • ` : ""}
                   {selectedUser.lineId}
@@ -1123,7 +1147,7 @@ function CardSetModal({
         onClick={onClose}
         className="absolute inset-0 bg-black/78 backdrop-blur-md"
       />
-      <div className="relative flex max-h-[92dvh] w-full max-w-[980px] flex-col overflow-hidden rounded-[30px] border border-white/14 bg-[linear-gradient(180deg,#141414,#050505)] shadow-[0_35px_140px_rgba(0,0,0,0.72)]">
+      <div className="relative flex max-h-[92dvh] w-full max-w-[1360px] flex-col overflow-hidden rounded-[30px] border border-white/14 bg-[linear-gradient(180deg,#141414,#050505)] shadow-[0_35px_140px_rgba(0,0,0,0.72)]">
         <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
           <div className="min-w-0">
             <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
@@ -1144,9 +1168,9 @@ function CardSetModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
-          <div className="grid gap-3">
+          <div className="grid gap-3 lg:grid-cols-2">
             {allSets.map((set) => {
-              const quantityValue = quantityBySet[set.id] || "1";
+              const quantityValue = quantityBySet[set.id] ?? "1";
               const withFoilBonus = Boolean(foilBonusBySet[set.id]);
               const baseValue = parseNexReward(set.reward, false);
               const activeValue = parseNexReward(set.reward, withFoilBonus);
@@ -1156,9 +1180,9 @@ function CardSetModal({
               return (
                 <div
                   key={set.id}
-                  className="rounded-[22px] border border-white/10 bg-black/24 p-3 sm:p-4"
+                  className="flex min-h-full flex-col rounded-[22px] border border-white/10 bg-black/24 p-3 sm:p-4"
                 >
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
+                  <div className="grid flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="flex h-9 min-w-9 items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.06] px-2 text-sm font-black text-white">
@@ -1186,7 +1210,7 @@ function CardSetModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-[minmax(84px,1fr)_112px] gap-2">
+                    <div className="grid grid-cols-[minmax(76px,1fr)_104px] gap-2">
                       <input
                         value={quantityValue}
                         onChange={(event) =>

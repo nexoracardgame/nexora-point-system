@@ -5,6 +5,7 @@ import MembersTable from "./MembersTable";
 type AdminMemberRow = {
   id: string;
   name: string | null;
+  image: string | null;
   displayName: string | null;
   username: string | null;
   lineId: string;
@@ -21,7 +22,7 @@ export default async function MembersPage() {
   const [users, localProfiles] = await Promise.all([
     prisma
       .$queryRawUnsafe<AdminMemberRow[]>(
-        'SELECT "id", "name", "displayName", "username", "lineId", "nexPoint", "coin", "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 1000'
+        'SELECT "id", "name", "image", "displayName", "username", "lineId", "nexPoint", "coin", "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 1000'
       )
       .catch(() => []),
     getAllLocalProfiles().catch(() => []),
@@ -45,6 +46,10 @@ export default async function MembersPage() {
         users={users.map((user) => ({
           id: user.id,
           name: user.name,
+          image:
+            localProfileMap.get(user.id)?.image ||
+            localProfileMap.get(user.lineId)?.image ||
+            user.image,
           displayName:
             localProfileMap.get(user.id)?.displayName ||
             localProfileMap.get(user.lineId)?.displayName ||

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { formatThaiDateTime } from "@/lib/thai-time";
+import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
 import MemberActions from "./MemberActions";
 
 function Card({ title, value, gold }: { title: string; value: string; gold?: boolean }) {
@@ -53,6 +55,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) notFound();
+  const localProfile = await getLocalProfileByUserId(user.id).catch(() => null);
+  const displayName = localProfile?.displayName || user.displayName || user.name || "-";
+  const profileImage = localProfile?.image || user.image;
 
   const logs = await prisma.pointLog.findMany({
     where: { lineId: user.lineId },
@@ -72,8 +77,25 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         </Link>
       </div>
 
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <AdminUserAvatar src={profileImage} name={displayName} size="lg" />
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/35">
+              Verified Profile
+            </div>
+            <h2 className="mt-2 break-words text-2xl font-black text-white sm:text-3xl">
+              {displayName}
+            </h2>
+            <div className="mt-2 break-all text-sm font-bold text-white/50">
+              {user.lineId}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        <Card title="ชื่อ" value={user.name || "-"} />
+        <Card title="ชื่อ" value={displayName} />
         <Card title="Line ID" value={user.lineId} />
         <Card title="NEX" value={String(user.nexPoint)} gold />
         <Card title="Coin" value={String(user.coin)} />
