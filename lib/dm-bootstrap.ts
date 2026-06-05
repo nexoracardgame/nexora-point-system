@@ -105,7 +105,13 @@ export async function getDirectChatBootstrap(input: {
   return {
     ok: true,
     roomId: access.roomId,
-    me: buildChatUser(meIdentity.userId, meIdentity.name, meIdentity.image, "You"),
+    me: buildChatUser(
+      meIdentity.userId,
+      meIdentity.name,
+      meIdentity.image,
+      "You",
+      [lineId]
+    ),
     other,
     messages: page.messages,
     hasMore: page.hasMore,

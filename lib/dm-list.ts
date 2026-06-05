@@ -74,6 +74,19 @@ function buildLatestMessageFields(message?: {
   };
 }
 
+function isSelfSender(
+  senderId?: string | null,
+  myId?: string | null,
+  myLineId?: string | null
+) {
+  const safeSenderId = String(senderId || "").trim();
+  return Boolean(
+    safeSenderId &&
+      (safeSenderId === String(myId || "").trim() ||
+        safeSenderId === String(myLineId || "").trim())
+  );
+}
+
 function latestTime(value?: string | null) {
   const time = value ? new Date(value).getTime() : 0;
   return Number.isFinite(time) ? time : 0;
@@ -367,6 +380,7 @@ export async function getDmRoomsForUser(
   const directItems = dedupedRooms.map((room) => {
     const roomId = String(room.roomid);
     const latestMessage = latestMessageByRoom.get(roomId);
+    const latestMessageFromMe = isSelfSender(latestMessage?.senderId, myId, myLineId);
     const roomUserAIsMe =
       room.usera === myId || (myLineId ? room.usera === myLineId : false);
     const profile = profileMap.get(roomId);
@@ -397,12 +411,12 @@ export async function getDmRoomsForUser(
       otherName:
         profile?.displayName ||
         (roomUserAIsMe ? room.userbname : room.useraname) ||
-        latestMessage?.senderName ||
+        (!latestMessageFromMe ? latestMessage?.senderName : "") ||
         "User",
       otherImage:
         profile?.image ||
         safeImage(roomUserAIsMe ? room.userbimage : room.useraimage) ||
-        safeImage(latestMessage?.senderImage),
+        (!latestMessageFromMe ? safeImage(latestMessage?.senderImage) : "/avatar.png"),
       unread: unreadCountByRoom.get(roomId) || 0,
       __clearedAt: clearedAt,
     };

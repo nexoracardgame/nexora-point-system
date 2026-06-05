@@ -211,6 +211,36 @@ function getOpenChatRoomId(pathname: string) {
   return "";
 }
 
+function getLocalAnchorHref(target: EventTarget | null) {
+  if (!(target instanceof Element)) {
+    return "";
+  }
+
+  const anchor = target.closest("a[href]");
+  if (!(anchor instanceof HTMLAnchorElement)) {
+    return "";
+  }
+
+  if (
+    anchor.target ||
+    anchor.hasAttribute("download") ||
+    anchor.getAttribute("rel")?.includes("external")
+  ) {
+    return "";
+  }
+
+  try {
+    const url = new URL(anchor.href);
+    if (url.origin !== window.location.origin) {
+      return "";
+    }
+
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return "";
+  }
+}
+
 export default function MainLayout({
   children,
 }: {
@@ -1171,6 +1201,50 @@ export default function MainLayout({
       document.body.style.overflow = prev;
     };
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const prefetchedRoutes = new Map<string, number>();
+    const prefetchRoute = (event: Event) => {
+      const href = getLocalAnchorHref(event.target);
+      if (!href || href === pathname || href.startsWith("/api/")) {
+        return;
+      }
+
+      const now = Date.now();
+      const previous = prefetchedRoutes.get(href) || 0;
+      if (now - previous < 45000) {
+        return;
+      }
+
+      prefetchedRoutes.set(href, now);
+      if (prefetchedRoutes.size > 120) {
+        const oldest = prefetchedRoutes.keys().next().value;
+        if (oldest) {
+          prefetchedRoutes.delete(oldest);
+        }
+      }
+      router.prefetch(href);
+    };
+
+    const options: AddEventListenerOptions = {
+      capture: true,
+      passive: true,
+    };
+
+    window.addEventListener("pointerover", prefetchRoute, options);
+    window.addEventListener("pointerdown", prefetchRoute, options);
+    window.addEventListener("touchstart", prefetchRoute, options);
+    window.addEventListener("focusin", prefetchRoute, true);
+
+    return () => {
+      window.removeEventListener("pointerover", prefetchRoute, options);
+      window.removeEventListener("pointerdown", prefetchRoute, options);
+      window.removeEventListener("touchstart", prefetchRoute, options);
+      window.removeEventListener("focusin", prefetchRoute, true);
+    };
+  }, [pathname, router]);
 
   const pageContext = useMemo(() => {
     if (pathname.startsWith("/buy-market")) return "ตลาดรับซื้อการ์ดใบเดียว";

@@ -309,14 +309,15 @@ function DMRoomContent({
       if (!targetRoomId || !myId) return;
 
       const unreadMessages = nextMessages.filter(
-        (message) => message.senderId !== myId && !message.seenAt
+        (message) =>
+          message.senderId !== myId && message.sender?.id !== myId && !message.seenAt
       );
       if (unreadMessages.length === 0) return;
 
       const seenAt = new Date().toISOString();
       setMessages((prev) =>
         prev.map((message) =>
-          message.senderId !== myId && !message.seenAt
+          message.senderId !== myId && message.sender?.id !== myId && !message.seenAt
             ? { ...message, seenAt }
             : message
         )
@@ -347,7 +348,9 @@ function DMRoomContent({
       return;
     }
 
-    const nextMe = data.me ? buildChatUser(data.me.id, data.me.name, data.me.image, "You") : null;
+    const nextMe = data.me
+      ? buildChatUser(data.me.id, data.me.name, data.me.image, "You", data.me.aliases)
+      : null;
     const nextOther = data.other
       ? buildChatUser(data.other.id, data.other.name, data.other.image)
       : null;
@@ -566,11 +569,12 @@ function DMRoomContent({
       me,
       other
     );
+    const incomingIsMine = eventIsMine || incoming.sender?.id === me?.id;
 
     setMessages((prev) => mergeSingleChatMessage(prev, incoming, roomId, me, other));
 
     if (
-      !eventIsMine &&
+      !incomingIsMine &&
       document.visibilityState === "visible"
     ) {
       void markLoadedRoomSeen(roomId, [incoming], me);
@@ -618,7 +622,13 @@ function DMRoomContent({
     }
 
     const cachedMe = cached.meta?.me
-      ? buildChatUser(cached.meta.me.id, cached.meta.me.name, cached.meta.me.image, "You")
+      ? buildChatUser(
+          cached.meta.me.id,
+          cached.meta.me.name,
+          cached.meta.me.image,
+          "You",
+          cached.meta.me.aliases
+        )
       : null;
     const cachedOther = cached.meta?.other
       ? buildChatUser(cached.meta.other.id, cached.meta.other.name, cached.meta.other.image)
@@ -1052,7 +1062,10 @@ function DMRoomContent({
     if (lastMessageIdRef.current === latestMessage.id) return;
     lastMessageIdRef.current = latestMessage.id;
 
-    const isMine = latestMessage.senderId === me?.id || latestMessage.optimistic;
+    const isMine =
+      latestMessage.senderId === me?.id ||
+      latestMessage.sender?.id === me?.id ||
+      latestMessage.optimistic;
     const nearBottom = checkIsNearBottom();
     const shouldAutoScroll = isMine || shouldAutoScrollOnIncoming();
     isNearBottomRef.current = nearBottom;
@@ -1072,7 +1085,11 @@ function DMRoomContent({
   }, [me?.id, messages]);
 
   const lastSeenMineId = useMemo(() => {
-    const mineSeen = messages.filter((message) => message.senderId === me?.id && !!message.seenAt);
+    const mineSeen = messages.filter(
+      (message) =>
+        (message.senderId === me?.id || message.sender?.id === me?.id) &&
+        !!message.seenAt
+    );
     if (mineSeen.length === 0) return null;
     return mineSeen[mineSeen.length - 1]?.id || null;
   }, [messages, me?.id]);
@@ -1376,7 +1393,7 @@ function DMRoomContent({
             ) : null}
 
             {messages.map((message) => {
-              const mine = message.senderId === me?.id;
+              const mine = message.senderId === me?.id || message.sender?.id === me?.id;
               const sender = mine
                 ? buildChatSender(
                     String(message.senderId || "").trim(),

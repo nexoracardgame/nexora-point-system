@@ -4,6 +4,7 @@ export type ChatUser = {
   id: string;
   name: string;
   image: string;
+  aliases?: string[];
 };
 
 export type ChatMessage = {
@@ -30,6 +31,7 @@ type ChatIdentity = {
   id?: string | null;
   name?: string | null;
   image?: string | null;
+  aliases?: Array<string | null | undefined>;
 } | null;
 
 function safeTime(value?: string | null) {
@@ -39,6 +41,19 @@ function safeTime(value?: string | null) {
 
 function safeText(value?: string | null) {
   return String(value || "").trim();
+}
+
+function identityIds(identity?: ChatIdentity) {
+  return new Set(
+    [identity?.id, ...(identity?.aliases || [])]
+      .map((value) => safeText(value))
+      .filter(Boolean)
+  );
+}
+
+function identityMatches(senderId: string, identity?: ChatIdentity) {
+  const safeSenderId = safeText(senderId);
+  return Boolean(safeSenderId && identityIds(identity).has(safeSenderId));
 }
 
 function hasImage(message?: ChatMessage | null) {
@@ -74,12 +89,23 @@ export function buildChatUser(
   id?: string | null,
   name?: string | null,
   image?: string | null,
-  fallbackName = "User"
+  fallbackName = "User",
+  aliases: Array<string | null | undefined> = []
 ): ChatUser {
+  const safeId = String(id || "").trim();
+  const safeAliases = Array.from(
+    new Set(
+      aliases
+        .map((value) => safeText(value))
+        .filter((value) => value && value !== safeId)
+    )
+  );
+
   return {
-    id: String(id || "").trim(),
+    id: safeId,
     name: String(name || "").trim() || fallbackName,
     image: String(image || "").trim() || "/avatar.png",
+    ...(safeAliases.length ? { aliases: safeAliases } : {}),
   };
 }
 
@@ -89,21 +115,24 @@ export function buildChatSender(
   me?: ChatIdentity,
   other?: ChatIdentity
 ) {
-  const isMine = senderId === String(me?.id || "").trim();
+  const safeSenderId = safeText(senderId);
+  const isMine = identityMatches(safeSenderId, me);
 
   if (isMine) {
     return buildChatUser(
-      senderId,
+      safeText(me?.id) || safeSenderId,
       me?.name || input?.senderName,
       me?.image || input?.senderImage,
       "You"
     );
   }
 
+  const isOther = identityMatches(safeSenderId, other);
+
   return buildChatUser(
-    senderId,
-    other?.name || input?.senderName,
-    other?.image || input?.senderImage,
+    isOther ? safeText(other?.id) || safeSenderId : safeSenderId,
+    isOther ? other?.name || input?.senderName : input?.senderName || other?.name,
+    isOther ? other?.image || input?.senderImage : input?.senderImage || other?.image,
     "User"
   );
 }
@@ -114,13 +143,17 @@ export function normalizeChatMessage(
   me?: ChatIdentity,
   other?: ChatIdentity
 ): ChatMessage {
+  const senderId = String(message.senderId || "").trim();
+  const shouldBindFromRoomIdentity =
+    Boolean(senderId) && (identityMatches(senderId, me) || identityMatches(senderId, other));
+
   return {
     ...message,
     roomId: String(message.roomId || roomId || "").trim(),
-    sender: message.sender
+    sender: !shouldBindFromRoomIdentity && message.sender
       ? buildChatUser(message.sender.id, message.sender.name, message.sender.image)
       : buildChatSender(
-          String(message.senderId || "").trim(),
+          senderId,
           {
             senderName: message.senderName,
             senderImage: message.senderImage,

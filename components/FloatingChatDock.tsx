@@ -831,7 +831,10 @@ export default function FloatingChatDock({
     }
 
     const mineSeen = messages.filter(
-      (message) => safeText(message.senderId) === myId && Boolean(message.seenAt)
+      (message) =>
+        (safeText(message.senderId) === myId ||
+          safeText(message.sender?.id) === myId) &&
+        Boolean(message.seenAt)
     );
 
     return mineSeen[mineSeen.length - 1]?.id || null;
@@ -1094,7 +1097,10 @@ export default function FloatingChatDock({
       }
 
       const unreadMessages = nextMessages.filter(
-        (message) => safeText(message.senderId) !== meId && !message.seenAt
+        (message) =>
+          safeText(message.senderId) !== meId &&
+          safeText(message.sender?.id) !== meId &&
+          !message.seenAt
       );
       const unreadToClear = Math.max(
         unreadMessages.length,
@@ -1108,7 +1114,9 @@ export default function FloatingChatDock({
       const readAt = new Date().toISOString();
       setMessages((current) =>
         current.map((message) =>
-          safeText(message.senderId) !== meId && !message.seenAt
+          safeText(message.senderId) !== meId &&
+          safeText(message.sender?.id) !== meId &&
+          !message.seenAt
             ? { ...message, seenAt: readAt }
             : message
         )
@@ -1150,7 +1158,10 @@ export default function FloatingChatDock({
     }
 
     const hasUnreadIncoming = messages.some(
-      (message) => safeText(message.senderId) !== myId && !message.seenAt
+      (message) =>
+        safeText(message.senderId) !== myId &&
+        safeText(message.sender?.id) !== myId &&
+        !message.seenAt
     );
 
     if (!hasUnreadIncoming && Number(active.unread || 0) <= 0) {
@@ -1205,14 +1216,21 @@ export default function FloatingChatDock({
       return {
         ...room,
         actualRoomId: safeText(cachedActive?.actualRoomId) || room.roomId,
-        me:
-          cachedActive?.me ||
-          buildChatUser(
-            currentUserId,
-            sessionUserName,
-            sessionUserImage,
-            "You"
-          ),
+        me: cachedActive?.me
+          ? buildChatUser(
+              cachedActive.me.id,
+              cachedActive.me.name,
+              cachedActive.me.image,
+              "You",
+              [...(cachedActive.me.aliases || []), sessionUserLineId]
+            )
+          : buildChatUser(
+              currentUserId,
+              sessionUserName,
+              sessionUserImage,
+              "You",
+              [sessionUserLineId]
+            ),
         other:
           cachedActive?.other ||
           buildChatUser(room.otherUserId, room.otherName, room.otherImage),
@@ -1223,7 +1241,7 @@ export default function FloatingChatDock({
         deal: cachedActive?.deal || fallbackDeal,
       };
     },
-    [currentUserId, sessionUserImage, sessionUserName]
+    [currentUserId, sessionUserImage, sessionUserLineId, sessionUserName]
   );
 
   const readPersistedRoomCache = useCallback(
@@ -1455,9 +1473,14 @@ export default function FloatingChatDock({
           sessionUserLineId
         )
       );
+      const detailSenderId = safeText(detail.senderId);
+      const detailIsMine =
+        Boolean(detail.isMine) ||
+        detailSenderId === safeText(currentUserId) ||
+        detailSenderId === safeText(sessionUserLineId);
 
       if (!room) {
-        const provisionalRoom = detail.isMine
+        const provisionalRoom = detailIsMine
           ? null
           : buildRoomFromRealtimeDetail(detail);
         if (provisionalRoom) {
@@ -1511,7 +1534,7 @@ export default function FloatingChatDock({
         ? sameRoomEvent(active, detail, currentUserId, sessionUserLineId)
         : false;
       const shouldIncrementUnread =
-        !detail.isMine && !(isOpen && activeMatches);
+        !detailIsMine && !(isOpen && activeMatches);
       const messageCreatedAt = safeText(detail.createdAt) || new Date().toISOString();
       const preview = buildMessagePreview(detail.content, detail.imageUrl);
 
@@ -1531,7 +1554,7 @@ export default function FloatingChatDock({
                   lastMessageSeenAt: detail.seenAt || null,
                   lastMessageAt: messageCreatedAt,
                   createdAt: messageCreatedAt || item.createdAt,
-                  unread: detail.isMine
+                  unread: detailIsMine
                     ? 0
                     : shouldIncrementUnread
                       ? Math.max(0, Number(item.unread || 0)) + 1
@@ -2530,7 +2553,14 @@ export default function FloatingChatDock({
       });
       scrollToBottom("smooth");
 
-      if (!detail.isMine && open) {
+      const detailSenderId = safeText(detail.senderId);
+      const detailIsMine =
+        Boolean(detail.isMine) ||
+        detailSenderId === safeText(currentUserId) ||
+        detailSenderId === safeText(sessionUserLineId) ||
+        safeText(incoming.sender?.id) === safeText(active.me?.id || currentUserId);
+
+      if (!detailIsMine && open) {
         void markRoomSeen(active, active.actualRoomId, [incoming], active.me);
       }
     };
@@ -2561,7 +2591,9 @@ export default function FloatingChatDock({
       setMessages((current) => {
         let changed = false;
         const nextMessages = current.map((message) => {
-          const isMine = safeText(message.senderId) === myId;
+          const isMine =
+            safeText(message.senderId) === myId ||
+            safeText(message.sender?.id) === myId;
           const matchesMessage = messageId
             ? safeText(message.id) === messageId
             : isMine;
@@ -3350,8 +3382,15 @@ export default function FloatingChatDock({
                     type="button"
                     onClick={() => {
                       if (!activeProfileHref) return;
+                      router.prefetch(activeProfileHref);
                       setOpen(false);
                       router.push(activeProfileHref);
+                    }}
+                    onPointerEnter={() => {
+                      if (activeProfileHref) router.prefetch(activeProfileHref);
+                    }}
+                    onTouchStart={() => {
+                      if (activeProfileHref) router.prefetch(activeProfileHref);
                     }}
                     disabled={!activeProfileHref}
                     className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-1.5 py-1 text-left transition hover:bg-white/[0.06] disabled:cursor-default disabled:hover:bg-transparent"
@@ -3470,6 +3509,8 @@ export default function FloatingChatDock({
                       {messages.map((message) => {
                         const mine =
                           safeText(message.senderId) ===
+                            safeText(activeRoom.me?.id || currentUserId) ||
+                          safeText(message.sender?.id) ===
                           safeText(activeRoom.me?.id || currentUserId);
                         const sender = mine ? activeRoom.me : activeRoom.other;
 

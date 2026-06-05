@@ -294,6 +294,7 @@ export default async function SellerProfilePage({
       .groupBy({
         by: ["sellerId"],
         where: {
+          sellerId: id,
           NOT: {
             status: {
               equals: "sold",
@@ -316,6 +317,7 @@ export default async function SellerProfilePage({
       .groupBy({
         by: ["sellerId"],
         where: {
+          sellerId: id,
           status: {
             equals: "completed",
             mode: "insensitive",
@@ -354,6 +356,9 @@ export default async function SellerProfilePage({
     prisma.sellerReview
       .groupBy({
         by: ["sellerId"],
+        where: {
+          sellerId: id,
+        },
         _avg: {
           rating: true,
         },
@@ -584,11 +589,15 @@ export default async function SellerProfilePage({
   );
 
   const now = new Date().getTime();
-  const dealerSalesRows = await prisma
-    .$queryRawUnsafe<DealerSalesLookupRow[]>(
-      'SELECT "userId", "memberId" FROM "DealerVerification" WHERE LOWER("status") = \'verified\''
-    )
-    .catch(() => [] as DealerSalesLookupRow[]);
+  const dealerSalesRows =
+    dealerVerification.verified && dealerVerification.memberId
+      ? ([
+          {
+            userId: seller.id,
+            memberId: dealerVerification.memberId,
+          } as DealerSalesLookupRow,
+        ])
+      : [];
   const dealerMemberIds = new Set(
     dealerSalesRows
       .map((row) => row.memberId || row.memberid || "")
