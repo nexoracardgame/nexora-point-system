@@ -316,3 +316,18 @@ textarea {
     transition: none !important;
   }
 }
+
+@keyframes nexora-route-progress {
+  0% {
+    transform: translateX(-70%) scaleX(0.32);
+    opacity: 0.55;
+  }
+  55% {
+    transform: translateX(38%) scaleX(0.88);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(118%) scaleX(0.28);
+    opacity: 0.45;
+  }
+}

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import FirstOpenSplash from "@/components/FirstOpenSplash";
 import GlobalActivityBar from "@/components/GlobalActivityBar";
+import InstantNavigationFeedback from "@/components/InstantNavigationFeedback";
 import NexoraDialogProvider from "@/components/NexoraDialogProvider";
 import PageTransition from "@/components/PageTransition";
 import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
@@ -26,6 +27,7 @@ export default function RootChrome({
       <PushNotificationBootstrap />
       <FirstOpenSplash />
       <GlobalActivityBar />
+      <InstantNavigationFeedback />
       <PageTransition>
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </PageTransition>

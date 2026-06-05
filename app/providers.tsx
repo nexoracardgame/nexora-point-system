@@ -11,7 +11,7 @@ export default function Providers({
   children: React.ReactNode;
 }) {
   return (
-    <SessionProvider refetchInterval={10} refetchOnWindowFocus>
+    <SessionProvider refetchInterval={300} refetchOnWindowFocus={false}>
       <NativeViewportBridge />
       <SessionKillSwitch />
       <LanguageProvider>{children}</LanguageProvider>

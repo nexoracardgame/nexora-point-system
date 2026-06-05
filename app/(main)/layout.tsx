@@ -59,13 +59,13 @@ function formatBalance(value?: number | null) {
   return Number(value || 0).toLocaleString("th-TH");
 }
 
-const CHAT_UNREAD_POLL_TICK_MS = 1000;
+const CHAT_UNREAD_POLL_TICK_MS = 5000;
 const CHAT_UNREAD_REALTIME_FALLBACK_MS = 15000;
-const CHAT_UNREAD_CONNECTING_FALLBACK_MS = 1800;
+const CHAT_UNREAD_CONNECTING_FALLBACK_MS = 5000;
 const CHAT_UNREAD_CONFIRM_REFRESH_MS = 550;
-const WALLET_UNREAD_POLL_TICK_MS = 2000;
+const WALLET_UNREAD_POLL_TICK_MS = 8000;
 const WALLET_UNREAD_REALTIME_FALLBACK_MS = 30000;
-const WALLET_UNREAD_CONNECTING_FALLBACK_MS = 12000;
+const WALLET_UNREAD_CONNECTING_FALLBACK_MS = 20000;
 
 type NavigatorWithConnection = Navigator & {
   connection?: {
@@ -486,7 +486,6 @@ export default function MainLayout({
         safeProfileSrc(detail.image),
         String(detail.name || "").trim(),
       ].join("|");
-      router.refresh();
     });
   }, [router]);
 
@@ -529,7 +528,6 @@ export default function MainLayout({
           setProfileName(nextName);
         }
 
-        router.refresh();
       } catch {
         return;
       }
