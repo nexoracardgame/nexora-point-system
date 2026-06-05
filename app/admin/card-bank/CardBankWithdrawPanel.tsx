@@ -7,8 +7,12 @@ import type { CardBankAsset } from "@/lib/card-bank-store";
 
 type WithdrawState = {
   quantity: string;
+  nexValue: string;
+  coinValue: string;
   note: string;
 };
+
+type WithdrawFilter = "all" | "specific" | "sets" | "bulk" | "unknown";
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -27,9 +31,17 @@ function assetLabel(asset: CardBankAsset) {
     return asset.setName || asset.cardName;
   }
   if (asset.intakeMode === "bulk") {
-    return "Bulk NEX / COIN Pool";
+    if (asset.assetTier === "pure") return "กอง NEX / COIN ไม่ระบุหมวดการ์ด";
+    if (asset.assetTier === "unknown") return "กองการ์ดหมวด UNKNOWN";
+    return `กองการ์ดหมวด ${asset.assetTier.toUpperCase()}`;
   }
   return asset.cardNo ? `No.${asset.cardNo} ${asset.cardName}` : asset.cardName;
+}
+
+function withdrawModeLabel(asset: CardBankAsset) {
+  if (asset.intakeMode === "sets") return "ถอนคืนเป็นเซ็ต";
+  if (asset.intakeMode === "bulk") return "ถอนคืนจากกองรวม";
+  return "ถอนคืนเป็นใบ";
 }
 
 export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsset[] }) {
@@ -39,23 +51,60 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [forms, setForms] = useState<Record<string, WithdrawState>>({});
+  const [filter, setFilter] = useState<WithdrawFilter>("all");
 
   const withdrawableAssets = useMemo(
     () =>
       assets.filter(
         (asset) =>
-          asset.quantity > 0 &&
           (asset.status === "stored" || asset.status === "pawned") &&
-          asset.intakeMode !== "bulk"
+          (asset.intakeMode === "bulk"
+            ? asset.nexValue > 0 || asset.coinValue > 0
+            : asset.quantity > 0)
       ),
     [assets]
   );
+  const visibleAssets = useMemo(
+    () =>
+      withdrawableAssets.filter((asset) => {
+        if (filter === "all") return true;
+        if (filter === "unknown") return asset.assetTier === "unknown";
+        return asset.intakeMode === filter;
+      }),
+    [filter, withdrawableAssets]
+  );
+
+  const filterOptions: Array<{ value: WithdrawFilter; label: string; count: number }> = [
+    { value: "all", label: "ทั้งหมด", count: withdrawableAssets.length },
+    {
+      value: "specific",
+      label: "ใบเดี่ยว",
+      count: withdrawableAssets.filter((asset) => asset.intakeMode === "specific").length,
+    },
+    {
+      value: "sets",
+      label: "เซ็ต",
+      count: withdrawableAssets.filter((asset) => asset.intakeMode === "sets").length,
+    },
+    {
+      value: "bulk",
+      label: "กองรวม",
+      count: withdrawableAssets.filter((asset) => asset.intakeMode === "bulk").length,
+    },
+    {
+      value: "unknown",
+      label: "UNKNOWN",
+      count: withdrawableAssets.filter((asset) => asset.assetTier === "unknown").length,
+    },
+  ];
 
   const updateForm = (assetId: string, patch: Partial<WithdrawState>) => {
     setForms((current) => ({
       ...current,
       [assetId]: {
         quantity: current[assetId]?.quantity || "1",
+        nexValue: current[assetId]?.nexValue || "",
+        coinValue: current[assetId]?.coinValue || "",
         note: current[assetId]?.note || "",
         ...patch,
       },
@@ -63,12 +112,28 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
   };
 
   const withdrawAsset = async (asset: CardBankAsset) => {
-    const form = forms[asset.id] || { quantity: "1", note: "" };
+    const form = forms[asset.id] || { quantity: "1", nexValue: "", coinValue: "", note: "" };
     const quantity = Math.max(1, Math.floor(Number(form.quantity || 1)));
-    if (!Number.isFinite(quantity) || quantity <= 0) return;
-    if (quantity > asset.quantity) {
+    const nexValue = Math.max(0, Number(form.nexValue || 0));
+    const coinValue = Math.max(0, Math.floor(Number(form.coinValue || 0)));
+    if (asset.intakeMode !== "bulk" && (!Number.isFinite(quantity) || quantity <= 0)) return;
+    if (asset.intakeMode !== "bulk" && quantity > asset.quantity) {
       setError(`จำนวนเบิกคืนมากกว่าคงเหลือของ ${assetLabel(asset)}`);
       return;
+    }
+    if (asset.intakeMode === "bulk") {
+      if ((!Number.isFinite(nexValue) || nexValue <= 0) && (!Number.isFinite(coinValue) || coinValue <= 0)) {
+        setError(`ระบุยอด NEX หรือ COIN ที่ต้องถอนคืนจาก ${assetLabel(asset)}`);
+        return;
+      }
+      if (nexValue > asset.nexValue) {
+        setError(`ยอด NEX ที่ถอนคืนมากกว่าคงเหลือของ ${assetLabel(asset)}`);
+        return;
+      }
+      if (coinValue > asset.coinValue) {
+        setError(`ยอด COIN ที่ถอนคืนมากกว่าคงเหลือของ ${assetLabel(asset)}`);
+        return;
+      }
     }
 
     setBusyAssetId(asset.id);
@@ -83,6 +148,8 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
         },
         body: JSON.stringify({
           quantity,
+          nexValue: asset.intakeMode === "bulk" ? nexValue : 0,
+          coinValue: asset.intakeMode === "bulk" ? coinValue : 0,
           note: form.note,
         }),
       });
@@ -90,7 +157,11 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
         ok?: boolean;
         error?: string;
         withdrawnQuantity?: number;
+        withdrawnNexValue?: number;
+        withdrawnCoinValue?: number;
         remainingQuantity?: number;
+        remainingNexValue?: number;
+        remainingCoinValue?: number;
       };
 
       if (!response.ok || !result.ok) {
@@ -98,11 +169,13 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
       }
 
       setSuccess(
-        `เบิกคืน ${assetLabel(asset)} จำนวน ${result.withdrawnQuantity || quantity} สำเร็จ เหลือ ${result.remainingQuantity || 0}`
+        asset.intakeMode === "bulk"
+          ? `ถอนคืน ${assetLabel(asset)} สำเร็จ: ${Number(result.withdrawnNexValue || nexValue).toLocaleString("th-TH")} NEX / ${Number(result.withdrawnCoinValue || coinValue).toLocaleString("th-TH")} COIN เหลือ ${Number(result.remainingNexValue || 0).toLocaleString("th-TH")} NEX / ${Number(result.remainingCoinValue || 0).toLocaleString("th-TH")} COIN`
+          : `เบิกคืน ${assetLabel(asset)} จำนวน ${result.withdrawnQuantity || quantity} สำเร็จ เหลือ ${result.remainingQuantity || 0}`
       );
       setForms((current) => ({
         ...current,
-        [asset.id]: { quantity: "1", note: "" },
+        [asset.id]: { quantity: "1", nexValue: "", coinValue: "", note: "" },
       }));
       startTransition(() => router.refresh());
     } catch (caught) {
@@ -126,6 +199,23 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
         </div>
       </div>
 
+      <div className="mt-4 flex flex-wrap gap-2">
+        {filterOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setFilter(option.value)}
+            className={`rounded-full border px-3 py-2 text-xs font-black transition ${
+              filter === option.value
+                ? "border-white/36 bg-white text-black"
+                : "border-white/10 bg-white/[0.045] text-white/58 hover:bg-white/[0.075]"
+            }`}
+          >
+            {option.label} ({option.count.toLocaleString("th-TH")})
+          </button>
+        ))}
+      </div>
+
       {error ? (
         <div className="mt-4 rounded-[18px] border border-red-300/20 bg-red-500/10 p-3 text-sm font-bold text-red-100">
           {error}
@@ -138,24 +228,24 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
       ) : null}
 
       <div className="mt-5 overflow-x-auto rounded-[22px] border border-white/10">
-        <div className="min-w-[980px]">
-          <div className="grid grid-cols-[1fr_1fr_110px_130px_140px_190px] bg-white/[0.045] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+        <div className="min-w-[1090px]">
+          <div className="grid grid-cols-[1fr_1.1fr_150px_220px_140px_190px] bg-white/[0.045] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
             <div>Owner</div>
             <div>Asset</div>
             <div>คงเหลือ</div>
-            <div>จำนวนคืน</div>
+            <div>ถอนคืนแบบไหน</div>
             <div>สร้างเมื่อ</div>
             <div>Action</div>
           </div>
-          {withdrawableAssets.length > 0 ? (
-            withdrawableAssets.map((asset) => {
-              const form = forms[asset.id] || { quantity: "1", note: "" };
+          {visibleAssets.length > 0 ? (
+            visibleAssets.map((asset) => {
+              const form = forms[asset.id] || { quantity: "1", nexValue: "", coinValue: "", note: "" };
               const busy = busyAssetId === asset.id || isPending;
 
               return (
                 <div
                   key={asset.id}
-                  className="grid grid-cols-[1fr_1fr_110px_130px_140px_190px] items-center gap-3 border-t border-white/8 px-4 py-4 text-sm"
+                  className="grid grid-cols-[1fr_1.1fr_150px_220px_140px_190px] items-center gap-3 border-t border-white/8 px-4 py-4 text-sm"
                 >
                   <div className="min-w-0">
                     <div className="truncate font-black text-white">{asset.ownerName}</div>
@@ -166,7 +256,9 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
                     <div className="truncate text-xs text-white/38">
                       {asset.intakeMode === "sets"
                         ? `เซ็ต ${asset.setCardTotal || 0} ใบ / ${asset.nexValue.toLocaleString("th-TH")} NEX`
-                        : asset.cardType || asset.intakeMode}
+                        : asset.intakeMode === "bulk"
+                          ? `${asset.assetTier.toUpperCase()} / ${asset.entryMode === "pawn" ? "pawn" : "bank"}`
+                          : asset.cardType || asset.intakeMode}
                     </div>
                     <input
                       value={form.note}
@@ -175,14 +267,45 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
                       className="mt-2 h-9 w-full rounded-[14px] border border-white/10 bg-black/30 px-3 text-xs font-bold text-white outline-none placeholder:text-white/32 focus:border-white/30"
                     />
                   </div>
-                  <div className="font-black text-white">{asset.quantity.toLocaleString("th-TH")}</div>
+                  <div className="font-black text-white">
+                    {asset.intakeMode === "bulk" ? (
+                      <div className="space-y-1">
+                        <div>{asset.nexValue.toLocaleString("th-TH")} NEX</div>
+                        <div>{asset.coinValue.toLocaleString("th-TH")} COIN</div>
+                      </div>
+                    ) : (
+                      asset.quantity.toLocaleString("th-TH")
+                    )}
+                  </div>
                   <div>
-                    <input
-                      value={form.quantity}
-                      onChange={(event) => updateForm(asset.id, { quantity: event.target.value })}
-                      inputMode="numeric"
-                      className="h-10 w-full rounded-[14px] border border-white/10 bg-black/30 px-3 text-sm font-black text-white outline-none focus:border-white/30"
-                    />
+                    <div className="mb-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] font-black text-white/62">
+                      {withdrawModeLabel(asset)}
+                    </div>
+                    {asset.intakeMode === "bulk" ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={form.nexValue}
+                          onChange={(event) => updateForm(asset.id, { nexValue: event.target.value })}
+                          inputMode="decimal"
+                          placeholder="NEX"
+                          className="h-10 w-full rounded-[14px] border border-white/10 bg-black/30 px-3 text-sm font-black text-white outline-none placeholder:text-white/32 focus:border-white/30"
+                        />
+                        <input
+                          value={form.coinValue}
+                          onChange={(event) => updateForm(asset.id, { coinValue: event.target.value })}
+                          inputMode="numeric"
+                          placeholder="COIN"
+                          className="h-10 w-full rounded-[14px] border border-white/10 bg-black/30 px-3 text-sm font-black text-white outline-none placeholder:text-white/32 focus:border-white/30"
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        value={form.quantity}
+                        onChange={(event) => updateForm(asset.id, { quantity: event.target.value })}
+                        inputMode="numeric"
+                        className="h-10 w-full rounded-[14px] border border-white/10 bg-black/30 px-3 text-sm font-black text-white outline-none focus:border-white/30"
+                      />
+                    )}
                   </div>
                   <div className="text-white/52">{formatDateTime(asset.createdAt)}</div>
                   <button

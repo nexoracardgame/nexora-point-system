@@ -84,6 +84,8 @@ export type CreateCardBankEntriesInput = {
 export type WithdrawCardBankAssetInput = {
   assetId: string;
   quantity: number;
+  nexValue?: number;
+  coinValue?: number;
   actor: {
     id: string;
     name: string;
@@ -98,6 +100,22 @@ export type CardBankAdminSummary = {
   forfeitedQuantity: number;
   latestAssets: CardBankAsset[];
 };
+
+export function getCardBankAssetsVersion(assets: CardBankAsset[]) {
+  return assets
+    .map((asset) =>
+      [
+        asset.id,
+        asset.status,
+        asset.quantity,
+        asset.nexValue,
+        asset.coinValue,
+        asset.updatedAt,
+      ].join(":")
+    )
+    .sort()
+    .join("|");
+}
 
 let schemaReadyPromise: Promise<void> | null = null;
 
@@ -150,6 +168,14 @@ function normalizeAssetTier(value: unknown): CardBankAssetTier {
 function toNumber(value: unknown) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? number : 0;
+}
+
+function toNonNegativeNumber(value: unknown) {
+  return Math.max(0, toNumber(value));
+}
+
+function toNonNegativeInt(value: unknown) {
+  return Math.max(0, Math.floor(toNumber(value)));
 }
 
 function toNullableString(value: unknown) {
@@ -376,6 +402,8 @@ export async function createCardBankEntries(input: CreateCardBankEntriesInput) {
 export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
   const assetId = String(input.assetId || "").trim();
   const requestedQuantity = Math.max(1, Math.floor(Number(input.quantity || 1)));
+  const requestedNexValue = toNonNegativeNumber(input.nexValue);
+  const requestedCoinValue = toNonNegativeInt(input.coinValue);
   if (!assetId) {
     throw new Error("Missing asset id");
   }
@@ -388,12 +416,33 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
       throw new Error("Asset is already closed");
     }
 
-    const withdrawQuantity = Math.min(requestedQuantity, asset.quantity);
-    const remainingQuantity = asset.quantity - withdrawQuantity;
+    const isBulk = asset.intakeMode === "bulk";
+    const withdrawNexValue = isBulk ? requestedNexValue : 0;
+    const withdrawCoinValue = isBulk ? requestedCoinValue : 0;
+
+    if (isBulk && withdrawNexValue <= 0 && withdrawCoinValue <= 0) {
+      throw new Error("Bulk withdrawal requires NEX or COIN amount");
+    }
+    if (isBulk && withdrawNexValue > asset.nexValue) {
+      throw new Error("Withdraw NEX is greater than the remaining pool");
+    }
+    if (isBulk && withdrawCoinValue > asset.coinValue) {
+      throw new Error("Withdraw COIN is greater than the remaining pool");
+    }
+
+    const withdrawQuantity = isBulk ? asset.quantity : Math.min(requestedQuantity, asset.quantity);
+    const remainingQuantity = isBulk ? asset.quantity : asset.quantity - withdrawQuantity;
+    const remainingNexValue = isBulk ? asset.nexValue - withdrawNexValue : asset.nexValue;
+    const remainingCoinValue = isBulk ? asset.coinValue - withdrawCoinValue : asset.coinValue;
+    const isClosed = isBulk
+      ? remainingNexValue <= 0 && remainingCoinValue <= 0
+      : remainingQuantity <= 0;
     const updatedAsset: CardBankAsset = {
       ...asset,
       quantity: Math.max(0, remainingQuantity),
-      status: remainingQuantity <= 0 ? "withdrawn" : asset.status,
+      nexValue: Math.max(0, remainingNexValue),
+      coinValue: Math.max(0, remainingCoinValue),
+      status: isClosed ? "withdrawn" : asset.status,
       updatedAt: new Date().toISOString(),
     };
 
@@ -403,39 +452,65 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
     return {
       asset: updatedAsset,
       withdrawnQuantity: withdrawQuantity,
+      withdrawnNexValue: withdrawNexValue,
+      withdrawnCoinValue: withdrawCoinValue,
       remainingQuantity: updatedAsset.quantity,
+      remainingNexValue: updatedAsset.nexValue,
+      remainingCoinValue: updatedAsset.coinValue,
     };
   }
 
   await ensureCardBankSchema();
-  const rows = await prisma.$queryRawUnsafe<DbRow[]>(
-    'SELECT * FROM "CardBankAsset" WHERE "id" = $1 LIMIT 1',
-    assetId
-  );
-  const asset = rows[0] ? toAssetRecord(rows[0]) : null;
-  if (!asset) throw new Error("Asset not found");
-  if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
-    throw new Error("Asset is already closed");
-  }
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRawUnsafe<DbRow[]>(
+      'SELECT * FROM "CardBankAsset" WHERE "id" = $1 FOR UPDATE',
+      assetId
+    );
+    const asset = rows[0] ? toAssetRecord(rows[0]) : null;
+    if (!asset) throw new Error("Asset not found");
+    if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
+      throw new Error("Asset is already closed");
+    }
 
-  const withdrawQuantity = Math.min(requestedQuantity, asset.quantity);
-  const remainingQuantity = asset.quantity - withdrawQuantity;
-  const nextStatus = remainingQuantity <= 0 ? "withdrawn" : asset.status;
-  const afterState = {
-    ...asset,
-    quantity: Math.max(0, remainingQuantity),
-    status: nextStatus,
-    updatedAt: new Date().toISOString(),
-  };
+    const isBulk = asset.intakeMode === "bulk";
+    const withdrawNexValue = isBulk ? requestedNexValue : 0;
+    const withdrawCoinValue = isBulk ? requestedCoinValue : 0;
 
-  await prisma.$transaction([
-    prisma.$executeRawUnsafe(
-      'UPDATE "CardBankAsset" SET "quantity" = $1, "status" = $2, "updatedAt" = NOW() WHERE "id" = $3',
+    if (isBulk && withdrawNexValue <= 0 && withdrawCoinValue <= 0) {
+      throw new Error("Bulk withdrawal requires NEX or COIN amount");
+    }
+    if (isBulk && withdrawNexValue > asset.nexValue) {
+      throw new Error("Withdraw NEX is greater than the remaining pool");
+    }
+    if (isBulk && withdrawCoinValue > asset.coinValue) {
+      throw new Error("Withdraw COIN is greater than the remaining pool");
+    }
+
+    const withdrawQuantity = isBulk ? asset.quantity : Math.min(requestedQuantity, asset.quantity);
+    const remainingQuantity = isBulk ? asset.quantity : asset.quantity - withdrawQuantity;
+    const remainingNexValue = isBulk ? asset.nexValue - withdrawNexValue : asset.nexValue;
+    const remainingCoinValue = isBulk ? asset.coinValue - withdrawCoinValue : asset.coinValue;
+    const isClosed = isBulk
+      ? remainingNexValue <= 0 && remainingCoinValue <= 0
+      : remainingQuantity <= 0;
+    const afterState = {
+      ...asset,
+      quantity: Math.max(0, remainingQuantity),
+      nexValue: Math.max(0, remainingNexValue),
+      coinValue: Math.max(0, remainingCoinValue),
+      status: isClosed ? "withdrawn" as const : asset.status,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await tx.$executeRawUnsafe(
+      'UPDATE "CardBankAsset" SET "quantity" = $1, "nexValue" = $2, "coinValue" = $3, "status" = $4, "updatedAt" = NOW() WHERE "id" = $5',
       afterState.quantity,
+      afterState.nexValue,
+      afterState.coinValue,
       afterState.status,
       assetId
-    ),
-    prisma.$executeRawUnsafe(
+    );
+    await tx.$executeRawUnsafe(
       'INSERT INTO "CardBankMovement" ("id", "assetId", "ownerId", "action", "beforeState", "afterState", "staffId", "staffName", "note") VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9)',
       randomUUID(),
       asset.id,
@@ -445,18 +520,24 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
       JSON.stringify({
         ...afterState,
         withdrawnQuantity: withdrawQuantity,
+        withdrawnNexValue: withdrawNexValue,
+        withdrawnCoinValue: withdrawCoinValue,
       }),
       input.actor.id,
       input.actor.name,
       String(input.note || "Return card asset to customer").trim()
-    ),
-  ]);
+    );
 
-  return {
-    asset: afterState,
-    withdrawnQuantity: withdrawQuantity,
-    remainingQuantity: afterState.quantity,
-  };
+    return {
+      asset: afterState,
+      withdrawnQuantity: withdrawQuantity,
+      withdrawnNexValue: withdrawNexValue,
+      withdrawnCoinValue: withdrawCoinValue,
+      remainingQuantity: afterState.quantity,
+      remainingNexValue: afterState.nexValue,
+      remainingCoinValue: afterState.coinValue,
+    };
+  });
 }
 
 export async function getCardBankAssetsForUser(userId: string) {

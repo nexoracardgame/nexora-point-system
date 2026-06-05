@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { withdrawCardBankAsset } from "@/lib/card-bank-store";
+import { publishCardBankEvent } from "@/lib/card-bank-realtime";
 import { isStaffRole } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,11 @@ function cleanQuantity(value: unknown) {
   return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
 }
 
+function cleanNumber(value: unknown) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
 export async function POST(
   request: Request,
   context: RouteContext<"/api/admin/card-bank/assets/[assetId]/withdraw">
@@ -41,6 +47,8 @@ export async function POST(
     const result = await withdrawCardBankAsset({
       assetId,
       quantity: cleanQuantity(body.quantity),
+      nexValue: Math.max(0, cleanNumber(body.nexValue)),
+      coinValue: Math.max(0, Math.floor(cleanNumber(body.coinValue))),
       note: cleanText(body.note),
       actor: {
         id: sessionUser.id,
@@ -50,6 +58,11 @@ export async function POST(
 
     revalidatePath("/admin/card-bank");
     revalidatePath("/card-bank");
+    publishCardBankEvent({
+      ownerId: result.asset.ownerId,
+      assetId: result.asset.id,
+      action: "withdraw",
+    });
 
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

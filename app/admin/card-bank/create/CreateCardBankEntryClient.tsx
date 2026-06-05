@@ -74,7 +74,7 @@ type DepositSetItem = {
 type EntryMode = "bank" | "pawn";
 type IntakeMode = "specific" | "sets" | "bulk";
 type CardType = "normal" | "foil";
-type BulkCategory = "pure" | "bronze" | "silver" | "gold";
+type BulkCategory = "pure" | "bronze" | "silver" | "gold" | "unknown";
 
 function normalizeSearch(value: string) {
   return value.toLowerCase().trim().replace(/^@+/, "");
@@ -1049,6 +1049,7 @@ function BulkValueForm({
     { value: "bronze", label: "Bronze", desc: "นับเป็นบรอนซ์" },
     { value: "silver", label: "Silver", desc: "นับเป็นซิลเวอร์" },
     { value: "gold", label: "Gold", desc: "นับเป็นโกลด์" },
+    { value: "unknown", label: "UNKNOWN", desc: "นับเป็นหมวด UNKNOWN" },
   ];
 
   return (
@@ -1068,7 +1069,7 @@ function BulkValueForm({
 
       <div className="mt-5">
         <div className="text-sm font-black text-white">ประเภทของกองนี้</div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <div className="mt-3 grid gap-2 sm:grid-cols-5">
           {categoryOptions.map((option) => (
             <button
               key={option.value}
@@ -1392,6 +1393,8 @@ function BulkSummary({
   const categoryLabel =
     bulkCategory === "pure"
       ? "NEX/COIN เพียว ไม่ระบุการ์ด"
+      : bulkCategory === "unknown"
+        ? "กองการ์ดหมวด UNKNOWN"
       : `${bulkCategory.toUpperCase()} card pool`;
 
   return (

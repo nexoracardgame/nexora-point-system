@@ -7,6 +7,7 @@ import {
   type CardBankEntryMode,
   type CardBankIntakeMode,
 } from "@/lib/card-bank-store";
+import { publishCardBankEvent } from "@/lib/card-bank-realtime";
 import { isStaffRole } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
@@ -137,6 +138,10 @@ export async function POST(request: Request) {
   revalidatePath("/admin/card-bank");
   revalidatePath("/admin/card-bank/create");
   revalidatePath("/card-bank");
+  publishCardBankEvent({
+    ownerId,
+    action: "deposit",
+  });
 
   return NextResponse.json({
     ok: true,

@@ -17,7 +17,12 @@ import {
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCardBankAssetsForUser, type CardBankAsset } from "@/lib/card-bank-store";
+import {
+  getCardBankAssetsForUser,
+  getCardBankAssetsVersion,
+  type CardBankAsset,
+} from "@/lib/card-bank-store";
+import CardBankRealtimeRefresh from "./CardBankRealtimeRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +58,12 @@ type BulkAssetPool = {
   pileCount: number;
   updatedAt: string;
 };
+
+function getAssetTierLabel(tier: string) {
+  if (tier === "pure") return "กอง NEX / COIN ไม่ระบุหมวดการ์ด";
+  if (tier === "unknown") return "กองการ์ดหมวด UNKNOWN";
+  return `กองการ์ดหมวด ${tier.toUpperCase()}`;
+}
 
 const bankTerms = [
   "ระบบธนาคารการ์ดจะแสดงข้อมูลเฉพาะการ์ดจริงที่ลูกค้านำมาฝาก และแอดมินคีย์เข้าหลังบ้านแล้วเท่านั้น",
@@ -159,10 +170,7 @@ function mapPawnCard(asset: CardBankAsset): PawnCard {
 function mapBulkPool(asset: CardBankAsset): BulkAssetPool {
   return {
     id: asset.id,
-    label:
-      asset.assetTier === "pure"
-        ? "NEX / COIN เพียว"
-        : `กองการ์ด ${asset.assetTier.toUpperCase()}`,
+    label: getAssetTierLabel(asset.assetTier),
     category: asset.assetTier,
     nexBalance: asset.nexValue,
     coinBalance: asset.coinValue,
@@ -204,14 +212,18 @@ export default async function CardBankPage() {
     (summary, asset) => {
       if (asset.assetTier === "bronze" || asset.assetTier === "silver" || asset.assetTier === "gold") {
         summary[asset.assetTier] += Math.max(1, asset.quantity);
+      } else if (asset.assetTier === "unknown") {
+        summary.unknown += Math.max(1, asset.quantity);
       }
       return summary;
     },
-    { bronze: 0, silver: 0, gold: 0 }
+    { bronze: 0, silver: 0, gold: 0, unknown: 0 }
   );
+  const assetsVersion = getCardBankAssetsVersion(assets);
 
   return (
     <div className="min-h-full space-y-4 text-white sm:space-y-5">
+      <CardBankRealtimeRefresh initialVersion={assetsVersion} />
       <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#f8fafc_0%,#d4d4d8_36%,#09090b_37%,#030303_100%)] p-[1px] shadow-[0_24px_100px_rgba(0,0,0,0.52)]">
         <div className="rounded-[27px] bg-[radial-gradient(circle_at_16%_18%,rgba(255,255,255,0.16),transparent_28%),linear-gradient(135deg,#101113_0%,#050506_62%,#000_100%)] p-4 sm:p-6 lg:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -379,7 +391,7 @@ function AssetSummaryPanel({
   totalCoinValue: number;
   depositedQuantity: number;
   pawnedQuantity: number;
-  tierCounts: { bronze: number; silver: number; gold: number };
+  tierCounts: { bronze: number; silver: number; gold: number; unknown: number };
 }) {
   return (
     <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#18181b,#050505_70%,#000)] p-4 shadow-[0_18px_70px_rgba(0,0,0,0.38)] sm:p-5">
@@ -402,10 +414,11 @@ function AssetSummaryPanel({
         <Metric label="อยู่ในโรงรับจำนำ" value={`${pawnedQuantity.toLocaleString("th-TH")} ใบ/ชุด/กอง`} />
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
         <TierCountCard label="Bronze" value={tierCounts.bronze} tone="bronze" />
         <TierCountCard label="Silver" value={tierCounts.silver} tone="silver" />
         <TierCountCard label="Gold" value={tierCounts.gold} tone="gold" />
+        <TierCountCard label="UNKNOWN" value={tierCounts.unknown} tone="unknown" />
       </div>
     </section>
   );
@@ -418,14 +431,16 @@ function TierCountCard({
 }: {
   label: string;
   value: number;
-  tone: "bronze" | "silver" | "gold";
+  tone: "bronze" | "silver" | "gold" | "unknown";
 }) {
   const toneClass =
     tone === "gold"
       ? "border-amber-200/20 bg-amber-300/10 text-amber-100"
       : tone === "silver"
         ? "border-zinc-200/20 bg-zinc-200/10 text-zinc-100"
-        : "border-orange-200/20 bg-orange-400/10 text-orange-100";
+        : tone === "unknown"
+          ? "border-sky-200/20 bg-sky-400/10 text-sky-100"
+          : "border-orange-200/20 bg-orange-400/10 text-orange-100";
 
   return (
     <div className={`rounded-[20px] border p-4 ${toneClass}`}>
@@ -433,7 +448,7 @@ function TierCountCard({
         {label}
       </div>
       <div className="mt-2 text-3xl font-black">{value.toLocaleString("th-TH")}</div>
-      <div className="mt-1 text-xs font-bold opacity-70">ใบ/กองที่ระบุเป็น {label}</div>
+      <div className="mt-1 text-xs font-bold opacity-70">ใบ/กองที่นับเป็นหมวด {label}</div>
     </div>
   );
 }
@@ -562,7 +577,9 @@ function BulkPoolView({ pools }: { pools: BulkAssetPool[] }) {
               <div className="mt-1 text-xs font-bold text-white/42">
                 {pool.category === "pure"
                   ? "ยอดรวมเพียว ไม่ระบุรายการการ์ด"
-                  : `นับเป็นหมวด ${pool.category.toUpperCase()}`}
+                  : pool.category === "unknown"
+                    ? "นับเป็นหมวด UNKNOWN"
+                    : `นับเป็นหมวด ${pool.category.toUpperCase()}`}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <RuleLine label="NEX" value={pool.nexBalance.toLocaleString("th-TH")} />
