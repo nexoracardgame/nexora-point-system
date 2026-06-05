@@ -76,6 +76,8 @@ export async function POST(request: Request) {
           cardNo: cleanText(item.cardNo).replace(/\D/g, "").padStart(3, "0").slice(-3),
           cardName: cleanText(item.cardName),
           cardType: cleanText(item.cardType).toLowerCase() === "foil" ? ("foil" as const) : ("normal" as const),
+          rarity: cleanText(item.rarity),
+          assetTier: cleanText(item.assetTier),
           quantity: cleanQuantity(item.quantity),
           imageUrl: cleanText(item.imageUrl) || null,
         }))
@@ -102,6 +104,7 @@ export async function POST(request: Request) {
   const bulk = {
     nexValue: cleanNumber(bulkObject.nexValue),
     coinValue: Math.floor(cleanNumber(bulkObject.coinValue)),
+    category: cleanText(bulkObject.category) || "pure",
   };
 
   if (intakeMode === "specific" && items.length === 0) {

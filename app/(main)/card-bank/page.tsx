@@ -31,6 +31,7 @@ type BankCard = {
   nexValue: number;
   coinValue: number;
   setCardTotal: number | null;
+  assetTier: string;
   valueTHB: number;
   status: "stored" | "pawned";
   nextFeeDate: string;
@@ -46,6 +47,7 @@ type PawnCard = BankCard & {
 type BulkAssetPool = {
   id: string;
   label: string;
+  category: string;
   nexBalance: number;
   coinBalance: number;
   pileCount: number;
@@ -128,6 +130,7 @@ function mapBankCard(asset: CardBankAsset): BankCard {
     nexValue: asset.nexValue,
     coinValue: asset.coinValue,
     setCardTotal: asset.setCardTotal,
+    assetTier: asset.assetTier,
     valueTHB: asset.valueTHB,
     status: asset.status === "pawned" ? "pawned" : "stored",
     nextFeeDate: formatThaiDate(addMonths(asset.createdAt, 1).toISOString()),
@@ -156,7 +159,11 @@ function mapPawnCard(asset: CardBankAsset): PawnCard {
 function mapBulkPool(asset: CardBankAsset): BulkAssetPool {
   return {
     id: asset.id,
-    label: asset.cardName,
+    label:
+      asset.assetTier === "pure"
+        ? "NEX / COIN เพียว"
+        : `กองการ์ด ${asset.assetTier.toUpperCase()}`,
+    category: asset.assetTier,
     nexBalance: asset.nexValue,
     coinBalance: asset.coinValue,
     pileCount: asset.quantity,
@@ -168,6 +175,9 @@ export default async function CardBankPage() {
   const session = await getServerSession(authOptions);
   const userId = String(session?.user?.id || "").trim();
   const assets = userId ? await getCardBankAssetsForUser(userId) : [];
+  const activeAssets = assets.filter(
+    (asset) => asset.status === "stored" || asset.status === "pawned"
+  );
   const depositedCards = assets
     .filter((asset) => asset.status === "stored" && asset.intakeMode !== "bulk")
     .map(mapBankCard);
@@ -175,13 +185,30 @@ export default async function CardBankPage() {
     .filter((asset) => asset.status === "pawned")
     .map(mapPawnCard);
   const pooledAssets = assets
-    .filter((asset) => asset.intakeMode === "bulk")
+    .filter((asset) => asset.intakeMode === "bulk" && (asset.status === "stored" || asset.status === "pawned"))
     .map(mapBulkPool);
   const hasBankCards = depositedCards.length > 0;
   const hasPawnCards = pawnedCards.length > 0;
   const hasPooledAssets = pooledAssets.length > 0;
   const depositedQuantity = depositedCards.reduce((sum, card) => sum + card.quantity, 0);
   const pawnedQuantity = pawnedCards.reduce((sum, card) => sum + card.quantity, 0);
+  const totalNexValue = activeAssets.reduce(
+    (sum, asset) => sum + asset.nexValue * Math.max(1, asset.quantity),
+    0
+  );
+  const totalCoinValue = activeAssets.reduce(
+    (sum, asset) => sum + asset.coinValue * Math.max(1, asset.quantity),
+    0
+  );
+  const tierCounts = activeAssets.reduce(
+    (summary, asset) => {
+      if (asset.assetTier === "bronze" || asset.assetTier === "silver" || asset.assetTier === "gold") {
+        summary[asset.assetTier] += Math.max(1, asset.quantity);
+      }
+      return summary;
+    },
+    { bronze: 0, silver: 0, gold: 0 }
+  );
 
   return (
     <div className="min-h-full space-y-4 text-white sm:space-y-5">
@@ -204,8 +231,8 @@ export default async function CardBankPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
-              <Metric label="การ์ดในธนาคาร" value={`${depositedQuantity.toLocaleString("th-TH")} ใบ/ชุด`} />
-              <Metric label="การ์ดจำนำอยู่" value={`${pawnedQuantity.toLocaleString("th-TH")} ใบ/ชุด`} />
+              <Metric label="ทรัพย์สินรวม" value={`${totalNexValue.toLocaleString("th-TH")} NEX`} />
+              <Metric label="COIN รวม" value={totalCoinValue.toLocaleString("th-TH")} />
               <Metric label="สถานะข้อมูล" value={hasBankCards || hasPooledAssets ? "พร้อมใช้งาน" : "ยังว่าง"} />
             </div>
           </div>
@@ -216,6 +243,13 @@ export default async function CardBankPage() {
         <EmptyBankNotice />
       ) : (
         <div className="space-y-4">
+          <AssetSummaryPanel
+            totalNexValue={totalNexValue}
+            totalCoinValue={totalCoinValue}
+            depositedQuantity={depositedQuantity}
+            pawnedQuantity={pawnedQuantity}
+            tierCounts={tierCounts}
+          />
           {hasPooledAssets ? <BulkPoolView pools={pooledAssets} /> : null}
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
             <CardList title="การ์ดที่ฝากในธนาคาร" cards={depositedCards} />
@@ -334,6 +368,76 @@ function EmptyBankNotice() {
   );
 }
 
+function AssetSummaryPanel({
+  totalNexValue,
+  totalCoinValue,
+  depositedQuantity,
+  pawnedQuantity,
+  tierCounts,
+}: {
+  totalNexValue: number;
+  totalCoinValue: number;
+  depositedQuantity: number;
+  pawnedQuantity: number;
+  tierCounts: { bronze: number; silver: number; gold: number };
+}) {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#18181b,#050505_70%,#000)] p-4 shadow-[0_18px_70px_rgba(0,0,0,0.38)] sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
+            Asset Summary
+          </div>
+          <h2 className="mt-2 text-2xl font-black text-white">สรุปทรัพย์สินในธนาคารการ์ด</h2>
+        </div>
+        <div className="rounded-full border border-emerald-300/18 bg-emerald-400/10 px-3 py-1.5 text-xs font-black text-emerald-100">
+          {totalNexValue.toLocaleString("th-TH")} NEX ทั้งหมด
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Metric label="มูลค่าทรัพย์สินรวม" value={`${totalNexValue.toLocaleString("th-TH")} NEX`} />
+        <Metric label="COIN รวม" value={totalCoinValue.toLocaleString("th-TH")} />
+        <Metric label="อยู่ในธนาคาร" value={`${depositedQuantity.toLocaleString("th-TH")} ใบ/ชุด/กอง`} />
+        <Metric label="อยู่ในโรงรับจำนำ" value={`${pawnedQuantity.toLocaleString("th-TH")} ใบ/ชุด/กอง`} />
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <TierCountCard label="Bronze" value={tierCounts.bronze} tone="bronze" />
+        <TierCountCard label="Silver" value={tierCounts.silver} tone="silver" />
+        <TierCountCard label="Gold" value={tierCounts.gold} tone="gold" />
+      </div>
+    </section>
+  );
+}
+
+function TierCountCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "bronze" | "silver" | "gold";
+}) {
+  const toneClass =
+    tone === "gold"
+      ? "border-amber-200/20 bg-amber-300/10 text-amber-100"
+      : tone === "silver"
+        ? "border-zinc-200/20 bg-zinc-200/10 text-zinc-100"
+        : "border-orange-200/20 bg-orange-400/10 text-orange-100";
+
+  return (
+    <div className={`rounded-[20px] border p-4 ${toneClass}`}>
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">
+        {label}
+      </div>
+      <div className="mt-2 text-3xl font-black">{value.toLocaleString("th-TH")}</div>
+      <div className="mt-1 text-xs font-bold opacity-70">ใบ/กองที่ระบุเป็น {label}</div>
+    </div>
+  );
+}
+
 function CardList({ title, cards }: { title: string; cards: BankCard[] }) {
   return (
     <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
@@ -415,11 +519,11 @@ function BulkPoolView({ pools }: { pools: BulkAssetPool[] }) {
               Bulk Card Pool
             </div>
             <h2 className="mt-4 text-2xl font-black text-white sm:text-3xl">
-              กองการ์ดแบบไม่ระบุเลข
+              กอง NEX / COIN แบบรวม
             </h2>
             <p className="mt-3 text-sm leading-7 text-white/58">
-              รายการนี้แอดมินคีย์เป็นยอดรวม NEX / COIN โดยไม่แยกเลขการ์ด
-              ลูกค้าจะไม่เห็นการ์ดรายใบ แต่จะเห็นยอดกองรวมและสถานะการใช้งานแทน
+              รายการนี้แอดมินคีย์เป็นยอดรวม ถ้าเป็น NEX เพียวจะไม่แสดงชนิดการ์ด
+              ถ้าเลือก Bronze / Silver / Gold ระบบจะนับเข้าหมวดนั้นในสรุปด้านบน
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -455,6 +559,11 @@ function BulkPoolView({ pools }: { pools: BulkAssetPool[] }) {
           {pools.map((pool) => (
             <div key={pool.id} className="rounded-[20px] border border-white/10 bg-black/26 p-4">
               <div className="font-black text-white">{pool.label}</div>
+              <div className="mt-1 text-xs font-bold text-white/42">
+                {pool.category === "pure"
+                  ? "ยอดรวมเพียว ไม่ระบุรายการการ์ด"
+                  : `นับเป็นหมวด ${pool.category.toUpperCase()}`}
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <RuleLine label="NEX" value={pool.nexBalance.toLocaleString("th-TH")} />
                 <RuleLine label="COIN" value={pool.coinBalance.toLocaleString("th-TH")} />

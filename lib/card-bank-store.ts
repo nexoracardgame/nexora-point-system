@@ -13,6 +13,7 @@ type DbRow = Record<string, unknown>;
 export type CardBankEntryMode = "bank" | "pawn";
 export type CardBankIntakeMode = "specific" | "sets" | "bulk";
 export type CardBankStatus = "stored" | "pawned" | "converted" | "withdrawn" | "forfeited";
+export type CardBankAssetTier = "bronze" | "silver" | "gold" | "set" | "pure" | "unknown";
 
 export type CardBankAsset = {
   id: string;
@@ -24,6 +25,7 @@ export type CardBankAsset = {
   cardNo: string | null;
   cardName: string;
   cardType: string | null;
+  assetTier: CardBankAssetTier;
   quantity: number;
   imageUrl: string | null;
   setId: string | null;
@@ -53,6 +55,8 @@ export type CreateCardBankEntriesInput = {
     cardNo: string;
     cardName: string;
     cardType: "normal" | "foil";
+    rarity?: string | null;
+    assetTier?: string | null;
     quantity: number;
     imageUrl?: string | null;
   }>;
@@ -69,6 +73,7 @@ export type CreateCardBankEntriesInput = {
   bulk?: {
     nexValue: number;
     coinValue: number;
+    category?: string | null;
   };
   actor: {
     id: string;
@@ -132,6 +137,16 @@ function normalizeStatus(value: unknown): CardBankStatus {
   return "stored";
 }
 
+function normalizeAssetTier(value: unknown): CardBankAssetTier {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (/bronze|บรอนซ์/.test(normalized)) return "bronze";
+  if (/silver|ซิลเวอร์/.test(normalized)) return "silver";
+  if (/gold|โกลด์/.test(normalized)) return "gold";
+  if (/set|เซ็ต/.test(normalized)) return "set";
+  if (/pure|nex|coin|เพียว/.test(normalized)) return "pure";
+  return "unknown";
+}
+
 function toNumber(value: unknown) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? number : 0;
@@ -153,6 +168,7 @@ function toAssetRecord(row: DbRow): CardBankAsset {
     cardNo: toNullableString(rowValue(row, "cardNo", "cardno")),
     cardName: String(rowValue(row, "cardName", "cardname") || "").trim() || "Card Bank Asset",
     cardType: toNullableString(rowValue(row, "cardType", "cardtype")),
+    assetTier: normalizeAssetTier(rowValue(row, "assetTier", "assettier")),
     quantity: Math.max(1, Math.floor(toNumber(row.quantity) || 1)),
     imageUrl: toNullableString(rowValue(row, "imageUrl", "imageurl")),
     setId: toNullableString(rowValue(row, "setId", "setid")),
@@ -175,7 +191,10 @@ async function ensureCardBankSchema() {
   if (!schemaReadyPromise) {
     schemaReadyPromise = (async () => {
       await prisma.$executeRawUnsafe(
-        'CREATE TABLE IF NOT EXISTS "CardBankAsset" ("id" TEXT PRIMARY KEY, "ownerId" TEXT NOT NULL, "ownerLineId" TEXT, "ownerName" TEXT NOT NULL, "entryMode" TEXT NOT NULL DEFAULT \'bank\', "intakeMode" TEXT NOT NULL DEFAULT \'specific\', "cardNo" TEXT, "cardName" TEXT NOT NULL, "cardType" TEXT, "quantity" INTEGER NOT NULL DEFAULT 1, "imageUrl" TEXT, "setId" TEXT, "setName" TEXT, "setOrder" INTEGER, "setCardTotal" INTEGER, "withFoilBonus" BOOLEAN NOT NULL DEFAULT FALSE, "valueTHB" DOUBLE PRECISION NOT NULL DEFAULT 0, "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0, "coinValue" INTEGER NOT NULL DEFAULT 0, "status" TEXT NOT NULL DEFAULT \'stored\', "sourcePayload" JSONB, "createdById" TEXT, "createdByName" TEXT, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+        'CREATE TABLE IF NOT EXISTS "CardBankAsset" ("id" TEXT PRIMARY KEY, "ownerId" TEXT NOT NULL, "ownerLineId" TEXT, "ownerName" TEXT NOT NULL, "entryMode" TEXT NOT NULL DEFAULT \'bank\', "intakeMode" TEXT NOT NULL DEFAULT \'specific\', "cardNo" TEXT, "cardName" TEXT NOT NULL, "cardType" TEXT, "assetTier" TEXT NOT NULL DEFAULT \'unknown\', "quantity" INTEGER NOT NULL DEFAULT 1, "imageUrl" TEXT, "setId" TEXT, "setName" TEXT, "setOrder" INTEGER, "setCardTotal" INTEGER, "withFoilBonus" BOOLEAN NOT NULL DEFAULT FALSE, "valueTHB" DOUBLE PRECISION NOT NULL DEFAULT 0, "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0, "coinValue" INTEGER NOT NULL DEFAULT 0, "status" TEXT NOT NULL DEFAULT \'stored\', "sourcePayload" JSONB, "createdById" TEXT, "createdByName" TEXT, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      );
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CardBankAsset" ADD COLUMN IF NOT EXISTS "assetTier" TEXT NOT NULL DEFAULT \'unknown\''
       );
       await prisma.$executeRawUnsafe(
         'CREATE INDEX IF NOT EXISTS "CardBankAsset_owner_status_idx" ON "CardBankAsset" ("ownerId", "status", "createdAt" DESC)'
@@ -230,6 +249,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
       cardNo: null,
       cardName: item.setName,
       cardType: item.withFoilBonus ? "foil-set" : "set",
+      assetTier: "set" as CardBankAssetTier,
       quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
       imageUrl: null,
       setId: item.setId,
@@ -252,6 +272,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
         cardNo: null,
         cardName: "Bulk Card Pool",
         cardType: "bulk",
+        assetTier: normalizeAssetTier(input.bulk?.category || "pure"),
         quantity: 1,
         imageUrl: null,
         setId: null,
@@ -273,6 +294,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
     cardNo: item.cardNo,
     cardName: item.cardName,
     cardType: item.cardType,
+    assetTier: normalizeAssetTier(item.assetTier || item.rarity),
     quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
     imageUrl: item.imageUrl || null,
     setId: null,
@@ -302,7 +324,7 @@ export async function createCardBankEntries(input: CreateCardBankEntriesInput) {
   await prisma.$transaction(
     assets.map((asset) =>
       prisma.$executeRawUnsafe(
-        'INSERT INTO "CardBankAsset" ("id", "ownerId", "ownerLineId", "ownerName", "entryMode", "intakeMode", "cardNo", "cardName", "cardType", "quantity", "imageUrl", "setId", "setName", "setOrder", "setCardTotal", "withFoilBonus", "valueTHB", "nexValue", "coinValue", "status", "sourcePayload", "createdById", "createdByName") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22,$23)',
+        'INSERT INTO "CardBankAsset" ("id", "ownerId", "ownerLineId", "ownerName", "entryMode", "intakeMode", "cardNo", "cardName", "cardType", "assetTier", "quantity", "imageUrl", "setId", "setName", "setOrder", "setCardTotal", "withFoilBonus", "valueTHB", "nexValue", "coinValue", "status", "sourcePayload", "createdById", "createdByName") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb,$23,$24)',
         asset.id,
         asset.ownerId,
         asset.ownerLineId,
@@ -312,6 +334,7 @@ export async function createCardBankEntries(input: CreateCardBankEntriesInput) {
         asset.cardNo,
         asset.cardName,
         asset.cardType,
+        asset.assetTier,
         asset.quantity,
         asset.imageUrl,
         asset.setId,

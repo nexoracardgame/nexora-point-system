@@ -54,6 +54,7 @@ type DepositItem = {
   cardNo: string;
   cardName: string;
   cardType: "normal" | "foil";
+  rarity?: string;
   quantity: number;
   imageUrl: string;
 };
@@ -73,6 +74,7 @@ type DepositSetItem = {
 type EntryMode = "bank" | "pawn";
 type IntakeMode = "specific" | "sets" | "bulk";
 type CardType = "normal" | "foil";
+type BulkCategory = "pure" | "bronze" | "silver" | "gold";
 
 function normalizeSearch(value: string) {
   return value.toLowerCase().trim().replace(/^@+/, "");
@@ -86,6 +88,15 @@ function normalizeCardNo(value: string) {
 
 function formatNumber(value: number) {
   return value.toLocaleString("th-TH");
+}
+
+function normalizeAssetTier(value?: string | null): BulkCategory | "unknown" {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (/bronze|บรอนซ์/.test(normalized)) return "bronze";
+  if (/silver|ซิลเวอร์/.test(normalized)) return "silver";
+  if (/gold|โกลด์/.test(normalized)) return "gold";
+  if (/pure|nex|coin|เพียว/.test(normalized)) return "pure";
+  return "unknown";
 }
 
 function parseNexReward(reward: string, withFoilBonus: boolean) {
@@ -171,6 +182,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const [cardSetItems, setCardSetItems] = useState<DepositSetItem[]>([]);
   const [bulkNex, setBulkNex] = useState("");
   const [bulkCoin, setBulkCoin] = useState("");
+  const [bulkCategory, setBulkCategory] = useState<BulkCategory>("pure");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -288,6 +300,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         cardNo: cardPreview.cardNo,
         cardName: cardPreview.cardName,
         cardType: safeCardType,
+        rarity: cardPreview.rarity || normalizeAssetTier(cardPreview.cardName),
         quantity,
         imageUrl: cardPreview.imageUrl,
       },
@@ -365,6 +378,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
           bulk: {
             nexValue: Number(bulkNex || 0),
             coinValue: Number(bulkCoin || 0),
+            category: bulkCategory,
           },
         }),
       });
@@ -383,6 +397,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       setCardSetItems([]);
       setBulkNex("");
       setBulkCoin("");
+      setBulkCategory("pure");
       setCardQuery("");
       setCardPreview(null);
       router.refresh();
@@ -596,6 +611,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 setBulkNex={setBulkNex}
                 bulkCoin={bulkCoin}
                 setBulkCoin={setBulkCoin}
+                bulkCategory={bulkCategory}
+                setBulkCategory={setBulkCategory}
               />
             )}
 
@@ -616,7 +633,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               ) : intakeMode === "sets" ? (
                 <CardSetSummary items={cardSetItems} setItems={setCardSetItems} />
               ) : (
-                <BulkSummary bulkNex={bulkNex} bulkCoin={bulkCoin} />
+                <BulkSummary bulkNex={bulkNex} bulkCoin={bulkCoin} bulkCategory={bulkCategory} />
               )}
 
               <SecurityLogPanel />
@@ -1017,12 +1034,23 @@ function BulkValueForm({
   setBulkNex,
   bulkCoin,
   setBulkCoin,
+  bulkCategory,
+  setBulkCategory,
 }: {
   bulkNex: string;
   setBulkNex: (value: string) => void;
   bulkCoin: string;
   setBulkCoin: (value: string) => void;
+  bulkCategory: BulkCategory;
+  setBulkCategory: (value: BulkCategory) => void;
 }) {
+  const categoryOptions: Array<{ value: BulkCategory; label: string; desc: string }> = [
+    { value: "pure", label: "NEX เพียว", desc: "ไม่แสดงชนิดการ์ด" },
+    { value: "bronze", label: "Bronze", desc: "นับเป็นบรอนซ์" },
+    { value: "silver", label: "Silver", desc: "นับเป็นซิลเวอร์" },
+    { value: "gold", label: "Gold", desc: "นับเป็นโกลด์" },
+  ];
+
   return (
     <div className="rounded-[28px] border border-red-300/18 bg-[linear-gradient(180deg,rgba(127,29,29,0.22),rgba(5,5,5,0.92))] p-4 sm:p-5">
       <div className="flex items-start gap-3">
@@ -1035,6 +1063,27 @@ function BulkValueForm({
             โหมดนี้ไม่ระบุว่าฝากการ์ดเลขอะไร แอดมินต้องตกลงกับลูกค้าชัดเจนก่อน
             เพราะเมื่อลูกค้าใช้ยอดนี้ ระบบจะหักการ์ดแบบไม่สนใจใบ/เซ็ต/ความแรร์จนกว่ายอดจะหมด
           </p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="text-sm font-black text-white">ประเภทของกองนี้</div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+          {categoryOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setBulkCategory(option.value)}
+              className={`rounded-[18px] border p-3 text-left transition ${
+                bulkCategory === option.value
+                  ? "border-white/34 bg-white/[0.12] text-white"
+                  : "border-white/10 bg-black/24 text-white/58 hover:bg-white/[0.055]"
+              }`}
+            >
+              <div className="text-sm font-black">{option.label}</div>
+              <div className="mt-1 text-xs font-bold leading-5 text-white/42">{option.desc}</div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1331,9 +1380,29 @@ function CardSetModal({
   );
 }
 
-function BulkSummary({ bulkNex, bulkCoin }: { bulkNex: string; bulkCoin: string }) {
+function BulkSummary({
+  bulkNex,
+  bulkCoin,
+  bulkCategory,
+}: {
+  bulkNex: string;
+  bulkCoin: string;
+  bulkCategory: BulkCategory;
+}) {
+  const categoryLabel =
+    bulkCategory === "pure"
+      ? "NEX/COIN เพียว ไม่ระบุการ์ด"
+      : `${bulkCategory.toUpperCase()} card pool`;
+
   return (
-    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="rounded-[20px] border border-white/10 bg-black/24 p-4">
+        <Layers3 className="h-5 w-5 text-white/60" />
+        <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
+          Pool Type
+        </div>
+        <div className="mt-1 text-lg font-black text-white">{categoryLabel}</div>
+      </div>
       <div className="rounded-[20px] border border-white/10 bg-black/24 p-4">
         <CircleDollarSign className="h-5 w-5 text-white/60" />
         <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
