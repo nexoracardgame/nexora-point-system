@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getCardBankAdminSummary, type CardBankAdminSummary } from "@/lib/card-bank-store";
+import CardBankWithdrawPanel from "./CardBankWithdrawPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -332,6 +333,8 @@ export default async function AdminCardBankPage() {
           </div>
         </div>
       </section>
+
+      <CardBankWithdrawPanel assets={summary.latestAssets} />
 
       <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#101010,#050505)] p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

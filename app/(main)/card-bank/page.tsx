@@ -26,6 +26,11 @@ type BankCard = {
   cardNo: string;
   name: string;
   tier: string;
+  intakeMode: "specific" | "sets" | "bulk";
+  quantity: number;
+  nexValue: number;
+  coinValue: number;
+  setCardTotal: number | null;
   valueTHB: number;
   status: "stored" | "pawned";
   nextFeeDate: string;
@@ -114,7 +119,15 @@ function mapBankCard(asset: CardBankAsset): BankCard {
     id: asset.id,
     cardNo: asset.cardNo ? `No.${asset.cardNo}` : asset.setId || "SET",
     name: asset.cardName,
-    tier: asset.setName || asset.cardType || asset.intakeMode,
+    tier:
+      asset.intakeMode === "sets"
+        ? `เซ็ตการ์ด${asset.withFoilBonus ? " + Foil bonus" : ""}`
+        : asset.cardType || asset.intakeMode,
+    intakeMode: asset.intakeMode,
+    quantity: asset.quantity,
+    nexValue: asset.nexValue,
+    coinValue: asset.coinValue,
+    setCardTotal: asset.setCardTotal,
     valueTHB: asset.valueTHB,
     status: asset.status === "pawned" ? "pawned" : "stored",
     nextFeeDate: formatThaiDate(addMonths(asset.createdAt, 1).toISOString()),
@@ -167,6 +180,8 @@ export default async function CardBankPage() {
   const hasBankCards = depositedCards.length > 0;
   const hasPawnCards = pawnedCards.length > 0;
   const hasPooledAssets = pooledAssets.length > 0;
+  const depositedQuantity = depositedCards.reduce((sum, card) => sum + card.quantity, 0);
+  const pawnedQuantity = pawnedCards.reduce((sum, card) => sum + card.quantity, 0);
 
   return (
     <div className="min-h-full space-y-4 text-white sm:space-y-5">
@@ -189,8 +204,8 @@ export default async function CardBankPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
-              <Metric label="การ์ดในธนาคาร" value={`${depositedCards.length} ใบ`} />
-              <Metric label="การ์ดจำนำอยู่" value={`${pawnedCards.length} ใบ`} />
+              <Metric label="การ์ดในธนาคาร" value={`${depositedQuantity.toLocaleString("th-TH")} ใบ/ชุด`} />
+              <Metric label="การ์ดจำนำอยู่" value={`${pawnedQuantity.toLocaleString("th-TH")} ใบ/ชุด`} />
               <Metric label="สถานะข้อมูล" value={hasBankCards || hasPooledAssets ? "พร้อมใช้งาน" : "ยังว่าง"} />
             </div>
           </div>
@@ -328,14 +343,33 @@ function CardList({ title, cards }: { title: string; cards: BankCard[] }) {
           <div key={card.id} className="rounded-[20px] border border-white/10 bg-black/30 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-xs font-black uppercase tracking-[0.18em] text-white/38">
-                  {card.cardNo}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white/56">
+                    {card.intakeMode === "sets" ? "SET" : card.cardNo}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-black/24 px-3 py-1 text-[11px] font-black text-white/48">
+                    คงเหลือ {card.quantity.toLocaleString("th-TH")}
+                  </span>
                 </div>
                 <div className="mt-1 text-lg font-black text-white">{card.name}</div>
                 <div className="mt-1 text-sm text-white/52">{card.tier}</div>
+                {card.intakeMode === "sets" ? (
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-white/52">
+                    <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1">
+                      {card.setCardTotal || 0} ใบต่อเซ็ต
+                    </span>
+                    <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-3 py-1 text-emerald-100/80">
+                      {card.nexValue.toLocaleString("th-TH")} NEX ต่อเซ็ต
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="text-left sm:text-right">
-                <div className="text-lg font-black text-white">{formatTHB(card.valueTHB)}</div>
+                <div className="text-lg font-black text-white">
+                  {card.intakeMode === "sets"
+                    ? `${(card.nexValue * card.quantity).toLocaleString("th-TH")} NEX`
+                    : formatTHB(card.valueTHB)}
+                </div>
                 <div className="mt-1 text-xs text-white/45">ค่าฝากถัดไป {card.nextFeeDate}</div>
               </div>
             </div>

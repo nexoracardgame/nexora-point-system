@@ -76,6 +76,16 @@ export type CreateCardBankEntriesInput = {
   };
 };
 
+export type WithdrawCardBankAssetInput = {
+  assetId: string;
+  quantity: number;
+  actor: {
+    id: string;
+    name: string;
+  };
+  note?: string | null;
+};
+
 export type CardBankAdminSummary = {
   pendingCount: number;
   storedQuantity: number;
@@ -340,6 +350,92 @@ export async function createCardBankEntries(input: CreateCardBankEntriesInput) {
   return assets.map(({ sourcePayload: _sourcePayload, ...asset }) => asset);
 }
 
+export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
+  const assetId = String(input.assetId || "").trim();
+  const requestedQuantity = Math.max(1, Math.floor(Number(input.quantity || 1)));
+  if (!assetId) {
+    throw new Error("Missing asset id");
+  }
+
+  if (!hasDatabaseConfig()) {
+    const current = await readLocalAssets();
+    const asset = current.find((item) => item.id === assetId);
+    if (!asset) throw new Error("Asset not found");
+    if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
+      throw new Error("Asset is already closed");
+    }
+
+    const withdrawQuantity = Math.min(requestedQuantity, asset.quantity);
+    const remainingQuantity = asset.quantity - withdrawQuantity;
+    const updatedAsset: CardBankAsset = {
+      ...asset,
+      quantity: Math.max(0, remainingQuantity),
+      status: remainingQuantity <= 0 ? "withdrawn" : asset.status,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await writeLocalAssets(
+      current.map((item) => (item.id === assetId ? updatedAsset : item))
+    );
+    return {
+      asset: updatedAsset,
+      withdrawnQuantity: withdrawQuantity,
+      remainingQuantity: updatedAsset.quantity,
+    };
+  }
+
+  await ensureCardBankSchema();
+  const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+    'SELECT * FROM "CardBankAsset" WHERE "id" = $1 LIMIT 1',
+    assetId
+  );
+  const asset = rows[0] ? toAssetRecord(rows[0]) : null;
+  if (!asset) throw new Error("Asset not found");
+  if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
+    throw new Error("Asset is already closed");
+  }
+
+  const withdrawQuantity = Math.min(requestedQuantity, asset.quantity);
+  const remainingQuantity = asset.quantity - withdrawQuantity;
+  const nextStatus = remainingQuantity <= 0 ? "withdrawn" : asset.status;
+  const afterState = {
+    ...asset,
+    quantity: Math.max(0, remainingQuantity),
+    status: nextStatus,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await prisma.$transaction([
+    prisma.$executeRawUnsafe(
+      'UPDATE "CardBankAsset" SET "quantity" = $1, "status" = $2, "updatedAt" = NOW() WHERE "id" = $3',
+      afterState.quantity,
+      afterState.status,
+      assetId
+    ),
+    prisma.$executeRawUnsafe(
+      'INSERT INTO "CardBankMovement" ("id", "assetId", "ownerId", "action", "beforeState", "afterState", "staffId", "staffName", "note") VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9)',
+      randomUUID(),
+      asset.id,
+      asset.ownerId,
+      "withdraw",
+      JSON.stringify(asset),
+      JSON.stringify({
+        ...afterState,
+        withdrawnQuantity: withdrawQuantity,
+      }),
+      input.actor.id,
+      input.actor.name,
+      String(input.note || "Return card asset to customer").trim()
+    ),
+  ]);
+
+  return {
+    asset: afterState,
+    withdrawnQuantity: withdrawQuantity,
+    remainingQuantity: afterState.quantity,
+  };
+}
+
 export async function getCardBankAssetsForUser(userId: string) {
   const safeUserId = String(userId || "").trim();
   if (!safeUserId) return [];
@@ -372,7 +468,7 @@ export async function getCardBankAdminSummary(): Promise<CardBankAdminSummary> {
     await ensureCardBankSchema();
     const [latestRows, aggregateRows] = await Promise.all([
       prisma.$queryRawUnsafe<DbRow[]>(
-        'SELECT * FROM "CardBankAsset" ORDER BY "createdAt" DESC, "id" ASC LIMIT 12'
+        'SELECT * FROM "CardBankAsset" WHERE "status" IN (\'stored\', \'pawned\') ORDER BY "createdAt" DESC, "id" ASC LIMIT 80'
       ),
       prisma.$queryRawUnsafe<DbRow[]>(
         'SELECT "status", "intakeMode", COUNT(*) AS "assetCount", COALESCE(SUM("quantity"), 0) AS "quantityTotal" FROM "CardBankAsset" GROUP BY "status", "intakeMode"'
