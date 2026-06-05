@@ -15,6 +15,9 @@ import {
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { getCardBankAssetsForUser, type CardBankAsset } from "@/lib/card-bank-store";
 
 export const dynamic = "force-dynamic";
 
@@ -43,14 +46,6 @@ type BulkAssetPool = {
   pileCount: number;
   updatedAt: string;
 };
-
-const depositedCards: BankCard[] = [];
-const pawnedCards: PawnCard[] = [];
-const pooledAssets: BulkAssetPool[] = [];
-
-const hasBankCards = depositedCards.length > 0;
-const hasPawnCards = pawnedCards.length > 0;
-const hasPooledAssets = pooledAssets.length > 0;
 
 const bankTerms = [
   "ระบบธนาคารการ์ดจะแสดงข้อมูลเฉพาะการ์ดจริงที่ลูกค้านำมาฝาก และแอดมินคีย์เข้าหลังบ้านแล้วเท่านั้น",
@@ -97,7 +92,82 @@ function formatTHB(value: number) {
   });
 }
 
-export default function CardBankPage() {
+function formatThaiDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("th-TH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function addMonths(value: string, months: number) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return new Date();
+  date.setMonth(date.getMonth() + months);
+  return date;
+}
+
+function mapBankCard(asset: CardBankAsset): BankCard {
+  return {
+    id: asset.id,
+    cardNo: asset.cardNo ? `No.${asset.cardNo}` : asset.setId || "SET",
+    name: asset.cardName,
+    tier: asset.setName || asset.cardType || asset.intakeMode,
+    valueTHB: asset.valueTHB,
+    status: asset.status === "pawned" ? "pawned" : "stored",
+    nextFeeDate: formatThaiDate(addMonths(asset.createdAt, 1).toISOString()),
+  };
+}
+
+function mapPawnCard(asset: CardBankAsset): PawnCard {
+  const base = mapBankCard(asset);
+  const dueDate = addMonths(asset.createdAt, 1);
+  const today = new Date();
+  const lateDays = Math.max(
+    0,
+    Math.floor((today.getTime() - dueDate.getTime()) / 86_400_000)
+  );
+
+  return {
+    ...base,
+    status: "pawned",
+    pawnStartedAt: formatThaiDate(asset.createdAt),
+    interestDueDate: formatThaiDate(dueDate.toISOString()),
+    monthlyInterestTHB: Math.round(asset.valueTHB * 0.1),
+    lateDays,
+  };
+}
+
+function mapBulkPool(asset: CardBankAsset): BulkAssetPool {
+  return {
+    id: asset.id,
+    label: asset.cardName,
+    nexBalance: asset.nexValue,
+    coinBalance: asset.coinValue,
+    pileCount: asset.quantity,
+    updatedAt: formatThaiDate(asset.updatedAt),
+  };
+}
+
+export default async function CardBankPage() {
+  const session = await getServerSession(authOptions);
+  const userId = String(session?.user?.id || "").trim();
+  const assets = userId ? await getCardBankAssetsForUser(userId) : [];
+  const depositedCards = assets
+    .filter((asset) => asset.status === "stored" && asset.intakeMode !== "bulk")
+    .map(mapBankCard);
+  const pawnedCards = assets
+    .filter((asset) => asset.status === "pawned")
+    .map(mapPawnCard);
+  const pooledAssets = assets
+    .filter((asset) => asset.intakeMode === "bulk")
+    .map(mapBulkPool);
+  const hasBankCards = depositedCards.length > 0;
+  const hasPawnCards = pawnedCards.length > 0;
+  const hasPooledAssets = pooledAssets.length > 0;
+
   return (
     <div className="min-h-full space-y-4 text-white sm:space-y-5">
       <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#f8fafc_0%,#d4d4d8_36%,#09090b_37%,#030303_100%)] p-[1px] shadow-[0_24px_100px_rgba(0,0,0,0.52)]">

@@ -171,6 +171,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const [cardSetItems, setCardSetItems] = useState<DepositSetItem[]>([]);
   const [bulkNex, setBulkNex] = useState("");
   const [bulkCoin, setBulkCoin] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const quantityInputRef = useRef<HTMLInputElement>(null);
 
   const filteredUsers = useMemo(() => {
@@ -247,14 +249,6 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     return () => window.clearTimeout(timer);
   }, [quantityModalOpen]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      router.refresh();
-    }, 20_000);
-
-    return () => window.clearInterval(interval);
-  }, [router]);
-
   const selectedUsername = String(selectedUser?.username || "").trim().replace(/^@+/, "");
   const totalSpecificCards = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalSetCount = cardSetItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -327,7 +321,9 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     ]);
   };
 
-  const submitDraft = () => {
+  const submitDraft = async () => {
+    setSaveError("");
+
     if (!selectedUser || !entryMode) {
       alert("เลือกยูสเซอร์และประเภทรายการก่อน");
       return;
@@ -348,7 +344,57 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       return;
     }
 
-    alert("เตรียมข้อมูลรายการเรียบร้อยแล้ว ขั้นต่อไปคือเชื่อม API/ฐานข้อมูล Card Bank เพื่อบันทึกจริง");
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/admin/card-bank/assets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          owner: {
+            id: selectedUser.id,
+            lineId: selectedUser.lineId,
+            name: getDisplayName(selectedUser),
+          },
+          entryMode,
+          intakeMode,
+          items,
+          setItems: cardSetItems,
+          bulk: {
+            nexValue: Number(bulkNex || 0),
+            coinValue: Number(bulkCoin || 0),
+          },
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        createdCount?: number;
+      };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || "Save failed");
+      }
+
+      alert(`บันทึกเข้าธนาคารการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`);
+      setItems([]);
+      setCardSetItems([]);
+      setBulkNex("");
+      setBulkCoin("");
+      setCardQuery("");
+      setCardPreview(null);
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "บันทึก Card Bank ไม่สำเร็จ กรุณาลองใหม่";
+      setSaveError(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -575,13 +621,24 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
               <SecurityLogPanel />
 
+              {saveError ? (
+                <div className="mt-4 rounded-[18px] border border-red-300/20 bg-red-500/10 p-3 text-sm font-bold leading-6 text-red-100">
+                  {saveError}
+                </div>
+              ) : null}
+
               <button
                 type="button"
+                disabled={saving}
                 onClick={submitDraft}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-[20px] bg-white px-4 py-4 text-sm font-black text-black transition hover:bg-zinc-200"
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-[20px] bg-white px-4 py-4 text-sm font-black text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-500 disabled:text-zinc-900"
               >
-                <PackagePlus className="h-4 w-4" />
-                เตรียมบันทึกรายการ
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PackagePlus className="h-4 w-4" />
+                )}
+                {saving ? "กำลังบันทึกเข้าระบบจริง..." : "บันทึกเข้าธนาคารการ์ดจริง"}
               </button>
             </div>
           </>

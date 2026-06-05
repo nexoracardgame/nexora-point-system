@@ -17,15 +17,18 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { getCardBankAdminSummary, type CardBankAdminSummary } from "@/lib/card-bank-store";
 
 export const dynamic = "force-dynamic";
 
-const overview = [
-  { label: "รอรับฝาก/ตรวจสภาพ", value: "0 รายการ", icon: ClipboardCheck },
-  { label: "ฝากอยู่ในธนาคาร", value: "0 ใบ", icon: Landmark },
-  { label: "อยู่ในโรงรับจำนำ", value: "0 ใบ", icon: Banknote },
-  { label: "เสี่ยงหลุดถาวร", value: "0 ใบ", icon: AlertTriangle },
-];
+function buildOverview(summary: CardBankAdminSummary) {
+  return [
+    { label: "รอรับฝาก/ตรวจสภาพ", value: `${summary.pendingCount.toLocaleString("th-TH")} รายการ`, icon: ClipboardCheck },
+    { label: "ฝากอยู่ในธนาคาร", value: `${summary.storedQuantity.toLocaleString("th-TH")} ใบ`, icon: Landmark },
+    { label: "อยู่ในโรงรับจำนำ", value: `${summary.pawnedQuantity.toLocaleString("th-TH")} ใบ`, icon: Banknote },
+    { label: "เสี่ยงหลุดถาวร", value: `${summary.forfeitedQuantity.toLocaleString("th-TH")} ใบ`, icon: AlertTriangle },
+  ];
+}
 
 const adminModules = [
   {
@@ -129,7 +132,22 @@ const auditLogRows = [
   },
 ];
 
-export default function AdminCardBankPage() {
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default async function AdminCardBankPage() {
+  const summary = await getCardBankAdminSummary();
+  const overview = buildOverview(summary);
+
   return (
     <div className="space-y-5 text-white">
       <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,#f5f5f5_0%,#cfcfcf_30%,#111_31%,#030303_100%)] p-[1px] shadow-[0_28px_110px_rgba(0,0,0,0.52)]">
@@ -248,6 +266,69 @@ export default function AdminCardBankPage() {
                 <div className="leading-6 text-white/52">{queue.detail}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
+              Real Assets
+            </div>
+            <h2 className="mt-2 text-2xl font-black">รายการ Card Bank ล่าสุด</h2>
+          </div>
+          <Link
+            href="/admin/card-bank/create"
+            className="rounded-[18px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-black text-white transition hover:bg-white/[0.09]"
+          >
+            คีย์รายการเพิ่ม
+          </Link>
+        </div>
+
+        <div className="mt-5 overflow-x-auto rounded-[22px] border border-white/10">
+          <div className="min-w-[920px]">
+            <div className="grid grid-cols-[150px_1.1fr_1fr_140px_130px_150px] bg-white/[0.045] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+              <div>Mode</div>
+              <div>Owner</div>
+              <div>Asset</div>
+              <div>Qty</div>
+              <div>Status</div>
+              <div>Created</div>
+            </div>
+            {summary.latestAssets.length > 0 ? (
+              summary.latestAssets.map((asset) => (
+                <div
+                  key={asset.id}
+                  className="grid grid-cols-[150px_1.1fr_1fr_140px_130px_150px] items-center border-t border-white/8 px-4 py-4 text-sm"
+                >
+                  <div className="font-black text-white">
+                    {asset.entryMode === "pawn" ? "Pawn" : "Bank"} / {asset.intakeMode}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate font-bold text-white/82">{asset.ownerName}</div>
+                    <div className="truncate text-xs text-white/38">{asset.ownerLineId || asset.ownerId}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate font-bold text-white/82">{asset.cardName}</div>
+                    <div className="truncate text-xs text-white/38">
+                      {asset.cardNo ? `No.${asset.cardNo}` : asset.setName || "Bulk pool"}
+                    </div>
+                  </div>
+                  <div className="font-black text-white">{asset.quantity.toLocaleString("th-TH")}</div>
+                  <div>
+                    <span className="rounded-full border border-white/12 bg-white/[0.055] px-3 py-1 text-xs font-black text-white/70">
+                      {asset.status}
+                    </span>
+                  </div>
+                  <div className="text-white/52">{formatDateTime(asset.createdAt)}</div>
+                </div>
+              ))
+            ) : (
+              <div className="border-t border-white/8 px-4 py-5 text-sm font-bold text-white/45">
+                ยังไม่มีรายการจริงใน Card Bank
+              </div>
+            )}
           </div>
         </div>
       </section>
