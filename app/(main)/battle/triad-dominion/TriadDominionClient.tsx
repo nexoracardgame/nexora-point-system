@@ -157,10 +157,10 @@ const TURN_SECONDS = 120;
 const RESULT_SECONDS = 60;
 const SPECTATOR_LIMIT = 10;
 const ROOM_API_PATH = "/api/triad-rooms";
-const LOBBY_SYNC_MS = 800;
-const ACTIVE_ROOM_SYNC_MS = 220;
-const HIDDEN_SYNC_MS = 1200;
-const MIN_SYNC_GAP_MS = 80;
+const LOBBY_SYNC_MS = 1800;
+const ACTIVE_ROOM_SYNC_MS = 1000;
+const HIDDEN_SYNC_MS = 4000;
+const MIN_SYNC_GAP_MS = 140;
 
 const rankFrames = [
   { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
@@ -2053,6 +2053,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
   };
 
+  const patchCurrentRoom = (updater: (room: TriadRoom) => TriadRoom) => {
+    if (!currentRoom) return null;
+    const nextRoom = updater(currentRoom);
+    setRooms((current) => mergeRoomByCode(current, nextRoom));
+    activeRoomSnapshotRef.current = nextRoom;
+    setActiveRoomSnapshot(nextRoom);
+    if (activeRoomCodeRef.current === nextRoom.code) {
+      setActiveRoomCode(nextRoom.code);
+    }
+    return nextRoom;
+  };
+
   const postRoomAction = async (body: Record<string, unknown>) => {
     const response = await fetch(ROOM_API_PATH, {
       method: "POST",
@@ -2495,6 +2507,23 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
+      const optimisticRoom = patchCurrentRoom((room) => ({
+        ...room,
+        game: {
+          ...room.game,
+          deckReady: {
+            ...room.game.deckReady,
+            [roomPlayerSide]: true,
+          },
+        },
+      }));
+      if (optimisticRoom?.game.deckReady.host && optimisticRoom?.game.deckReady.challenger) {
+        resetBattlePlayState();
+        setPhase("battle");
+        setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
+      } else {
+        setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
+      }
       const result = await postRoomAction({
         action: "ready-deck",
         code: currentRoom.code,
@@ -2624,17 +2653,55 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
+    const playerCard = cardsByNo.get(player[lane] || "");
+
     if (currentRoom && roomPlayerSide && opponentSide) {
+      const needsSkillChoice = Boolean(playerCard && skillNeedsChoice(playerCard));
+      patchCurrentRoom((room) => ({
+        ...room,
+        game: {
+          ...room.game,
+          triangles: {
+            ...room.game.triangles,
+            [roomPlayerSide]: {
+              ...room.game.triangles[roomPlayerSide],
+              [lane]: player[lane],
+            },
+          },
+          skillChoices: needsSkillChoice
+            ? [
+                ...room.game.skillChoices.filter(
+                  (choice) =>
+                    choice.fightNo !== room.game.fightNo ||
+                    choice.turn !== room.game.activeTurn ||
+                    choice.side !== roomPlayerSide
+                ),
+                {
+                  fightNo: room.game.fightNo,
+                  turn: room.game.activeTurn,
+                  side: roomPlayerSide,
+                  lane,
+                  cardNo: playerCard?.cardNo || "",
+                  startedAt: Date.now(),
+                  deadlineAt: Date.now() + 30_000,
+                  selectedTarget: "",
+                  skipped: false,
+                },
+              ]
+            : room.game.skillChoices,
+        },
+      }));
+      setTurnLocked(true);
       void postRoomAction({
         action: "lock-card",
         code: currentRoom.code,
         cardNo: player[lane],
       }).then((result) => {
         if (!result.ok) {
+          void syncRooms({ force: true }).catch(() => null);
           setBattleLog((current) => ["ล็อกการ์ดในห้อง PvP ไม่ได้", ...current]);
           return;
         }
-        setTurnLocked(true);
         setBattleLog((current) => [
           result.payload?.resolved
             ? `ตาที่ ${activeTurn}: ทั้งสองฝั่งล็อกแล้ว`
@@ -2653,7 +2720,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       botDeckCards: availableBotCards,
     });
     const bot = { ...baseBot, [lane]: botCardNo };
-    const playerCard = cardsByNo.get(player[lane] || "");
     if (playerCard?.cardNo === "254") {
       setLockedFight({ fightNo, player, bot, turns: lockedFight?.turns || [] });
       setTurnLocked(true);
@@ -2718,16 +2784,32 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
+      patchCurrentRoom((room) => ({
+        ...room,
+        game: {
+          ...room.game,
+          skillChoices: room.game.skillChoices.map((choice) =>
+            choice.fightNo === room.game.fightNo &&
+            choice.turn === room.game.activeTurn &&
+            choice.side === roomPlayerSide &&
+            !choice.selectedTarget &&
+            !choice.skipped
+              ? { ...choice, selectedTarget }
+              : choice
+          ),
+        },
+      }));
+      setPendingSkillChoice(null);
       void postRoomAction({
         action: "choose-skill-target",
         code: currentRoom.code,
         selectedTarget,
       }).then((result) => {
         if (!result.ok) {
+          void syncRooms({ force: true }).catch(() => null);
           setBattleLog((current) => ["เลือกเป้าหมายสกิลไม่สำเร็จ หรือหมดเวลา 30 วินาทีแล้ว", ...current]);
           return;
         }
-        setPendingSkillChoice(null);
         setBattleLog((current) => [`${skillCard?.name || pendingSkillChoice.cardNo}: ยืนยันเป้าหมายแล้ว`, ...current]);
       });
       return;
