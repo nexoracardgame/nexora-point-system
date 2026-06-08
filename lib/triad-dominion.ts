@@ -8,6 +8,7 @@ export type TriadMetric = "attack" | "support";
 export type TriadSkillShape =
   | "stat"
   | "block-stat-gain"
+  | "skill-cancel"
   | "element-transform"
   | "swap-control"
   | "unparsed";
@@ -249,6 +250,7 @@ function inferAllowedTurns(text: string, shape: TriadSkillShape): TriadTurn[] {
 }
 
 function inferSkillShape(text: string, effects: TriadSkillEffect[]): TriadSkillShape {
+  if (/ยกเลิกสกิล|cancel skill|suppress skill|สกัดศัตรูก่อนจะได้เริ่มลงมือใดๆ/i.test(text)) return "skill-cancel";
   if (/Buff|บัฟ|พลังเสริม/i.test(text)) return "block-stat-gain";
   if (/สลับตำแหน่ง|นำมาใช้งานในตานี้|swap/i.test(text)) return "swap-control";
   if (/ไม่สามารถเพิ่มค่า\s*ATTACK|cannot increase ATTACK/i.test(text)) return "block-stat-gain";
@@ -275,7 +277,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
 
   const effects = statEffects(card.skillText);
   const inferredShape = inferSkillShape(card.skillText, effects);
-  const shape: TriadSkillShape = card.cardNo === "284" ? "swap-control" : inferredShape;
+  const shape: TriadSkillShape = card.cardNo === "284" ? "swap-control" : card.cardNo === "236" ? "skill-cancel" : inferredShape;
   const blockedMetric = /Buff|บัฟ|พลังเสริม/i.test(card.skillText)
     ? undefined
     : /ATTACK/i.test(card.skillText)
@@ -401,7 +403,8 @@ function applySkill(
   turn: TriadTurn,
   side: "player" | "opponent",
   blockers: StatGainBlocker[] = [],
-  skippedSkillCardNos: Set<string> = new Set()
+  skippedSkillCardNos: Set<string> = new Set(),
+  cancelledSkillCardNos: Set<string> = new Set()
 ) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   const unresolved: TriadSkillRule[] = [];
@@ -410,6 +413,20 @@ function applySkill(
 
   const rule = triadSkillRuleByNo.get(laneCard.cardNo);
   if (!rule) return { unresolved, events };
+
+  if (cancelledSkillCardNos.has(rule.cardNo)) {
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: skill was cancelled this turn`);
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "สกิลถูกยกเลิกในตานี้ จึงกลับไปใช้คะแนนมอนสเตอร์หลักแทน",
+      blocked: true,
+    });
+    return { unresolved, events };
+  }
 
   if (skippedSkillCardNos.has(rule.cardNo)) {
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: skipped because no target was selected in time`);
@@ -434,6 +451,20 @@ function applySkill(
       type: rule.shape,
       text: rule.text,
       summary: "สกิลนี้ยังไม่ทำงานในตานี้",
+    });
+    return { unresolved, events };
+  }
+
+  if (rule.shape === "skill-cancel") {
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ยกเลิกสกิลฝั่งตรงข้ามในตานี้`);
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ยกเลิกสกิลฝั่งตรงข้ามในตานี้ แล้วใช้คะแนนมอนสเตอร์หลักแทน",
+      blocked: true,
     });
     return { unresolved, events };
   }
@@ -514,9 +545,10 @@ function applySkill(
   return { unresolved, events };
 }
 
-function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn) {
+function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   if (!laneCard || laneCard.kind !== "skill") return undefined;
+  if (skippedSkillCardNos.has(laneCard.cardNo)) return undefined;
   return triadSkillRuleByNo.get(laneCard.cardNo);
 }
 
@@ -527,12 +559,12 @@ type StatGainBlocker = {
   rule: TriadSkillRule;
 };
 
-function collectStatGainBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn) {
+function collectStatGainBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
   const blockers: StatGainBlocker[] = [];
   const events: TriadSkillEvent[] = [];
   const items = [
-    { side: "player" as const, rule: getLaneSkillRule(player, turn) },
-    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn) },
+    { side: "player" as const, rule: getLaneSkillRule(player, turn, skippedSkillCardNos) },
+    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn, skippedSkillCardNos) },
   ].filter(
     (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
       item.rule?.shape === "block-stat-gain" && item.rule.allowedTurns.includes(turn)
@@ -562,14 +594,47 @@ function collectStatGainBlockers(player: TriadTriangle, opponent: TriadTriangle,
   return { blockers, events };
 }
 
-function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn) {
+function collectSkillCancels(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn) {
+  const cancelledSkillCardNos = new Set<string>();
+  const events: TriadSkillEvent[] = [];
+  const items = [
+    { side: "player" as const, rule: getLaneSkillRule(player, turn) },
+    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn) },
+  ].filter(
+    (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
+      item.rule?.shape === "skill-cancel" && item.rule.allowedTurns.includes(turn)
+  );
+
+  for (const item of items) {
+    const targetSide = item.side === "player" ? "opponent" : "player";
+    const targetTriangle = targetSide === "player" ? player : opponent;
+    const targetCardNo = getCard(targetTriangle[selectedLane(turn)])?.cardNo;
+    if (targetCardNo) cancelledSkillCardNos.add(targetCardNo);
+    events.push({
+      cardNo: item.rule.cardNo,
+      name: item.rule.name,
+      side: item.side,
+      type: item.rule.shape,
+      text: item.rule.text,
+      summary: targetCardNo
+        ? `ยกเลิกสกิลฝั่ง${targetSide === "player" ? "เรา" : "ตรงข้าม"} No.${normalizeCardNo(targetCardNo)} ในตานี้ แล้วใช้คะแนนมอนสเตอร์หลักแทน`
+        : "ยกเลิกสกิลฝั่งตรงข้ามในตานี้ แล้วใช้คะแนนมอนสเตอร์หลักแทน",
+      targetLabel: targetCardNo ? `No.${normalizeCardNo(targetCardNo)}` : undefined,
+      blocked: true,
+    });
+  }
+
+  return { cancelledSkillCardNos, events };
+}
+
+function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
   const effectivePlayer = { ...player };
   const effectiveOpponent = { ...opponent };
   const events: TriadSkillEvent[] = [];
 
   const swapSkills = [
-    { side: "player" as const, rule: getLaneSkillRule(player, turn) },
-    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn) },
+    { side: "player" as const, rule: getLaneSkillRule(player, turn, skippedSkillCardNos) },
+    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn, skippedSkillCardNos) },
   ].filter(
     (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
       item.rule?.shape === "swap-control" && item.rule.allowedTurns.includes(turn)
@@ -594,12 +659,14 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
 
 export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const skippedSkillCardNos = new Set((input.skippedSkillCardNos || []).map((cardNo) => normalizeCardNo(cardNo)));
-  const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn);
-  const statGainBlocks = collectStatGainBlockers(input.player, input.opponent, input.turn);
+  const skillCancels = collectSkillCancels(input.player, input.opponent, input.turn);
+  const blockedSkillCardNos = new Set([...skippedSkillCardNos, ...skillCancels.cancelledSkillCardNos]);
+  const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos);
+  const statGainBlocks = collectStatGainBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const playerScore = baseScore(preScore.player, input.turn);
   const opponentScore = baseScore(preScore.opponent, input.turn);
-  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn, "player", statGainBlocks.blockers, skippedSkillCardNos);
-  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn, "opponent", statGainBlocks.blockers, skippedSkillCardNos);
+  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn, "player", statGainBlocks.blockers, blockedSkillCardNos);
+  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn, "opponent", statGainBlocks.blockers, blockedSkillCardNos);
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
 
@@ -614,7 +681,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: [...playerApplied.unresolved, ...opponentApplied.unresolved],
-    skillEvents: [...preScore.events, ...statGainBlocks.events, ...playerApplied.events, ...opponentApplied.events],
+    skillEvents: [...skillCancels.events, ...preScore.events, ...statGainBlocks.events, ...playerApplied.events, ...opponentApplied.events],
   };
 }
 

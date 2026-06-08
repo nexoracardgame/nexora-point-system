@@ -1818,11 +1818,11 @@ function CompactBattleBoard({
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
 
-        <div className="relative z-30 grid -translate-y-1 grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="relative z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2">
           <div />
-          <div className="mx-auto w-full max-w-[620px]">
+          <div className="mx-auto w-full max-w-[560px] space-y-2">
             <PhaseTrack activeTurn={activeTurn} />
-            <div className="mt-1.5 rounded-full border border-amber-100/14 bg-black/32 px-3 py-1 text-center text-xs font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+            <div className="rounded-full border border-amber-100/14 bg-black/32 px-3 py-1 text-center text-[10px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
               เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
             </div>
           </div>
