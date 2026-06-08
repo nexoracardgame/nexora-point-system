@@ -987,7 +987,7 @@ function RevealSpotlight({
         ];
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-[11%] z-20 flex justify-center px-3">
+    <div className="pointer-events-none absolute inset-x-0 top-[32%] z-20 flex justify-center px-3">
       {isScored ? (
         <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
@@ -1057,7 +1057,7 @@ function RevealSpotlight({
                   <span className="truncate">บัฟถูกบล็อก</span>
                 </div>
               ) : null}
-              <div className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-white/72">
+              <div className="mt-1 text-xs font-semibold leading-5 text-white/72">
                 {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
               </div>
             </div>
@@ -1558,6 +1558,7 @@ function SkillTargetOverlay({
     { id: "player-top" as const, label: "การ์ดหลักเรา", card: playerTop, tone: "border-red-300/60" },
     { id: "bot-top" as const, label: "การ์ดหลักคู่แข่ง", card: botTop, tone: "border-cyan-300/60" },
   ].filter((target) => selectableTargetIds.has(target.id));
+  const effectiveSelectedTarget = selectedTarget || (targets.length === 1 ? targets[0].id : "");
 
   return (
     <div className="absolute bottom-4 right-4 top-16 z-40 flex w-[min(430px,calc(100%-2rem))] items-center">
@@ -1578,7 +1579,7 @@ function SkillTargetOverlay({
               type="button"
               onClick={() => onSelect(target.id)}
               className={`rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
-                selectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
+                effectiveSelectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
               }`}
             >
               <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white/56">{target.label}</div>
@@ -1591,8 +1592,11 @@ function SkillTargetOverlay({
 
         <button
           type="button"
-          onClick={onConfirm}
-          disabled={!selectedTarget}
+          onClick={() => {
+            if (!selectedTarget && targets.length === 1) onSelect(targets[0].id);
+            onConfirm();
+          }}
+          disabled={!effectiveSelectedTarget}
           className="mt-5 h-12 w-full rounded-2xl bg-violet-300 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/30"
         >
           ยืนยันเป้าหมาย
@@ -1715,7 +1719,9 @@ function CompactBattleBoard({
   const playerVisible = (lane: Lane) => revealAllCards || Boolean(revealed[turnForLane(lane)]?.player);
   const canEditPlayerSlots = !turnLocked && !revealAllCards;
   const skillChoiceForAura = pendingSkillChoice || waitingSkillChoice || null;
-  const pendingTarget = pendingSkillChoice?.selectedTarget || "";
+  const pendingSkillCard = pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined;
+  const pendingFallbackTargets = pendingSkillChoice ? getSelectableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side) : [];
+  const pendingTarget = pendingSkillChoice?.selectedTarget || (pendingFallbackTargets.length === 1 ? pendingFallbackTargets[0] : "");
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
   const botAuraByLane: Partial<Record<Lane, TargetAura>> = {};
   if (skillChoiceForAura) {
@@ -1963,6 +1969,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           !choice.selectedTarget &&
           !choice.skipped
       ) || null
+    : null;
+  const waitingPendingRoomSkillChoice = currentRoom
+    ? currentRoom.game.skillChoices.find(
+        (choice) =>
+          choice.fightNo === currentRoom.game.fightNo &&
+          choice.turn === currentRoom.game.activeTurn &&
+          choice.side !== roomPlayerSide &&
+          !choice.selectedTarget &&
+          !choice.skipped
+      ) || null
+    : null;
+  const waitingSkillChoice: PendingSkillChoice | null = waitingPendingRoomSkillChoice
+    ? {
+        side: "bot",
+        lane: waitingPendingRoomSkillChoice.lane,
+        cardNo: waitingPendingRoomSkillChoice.cardNo,
+        selectedTarget: "",
+      }
     : null;
   const forcedWinnerLabel = forcedWinnerSide ? currentRoom?.seats[forcedWinnerSide]?.name || "ผู้ชนะ" : "";
   const surrenderedLabel = surrenderedSide ? currentRoom?.seats[surrenderedSide]?.name || "ผู้ยอมแพ้" : "";
@@ -2394,15 +2418,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   useEffect(() => {
     if (!ownPendingRoomSkillChoice || !roomPlayerSide) {
       if (isPvpRoom) setPendingSkillChoice(null);
-      return;
+      if (!waitingPendingRoomSkillChoice) return;
+      const tick = () => {
+        setTimeLeft(Math.max(0, Math.ceil((waitingPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000)));
+      };
+      tick();
+      const timer = window.setInterval(tick, 250);
+      return () => window.clearInterval(timer);
     }
 
-    setPendingSkillChoice({
+    setPendingSkillChoice((current) => ({
       side: "player",
       lane: ownPendingRoomSkillChoice.lane,
       cardNo: ownPendingRoomSkillChoice.cardNo,
-      selectedTarget: "",
-    });
+      selectedTarget:
+        current?.cardNo === ownPendingRoomSkillChoice.cardNo && current?.lane === ownPendingRoomSkillChoice.lane
+          ? current.selectedTarget
+          : "",
+    }));
 
     const tick = () => {
       setTimeLeft(Math.max(0, Math.ceil((ownPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000)));
@@ -2410,7 +2443,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     tick();
     const timer = window.setInterval(tick, 250);
     return () => window.clearInterval(timer);
-  }, [isPvpRoom, ownPendingRoomSkillChoice, roomPlayerSide]);
+  }, [isPvpRoom, ownPendingRoomSkillChoice, roomPlayerSide, waitingPendingRoomSkillChoice]);
 
   const toggleDeckCard = (cardNo: string) => {
     if (ownDeckReady) return;
@@ -2669,9 +2702,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const confirmSkillTarget = () => {
-    if (!pendingSkillChoice || !lockedFight || !pendingSkillChoice.selectedTarget) return;
-    const selectedTarget = pendingSkillChoice.selectedTarget;
+    if (!pendingSkillChoice || !lockedFight) return;
     const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
+    const fallbackTargets = getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side);
+    const selectedTarget = pendingSkillChoice.selectedTarget || (fallbackTargets.length === 1 ? fallbackTargets[0] : "");
+    if (!selectedTarget) return;
     const selectableTargetIds = new Set(getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side));
     if (!selectableTargetIds.has(selectedTarget)) {
       setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: "" } : current));
@@ -3589,6 +3624,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             timeLeft={timeLeft}
             turnLocked={turnLocked}
             pendingSkillChoice={pendingSkillChoice}
+            waitingSkillChoice={waitingSkillChoice}
             revealAllCards={false}
             randomCard={randomDrawCard}
             onSelectSkillTarget={(target) =>
@@ -3778,7 +3814,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <Trophy className="h-4 w-4 text-amber-300" />
               บันทึกการต่อสู้
             </div>
-            <div className="max-h-[180px] space-y-2 overflow-auto pr-1">
+            <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
               {battleLog.length > 0 ? (
                 battleLog.map((line, index) => (
                   <div key={`${line}-${index}`} className="rounded-lg border border-white/8 bg-black/22 p-3 text-xs font-semibold leading-5 text-white/58">

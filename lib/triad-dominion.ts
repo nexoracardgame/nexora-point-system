@@ -237,7 +237,7 @@ function inferTarget(text: string): TriadSkillRule["target"] {
   if (/บนสนามเราทุกใบ|ของเราทุกใบ|เรา ทุกใบ/.test(text)) return "own-all";
   if (/บนสนามใครก็ได้|ใครก็ได้/.test(text)) return "any-one";
   if (/มอนสเตอร์ทั้งหมด|ทุกใบ/.test(text)) return "all";
-  if (/เลือกมอนสเตอร์ บนสนามเรา|บนสนามเรา 1 ใบ|ของเรา 1 ใบ/.test(text)) return "own-one";
+  if (/เลือกมอนสเตอร์\s*บนสนาม|เลือกมอนสเตอร์บนสนาม|เลือกมอนสเตอร์.*บนสนาม/i.test(text)) return "any-one";
   return "own-main";
 }
 
