@@ -286,9 +286,10 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
       ? "support"
       : undefined;
   const needsReview =
-    shape === "unparsed" ||
-    shape === "element-transform" ||
-    /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText);
+    card.cardNo !== "236" &&
+    (shape === "unparsed" ||
+      shape === "element-transform" ||
+      /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText));
 
   return {
     cardNo: card.cardNo,
@@ -665,8 +666,26 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const statGainBlocks = collectStatGainBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const playerScore = baseScore(preScore.player, input.turn);
   const opponentScore = baseScore(preScore.opponent, input.turn);
-  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn, "player", statGainBlocks.blockers, blockedSkillCardNos);
-  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn, "opponent", statGainBlocks.blockers, blockedSkillCardNos);
+  const playerApplied = applySkill(
+    input.player,
+    playerScore,
+    opponentScore,
+    input.turn,
+    "player",
+    statGainBlocks.blockers,
+    skippedSkillCardNos,
+    skillCancels.cancelledSkillCardNos
+  );
+  const opponentApplied = applySkill(
+    input.opponent,
+    opponentScore,
+    playerScore,
+    input.turn,
+    "opponent",
+    statGainBlocks.blockers,
+    skippedSkillCardNos,
+    skillCancels.cancelledSkillCardNos
+  );
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
 
