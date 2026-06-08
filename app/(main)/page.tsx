@@ -3,14 +3,12 @@
 import Image from "next/image";
 import { Noto_Sans_Thai } from "next/font/google";
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { Swords } from "lucide-react";
 import AppInstallButton from "@/components/AppInstallButton";
 import AppStoreButton from "@/components/AppStoreButton";
 import GooglePlayButton from "@/components/GooglePlayButton";
 import PrefetchLink from "@/components/PrefetchLink";
 import WindowsDownloadButton from "@/components/WindowsDownloadButton";
-import { isAdminRole } from "@/lib/staff-auth";
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -85,8 +83,6 @@ function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
 }
 
 export default function NexoraLuxuryHome() {
-  const { data: session } = useSession();
-  const showBattleTest = isAdminRole(session?.user?.role);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
   const isMobileViewport = useHomeViewportMode();
 
@@ -148,15 +144,6 @@ export default function NexoraLuxuryHome() {
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <AppInstallButton variant="dark" />
-          {showBattleTest ? (
-            <PrefetchLink
-              href="/battle/triad-dominion"
-              className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#10141c] px-4 py-3 text-sm font-black text-white shadow-[0_18px_32px_rgba(0,0,0,0.18)] ring-1 ring-black/10 transition active:scale-[0.98]"
-            >
-              <Swords className="h-4 w-4 text-amber-300" />
-              TEST BATTLE
-            </PrefetchLink>
-          ) : null}
         </div>
 
         {showDownloadStoreButtons ? (
@@ -244,15 +231,13 @@ export default function NexoraLuxuryHome() {
 
       <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center gap-3 sm:flex">
         <AppInstallButton variant="dark" />
-        {showBattleTest ? (
-          <PrefetchLink
-            href="/battle/triad-dominion"
-            className="pointer-events-auto inline-flex min-h-12 items-center gap-2 rounded-2xl bg-[#10141c] px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_rgba(0,0,0,0.18)] ring-1 ring-black/10 transition hover:scale-[1.03] hover:bg-black active:scale-[0.98]"
-          >
-            <Swords className="h-4 w-4 text-amber-300" />
-            TEST BATTLE
-          </PrefetchLink>
-        ) : null}
+        <PrefetchLink
+          href="/battle/triad-dominion"
+          className="pointer-events-auto inline-flex min-h-12 items-center gap-2 rounded-2xl bg-[#10141c] px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_rgba(0,0,0,0.18)] ring-1 ring-black/10 transition hover:scale-[1.03] hover:bg-black active:scale-[0.98]"
+        >
+          <Swords className="h-4 w-4 text-amber-300" />
+          TEST BATTLE
+        </PrefetchLink>
         {showDownloadStoreButtons ? (
           <>
             <WindowsDownloadButton />

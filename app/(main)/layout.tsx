@@ -1350,12 +1350,6 @@ export default function MainLayout({
         active: pathname.startsWith("/collections"),
       },
       {
-        href: "/battle/triad-dominion",
-        label: "Battle",
-        icon: Swords,
-        active: pathname.startsWith("/battle"),
-      },
-      {
         href: "/community",
         label: t("layout.nav.community"),
         icon: Cat,
@@ -1384,7 +1378,7 @@ export default function MainLayout({
   );
 
   const drawerLinks = [
-    ...sideItems,
+    ...sideItems.filter((item) => !item.href.startsWith("/battle")),
     {
       href: "/wallet",
       label: t("layout.nav.wallet"),

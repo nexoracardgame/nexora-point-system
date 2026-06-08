@@ -1,8 +1,6 @@
-import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import TriadDominionClient from "./TriadDominionClient";
 import { authOptions } from "@/lib/auth";
-import { isAdminRole } from "@/lib/staff-auth";
 import {
   getTriadCatalogSummary,
   triadCards,
@@ -11,10 +9,6 @@ import {
 
 export default async function TriadDominionPage() {
   const session = await getServerSession(authOptions);
-
-  if (!isAdminRole(session?.user?.role)) {
-    redirect("/");
-  }
 
   const summary = getTriadCatalogSummary();
   const cards = triadCards.map((card) => ({
