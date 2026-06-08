@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import TriadDominionClient from "./TriadDominionClient";
 import { authOptions } from "@/lib/auth";
@@ -9,6 +10,12 @@ import {
 
 export default async function TriadDominionPage() {
   const session = await getServerSession(authOptions);
+  const sessionUser = session?.user;
+  const userId = String(sessionUser?.id || "").trim();
+
+  if (!userId) {
+    redirect("/login?callbackUrl=/battle/triad-dominion");
+  }
 
   const summary = getTriadCatalogSummary();
   const cards = triadCards.map((card) => ({
@@ -38,9 +45,9 @@ export default async function TriadDominionPage() {
       reviewSkills={reviewSkills}
       summary={summary}
       currentUser={{
-        id: String(session?.user?.id || session?.user?.email || session?.user?.name || "admin"),
-        name: String(session?.user?.name || "ADMIN"),
-        image: String(session?.user?.image || "/avatar.png"),
+        id: userId,
+        name: String(sessionUser?.name || "PLAYER"),
+        image: String(sessionUser?.image || "/avatar.png"),
       }}
     />
   );

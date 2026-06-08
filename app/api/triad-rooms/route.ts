@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdminActor } from "@/lib/admin-auth";
+import { getApiActor, requireAdminActor, type ApiActor } from "@/lib/admin-auth";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 import {
   createTriadRoom,
@@ -90,36 +90,38 @@ async function roomActionJson(
   return noStoreJson(body, init);
 }
 
-function participantFromBody(body: Record<string, unknown>, fallbackName: string): TriadRoomParticipant {
+function participantFromActor(body: Record<string, unknown>, actor: ApiActor): TriadRoomParticipant {
   const raw = body.participant && typeof body.participant === "object" ? (body.participant as Record<string, unknown>) : {};
   return {
-    id: cleanText(raw.id),
-    name: cleanText(raw.name) || fallbackName || "ADMIN",
-    image: cleanText(raw.image) || "/avatar.png",
+    id: actor.id,
+    name: actor.name || actor.lineId || cleanText(raw.name) || "PLAYER",
+    image: actor.image || cleanText(raw.image) || "/avatar.png",
     joinedAt: Number(raw.joinedAt || Date.now()),
   };
 }
 
 export async function GET() {
-  const { error } = await requireAdminActor();
-  if (error) return error;
+  const actor = await getApiActor();
+  if (!actor) return noStoreJson({ error: "unauthorized" }, { status: 401 });
 
   return noStoreJson({ rooms: await listTriadRooms() });
 }
 
 export async function POST(request: Request) {
-  const { actor, error } = await requireAdminActor();
-  if (error || !actor) return error;
+  const actor = await getApiActor();
+  if (!actor) return noStoreJson({ error: "unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const action = cleanText(body.action);
 
   if (action === "clear-all") {
+    const { error } = await requireAdminActor();
+    if (error) return error;
     const result = await clearTriadRooms();
     return roomActionJson(result, undefined, { action, refresh: true });
   }
 
-  const participant = participantFromBody(body, actor.name || actor.lineId);
+  const participant = participantFromActor(body, actor);
 
   if (!participant.id) {
     return noStoreJson({ error: "participant_required" }, { status: 400 });

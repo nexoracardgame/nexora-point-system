@@ -2033,11 +2033,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const enterRoom = async (codeInput = joinCode, forceSpectator = false, passwordInput = joinPassword) => {
     const code = codeInput.replace(/\D/g, "").slice(0, 6);
     const room = rooms.find((item) => item.code === code);
-    if (!room) {
+    if (code.length !== 6) {
       setLobbyMessage("ไม่พบห้องนี้");
       return;
     }
-    if (room.access === "private" && !passwordInput.trim() && room.hostId !== participant.id) {
+    if (room?.access === "private" && !passwordInput.trim() && room.hostId !== participant.id) {
       setPasswordRoom(room);
       setLobbyMessage("");
       return;
@@ -2051,6 +2051,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
 
     if (!result.ok) {
+      const lockedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || null;
+      if (result.payload?.reason === "wrong_password" && lockedRoom && !passwordInput.trim()) {
+        setPasswordRoom(lockedRoom);
+        setLobbyMessage("");
+        return;
+      }
       setLobbyMessage(result.payload?.reason === "wrong_password" ? "รหัสห้องไม่ถูกต้อง" : "เข้าห้องนี้ไม่ได้");
       return;
     }
@@ -2058,10 +2064,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPasswordRoom(null);
     setJoinPassword("");
     const joinedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || room;
+    if (!joinedRoom?.code) {
+      setLobbyMessage("ไม่พบห้องนี้");
+      return;
+    }
     setActiveRoomSnapshot(joinedRoom);
     activeRoomSnapshotRef.current = joinedRoom;
-    activeRoomCodeRef.current = code;
-    setActiveRoomCode(code);
+    activeRoomCodeRef.current = joinedRoom.code;
+    setActiveRoomCode(joinedRoom.code);
     setLobbyMessage(result.payload?.joinedAs === "spectator" ? "เข้ามาเป็นผู้ชมแล้ว" : "");
     const joinedDecksReady = Boolean(joinedRoom.game.deckReady.host && joinedRoom.game.deckReady.challenger);
     const joinedAsSpectator = Boolean(result.payload?.joinedAs === "spectator" || joinedRoom.spectators.some((viewer) => viewer.id === participant.id));
