@@ -1868,6 +1868,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const surrenderedSide = currentRoom?.game.surrenderedBy || "";
   const matchDone = fightNo > 3 || Boolean(forcedWinnerSide);
   const isRoomHost = Boolean(currentRoom && currentRoom.hostId === participant.id);
+  const isRoomController = Boolean(
+    currentRoom && (currentRoom.hostId === participant.id || currentRoom.seats.host?.id === participant.id)
+  );
   const isSpectator = Boolean(currentRoom?.spectators.some((viewer) => viewer.id === participant.id));
   const isFieldPlayer = Boolean(
     currentRoom?.seats.host?.id === participant.id || currentRoom?.seats.challenger?.id === participant.id
@@ -2091,7 +2094,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const startRoomGame = async () => {
-    if (!currentRoom || !isRoomHost || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    if (!currentRoom || !isRoomController || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
     const result = await postRoomAction({ action: "start", code: currentRoom.code });
     if (!result.ok) {
       setLobbyMessage("เจ้าของห้องเริ่มเกมได้เมื่อมีผู้เล่นครบ 2 ฝั่ง");
@@ -2113,7 +2116,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const continueRoomBattle = async () => {
-    if (!currentRoom || !isRoomHost) return;
+    if (!currentRoom || !isRoomController) return;
     const result = await postRoomAction({ action: "continue", code: currentRoom.code });
     if (!result.ok) {
       setLobbyMessage("เริ่มสู้ต่อในห้องนี้ไม่ได้");
@@ -2276,13 +2279,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, isSpectator, participant.id, phase]);
 
   useEffect(() => {
-    if (!currentRoom?.game.matchWinner || !currentRoom.game.matchEndedAt || !isRoomHost) return;
+    if (!currentRoom?.game.matchWinner || !currentRoom.game.matchEndedAt || !isRoomController) return;
     const delay = Math.max(0, 6500 - (Date.now() - currentRoom.game.matchEndedAt));
     const timer = window.setTimeout(() => {
       void postRoomAction({ action: "continue", code: currentRoom.code });
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, isRoomHost]);
+  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, isRoomController]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -2842,7 +2845,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const nextTurn = () => {
     if (!lockedFight || activeTurn >= 3) return;
-    if (currentRoom && isRoomHost) {
+    if (currentRoom && isRoomController) {
       void postRoomAction({ action: "advance-turn", code: currentRoom.code });
     }
     const lane = laneForTurn(activeTurn);
@@ -2865,7 +2868,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const nextFight = () => {
     if (!lockedFight) return;
-    if (currentRoom && isRoomHost) {
+    if (currentRoom && isRoomController) {
       void postRoomAction({ action: "advance-turn", code: currentRoom.code });
     }
 
@@ -2926,7 +2929,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setResultTimeLeft((current) => {
         if (current <= 1) {
           window.clearInterval(timer);
-          if (!isPvpRoom || isRoomHost) {
+          if (!isPvpRoom || isRoomController) {
             setTimeout(() => {
               if (activeTurn >= 3) nextFight();
               else nextTurn();
@@ -2939,7 +2942,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [activeRoomCode, activeTurn, activeTurnScored, currentResult?.winner, fightNo, isPvpRoom, isRoomHost, lockedFight, matchDone, phase]);
+  }, [activeRoomCode, activeTurn, activeTurnScored, currentResult?.winner, fightNo, isPvpRoom, isRoomController, lockedFight, matchDone, phase]);
 
   const revealButtonLabel =
     !canRevealTurn
@@ -3227,7 +3230,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       );
     }
 
-    const canStart = isRoomHost && Boolean(currentRoom.seats.host && currentRoom.seats.challenger);
+    const canStart = isRoomController && Boolean(currentRoom.seats.host && currentRoom.seats.challenger);
     const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
 
     return (
@@ -3615,7 +3618,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                       <button
                         type="button"
                         onClick={continueRoomBattle}
-                        disabled={!isRoomHost}
+                        disabled={!isRoomController}
                         className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -3640,7 +3643,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                       เริ่มใหม่
                     </button>
                   )
-                ) : !isSpectator && (!isPvpRoom || isRoomHost) && turnLocked && lockedFight && revealed[3].scored ? (
+                ) : !isSpectator && (!isPvpRoom || isRoomController) && turnLocked && lockedFight && revealed[3].scored ? (
                   <button
                     type="button"
                     onClick={nextFight}
@@ -3649,7 +3652,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     {fightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                ) : !isSpectator && (!isPvpRoom || isRoomHost) && turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
+                ) : !isSpectator && (!isPvpRoom || isRoomController) && turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
                   <button
                     type="button"
                     onClick={nextTurn}

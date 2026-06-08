@@ -521,6 +521,10 @@ function participantInStoredRoom(room: StoredTriadRoom, participantId: string) {
   return Boolean(sideForParticipant(room, participantId) || room.spectators.some((viewer) => viewer.id === participantId));
 }
 
+function canControlStoredRoom(room: StoredTriadRoom, participantId: string) {
+  return Boolean(participantId && (room.hostId === participantId || room.seats.host?.id === participantId));
+}
+
 function laneForTurn(turn: TriadTurn): keyof TriadTriangle {
   if (turn === 1) return "top";
   if (turn === 2) return "left";
@@ -852,7 +856,7 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
 export async function advanceTriadRoomTurn(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
-  if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
   if (!room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {
     return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
   }
@@ -920,7 +924,11 @@ export async function joinTriadRoom(input: {
   }
 
   const cleanRoom = removeParticipant(room, input.participant.id);
-  const mustSpectate = Boolean(input.forceSpectator || cleanRoom.status === "playing" || cleanRoom.seats.challenger);
+  const mustSpectate = Boolean(
+    input.forceSpectator ||
+    cleanRoom.status === "playing" ||
+    (cleanRoom.seats.host && cleanRoom.seats.challenger)
+  );
   if (mustSpectate) {
     if (cleanRoom.spectators.length >= SPECTATOR_LIMIT) {
       return { ok: false as const, reason: "spectators_full" as const, room: publicRoom(cleanRoom) };
@@ -958,7 +966,9 @@ export async function takeTriadRoomSlot(code: string, slot: TriadRoomSlot, parti
 
   const cleanRoom = removeParticipant(room, participant.id);
   cleanRoom.seats[slot] = participant;
-  if (slot === "host") cleanRoom.hostId = participant.id;
+  if (!cleanRoom.hostId || !participantInStoredRoom(cleanRoom, cleanRoom.hostId)) {
+    cleanRoom.hostId = cleanRoom.seats.host?.id || participant.id;
+  }
   await upsertStoredRoom(cleanRoom);
   return { ok: true as const, room: publicRoom(cleanRoom) };
 }
@@ -966,7 +976,7 @@ export async function takeTriadRoomSlot(code: string, slot: TriadRoomSlot, parti
 export async function startTriadRoom(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
-  if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
   if (!room.seats.host || !room.seats.challenger) {
     return { ok: false as const, reason: "need_two_players" as const, room: publicRoom(room) };
   }
@@ -985,7 +995,7 @@ export async function startTriadRoom(code: string, participantId: string) {
 export async function resetTriadRoomBattle(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
-  if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
   room.status = "waiting";
   room.game = {
     ...freshGame(),
@@ -1021,17 +1031,24 @@ export async function leaveTriadRoom(code: string, participantId: string) {
     await deleteStoredRoom(room.code);
     return { ok: true as const };
   }
+  const ownerStillPresent = participantInStoredRoom(cleanRoom, cleanRoom.hostId);
   if (!cleanRoom.seats.host && cleanRoom.seats.challenger) {
     cleanRoom.seats.host = cleanRoom.seats.challenger;
     cleanRoom.seats.challenger = null;
-    cleanRoom.hostId = cleanRoom.seats.host.id;
   } else if (!cleanRoom.seats.host && cleanRoom.spectators.length > 0) {
     const [nextHost, ...remainingSpectators] = cleanRoom.spectators;
     cleanRoom.seats.host = nextHost;
     cleanRoom.spectators = remainingSpectators;
-    cleanRoom.hostId = nextHost.id;
+  }
+
+  if (ownerStillPresent) {
+    cleanRoom.hostId = room.hostId;
   } else if (cleanRoom.seats.host) {
     cleanRoom.hostId = cleanRoom.seats.host.id;
+  } else if (cleanRoom.seats.challenger) {
+    cleanRoom.hostId = cleanRoom.seats.challenger.id;
+  } else if (cleanRoom.spectators.length > 0) {
+    cleanRoom.hostId = cleanRoom.spectators[0].id;
   }
   if (cleanRoom.status === "playing" && (!cleanRoom.seats.host || !cleanRoom.seats.challenger)) {
     cleanRoom.status = "waiting";
