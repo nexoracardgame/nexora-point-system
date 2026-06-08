@@ -232,13 +232,7 @@ function safeTimeMs(value: unknown, fallback = Date.now()) {
 }
 
 function getParticipantId(baseId: string) {
-  if (typeof window === "undefined") return baseId || "triad-local-player";
-  const key = "nexora:triad-dominion:participant-id";
-  const existing = window.sessionStorage.getItem(key);
-  if (existing) return existing;
-  const next = `${baseId || "triad"}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  window.sessionStorage.setItem(key, next);
-  return next;
+  return baseId || "triad-local-player";
 }
 
 function makeParticipant(user: Props["currentUser"]): RoomParticipant {
@@ -1809,7 +1803,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     [cards]
   );
 
-  const [participant] = useState(() => makeParticipant(currentUser));
+  const participant = useMemo(() => makeParticipant(currentUser), [currentUser.id, currentUser.image, currentUser.name]);
   const [phase, setPhase] = useState<BattlePhase>("lobby");
   const [rooms, setRooms] = useState<TriadRoom[]>([]);
   const [activeRoomCode, setActiveRoomCode] = useState("");
