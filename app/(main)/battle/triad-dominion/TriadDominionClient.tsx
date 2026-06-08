@@ -2101,7 +2101,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
     resetBattle();
-    setPhase("deck");
+    const startedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || currentRoom;
+    const startedAsFieldPlayer = Boolean(
+      startedRoom?.seats.host?.id === participant.id || startedRoom?.seats.challenger?.id === participant.id
+    );
+    setPhase(startedAsFieldPlayer ? "deck" : "battle");
   };
 
   const leaveRoom = async () => {
