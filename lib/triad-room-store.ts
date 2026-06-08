@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import {
   resolveTriadTurn,
+  triadCards,
+  triadSkillRuleByNo,
   type TriadTriangle,
   type TriadTurn,
   type TriadTurnResult,
@@ -9,6 +11,19 @@ import {
 export type TriadRoomAccess = "public" | "private";
 export type TriadRoomStatus = "waiting" | "playing";
 export type TriadRoomSlot = "host" | "challenger";
+export type TriadDeckMode = "all" | "random";
+
+export type TriadRoomSkillChoice = {
+  fightNo: number;
+  turn: TriadTurn;
+  side: TriadRoomSlot;
+  lane: keyof TriadTriangle;
+  cardNo: string;
+  startedAt: number;
+  deadlineAt: number;
+  selectedTarget: string;
+  skipped: boolean;
+};
 
 export type TriadRoomParticipant = {
   id: string;
@@ -42,11 +57,17 @@ export type TriadRoomGame = {
     host: boolean;
     challenger: boolean;
   };
+  deckMode: TriadDeckMode;
+  selectionPools: {
+    host: string[];
+    challenger: string[];
+  };
   deckStartedAt: number;
   triangles: {
     host: TriadTriangle;
     challenger: TriadTriangle;
   };
+  skillChoices: TriadRoomSkillChoice[];
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
   fightNo: number;
@@ -75,6 +96,7 @@ type TriadRoomRow = {
 
 const SPECTATOR_LIMIT = 10;
 const TURN_TIMEOUT_MS = 120_000;
+const SKILL_CHOICE_TIMEOUT_MS = 30_000;
 const DECK_SELECT_TIMEOUT_MS = 5 * 60_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
 const PLAYING_ROOM_TTL_MS = 30 * 60_000;
@@ -134,7 +156,36 @@ function emptyTriangle(): TriadTriangle {
 }
 
 function normalizeDeck(value: unknown) {
-  return Array.isArray(value) ? value.map((item) => cleanText(item)).filter(Boolean).slice(0, 9) : [];
+  return Array.isArray(value) ? value.map((item) => cleanText(item)).filter(Boolean).slice(0, 40) : [];
+}
+
+function normalizeDeckMode(value: unknown): TriadDeckMode {
+  return value === "random" ? "random" : "all";
+}
+
+function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const raw = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      const turn = Number(raw.turn || 1);
+      const side = raw.side === "challenger" ? "challenger" : raw.side === "host" ? "host" : "";
+      const lane = raw.lane === "left" || raw.lane === "right" || raw.lane === "top" ? raw.lane : "";
+      const cardNo = cleanText(raw.cardNo);
+      if (!side || !lane || !cardNo || (turn !== 1 && turn !== 2 && turn !== 3)) return null;
+      return {
+        fightNo: Number(raw.fightNo || 1),
+        turn: turn as TriadTurn,
+        side,
+        lane,
+        cardNo,
+        startedAt: Number(raw.startedAt || Date.now()),
+        deadlineAt: Number(raw.deadlineAt || Date.now() + SKILL_CHOICE_TIMEOUT_MS),
+        selectedTarget: cleanText(raw.selectedTarget),
+        skipped: Boolean(raw.skipped),
+      };
+    })
+    .filter((item): item is TriadRoomSkillChoice => Boolean(item));
 }
 
 function normalizeGame(value: unknown): TriadRoomGame {
@@ -152,11 +203,17 @@ function normalizeGame(value: unknown): TriadRoomGame {
       host: Boolean(deckReady.host),
       challenger: Boolean(deckReady.challenger),
     },
+    deckMode: normalizeDeckMode(raw.deckMode),
+    selectionPools: {
+      host: normalizeDeck((raw.selectionPools as Record<string, unknown> | undefined)?.host),
+      challenger: normalizeDeck((raw.selectionPools as Record<string, unknown> | undefined)?.challenger),
+    },
     deckStartedAt: Number(raw.deckStartedAt || Date.now()),
     triangles: {
       host: { ...emptyTriangle(), ...((triangles.host as TriadTriangle | undefined) || {}) },
       challenger: { ...emptyTriangle(), ...((triangles.challenger as TriadTriangle | undefined) || {}) },
     },
+    skillChoices: normalizeSkillChoices(raw.skillChoices),
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
@@ -410,7 +467,12 @@ export async function listTriadRooms() {
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
   for (const room of aliveRooms) {
-    if (deckSelectExpired(room) && finalizeDeckSelection(room)) {
+    const deckFinalized = deckSelectExpired(room) && finalizeDeckSelection(room);
+    const choicesExpired = markExpiredSkillChoices(room);
+    const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
+    resolveIfBothLocked(room);
+    const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
+    if (deckFinalized || choicesExpired || resolvedAfterChoiceTimeout) {
       await upsertStoredRoom(room);
     }
   }
@@ -421,9 +483,11 @@ export async function createTriadRoom(input: {
   access: TriadRoomAccess;
   password?: string;
   participant: TriadRoomParticipant;
+  deckMode?: TriadDeckMode;
 }) {
   const existingRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const code = roomCode(existingRooms);
+  const deckMode = normalizeDeckMode(input.deckMode);
   const room: StoredTriadRoom = {
     code,
     access: input.access,
@@ -437,7 +501,10 @@ export async function createTriadRoom(input: {
       challenger: null,
     },
     spectators: [],
-    game: normalizeGame(null),
+    game: normalizeGame({
+      deckMode,
+      selectionPools: buildSelectionPools(deckMode, code),
+    }),
   };
 
   await upsertStoredRoom(room);
@@ -464,6 +531,54 @@ function metricForTurn(turn: TriadTurn): TriadTurnResult["metric"] {
   if (turn === 1) return "total";
   if (turn === 2) return "attack";
   return "support";
+}
+
+function shuffled<T>(items: T[], seed: string) {
+  const next = [...items];
+  let state = seed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) || 1;
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const swapIndex = state % (index + 1);
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
+function pairedMonsterPools(seed: string) {
+  const monsters = triadCards
+    .filter((card) => card.kind === "monster")
+    .sort((a, b) => a.attack + a.support - (b.attack + b.support));
+  const buckets = 5;
+  const perBucket = 4;
+  const host: string[] = [];
+  const challenger: string[] = [];
+  for (let bucket = 0; bucket < buckets; bucket += 1) {
+    const start = Math.floor((monsters.length / buckets) * bucket);
+    const end = Math.floor((monsters.length / buckets) * (bucket + 1));
+    const bucketCards = shuffled(monsters.slice(start, end), `${seed}:monster:${bucket}`).slice(0, perBucket * 2);
+    host.push(...bucketCards.slice(0, perBucket).map((card) => card.cardNo));
+    challenger.push(...bucketCards.slice(perBucket, perBucket * 2).map((card) => card.cardNo));
+  }
+  return {
+    host: shuffled(host, `${seed}:host:monster:final`).slice(0, 20),
+    challenger: shuffled(challenger, `${seed}:challenger:monster:final`).slice(0, 20),
+  };
+}
+
+function randomSkillPool(seed: string) {
+  return shuffled(
+    triadCards.filter((card) => card.kind === "skill"),
+    `${seed}:skill`
+  ).slice(0, 20).map((card) => card.cardNo);
+}
+
+function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["selectionPools"] {
+  if (mode === "all") return { host: [], challenger: [] };
+  const monsters = pairedMonsterPools(seed);
+  return {
+    host: [...monsters.host, ...randomSkillPool(`${seed}:host`)],
+    challenger: [...monsters.challenger, ...randomSkillPool(`${seed}:challenger`)],
+  };
 }
 
 function freshGame(): TriadRoomGame {
@@ -493,15 +608,82 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   return true;
 }
 
+function skillNeedsManualChoice(cardNo: string) {
+  const rule = triadSkillRuleByNo.get(cleanText(cardNo));
+  if (!rule) return false;
+  return /เลือก|choose|target/i.test(rule.text) || rule.target === "own-one" || rule.target === "opponent-one" || rule.target === "any-one";
+}
+
+function currentTurnChoices(room: StoredTriadRoom) {
+  return room.game.skillChoices.filter(
+    (choice) => choice.fightNo === room.game.fightNo && choice.turn === room.game.activeTurn
+  );
+}
+
+function ensureSkillChoices(room: StoredTriadRoom) {
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  const now = Date.now();
+  const nextChoices = currentTurnChoices(room);
+  for (const side of ["host", "challenger"] as const) {
+    const cardNo = room.game.triangles[side][lane];
+    if (!cardNo || !skillNeedsManualChoice(cardNo)) continue;
+    if (nextChoices.some((choice) => choice.side === side && choice.cardNo === cardNo)) continue;
+    nextChoices.push({
+      fightNo: room.game.fightNo,
+      turn,
+      side,
+      lane,
+      cardNo,
+      startedAt: now,
+      deadlineAt: now + SKILL_CHOICE_TIMEOUT_MS,
+      selectedTarget: "",
+      skipped: false,
+    });
+  }
+  room.game.skillChoices = [
+    ...room.game.skillChoices.filter(
+      (choice) => choice.fightNo !== room.game.fightNo || choice.turn !== room.game.activeTurn
+    ),
+    ...nextChoices,
+  ];
+  return nextChoices;
+}
+
+function markExpiredSkillChoices(room: StoredTriadRoom) {
+  const now = Date.now();
+  let changed = false;
+  room.game.skillChoices = room.game.skillChoices.map((choice) => {
+    if (choice.fightNo !== room.game.fightNo || choice.turn !== room.game.activeTurn || choice.selectedTarget || choice.skipped) {
+      return choice;
+    }
+    if (now < choice.deadlineAt) return choice;
+    changed = true;
+    return { ...choice, skipped: true };
+  });
+  return changed;
+}
+
+function skillChoicesResolved(room: StoredTriadRoom) {
+  const choices = ensureSkillChoices(room);
+  markExpiredSkillChoices(room);
+  return choices.every((choice) => choice.selectedTarget || choice.skipped);
+}
+
 function resolveIfBothLocked(room: StoredTriadRoom) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
   if (!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) return;
+  if (!skillChoicesResolved(room)) return;
   const opener = getOpeningSide(room);
+  const skippedSkillCardNos = currentTurnChoices(room)
+    .filter((choice) => choice.skipped && !choice.selectedTarget)
+    .map((choice) => choice.cardNo);
   const rawResult = resolveTriadTurn({
     turn,
     player: room.game.triangles[opener],
     opponent: room.game.triangles[opener === "host" ? "challenger" : "host"],
+    skippedSkillCardNos,
   });
   const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
@@ -638,6 +820,35 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   };
 }
 
+export async function chooseTriadRoomSkillTarget(code: string, participantId: string, selectedTarget: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  ensureSkillChoices(room);
+  markExpiredSkillChoices(room);
+  const choice = room.game.skillChoices.find(
+    (item) => item.fightNo === room.game.fightNo && item.turn === turn && item.side === side && item.lane === lane
+  );
+  if (!choice) return { ok: false as const, reason: "no_choice" as const, room: publicRoom(room) };
+  if (choice.skipped || Date.now() > choice.deadlineAt) {
+    choice.skipped = true;
+    resolveIfBothLocked(room);
+    await upsertStoredRoom(room);
+    return { ok: false as const, reason: "choice_expired" as const, room: publicRoom(room) };
+  }
+  choice.selectedTarget = cleanText(selectedTarget) || "selected";
+  resolveIfBothLocked(room);
+  await upsertStoredRoom(room);
+  return {
+    ok: true as const,
+    room: publicRoom(room),
+    resolved: room.game.turns.some((item) => item.turn === room.game.activeTurn),
+  };
+}
+
 export async function advanceTriadRoomTurn(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
@@ -761,7 +972,12 @@ export async function startTriadRoom(code: string, participantId: string) {
   }
 
   room.status = "playing";
-  room.game = freshGame();
+  const deckMode = room.game.deckMode || "all";
+  room.game = {
+    ...freshGame(),
+    deckMode,
+    selectionPools: buildSelectionPools(deckMode, `${room.code}:${Date.now()}`),
+  };
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
 }
@@ -771,7 +987,11 @@ export async function resetTriadRoomBattle(code: string, participantId: string) 
   if (!room) return { ok: false as const, reason: "not_found" as const };
   if (room.hostId !== participantId) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
   room.status = "waiting";
-  room.game = freshGame();
+  room.game = {
+    ...freshGame(),
+    deckMode: room.game.deckMode || "all",
+    selectionPools: buildSelectionPools(room.game.deckMode || "all", `${room.code}:${Date.now()}`),
+  };
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
 }

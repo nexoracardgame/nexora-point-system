@@ -85,6 +85,7 @@ type Lane = "top" | "left" | "right";
 type RoomAccess = "public" | "private";
 type RoomStatus = "waiting" | "playing";
 type RoomPlayerSide = "host" | "challenger";
+type DeckMode = "all" | "random";
 
 type RoomParticipant = {
   id: string;
@@ -112,8 +113,11 @@ type TriadRoom = {
 type RoomGame = {
   decks: Record<RoomPlayerSide, string[]>;
   deckReady: Record<RoomPlayerSide, boolean>;
+  deckMode: DeckMode;
+  selectionPools: Record<RoomPlayerSide, string[]>;
   deckStartedAt: number;
   triangles: Record<RoomPlayerSide, TriadTriangle>;
+  skillChoices: RoomSkillChoice[];
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
   fightNo: number;
@@ -121,6 +125,18 @@ type RoomGame = {
   matchWinner: RoomPlayerSide | "";
   surrenderedBy: RoomPlayerSide | "";
   matchEndedAt: number;
+};
+
+type RoomSkillChoice = {
+  fightNo: number;
+  turn: TriadTurn;
+  side: RoomPlayerSide;
+  lane: Lane;
+  cardNo: string;
+  startedAt: number;
+  deadlineAt: number;
+  selectedTarget: string;
+  skipped: boolean;
 };
 
 type LockedFight = {
@@ -367,9 +383,33 @@ function normalizeRoomGame(value: unknown): RoomGame {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
   const deckReady = raw.deckReady && typeof raw.deckReady === "object" ? (raw.deckReady as Record<string, unknown>) : {};
+  const selectionPools = raw.selectionPools && typeof raw.selectionPools === "object" ? (raw.selectionPools as Record<string, unknown>) : {};
   const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
   const activeTurn = Number(raw.activeTurn || 1);
   const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
+  const cleanPool = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, 40) : [];
+  const cleanSkillChoices = (choices: unknown): RoomSkillChoice[] => Array.isArray(choices)
+    ? choices
+        .map((choice) => {
+          const rawChoice = choice && typeof choice === "object" ? (choice as Record<string, unknown>) : {};
+          const turn = Number(rawChoice.turn || 1);
+          const lane: Lane = rawChoice.lane === "left" || rawChoice.lane === "right" || rawChoice.lane === "top" ? rawChoice.lane : "top";
+          const side: RoomPlayerSide = rawChoice.side === "challenger" ? "challenger" : "host";
+          const normalizedTurn: TriadTurn = turn === 2 || turn === 3 ? turn : 1;
+          return {
+            fightNo: Number(rawChoice.fightNo || 1),
+            turn: normalizedTurn,
+            side,
+            lane,
+            cardNo: safeText(rawChoice.cardNo),
+            startedAt: Number(rawChoice.startedAt || Date.now()),
+            deadlineAt: Number(rawChoice.deadlineAt || Date.now()),
+            selectedTarget: safeText(rawChoice.selectedTarget),
+            skipped: Boolean(rawChoice.skipped),
+          };
+        })
+        .filter((choice) => choice.cardNo)
+    : [];
   return {
     decks: {
       host: cleanDeck(decks.host),
@@ -379,11 +419,17 @@ function normalizeRoomGame(value: unknown): RoomGame {
       host: Boolean(deckReady.host),
       challenger: Boolean(deckReady.challenger),
     },
+    deckMode: raw.deckMode === "random" ? "random" : "all",
+    selectionPools: {
+      host: cleanPool(selectionPools.host),
+      challenger: cleanPool(selectionPools.challenger),
+    },
     deckStartedAt: Number(raw.deckStartedAt || Date.now()),
     triangles: {
       host: { top: "", left: "", right: "", ...((triangles.host as TriadTriangle | undefined) || {}) },
       challenger: { top: "", left: "", right: "", ...((triangles.challenger as TriadTriangle | undefined) || {}) },
     },
+    skillChoices: cleanSkillChoices(raw.skillChoices),
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
@@ -925,12 +971,12 @@ function RevealSpotlight({
         ];
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
+    <div className="pointer-events-none absolute inset-x-0 top-[11%] z-20 flex justify-center px-3">
       {isScored ? (
-        <div className="absolute inset-0 bg-black/42 backdrop-blur-[5px]" />
+        <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
       <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
-      <div className="relative grid w-[min(820px,88%)] items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+      <div className="relative grid w-[min(720px,76%)] items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <div className={`mx-auto w-[clamp(96px,13vw,174px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
@@ -1495,8 +1541,8 @@ function SkillTargetOverlay({
   ].filter((target) => selectableTargetIds.has(target.id));
 
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-black/72 px-4 backdrop-blur-md">
-      <div className="w-[min(820px,94%)] rounded-3xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] sm:p-6">
+    <div className="absolute bottom-4 right-4 top-16 z-40 flex w-[min(430px,calc(100%-2rem))] items-center">
+      <div className="max-h-full w-full overflow-auto rounded-2xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] backdrop-blur-md sm:p-5">
         <div className="text-center">
           <div className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-200/70">เลือกเป้าหมายสกิล</div>
           <div className="mt-1 text-2xl font-black uppercase text-white">{card.name}</div>
@@ -1506,7 +1552,7 @@ function SkillTargetOverlay({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
           {targets.map((target) => (
             <button
               key={target.id}
@@ -1769,6 +1815,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [activeRoomCode, setActiveRoomCode] = useState("");
   const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
   const [roomPassword, setRoomPassword] = useState("");
+  const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
@@ -1831,6 +1878,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ? "challenger"
       : null;
   const opponentSide: RoomPlayerSide | null = roomPlayerSide === "host" ? "challenger" : roomPlayerSide === "challenger" ? "host" : null;
+  const selectableDeckCatalog = useMemo(() => {
+    if (!currentRoom || !roomPlayerSide || currentRoom.game.deckMode !== "random") return deckCatalog;
+    const allowed = new Set(currentRoom.game.selectionPools[roomPlayerSide]);
+    return deckCatalog.filter((card) => allowed.has(card.cardNo));
+  }, [currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
@@ -1847,6 +1899,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
+  const ownPendingRoomSkillChoice = currentRoom && roomPlayerSide
+    ? currentRoom.game.skillChoices.find(
+        (choice) =>
+          choice.fightNo === currentRoom.game.fightNo &&
+          choice.turn === currentRoom.game.activeTurn &&
+          choice.side === roomPlayerSide &&
+          !choice.selectedTarget &&
+          !choice.skipped
+      ) || null
+    : null;
   const forcedWinnerLabel = forcedWinnerSide ? currentRoom?.seats[forcedWinnerSide]?.name || "ผู้ชนะ" : "";
   const surrenderedLabel = surrenderedSide ? currentRoom?.seats[surrenderedSide]?.name || "ผู้ยอมแพ้" : "";
   const winnerText =
@@ -1940,7 +2002,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return { ok: response.ok, status: response.status, payload };
   };
 
-  const createRoom = async () => {
+  const createRoom = async (deckMode: DeckMode) => {
     const access = roomAccess;
     const password = access === "private" ? roomPassword.trim() : "";
     if (access === "private" && password.length < 4) {
@@ -1952,6 +2014,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       action: "create",
       access,
       password,
+      deckMode,
     });
 
     const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
@@ -2259,8 +2322,30 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
   }, [currentRoom, opponentSide, ownDeckReady, phase, roomPlayerSide]);
 
+  useEffect(() => {
+    if (!ownPendingRoomSkillChoice || !roomPlayerSide) {
+      if (isPvpRoom) setPendingSkillChoice(null);
+      return;
+    }
+
+    setPendingSkillChoice({
+      side: "player",
+      lane: ownPendingRoomSkillChoice.lane,
+      cardNo: ownPendingRoomSkillChoice.cardNo,
+      selectedTarget: "",
+    });
+
+    const tick = () => {
+      setTimeLeft(Math.max(0, Math.ceil((ownPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000)));
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [isPvpRoom, ownPendingRoomSkillChoice, roomPlayerSide]);
+
   const toggleDeckCard = (cardNo: string) => {
     if (ownDeckReady) return;
+    if (!selectableDeckCatalog.some((card) => card.cardNo === cardNo)) return;
     const nextDeck = playerDeck.includes(cardNo)
       ? playerDeck.filter((item) => item !== cardNo)
       : playerDeck.length >= DECK_SIZE
@@ -2528,6 +2613,22 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
+    if (currentRoom && roomPlayerSide && opponentSide) {
+      void postRoomAction({
+        action: "choose-skill-target",
+        code: currentRoom.code,
+        selectedTarget,
+      }).then((result) => {
+        if (!result.ok) {
+          setBattleLog((current) => ["เลือกเป้าหมายสกิลไม่สำเร็จ หรือหมดเวลา 30 วินาทีแล้ว", ...current]);
+          return;
+        }
+        setPendingSkillChoice(null);
+        setBattleLog((current) => [`${skillCard?.name || pendingSkillChoice.cardNo}: ยืนยันเป้าหมายแล้ว`, ...current]);
+      });
+      return;
+    }
+
     const result = resolveTriadTurn({
       turn: activeTurn,
       player: lockedFight.player,
@@ -2720,35 +2821,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     setRevealed((current) => {
       const state = current[activeTurn];
-      let next = current;
-
-      if (activeTurn === 1 || lastTurnWinner === null || lastTurnWinner === "draw") {
-        next = {
-          ...current,
-          [activeTurn]: { ...state, player: true, bot: true },
-        };
-        return scoreTurnIfReady(activeTurn, next);
-      }
-
-      const firstSide: Side = lastTurnWinner === "bot" ? "bot" : "player";
-      const secondSide: Side = firstSide === "bot" ? "player" : "bot";
-
-      if (!state[firstSide]) {
-        return {
-          ...current,
-          [activeTurn]: { ...state, [firstSide]: true },
-        };
-      }
-
-      if (!state[secondSide]) {
-        next = {
-          ...current,
-          [activeTurn]: { ...state, [secondSide]: true },
-        };
-        return scoreTurnIfReady(activeTurn, next);
-      }
-
-      return current;
+      if (state.scored) return current;
+      const next = {
+        ...current,
+        [activeTurn]: { ...state, player: true, bot: true },
+      };
+      return scoreTurnIfReady(activeTurn, next);
     });
   };
 
@@ -2822,13 +2900,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const revealState = revealed[activeTurn];
   const activeTurnScored = Boolean(revealState?.scored);
   const canRevealTurn = Boolean(currentResult) && (turnLocked || Boolean(isPvpRoom && roomTurnResolved));
-  const needsSecondReveal =
-    lockedFight &&
-    activeTurn > 1 &&
-    lastTurnWinner !== null &&
-    lastTurnWinner !== "draw" &&
-    (revealState.player !== revealState.bot);
-
   useEffect(() => {
     if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored) {
       resultAdvanceKeyRef.current = "";
@@ -2863,13 +2934,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const revealButtonLabel =
     !canRevealTurn
       ? "ล็อกการ์ดก่อน"
-      : activeTurn === 1 || lastTurnWinner === null || lastTurnWinner === "draw"
-        ? "เปิดทั้งสองฝั่ง"
-        : needsSecondReveal
-          ? "เปิดอีกฝั่ง"
-          : lastTurnWinner === "bot"
-            ? `${opponentLabel} เปิดก่อน`
-            : `${playerLabel} เปิดก่อน`;
+      : "เปิดทั้งสองฝั่ง";
 
   if (phase === "lobby") {
     const visibleRooms = rooms
@@ -2917,6 +2982,42 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   ยืนยัน
                 </button>
               </div>
+            </div>
+          </div>
+        ) : null}
+        {createModeDialogOpen ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
+            <div className="w-[min(620px,94vw)] rounded-2xl border border-amber-200/28 bg-[#090b12] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+              <div className="text-center">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/58">เลือกโหมดการ์ดของห้อง</div>
+                <div className="mt-1 text-3xl font-black text-white">ตั้งกองเลือกก่อนสร้าง</div>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {[
+                  { id: "all" as DeckMode, title: "ALL", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
+                  { id: "random" as DeckMode, title: "RANDOM", detail: "สุ่ม pool ฝั่งละ 40 ใบ: มอนสเตอร์ 20 และสกิล 20 แบบถ่วงพลังให้ใกล้กัน" },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => {
+                      setCreateModeDialogOpen(false);
+                      void createRoom(mode.id);
+                    }}
+                    className="min-h-36 rounded-xl border border-amber-200/18 bg-white/[0.045] p-4 text-left transition hover:-translate-y-1 hover:border-amber-200/60 hover:bg-amber-200/10"
+                  >
+                    <div className="text-3xl font-black text-white">{mode.title}</div>
+                    <div className="mt-3 text-sm font-semibold leading-6 text-white/58">{mode.detail}</div>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreateModeDialogOpen(false)}
+                className="mt-4 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-white/30"
+              >
+                ยกเลิก
+              </button>
             </div>
           </div>
         ) : null}
@@ -2988,7 +3089,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               ) : null}
               <button
                 type="button"
-                onClick={createRoom}
+                onClick={() => setCreateModeDialogOpen(true)}
                 className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.32)] transition hover:bg-red-400"
               >
                 <Plus className="h-4 w-4" />
@@ -3273,7 +3374,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
         <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-            {deckCatalog.map((card) => {
+            {selectableDeckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
               const disabled = ownDeckReady || (playerDeck.length >= DECK_SIZE && !selected);
               return (
@@ -3419,7 +3520,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             timeLeft={timeLeft}
             turnLocked={turnLocked}
             pendingSkillChoice={pendingSkillChoice}
-            revealAllCards={isSpectator}
+            revealAllCards={false}
             randomCard={randomDrawCard}
             onSelectSkillTarget={(target) =>
               setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))

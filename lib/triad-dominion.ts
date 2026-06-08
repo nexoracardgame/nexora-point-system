@@ -89,6 +89,7 @@ export type TriadTurnInput = {
   turn: TriadTurn;
   player: TriadTriangle;
   opponent: TriadTriangle;
+  skippedSkillCardNos?: string[];
 };
 
 export type TriadTurnResult = {
@@ -399,7 +400,8 @@ function applySkill(
   opponentScore: ReturnType<typeof baseScore>,
   turn: TriadTurn,
   side: "player" | "opponent",
-  blockers: StatGainBlocker[] = []
+  blockers: StatGainBlocker[] = [],
+  skippedSkillCardNos: Set<string> = new Set()
 ) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   const unresolved: TriadSkillRule[] = [];
@@ -408,6 +410,20 @@ function applySkill(
 
   const rule = triadSkillRuleByNo.get(laneCard.cardNo);
   if (!rule) return { unresolved, events };
+
+  if (skippedSkillCardNos.has(rule.cardNo)) {
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: skipped because no target was selected in time`);
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ไม่ได้เลือกเป้าหมายในเวลา สกิลใบนี้ไม่ทำงานในตานี้",
+      blocked: true,
+    });
+    return { unresolved, events };
+  }
 
   if (!rule.allowedTurns.includes(turn)) {
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: สกิลไม่เข้าเงื่อนไขตานี้`);
@@ -577,12 +593,13 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
 }
 
 export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
+  const skippedSkillCardNos = new Set((input.skippedSkillCardNos || []).map((cardNo) => normalizeCardNo(cardNo)));
   const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn);
   const statGainBlocks = collectStatGainBlockers(input.player, input.opponent, input.turn);
   const playerScore = baseScore(preScore.player, input.turn);
   const opponentScore = baseScore(preScore.opponent, input.turn);
-  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn, "player", statGainBlocks.blockers);
-  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn, "opponent", statGainBlocks.blockers);
+  const playerApplied = applySkill(input.player, playerScore, opponentScore, input.turn, "player", statGainBlocks.blockers, skippedSkillCardNos);
+  const opponentApplied = applySkill(input.opponent, opponentScore, playerScore, input.turn, "opponent", statGainBlocks.blockers, skippedSkillCardNos);
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
 

@@ -1104,6 +1104,7 @@ export default function MainLayout({
       "/redeem",
       "/collections",
       "/community",
+      "/battle/triad-dominion",
       "/live",
       "/wallet",
       "/dm",
@@ -1288,6 +1289,12 @@ export default function MainLayout({
         active: pathname.startsWith("/card-bank"),
       },
       {
+        href: "/battle/triad-dominion",
+        label: "Triad",
+        icon: Swords,
+        active: pathname.startsWith("/battle"),
+      },
+      {
         href: "/rewards",
         label: t("layout.nav.rewards"),
         icon: Trophy,
@@ -1305,16 +1312,6 @@ export default function MainLayout({
         icon: FolderKanban,
         active: pathname.startsWith("/collections"),
       },
-      ...(isAdminModeUser
-        ? [
-            {
-              href: "/battle/triad-dominion",
-              label: "Triad",
-              icon: Swords,
-              active: pathname.startsWith("/battle"),
-            },
-          ]
-        : []),
       {
         href: "/community",
         label: t("layout.nav.community"),
@@ -1334,7 +1331,7 @@ export default function MainLayout({
        active: pathname.startsWith("/dm"),
       },
     ],
-    [isAdminModeUser, pathname, t]
+    [pathname, t]
   );
 
   const mobileBottomItems = useMemo(
@@ -1351,6 +1348,12 @@ export default function MainLayout({
         label: t("layout.nav.collections"),
         icon: FolderKanban,
         active: pathname.startsWith("/collections"),
+      },
+      {
+        href: "/battle/triad-dominion",
+        label: "Battle",
+        icon: Swords,
+        active: pathname.startsWith("/battle"),
       },
       {
         href: "/community",

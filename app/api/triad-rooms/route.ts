@@ -5,6 +5,7 @@ import {
   createTriadRoom,
   advanceTriadRoomTurn,
   clearTriadRooms,
+  chooseTriadRoomSkillTarget,
   disbandTriadRoom,
   joinTriadRoom,
   leaveTriadRoom,
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
     if (access === "private" && password.length < 4) {
       return noStoreJson({ error: "password_too_short" }, { status: 400 });
     }
-    const room = await createTriadRoom({ access, password, participant });
+    const room = await createTriadRoom({ access, password, participant, deckMode: body.deckMode === "random" ? "random" : "all" });
     return roomActionJson({ room }, undefined, { action, code: room.code, room });
   }
 
@@ -203,6 +204,15 @@ export async function POST(request: Request) {
       result,
       { status: result.ok ? 200 : 409 },
       result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "choose-skill-target") {
+    const result = await chooseTriadRoomSkillTarget(cleanText(body.code), participant.id, cleanText(body.selectedTarget));
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      "room" in result ? { action, code: getPayloadRoomCode(result), room: result.room } : null
     );
   }
 
