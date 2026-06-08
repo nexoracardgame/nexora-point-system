@@ -182,6 +182,7 @@ type PendingSkillChoice = {
 };
 
 type SkillTargetId = Exclude<PendingSkillChoice["selectedTarget"], "">;
+type TargetAura = "own" | "enemy" | "pending";
 
 type BlessingChoice = "draw-skill" | "reroll-own" | "reroll-opponent";
 
@@ -832,12 +833,14 @@ function BoardCardSlot({
   card,
   hidden,
   active,
+  aura,
   label,
   tone,
 }: {
   card?: CardView;
   hidden?: boolean;
   active?: boolean;
+  aura?: TargetAura;
   label: string;
   tone: "player" | "bot" | "neutral";
 }) {
@@ -850,8 +853,27 @@ function BoardCardSlot({
 
   return (
     <div
-      className={`relative w-[clamp(58px,8.4vw,126px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border}`}
+      className={`relative w-[clamp(58px,8.4vw,126px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border} ${
+        aura === "own"
+          ? "ring-4 ring-cyan-300/85 shadow-[0_0_42px_rgba(34,211,238,0.62)]"
+          : aura === "enemy"
+            ? "ring-4 ring-red-400/85 shadow-[0_0_42px_rgba(248,113,113,0.62)]"
+            : aura === "pending"
+              ? "ring-4 ring-violet-300/80 shadow-[0_0_42px_rgba(168,85,247,0.55)]"
+              : ""
+      }`}
     >
+      {aura ? (
+        <div
+          className={`pointer-events-none absolute inset-0 z-10 animate-pulse rounded-[inherit] ${
+            aura === "own"
+              ? "bg-cyan-300/14"
+              : aura === "enemy"
+                ? "bg-red-500/16"
+                : "bg-violet-400/14"
+          }`}
+        />
+      ) : null}
       <div className="relative aspect-[3/4]">
         {card && !hidden ? (
           <Image src={card.sourceImage} alt={card.name} fill sizes="128px" className="object-cover" />
@@ -1069,6 +1091,7 @@ function BoardTriangle({
   tone,
   isVisible,
   swapActive,
+  auraByLane,
   onSlotClick,
   onDropCard,
   selectedLane,
@@ -1079,6 +1102,7 @@ function BoardTriangle({
   tone: "player" | "bot";
   isVisible: (lane: Lane) => boolean;
   swapActive?: boolean;
+  auraByLane?: Partial<Record<Lane, TargetAura>>;
   onSlotClick?: (lane: Lane) => void;
   onDropCard?: (lane: Lane, cardNo: string) => void;
   selectedLane?: Lane;
@@ -1134,6 +1158,7 @@ function BoardTriangle({
               card={cardNo ? cardsByNo.get(cardNo) : undefined}
               hidden={!isVisible(lane)}
               active={activeLane === lane}
+              aura={auraByLane?.[lane]}
               label={label}
               tone={tone}
             />
@@ -1638,6 +1663,7 @@ function CompactBattleBoard({
   timeLeft,
   turnLocked,
   pendingSkillChoice,
+  waitingSkillChoice,
   revealAllCards = false,
   randomCard,
   onSelectSkillTarget,
@@ -1666,6 +1692,7 @@ function CompactBattleBoard({
   timeLeft: number;
   turnLocked: boolean;
   pendingSkillChoice: PendingSkillChoice | null;
+  waitingSkillChoice?: PendingSkillChoice | null;
   revealAllCards?: boolean;
   randomCard?: CardView | null;
   onSelectSkillTarget: (target: PendingSkillChoice["selectedTarget"]) => void;
@@ -1687,6 +1714,21 @@ function CompactBattleBoard({
   const botVisible = (lane: Lane) => revealAllCards || Boolean(revealed[turnForLane(lane)]?.bot);
   const playerVisible = (lane: Lane) => revealAllCards || Boolean(revealed[turnForLane(lane)]?.player);
   const canEditPlayerSlots = !turnLocked && !revealAllCards;
+  const skillChoiceForAura = pendingSkillChoice || waitingSkillChoice || null;
+  const pendingTarget = pendingSkillChoice?.selectedTarget || "";
+  const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
+  const botAuraByLane: Partial<Record<Lane, TargetAura>> = {};
+  if (skillChoiceForAura) {
+    const sourceAura: TargetAura = skillChoiceForAura === pendingSkillChoice ? "pending" : "enemy";
+    if (skillChoiceForAura.side === "player") playerAuraByLane[skillChoiceForAura.lane] = sourceAura;
+    else botAuraByLane[skillChoiceForAura.lane] = sourceAura;
+  }
+  if (pendingTarget) {
+    const aura: TargetAura = pendingTarget === "player-top" ? "own" : "enemy";
+    if (pendingTarget === "player-top") playerAuraByLane.top = aura;
+    if (pendingTarget === "bot-top") botAuraByLane.top = aura;
+  }
+  const waitingCard = waitingSkillChoice ? cardsByNo.get(waitingSkillChoice.cardNo) : undefined;
 
   return (
     <div className="relative h-full min-h-[360px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[460px] xl:min-h-0">
@@ -1738,6 +1780,20 @@ function CompactBattleBoard({
         }}
         onConfirm={onConfirmSkillTarget}
       />
+      {!pendingSkillChoice && waitingSkillChoice ? (
+        <div className="absolute bottom-4 right-4 top-16 z-40 flex w-[min(430px,calc(100%-2rem))] items-center">
+          <div className="w-full rounded-2xl border border-red-300/35 bg-[#090507]/94 p-5 text-center shadow-[0_0_72px_rgba(248,113,113,0.34)] backdrop-blur-md">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-red-100/64">รอฝ่ายตรงข้ามเลือกเป้าหมาย</div>
+            <div className="mt-2 text-2xl font-black uppercase text-white">{waitingCard?.name || `No.${waitingSkillChoice.cardNo}`}</div>
+            <div className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-6 text-white/60">
+              อีกฝ่ายกำลังเลือกเป้าหมายสกิล การ์ดที่เกี่ยวข้องจะมีออร่าสีแดงจนกว่าตานี้จะตัดสินผล
+            </div>
+            <div className="mt-4 text-3xl font-black text-red-100">
+              {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative grid h-full min-h-0 grid-rows-[8px_minmax(126px,1fr)_auto_minmax(126px,1fr)_8px] gap-y-1 px-[clamp(6px,1.2vw,18px)] py-[clamp(8px,1.1vw,16px)]">
         <div />
@@ -1751,6 +1807,7 @@ function CompactBattleBoard({
             tone="bot"
             isVisible={(lane) => botVisible(lane)}
             swapActive={hasSwapResult && showResolvedBoard}
+            auraByLane={botAuraByLane}
           />
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
@@ -1775,6 +1832,7 @@ function CompactBattleBoard({
             tone="player"
             isVisible={() => true}
             swapActive={hasSwapResult && showResolvedBoard}
+            auraByLane={playerAuraByLane}
             onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
             onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}
