@@ -62,6 +62,7 @@ export type TriadSkillRule = {
   allowedTurns: TriadTurn[];
   elementHint: TriadElement;
   blockedMetric?: TriadMetric;
+  blockedUseMetric?: TriadMetric;
   transformElement?: TriadElement;
   needsReview: boolean;
   reviewReason?: string;
@@ -285,6 +286,11 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     : /SUPPORT|SUP\b/i.test(card.skillText)
       ? "support"
       : undefined;
+  const blockedUseMetric = /ไม่สามารถใช้(?:ค่า|คำ)?\s*ATTACK|cannot use ATTACK|cannot use ATK/i.test(card.skillText)
+    ? "attack"
+    : /ไม่สามารถใช้(?:ค่า|คำ)?\s*SUPPORT|cannot use SUPPORT|cannot use SUP/i.test(card.skillText)
+      ? "support"
+      : undefined;
   const needsReview =
     card.cardNo !== "236" &&
     (shape === "unparsed" ||
@@ -301,6 +307,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
     blockedMetric,
+    blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
     needsReview,
     reviewReason: needsReview
@@ -371,19 +378,22 @@ function getCard(cardNo?: string) {
   return triadCardByNo.get(normalizeCardNo(cardNo));
 }
 
-function baseScore(triangle: TriadTriangle, turn: TriadTurn) {
+function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: TriadMetric[] = []) {
+  const blockedTopMetricSet = new Set(blockedTopMetrics);
   const top = getCard(triangle.top);
   const laneCard = getCard(triangle[selectedLane(turn)]);
   if (turn === 1) {
+    const topAttack = blockedTopMetricSet.has("attack") ? 0 : top?.attack || 0;
+    const topSupport = blockedTopMetricSet.has("support") ? 0 : top?.support || 0;
     return {
       metric: "total" as const,
-      total: (top?.attack || 0) + (top?.support || 0),
-      breakdown: top ? [`No.${top.cardNo} ${top.name}: ATK ${top.attack} + SUP ${top.support}`] : [],
+      total: topAttack + topSupport,
+      breakdown: top ? [`No.${top.cardNo} ${top.name}: ATK ${topAttack} + SUP ${topSupport}`] : [],
     };
   }
 
   const metric: TriadMetric = turn === 2 ? "attack" : "support";
-  const topValue = top?.[metric] || 0;
+  const topValue = top ? (blockedTopMetricSet.has(metric) ? 0 : top[metric] || 0) : 0;
   const laneValue = laneCard?.kind === "monster" ? laneCard[metric] : 0;
   const label = metric === "attack" ? "ATK" : "SUP";
 
@@ -395,6 +405,51 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn) {
       laneCard?.kind === "monster" ? `No.${laneCard.cardNo} ${laneCard.name}: ${label} ${laneValue}` : "",
     ].filter(Boolean),
   };
+}
+
+type StatUseBlocker = {
+  sourceSide: "player" | "opponent";
+  targetSide: "player" | "opponent";
+  metric: TriadMetric;
+  rule: TriadSkillRule;
+};
+
+function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
+  const blockers: StatUseBlocker[] = [];
+  const events: TriadSkillEvent[] = [];
+  const items = [
+    { side: "player" as const, rule: getLaneSkillRule(player, turn, skippedSkillCardNos) },
+    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn, skippedSkillCardNos) },
+  ].filter(
+    (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
+      Boolean(item.rule?.blockedUseMetric && item.rule.allowedTurns.includes(turn))
+  );
+
+  for (const item of items) {
+    const metric = item.rule.blockedUseMetric;
+    if (!metric) continue;
+    const targetSide =
+      item.rule.target.startsWith("own")
+        ? item.side
+        : item.side === "player"
+          ? "opponent"
+          : "player";
+    const metricLabel = metric === "attack" ? "ATK" : "SUP";
+    const targetLabel = targetSide === item.side ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝั่งตรงข้าม";
+    blockers.push({ sourceSide: item.side, targetSide, metric, rule: item.rule });
+    events.push({
+      cardNo: item.rule.cardNo,
+      name: item.rule.name,
+      side: item.side,
+      type: item.rule.shape,
+      text: item.rule.text,
+      summary: `ล็อกเป้า ${targetLabel} แล้ว ทำให้ใช้ค่า ${metricLabel} ไม่ได้ในตานี้`,
+      targetLabel,
+      blocked: true,
+    });
+  }
+
+  return { blockers, events };
 }
 
 function applySkill(
@@ -662,10 +717,19 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const skippedSkillCardNos = new Set((input.skippedSkillCardNos || []).map((cardNo) => normalizeCardNo(cardNo)));
   const skillCancels = collectSkillCancels(input.player, input.opponent, input.turn);
   const blockedSkillCardNos = new Set([...skippedSkillCardNos, ...skillCancels.cancelledSkillCardNos]);
+  const statUseBlocks = collectStatUseBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const statGainBlocks = collectStatGainBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
-  const playerScore = baseScore(preScore.player, input.turn);
-  const opponentScore = baseScore(preScore.opponent, input.turn);
+  const playerScore = baseScore(
+    preScore.player,
+    input.turn,
+    statUseBlocks.blockers.filter((blocker) => blocker.targetSide === "player").map((blocker) => blocker.metric)
+  );
+  const opponentScore = baseScore(
+    preScore.opponent,
+    input.turn,
+    statUseBlocks.blockers.filter((blocker) => blocker.targetSide === "opponent").map((blocker) => blocker.metric)
+  );
   const playerApplied = applySkill(
     input.player,
     playerScore,
@@ -700,7 +764,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: [...playerApplied.unresolved, ...opponentApplied.unresolved],
-    skillEvents: [...skillCancels.events, ...preScore.events, ...statGainBlocks.events, ...playerApplied.events, ...opponentApplied.events],
+    skillEvents: [...skillCancels.events, ...statUseBlocks.events, ...preScore.events, ...statGainBlocks.events, ...playerApplied.events, ...opponentApplied.events],
   };
 }
 
