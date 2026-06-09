@@ -85,7 +85,7 @@ type Lane = "top" | "left" | "right";
 type RoomAccess = "public" | "private";
 type RoomStatus = "waiting" | "playing";
 type RoomPlayerSide = "host" | "challenger";
-type DeckMode = "all" | "random";
+type DeckMode = "all" | "monster" | "skill";
 
 type RoomParticipant = {
   id: string;
@@ -420,7 +420,7 @@ function normalizeRoomGame(value: unknown): RoomGame {
       host: Boolean(deckReady.host),
       challenger: Boolean(deckReady.challenger),
     },
-    deckMode: raw.deckMode === "random" ? "random" : "all",
+    deckMode: raw.deckMode === "monster" || raw.deckMode === "skill" ? raw.deckMode : "all",
     selectionPools: {
       host: cleanPool(selectionPools.host),
       challenger: cleanPool(selectionPools.challenger),
@@ -646,17 +646,22 @@ function chooseBotCardForTurn({
   player,
   bot,
   botDeckCards,
+  deckMode = "all",
 }: {
   turn: TriadTurn;
   player: TriadTriangle;
   bot: TriadTriangle;
   botDeckCards: CardView[];
+  deckMode?: DeckMode;
 }) {
   const lane = laneForTurn(turn);
   const alreadyPlaced = new Set([bot.top, bot.left, bot.right].filter(Boolean));
+  const requiredKind: TriadCardKind | "any" =
+    lane === "top" ? "monster" : deckMode === "monster" ? "monster" : deckMode === "skill" ? "skill" : "any";
   const playableCards = botDeckCards.filter((card) => {
     if (alreadyPlaced.has(card.cardNo)) return false;
-    return lane === "top" ? card.kind === "monster" : card.kind === "monster" || card.kind === "skill";
+    if (requiredKind === "any") return card.kind === "monster" || card.kind === "skill";
+    return card.kind === requiredKind;
   });
   let best: { cardNo: string; margin: number; total: number } | null = null;
 
@@ -670,6 +675,49 @@ function chooseBotCardForTurn({
   }
 
   return best?.cardNo || playableCards[0]?.cardNo || "";
+}
+
+function deckModeCardKind(mode: DeckMode, lane: Lane): TriadCardKind | "any" {
+  if (lane === "top") return "monster";
+  if (mode === "monster") return "monster";
+  if (mode === "skill") return "skill";
+  return "any";
+}
+
+function deckAllowsCard(mode: DeckMode, lane: Lane, card?: CardView | null) {
+  if (!card) return false;
+  const requiredKind = deckModeCardKind(mode, lane);
+  if (requiredKind === "any") return card.kind === "monster" || card.kind === "skill";
+  return card.kind === requiredKind;
+}
+
+function validateDeckForMode(cards: CardView[], mode: DeckMode) {
+  const monsters = cards.filter((card) => card.kind === "monster").length;
+  const skills = cards.filter((card) => card.kind === "skill").length;
+  const errors: string[] = [];
+
+  if (cards.length !== DECK_SIZE) {
+    errors.push(`ต้องเลือกการ์ดให้ครบ ${DECK_SIZE} ใบ`);
+  }
+
+  if (mode === "monster") {
+    if (monsters !== DECK_SIZE) {
+      errors.push("โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ 13 ใบ");
+    }
+  } else if (mode === "skill") {
+    if (monsters !== 5 || skills !== 8) {
+      errors.push("โหมด SKILL ต้องมีการ์ดมอนสเตอร์ 5 ใบ และการ์ดสกิล 8 ใบ");
+    }
+  } else if (monsters < 3) {
+    errors.push("โหมด ALL IN ONE ต้องมีการ์ดมอนสเตอร์อย่างน้อย 3 ใบ");
+  }
+
+  return {
+    valid: errors.length === 0,
+    monsters,
+    skills,
+    errors,
+  };
 }
 
 function skillNeedsChoice(card?: CardView) {
@@ -2081,6 +2129,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
   const [roomPassword, setRoomPassword] = useState("");
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
+  const [createRoomMode, setCreateRoomMode] = useState<DeckMode>("all");
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
@@ -2124,6 +2173,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const usedBotSet = new Set(usedBotCards);
   const availableBotCards = botDeckCards.filter((card) => !usedBotSet.has(card.cardNo));
   const currentRoom = rooms.find((room) => room.code === activeRoomCode) || activeRoomSnapshot;
+  const currentDeckMode: DeckMode = currentRoom?.game.deckMode || "all";
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const roomTurnResolved = Boolean(currentRoom?.game.turns.some((turn) => turn.turn === activeTurn));
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
@@ -2186,10 +2236,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     };
   }, [cardsByNo, currentRoom, isSpectator]);
   const selectableDeckCatalog = useMemo(() => {
-    if (!currentRoom || !roomPlayerSide || currentRoom.game.deckMode !== "random") return deckCatalog;
+    if (!currentRoom || !roomPlayerSide || currentDeckMode === "all") return deckCatalog;
     const allowed = new Set(currentRoom.game.selectionPools[roomPlayerSide]);
+    if (currentDeckMode === "monster") {
+      return deckCatalog.filter((card) => card.kind === "monster" && allowed.has(card.cardNo));
+    }
     return deckCatalog.filter((card) => allowed.has(card.cardNo));
-  }, [currentRoom, deckCatalog, roomPlayerSide]);
+  }, [currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
@@ -2222,6 +2275,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
+  const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
   const ownPendingRoomSkillChoice = currentRoom && roomPlayerSide
     ? currentRoom.game.skillChoices.find(
         (choice) =>
@@ -2773,6 +2827,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         ? playerDeck
         : [...playerDeck, cardNo];
     setPlayerDeck(nextDeck);
+    if (!deckValidation.valid) {
+      setBattleLog(deckValidation.errors);
+      return;
+    }
+
     if (currentRoom && roomPlayerSide && opponentSide) {
       void postRoomAction({
         action: "set-deck",
@@ -2869,7 +2928,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const timer = window.setInterval(() => {
       const nextLeft = roomDeckSecondsLeft(currentRoom);
       setDeckTimeLeft(nextLeft);
-      if (nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady) {
+      if (nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && deckValidation.valid) {
         void postRoomAction({
           action: "ready-deck",
           code: currentRoom.code,
@@ -2918,7 +2977,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (turnLocked || matchDone || usedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;
     const card = cardsByNo.get(cardNo);
     if (lane === "top" && card?.kind !== "monster") {
+      setBattleLog((current) => ["ตาแรกต้องวางการ์ดมอนสเตอร์เท่านั้น", ...current]);
+      return;
+    }
+    if (lane === "top" && card?.kind !== "monster") {
       setBattleLog((current) => ["ตา 1 ต้องวางมอนสเตอร์เป็นการ์ดหลัก", ...current]);
+      return;
+    }
+    if (currentDeckMode === "monster" && card?.kind !== "monster") {
+      setBattleLog((current) => ["โหมด MONSTER ใช้การ์ดมอนสเตอร์เท่านั้น", ...current]);
+      return;
+    }
+    if (currentDeckMode === "skill" && lane !== "top" && card?.kind !== "skill") {
+      setBattleLog((current) => ["โหมด SKILL ใช้การ์ดสกิลในตานี้เท่านั้น", ...current]);
       return;
     }
     if (lane !== "top" && card?.kind !== "monster" && card?.kind !== "skill") return;
@@ -3025,6 +3096,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       player,
       bot: baseBot,
       botDeckCards: availableBotCards,
+      deckMode: currentDeckMode,
     });
     const bot = { ...baseBot, [lane]: botCardNo };
     if (playerCard?.cardNo === "254") {
@@ -3532,16 +3604,52 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     key={mode.id}
                     type="button"
                     onClick={() => {
-                      setCreateModeDialogOpen(false);
-                      void createRoom(mode.id);
+                      setCreateRoomMode(mode.title === "ALL" ? "all" : "monster");
                     }}
                     className="min-h-36 rounded-xl border border-amber-200/18 bg-white/[0.045] p-4 text-left transition hover:-translate-y-1 hover:border-amber-200/60 hover:bg-amber-200/10"
                   >
-                    <div className="text-3xl font-black text-white">{mode.title}</div>
-                    <div className="mt-3 text-sm font-semibold leading-6 text-white/58">{mode.detail}</div>
+                    <div className="text-3xl font-black text-white">{mode.title === "ALL" ? "ALL IN ONE" : "MONSTER"}</div>
+                    <div className="mt-3 text-sm font-semibold leading-6 text-white/58">
+                      {mode.title === "ALL" ? mode.detail : "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้"}
+                    </div>
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => setCreateRoomMode("skill")}
+                className={`mt-3 flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition ${
+                  createRoomMode === "skill"
+                    ? "border-amber-200/70 bg-amber-200/14"
+                    : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/50 hover:bg-amber-200/10"
+                }`}
+              >
+                <div
+                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[10px] font-black ${
+                    createRoomMode === "skill"
+                      ? "border-amber-200 bg-amber-200 text-black"
+                      : "border-white/16 bg-black/34 text-white/40"
+                  }`}
+                >
+                  {createRoomMode === "skill" ? "✓" : ""}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-base font-black text-white">SKILL</div>
+                  <div className="mt-1 text-sm font-semibold leading-6 text-white/58">
+                    บังคับเด็ค 5 มอนสเตอร์ + 8 สกิล และให้กติกาตรงตามโหมดสกิล
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateModeDialogOpen(false);
+                  void createRoom(createRoomMode);
+                }}
+                className="mt-4 h-11 w-full rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
+              >
+                ยืนยันสร้างห้อง
+              </button>
               <button
                 type="button"
                 onClick={() => setCreateModeDialogOpen(false)}
@@ -3620,7 +3728,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               ) : null}
               <button
                 type="button"
-                onClick={() => setCreateModeDialogOpen(true)}
+                onClick={() => {
+                  setCreateRoomMode("all");
+                  setCreateModeDialogOpen(true);
+                }}
                 className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.32)] transition hover:bg-red-400"
               >
                 <Plus className="h-4 w-4" />
@@ -3850,7 +3961,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   if (phase === "deck") {
-    const deckReadyDisabled = currentRoom ? ownDeckReady : playerDeck.length !== DECK_SIZE;
+    const deckReadyDisabled = currentRoom ? ownDeckReady || !deckValidation.valid : !deckValidation.valid;
     const deckReadyLabel = ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
   resolveTriadTurn,
+  triadCardByNo,
   triadCards,
   triadSkillRuleByNo,
   type TriadTriangle,
@@ -11,7 +12,7 @@ import {
 export type TriadRoomAccess = "public" | "private";
 export type TriadRoomStatus = "waiting" | "playing";
 export type TriadRoomSlot = "host" | "challenger";
-export type TriadDeckMode = "all" | "random";
+export type TriadDeckMode = "all" | "monster" | "skill";
 type TriadBlessingChoice = "draw-skill" | "reroll-own" | "reroll-opponent";
 
 export type TriadRoomSkillChoice = {
@@ -164,7 +165,56 @@ function normalizeDeck(value: unknown) {
 }
 
 function normalizeDeckMode(value: unknown): TriadDeckMode {
-  return value === "random" ? "random" : "all";
+  if (value === "monster") return "monster";
+  if (value === "skill") return "skill";
+  return "all";
+}
+
+function deckCardCounts(deck: string[]) {
+  return deck.reduce(
+    (counts, cardNo) => {
+      const card = triadCardByNo.get(cardNo);
+      if (!card || card.kind === "unknown") return counts;
+      counts.total += 1;
+      if (card.kind === "monster") counts.monsters += 1;
+      if (card.kind === "skill") counts.skills += 1;
+      return counts;
+    },
+    { total: 0, monsters: 0, skills: 0 }
+  );
+}
+
+function normalizeDeckForMode(mode: TriadDeckMode, deck: unknown) {
+  const cards = normalizeDeck(deck);
+  if (mode !== "monster") return cards;
+  return cards.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster");
+}
+
+function validateDeckForMode(mode: TriadDeckMode, deck: string[]) {
+  const counts = deckCardCounts(deck);
+  const errors: string[] = [];
+
+  if (counts.total !== 13) {
+    errors.push("เด็คต้องมีการ์ดทั้งหมด 13 ใบ");
+  }
+
+  if (mode === "all") {
+    if (counts.monsters < 3) errors.push("โหมด ALL IN ONE ต้องมีการ์ดมอนสเตอร์อย่างน้อย 3 ใบ");
+    return { ok: errors.length === 0, errors };
+  }
+
+  if (mode === "monster") {
+    if (counts.monsters !== 13 || counts.skills > 0) {
+      errors.push("โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ 13 ใบ");
+    }
+    return { ok: errors.length === 0, errors };
+  }
+
+  if (counts.monsters !== 5 || counts.skills !== 8) {
+    errors.push("โหมด SKILL ต้องมีการ์ดมอนสเตอร์ 5 ใบ และการ์ดสกิล 8 ใบ");
+  }
+
+  return { ok: errors.length === 0, errors };
 }
 
 function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
@@ -595,6 +645,12 @@ function randomCardNoByKind(kind: "monster" | "skill") {
 function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["selectionPools"] {
   if (mode === "all") return { host: [], challenger: [] };
   const monsters = pairedMonsterPools(seed);
+  if (mode === "monster") {
+    return {
+      host: monsters.host,
+      challenger: monsters.challenger,
+    };
+  }
   return {
     host: [...monsters.host, ...randomSkillPool(`${seed}:host`)],
     challenger: [...monsters.challenger, ...randomSkillPool(`${seed}:challenger`)],
@@ -844,7 +900,7 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
   if (room.game.deckReady[side]) {
     return { ok: false as const, reason: "deck_locked" as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
   }
-  room.game.decks[side] = normalizeDeck(deck);
+  room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
   if (deckSelectExpired(room)) {
     finalizeDeckSelection(room, true);
   }
@@ -859,7 +915,16 @@ export async function readyTriadRoomDeck(code: string, participantId: string, de
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   const wasBattleReady = battleDecksReady(room);
   if (!room.game.deckReady[side]) {
-    room.game.decks[side] = normalizeDeck(deck);
+    room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
+    const validation = validateDeckForMode(room.game.deckMode || "all", room.game.decks[side]);
+    if (!validation.ok) {
+      return {
+        ok: false as const,
+        reason: "invalid_deck" as const,
+        room: publicRoom(room),
+        battleReady: battleDecksReady(room),
+      };
+    }
     room.game.deckReady[side] = true;
   }
   if ((!wasBattleReady && battleDecksReady(room)) || deckSelectExpired(room)) {

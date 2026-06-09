@@ -133,7 +133,8 @@ export async function POST(request: Request) {
     if (access === "private" && password.length < 4) {
       return noStoreJson({ error: "password_too_short" }, { status: 400 });
     }
-    const room = await createTriadRoom({ access, password, participant, deckMode: body.deckMode === "random" ? "random" : "all" });
+    const deckMode = body.deckMode === "monster" || body.deckMode === "skill" ? body.deckMode : "all";
+    const room = await createTriadRoom({ access, password, participant, deckMode });
     return roomActionJson({ room }, undefined, { action, code: room.code, room });
   }
 

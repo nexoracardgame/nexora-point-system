@@ -302,7 +302,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: inferTarget(card.skillText),
+    target: card.cardNo === "258" ? "opponent-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
