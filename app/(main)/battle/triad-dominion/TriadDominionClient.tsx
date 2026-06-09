@@ -3656,43 +3656,38 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         ) : null}
         <section className="relative min-h-[320px] overflow-hidden border-b border-amber-200/12 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(160,120,35,0.22),transparent_28%),linear-gradient(135deg,#090909,#050507_58%,#120d08)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:54px_54px]" />
-          <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full border border-amber-300/14 bg-amber-500/10 blur-2xl" />
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
-            <div className="absolute inset-0 -m-8 rounded-full bg-amber-300/18 blur-3xl" />
-            <div className="relative rounded-full border border-amber-200/24 bg-black/45 px-4 py-3 shadow-[0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-sm">
-              <Image
-                src="https://i.ibb.co/7JYBY7M0/VS.png"
-                alt="VS"
-                width={180}
-                height={180}
-                priority
-                unoptimized
-                className="h-[84px] w-[84px] object-contain drop-shadow-[0_0_26px_rgba(251,191,36,0.32)] sm:h-[110px] sm:w-[110px] md:h-[128px] md:w-[128px]"
-              />
-            </div>
+          <div className="absolute inset-0">
+            <Image
+              src="/images/triad/battle-header-banner.webp"
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-center"
+            />
           </div>
-          <div className="relative flex min-h-[280px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.18)_0%,rgba(0,0,0,0.36)_42%,rgba(0,0,0,0.68)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.34)_0%,rgba(0,0,0,0.1)_38%,rgba(0,0,0,0.22)_100%)]" />
+          <div className="relative z-10 flex min-h-[280px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="relative z-20 max-w-3xl lg:max-w-[44%]">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-black/34 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/16 bg-black/35 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/85 backdrop-blur-sm">
                 <Swords className="h-3.5 w-3.5" />
                 ห้องแบทเทิลการ์ด
               </div>
-              <h1 className="text-[clamp(2.4rem,9vw,6.4rem)] font-black uppercase leading-[0.86] tracking-normal text-white drop-shadow-[0_0_34px_rgba(251,191,36,0.16)]">
+              <h1 className="text-[clamp(2.4rem,9vw,6.4rem)] font-black uppercase leading-[0.86] tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.75)]">
                 ล็อบบี้ต่อสู้
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/62 sm:text-base">
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/78 sm:text-base drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
                 สร้างห้อง เข้าห้องด้วยเลข 6 ตัว หรือเลือกนั่งชมก่อนเริ่มสู้ได้เลย
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:min-w-[420px]">
+            <div className="relative z-20 grid grid-cols-3 gap-2 sm:min-w-[420px]">
               {[
                 ["ห้อง", rooms.length],
                 ["ล็อก", rooms.filter((room) => room.access === "private").length],
                 ["กำลังสู้", rooms.filter((room) => room.status === "playing").length],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-amber-200/14 bg-black/52 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04),0_0_20px_rgba(251,191,36,0.05)]">
+                <div key={label} className="rounded-xl border border-white/12 bg-black/36 p-3 backdrop-blur-sm shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                   <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">{label}</div>
                   <div className="mt-1 text-2xl font-black text-white">{value}</div>
                 </div>
