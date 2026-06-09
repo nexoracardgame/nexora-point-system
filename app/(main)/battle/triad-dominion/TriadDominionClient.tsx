@@ -3876,7 +3876,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0">
             <Image
-              src="/triad-room-banner.png"
+              src="/images/triad/battle-header-banner.webp"
               alt=""
               fill
               priority
