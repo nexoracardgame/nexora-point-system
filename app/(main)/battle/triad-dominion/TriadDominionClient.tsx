@@ -795,11 +795,13 @@ function DeckCard({
   card,
   selected,
   disabled,
+  disabledReason,
   onClick,
 }: {
   card: CardView;
   selected: boolean;
   disabled: boolean;
+  disabledReason?: string;
   onClick: () => void;
 }) {
   return (
@@ -807,6 +809,7 @@ function DeckCard({
       type="button"
       onClick={onClick}
       disabled={disabled && !selected}
+      title={disabled && !selected ? disabledReason : selected ? "คลิกอีกครั้งเพื่อลบการ์ดใบนี้" : undefined}
       className={`group relative min-w-0 overflow-hidden rounded-xl border bg-black/52 text-left shadow-[0_18px_48px_rgba(0,0,0,0.32)] transition hover:-translate-y-1 hover:border-amber-300/60 disabled:cursor-not-allowed disabled:opacity-35 ${
         selected ? "border-amber-300 ring-2 ring-amber-300/30" : "border-white/10"
       }`}
@@ -2231,6 +2234,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const randomDrawCard = randomDrawCardNo ? cardsByNo.get(randomDrawCardNo) || null : null;
   const usedPlayerSet = new Set(usedPlayerCards);
   const usedBotSet = new Set(usedBotCards);
+  const deckSelectionCounts = useMemo(
+    () =>
+      playerDeckCards.reduce(
+        (counts, card) => {
+          if (card.kind === "monster") counts.monsters += 1;
+          if (card.kind === "skill") counts.skills += 1;
+          return counts;
+        },
+        { monsters: 0, skills: 0 }
+      ),
+    [playerDeckCards]
+  );
   const availableBotCards = botDeckCards.filter((card) => !usedBotSet.has(card.cardNo));
   const currentRoom = rooms.find((room) => room.code === activeRoomCode) || activeRoomSnapshot;
   const currentDeckMode: DeckMode = currentRoom?.game.deckMode || "all";
@@ -2352,6 +2367,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
   const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
+  const deckSelectionGuide =
+    currentDeckMode === "skill"
+      ? `โหมด SKILL: มอนสเตอร์ ${deckSelectionCounts.monsters}/5 ใบ · สกิล ${deckSelectionCounts.skills}/8 ใบ · รวม ${playerDeck.length}/13 ใบ`
+      : currentDeckMode === "monster"
+        ? `โหมด MONSTER: มอนสเตอร์ ${playerDeckCards.length}/13 ใบ`
+        : `โหมด ALL IN ONE: มอนสเตอร์อย่างน้อย 3 ใบ · รวม ${playerDeck.length}/13 ใบ`;
+  const deckSelectionNotice =
+    currentDeckMode === "skill" && (deckSelectionCounts.monsters >= 5 || deckSelectionCounts.skills >= 8)
+      ? "ครบโควตาแล้ว กดใบเดิมเพื่อยกเลิกก่อนถึงจะเลือกใบใหม่ได้"
+      : currentDeckMode === "skill"
+        ? "มอนสเตอร์ได้ 5 ใบ สกิลได้ 8 ใบ เท่านั้น"
+        : currentDeckMode === "monster"
+          ? "โหมดนี้ใช้การ์ดมอนสเตอร์ทั้งหมด 13 ใบ"
+          : "โหมดนี้ต้องมีมอนสเตอร์อย่างน้อย 3 ใบ ที่เหลือเลือกการ์ดใดก็ได้";
   const ownPendingRoomSkillChoice = currentRoom && roomPlayerSide
     ? currentRoom.game.skillChoices.find(
         (choice) =>
@@ -2896,12 +2925,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const toggleDeckCard = (cardNo: string) => {
     if (ownDeckReady) return;
-    if (!selectableDeckCatalog.some((card) => card.cardNo === cardNo)) return;
-    const nextDeck = playerDeck.includes(cardNo)
-      ? playerDeck.filter((item) => item !== cardNo)
-      : playerDeck.length >= DECK_SIZE
-        ? playerDeck
-        : [...playerDeck, cardNo];
+    const card = cardsByNo.get(cardNo);
+    if (!selectableDeckCatalog.some((item) => item.cardNo === cardNo) || !card) return;
+    const selected = playerDeck.includes(cardNo);
+    if (!selected) {
+      if (playerDeck.length >= DECK_SIZE) {
+        setBattleLog((current) => [`เลือกได้ทั้งหมด ${DECK_SIZE} ใบเท่านั้น`, ...current]);
+        return;
+      }
+      if (currentDeckMode === "skill" && card.kind === "monster" && deckSelectionCounts.monsters >= 5) {
+        setBattleLog((current) => ["โหมด SKILL เลือกมอนสเตอร์ได้ 5 ใบเท่านั้น ต้องยกเลิกใบเดิมก่อน", ...current]);
+        return;
+      }
+      if (currentDeckMode === "skill" && card.kind === "skill" && deckSelectionCounts.skills >= 8) {
+        setBattleLog((current) => ["โหมด SKILL เลือกการ์ดสกิลได้ 8 ใบเท่านั้น ต้องยกเลิกใบเดิมก่อน", ...current]);
+        return;
+      }
+    }
+    const nextDeck = selected ? playerDeck.filter((item) => item !== cardNo) : [...playerDeck, cardNo];
     setPlayerDeck(nextDeck);
     if (!deckValidation.valid) {
       setBattleLog(deckValidation.errors);
@@ -3982,7 +4023,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 type="button"
                 onClick={startRoomGame}
                 disabled={!canStart}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-5 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.26)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-5 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.26)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35"
               >
                 <Swords className="h-4 w-4" />
                 เริ่มเกม
@@ -4070,6 +4111,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/62 sm:text-base">
                 เลือกการ์ด 13 ใบสำหรับ 3 รอบสู้ การ์ดแต่ละใบใช้ได้ครั้งเดียวในเกมนี้
               </p>
+              <div className="mt-4 max-w-2xl rounded-2xl border border-amber-200/16 bg-black/30 px-4 py-3 text-sm font-bold leading-6 text-amber-100/86">
+                {deckSelectionGuide}
+                <div className="mt-1 text-xs font-semibold text-amber-100/62">{deckSelectionNotice}</div>
+              </div>
             </div>
 
             <div className="relative z-20 rounded-2xl border border-amber-200/12 bg-black/36 p-4 shadow-[0_0_24px_rgba(251,191,36,0.04)]">
@@ -4086,7 +4131,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 type="button"
                 onClick={enterBattle}
                 disabled={deckReadyDisabled}
-                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-4 text-sm font-black text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32 disabled:hover:from-white/10"
+                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-4 text-sm font-black text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 disabled:hover:from-white/10"
               >
                 {deckReadyLabel}
                 <ChevronRight className="h-4 w-4" />
@@ -4108,13 +4153,26 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {selectableDeckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
-              const disabled = ownDeckReady || (playerDeck.length >= DECK_SIZE && !selected);
+              const disabled =
+                ownDeckReady ||
+                (playerDeck.length >= DECK_SIZE && !selected) ||
+                (currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= 5) ||
+                (currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= 8);
+              const disabledReason =
+                currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= 5
+                  ? "โหมด SKILL เลือกมอนสเตอร์ได้ 5 ใบเท่านั้น"
+                  : currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= 8
+                    ? "โหมด SKILL เลือกการ์ดสกิลได้ 8 ใบเท่านั้น"
+                    : playerDeck.length >= DECK_SIZE && !selected
+                      ? `เลือกได้ ${DECK_SIZE} ใบเท่านั้น`
+                      : undefined;
               return (
                 <DeckCard
                   key={card.cardNo}
                   card={card}
                   selected={selected}
                   disabled={disabled}
+                  disabledReason={disabledReason}
                   onClick={() => toggleDeckCard(card.cardNo)}
                 />
               );
@@ -4160,7 +4218,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               type="button"
               onClick={enterBattle}
               disabled={ownDeckReady}
-              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-6 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32 disabled:hover:from-white/10"
+              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-6 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 disabled:hover:from-white/10"
             >
               {ownDeckReady ? "พร้อมแล้ว" : "พร้อม"}
             </button>
@@ -4344,7 +4402,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                         type="button"
                         onClick={continueRoomBattle}
                         disabled={!isRoomController}
-                        className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35"
                       >
                         <RotateCcw className="h-4 w-4" />
                         สู้ต่อ
@@ -4393,7 +4451,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                         type="button"
                         onClick={lockFight}
                         disabled={matchDone || isSpectator}
-                        className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                        className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35"
                       >
                         <Brain className="h-4 w-4" />
                         ล็อกการ์ด
