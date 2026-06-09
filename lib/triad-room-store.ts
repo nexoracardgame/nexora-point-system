@@ -643,7 +643,16 @@ function randomCardNoByKind(kind: "monster" | "skill") {
 }
 
 function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["selectionPools"] {
-  if (mode === "all") return { host: [], challenger: [] };
+  const allCards = shuffled(
+    triadCards.filter((card) => card.kind !== "unknown").map((card) => card.cardNo),
+    `${seed}:all`
+  );
+  if (mode === "all") {
+    return {
+      host: shuffled(allCards, `${seed}:host:all`),
+      challenger: shuffled(allCards, `${seed}:challenger:all`),
+    };
+  }
   const monsters = pairedMonsterPools(seed);
   if (mode === "monster") {
     return {

@@ -217,6 +217,17 @@ const elementLabel: Record<TriadElement, string> = {
   unknown: "ไม่ระบุ",
 };
 
+function shuffledCardsBySeed(cards: CardView[], seed: string) {
+  const next = [...cards];
+  let state = seed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) || 1;
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const swapIndex = state % (index + 1);
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
 function uniqueByNo(cards: CardView[]) {
   const seen = new Set<string>();
   return cards.filter((card) => {
@@ -2285,13 +2296,29 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     };
   }, [cardsByNo, currentRoom, isSpectator]);
   const selectableDeckCatalog = useMemo(() => {
-    if (!currentRoom || !roomPlayerSide || currentDeckMode === "all") return deckCatalog;
-    const allowed = new Set(currentRoom.game.selectionPools[roomPlayerSide]);
-    if (currentDeckMode === "monster") {
-      return deckCatalog.filter((card) => card.kind === "monster" && allowed.has(card.cardNo));
+    if (!currentRoom || !roomPlayerSide) return deckCatalog;
+    const pool = currentRoom.game.selectionPools[roomPlayerSide] || [];
+    if (pool.length > 0) {
+      const orderedCards = pool.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
+      if (currentDeckMode === "monster") {
+        return orderedCards.filter((card) => card.kind === "monster");
+      }
+      if (currentDeckMode === "skill") {
+        return orderedCards.filter((card) => card.kind === "monster" || card.kind === "skill");
+      }
+      return orderedCards;
     }
-    return deckCatalog.filter((card) => allowed.has(card.cardNo));
-  }, [currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
+    if (currentDeckMode === "monster") {
+      return shuffledCardsBySeed(deckCatalog.filter((card) => card.kind === "monster"), `${currentRoom.code}:monster:${roomPlayerSide}`);
+    }
+    if (currentDeckMode === "skill") {
+      return shuffledCardsBySeed(
+        deckCatalog.filter((card) => card.kind === "monster" || card.kind === "skill"),
+        `${currentRoom.code}:skill:${roomPlayerSide}`
+      );
+    }
+    return shuffledCardsBySeed(deckCatalog, `${currentRoom.code}:all:${roomPlayerSide}`);
+  }, [cardsByNo, currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
