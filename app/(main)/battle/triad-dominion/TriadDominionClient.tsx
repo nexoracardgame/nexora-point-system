@@ -796,14 +796,14 @@ function DeckCard({
       type="button"
       onClick={onClick}
       disabled={disabled && !selected}
-      className={`group relative min-w-0 overflow-hidden rounded-xl border bg-black/50 text-left shadow-[0_18px_48px_rgba(0,0,0,0.32)] transition hover:-translate-y-1 hover:border-amber-300/60 disabled:cursor-not-allowed disabled:opacity-35 ${
+      className={`group relative min-w-0 overflow-hidden rounded-xl border bg-black/52 text-left shadow-[0_18px_48px_rgba(0,0,0,0.32)] transition hover:-translate-y-1 hover:border-amber-300/60 disabled:cursor-not-allowed disabled:opacity-35 ${
         selected ? "border-amber-300 ring-2 ring-amber-300/30" : "border-white/10"
       }`}
     >
       <div className="relative aspect-[3/4]">
         <Image src={card.sourceImage} alt={card.name} fill sizes="180px" className="object-cover" />
         {selected ? (
-          <div className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-amber-300 text-black">
+          <div className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-amber-200 to-amber-400 text-black shadow-[0_0_18px_rgba(251,191,36,0.35)]">
             <Check className="h-4 w-4" />
           </div>
         ) : null}
@@ -1593,7 +1593,7 @@ function RoomSeatCard({
   const toneClass =
     tone === "host"
       ? "border-amber-300/45 from-amber-300/18 via-[#120806]/82 to-black"
-      : "border-red-300/45 from-red-500/18 via-[#120608]/82 to-black";
+      : "border-amber-200/28 from-[#2a1112]/82 via-[#120608]/88 to-black";
   const isCurrent = participant?.id === currentId;
 
   return (
@@ -1630,7 +1630,7 @@ function RoomSeatCard({
             <button
               type="button"
               onClick={onTake}
-              className="absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_30px_rgba(239,68,68,0.28)] transition hover:bg-red-400"
+              className="absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-5 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_30px_rgba(251,191,36,0.24)] transition hover:from-amber-200 hover:to-yellow-100"
             >
               <UserCheck className="h-4 w-4" />
               ลงสนาม
@@ -1654,7 +1654,7 @@ function SpectatorPanel({
   onWatch: () => void;
 }) {
   return (
-    <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
+    <div className="rounded-[18px] border border-amber-200/16 bg-[linear-gradient(180deg,rgba(15,14,12,0.9),rgba(6,6,8,0.9))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-black text-white">
           <Eye className="h-4 w-4 text-violet-200" />
@@ -1664,7 +1664,7 @@ function SpectatorPanel({
           <button
             type="button"
             onClick={onWatch}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-red-200/35 bg-red-500/14 px-3 text-xs font-black text-red-100 transition hover:border-red-100/60"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-200/35 bg-amber-300/10 px-3 text-xs font-black text-amber-100 transition hover:border-amber-100/60"
           >
             นั่งชม
           </button>
@@ -3590,7 +3590,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         ) : null}
         {createModeDialogOpen ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
-            <div className="w-[min(620px,94vw)] rounded-2xl border border-amber-200/28 bg-[#090b12] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+            <div className="w-[min(620px,94vw)] rounded-[28px] border border-amber-200/28 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.12),transparent_34%),linear-gradient(180deg,#0a0b0f,#050507_62%,#040405)] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.58)]">
               <div className="text-center">
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/58">เลือกโหมดการ์ดของห้อง</div>
                 <div className="mt-1 text-3xl font-black text-white">ตั้งกองเลือกก่อนสร้าง</div>
@@ -3609,7 +3609,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                       onClick={() => setCreateRoomMode(mode.id)}
                       className={`min-h-40 rounded-2xl border p-4 text-left transition ${
                         selected
-                          ? "border-amber-200 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.18),rgba(255,196,0,0.05)_42%,rgba(255,255,255,0.02)_100%)] shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_30px_rgba(251,191,36,0.16)]"
+                          ? "border-amber-200 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.2),rgba(255,196,0,0.06)_42%,rgba(255,255,255,0.02)_100%)] shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_30px_rgba(251,191,36,0.16)]"
                           : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/55 hover:bg-amber-200/10"
                       }`}
                     >
@@ -3641,14 +3641,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   setCreateModeDialogOpen(false);
                   void createRoom(createRoomMode);
                 }}
-                className="mt-4 h-11 w-full rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
+                className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_26px_rgba(251,191,36,0.18)] transition hover:from-amber-200 hover:to-yellow-100"
               >
                 ยืนยันสร้างห้อง
               </button>
               <button
                 type="button"
                 onClick={() => setCreateModeDialogOpen(false)}
-                className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-white/30"
+                className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-amber-200/30 hover:text-white"
               >
                 ยกเลิก
               </button>
@@ -3656,19 +3656,33 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         ) : null}
         <section className="relative min-h-[320px] overflow-hidden border-b border-amber-200/12 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_16%,rgba(248,113,113,0.28),transparent_24%),radial-gradient(circle_at_76%_24%,rgba(251,191,36,0.22),transparent_26%),radial-gradient(circle_at_50%_100%,rgba(239,68,68,0.24),transparent_32%),linear-gradient(135deg,#131015,#050507_62%,#0f0805)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(160,120,35,0.22),transparent_28%),linear-gradient(135deg,#090909,#050507_58%,#120d08)]" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:54px_54px]" />
-          <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full border border-red-300/14 bg-red-500/10 blur-2xl" />
+          <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full border border-amber-300/14 bg-amber-500/10 blur-2xl" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute inset-0 -m-8 rounded-full bg-amber-300/18 blur-3xl" />
+            <div className="relative rounded-full border border-amber-200/24 bg-black/45 px-4 py-3 shadow-[0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-sm">
+              <Image
+                src="https://i.ibb.co/7JYBY7M0/VS.png"
+                alt="VS"
+                width={180}
+                height={180}
+                priority
+                unoptimized
+                className="h-[84px] w-[84px] object-contain drop-shadow-[0_0_26px_rgba(251,191,36,0.32)] sm:h-[110px] sm:w-[110px] md:h-[128px] md:w-[128px]"
+              />
+            </div>
+          </div>
           <div className="relative flex min-h-[280px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
+            <div className="relative z-20 max-w-3xl lg:max-w-[44%]">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-black/34 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
                 <Swords className="h-3.5 w-3.5" />
                 ห้องแบทเทิลการ์ด
               </div>
-              <h1 className="text-[clamp(2.4rem,9vw,6.4rem)] font-black uppercase leading-[0.86] tracking-normal drop-shadow-[0_0_34px_rgba(248,113,113,0.2)]">
+              <h1 className="text-[clamp(2.4rem,9vw,6.4rem)] font-black uppercase leading-[0.86] tracking-normal text-white drop-shadow-[0_0_34px_rgba(251,191,36,0.16)]">
                 ล็อบบี้ต่อสู้
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/60 sm:text-base">
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/62 sm:text-base">
                 สร้างห้อง เข้าห้องด้วยเลข 6 ตัว หรือเลือกนั่งชมก่อนเริ่มสู้ได้เลย
               </p>
             </div>
@@ -3678,7 +3692,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 ["ล็อก", rooms.filter((room) => room.access === "private").length],
                 ["กำลังสู้", rooms.filter((room) => room.status === "playing").length],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-amber-200/14 bg-black/42 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                <div key={label} className="rounded-xl border border-amber-200/14 bg-black/52 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04),0_0_20px_rgba(251,191,36,0.05)]">
                   <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">{label}</div>
                   <div className="mt-1 text-2xl font-black text-white">{value}</div>
                 </div>
@@ -3961,23 +3975,23 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
       <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
-        <section className="relative overflow-hidden border-b border-white/8 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(245,158,11,0.22),transparent_26%),radial-gradient(circle_at_80%_18%,rgba(34,211,238,0.18),transparent_24%),linear-gradient(180deg,#08111e,#050710)]" />
+        <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(160,120,35,0.22),transparent_28%),linear-gradient(180deg,#090909,#050507_58%,#120d08)]" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
                 <Layers3 className="h-3.5 w-3.5" />
                 จัดเด็ค
               </div>
-              <h1 className="text-[clamp(2.2rem,8vw,6rem)] font-black uppercase leading-[0.88] tracking-normal">
+              <h1 className="text-[clamp(2.2rem,8vw,6rem)] font-black uppercase leading-[0.88] tracking-normal text-white">
                 เลือกเด็คของคุณ
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/60 sm:text-base">
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/62 sm:text-base">
                 เลือกการ์ด 13 ใบสำหรับ 3 รอบสู้ การ์ดแต่ละใบใช้ได้ครั้งเดียวในเกมนี้
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="relative z-20 rounded-2xl border border-amber-200/12 bg-black/36 p-4 shadow-[0_0_24px_rgba(251,191,36,0.04)]">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">
                 {currentRoom ? "เวลาเลือกเด็ค" : "เลือกแล้ว"}
               </div>
@@ -3991,7 +4005,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 type="button"
                 onClick={enterBattle}
                 disabled={deckReadyDisabled}
-                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-[0_0_32px_rgba(239,68,68,0.28)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-4 text-sm font-black text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32 disabled:hover:from-white/10"
               >
                 {deckReadyLabel}
                 <ChevronRight className="h-4 w-4" />
@@ -4000,7 +4014,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 <button
                   type="button"
                   onClick={leaveRoom}
-                  className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-black/28 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-white/30"
+                  className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-black/28 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-amber-200/30 hover:text-white"
                 >
                   ออกห้อง
                 </button>
@@ -4026,7 +4040,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             })}
           </div>
 
-          <aside className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 lg:sticky lg:top-4 lg:self-start">
+          <aside className="rounded-2xl border border-amber-200/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] p-4 lg:sticky lg:top-4 lg:self-start">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Sparkles className="h-4 w-4 text-amber-300" />
               เด็คที่เลือก
@@ -4037,7 +4051,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   key={card.cardNo}
                   type="button"
                   onClick={() => toggleDeckCard(card.cardNo)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-white/8 bg-black/24 p-2 text-left transition hover:border-amber-300/40"
+                  className="flex w-full items-center gap-3 rounded-xl border border-white/8 bg-black/24 p-2 text-left transition hover:border-amber-300/40 hover:bg-amber-300/6"
                 >
                   <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-300 text-xs font-black text-black">
                     {index + 1}
@@ -4052,9 +4066,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </aside>
         </section>
         {currentRoom ? (
-          <div className="fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-red-200/35 bg-black/78 p-3 shadow-[0_0_44px_rgba(239,68,68,0.28)] backdrop-blur-md xl:bottom-5">
+          <div className="fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-amber-200/24 bg-black/78 p-3 shadow-[0_0_44px_rgba(251,191,36,0.12)] backdrop-blur-md xl:bottom-5">
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-red-100/62">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/62">
                 ล็อกเด็คอัตโนมัติใน {deckTimerText}
               </div>
               <div className="mt-1 truncate text-sm font-bold text-white/70">
@@ -4065,7 +4079,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               type="button"
               onClick={enterBattle}
               disabled={ownDeckReady}
-              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-red-500 px-6 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.34)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
+              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-6 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32 disabled:hover:from-white/10"
             >
               {ownDeckReady ? "พร้อมแล้ว" : "พร้อม"}
             </button>
