@@ -1569,6 +1569,41 @@ function CardHoverPreview({ card }: { card: CardView | null }) {
   );
 }
 
+function SpectatorDeckStrip({
+  title,
+  cards,
+  tone,
+}: {
+  title: string;
+  cards: CardView[];
+  tone: "top" | "bottom";
+}) {
+  const accent =
+    tone === "top"
+      ? "border-cyan-200/24 bg-cyan-500/10 text-cyan-100"
+      : "border-rose-200/24 bg-rose-500/10 text-rose-100";
+  return (
+    <div className={`rounded-2xl border bg-black/42 px-3 py-2 shadow-[0_18px_52px_rgba(0,0,0,0.3)] backdrop-blur-sm ${tone === "top" ? "border-cyan-200/18" : "border-rose-200/18"}`}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className={`text-[10px] font-black uppercase tracking-[0.18em] ${tone === "top" ? "text-cyan-100/72" : "text-rose-100/72"}`}>
+          {title}
+        </div>
+        <div className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] ${accent}`}>
+          {cards.length} ใบ
+        </div>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {cards.map((card) => (
+          <div key={card.cardNo} className="relative h-24 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black sm:h-28 sm:w-20">
+            <Image src={card.sourceImage} alt={card.name} fill sizes="80px" quality={90} unoptimized loading="eager" className="object-cover" />
+            <div className="absolute left-1 top-1 rounded bg-black/72 px-1 py-0.5 text-[8px] font-black text-white">{card.cardNo}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RoomSeatCard({
   label,
   participant,
@@ -1906,6 +1941,8 @@ function CompactBattleBoard({
   botDeckLeft,
   playerGraveCards,
   botGraveCards,
+  spectatorTopDeckCards,
+  spectatorBottomDeckCards,
   playerName,
   botName,
   playerImage,
@@ -1937,6 +1974,8 @@ function CompactBattleBoard({
   botDeckLeft: number;
   playerGraveCards: CardView[];
   botGraveCards: CardView[];
+  spectatorTopDeckCards?: CardView[];
+  spectatorBottomDeckCards?: CardView[];
   playerName: string;
   botName: string;
   playerImage: string;
@@ -2017,6 +2056,16 @@ function CompactBattleBoard({
         </div>
         <Image src={playerImage || "/avatar.png"} alt={playerName} width={44} height={44} className="h-10 w-10 shrink-0 rounded-xl border border-red-100/18 object-contain" />
       </div>
+      {viewMode === "spectator" && spectatorTopDeckCards && spectatorBottomDeckCards ? (
+        <>
+          <div className="absolute left-3 right-3 top-16 z-30 sm:left-4 sm:right-4">
+            <SpectatorDeckStrip title={`ฝั่งบน · ${botName}`} cards={spectatorTopDeckCards} tone="top" />
+          </div>
+          <div className="absolute left-3 right-3 bottom-16 z-30 sm:left-4 sm:right-4">
+            <SpectatorDeckStrip title={`ฝั่งล่าง · ${playerName}`} cards={spectatorBottomDeckCards} tone="bottom" />
+          </div>
+        </>
+      ) : null}
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
         botCard={botTriangle[activeLane] ? cardsByNo.get(botTriangle[activeLane]) : undefined}
@@ -4168,6 +4217,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             botDeckLeft={Math.max(0, displayBotDeckCards.length)}
             playerGraveCards={playerGraveCards}
             botGraveCards={botGraveCards}
+            spectatorTopDeckCards={displayBotDeckCards}
+            spectatorBottomDeckCards={displayPlayerDeckCards}
             playerName={displayPlayerName}
             botName={displayBotName}
             playerImage={displayPlayerImage}
