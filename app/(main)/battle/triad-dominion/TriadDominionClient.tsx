@@ -3874,18 +3874,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return (
       <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
         <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(245,158,11,0.24),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(239,68,68,0.24),transparent_24%),linear-gradient(180deg,#130d0b,#050507)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:54px_54px]" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="absolute inset-0">
+            <Image
+              src="/triad-room-banner.png"
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-center"
+            />
+          </div>
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.6)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.22)_0%,rgba(0,0,0,0.1)_40%,rgba(0,0,0,0.16)_100%)]" />
+          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/70">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/16 bg-black/35 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/85 backdrop-blur-sm">
                 <KeyRound className="h-3.5 w-3.5" />
                 ห้อง {currentRoom.code}
               </div>
-              <h1 className="font-mono text-[clamp(2.4rem,9vw,6rem)] font-black leading-none tracking-[0.14em]">
+              <h1 className="font-mono text-[clamp(2.4rem,9vw,6rem)] font-black leading-none tracking-[0.14em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.75)]">
                 {currentRoom.code}
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/60">
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/78 drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
                 เจ้าของห้องเป็นคนกดเริ่มเกม คนที่เข้ามาหลังเกมเริ่มจะถูกนั่งเป็นผู้ชมอัตโนมัติ
               </p>
             </div>
@@ -3893,7 +3903,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <button
                 type="button"
                 onClick={leaveRoom}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-black/38 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-white/30"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/14 bg-black/45 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/78 transition hover:border-white/30 hover:bg-black/55"
               >
                 ออกห้อง
               </button>
@@ -3901,7 +3911,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 type="button"
                 onClick={startRoomGame}
                 disabled={!canStart}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.3)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-5 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.26)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
               >
                 <Swords className="h-4 w-4" />
                 เริ่มเกม
