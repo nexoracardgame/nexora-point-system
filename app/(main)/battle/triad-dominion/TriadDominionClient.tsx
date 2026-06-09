@@ -3595,51 +3595,38 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/58">เลือกโหมดการ์ดของห้อง</div>
                 <div className="mt-1 text-3xl font-black text-white">ตั้งกองเลือกก่อนสร้าง</div>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {[
-                  { id: "all" as DeckMode, title: "ALL", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
-                  { id: "random" as DeckMode, title: "RANDOM", detail: "สุ่ม pool ฝั่งละ 40 ใบ: มอนสเตอร์ 20 และสกิล 20 แบบถ่วงพลังให้ใกล้กัน" },
-                ].map((mode) => (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => {
-                      setCreateRoomMode(mode.title === "ALL" ? "all" : "monster");
-                    }}
-                    className="min-h-36 rounded-xl border border-amber-200/18 bg-white/[0.045] p-4 text-left transition hover:-translate-y-1 hover:border-amber-200/60 hover:bg-amber-200/10"
-                  >
-                    <div className="text-3xl font-black text-white">{mode.title === "ALL" ? "ALL IN ONE" : "MONSTER"}</div>
-                    <div className="mt-3 text-sm font-semibold leading-6 text-white/58">
-                      {mode.title === "ALL" ? mode.detail : "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้"}
-                    </div>
-                  </button>
-                ))}
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {
+                  [
+                    { id: "all" as DeckMode, title: "ALL IN ONE", detail: "???????????????? 293 ???????????????????????????????" },
+                    { id: "monster" as DeckMode, title: "MONSTER", detail: "???? pool ?????? 20 ??: ??????????????????????????" },
+                    { id: "skill" as DeckMode, title: "SKILL", detail: "?????????? 5 ????????? + 8 ???? ?????????????????????????" },
+                  ].map((mode) => {
+                    const selected = createRoomMode === mode.id;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setCreateRoomMode(mode.id)}
+                        className={`min-h-40 rounded-2xl border p-4 text-left transition ${selected ? "border-amber-200 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.18),rgba(255,196,0,0.05)_42%,rgba(255,255,255,0.02)_100%)] shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_30px_rgba(251,191,36,0.16)]" : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/55 hover:bg-amber-200/10"}`}
+                      >
+                        <div className="flex h-full flex-col">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-black uppercase tracking-[0.18em] text-amber-200/80">
+                              {selected ? '?????????' : '????'}
+                            </div>
+                            <div className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] font-black ${selected ? "border-amber-200 bg-amber-200 text-black shadow-[0_0_18px_rgba(251,191,36,0.6)]" : "border-white/16 bg-black/34 text-white/28"}`}>
+                              {selected ? '?' : ''}
+                            </div>
+                          </div>
+                          <div className="mt-4 text-2xl font-black text-white">{mode.title}</div>
+                          <div className="mt-3 text-sm font-semibold leading-6 text-white/58">{mode.detail}</div>
+                        </div>
+                      </button>
+                    );
+                  })
+                }
               </div>
-              <button
-                type="button"
-                onClick={() => setCreateRoomMode("skill")}
-                className={`mt-3 flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition ${
-                  createRoomMode === "skill"
-                    ? "border-amber-200/70 bg-amber-200/14"
-                    : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/50 hover:bg-amber-200/10"
-                }`}
-              >
-                <div
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[10px] font-black ${
-                    createRoomMode === "skill"
-                      ? "border-amber-200 bg-amber-200 text-black"
-                      : "border-white/16 bg-black/34 text-white/40"
-                  }`}
-                >
-                  {createRoomMode === "skill" ? "✓" : ""}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-base font-black text-white">SKILL</div>
-                  <div className="mt-1 text-sm font-semibold leading-6 text-white/58">
-                    บังคับเด็ค 5 มอนสเตอร์ + 8 สกิล และให้กติกาตรงตามโหมดสกิล
-                  </div>
-                </div>
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -3648,14 +3635,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 }}
                 className="mt-4 h-11 w-full rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
               >
-                ยืนยันสร้างห้อง
-              </button>
-              <button
-                type="button"
-                onClick={() => setCreateModeDialogOpen(false)}
-                className="mt-4 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-white/30"
-              >
-                ยกเลิก
+                ???????????????
               </button>
             </div>
           </div>
