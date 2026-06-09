@@ -1378,7 +1378,7 @@ export default function MainLayout({
   );
 
   const drawerLinks = [
-    ...sideItems.filter((item) => !item.href.startsWith("/battle")),
+    ...sideItems,
     {
       href: "/wallet",
       label: t("layout.nav.wallet"),
