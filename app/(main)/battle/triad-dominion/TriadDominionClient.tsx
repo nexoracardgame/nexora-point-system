@@ -3596,36 +3596,44 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 <div className="mt-1 text-3xl font-black text-white">ตั้งกองเลือกก่อนสร้าง</div>
               </div>
               <div className="mt-5 grid gap-3 md:grid-cols-3">
-                {
-                  [
-                    { id: "all" as DeckMode, title: "ALL IN ONE", detail: "???????????????? 293 ???????????????????????????????" },
-                    { id: "monster" as DeckMode, title: "MONSTER", detail: "???? pool ?????? 20 ??: ??????????????????????????" },
-                    { id: "skill" as DeckMode, title: "SKILL", detail: "?????????? 5 ????????? + 8 ???? ?????????????????????????" },
-                  ].map((mode) => {
-                    const selected = createRoomMode === mode.id;
-                    return (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() => setCreateRoomMode(mode.id)}
-                        className={`min-h-40 rounded-2xl border p-4 text-left transition ${selected ? "border-amber-200 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.18),rgba(255,196,0,0.05)_42%,rgba(255,255,255,0.02)_100%)] shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_30px_rgba(251,191,36,0.16)]" : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/55 hover:bg-amber-200/10"}`}
-                      >
-                        <div className="flex h-full flex-col">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-black uppercase tracking-[0.18em] text-amber-200/80">
-                              {selected ? '?????????' : '????'}
-                            </div>
-                            <div className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] font-black ${selected ? "border-amber-200 bg-amber-200 text-black shadow-[0_0_18px_rgba(251,191,36,0.6)]" : "border-white/16 bg-black/34 text-white/28"}`}>
-                              {selected ? '?' : ''}
-                            </div>
+                {[
+                  { id: "all" as DeckMode, title: "ALL IN ONE", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
+                  { id: "monster" as DeckMode, title: "MONSTER", detail: "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้" },
+                  { id: "skill" as DeckMode, title: "SKILL", detail: "บังคับเด็ค 5 มอนสเตอร์ + 8 สกิล และให้กติกาตรงตามโหมดสกิล" },
+                ].map((mode) => {
+                  const selected = createRoomMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setCreateRoomMode(mode.id)}
+                      className={`min-h-40 rounded-2xl border p-4 text-left transition ${
+                        selected
+                          ? "border-amber-200 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.18),rgba(255,196,0,0.05)_42%,rgba(255,255,255,0.02)_100%)] shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_30px_rgba(251,191,36,0.16)]"
+                          : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/55 hover:bg-amber-200/10"
+                      }`}
+                    >
+                      <div className="flex h-full flex-col">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-black uppercase tracking-[0.18em] text-amber-200/80">
+                            {selected ? "เลือกอยู่" : "โหมด"}
                           </div>
-                          <div className="mt-4 text-2xl font-black text-white">{mode.title}</div>
-                          <div className="mt-3 text-sm font-semibold leading-6 text-white/58">{mode.detail}</div>
+                          <div
+                            className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] font-black ${
+                              selected
+                                ? "border-amber-200 bg-amber-200 text-black shadow-[0_0_18px_rgba(251,191,36,0.6)]"
+                                : "border-white/16 bg-black/34 text-white/28"
+                            }`}
+                          >
+                            {selected ? "✓" : ""}
+                          </div>
                         </div>
-                      </button>
-                    );
-                  })
-                }
+                        <div className="mt-4 text-2xl font-black text-white">{mode.title}</div>
+                        <div className="mt-3 text-sm font-semibold leading-6 text-white/58">{mode.detail}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
               <button
                 type="button"
@@ -3635,7 +3643,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 }}
                 className="mt-4 h-11 w-full rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
               >
-                ???????????????
+                ยืนยันสร้างห้อง
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateModeDialogOpen(false)}
+                className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-white/30"
+              >
+                ยกเลิก
               </button>
             </div>
           </div>
