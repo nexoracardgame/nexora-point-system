@@ -502,6 +502,40 @@ function getFightScore(turns: TriadTurnResult[], reveals: Record<TriadTurn, Turn
   );
 }
 
+function buildRevealStateForTurns(turns: TriadTurnResult[]) {
+  const next = emptyRevealState();
+  for (const turn of turns) {
+    if (turn.turn === 1 || turn.turn === 2 || turn.turn === 3) {
+      next[turn.turn] = { player: true, bot: true, scored: true };
+    }
+  }
+  return next;
+}
+
+function buildSpectatorBattleLog(
+  turns: TriadTurnResult[],
+  hostName: string,
+  challengerName: string
+) {
+  const lines: string[] = [];
+  for (const turn of turns) {
+    const winnerLabel =
+      turn.winner === "draw"
+        ? "เสมอ"
+        : turn.winner === "player"
+          ? hostName
+          : challengerName;
+    lines.push(
+      `ตาที่ ${turn.turn}: ${winnerLabel} ชนะ (${turn.playerTotal.toLocaleString()} ต่อ ${turn.opponentTotal.toLocaleString()})`
+    );
+    for (const event of turn.skillEvents) {
+      const actor = event.side === "player" ? hostName : challengerName;
+      lines.push(`${actor}: ${event.summary}`);
+    }
+  }
+  return lines;
+}
+
 function getUsedFromFights(fights: LockedFight[]) {
   return new Set(
     fights.flatMap((fight) => [
@@ -1310,6 +1344,99 @@ function PlayerHand({
   );
 }
 
+function SpectatorBattleOverview({
+  hostName,
+  challengerName,
+  hostDeckCards,
+  challengerDeckCards,
+  turns,
+}: {
+  hostName: string;
+  challengerName: string;
+  hostDeckCards: CardView[];
+  challengerDeckCards: CardView[];
+  turns: TriadTurnResult[];
+}) {
+  function DeckRail({
+    title,
+    cards,
+    tone,
+  }: {
+    title: string;
+    cards: CardView[];
+    tone: "host" | "challenger";
+  }) {
+    const border = tone === "host" ? "border-cyan-200/18" : "border-rose-200/18";
+    const glow = tone === "host" ? "shadow-[0_0_26px_rgba(34,211,238,0.14)]" : "shadow-[0_0_26px_rgba(248,113,113,0.14)]";
+    return (
+      <div className={`rounded-xl border bg-black/28 p-3 ${border} ${glow}`}>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="text-xs font-black uppercase tracking-[0.16em] text-white/52">{title}</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/34">9 ใบ</div>
+        </div>
+        <div className="grid grid-cols-9 gap-1 overflow-x-auto">
+          {cards.map((card) => (
+            <div key={card.cardNo} className="relative aspect-[3/4] overflow-hidden rounded-lg border border-white/10 bg-black">
+              <Image src={card.sourceImage} alt={card.name} fill sizes="64px" className="object-cover" />
+              <div className="absolute left-1 top-1 rounded bg-black/72 px-1.5 py-0.5 text-[8px] font-black text-white">
+                {card.cardNo}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const visibleTurns = turns.slice().sort((a, b) => a.turn - b.turn);
+
+  return (
+    <div className="rounded-xl border border-violet-200/18 bg-black/28 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.28)]">
+      <div className="mb-3 flex items-center gap-2 text-sm font-black text-violet-100">
+        <Eye className="h-4 w-4 text-violet-200" />
+        มุมมองผู้ชมสด
+      </div>
+      <div className="space-y-3">
+        <DeckRail title={hostName} cards={hostDeckCards} tone="host" />
+        <DeckRail title={challengerName} cards={challengerDeckCards} tone="challenger" />
+      </div>
+      <div className="mt-4 rounded-xl border border-white/8 bg-white/[0.03] p-3">
+        <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">ผลตาที่จบแล้ว</div>
+        <div className="space-y-2">
+          {visibleTurns.length ? (
+            visibleTurns.map((turn) => (
+              <div key={turn.turn} className="rounded-lg border border-white/8 bg-black/24 p-3 text-xs font-semibold leading-5 text-white/72">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-black text-white">ตาที่ {turn.turn}</div>
+                  <div className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/48">
+                    {turn.winner === "draw" ? "เสมอ" : turn.winner === "player" ? hostName : challengerName}
+                  </div>
+                </div>
+                <div className="mt-1 text-white/62">
+                  {turn.playerTotal.toLocaleString()} ต่อ {turn.opponentTotal.toLocaleString()}
+                </div>
+                {turn.skillEvents.length ? (
+                  <div className="mt-2 space-y-1.5">
+                    {turn.skillEvents.slice(0, 3).map((event, index) => (
+                      <div key={`${turn.turn}-${index}`} className="rounded-md border border-white/8 bg-white/[0.035] px-2 py-1.5 text-[11px] text-white/56">
+                        {event.summary}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))
+          ) : (
+            <div className="rounded-lg border border-white/8 bg-black/24 p-3 text-sm font-semibold text-white/42">
+              รอเริ่มตาแรก
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CardHoverPreview({ card }: { card: CardView | null }) {
   if (!card) return null;
   return (
@@ -1675,6 +1802,7 @@ function CompactBattleBoard({
   onDrawRandomCard,
   onSelectLane,
   onPlaceCard,
+  viewMode = "player",
 }: {
   cardsByNo: Map<string, CardView>;
   lockedFight: LockedFight | null;
@@ -1704,6 +1832,7 @@ function CompactBattleBoard({
   onDrawRandomCard: () => void;
   onSelectLane: (lane: Lane) => void;
   onPlaceCard: (lane: Lane, cardNo: string) => void;
+  viewMode?: "player" | "spectator";
 }) {
   const playerTriangle = lockedFight?.player || player;
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
@@ -1735,6 +1864,8 @@ function CompactBattleBoard({
     if (pendingTarget === "bot-top") botAuraByLane.top = aura;
   }
   const waitingCard = waitingSkillChoice ? cardsByNo.get(waitingSkillChoice.cardNo) : undefined;
+  const topBadgeLabel = viewMode === "spectator" ? "ฝ่ายบน" : "คู่แข่ง";
+  const bottomBadgeLabel = viewMode === "spectator" ? "ฝ่ายล่าง" : "เรา";
 
   return (
     <div className="relative h-full min-h-[360px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[460px] xl:min-h-0">
@@ -1939,6 +2070,40 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ? "challenger"
       : null;
   const opponentSide: RoomPlayerSide | null = roomPlayerSide === "host" ? "challenger" : roomPlayerSide === "challenger" ? "host" : null;
+  const spectatorBattleState = useMemo(() => {
+    if (!isSpectator || !currentRoom) return null;
+    const revealState = buildRevealStateForTurns(currentRoom.game.turns);
+    const activeLane = laneForTurn(currentRoom.game.activeTurn);
+    const hostTriangle = currentRoom.game.triangles.host;
+    const challengerTriangle = currentRoom.game.triangles.challenger;
+    return {
+      lockedFight: {
+        fightNo: currentRoom.game.fightNo,
+        player: hostTriangle,
+        bot: challengerTriangle,
+        turns: currentRoom.game.turns,
+      } as LockedFight,
+      player: hostTriangle,
+      revealed: revealState,
+      activeTurn: currentRoom.game.activeTurn,
+      fightNo: currentRoom.game.fightNo,
+      fightScore: getFightScore(currentRoom.game.turns, revealState),
+      matchScore: getFightScore(currentRoom.game.turns, revealState),
+      turnLocked: Boolean(hostTriangle[activeLane] || challengerTriangle[activeLane]),
+      timeLeft: roomTurnSecondsLeft(currentRoom),
+      playerDeckCards: currentRoom.game.decks.host.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[],
+      botDeckCards: currentRoom.game.decks.challenger.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[],
+      playerName: currentRoom.seats.host?.name || "ฝั่งบน",
+      botName: currentRoom.seats.challenger?.name || "ฝั่งล่าง",
+      playerImage: currentRoom.seats.host?.image || "/avatar.png",
+      botImage: currentRoom.seats.challenger?.image || "/avatar.png",
+      battleLog: buildSpectatorBattleLog(
+        currentRoom.game.turns,
+        currentRoom.seats.host?.name || "ฝั่งบน",
+        currentRoom.seats.challenger?.name || "ฝั่งล่าง"
+      ),
+    };
+  }, [cardsByNo, currentRoom, isSpectator]);
   const selectableDeckCatalog = useMemo(() => {
     if (!currentRoom || !roomPlayerSide || currentRoom.game.deckMode !== "random") return deckCatalog;
     const allowed = new Set(currentRoom.game.selectionPools[roomPlayerSide]);
@@ -1957,6 +2122,22 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const opponentImage = opponentSide
     ? currentRoom?.seats[opponentSide]?.image || "/avatar.png"
     : "/avatar.png";
+  const displayLockedFight = spectatorBattleState?.lockedFight || lockedFight;
+  const displayPlayer = spectatorBattleState?.player || player;
+  const displayRevealed = spectatorBattleState?.revealed || revealed;
+  const displayActiveTurn = spectatorBattleState?.activeTurn || activeTurn;
+  const displayFightNo = spectatorBattleState?.fightNo || fightNo;
+  const displayMatchScore = spectatorBattleState?.matchScore || matchScore;
+  const displayFightScore = spectatorBattleState?.fightScore || fightScore;
+  const displayTimeLeft = spectatorBattleState?.timeLeft ?? timeLeft;
+  const displayTurnLocked = spectatorBattleState?.turnLocked ?? turnLocked;
+  const displayPlayerName = spectatorBattleState?.playerName || playerLabel;
+  const displayBotName = spectatorBattleState?.botName || opponentLabel;
+  const displayPlayerImage = spectatorBattleState?.playerImage || playerImage;
+  const displayBotImage = spectatorBattleState?.botImage || opponentImage;
+  const displayPlayerDeckCards = spectatorBattleState?.playerDeckCards || playerDeckCards;
+  const displayBotDeckCards = spectatorBattleState?.botDeckCards || botDeckCards;
+  const displayBattleLog = spectatorBattleState?.battleLog || battleLog;
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
@@ -3083,9 +3264,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPlacementLane(nextAvailablePlayer.length > 0 ? "top" : placementLane);
   };
 
-  const revealState = revealed[activeTurn];
+  const displayCurrentResult = spectatorBattleState?.lockedFight?.turns.find((turn) => turn.turn === displayActiveTurn) || currentResult;
+  const revealState = displayRevealed[displayActiveTurn];
   const activeTurnScored = Boolean(revealState?.scored);
-  const canRevealTurn = Boolean(currentResult) && (turnLocked || Boolean(isPvpRoom && roomTurnResolved));
+  const canRevealTurn = Boolean(displayCurrentResult) && (displayTurnLocked || Boolean(isPvpRoom && roomTurnResolved));
   useEffect(() => {
     if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored) {
       resultAdvanceKeyRef.current = "";
@@ -3666,9 +3848,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 xl:min-w-[560px]">
             {[
-              ["เกม", `${matchScore.player}-${matchScore.bot}`],
-              ["รอบ", Math.min(fightNo, 3)],
-              ["เด็ค", `${playerDeck.length}/${DECK_SIZE}`],
+              ["เกม", `${displayMatchScore.player}-${displayMatchScore.bot}`],
+              ["รอบ", Math.min(displayFightNo, 3)],
+              ["เด็ค", isSpectator ? `${displayPlayerDeckCards.length}/${DECK_SIZE}` : `${playerDeck.length}/${DECK_SIZE}`],
               ["การ์ด", summary.totalCards],
               ["รอเช็ก", summary.reviewSkills],
             ].map(([label, value]) => (
@@ -3687,28 +3869,29 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         <section className="grid min-h-0 grid-rows-[minmax(390px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(500px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(500px,calc(100vh-360px))_auto_auto]">
           <CompactBattleBoard
             cardsByNo={cardsByNo}
-            lockedFight={lockedFight}
-            player={player}
-            revealed={revealed}
-            activeTurn={activeTurn}
-            matchScore={matchScore}
-            fightNo={fightNo}
-            fightScore={fightScore}
-            playerDeckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)}
-            botDeckLeft={Math.max(0, botDeck.length - usedBotCards.length)}
+            lockedFight={displayLockedFight}
+            player={displayPlayer}
+            revealed={displayRevealed}
+            activeTurn={displayActiveTurn}
+            matchScore={displayMatchScore}
+            fightNo={displayFightNo}
+            fightScore={displayFightScore}
+            playerDeckLeft={Math.max(0, displayPlayerDeckCards.length)}
+            botDeckLeft={Math.max(0, displayBotDeckCards.length)}
             playerGraveCards={playerGraveCards}
             botGraveCards={botGraveCards}
-            playerName={playerLabel}
-            botName={opponentLabel}
-            playerImage={playerImage}
-            botImage={opponentImage}
+            playerName={displayPlayerName}
+            botName={displayBotName}
+            playerImage={displayPlayerImage}
+            botImage={displayBotImage}
             placementLane={placementLane}
-            timeLeft={timeLeft}
-            turnLocked={turnLocked}
+            timeLeft={displayTimeLeft}
+            turnLocked={displayTurnLocked}
             pendingSkillChoice={pendingSkillChoice}
             waitingSkillChoice={waitingSkillChoice}
-            revealAllCards={false}
+            revealAllCards={isSpectator}
             randomCard={randomDrawCard}
+            viewMode={isSpectator ? "spectator" : "player"}
             onSelectSkillTarget={(target) =>
               setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
             }
@@ -3723,6 +3906,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             }}
           />
           <BlessingChoiceOverlay card={pendingBlessingChoice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
+
+          {isSpectator ? (
+            <SpectatorBattleOverview
+              hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+              challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+              hostDeckCards={displayPlayerDeckCards}
+              challengerDeckCards={displayBotDeckCards}
+              turns={displayLockedFight?.turns || []}
+            />
+          ) : null}
 
           {isSpectator ? (
             <div className="rounded-xl border border-violet-200/18 bg-violet-200/[0.06] p-4">
@@ -3759,13 +3952,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     <div>
                       <div className="text-2xl font-black">{winnerText}</div>
                       <div className="text-sm font-semibold text-white/52">
-                        คะแนนรวม {matchScore.player}-{matchScore.bot}
+                        คะแนนรวม {displayMatchScore.player}-{displayMatchScore.bot}
                       </div>
                     </div>
                   </div>
-                ) : currentResult && activeTurnScored ? (
+                ) : displayCurrentResult && activeTurnScored ? (
                   <div>
-                    <ResultBanner result={currentResult} activeTurn={activeTurn} />
+                    <ResultBanner result={displayCurrentResult} activeTurn={displayActiveTurn} />
                     <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-200/20 bg-amber-200/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-amber-100">
                       ตาถัดไปอัตโนมัติใน {Math.floor(resultTimeLeft / 60)}:{String(resultTimeLeft % 60).padStart(2, "0")}
                     </div>
@@ -3774,7 +3967,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   <div>
                     <div className="mb-2 flex items-center gap-2 text-lg font-black">
                       <Flame className="h-5 w-5 text-amber-300" />
-                      {canRevealTurn ? "พร้อมเปิดการ์ด" : `รอล็อกการ์ดตาที่ ${activeTurn}`}
+                      {canRevealTurn ? "พร้อมเปิดการ์ด" : `รอล็อกการ์ดตาที่ ${displayActiveTurn}`}
                     </div>
                     <div className="text-sm font-semibold text-white/52">
                       {canRevealTurn
@@ -3817,16 +4010,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                       เริ่มใหม่
                     </button>
                   )
-                ) : !isSpectator && (!isPvpRoom || isRoomController) && turnLocked && lockedFight && revealed[3].scored ? (
+                ) : !isSpectator && (!isPvpRoom || isRoomController) && displayTurnLocked && displayLockedFight && displayRevealed[3].scored ? (
                   <button
                     type="button"
                     onClick={nextFight}
                     className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100"
                   >
-                    {fightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
+                    {displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                ) : !isSpectator && (!isPvpRoom || isRoomController) && turnLocked && lockedFight && activeTurnScored && activeTurn < 3 ? (
+                ) : !isSpectator && (!isPvpRoom || isRoomController) && displayTurnLocked && displayLockedFight && activeTurnScored && displayActiveTurn < 3 ? (
                   <button
                     type="button"
                     onClick={nextTurn}
@@ -3837,7 +4030,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   </button>
                 ) : (
                   <>
-                    {!turnLocked && !currentResult ? (
+                    {!displayTurnLocked && !displayCurrentResult ? (
                       <button
                         type="button"
                         onClick={lockFight}
@@ -3851,7 +4044,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     <button
                       type="button"
                       onClick={revealNext}
-                      disabled={isSpectator || !canRevealTurn || !lockedFight || activeTurnScored}
+                      disabled={isSpectator || !canRevealTurn || !displayLockedFight || activeTurnScored}
                       className="inline-flex h-full min-h-14 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32"
                     >
                       {revealButtonLabel}
@@ -3862,13 +4055,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               </div>
           </div>
 
-          {currentResult && activeTurnScored ? (
+          {displayCurrentResult && activeTurnScored ? (
             <div className="hidden gap-3 lg:grid-cols-2">
               <div className="rounded-xl border border-emerald-300/16 bg-emerald-300/[0.05] p-4">
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-100/70">
                   วิธีคิดคะแนนเรา
                 </div>
-                {currentResult.playerBreakdown.map((line) => (
+                {displayCurrentResult.playerBreakdown.map((line) => (
                   <div key={line} className="text-sm font-semibold leading-6 text-white/62">
                     {line}
                   </div>
@@ -3878,7 +4071,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-rose-100/70">
                   วิธีคิดคะแนนคู่แข่ง
                 </div>
-                {currentResult.opponentBreakdown.map((line) => (
+                {displayCurrentResult.opponentBreakdown.map((line) => (
                   <div key={line} className="text-sm font-semibold leading-6 text-white/62">
                     {line}
                   </div>
@@ -3889,7 +4082,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </section>
 
         <aside className="flex min-h-0 flex-col gap-3 overflow-visible">
-          <FighterPanel name={opponentLabel} image={opponentImage} score={matchScore.bot} tone="bot" deckLeft={Math.max(0, botDeck.length - usedBotCards.length)} side="left" />
+          <FighterPanel
+            name={displayBotName}
+            image={displayBotImage}
+            score={displayMatchScore.bot}
+            tone="bot"
+            deckLeft={Math.max(0, displayBotDeckCards.length)}
+            side="left"
+          />
 
           <div className="min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
@@ -3897,8 +4097,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               บันทึกการต่อสู้
             </div>
             <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
-              {battleLog.length > 0 ? (
-                battleLog.map((line, index) => (
+              {displayBattleLog.length > 0 ? (
+                displayBattleLog.map((line, index) => (
                   <div key={`${line}-${index}`} className="rounded-lg border border-white/8 bg-black/22 p-3 text-xs font-semibold leading-5 text-white/58">
                     {line}
                   </div>
@@ -3929,7 +4129,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
 
           <div className="mt-auto pb-16 xl:pb-20">
-            <FighterPanel name={playerLabel} image={playerImage} score={matchScore.player} tone="player" deckLeft={Math.max(0, playerDeck.length - usedPlayerCards.length)} side="left" />
+          <FighterPanel
+            name={displayPlayerName}
+            image={displayPlayerImage}
+            score={displayMatchScore.player}
+            tone="player"
+            deckLeft={Math.max(0, displayPlayerDeckCards.length)}
+            side="left"
+          />
           </div>
         </aside>
       </section>
