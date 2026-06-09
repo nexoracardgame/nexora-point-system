@@ -12,6 +12,7 @@ export type TriadRoomAccess = "public" | "private";
 export type TriadRoomStatus = "waiting" | "playing";
 export type TriadRoomSlot = "host" | "challenger";
 export type TriadDeckMode = "all" | "random";
+type TriadBlessingChoice = "draw-skill" | "reroll-own" | "reroll-opponent";
 
 export type TriadRoomSkillChoice = {
   fightNo: number;
@@ -23,6 +24,9 @@ export type TriadRoomSkillChoice = {
   deadlineAt: number;
   selectedTarget: string;
   skipped: boolean;
+  blessingChoice?: TriadBlessingChoice;
+  blessingDrawCardNo?: string;
+  blessingPreviewTopNo?: string;
 };
 
 export type TriadRoomParticipant = {
@@ -165,7 +169,7 @@ function normalizeDeckMode(value: unknown): TriadDeckMode {
 
 function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
   if (!Array.isArray(value)) return [];
-  return value
+  const mapped: Array<TriadRoomSkillChoice | null> = value
     .map((item) => {
       const raw = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
       const turn = Number(raw.turn || 1);
@@ -183,9 +187,15 @@ function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
         deadlineAt: Number(raw.deadlineAt || Date.now() + SKILL_CHOICE_TIMEOUT_MS),
         selectedTarget: cleanText(raw.selectedTarget),
         skipped: Boolean(raw.skipped),
+        blessingChoice:
+          raw.blessingChoice === "draw-skill" || raw.blessingChoice === "reroll-own" || raw.blessingChoice === "reroll-opponent"
+            ? raw.blessingChoice
+            : undefined,
+        blessingDrawCardNo: cleanText(raw.blessingDrawCardNo),
+        blessingPreviewTopNo: cleanText(raw.blessingPreviewTopNo),
       };
-    })
-    .filter((item): item is TriadRoomSkillChoice => Boolean(item));
+    });
+  return mapped.filter((item): item is TriadRoomSkillChoice => item !== null);
 }
 
 function normalizeGame(value: unknown): TriadRoomGame {
@@ -576,6 +586,12 @@ function randomSkillPool(seed: string) {
   ).slice(0, 20).map((card) => card.cardNo);
 }
 
+function randomCardNoByKind(kind: "monster" | "skill") {
+  const pool = triadCards.filter((card) => card.kind === kind);
+  const card = pool[Math.floor(Math.random() * Math.max(1, pool.length))];
+  return card?.cardNo || "";
+}
+
 function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["selectionPools"] {
   if (mode === "all") return { host: [], challenger: [] };
   const monsters = pairedMonsterPools(seed);
@@ -622,6 +638,53 @@ function currentTurnChoices(room: StoredTriadRoom) {
   return room.game.skillChoices.filter(
     (choice) => choice.fightNo === room.game.fightNo && choice.turn === room.game.activeTurn
   );
+}
+
+function currentTurnBlessings(room: StoredTriadRoom) {
+  return currentTurnChoices(room).filter((choice) => choice.cardNo === "254" && choice.selectedTarget && !choice.skipped);
+}
+
+function applyTurnBlessings(room: StoredTriadRoom) {
+  const hostTriangle = { ...room.game.triangles.host };
+  const challengerTriangle = { ...room.game.triangles.challenger };
+  const events: { choice: TriadRoomSkillChoice; summary: string }[] = [];
+  for (const choice of currentTurnBlessings(room)) {
+    const sideTriangle = choice.side === "host" ? hostTriangle : challengerTriangle;
+    const opponentTriangle = choice.side === "host" ? challengerTriangle : hostTriangle;
+    if (choice.selectedTarget === "draw-skill") {
+      events.push({
+        choice,
+        summary: choice.blessingDrawCardNo
+          ? `No.254 ขอพรศักดิ์สิทธิ์: สุ่มสกิลเพิ่ม No.${choice.blessingDrawCardNo}`
+          : "No.254 ขอพรศักดิ์สิทธิ์: สุ่มสกิลเพิ่ม",
+      });
+      continue;
+    }
+    if (choice.selectedTarget === "reroll-own") {
+      if (choice.blessingPreviewTopNo) {
+        sideTriangle.top = choice.blessingPreviewTopNo;
+      }
+      events.push({
+        choice,
+        summary: choice.blessingPreviewTopNo
+          ? `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "เรา" : "ตรงข้าม"}เป็น No.${choice.blessingPreviewTopNo}`
+          : `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "เรา" : "ตรงข้าม"}`,
+      });
+      continue;
+    }
+    if (choice.selectedTarget === "reroll-opponent") {
+      if (choice.blessingPreviewTopNo) {
+        opponentTriangle.top = choice.blessingPreviewTopNo;
+      }
+      events.push({
+        choice,
+        summary: choice.blessingPreviewTopNo
+          ? `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "ตรงข้าม" : "เรา"}เป็น No.${choice.blessingPreviewTopNo}`
+          : `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "ตรงข้าม" : "เรา"}`,
+      });
+    }
+  }
+  return { player: hostTriangle, opponent: challengerTriangle, events };
 }
 
 function ensureSkillChoices(room: StoredTriadRoom) {
@@ -683,14 +746,26 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
   const skippedSkillCardNos = currentTurnChoices(room)
     .filter((choice) => choice.skipped && !choice.selectedTarget)
     .map((choice) => choice.cardNo);
+  skippedSkillCardNos.push(...currentTurnBlessings(room).map(() => "254"));
+  const blessingState = applyTurnBlessings(room);
+  const playerTriangles = blessingState.player;
+  const opponentTriangles = blessingState.opponent;
   const rawResult = resolveTriadTurn({
     turn,
-    player: room.game.triangles[opener],
-    opponent: room.game.triangles[opener === "host" ? "challenger" : "host"],
+    player: opener === "host" ? playerTriangles : opponentTriangles,
+    opponent: opener === "host" ? opponentTriangles : playerTriangles,
     skippedSkillCardNos,
   });
   const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
-  room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
+  const blessingEvents = blessingState.events.map(({ choice, summary }) => ({
+    cardNo: choice.cardNo,
+    name: triadCards.find((card) => card.cardNo === choice.cardNo)?.name || "ขอพรศักดิ์สิทธิ์",
+    side: choice.side === opener ? "player" as const : "opponent" as const,
+    type: "unparsed" as const,
+    text: triadCards.find((card) => card.cardNo === choice.cardNo)?.skillText || "",
+    summary,
+  }));
+  room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), { ...result, skillEvents: [...blessingEvents, ...result.skillEvents] }].sort((a, b) => a.turn - b.turn);
 }
 
 function resolveTimeout(room: StoredTriadRoom) {
@@ -843,7 +918,28 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     await upsertStoredRoom(room);
     return { ok: false as const, reason: "choice_expired" as const, room: publicRoom(room) };
   }
-  choice.selectedTarget = cleanText(selectedTarget) || "selected";
+  const cleanTarget = cleanText(selectedTarget);
+  if (choice.cardNo === "254") {
+    if (!["draw-skill", "reroll-own", "reroll-opponent"].includes(cleanTarget)) {
+      return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+    }
+    choice.selectedTarget = cleanTarget;
+    choice.blessingChoice = cleanTarget as TriadBlessingChoice;
+    if (cleanTarget === "draw-skill") {
+      const drawn = randomCardNoByKind("skill");
+      if (drawn) {
+        choice.blessingDrawCardNo = drawn;
+        room.game.decks[side] = [...room.game.decks[side], drawn];
+      }
+    } else {
+      const drawn = randomCardNoByKind("monster");
+      if (drawn) {
+        choice.blessingPreviewTopNo = drawn;
+      }
+    }
+  } else {
+    choice.selectedTarget = cleanTarget || "selected";
+  }
   resolveIfBothLocked(room);
   await upsertStoredRoom(room);
   return {
@@ -880,7 +976,7 @@ export async function timeoutTriadRoomTurn(code: string, participantId: string) 
   if (!participantId || !participantInStoredRoom(room, participantId)) {
     return { ok: false as const, reason: "not_in_room" as const, room: publicRoom(room) };
   }
-  if (room.status !== "playing" || room.game.decks.host.length !== 9 || room.game.decks.challenger.length !== 9) {
+  if (room.status !== "playing" || room.game.decks.host.length < 13 || room.game.decks.challenger.length < 13) {
     return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
   }
   if (room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {
