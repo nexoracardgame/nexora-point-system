@@ -2265,6 +2265,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
   const resultAdvanceKeyRef = useRef("");
+  const deckBattleStartKeyRef = useRef("");
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
@@ -2950,8 +2951,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
     setDeckTimeLeft(roomDeckSecondsLeft(currentRoom));
     if ((phase === "deck" || deckSelectionActive) && currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger) {
-      resetBattlePlayState();
-      setPhase("battle");
       setBattleLog((current) => current.length ? current : ["ทั้งสองฝั่งล็อกเด็คแล้ว เริ่มสู้กันได้เลย"]);
     }
   }, [currentRoom, deckSelectionActive, opponentSide, ownDeckReady, phase, roomPlayerSide]);
@@ -3064,8 +3063,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         },
       }));
       if (optimisticRoom?.game.deckReady.host && optimisticRoom?.game.deckReady.challenger) {
-        resetBattlePlayState();
-        setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
         setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
@@ -3085,8 +3082,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setBotDeck(enemyDeck);
       setPlayerDeck(ownDeck);
       if (room.game.deckReady.host && room.game.deckReady.challenger) {
-        resetBattlePlayState();
-        setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
         setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
@@ -3117,8 +3112,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           if (result.ok) {
             const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
             if (room?.game.deckReady.host && room.game.deckReady.challenger) {
-              resetBattlePlayState();
-              setPhase("battle");
               setBattleLog(["หมดเวลาเลือกเด็ค ระบบล็อกเด็คเท่าที่เลือกไว้แล้ว"]);
             }
           }
@@ -3127,6 +3120,23 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }, 1000);
     return () => window.clearInterval(timer);
   }, [currentRoom, deckSelectionActive, deckValidation.valid, ownDeckReady, opponentSide, phase, playerDeck, roomPlayerSide]);
+
+  useEffect(() => {
+    if (!currentRoom || currentRoom.status !== "playing") return;
+    const decksReady = Boolean(currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger);
+    if (!decksReady) {
+      deckBattleStartKeyRef.current = "";
+      return;
+    }
+
+    const startKey = `${currentRoom.code}:${currentRoom.game.deckReady.host ? 1 : 0}:${currentRoom.game.deckReady.challenger ? 1 : 0}`;
+    if (deckBattleStartKeyRef.current === startKey && phase === "battle") return;
+    deckBattleStartKeyRef.current = startKey;
+
+    resetBattlePlayState();
+    setPhase("battle");
+    setBattleLog((current) => (current.length ? current : ["ทั้งสองฝั่งล็อคเด็คแล้ว เริ่มสู้กันได้เลย"]));
+  }, [currentRoom, phase]);
 
   function resetBattle() {
     setPhase("deck");
