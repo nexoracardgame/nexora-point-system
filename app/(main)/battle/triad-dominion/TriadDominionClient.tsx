@@ -1594,6 +1594,51 @@ function CardHoverPreview({ card }: { card: CardView | null }) {
   );
 }
 
+function DeckSelectionStatusBanner({
+  title,
+  leftName,
+  rightName,
+  timerText,
+  message,
+  compact = false,
+}: {
+  title: string;
+  leftName: string;
+  rightName: string;
+  timerText: string;
+  message: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-2xl border shadow-[0_18px_44px_rgba(0,0,0,0.26)] backdrop-blur-md",
+        compact
+          ? "border-amber-200/18 bg-black/72 px-3 py-2"
+          : "border-amber-200/16 bg-amber-300/10 px-4 py-3",
+      ].join(" ")}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${compact ? "text-amber-100/62" : "text-amber-100/70"}`}>
+            {title}
+          </div>
+          <div className="mt-1 text-sm font-black text-white">
+            {leftName} และ {rightName}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-amber-100/18 bg-black/42 px-3 py-2 text-right">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/52">เวลาที่เหลือ</div>
+          <div className={`${compact ? "text-2xl" : "text-3xl"} font-black text-amber-100`}>{timerText}</div>
+        </div>
+      </div>
+      <div className={`mt-2 text-xs font-semibold leading-5 ${compact ? "text-white/56" : "text-white/62"}`}>
+        {message}
+      </div>
+    </div>
+  );
+}
+
 function SpectatorDeckStrip({
   title,
   cards,
@@ -4031,6 +4076,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </section>
 
+        <div className="px-4 pb-2 sm:px-6 xl:px-8">
+          <div className="rounded-2xl border border-cyan-200/14 bg-cyan-300/8 px-4 py-3 text-sm font-semibold leading-6 text-cyan-50/78">
+            เมื่อเริ่มเกม ทั้งสองฝั่งจะเข้าสู่ช่วงเลือกเด็คพร้อมกัน ผู้ชมจะเห็นตัวนับถอยหลัง 5 นาทีและชื่อของฝั่งที่กำลังจัดเด็คอย่างชัดเจน
+          </div>
+        </div>
+
         <section className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[1fr_320px] xl:p-8">
           <div className="grid gap-4 md:grid-cols-2">
             <RoomSeatCard
@@ -4148,6 +4199,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </section>
 
+        {deckSelectionActive ? (
+          <div className="px-4 pb-2 sm:px-6 lg:px-8">
+            <DeckSelectionStatusBanner
+              title="กำลังเลือกเด็ค"
+              leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+              rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+              timerText={deckTimerText}
+              message="ทั้งสองฝั่งกำลังจัดเด็คพร้อมกันจนกว่าจะกดพร้อมครบ ผู้ชมจะเห็นสถานะนี้แบบเดียวกันทั้งห้อง"
+            />
+          </div>
+        ) : null}
+
         <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {selectableDeckCatalog.map((card) => {
@@ -4250,6 +4313,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         >
           ออกห้อง
         </button>
+      ) : null}
+      {deckSelectionActive ? (
+        <div className="pointer-events-none absolute left-4 right-4 top-16 z-30 sm:left-auto sm:right-4 sm:w-[min(390px,calc(100%-2rem))]">
+          <DeckSelectionStatusBanner
+            title="กำลังเลือกเด็ค"
+            leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+            rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+            timerText={deckTimerText}
+            message="ผู้ชมจะเห็นสถานะนี้จนกว่าทั้งสองฝั่งจะกดพร้อมครบ เกมจึงจะเริ่มต่อได้"
+            compact
+          />
+        </div>
       ) : null}
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
