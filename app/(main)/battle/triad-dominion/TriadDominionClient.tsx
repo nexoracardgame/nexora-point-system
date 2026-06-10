@@ -1520,6 +1520,8 @@ function SpectatorBattleOverview({
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
 
+  return null;
+
   const visibleTurns = turns.slice().sort((a, b) => a.turn - b.turn);
 
   return (
@@ -1614,25 +1616,25 @@ function DeckSelectionStatusBanner({
       className={[
         "rounded-2xl border shadow-[0_18px_44px_rgba(0,0,0,0.26)] backdrop-blur-md",
         compact
-          ? "border-amber-200/18 bg-black/72 px-3 py-2"
-          : "border-amber-200/16 bg-amber-300/10 px-4 py-3",
+          ? "border-white/10 bg-black/76 px-3 py-2"
+          : "border-white/10 bg-black/72 px-4 py-3",
       ].join(" ")}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${compact ? "text-amber-100/62" : "text-amber-100/70"}`}>
+          <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${compact ? "text-cyan-100/62" : "text-cyan-100/70"}`}>
             {title}
           </div>
           <div className="mt-1 text-sm font-black text-white">
             {leftName} และ {rightName}
           </div>
         </div>
-        <div className="rounded-2xl border border-amber-100/18 bg-black/42 px-3 py-2 text-right">
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/52">เวลาที่เหลือ</div>
-          <div className={`${compact ? "text-2xl" : "text-3xl"} font-black text-amber-100`}>{timerText}</div>
+        <div className="rounded-2xl border border-white/10 bg-black/48 px-3 py-2 text-right">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/46">เวลาที่เหลือ</div>
+          <div className={`${compact ? "text-2xl" : "text-3xl"} font-black text-white`}>{timerText}</div>
         </div>
       </div>
-      <div className={`mt-2 text-xs font-semibold leading-5 ${compact ? "text-white/56" : "text-white/62"}`}>
+      <div className={`mt-2 text-xs font-semibold leading-5 ${compact ? "text-white/50" : "text-white/58"}`}>
         {message}
       </div>
     </div>
@@ -1643,10 +1645,12 @@ function SpectatorDeckStrip({
   title,
   cards,
   tone,
+  onPreview,
 }: {
   title: string;
   cards: CardView[];
   tone: "top" | "bottom";
+  onPreview?: (card: CardView | null) => void;
 }) {
   const accent =
     tone === "top"
@@ -1664,10 +1668,28 @@ function SpectatorDeckStrip({
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(2.7rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] md:grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))]">
         {cards.map((card) => (
-          <div key={card.cardNo} className="relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)]">
-            <Image src={card.sourceImage} alt={card.name} fill sizes="80px" quality={90} unoptimized loading="eager" className="object-cover" />
+          <button
+            key={card.cardNo}
+            type="button"
+            onMouseEnter={() => onPreview?.(card)}
+            onMouseLeave={() => onPreview?.(null)}
+            onFocus={() => onPreview?.(card)}
+            onBlur={() => onPreview?.(null)}
+            onClick={() => onPreview?.(card)}
+            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/55 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
+          >
+            <Image
+              src={card.sourceImage}
+              alt={card.name}
+              fill
+              sizes="72px"
+              quality={92}
+              unoptimized
+              loading="eager"
+              className="object-cover transition duration-200 group-hover:scale-[1.04]"
+            />
             <div className="absolute left-1 top-1 rounded bg-black/72 px-1 py-0.5 text-[8px] font-black text-white">{card.cardNo}</div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -2266,6 +2288,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [fightNo, setFightNo] = useState(1);
   const [matchScore, setMatchScore] = useState({ player: 0, bot: 0 });
   const [battleLog, setBattleLog] = useState<string[]>([]);
+  const [spectatorPreviewCard, setSpectatorPreviewCard] = useState<CardView | null>(null);
 
   const playerDeckCards = playerDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botDeckCards = botDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -4325,6 +4348,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           />
         </div>
       ) : null}
+      {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} /> : null}
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -4361,8 +4385,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       </section>
 
       <section className="grid min-h-0 gap-2 p-2 pt-16 sm:gap-3 sm:p-3 sm:pt-16 xl:grid-cols-[minmax(0,1fr)_220px]">
-        <section className="grid min-h-0 grid-rows-[minmax(390px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(500px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(500px,calc(100vh-360px))_auto_auto]">
-          {deckSelectionActive ? (
+        <section className="grid min-h-0 grid-rows-[minmax(460px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(540px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
+          {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -4386,7 +4410,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
           {isSpectator ? (
             <div className="grid gap-2 sm:gap-3">
-              <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" />
+              <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" onPreview={setSpectatorPreviewCard} />
               <CompactBattleBoard
                 cardsByNo={cardsByNo}
                 lockedFight={displayLockedFight}
@@ -4425,7 +4449,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   setPlayerLane(lane, cardNo);
                 }}
               />
-              <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" />
+              <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" onPreview={setSpectatorPreviewCard} />
             </div>
           ) : (
             <CompactBattleBoard
@@ -4468,16 +4492,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             />
           )}
           <BlessingChoiceOverlay card={pendingBlessingChoice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
-
-          {isSpectator ? (
-            <SpectatorBattleOverview
-              hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
-              challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
-              hostDeckCards={displayPlayerDeckCards}
-              challengerDeckCards={displayBotDeckCards}
-              turns={displayLockedFight?.turns || []}
-            />
-          ) : null}
 
           {!isSpectator ? (
             <PlayerHand
