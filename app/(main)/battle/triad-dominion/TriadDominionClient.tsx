@@ -3193,7 +3193,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (currentRoom && roomPlayerSide && opponentSide) {
       const needsSkillChoice = Boolean(playerCard && skillNeedsChoice(playerCard));
       const previousRoom = currentRoom;
-      const previousRoom = currentRoom;
       patchCurrentRoom((room) => ({
         ...room,
         game: {
