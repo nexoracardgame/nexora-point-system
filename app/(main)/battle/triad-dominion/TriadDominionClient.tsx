@@ -1966,8 +1966,6 @@ function CompactBattleBoard({
   botDeckLeft,
   playerGraveCards,
   botGraveCards,
-  spectatorTopDeckCards,
-  spectatorBottomDeckCards,
   playerName,
   botName,
   playerImage,
@@ -1984,7 +1982,6 @@ function CompactBattleBoard({
   onDrawRandomCard,
   onSelectLane,
   onPlaceCard,
-  viewMode = "player",
   blessingAuras = null,
 }: {
   cardsByNo: Map<string, CardView>;
@@ -1999,8 +1996,6 @@ function CompactBattleBoard({
   botDeckLeft: number;
   playerGraveCards: CardView[];
   botGraveCards: CardView[];
-  spectatorTopDeckCards?: CardView[];
-  spectatorBottomDeckCards?: CardView[];
   playerName: string;
   botName: string;
   playerImage: string;
@@ -2017,7 +2012,6 @@ function CompactBattleBoard({
   onDrawRandomCard: () => void;
   onSelectLane: (lane: Lane) => void;
   onPlaceCard: (lane: Lane, cardNo: string) => void;
-  viewMode?: "player" | "spectator";
   blessingAuras?: { player?: TargetAura; bot?: TargetAura } | null;
 }) {
   const playerTriangle = lockedFight?.player || player;
@@ -2052,8 +2046,6 @@ function CompactBattleBoard({
   if (blessingAuras?.player) playerAuraByLane.top = blessingAuras.player;
   if (blessingAuras?.bot) botAuraByLane.top = blessingAuras.bot;
   const waitingCard = waitingSkillChoice ? cardsByNo.get(waitingSkillChoice.cardNo) : undefined;
-  const topBadgeLabel = viewMode === "spectator" ? "ฝ่ายบน" : "คู่แข่ง";
-  const bottomBadgeLabel = viewMode === "spectator" ? "ฝ่ายล่าง" : "เรา";
 
   return (
     <div className="relative h-full min-h-[360px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[460px] xl:min-h-0">
@@ -2081,16 +2073,6 @@ function CompactBattleBoard({
         </div>
         <Image src={playerImage || "/avatar.png"} alt={playerName} width={44} height={44} className="h-10 w-10 shrink-0 rounded-xl border border-red-100/18 object-contain" />
       </div>
-      {viewMode === "spectator" && spectatorTopDeckCards && spectatorBottomDeckCards ? (
-        <>
-          <div className="absolute left-3 right-3 top-16 z-30 sm:left-4 sm:right-4">
-            <SpectatorDeckStrip title={`ฝั่งบน · ${botName}`} cards={spectatorTopDeckCards} tone="top" />
-          </div>
-          <div className="absolute left-3 right-3 bottom-16 z-30 sm:left-4 sm:right-4">
-            <SpectatorDeckStrip title={`ฝั่งล่าง · ${playerName}`} cards={spectatorBottomDeckCards} tone="bottom" />
-          </div>
-        </>
-      ) : null}
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
         botCard={botTriangle[activeLane] ? cardsByNo.get(botTriangle[activeLane]) : undefined}
@@ -3163,6 +3145,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     if (currentRoom && roomPlayerSide && opponentSide) {
       const needsSkillChoice = Boolean(playerCard && skillNeedsChoice(playerCard));
+      const previousRoom = currentRoom;
+      const previousRoom = currentRoom;
       patchCurrentRoom((room) => ({
         ...room,
         game: {
@@ -3204,6 +3188,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         cardNo: player[lane],
       }).then((result) => {
         if (!result.ok) {
+          setTurnLocked(false);
+          if (previousRoom) patchCurrentRoom(() => previousRoom);
           void syncRooms({ force: true }).catch(() => null);
           setBattleLog((current) => ["ล็อกการ์ดในห้อง PvP ไม่ได้", ...current]);
           return;
@@ -4300,47 +4286,89 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
       <section className="grid min-h-0 gap-2 p-2 pt-16 sm:gap-3 sm:p-3 sm:pt-16 xl:grid-cols-[minmax(0,1fr)_220px]">
         <section className="grid min-h-0 grid-rows-[minmax(390px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(500px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(500px,calc(100vh-360px))_auto_auto]">
-          <CompactBattleBoard
-            cardsByNo={cardsByNo}
-            lockedFight={displayLockedFight}
-            player={displayPlayer}
-            revealed={displayRevealed}
-            activeTurn={displayActiveTurn}
-            matchScore={displayMatchScore}
-            fightNo={displayFightNo}
-            fightScore={displayFightScore}
-            playerDeckLeft={Math.max(0, displayPlayerDeckCards.length)}
-            botDeckLeft={Math.max(0, displayBotDeckCards.length)}
-            playerGraveCards={playerGraveCards}
-            botGraveCards={botGraveCards}
-            spectatorTopDeckCards={displayBotDeckCards}
-            spectatorBottomDeckCards={displayPlayerDeckCards}
-            playerName={displayPlayerName}
-            botName={displayBotName}
-            playerImage={displayPlayerImage}
-            botImage={displayBotImage}
-            placementLane={placementLane}
-            timeLeft={displayTimeLeft}
-            turnLocked={displayTurnLocked}
-            pendingSkillChoice={pendingSkillChoice}
-            waitingSkillChoice={waitingSkillChoice}
-            revealAllCards={isSpectator}
-            randomCard={randomDrawCard}
-            viewMode={isSpectator ? "spectator" : "player"}
-            blessingAuras={displayBlessingAuras}
-            onSelectSkillTarget={(target) =>
-              setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
-            }
-            onConfirmSkillTarget={confirmSkillTarget}
-            onDrawRandomCard={() => {
-              void drawRandomCard();
-            }}
-            onSelectLane={setPlacementLane}
-            onPlaceCard={(lane, cardNo) => {
-              setPlacementLane(lane);
-              setPlayerLane(lane, cardNo);
-            }}
-          />
+          {isSpectator ? (
+            <div className="grid gap-2 sm:gap-3">
+              <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" />
+              <CompactBattleBoard
+                cardsByNo={cardsByNo}
+                lockedFight={displayLockedFight}
+                player={displayPlayer}
+                revealed={displayRevealed}
+                activeTurn={displayActiveTurn}
+                matchScore={displayMatchScore}
+                fightNo={displayFightNo}
+                fightScore={displayFightScore}
+                playerDeckLeft={Math.max(0, displayPlayerDeckCards.length)}
+                botDeckLeft={Math.max(0, displayBotDeckCards.length)}
+                playerGraveCards={playerGraveCards}
+                botGraveCards={botGraveCards}
+                playerName={displayPlayerName}
+                botName={displayBotName}
+                playerImage={displayPlayerImage}
+                botImage={displayBotImage}
+                placementLane={placementLane}
+                timeLeft={displayTimeLeft}
+                turnLocked={displayTurnLocked}
+                pendingSkillChoice={pendingSkillChoice}
+                waitingSkillChoice={waitingSkillChoice}
+                revealAllCards={isSpectator}
+                randomCard={randomDrawCard}
+                blessingAuras={displayBlessingAuras}
+                onSelectSkillTarget={(target) =>
+                  setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
+                }
+                onConfirmSkillTarget={confirmSkillTarget}
+                onDrawRandomCard={() => {
+                  void drawRandomCard();
+                }}
+                onSelectLane={setPlacementLane}
+                onPlaceCard={(lane, cardNo) => {
+                  setPlacementLane(lane);
+                  setPlayerLane(lane, cardNo);
+                }}
+              />
+              <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" />
+            </div>
+          ) : (
+            <CompactBattleBoard
+              cardsByNo={cardsByNo}
+              lockedFight={displayLockedFight}
+              player={displayPlayer}
+              revealed={displayRevealed}
+              activeTurn={displayActiveTurn}
+              matchScore={displayMatchScore}
+              fightNo={displayFightNo}
+              fightScore={displayFightScore}
+              playerDeckLeft={Math.max(0, displayPlayerDeckCards.length)}
+              botDeckLeft={Math.max(0, displayBotDeckCards.length)}
+              playerGraveCards={playerGraveCards}
+              botGraveCards={botGraveCards}
+              playerName={displayPlayerName}
+              botName={displayBotName}
+              playerImage={displayPlayerImage}
+              botImage={displayBotImage}
+              placementLane={placementLane}
+              timeLeft={displayTimeLeft}
+              turnLocked={displayTurnLocked}
+              pendingSkillChoice={pendingSkillChoice}
+              waitingSkillChoice={waitingSkillChoice}
+              revealAllCards={isSpectator}
+              randomCard={randomDrawCard}
+              blessingAuras={displayBlessingAuras}
+              onSelectSkillTarget={(target) =>
+                setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
+              }
+              onConfirmSkillTarget={confirmSkillTarget}
+              onDrawRandomCard={() => {
+                void drawRandomCard();
+              }}
+              onSelectLane={setPlacementLane}
+              onPlaceCard={(lane, cardNo) => {
+                setPlacementLane(lane);
+                setPlayerLane(lane, cardNo);
+              }}
+            />
+          )}
           <BlessingChoiceOverlay card={pendingBlessingChoice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
 
           {isSpectator ? (
