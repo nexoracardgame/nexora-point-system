@@ -355,6 +355,14 @@ function participantInRoom(room: TriadRoom | undefined, participantId: string) {
   );
 }
 
+function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhase | null {
+  const spectator = room.spectators.some((viewer) => viewer.id === participantId);
+  const fieldPlayer = room.seats.host?.id === participantId || room.seats.challenger?.id === participantId;
+  if (!spectator && !fieldPlayer) return null;
+  if (spectator) return "battle";
+  return room.game.deckReady.host && room.game.deckReady.challenger ? "battle" : "deck";
+}
+
 function removeParticipant(room: TriadRoom, participantId: string): TriadRoom {
   return {
     ...room,
@@ -2550,13 +2558,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const activeCode = activeRoomCodeRef.current;
     const reconnectRoom = !activeCode ? nextRooms.find((room) => participantInRoom(room, participant.id)) : null;
     if (reconnectRoom) {
-      const reconnectAsSpectator = reconnectRoom.spectators.some((viewer) => viewer.id === participant.id);
-      const reconnectDecksReady = Boolean(reconnectRoom.game.deckReady.host && reconnectRoom.game.deckReady.challenger);
       activeRoomCodeRef.current = reconnectRoom.code;
       activeRoomSnapshotRef.current = reconnectRoom;
       setActiveRoomCode(reconnectRoom.code);
       setActiveRoomSnapshot(reconnectRoom);
-      setPhase(reconnectRoom.status === "playing" ? (reconnectAsSpectator || reconnectDecksReady ? "battle" : "deck") : "room");
+      setPhase(reconnectRoom.status === "playing" ? phaseForPlayingRoom(reconnectRoom, participant.id) || "battle" : "room");
       setLobbyMessage("");
     }
     if (activeCode && !nextRooms.some((room) => room.code === activeCode)) {
@@ -2607,6 +2613,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (actionRoom) {
       activeRoomSnapshotRef.current = actionRoom;
       setActiveRoomSnapshot(actionRoom);
+      if (participantInRoom(actionRoom, participant.id) && actionRoom.status === "playing") {
+        const nextPhase = phaseForPlayingRoom(actionRoom, participant.id);
+        if (nextPhase) setPhase(nextPhase);
+      }
     } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
       activeRoomCodeRef.current = "";
       activeRoomSnapshotRef.current = null;
@@ -2689,9 +2699,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     activeRoomCodeRef.current = joinedRoom.code;
     setActiveRoomCode(joinedRoom.code);
     setLobbyMessage(result.payload?.joinedAs === "spectator" ? "เข้ามาเป็นผู้ชมแล้ว" : "");
-    const joinedDecksReady = Boolean(joinedRoom.game.deckReady.host && joinedRoom.game.deckReady.challenger);
-    const joinedAsSpectator = Boolean(result.payload?.joinedAs === "spectator" || joinedRoom.spectators.some((viewer) => viewer.id === participant.id));
-    setPhase(joinedRoom.status === "playing" ? (joinedAsSpectator || joinedDecksReady ? "battle" : "deck") : "room");
+    setPhase(joinedRoom.status === "playing" ? phaseForPlayingRoom(joinedRoom, participant.id) || "battle" : "room");
   };
 
   const moveToSpectator = async () => {
@@ -2854,10 +2862,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       }
 
       if (roomIncludesMe) {
-        const spectator = room.spectators.some((viewer) => viewer.id === participant.id);
-        const decksReady = Boolean(room.game.deckReady.host && room.game.deckReady.challenger);
         setPhase((currentPhase) => {
-          if (room.status === "playing") return spectator || decksReady ? "battle" : "deck";
+          if (room.status === "playing") return phaseForPlayingRoom(room, participant.id) || currentPhase;
           if (currentPhase === "deck" || currentPhase === "battle" || currentPhase === "lobby") return "room";
           return currentPhase;
         });
@@ -2890,10 +2896,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase("room");
       return;
     }
-    if (currentRoom.status === "playing" && phase === "room") {
-      setPhase(isSpectator ? "battle" : "deck");
+    if (currentRoom.status === "playing") {
+      const nextPhase = phaseForPlayingRoom(currentRoom, participant.id);
+      if (nextPhase && phase !== nextPhase) setPhase(nextPhase);
     }
-  }, [currentRoom, isSpectator, participant.id, phase]);
+  }, [currentRoom, participant.id, phase]);
 
   useEffect(() => {
     if (!currentRoom?.game.matchWinner || !currentRoom.game.matchEndedAt || !isRoomController) return;
