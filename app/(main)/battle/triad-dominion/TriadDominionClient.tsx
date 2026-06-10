@@ -2359,6 +2359,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
+  const deckSelectionActive = Boolean(currentRoom && currentRoom.status === "playing" && !bothDecksReady);
+  const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
   const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
   const deckSelectionGuide =
     currentDeckMode === "skill"
@@ -2879,12 +2881,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       turns: mappedTurns,
     });
     setDeckTimeLeft(roomDeckSecondsLeft(currentRoom));
-    if (phase === "deck" && currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger) {
+    if ((phase === "deck" || deckSelectionActive) && currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger) {
       resetBattlePlayState();
       setPhase("battle");
       setBattleLog((current) => current.length ? current : ["ทั้งสองฝั่งล็อกเด็คแล้ว เริ่มสู้กันได้เลย"]);
     }
-  }, [currentRoom, opponentSide, ownDeckReady, phase, roomPlayerSide]);
+  }, [currentRoom, deckSelectionActive, opponentSide, ownDeckReady, phase, roomPlayerSide]);
 
   useEffect(() => {
     if (!ownPendingRoomSkillChoice || !roomPlayerSide) {
@@ -3034,11 +3036,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   useEffect(() => {
-    if (phase !== "deck" || !currentRoom) return;
+    if (!currentRoom || (!deckSelectionActive && phase !== "deck")) return;
     const timer = window.setInterval(() => {
       const nextLeft = roomDeckSecondsLeft(currentRoom);
       setDeckTimeLeft(nextLeft);
-      if (nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && deckValidation.valid) {
+      if (phase === "deck" && nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && deckValidation.valid) {
         void postRoomAction({
           action: "ready-deck",
           code: currentRoom.code,
@@ -3056,7 +3058,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [currentRoom, opponentSide, ownDeckReady, phase, playerDeck, roomPlayerSide]);
+  }, [currentRoom, deckSelectionActive, deckValidation.valid, ownDeckReady, opponentSide, phase, playerDeck, roomPlayerSide]);
 
   function resetBattle() {
     setPhase("deck");
@@ -4286,6 +4288,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
       <section className="grid min-h-0 gap-2 p-2 pt-16 sm:gap-3 sm:p-3 sm:pt-16 xl:grid-cols-[minmax(0,1fr)_220px]">
         <section className="grid min-h-0 grid-rows-[minmax(390px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(500px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(500px,calc(100vh-360px))_auto_auto]">
+          {deckSelectionActive ? (
+            <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/70">
+                    กำลังเลือกเด็ค
+                  </div>
+                  <div className="mt-1 text-sm font-black text-white">
+                    {currentRoom?.seats.host?.name || "ฝั่งบน"} และ {currentRoom?.seats.challenger?.name || "ฝั่งล่าง"} กำลังเลือกเด็คอยู่
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-amber-100/18 bg-black/40 px-3 py-2 text-right">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/52">เวลาที่เหลือ</div>
+                  <div className="text-3xl font-black text-amber-100">{deckTimerText}</div>
+                </div>
+              </div>
+              <div className="mt-2 text-xs font-semibold leading-5 text-white/62">
+                ผู้ชมจะเห็นสถานะนี้จนกว่าทั้งสองฝั่งจะกดพร้อมครบ เด็คถึงจะเริ่มสู้ต่อได้
+              </div>
+            </div>
+          ) : null}
+
           {isSpectator ? (
             <div className="grid gap-2 sm:gap-3">
               <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" />
