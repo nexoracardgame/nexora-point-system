@@ -1454,6 +1454,57 @@ function PlayerHand({
   );
 }
 
+function SpectatorDeckRail({
+  title,
+  cards,
+  tone,
+  onPreview,
+}: {
+  title: string;
+  cards: CardView[];
+  tone: "host" | "challenger";
+  onPreview: (card: CardView | null) => void;
+}) {
+  const border = tone === "host" ? "border-cyan-200/18" : "border-rose-200/18";
+  const glow = tone === "host" ? "shadow-[0_0_26px_rgba(34,211,238,0.14)]" : "shadow-[0_0_26px_rgba(248,113,113,0.14)]";
+  return (
+    <div className={`rounded-xl border bg-black/28 p-3 ${border} ${glow}`}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-xs font-black uppercase tracking-[0.16em] text-white/52">{title}</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/34">13 ใบ</div>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3.6rem,1fr))]">
+        {cards.map((card) => (
+          <button
+            key={card.cardNo}
+            type="button"
+            onMouseEnter={() => onPreview(card)}
+            onMouseLeave={() => onPreview(null)}
+            onFocus={() => onPreview(card)}
+            onBlur={() => onPreview(null)}
+            onClick={() => onPreview(card)}
+            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_12px_22px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/60 hover:shadow-[0_0_34px_rgba(251,191,36,0.24)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
+          >
+            <Image
+              src={card.sourceImage}
+              alt={card.name}
+              fill
+              sizes="118px"
+              quality={100}
+              unoptimized
+              loading="eager"
+              className="object-cover transition duration-200 group-hover:scale-[1.04]"
+            />
+            <div className="absolute left-1 top-1 rounded bg-black/72 px-1.5 py-0.5 text-[8px] font-black text-white">
+              {card.cardNo}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SpectatorBattleOverview({
   hostName,
   challengerName,
@@ -1467,7 +1518,9 @@ function SpectatorBattleOverview({
   challengerDeckCards: CardView[];
   turns: TriadTurnResult[];
 }) {
-  function DeckRail({
+  const [previewCard, setPreviewCard] = useState<CardView | null>(null);
+
+  function renderDeckRail({
     title,
     cards,
     tone,
@@ -1484,11 +1537,17 @@ function SpectatorBattleOverview({
           <div className="text-xs font-black uppercase tracking-[0.16em] text-white/52">{title}</div>
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/34">13 ใบ</div>
         </div>
-        <div className="grid grid-cols-9 gap-1">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3.6rem,1fr))]">
           {cards.map((card) => (
-            <div
+            <button
               key={card.cardNo}
-              className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border border-white/10 bg-black"
+              type="button"
+              onMouseEnter={() => setPreviewCard(card)}
+              onMouseLeave={() => setPreviewCard((current) => (current?.cardNo === card.cardNo ? null : current))}
+              onFocus={() => setPreviewCard(card)}
+              onBlur={() => setPreviewCard((current) => (current?.cardNo === card.cardNo ? null : current))}
+              onClick={() => setPreviewCard(card)}
+              className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_12px_22px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/60 hover:shadow-[0_0_34px_rgba(251,191,36,0.24)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
             >
               <Image
                 src={card.sourceImage}
@@ -1498,12 +1557,12 @@ function SpectatorBattleOverview({
                 quality={100}
                 unoptimized
                 loading="eager"
-                className="object-cover"
+                className="object-cover transition duration-200 group-hover:scale-[1.04]"
               />
               <div className="absolute left-1 top-1 rounded bg-black/72 px-1.5 py-0.5 text-[8px] font-black text-white">
                 {card.cardNo}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1514,13 +1573,14 @@ function SpectatorBattleOverview({
 
   return (
     <div className="rounded-xl border border-violet-200/18 bg-black/28 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.28)]">
+      <CardHoverPreview card={previewCard} />
       <div className="mb-3 flex items-center gap-2 text-sm font-black text-violet-100">
         <Eye className="h-4 w-4 text-violet-200" />
         มุมมองผู้ชมสด
       </div>
       <div className="space-y-3">
-        <DeckRail title={challengerName} cards={challengerDeckCards} tone="challenger" />
-        <DeckRail title={hostName} cards={hostDeckCards} tone="host" />
+        <SpectatorDeckRail title={challengerName} cards={challengerDeckCards} tone="challenger" onPreview={setPreviewCard} />
+        <SpectatorDeckRail title={hostName} cards={hostDeckCards} tone="host" onPreview={setPreviewCard} />
       </div>
       <div className="mt-4 rounded-xl border border-white/8 bg-white/[0.03] p-3">
         <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">ผลตาที่จบแล้ว</div>

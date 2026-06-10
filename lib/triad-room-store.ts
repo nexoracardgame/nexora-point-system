@@ -102,7 +102,6 @@ type TriadRoomRow = {
 const SPECTATOR_LIMIT = 10;
 const TURN_TIMEOUT_MS = 120_000;
 const SKILL_CHOICE_TIMEOUT_MS = 30_000;
-const DECK_SELECT_TIMEOUT_MS = 5 * 60_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
 const PLAYING_ROOM_TTL_MS = 30 * 60_000;
 
@@ -527,12 +526,11 @@ export async function listTriadRooms() {
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
   for (const room of aliveRooms) {
-    const deckFinalized = deckSelectExpired(room) && finalizeDeckSelection(room);
     const choicesExpired = markExpiredSkillChoices(room);
     const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
     resolveIfBothLocked(room);
     const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    if (deckFinalized || choicesExpired || resolvedAfterChoiceTimeout) {
+    if (choicesExpired || resolvedAfterChoiceTimeout) {
       await upsertStoredRoom(room);
     }
   }
@@ -669,10 +667,6 @@ function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["
 function freshGame(): TriadRoomGame {
   const now = Date.now();
   return normalizeGame({ deckStartedAt: now, turnStartedAt: now });
-}
-
-function deckSelectExpired(room: StoredTriadRoom, now = Date.now()) {
-  return room.status === "playing" && now - Number(room.game.deckStartedAt || room.createdAt) >= DECK_SELECT_TIMEOUT_MS;
 }
 
 function battleDecksReady(room: StoredTriadRoom) {
@@ -910,9 +904,6 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
     return { ok: false as const, reason: "deck_locked" as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
   }
   room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
-  if (deckSelectExpired(room)) {
-    finalizeDeckSelection(room, true);
-  }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
 }
@@ -936,7 +927,7 @@ export async function readyTriadRoomDeck(code: string, participantId: string, de
     }
     room.game.deckReady[side] = true;
   }
-  if ((!wasBattleReady && battleDecksReady(room)) || deckSelectExpired(room)) {
+  if (!wasBattleReady && battleDecksReady(room)) {
     finalizeDeckSelection(room, true);
   }
   await upsertStoredRoom(room);
