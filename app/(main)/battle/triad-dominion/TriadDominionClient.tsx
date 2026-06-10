@@ -1520,55 +1520,6 @@ function SpectatorBattleOverview({
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
 
-  function renderDeckRail({
-    title,
-    cards,
-    tone,
-  }: {
-    title: string;
-    cards: CardView[];
-    tone: "host" | "challenger";
-  }) {
-    const border = tone === "host" ? "border-cyan-200/18" : "border-rose-200/18";
-    const glow = tone === "host" ? "shadow-[0_0_26px_rgba(34,211,238,0.14)]" : "shadow-[0_0_26px_rgba(248,113,113,0.14)]";
-    return (
-      <div className={`rounded-xl border bg-black/28 p-3 ${border} ${glow}`}>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="text-xs font-black uppercase tracking-[0.16em] text-white/52">{title}</div>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/34">13 ใบ</div>
-        </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3.6rem,1fr))]">
-          {cards.map((card) => (
-            <button
-              key={card.cardNo}
-              type="button"
-              onMouseEnter={() => setPreviewCard(card)}
-              onMouseLeave={() => setPreviewCard((current) => (current?.cardNo === card.cardNo ? null : current))}
-              onFocus={() => setPreviewCard(card)}
-              onBlur={() => setPreviewCard((current) => (current?.cardNo === card.cardNo ? null : current))}
-              onClick={() => setPreviewCard(card)}
-              className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_12px_22px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/60 hover:shadow-[0_0_34px_rgba(251,191,36,0.24)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
-            >
-              <Image
-                src={card.sourceImage}
-                alt={card.name}
-                fill
-                sizes="118px"
-                quality={100}
-                unoptimized
-                loading="eager"
-                className="object-cover transition duration-200 group-hover:scale-[1.04]"
-              />
-              <div className="absolute left-1 top-1 rounded bg-black/72 px-1.5 py-0.5 text-[8px] font-black text-white">
-                {card.cardNo}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   const visibleTurns = turns.slice().sort((a, b) => a.turn - b.turn);
 
   return (
@@ -1666,9 +1617,9 @@ function SpectatorDeckStrip({
           {cards.length} ใบ
         </div>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(2.7rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] md:grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))]">
         {cards.map((card) => (
-          <div key={card.cardNo} className="relative h-24 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black sm:h-28 sm:w-20">
+          <div key={card.cardNo} className="relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)]">
             <Image src={card.sourceImage} alt={card.name} fill sizes="80px" quality={90} unoptimized loading="eager" className="object-cover" />
             <div className="absolute left-1 top-1 rounded bg-black/72 px-1 py-0.5 text-[8px] font-black text-white">{card.cardNo}</div>
           </div>
