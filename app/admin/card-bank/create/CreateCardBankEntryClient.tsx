@@ -93,10 +93,10 @@ function formatNumber(value: number) {
 
 function normalizeAssetTier(value?: string | null): BulkCategory | "unknown" {
   const normalized = String(value || "").trim().toLowerCase();
-  if (/bronze|เธเธฃเธญเธเธเน/.test(normalized)) return "bronze";
-  if (/silver|เธเธดเธฅเน€เธงเธญเธฃเน/.test(normalized)) return "silver";
-  if (/gold|เนเธเธฅเธ”เน/.test(normalized)) return "gold";
-  if (/pure|nex|coin|เน€เธเธตเธขเธง/.test(normalized)) return "pure";
+  if (/bronze|บรอนซ์/.test(normalized)) return "bronze";
+  if (/silver|ซิลเวอร์/.test(normalized)) return "silver";
+  if (/gold|โกลด์/.test(normalized)) return "gold";
+  if (/pure|nex|coin|เพียว/.test(normalized)) return "pure";
   return "unknown";
 }
 
@@ -114,14 +114,14 @@ function hasFoilBonusOption(set: NexoraCollectionSet) {
   return (
     /foil/.test(text) ||
     /ฟอยล์/.test(text) ||
-    /เน€เธยเน€เธเธเน€เธเธเน€เธเธ…/.test(text)
+    /พิเศษ/.test(text)
   );
 }
 
 function getSetConditionText(set: NexoraCollectionSet) {
   if (!hasFoilBonusOption(set)) return "";
   const parts = set.reward.split(";").map((part) => part.trim()).filter(Boolean);
-  return parts.find((part) => /foil|ฟอยล์|เน€เธยเน€เธเธเน€เธเธเน€เธเธ…/i.test(part)) || set.story;
+  return parts.find((part) => /foil|ฟอยล์|พิเศษ/i.test(part)) || set.story;
 }
 
 function getDisplayName(user: UserRow) {
@@ -275,15 +275,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     0
   );
   const saveButtonLabel =
-    entryMode === "pawn" ? "??????????????????????????" : "?????????????????????????";
+    entryMode === "pawn" ? "บันทึกเข้าโรงจำนำการ์ดจริง" : "บันทึกเข้าธนาคารการ์ดจริง";
   const saveButtonBusyLabel =
-    entryMode === "pawn" ? "???????????????????????????????..." : "??????????????????????????????...";
+    entryMode === "pawn" ? "กำลังบันทึกเข้าโรงจำนำการ์ดจริง..." : "กำลังบันทึกเข้าธนาคารการ์ดจริง...";
   const summaryBadgeLabel =
     intakeMode === "specific"
-      ? `${totalSpecificCards} ??`
+      ? `${totalSpecificCards} ใบ`
       : intakeMode === "sets"
-        ? `${formatNumber(totalSetCount)} ????`
-        : "??????";
+        ? `${formatNumber(totalSetCount)} เซ็ต`
+        : "กองรวม";
   const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const forcedFoil = isForcedFoilCard(previewCardNo);
 
@@ -595,7 +595,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     {entryMode === "bank" ? "Card Bank Intake" : "Pawn Intake"}
                   </div>
                   <h2 className="mt-2 text-2xl font-black">
-                    {entryMode === "bank" ? "???????????????????" : "????????????????"}
+                    {entryMode === "bank" ? "คีย์เข้าธนาคารการ์ด" : "คีย์เข้าระบบจำนำ"}
                   </h2>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-black text-white/55">
@@ -899,10 +899,10 @@ function SpecificCardForm({
   const cardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const selectableFoil = canChooseCardFinish(cardNo);
   const finishStatus = forcedFoil
-    ? "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเน€เธเนเธฟอยล์เน€เธงเธญเธฃเนเธเธฑเนเธเน€เธเนเธฒ เธฃเธฐเธเธเธฅเนเธญเธเน€เธเนเธ Foil เธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
+    ? "การ์ดเลขนี้เป็นฟอยล์เวอร์ชันเก่า ระบบล็อกเป็น Foil อัตโนมัติ"
     : selectableFoil
-      ? "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเน€เธฅเธทเธญเธเธฃเธฐเธซเธงเนเธฒเธเธเธฃเธฃเธกเธ”เธฒเนเธฅเธฐฟอยล์เนเธ”เน"
-      : "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเนเธเนเธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒเน€เธเนเธเธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธ";
+      ? "การ์ดเลขนี้เลือกได้ระหว่างธรรมดาและฟอยล์"
+      : "การ์ดเลขนี้ใช้การ์ดธรรมดาเป็นค่าเริ่มต้น";
 
   return (
     <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0d0d0e,#050505)] p-4 sm:p-5">
@@ -924,25 +924,25 @@ function SpecificCardForm({
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <CardTypeButton
                 active={cardType === "normal"}
-                title="เธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒ"
+                title="การ์ดธรรมดา"
                 icon={BadgeCheck}
                 disabled={forcedFoil}
-                lockReason="ฟอยล์เน€เธเนเธฒเธเธฑเธเธเธฑเธ เธฃเธฐเธเธเธซเนเธฒเธกเน€เธฅเธทเธญเธเธเธฃเธฃเธกเธ”เธฒ"
+                lockReason="ฟอยล์เก่าบังคับ ระบบห้ามเลือกการ์ดธรรมดา"
                 onClick={() => setCardType("normal")}
               />
               <CardTypeButton
                 active={forcedFoil || cardType === "foil"}
-                title="เธเธฒเธฃเนเธ”ฟอยล์"
+                title="การ์ดฟอยล์"
                 icon={Sparkles}
                 disabled={forcedFoil}
-                lockReason="ฟอยล์เน€เธเนเธฒเธเธฑเธเธเธฑเธ เธฃเธฐเธเธเธฅเนเธญเธเน€เธเนเธฟอยล์เนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
+                lockReason="ฟอยล์เก่าบังคับ ระบบล็อกเป็นฟอยล์ให้อัตโนมัติ"
                 onClick={() => setCardType("foil")}
               />
             </div>
             {forcedFoil ? (
               <div className="mt-3 rounded-[18px] border border-red-300/18 bg-red-500/10 p-3 text-sm font-bold leading-6 text-red-100/82">
-                เน€เธฅเธเธเธตเนเธญเธขเธนเนเนเธ Master เนเธเธฟอยล์เน€เธงเธญเธฃเนเธเธฑเนเธเน€เธเนเธฒ เธเธธเนเธกเน€เธฅเธทเธญเธเธเธฃเธฐเน€เธ เธ—เธเธถเธเธ–เธนเธเธฅเนเธญเธเธ—เธฑเนเธเธเธนเน
-                เน€เธเธทเนเธญเธเธฑเธเนเธญเธ”เธกเธดเธเธเธตเธขเนเธเธดเธ” เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธเธฐเธเธฑเธเธ—เธถเธเธเธฐเน€เธเนเธ Foil เน€เธ—เนเธฒเธเธฑเนเธ
+                เลขนี้อยู่ใน Master แบบฟอยล์เวอร์ชันเก่า ปุ่มเลือกประเภทจึงถูกล็อกทั้งคู่ เพื่อกันแอดมินคีย์ผิด รายการที่จะบันทึกจะเป็น Foil เท่านั้น
+                เพื่อกันแอดมินคีย์ผิด รายการที่จะบันทึกจะเป็น Foil เท่านั้น
               </div>
             ) : null}
           </div>
@@ -984,7 +984,7 @@ function SpecificCardForm({
               </div>
             </div>
             <div className="mt-2 min-h-5 text-xs font-bold text-white/38">
-              {cardLoading ? "เธเธณเธฅเธฑเธเธ”เธถเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเนเธ”..." : cardError || "เธเธดเธกเธเนเนเธฅเนเธงเธฃเธนเธเธเธฒเธฃเนเธ”เธเธฐเนเธชเธ”เธเธ”เนเธฒเธเธเนเธฒเธเธ—เธฑเธเธ—เธต"}
+              {cardLoading ? "กำลังดึงข้อมูลการ์ด..." : cardError || "พิมพ์แล้วรูปการ์ดจะแสดงด้านข้างทันที"}
             </div>
           </div>
         </div>
@@ -1024,7 +1024,7 @@ function SpecificCardForm({
             </div>
           ) : (
             <div className="flex aspect-[815/1110] items-center justify-center rounded-[18px] border border-dashed border-white/12 text-center text-sm font-bold leading-6 text-white/35">
-              เธฃเธนเธเธเธฒเธฃเนเธ”เธเธฐเนเธชเธ”เธเธ•เธฃเธเธเธตเน
+              รูปการ์ดจะแสดงตรงนี้
             </div>
           )}
         </div>
@@ -1075,10 +1075,10 @@ function CardTypeButton({
 
 function SecurityLogPanel() {
   const rows = [
-    "เธเธฑเธเธ—เธถเธเธเธนเนเธ—เธณเธฃเธฒเธขเธเธฒเธฃ, role, userId เธฅเธนเธเธเนเธฒ, IP/device, เน€เธงเธฅเธฒ เนเธฅเธฐ session id",
-    "เน€เธเนเธ before/after snapshot เธ—เธธเธเธเธฃเธฑเนเธเธ—เธตเนเธฃเธฑเธเธเธฒเธ เนเธเนเนเธ เธขเนเธฒเธขเน€เธเนเธฒเนเธฃเธเธฃเธฑเธเธเธณเธเธณ เธซเธฃเธทเธญเนเธเธฅเธเน€เธเนเธ NEX / COIN",
-    "เธฃเธฒเธขเธเธฒเธฃเนเธเธเธเธญเธเธฃเธงเธกเธ•เนเธญเธเธกเธตเธเธณเธขเธทเธเธขเธฑเธเธเธฒเธเธฅเธนเธเธเนเธฒเนเธฅเธฐเน€เธซเธ•เธธเธเธฅเธเธญเธเนเธญเธ”เธกเธดเธเธเนเธญเธเธเธฑเธเธ—เธถเธ",
-    "เธฃเธฒเธขเธเธฒเธฃ forced foil เธ•เนเธญเธเธฅเนเธญเธ finish เน€เธเนเธ foil เนเธฅเธฐเธเธฑเธเธ—เธถเธเน€เธซเธ•เธธเธเธฅเธงเนเธฒเน€เธเนเธ Master forced-foil",
+    "บันทึกผู้ทำรายการ, role, userId ลูกค้า, IP/device, เวลา และ session id",
+    "เก็บ before/after snapshot ทุกครั้งที่รับฝาก แก้ไข ย้ายเข้าโรงรับจำนำ หรือแปลงเป็น NEX / COIN",
+    "รายการแบบกองรวมต้องมีคำยืนยันจากลูกค้าและเหตุผลของแอดมินก่อนบันทึก",
+    "รายการ forced foil ต้องล็อก finish เป็น foil และบันทึกเหตุผลว่าเป็น Master forced-foil",
   ];
 
   return (
@@ -1088,9 +1088,9 @@ function SecurityLogPanel() {
           <ShieldCheck className="h-5 w-5 text-white/70" />
         </div>
         <div>
-          <div className="text-base font-black text-white">Security Logs เธ—เธตเนเธ•เนเธญเธเธเธฑเธเธ—เธถเธ</div>
+          <div className="text-base font-black text-white">Security Logs ที่ต้องบันทึก</div>
           <div className="mt-1 text-sm leading-6 text-white/50">
-            UI เธเธตเนเน€เธ•เธฃเธตเธขเธกเธเนเธญเธกเธนเธฅเธชเธณเธซเธฃเธฑเธ audit เธฃเธฐเธ”เธฑเธเธฅเธฐเน€เธญเธตเธขเธ” เธเนเธญเธเธ•เนเธญ API เธเธฑเธเธ—เธถเธเธเธฃเธดเธ
+            UI นี้เตรียมข้อมูลสำหรับ audit ระดับละเอียด ก่อนต่อ API บันทึกจริง
           </div>
         </div>
       </div>
@@ -1123,9 +1123,9 @@ function CardSetForm({
         <div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-black text-white">เน€เธเนเธ•เธเธฒเธฃเนเธ”</div>
+              <div className="text-sm font-black text-white">เซ็ตการ์ด</div>
               <p className="mt-2 text-sm leading-7 text-white/55">
-                เนเธเนเธชเธณเธซเธฃเธฑเธเธฅเธนเธเธเนเธฒเธ—เธตเนเธเธฑเธ”เน€เธเนเธ•เธเธฃเธเธกเธฒเน€เธญเธเธเธฒเธเธเนเธฒเธ เธฃเธฐเธเธเธเธฐเธ•เธตเธกเธนเธฅเธเนเธฒ NEX เธ•เธฒเธกเธเธธเธ”เนเธเธ”เธฒเธ•เนเธฒเน€เธเนเธ•เธ—เธฑเธเธ—เธต
+                ใช้สำหรับลูกค้าที่จัดเซ็ตครบมาเองจากบ้าน ระบบจะตีมูลค่า NEX ตามชุดในดาต้าเซ็ตทันที
               </p>
             </div>
             <button
@@ -1134,12 +1134,12 @@ function CardSetForm({
               className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-[18px] border border-white/14 bg-white text-sm font-black text-black transition hover:bg-zinc-200"
             >
               <Layers3 className="h-4 w-4" />
-              เน€เธฅเธทเธญเธเน€เธเนเธ•
+              เลือกเซ็ต
             </button>
           </div>
 
           <div className="mt-4 rounded-[20px] border border-white/10 bg-black/24 p-4 text-sm leading-7 text-white/58">
-            เธฅเธนเธเธเนเธฒเธ—เธตเนเนเธกเนเนเธ”เนเธเธฑเธ”เน€เธเนเธ•เธกเธฒ เธขเธฑเธเนเธเนเนเธซเธกเธ”เธเธญเธเธฃเธงเธก NEX / COIN เนเธ”เนเน€เธซเธกเธทเธญเธเน€เธ”เธดเธก เธชเนเธงเธเธฅเธนเธเธเนเธฒเธ—เธตเนเธเธฑเธ”เน€เธเนเธ•เธเธฃเธเธเธฐเนเธ”เนเธกเธนเธฅเธเนเธฒเธชเธนเธเธ•เธฒเธกเน€เธเนเธ•เธเธฑเนเธเธ—เธฑเธเธ—เธต
+            ลูกค้าที่ไม่ได้จัดเซ็ตมา ยังใช้โหมดกองรวม NEX / COIN ได้เหมือนเดิม ส่วนลูกค้าที่จัดเซ็ตครบจะได้มูลค่าสูงตามเซ็ตนั้นทันที
           </div>
         </div>
 
@@ -1165,7 +1165,7 @@ function CardSetForm({
 
       {setItems.length > 0 ? (
         <div className="mt-4 text-xs font-bold text-white/38">
-          เน€เธฅเธทเธญเธเนเธฅเนเธง {formatNumber(setItems.length)} เธฃเธฒเธขเธเธฒเธฃ เธเธ”เธชเธฃเธธเธเธ”เนเธฒเธเธฅเนเธฒเธเน€เธเธทเนเธญเธ•เธฃเธงเธเธญเธตเธเธเธฃเธฑเนเธเธเนเธญเธเธเธฑเธเธ—เธถเธ
+          เลือกแล้ว {formatNumber(setItems.length)} รายการ กดสรุปด้านล่างเพื่อเช็กอีกครั้งก่อนบันทึก
         </div>
       ) : null}
     </div>
@@ -1188,11 +1188,11 @@ function BulkValueForm({
   setBulkCategory: (value: BulkCategory) => void;
 }) {
   const categoryOptions: Array<{ value: BulkCategory; label: string; desc: string }> = [
-    { value: "pure", label: "NEX เน€เธเธตเธขเธง", desc: "เนเธกเนเนเธชเธ”เธเธเธเธดเธ”เธเธฒเธฃเนเธ”" },
-    { value: "bronze", label: "Bronze", desc: "เธเธฑเธเน€เธเนเธเธเธฃเธญเธเธเน" },
-    { value: "silver", label: "Silver", desc: "เธเธฑเธเน€เธเนเธเธเธดเธฅเน€เธงเธญเธฃเน" },
-    { value: "gold", label: "Gold", desc: "เธเธฑเธเน€เธเนเธเนเธเธฅเธ”เน" },
-    { value: "unknown", label: "UNKNOWN", desc: "เธเธฑเธเน€เธเนเธเธซเธกเธงเธ” UNKNOWN" },
+    { value: "pure", label: "NEX เพียว", desc: "ไม่แสดงชนิดการ์ด" },
+    { value: "bronze", label: "Bronze", desc: "นับเป็นบรอนซ์" },
+    { value: "silver", label: "Silver", desc: "นับเป็นซิลเวอร์" },
+    { value: "gold", label: "Gold", desc: "นับเป็นโกลด์" },
+    { value: "unknown", label: "UNKNOWN", desc: "นับเป็นหมวด UNKNOWN" },
   ];
 
   return (
@@ -1204,14 +1204,14 @@ function BulkValueForm({
         <div>
           <h2 className="text-xl font-black text-red-50">ระบบกองรวม NEX / COIN</h2>
           <p className="mt-2 text-sm leading-7 text-red-100/78">
-            เนเธซเธกเธ”เธเธตเนเนเธกเนเธฃเธฐเธเธธเธงเนเธฒเธเธฒเธเธเธฒเธฃเนเธ”เน€เธฅเธเธญเธฐเนเธฃ เนเธญเธ”เธกเธดเธเธ•เนเธญเธเธ•เธเธฅเธเธเธฑเธเธฅเธนเธเธเนเธฒเธเธฑเธ”เน€เธเธเธเนเธญเธ
-            เน€เธเธฃเธฒเธฐเน€เธกเธทเนเธญเธฅเธนเธเธเนเธฒเนเธเนเธขเธญเธ”เธเธตเน เธฃเธฐเธเธเธเธฐเธซเธฑเธเธเธฒเธฃเนเธ”เนเธเธเนเธกเนเธชเธเนเธเนเธ/เน€เธเนเธ•/เธเธงเธฒเธกเนเธฃเธฃเนเธเธเธเธงเนเธฒเธขเธญเธ”เธเธฐเธซเธกเธ”
+            โหมดนี้ไม่ระบุว่าฝากการ์ดเลขอะไร แอดมินต้องตกลงกับลูกค้าชัดเจนก่อน
+            เพราะเมื่อลูกค้าใช้ยอดนี้ ระบบจะหักการ์ดแบบไม่สนใจใบ/เซ็ต/ความแรร์จนกว่าจะหมด
           </p>
         </div>
       </div>
 
       <div className="mt-5">
-        <div className="text-sm font-black text-white">เธเธฃเธฐเน€เธ เธ—เธเธญเธเธเธญเธเธเธตเน</div>
+        <div className="text-sm font-black text-white">ประเภทของกองนี้</div>
         <div className="mt-3 grid gap-2 sm:grid-cols-5">
           {categoryOptions.map((option) => (
             <button
@@ -1233,31 +1233,31 @@ function BulkValueForm({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-sm font-black text-white">เธขเธญเธ”เธฃเธงเธก NEX</span>
+          <span className="text-sm font-black text-white">ยอดรวม NEX</span>
           <input
             value={bulkNex}
             onChange={(event) => setBulkNex(event.target.value)}
             inputMode="decimal"
-            placeholder="เน€เธเนเธ 150000"
+            placeholder="เช่น 150000"
             className="mt-2 h-14 w-full rounded-[20px] border border-white/10 bg-black/32 px-4 text-base font-bold text-white outline-none placeholder:text-white/35 focus:border-white/30"
           />
         </label>
         <label className="block">
-          <span className="text-sm font-black text-white">เธขเธญเธ”เธฃเธงเธก COIN</span>
+          <span className="text-sm font-black text-white">ยอดรวม COIN</span>
           <input
             value={bulkCoin}
             onChange={(event) => setBulkCoin(event.target.value)}
             inputMode="decimal"
-            placeholder="เน€เธเนเธ 2500"
+            placeholder="เช่น 2500"
             className="mt-2 h-14 w-full rounded-[20px] border border-white/10 bg-black/32 px-4 text-base font-bold text-white outline-none placeholder:text-white/35 focus:border-white/30"
           />
         </label>
       </div>
 
       <div className="mt-4 rounded-[20px] border border-white/10 bg-black/26 p-4 text-sm leading-7 text-white/58">
-        เน€เธซเธกเธฒเธฐเธเธฑเธเน€เธเธชเธ—เธตเนเธฅเธนเธเธเนเธฒเธเธฒเธเธเธฒเธฃเนเธ”เธเธณเธเธงเธเธกเธฒเธเน€เธเธทเนเธญเนเธเนเน€เธเนเธเธงเธเน€เธเธดเธเธเธทเนเธญเธชเธดเธเธเนเธฒ
-        เธซเธฅเธฑเธเธฅเธนเธเธเนเธฒเธชเนเธเธเธณเธเธญ เนเธญเธ”เธกเธดเธเธเธณเธฃเธฐเนเธซเนเธฃเนเธฒเธเธเนเธฒเธเธฅเธฒเธขเธ—เธฒเธเนเธเน€เธงเธฅเธฒเธ—เธณเธเธฒเธฃ
-        เนเธฅเนเธงเธซเธฑเธ NEX / COIN เธเธฒเธเธเธญเธเธฃเธงเธกเธ•เธฒเธกเธขเธญเธ”เธ—เธตเนเนเธเน
+        เหมาะกับเคสที่ลูกค้าฝากการ์ดจำนวนมากเพื่อใช้เป็นวงเงินซื้อสินค้า
+        หลังลูกค้าส่งคำขอ แอดมินชำระให้ร้านค้าปลายทางในเวลาทำการ
+        แล้วหัก NEX / COIN จากกองรวมตามยอดที่ใช้
       </div>
     </div>
   );
@@ -1273,7 +1273,7 @@ function SpecificSummary({
   if (items.length === 0) {
     return (
       <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 p-4 text-sm font-bold text-white/42">
-        เธขเธฑเธเนเธกเนเธกเธตเธเธฒเธฃเนเธ”เนเธเธฃเธฒเธขเธเธฒเธฃ เธเธฃเธญเธเน€เธฅเธเธเธฒเธฃเนเธ”เนเธฅเนเธงเธเธ” Enter เน€เธเธทเนเธญเธฃเธฐเธเธธเธเธณเธเธงเธ
+        ยังไม่มีการ์ดในรายการ กรอกเลขการ์ดแล้วกด Enter เพื่อระบุจำนวน
       </div>
     );
   }
@@ -1296,7 +1296,7 @@ function SpecificSummary({
             </div>
             <div className="mt-1 truncate font-black text-white">{item.cardName}</div>
             <div className="mt-2 text-sm font-bold text-white/55">
-              เธเธณเธเธงเธ {item.quantity.toLocaleString("th-TH")} เนเธ
+              จำนวน {item.quantity.toLocaleString("th-TH")} ใบ
             </div>
           </div>
           <button
@@ -1342,19 +1342,19 @@ function CardSetSummary({
               <div className="mt-1 truncate font-black text-white">{item.setName}</div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
                 <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-white/62">
-                  {formatNumber(item.quantity)} เน€เธเนเธ•
+                  {formatNumber(item.quantity)} เซ็ต
                 </span>
                 <span className="rounded-full border border-emerald-200/18 bg-emerald-400/10 px-3 py-1 text-emerald-100">
                   {formatNumber(item.nexValue * item.quantity)} NEX
                 </span>
                 {item.nexValue !== item.fullNexValue ? (
                   <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-white/55">
-                    เน€เธ•เนเธก {formatNumber(item.fullNexValue * item.quantity)} NEX
+                    เต็ม {formatNumber(item.fullNexValue * item.quantity)} NEX
                   </span>
                 ) : null}
                 {item.withFoilBonus ? (
                   <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-amber-100">
-                    เธฃเธงเธกเน€เธเธทเนเธญเธเนเธฟอยล์
+                    รวมเงื่อนไขฟอยล์
                   </span>
                 ) : null}
               </div>
@@ -1426,7 +1426,7 @@ function CardSetModal({
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-3 sm:p-5">
       <button
         type="button"
-        aria-label="เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธเน€เธฅเธทเธญเธเน€เธเนเธ•"
+        aria-label="ปิดหน้าต่างเลือกเซ็ต"
         onClick={onClose}
         className="absolute inset-0 bg-black/78 backdrop-blur-md"
       />
@@ -1436,9 +1436,9 @@ function CardSetModal({
             <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
               Collection Sets
             </div>
-            <h2 className="mt-2 text-2xl font-black text-white">เน€เธฅเธทเธญเธเน€เธเนเธ•เธเธฒเธฃเนเธ” 40 เน€เธเนเธ•</h2>
+            <h2 className="mt-2 text-2xl font-black text-white">เลือกเซ็ตการ์ด 40 เซ็ต</h2>
             <p className="mt-2 text-sm leading-6 text-white/55">
-              เธฃเธฐเธเธธเธเธณเธเธงเธเน€เธเนเธ•เธเนเธฒเธเธเธธเนเธกเน€เธเธดเนเธก เนเธฅเธฐเธ•เธดเนเธเน€เธเธทเนเธญเธเนเธฟอยล์เน€เธกเธทเนเธญเธเธธเธ”เธเธฑเนเธเธเธฑเธ”เธเธฃเธเธ•เธฒเธกเธเธ•เธดเธเธฒเน€เธชเธฃเธดเธก
+              ระบุจำนวนเซ็ตข้างปุ่มเพิ่ม และติ๊กเงื่อนไขฟอยล์เมื่อชุดนั้นจัดตามกติกาเสริม
             </p>
           </div>
           <button
@@ -1488,7 +1488,7 @@ function CardSetModal({
                           {set.name}
                         </span>
                         <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] font-black text-white/52">
-                          {cardTotal} เนเธ
+                          {cardTotal} ใบ
                         </span>
                       </div>
                       <div className="mt-2 line-clamp-2 text-sm leading-6 text-white/52">
@@ -1496,11 +1496,11 @@ function CardSetModal({
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
                         <span className="rounded-full border border-emerald-200/16 bg-emerald-400/10 px-3 py-1 text-emerald-100">
-                          {baseValue > 0 ? `${formatNumber(baseValue)} NEX` : "เธฃเธฒเธเธงเธฑเธฅเธเธดเน€เธจเธฉ"}
+                          {baseValue > 0 ? `${formatNumber(baseValue)} NEX` : "รางวัลพิเศษ"}
                         </span>
                         {withFoilBonus && activeValue !== baseValue ? (
                           <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-amber-100">
-                            เน€เธเธดเนเธกเน€เธเนเธ {formatNumber(activeValue)} NEX
+                            เพิ่มเป็น {formatNumber(activeValue)} NEX
                           </span>
                         ) : null}
                       </div>
@@ -1517,7 +1517,7 @@ function CardSetModal({
                             }))
                           }
                           inputMode="numeric"
-                          aria-label={`เธเธณเธเธงเธเน€เธเนเธ• ${set.order}`}
+                          aria-label={`จำนวนเซ็ต ${set.order}`}
                           className="h-12 min-w-0 w-full rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-base font-black text-white outline-none placeholder:text-white/25 focus:border-white/35"
                         />
                         <input
@@ -1529,12 +1529,12 @@ function CardSetModal({
                             }))
                           }
                           inputMode="numeric"
-                          aria-label={`เธขเธญเธ”เธ—เธตเนเธฃเธฑเธเธชเธณเธซเธฃเธฑเธเน€เธเนเธ• ${set.order}`}
-                          placeholder={`เน€เธ•เนเธก ${formatNumber(activeValue)} NEX`}
+                          aria-label={`ยอดที่รับสำหรับเซ็ต ${set.order}`}
+                          placeholder={`เต็ม ${formatNumber(activeValue)} NEX`}
                           className="h-12 min-w-0 w-full rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-sm font-black text-white outline-none placeholder:text-white/28 focus:border-white/35"
                         />
                         <div className="text-[11px] font-bold tracking-[0.08em] text-white/34">
-                          เน€เธงเนเธเธงเนเธฒเธ = เธฃเธฑเธเธขเธญเธ”เน€เธ•เนเธกเธเธญเธเน€เธเนเธ•
+                          เว้นว่าง = รับยอดเต็มของเซ็ต
                         </div>
                       </div>
                       <button
@@ -1556,7 +1556,7 @@ function CardSetModal({
                         className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200 active:scale-[0.98]"
                       >
                         <PackagePlus className="h-4 w-4" />
-                        เน€เธเธดเนเธก
+                        เพิ่ม
                       </button>
                     </div>
                   </div>
@@ -1591,7 +1591,7 @@ function CardSetModal({
             onClick={onClose}
             className="flex h-12 w-full items-center justify-center rounded-[18px] border border-white/12 bg-white/[0.06] text-sm font-black text-white transition hover:bg-white/[0.1]"
           >
-            เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธ
+            ปิดหน้าต่าง
           </button>
         </div>
       </div>
@@ -1617,9 +1617,9 @@ function BulkSummary({
 }) {
   const categoryLabel =
     bulkCategory === "pure"
-      ? "NEX/COIN เน€เธเธตเธขเธง เนเธกเนเธฃเธฐเธเธธเธเธฒเธฃเนเธ”"
+      ? "NEX/COIN เพียว ไม่ระบุการ์ด"
       : bulkCategory === "unknown"
-        ? "เธเธญเธเธเธฒเธฃเนเธ”เธซเธกเธงเธ” UNKNOWN"
+        ? "กองการ์ดหมวด UNKNOWN"
       : `${bulkCategory.toUpperCase()} card pool`;
 
   return (
@@ -1670,7 +1670,7 @@ function QuantityModal({
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
       <button
         type="button"
-        aria-label="เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธ"
+        aria-label="ปิดหน้าต่าง"
         onClick={onClose}
         className="absolute inset-0 bg-black/78 backdrop-blur-md"
       />
@@ -1687,13 +1687,13 @@ function QuantityModal({
           <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
             Quantity Confirm
           </div>
-          <h2 className="mt-2 text-2xl font-black text-white">เธฃเธฐเธเธธเธเธณเธเธงเธเธเธฒเธฃเนเธ”</h2>
+          <h2 className="mt-2 text-2xl font-black text-white">ระบุจำนวนการ์ด</h2>
           <p className="mt-2 text-sm leading-6 text-white/55">
             {cardPreview
               ? `No.${cardPreview.cardNo} • ${cardPreview.cardName} • ${
-                  cardType === "foil" ? "เธเธฒเธฃเนเธ”ฟอยล์" : "เธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒ"
+                  cardType === "foil" ? "การ์ดฟอยล์" : "การ์ดธรรมดา"
                 }`
-              : "เธฃเธฒเธขเธเธฒเธฃเธเธฒเธฃเนเธ”"}
+              : "รายการการ์ด"}
           </p>
         </div>
 
@@ -1711,7 +1711,7 @@ function QuantityModal({
             }
           }}
           inputMode="numeric"
-          placeholder="เธเธณเธเธงเธ เน€เธเนเธ 1"
+          placeholder="จำนวน เช่น 1"
           className="mt-5 h-16 w-full rounded-[22px] border border-white/12 bg-black/40 px-4 text-center text-2xl font-black text-white outline-none placeholder:text-white/25 focus:border-white/35 focus:ring-2 focus:ring-white/10"
         />
 
@@ -1721,14 +1721,14 @@ function QuantityModal({
             onClick={onClose}
             className="rounded-[20px] border border-red-300/20 bg-red-500/14 px-4 py-4 text-sm font-black text-red-100 transition hover:bg-red-500/20"
           >
-            เธขเธเน€เธฅเธดเธ
+            ยกเลิก
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className="rounded-[20px] bg-white px-4 py-4 text-sm font-black text-black transition hover:bg-zinc-200"
           >
-            เธขเธทเธเธขเธฑเธ
+            ยืนยัน
           </button>
         </div>
       </div>
