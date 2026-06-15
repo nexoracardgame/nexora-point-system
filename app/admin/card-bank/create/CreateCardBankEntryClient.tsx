@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -113,7 +113,7 @@ function hasFoilBonusOption(set: NexoraCollectionSet) {
   const text = `${set.reward} ${set.story}`.toLowerCase();
   return (
     /foil/.test(text) ||
-    /เธเธญเธขเธฅเน/.test(text) ||
+    /ฟอยล์/.test(text) ||
     /เน€เธยเน€เธเธเน€เธเธเน€เธเธ…/.test(text)
   );
 }
@@ -121,11 +121,11 @@ function hasFoilBonusOption(set: NexoraCollectionSet) {
 function getSetConditionText(set: NexoraCollectionSet) {
   if (!hasFoilBonusOption(set)) return "";
   const parts = set.reward.split(";").map((part) => part.trim()).filter(Boolean);
-  return parts.find((part) => /foil|เธเธญเธขเธฅเน|เน€เธยเน€เธเธเน€เธเธเน€เธเธ…/i.test(part)) || set.story;
+  return parts.find((part) => /foil|ฟอยล์|เน€เธยเน€เธเธเน€เธเธเน€เธเธ…/i.test(part)) || set.story;
 }
 
 function getDisplayName(user: UserRow) {
-  return user.displayName || user.name || user.username || user.lineId || "เนเธกเนเธเธเธเธทเนเธญ";
+  return user.displayName || user.name || user.username || user.lineId || "ไม่พบชื่อ";
 }
 
 function resolveApiCard(data: Record<string, unknown>, fallbackCardNo: string): CardPreview {
@@ -241,7 +241,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
         if (!response.ok || data.error) {
-          throw new Error(String(data.error || "เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธเธฒเธฃเนเธ”เนเธกเนเธชเธณเน€เธฃเนเธ"));
+          throw new Error(String(data.error || "โหลดข้อมูลการ์ดไม่สำเร็จ"));
         }
 
         setCardPreview(resolveApiCard(data, cardNo));
@@ -250,7 +250,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         setCardError(
           error instanceof Error
             ? error.message
-            : "เนเธเนเธฃเธนเธเธเธฒเธฃเนเธ”เนเธเน€เธเธฃเธทเนเธญเธเนเธ—เธเธเนเธญเธกเธนเธฅเธเธฒเธ API"
+            : "ใช้รูปการ์ดในเครื่องแทนข้อมูลจาก API"
         );
       } finally {
         setCardLoading(false);
@@ -275,15 +275,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     0
   );
   const saveButtonLabel =
-    entryMode === "pawn" ? "เธเธฑเธเธ—เธถเธเน€เธเนเธฒเนเธฃเธเธเธณเธเธณเธเธฒเธฃเนเธ”เธเธฃเธดเธ" : "เธเธฑเธเธ—เธถเธเน€เธเนเธฒเธเธเธฒเธเธฒเธฃเธเธฒเธฃเนเธ”เธเธฃเธดเธ";
+    entryMode === "pawn" ? "??????????????????????????" : "?????????????????????????";
   const saveButtonBusyLabel =
-    entryMode === "pawn" ? "เธเธณเธฅเธฑเธเธเธฑเธเธ—เธถเธเน€เธเนเธฒเนเธฃเธเธเธณเธเธณเธเธฃเธดเธ..." : "เธเธณเธฅเธฑเธเธเธฑเธเธ—เธถเธเน€เธเนเธฒเธเธเธฒเธเธฒเธฃเธเธฃเธดเธ...";
+    entryMode === "pawn" ? "???????????????????????????????..." : "??????????????????????????????...";
   const summaryBadgeLabel =
     intakeMode === "specific"
-      ? `${totalSpecificCards} เนเธ`
+      ? `${totalSpecificCards} ??`
       : intakeMode === "sets"
-        ? `${formatNumber(totalSetCount)} เน€เธเนเธ•`
-        : "เธเธญเธเธฃเธงเธก";
+        ? `${formatNumber(totalSetCount)} ????`
+        : "??????";
   const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const forcedFoil = isForcedFoilCard(previewCardNo);
 
@@ -460,9 +460,9 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               <Search className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-black">เน€เธฅเธทเธญเธเธขเธนเธชเน€เธเธญเธฃเน</h2>
+              <h2 className="text-xl font-black">เลือกลูกค้า</h2>
               <p className="mt-2 text-sm leading-6 text-white/55">
-                เธเธดเธกเธเนเธเธทเนเธญ, @username เธซเธฃเธทเธญ Line ID เธฃเธฐเธเธเธเธฐเนเธชเธ”เธเธเธนเนเนเธเนเธ—เธฑเธเธ—เธตเนเธ”เธขเนเธกเนเธ•เนเธญเธเธเธ” Enter
+                พิมพ์ชื่อ, @username หรือ Line ID ระบบจะแสดงผู้ใช้ทันทีโดยไม่ต้องกด Enter
               </p>
             </div>
           </div>
@@ -474,15 +474,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               setSelectedUser(null);
               setEntryMode(null);
             }}
-            placeholder="เธเนเธเธซเธฒ user เน€เธเนเธ @username, เธเธทเนเธญ, Line ID"
+            placeholder="ค้นหา user เช่น @username, ชื่อ, Line ID"
             className="mt-4 h-14 w-full rounded-[20px] border border-white/10 bg-black/30 px-4 text-base font-bold text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:ring-2 focus:ring-white/10"
           />
 
           <div className="mt-4 space-y-3">
             {!query.trim() ? (
-              <EmptyHint text="เน€เธฃเธดเนเธกเธเธดเธกเธเนเน€เธเธทเนเธญเธเนเธเธซเธฒเธฅเธนเธเธเนเธฒ" />
+              <EmptyHint text="เริ่มพิมพ์เพื่อค้นหาลูกค้า" />
             ) : filteredUsers.length === 0 ? (
-              <EmptyHint text="เนเธกเนเธเธเธฅเธนเธเธเนเธฒเธ—เธตเนเธ•เธฃเธเธเธฑเธเธเธณเธเนเธเธซเธฒ" />
+              <EmptyHint text="ไม่พบลูกค้าที่ตรงกับคำค้นหา" />
             ) : (
               filteredUsers.map((user) => {
                 const active = selectedUser?.id === user.id;
@@ -551,7 +551,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                   <UserCheck className="h-4 w-4 text-emerald-200" />
                 </div>
                 <p className="mt-2 text-sm leading-6 text-white/55">
-                  {selectedUsername ? `@${selectedUsername} โ€ข ` : ""}
+                  {selectedUsername ? `@${selectedUsername} • ` : ""}
                   {selectedUser.lineId}
                 </p>
               </div>
@@ -560,15 +560,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <ModeButton
                 active={entryMode === "bank"}
-                title="เธเธเธฒเธเธฒเธฃเธเธฒเธฃเนเธ”"
-                desc="เธเธตเธขเนเธเธฒเธฃเนเธ”เธเธฃเธดเธเน€เธเนเธฒเธฃเธฐเธเธเธเธฒเธเธชเธดเธเธ—เธฃเธฑเธเธขเนเธเธญเธเธฅเธนเธเธเนเธฒ"
+                title="ธนาคารการ์ด"
+                desc="คีย์การ์ดจริงเข้าระบบฝากสินทรัพย์ของลูกค้า"
                 icon={Landmark}
                 onClick={() => setEntryMode("bank")}
               />
               <ModeButton
                 active={entryMode === "pawn"}
-                title="เธเธณเธเธณเธเธฒเธฃเนเธ”"
-                desc="เธขเนเธฒเธขเน€เธเนเธฒเธฃเธฐเธเธเธเธณเธเธณ เธเธดเธ”เธ”เธญเธ 10% เธฃเธฒเธขเน€เธ”เธทเธญเธ"
+                title="จำนำการ์ด"
+                desc="ย้ายเข้าระบบจำนำ คิดดอก 10% รายเดือน"
                 icon={Banknote}
                 onClick={() => setEntryMode("pawn")}
               />
@@ -581,9 +581,9 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         {!selectedUser || !entryMode ? (
           <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-6 text-center">
             <ShieldCheck className="mx-auto h-10 w-10 text-white/50" />
-            <h2 className="mt-4 text-xl font-black">เธฃเธญเน€เธฅเธทเธญเธเธเธนเนเนเธเนเนเธฅเธฐเธเธฃเธฐเน€เธ เธ—เธฃเธฒเธขเธเธฒเธฃ</h2>
+            <h2 className="mt-4 text-xl font-black">รอเลือกลูกค้าและประเภทรายการ</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-white/50">
-              เน€เธกเธทเนเธญเน€เธฅเธทเธญเธเธเธฃเธเนเธฅเนเธง เธฃเธฐเธเธเธเธฐเนเธชเธ”เธเธเนเธญเธเธเธตเธขเนเธเนเธญเธกเธนเธฅเธเธฒเธฃเนเธ”เนเธเธเนเธเนเธเธฒเธเน€เธฃเนเธงเธ”เนเธฒเธเธเธตเน
+              เมื่อเลือกครบแล้ว ระบบจะแสดงช่องคีย์ข้อมูลการ์ดแบบใช้งานเร็วด้านนี้
             </p>
           </div>
         ) : (
@@ -595,31 +595,31 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     {entryMode === "bank" ? "Card Bank Intake" : "Pawn Intake"}
                   </div>
                   <h2 className="mt-2 text-2xl font-black">
-                    {entryMode === "bank" ? "เธเธตเธขเนเน€เธเนเธฒเธเธเธฒเธเธฒเธฃเธเธฒเธฃเนเธ”" : "เธเธตเธขเนเน€เธเนเธฒเธฃเธฐเธเธเธเธณเธเธณ"}
+                    {entryMode === "bank" ? "???????????????????" : "????????????????"}
                   </h2>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-black text-white/55">
-                  {entryMode === "pawn" ? "เธ”เธญเธ 10% / เน€เธ”เธทเธญเธ" : "เธเนเธฒเธเธฒเธเธฃเธฒเธขเน€เธ”เธทเธญเธ"}
+                  {entryMode === "pawn" ? "ดอก 10% / เดือน" : "ค่าฝากรายเดือน"}
                 </div>
               </div>
 
               <div className="mt-5 grid gap-3 lg:grid-cols-3">
                 <IntakeModeButton
                   active={intakeMode === "specific"}
-                  title="เธฃเธฐเธเธธเธเธฒเธฃเนเธ”เน€เธเนเธเนเธ"
-                  desc="เน€เธฅเธทเธญเธเธเธญเธขเธฅเน/เธเธฃเธฃเธกเธ”เธฒ เธเนเธเน€เธฅเธเธเธฒเธฃเนเธ” เนเธฅเธฐเธฃเธฐเธเธธเธเธณเธเธงเธ"
+                  title="ระบุการ์ดเป็นใบ"
+                  desc="เลือกฟอยล์/ธรรมดา ค้นเลขการ์ด และระบุจำนวน"
                   onClick={() => setIntakeMode("specific")}
                 />
                 <IntakeModeButton
                   active={intakeMode === "sets"}
-                  title="เน€เธเนเธ•เธเธฒเธฃเนเธ”"
-                  desc="เธฅเธนเธเธเนเธฒเธเธฑเธ”เน€เธเนเธ•เธกเธฒเธเธฃเธเธเธฒเธเธเนเธฒเธ เน€เธฅเธทเธญเธเน€เธเนเธ•เนเธฅเธฐเธเธณเธเธงเธเน€เธเธทเนเธญเธฃเธฑเธเธกเธนเธฅเธเนเธฒ NEX เธ•เธฒเธกเธ”เธฒเธ•เนเธฒ"
+                  title="เซ็ตการ์ด"
+                  desc="ลูกค้าจัดเซ็ตมาครบจากบ้าน เลือกเซ็ตและจำนวนเพื่อรับมูลค่า NEX ตามดาต้าเซ็ต"
                   onClick={() => setIntakeMode("sets")}
                 />
                 <IntakeModeButton
                   active={intakeMode === "bulk"}
-                  title="เธเธญเธเธฃเธงเธก NEX / COIN"
-                  desc="เนเธกเนเธเธฑเธ”เนเธ เนเธเนเธขเธญเธ”เธฃเธงเธก เนเธฅเธฐเธซเธฑเธเนเธเธเนเธกเนเธชเธเธเธฒเธฃเนเธ”"
+                  title="กองรวม NEX / COIN"
+                  desc="ไม่คัดใบ ใช้ยอดรวม และหักแบบไม่สนการ์ด"
                   onClick={() => setIntakeMode("bulk")}
                 />
               </div>
@@ -632,39 +632,39 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     <div className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-100/55">
                       Pawn Terms
                     </div>
-                    <h3 className="mt-2 text-xl font-black text-white">เธเนเธญเธกเธนเธฅเธเธณเธเธณเธ—เธตเนเธเธฐเธชเนเธเธฅเธเธเธตเธ•</h3>
+                    <h3 className="mt-2 text-xl font-black text-white">ข้อมูลจำนำที่จะส่งลงชีต</h3>
                   </div>
                   <div className="text-xs font-bold text-amber-100/65">
-                    เนเธเนเธชเธณเธซเธฃเธฑเธเธเธณเธเธงเธ“เธ”เธญเธเนเธฅเธฐเธงเธฑเธเธเธฃเธเธเธณเธซเธเธ”เธญเธฑเธ•เนเธเธกเธฑเธ•เธด
+                    ใช้สำหรับคำนวณดอกและวันครบกำหนดอัตโนมัติ
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <LabeledInput
-                    label="เน€เธเธดเธเธ•เนเธ (THB)"
+                    label="เงินต้น (THB)"
                     value={pawnPrincipal}
                     onChange={setPawnPrincipal}
                     inputMode="decimal"
                     placeholder="0"
                   />
                   <LabeledInput
-                    label="เธ”เธญเธเน€เธเธตเนเธข / เน€เธ”เธทเธญเธ (%)"
+                    label="ดอกเบี้ย / เดือน (%)"
                     value={pawnInterestRate}
                     onChange={setPawnInterestRate}
                     inputMode="decimal"
                     placeholder="10"
                   />
                   <LabeledInput
-                    label="เธเธฃเธเธเธณเธซเธเธ” (เธงเธฑเธ)"
+                    label="ครบกำหนด (วัน)"
                     value={pawnDueDays}
                     onChange={setPawnDueDays}
                     inputMode="numeric"
                     placeholder="30"
                   />
                   <LabeledInput
-                    label="เธซเธกเธฒเธขเน€เธซเธ•เธธ"
+                    label="หมายเหตุ"
                     value={pawnNote}
                     onChange={setPawnNote}
-                    placeholder="เน€เธเนเธ เธฃเธฑเธเธเธฒเธเธเธฒเธเธฅเธนเธเธเนเธฒเธเธฃเธฐเธเธณ"
+                    placeholder="เช่น รับฝากจากลูกค้าประจำ"
                   />
                 </div>
               </div>
@@ -703,13 +703,13 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
             <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-black">เธชเธฃเธธเธเธฃเธฒเธขเธเธฒเธฃเธเนเธญเธเธเธฑเธเธ—เธถเธ</h2>
+                <h2 className="text-xl font-black">สรุปรายการก่อนบันทึก</h2>
                 <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-black text-white/55">
                   {summaryBadgeLabel}
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6 text-white/52">
-                เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธ”เนเธซเธฅเธฒเธขเธเธดเนเธเธ•เธฒเธกเธฃเธนเธเนเธเธเธ—เธตเนเน€เธฅเธทเธญเธ เนเธฅเนเธงเธ•เธฃเธงเธเธชเธฃเธธเธเธ•เธฃเธเธเธตเนเธเนเธญเธเธเธ”เธเธฑเธเธ—เธถเธเธเธฃเธดเธ เน€เธเธทเนเธญเนเธซเนเธเนเธญเธกเธนเธฅเธ–เธนเธเธชเนเธเนเธเธ—เธตเน€เธ”เธตเธขเธงเนเธเธเนเธกเนเธ•เธเธซเธฅเนเธ
+                เพิ่มรายการได้หลายชิ้นตามรูปแบบที่เลือก แล้วตรวจสรุปตรงนี้ก่อนกดบันทึกจริง เพื่อให้ข้อมูลถูกส่งไปที่เดียวแบบไม่ตกหล่น
               </p>
 
               {intakeMode === "specific" ? (
@@ -899,9 +899,9 @@ function SpecificCardForm({
   const cardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const selectableFoil = canChooseCardFinish(cardNo);
   const finishStatus = forcedFoil
-    ? "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเน€เธเนเธเธเธญเธขเธฅเนเน€เธงเธญเธฃเนเธเธฑเนเธเน€เธเนเธฒ เธฃเธฐเธเธเธฅเนเธญเธเน€เธเนเธ Foil เธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
+    ? "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเน€เธเนเธฟอยล์เน€เธงเธญเธฃเนเธเธฑเนเธเน€เธเนเธฒ เธฃเธฐเธเธเธฅเนเธญเธเน€เธเนเธ Foil เธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
     : selectableFoil
-      ? "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเน€เธฅเธทเธญเธเธฃเธฐเธซเธงเนเธฒเธเธเธฃเธฃเธกเธ”เธฒเนเธฅเธฐเธเธญเธขเธฅเนเนเธ”เน"
+      ? "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเน€เธฅเธทเธญเธเธฃเธฐเธซเธงเนเธฒเธเธเธฃเธฃเธกเธ”เธฒเนเธฅเธฐฟอยล์เนเธ”เน"
       : "เธเธฒเธฃเนเธ”เน€เธฅเธเธเธตเนเนเธเนเธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒเน€เธเนเธเธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธ";
 
   return (
@@ -910,7 +910,7 @@ function SpecificCardForm({
         <div className="space-y-4">
           <div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm font-black text-white">เธเธฃเธฐเน€เธ เธ—เธเธฒเธฃเนเธ”</div>
+              <div className="text-sm font-black text-white">ประเภทการ์ด</div>
               <div
                 className={`rounded-full border px-3 py-1 text-xs font-black ${
                   forcedFoil
@@ -927,28 +927,28 @@ function SpecificCardForm({
                 title="เธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒ"
                 icon={BadgeCheck}
                 disabled={forcedFoil}
-                lockReason="เธเธญเธขเธฅเนเน€เธเนเธฒเธเธฑเธเธเธฑเธ เธฃเธฐเธเธเธซเนเธฒเธกเน€เธฅเธทเธญเธเธเธฃเธฃเธกเธ”เธฒ"
+                lockReason="ฟอยล์เน€เธเนเธฒเธเธฑเธเธเธฑเธ เธฃเธฐเธเธเธซเนเธฒเธกเน€เธฅเธทเธญเธเธเธฃเธฃเธกเธ”เธฒ"
                 onClick={() => setCardType("normal")}
               />
               <CardTypeButton
                 active={forcedFoil || cardType === "foil"}
-                title="เธเธฒเธฃเนเธ”เธเธญเธขเธฅเน"
+                title="เธเธฒเธฃเนเธ”ฟอยล์"
                 icon={Sparkles}
                 disabled={forcedFoil}
-                lockReason="เธเธญเธขเธฅเนเน€เธเนเธฒเธเธฑเธเธเธฑเธ เธฃเธฐเธเธเธฅเนเธญเธเน€เธเนเธเธเธญเธขเธฅเนเนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
+                lockReason="ฟอยล์เน€เธเนเธฒเธเธฑเธเธเธฑเธ เธฃเธฐเธเธเธฅเนเธญเธเน€เธเนเธฟอยล์เนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
                 onClick={() => setCardType("foil")}
               />
             </div>
             {forcedFoil ? (
               <div className="mt-3 rounded-[18px] border border-red-300/18 bg-red-500/10 p-3 text-sm font-bold leading-6 text-red-100/82">
-                เน€เธฅเธเธเธตเนเธญเธขเธนเนเนเธ Master เนเธเธเธเธญเธขเธฅเนเน€เธงเธญเธฃเนเธเธฑเนเธเน€เธเนเธฒ เธเธธเนเธกเน€เธฅเธทเธญเธเธเธฃเธฐเน€เธ เธ—เธเธถเธเธ–เธนเธเธฅเนเธญเธเธ—เธฑเนเธเธเธนเน
+                เน€เธฅเธเธเธตเนเธญเธขเธนเนเนเธ Master เนเธเธฟอยล์เน€เธงเธญเธฃเนเธเธฑเนเธเน€เธเนเธฒ เธเธธเนเธกเน€เธฅเธทเธญเธเธเธฃเธฐเน€เธ เธ—เธเธถเธเธ–เธนเธเธฅเนเธญเธเธ—เธฑเนเธเธเธนเน
                 เน€เธเธทเนเธญเธเธฑเธเนเธญเธ”เธกเธดเธเธเธตเธขเนเธเธดเธ” เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธเธฐเธเธฑเธเธ—เธถเธเธเธฐเน€เธเนเธ Foil เน€เธ—เนเธฒเธเธฑเนเธ
               </div>
             ) : null}
           </div>
 
           <div>
-            <div className="text-sm font-black text-white">เธเนเธเธซเธฒเธเธฒเธฃเนเธ”</div>
+            <div className="text-sm font-black text-white">ค้นหาการ์ด</div>
             <div className="mt-3 space-y-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35" />
@@ -964,7 +964,7 @@ function SpecificCardForm({
                       onEnterCard();
                     }
                   }}
-                  placeholder="เธเธดเธกเธเนเน€เธฅเธเธเธฒเธฃเนเธ” เน€เธเนเธ 010, 90, No.200 เนเธฅเนเธงเธเธ” Enter"
+                  placeholder="พิมพ์เลขการ์ด เช่น 010, 90, No.200 แล้วกด Enter"
                   className="h-14 w-full rounded-[20px] border border-white/10 bg-black/32 pl-12 pr-4 text-base font-bold text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:ring-2 focus:ring-white/10"
                 />
               </div>
@@ -976,10 +976,10 @@ function SpecificCardForm({
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-[18px] border border-amber-300/18 bg-amber-300/[0.08] px-4 text-sm font-black text-amber-100 transition hover:bg-amber-300/[0.12] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/28"
                 >
                   <PackagePlus className="h-4 w-4" />
-                  เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธเธเธตเน
+                  เพิ่มรายการใบนี้
                 </button>
                 <div className="text-xs font-bold text-white/38">
-                  เธเธ”เธเธธเนเธกเธเธตเนเธซเธฃเธทเธญเธเธ” Enter เน€เธเธทเนเธญเธขเธทเธเธขเธฑเธเธเธณเธเธงเธเนเธ
+                  กดปุ่มนี้หรือกด Enter เพื่อยืนยันจำนวนใบ
                 </div>
               </div>
             </div>
@@ -1009,7 +1009,7 @@ function SpecificCardForm({
                 className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-amber-300/18 bg-amber-300/[0.08] text-sm font-black text-amber-100 transition hover:bg-amber-300/[0.12] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/28"
               >
                 <PackagePlus className="h-4 w-4" />
-                เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธเธเธตเน
+                เพิ่มรายการใบนี้
               </button>
               <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
                 No.{cardPreview.cardNo}
@@ -1202,7 +1202,7 @@ function BulkValueForm({
           <AlertTriangle className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="text-xl font-black text-red-50">เธฃเธฐเธเธเธเธญเธเธฃเธงเธก NEX / COIN</h2>
+          <h2 className="text-xl font-black text-red-50">ระบบกองรวม NEX / COIN</h2>
           <p className="mt-2 text-sm leading-7 text-red-100/78">
             เนเธซเธกเธ”เธเธตเนเนเธกเนเธฃเธฐเธเธธเธงเนเธฒเธเธฒเธเธเธฒเธฃเนเธ”เน€เธฅเธเธญเธฐเนเธฃ เนเธญเธ”เธกเธดเธเธ•เนเธญเธเธ•เธเธฅเธเธเธฑเธเธฅเธนเธเธเนเธฒเธเธฑเธ”เน€เธเธเธเนเธญเธ
             เน€เธเธฃเธฒเธฐเน€เธกเธทเนเธญเธฅเธนเธเธเนเธฒเนเธเนเธขเธญเธ”เธเธตเน เธฃเธฐเธเธเธเธฐเธซเธฑเธเธเธฒเธฃเนเธ”เนเธเธเนเธกเนเธชเธเนเธเนเธ/เน€เธเนเธ•/เธเธงเธฒเธกเนเธฃเธฃเนเธเธเธเธงเนเธฒเธขเธญเธ”เธเธฐเธซเธกเธ”
@@ -1292,7 +1292,7 @@ function SpecificSummary({
           />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-              No.{item.cardNo} โ€ข {item.cardType === "foil" ? "Foil" : "Normal"}
+              No.{item.cardNo} • {item.cardType === "foil" ? "Foil" : "Normal"}
             </div>
             <div className="mt-1 truncate font-black text-white">{item.cardName}</div>
             <div className="mt-2 text-sm font-bold text-white/55">
@@ -1322,7 +1322,7 @@ function CardSetSummary({
   if (items.length === 0) {
     return (
       <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 p-4 text-sm font-bold text-white/42">
-        เธขเธฑเธเนเธกเนเธกเธตเน€เธเนเธ•เธเธฒเธฃเนเธ”เนเธเธฃเธฒเธขเธเธฒเธฃ เธเธ”เธเธธเนเธกเน€เธฅเธทเธญเธเน€เธเนเธ•เนเธฅเนเธงเธฃเธฐเธเธธเธเธณเธเธงเธเธเธธเธ”เธ—เธตเนเธฅเธนเธเธเนเธฒเธเธฑเธ”เธกเธฒ
+        ยังไม่มีเซ็ตการ์ดในรายการ กดปุ่มเลือกเซ็ตแล้วระบุจำนวนชุดที่ลูกค้าจัดมา
       </div>
     );
   }
@@ -1337,7 +1337,7 @@ function CardSetSummary({
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                Set {item.order} โ€ข {item.cardTotal} cards
+                Set {item.order} • {item.cardTotal} cards
               </div>
               <div className="mt-1 truncate font-black text-white">{item.setName}</div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs font-black">
@@ -1354,7 +1354,7 @@ function CardSetSummary({
                 ) : null}
                 {item.withFoilBonus ? (
                   <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-amber-100">
-                    เธฃเธงเธกเน€เธเธทเนเธญเธเนเธเธเธญเธขเธฅเน
+                    เธฃเธงเธกเน€เธเธทเนเธญเธเนเธฟอยล์
                   </span>
                 ) : null}
               </div>
@@ -1409,7 +1409,7 @@ function CardSetModal({
 
   const showAddedToast = (setId: string, setName: string) => {
     setRecentlyAddedSetId(setId);
-    setToastText(`เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธฅเนเธง: ${setName}`);
+    setToastText(`เพิ่มรายการแล้ว: ${setName}`);
 
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
@@ -1438,7 +1438,7 @@ function CardSetModal({
             </div>
             <h2 className="mt-2 text-2xl font-black text-white">เน€เธฅเธทเธญเธเน€เธเนเธ•เธเธฒเธฃเนเธ” 40 เน€เธเนเธ•</h2>
             <p className="mt-2 text-sm leading-6 text-white/55">
-              เธฃเธฐเธเธธเธเธณเธเธงเธเน€เธเนเธ•เธเนเธฒเธเธเธธเนเธกเน€เธเธดเนเธก เนเธฅเธฐเธ•เธดเนเธเน€เธเธทเนเธญเธเนเธเธเธญเธขเธฅเนเน€เธกเธทเนเธญเธเธธเธ”เธเธฑเนเธเธเธฑเธ”เธเธฃเธเธ•เธฒเธกเธเธ•เธดเธเธฒเน€เธชเธฃเธดเธก
+              เธฃเธฐเธเธธเธเธณเธเธงเธเน€เธเนเธ•เธเนเธฒเธเธเธธเนเธกเน€เธเธดเนเธก เนเธฅเธฐเธ•เธดเนเธเน€เธเธทเนเธญเธเนเธฟอยล์เน€เธกเธทเนเธญเธเธธเธ”เธเธฑเนเธเธเธฑเธ”เธเธฃเธเธ•เธฒเธกเธเธ•เธดเธเธฒเน€เธชเธฃเธดเธก
             </p>
           </div>
           <button
@@ -1475,7 +1475,7 @@ function CardSetModal({
                   ) : null}
                   {recentlyAddedSetId === set.id ? (
                     <div className="absolute right-3 top-3 rounded-full border border-amber-200/25 bg-amber-300/12 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-amber-100 shadow-[0_0_18px_rgba(250,204,21,0.25)]">
-                      เน€เธเธดเนเธกเธฃเธฒเธขเธเธฒเธฃเนเธฅเนเธง
+                      เพิ่มรายการแล้ว
                     </div>
                   ) : null}
                   <div className="grid flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-center">
@@ -1575,7 +1575,7 @@ function CardSetModal({
                         className="mt-1 h-4 w-4 shrink-0 accent-amber-200"
                       />
                       <span className="min-w-0">
-                        เนเธเนเน€เธเธทเนเธญเธเนเธเธเธญเธขเธฅเนเน€เธเธดเนเธก: {conditionText}
+                        ใช้เงื่อนไขฟอยล์เพิ่ม: {conditionText}
                       </span>
                     </label>
                   ) : null}
@@ -1690,8 +1690,8 @@ function QuantityModal({
           <h2 className="mt-2 text-2xl font-black text-white">เธฃเธฐเธเธธเธเธณเธเธงเธเธเธฒเธฃเนเธ”</h2>
           <p className="mt-2 text-sm leading-6 text-white/55">
             {cardPreview
-              ? `No.${cardPreview.cardNo} โ€ข ${cardPreview.cardName} โ€ข ${
-                  cardType === "foil" ? "เธเธฒเธฃเนเธ”เธเธญเธขเธฅเน" : "เธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒ"
+              ? `No.${cardPreview.cardNo} • ${cardPreview.cardName} • ${
+                  cardType === "foil" ? "เธเธฒเธฃเนเธ”ฟอยล์" : "เธเธฒเธฃเนเธ”เธเธฃเธฃเธกเธ”เธฒ"
                 }`
               : "เธฃเธฒเธขเธเธฒเธฃเธเธฒเธฃเนเธ”"}
           </p>
