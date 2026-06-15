@@ -31,6 +31,28 @@ const CARD_DB_SPREADSHEET_ID = "1zXG8UycndiDuehWQNfqXMvMWrnEoxuqjn_NURWSa7-0";
 const CARD_DB_SHEET_NAME = "";
 const CARD_DB_MAX_RESULTS = 50;
 
+const PAWN_LEDGER_SPREADSHEET_ID = "1r7tgannnDyOE052jBHk2OOZ23FhJR-5AlO_Tvsy56A4";
+const PAWN_LEDGER_SHEET_NAME = "";
+const PAWN_LEDGER_HEADER_ROW = [
+  "Record ID",
+  "Asset ID",
+  "Owner ID",
+  "Owner Line ID",
+  "วันที่จำนำ",
+  "ชื่อผู้จำนำ",
+  "เบอร์ติดต่อ / LINE",
+  "การ์ดที่จำนำ",
+  "จำนวน",
+  "เงินต้น (THB)",
+  "ดอกเบี้ย / เดือน (%)",
+  "ดอกเบี้ย / เดือน (THB)",
+  "วันครบกำหนด",
+  "สถานะ",
+  "หมายเหตุ",
+  "ผู้รับเรื่อง",
+  "อัปเดตล่าสุด",
+];
+
 const BLAZE_RESPONSE_POLICY = [
   "Blaze answer policy:",
   "- Answer the exact user question first. Do not add sales closing lines, examples, or unrelated suggestions unless the user asks.",
@@ -2218,9 +2240,216 @@ function normalizeApiReply(reply) {
   return sanitizeText(String(reply));
 }
 
+function pawnLedgerGetSheet_() {
+  const ss = SpreadsheetApp.openById(PAWN_LEDGER_SPREADSHEET_ID);
+  const configuredName = String(PAWN_LEDGER_SHEET_NAME || "").trim();
+  return (configuredName && ss.getSheetByName(configuredName)) || ss.getSheets()[0] || ss.insertSheet(configuredName || "Pawn Ledger");
+}
+
+function pawnLedgerEnsureHeaderRow_(sheet) {
+  const lastColumn = Math.max(sheet.getLastColumn(), PAWN_LEDGER_HEADER_ROW.length);
+  const existing = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  const hasAnyValue = existing.some((value) => String(value || "").trim());
+
+  if (!hasAnyValue) {
+    sheet.getRange(1, 1, 1, PAWN_LEDGER_HEADER_ROW.length).setValues([PAWN_LEDGER_HEADER_ROW]);
+    return PAWN_LEDGER_HEADER_ROW.slice();
+  }
+
+  const currentHeaders = existing.map((value) => String(value || "").trim());
+  const currentNormalized = currentHeaders.map(normalizeHeaderKey);
+  const missing = PAWN_LEDGER_HEADER_ROW.filter(
+    (header) => !currentNormalized.includes(normalizeHeaderKey(header))
+  );
+
+  if (missing.length > 0) {
+    sheet.getRange(1, currentHeaders.length + 1, 1, missing.length).setValues([missing]);
+    return currentHeaders.concat(missing);
+  }
+
+  return currentHeaders;
+}
+
+function pawnLedgerParseNumber_(value) {
+  const cleaned = String(value || "").replace(/[^\d.-]/g, "");
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pawnLedgerParseDate_(value) {
+  const text = sanitizeText(value);
+  if (!text) return "";
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
+  }
+  return text;
+}
+
+function pawnLedgerAddDays_(value, days) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date();
+  }
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function pawnLedgerNormalizeEntry_(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const entry = raw;
+  const principal = Math.max(0, pawnLedgerParseNumber_(entry.principalTHB ?? entry.principal_thb ?? 0));
+  const interestRate = Math.max(0, pawnLedgerParseNumber_(entry.monthlyInterestRate ?? entry.interestRate ?? 10));
+  const interestTHB = Math.max(
+    0,
+    pawnLedgerParseNumber_(entry.monthlyInterestTHB ?? Math.round(principal * (interestRate / 100)))
+  );
+  const dueDays = Math.max(1, Math.floor(pawnLedgerParseNumber_(entry.dueDays ?? 30)) || 30);
+  const updatedAt = sanitizeText(entry.updatedAt || new Date().toISOString());
+  const dueDate =
+    sanitizeText(entry.dueDate) ||
+    Utilities.formatDate(
+      pawnLedgerAddDays_(updatedAt || new Date().toISOString(), dueDays),
+      Session.getScriptTimeZone(),
+      "yyyy-MM-dd HH:mm"
+    );
+  const ownerLineId = sanitizeText(entry.ownerLineId || entry.owner_line_id || "");
+  const status = sanitizeText(entry.status || "กำลังใช้งาน");
+
+  return {
+    recordId: sanitizeText(entry.recordId || entry.assetId || entry.id || ""),
+    assetId: sanitizeText(entry.assetId || entry.id || entry.recordId || ""),
+    ownerId: sanitizeText(entry.ownerId || entry.owner_id || ""),
+    ownerLineId,
+    pledgeDate: pawnLedgerParseDate_(entry.pledgeDate || entry.createdAt || updatedAt || new Date().toISOString()),
+    borrowerName: sanitizeText(entry.ownerName || entry.borrowerName || "NEXORA Customer"),
+    borrowerContact: sanitizeText(entry.borrowerContact || ownerLineId),
+    cardLabel: sanitizeText(entry.cardLabel || entry.cardName || "Pawned Card"),
+    quantity: Math.max(1, Math.floor(pawnLedgerParseNumber_(entry.quantity || 1))),
+    principalTHB: principal,
+    monthlyInterestRate: interestRate,
+    monthlyInterestTHB: interestTHB,
+    dueDate,
+    status,
+    note: sanitizeText(entry.note || ""),
+    staffName: sanitizeText(entry.staffName || "NEXORA Staff"),
+    updatedAt: pawnLedgerParseDate_(updatedAt || new Date().toISOString()),
+  };
+}
+
+function pawnLedgerBuildRow_(entry) {
+  return [
+    entry.recordId,
+    entry.assetId,
+    entry.ownerId,
+    entry.ownerLineId,
+    entry.pledgeDate,
+    entry.borrowerName,
+    entry.borrowerContact,
+    entry.cardLabel,
+    entry.quantity,
+    entry.principalTHB,
+    entry.monthlyInterestRate,
+    entry.monthlyInterestTHB,
+    entry.dueDate,
+    entry.status,
+    entry.note,
+    entry.staffName,
+    entry.updatedAt,
+  ];
+}
+
+function pawnLedgerUpsertEntries_(sheet, entries) {
+  const headers = pawnLedgerEnsureHeaderRow_(sheet);
+  const headerIndex = headers.reduce((acc, header, index) => {
+    acc[normalizeHeaderKey(header)] = index + 1;
+    return acc;
+  }, {});
+  const assetIdColumn = headerIndex[normalizeHeaderKey("Asset ID")] || 2;
+  const lastRow = sheet.getLastRow();
+  const dataRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, headers.length).getValues() : [];
+  let inserted = 0;
+  let updated = 0;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    entries.forEach((entry) => {
+      const assetId = sanitizeText(entry.assetId);
+      if (!assetId) {
+        return;
+      }
+
+      const rowIndex = dataRows.findIndex((row) => sanitizeText(row[assetIdColumn - 1]) === assetId);
+      const rowValues = pawnLedgerBuildRow_(entry);
+
+      if (rowIndex >= 0) {
+        sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
+        dataRows[rowIndex] = rowValues;
+        updated += 1;
+        return;
+      }
+
+      sheet.appendRow(rowValues);
+      inserted += 1;
+    });
+  } finally {
+    lock.releaseLock();
+  }
+
+  return {
+    inserted,
+    updated,
+    total: inserted + updated,
+  };
+}
+
+function pawnLedgerHandleSync_(payload) {
+  const action = String(payload.action || "upsertPawnEntries").trim();
+  if (action !== "upsertPawnEntries" && action !== "upsertPawnEntry") {
+    return jsonOut({ ok: false, error: "unsupported_action" });
+  }
+
+  const incoming = Array.isArray(payload.entries)
+    ? payload.entries
+    : payload.entry
+      ? [payload.entry]
+      : [];
+
+  const entries = incoming
+    .map(pawnLedgerNormalizeEntry_)
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    return jsonOut({ ok: false, error: "no_entries" });
+  }
+
+  if (payload.dryRun) {
+    return jsonOut({ ok: true, dryRun: true, entries: entries.length, preview: entries });
+  }
+
+  const sheet = pawnLedgerGetSheet_();
+  const result = pawnLedgerUpsertEntries_(sheet, entries);
+
+  return jsonOut({
+    ok: true,
+    ...result,
+  });
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || "{}");
+    const syncAction = String(data.action || "").trim();
+
+    if (syncAction === "upsertPawnEntries" || syncAction === "upsertPawnEntry") {
+      return pawnLedgerHandleSync_(data);
+    }
+
     const apiMode = String(data.mode || "").toLowerCase().trim();
     const apiMessage = sanitizeText(data.message || "");
     const apiImage = String(data.image || "");

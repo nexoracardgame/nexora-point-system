@@ -24,7 +24,7 @@ const DEFAULT_MODEL = "gemini-2.5-flash";
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_HISTORY_ITEMS = 10;
 const DEFAULT_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
+  "https://script.google.com/macros/s/AKfycbw8RJSG7jX4wKKSApM3q7M630zLQzLla-MEUZKyMN_uYc2BvFeNPchxUt9hBg3fgzaU/exec";
 const DEFAULT_DATA_SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/1Ux_JZKUbhJLPNa2lLZdaBljXH-17bff9AdFzwXBcaGg/export?format=csv&gid=400649088";
 const DEFAULT_CARD_DB_CSV_URL =

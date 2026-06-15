@@ -163,6 +163,7 @@ export async function POST(request: Request) {
   });
 
   revalidatePath("/admin/card-bank");
+  revalidatePath("/admin/card-bank/pawn");
   revalidatePath("/admin/card-bank/create");
   revalidatePath("/card-bank");
   publishCardBankEvent({

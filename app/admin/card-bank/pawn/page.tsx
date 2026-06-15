@@ -8,6 +8,11 @@ import {
   TimerReset,
   type LucideIcon,
 } from "lucide-react";
+import {
+  getCardBankPawnAssets,
+  type CardBankAsset,
+  type CardBankStatus,
+} from "@/lib/card-bank-store";
 import { getPawnLedgerEntries, type PawnLedgerEntry } from "@/lib/pawn-ledger-sheet";
 
 export const dynamic = "force-dynamic";
@@ -130,18 +135,133 @@ function toDisplayRows(entries: PawnLedgerEntry[]) {
   }));
 }
 
+function parseNumber(value: unknown) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function getPawnSource(asset: CardBankAsset) {
+  const source =
+    asset.sourcePayload && typeof asset.sourcePayload === "object"
+      ? asset.sourcePayload
+      : null;
+  return source && typeof source.pawn === "object"
+    ? (source.pawn as Record<string, unknown>)
+    : null;
+}
+
+function addDays(value: string, days: number) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+function getAssetStatusLabel(status: CardBankStatus) {
+  if (status === "forfeited") return "หลุดจำนำ";
+  if (status === "withdrawn" || status === "converted") return "ปิดบัญชี";
+  return "กำลังใช้งาน";
+}
+
+function getAssetCardLabel(asset: CardBankAsset) {
+  if (asset.intakeMode === "sets") {
+    return asset.setName || asset.cardName || "Collection Set";
+  }
+
+  if (asset.intakeMode === "bulk") {
+    const nex = asset.nexValue > 0 ? `${asset.nexValue.toLocaleString("th-TH")} NEX` : "";
+    const coin = asset.coinValue > 0 ? `${asset.coinValue.toLocaleString("th-TH")} COIN` : "";
+    return ["กองรวม", nex, coin].filter(Boolean).join(" / ");
+  }
+
+  return asset.cardNo
+    ? `No.${asset.cardNo} ${asset.cardName}`
+    : asset.cardName || "Pawned Card";
+}
+
+function pawnAssetToLedgerEntry(asset: CardBankAsset, index: number): PawnLedgerEntry {
+  const pawn = getPawnSource(asset);
+  const principalTHB = Math.max(
+    0,
+    parseNumber(pawn?.principalTHB ?? asset.valueTHB ?? 0)
+  );
+  const monthlyInterestRate = Math.max(0, parseNumber(pawn?.interestRate ?? 10));
+  const monthlyInterestTHB = Math.max(
+    0,
+    parseNumber(
+      pawn?.monthlyInterestTHB ??
+        Math.round(principalTHB * (monthlyInterestRate / 100))
+    )
+  );
+  const dueDays = Math.max(1, Math.floor(parseNumber(pawn?.dueDays ?? 30)) || 30);
+  const dueDate = String(pawn?.dueDate || "").trim() || addDays(asset.createdAt, dueDays);
+
+  return {
+    rowNumber: index + 1,
+    recordId: asset.id,
+    assetId: asset.id,
+    ownerId: asset.ownerId,
+    ownerLineId: asset.ownerLineId || "",
+    pledgeDate: asset.createdAt,
+    borrowerName: asset.ownerName || "NEXORA Customer",
+    borrowerContact: asset.ownerLineId ? `LINE: ${asset.ownerLineId}` : "",
+    cardLabel: getAssetCardLabel(asset),
+    cardCount: Math.max(1, Math.floor(asset.quantity || 1)),
+    principalTHB,
+    monthlyInterestRate,
+    monthlyInterestTHB,
+    dueDate,
+    status: getAssetStatusLabel(asset.status),
+    note: String(pawn?.note || "").trim(),
+    staffName: asset.createdByName || "NEXORA Staff",
+    updatedAt: asset.updatedAt || asset.createdAt,
+  };
+}
+
+function mergeLedgerEntries(
+  primaryEntries: PawnLedgerEntry[],
+  secondaryEntries: PawnLedgerEntry[]
+) {
+  const byAssetId = new Map<string, PawnLedgerEntry>();
+
+  [...secondaryEntries, ...primaryEntries].forEach((entry) => {
+    const key = String(entry.assetId || entry.recordId || "").trim();
+    if (!key) return;
+    byAssetId.set(key, entry);
+  });
+
+  return Array.from(byAssetId.values())
+    .sort((a, b) => String(b.pledgeDate || "").localeCompare(String(a.pledgeDate || "")))
+    .map((entry, index) => ({ ...entry, rowNumber: index + 1 }));
+}
+
 export default async function PawnLedgerPage() {
+  const pawnAssets = await getCardBankPawnAssets();
+  const systemEntries = pawnAssets.map(pawnAssetToLedgerEntry);
   let entries = fallbackEntries;
+  let sheetEntries: PawnLedgerEntry[] = [];
   let sourceLabel = "ตัวอย่างข้อมูล";
 
   try {
-    const sheetEntries = await getPawnLedgerEntries();
+    sheetEntries = await getPawnLedgerEntries();
     if (sheetEntries.length > 0) {
       entries = sheetEntries;
       sourceLabel = "Google Sheet";
     }
   } catch {
     sourceLabel = "ข้อมูลตัวอย่าง (รอเชื่อมชีต)";
+  }
+
+  if (systemEntries.length > 0) {
+    entries = mergeLedgerEntries(systemEntries, sheetEntries);
+    sourceLabel = sheetEntries.length > 0
+      ? "ระบบหลัก + Google Sheet"
+      : "ระบบหลัก (รออ่าน Google Sheet)";
+  } else if (sheetEntries.length > 0) {
+    entries = mergeLedgerEntries([], sheetEntries);
+  } else {
+    entries = [];
+    sourceLabel = "ระบบหลัก";
   }
 
   const rows = toDisplayRows(entries);

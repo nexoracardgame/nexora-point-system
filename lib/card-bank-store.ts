@@ -660,6 +660,25 @@ export async function getCardBankAssetsForUser(userId: string) {
   }
 }
 
+export async function getCardBankPawnAssets() {
+  if (!hasDatabaseConfig()) {
+    return (await readLocalAssets())
+      .filter((asset) => asset.entryMode === "pawn")
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  try {
+    await ensureCardBankSchema();
+    const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+      'SELECT * FROM "CardBankAsset" WHERE "entryMode" = $1 ORDER BY "createdAt" DESC, "id" ASC',
+      "pawn"
+    );
+    return rows.map(toAssetRecord);
+  } catch {
+    return [];
+  }
+}
+
 export async function getCardBankAdminSummary(): Promise<CardBankAdminSummary> {
   if (!hasDatabaseConfig()) {
     const assets = await readLocalAssets();

@@ -136,7 +136,7 @@ const ROOM_WARM_PREFETCH_COUNT = 6;
 const ROOM_PREFETCH_LIMIT = 28;
 const ROOM_OPEN_LIMIT = 42;
 const BLAZE_AI_WEB_URL =
-  "https://script.google.com/macros/s/AKfycbzPxJE0QCtFuv-4mCG91q1iBcxUZx_UJKkeAay2BEPYp0PFpM-EwAB4oIPH3QYYr8xR/exec";
+  "https://script.google.com/macros/s/AKfycbw8RJSG7jX4wKKSApM3q7M630zLQzLla-MEUZKyMN_uYc2BvFeNPchxUt9hBg3fgzaU/exec";
 const BLAZE_AVATAR_URL = "https://s.imgz.io/2026/03/20/158-39efa94028226fea.png";
 const BLAZE_SESSION_STORAGE_PREFIX = "nexora:blaze-chat-session:v1";
 const BLAZE_WELCOME_MESSAGE: BlazeChatMessage = {

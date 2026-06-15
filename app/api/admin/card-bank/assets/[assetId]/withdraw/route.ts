@@ -57,6 +57,7 @@ export async function POST(
     });
 
     revalidatePath("/admin/card-bank");
+    revalidatePath("/admin/card-bank/pawn");
     revalidatePath("/card-bank");
     publishCardBankEvent({
       ownerId: result.asset.ownerId,

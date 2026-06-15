@@ -2,12 +2,17 @@ import "server-only";
 
 import type { CardBankAsset } from "@/lib/card-bank-store";
 
+const DEFAULT_PAWN_LEDGER_WEBHOOK_URL =
+  "https://script.google.com/macros/s/AKfycbw8RJSG7jX4wKKSApM3q7M630zLQzLla-MEUZKyMN_uYc2BvFeNPchxUt9hBg3fgzaU/exec";
+
 type PawnLedgerSyncEntry = {
   recordId: string;
   assetId: string;
   ownerId: string;
   ownerLineId: string;
   ownerName: string;
+  pledgeDate: string;
+  createdAt: string;
   cardLabel: string;
   quantity: number;
   principalTHB: number;
@@ -78,6 +83,8 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
     ownerId: cleanText(asset.ownerId),
     ownerLineId: cleanText(asset.ownerLineId || ""),
     ownerName: cleanText(asset.ownerName) || "NEXORA Customer",
+    pledgeDate: cleanText(asset.createdAt),
+    createdAt: cleanText(asset.createdAt),
     cardLabel:
       asset.intakeMode === "sets"
         ? cleanText(asset.setName || asset.cardName)
@@ -99,12 +106,10 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
 }
 
 export async function syncPawnLedgerEntries(assets: CardBankAsset[]): Promise<SyncResult> {
-  const endpoint = String(process.env.PAWN_LEDGER_WEBHOOK_URL || "").trim();
+  const endpoint =
+    String(process.env.PAWN_LEDGER_WEBHOOK_URL || "").trim() ||
+    DEFAULT_PAWN_LEDGER_WEBHOOK_URL;
   const token = String(process.env.PAWN_LEDGER_SYNC_TOKEN || "").trim();
-
-  if (!endpoint) {
-    return { ok: true, skipped: true };
-  }
 
   const entries = assets.map(buildEntry).filter((entry): entry is PawnLedgerSyncEntry => Boolean(entry));
   if (entries.length === 0) {
