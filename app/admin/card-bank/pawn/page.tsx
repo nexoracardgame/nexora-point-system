@@ -302,7 +302,7 @@ export default async function PawnLedgerPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
+      <section>
         <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -386,7 +386,7 @@ export default async function PawnLedgerPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="hidden">
           <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/12 bg-white/[0.055]">
