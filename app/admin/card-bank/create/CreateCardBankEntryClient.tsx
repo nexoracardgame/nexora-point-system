@@ -27,7 +27,7 @@ import {
   type NexoraCollectionSet,
 } from "@/lib/nexora-collection-sets";
 import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type UserRow = {
   id: string;
@@ -201,6 +201,10 @@ function resolveApiCard(data: Record<string, unknown>, fallbackCardNo: string): 
 
 export default function CreateCardBankEntryClient({ users }: { users: UserRow[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const lockedEntryMode = searchParams.get("mode") === "pawn" || searchParams.get("mode") === "bank"
+    ? (searchParams.get("mode") as EntryMode)
+    : null;
   const [query, setQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [entryMode, setEntryMode] = useState<EntryMode | null>(null);
@@ -291,6 +295,13 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     return () => window.clearTimeout(timer);
   }, [cardQuery]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    const mode = searchParams.get("mode");
+    if (mode === "pawn" || mode === "bank") {
+      setEntryMode(mode);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!quantityModalOpen) return;
@@ -577,21 +588,25 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <ModeButton
-                active={entryMode === "bank"}
-                title="ธนาคารการ์ด"
-                desc="คีย์การ์ดจริงเข้าระบบฝากสินทรัพย์ของลูกค้า"
-                icon={Landmark}
-                onClick={() => setEntryMode("bank")}
-              />
-              <ModeButton
-                active={entryMode === "pawn"}
-                title="รับฝากการ์ด"
-                desc="รับฝากพร้อมเงื่อนไขเงินต้นและดอก 10% รายเดือน"
-                icon={Banknote}
-                onClick={() => setEntryMode("pawn")}
-              />
+            <div className={`mt-5 grid gap-3 ${lockedEntryMode ? "" : "sm:grid-cols-2"}`}>
+              {lockedEntryMode !== "pawn" ? (
+                <ModeButton
+                  active={entryMode === "bank"}
+                  title="ธนาคารการ์ด"
+                  desc="คีย์การ์ดจริงเข้าระบบฝากสินทรัพย์ของลูกค้า"
+                  icon={Landmark}
+                  onClick={() => setEntryMode("bank")}
+                />
+              ) : null}
+              {lockedEntryMode !== "bank" ? (
+                <ModeButton
+                  active={entryMode === "pawn"}
+                  title="รับฝากการ์ด"
+                  desc="รับฝากพร้อมเงื่อนไขเงินต้นและดอก 10% รายเดือน"
+                  icon={Banknote}
+                  onClick={() => setEntryMode("pawn")}
+                />
+              ) : null}
             </div>
           </div>
         ) : null}

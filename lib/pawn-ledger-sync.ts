@@ -51,6 +51,12 @@ function parseNumber(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function getSyncStatusLabel(status: string) {
+  if (status === "forfeited") return "ปิดสิทธิ์รับฝาก";
+  if (status === "withdrawn" || status === "converted") return "ปิดบัญชี";
+  return "กำลังใช้งาน";
+}
+
 function getPawnSource(asset: CardBankAsset) {
   const source = asset.sourcePayload && typeof asset.sourcePayload === "object"
     ? asset.sourcePayload
@@ -96,7 +102,7 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
     monthlyInterestRate,
     monthlyInterestTHB,
     dueDate: dueDate || addDays(asset.createdAt, dueDays).toISOString(),
-    status: cleanText(asset.status) || "กำลังใช้งาน",
+    status: getSyncStatusLabel(asset.status),
     note:
       cleanText(pawn?.note || "") ||
       (asset.status === "forfeited" ? "ปิดสิทธิ์รับฝาก" : asset.status === "withdrawn" ? "ปิดบัญชี" : ""),

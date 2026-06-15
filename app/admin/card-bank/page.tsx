@@ -212,10 +212,10 @@ export default async function AdminCardBankPage() {
               <h2 className="mt-2 text-2xl font-black">เมนูทำงานของแอดมิน</h2>
             </div>
             <Link
-              href="/admin/card-bank/create"
+              href="/admin/card-bank/create?mode=bank"
               className="rounded-[18px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-black text-white transition hover:bg-white/[0.09]"
             >
-              เพิ่มรายการรับฝาก
+              เพิ่มรายการธนาคารการ์ด
             </Link>
           </div>
 

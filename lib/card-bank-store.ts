@@ -113,6 +113,18 @@ export type WithdrawCardBankAssetInput = {
   note?: string | null;
 };
 
+export type CardBankPawnActionInput = {
+  assetId: string;
+  action: "payment" | "renew" | "forfeit";
+  amountTHB?: number;
+  extendDays?: number;
+  note?: string | null;
+  actor: {
+    id: string;
+    name: string;
+  };
+};
+
 export type CardBankAdminSummary = {
   pendingCount: number;
   storedQuantity: number;
@@ -290,6 +302,45 @@ function stripSourcePayload(asset: CardBankAsset) {
   const { sourcePayload, ...rest } = asset;
   void sourcePayload;
   return rest;
+}
+
+function mergePawnPayload(
+  asset: CardBankAsset,
+  patch: Record<string, unknown>
+) {
+  const currentSource =
+    asset.sourcePayload && typeof asset.sourcePayload === "object"
+      ? asset.sourcePayload
+      : {};
+  const currentPawn =
+    currentSource.pawn && typeof currentSource.pawn === "object"
+      ? (currentSource.pawn as Record<string, unknown>)
+      : {};
+
+  return {
+    ...currentSource,
+    pawn: {
+      ...currentPawn,
+      ...patch,
+    },
+  };
+}
+
+function getPawnLikePayload(asset: CardBankAsset) {
+  const source =
+    asset.sourcePayload && typeof asset.sourcePayload === "object"
+      ? asset.sourcePayload
+      : {};
+  return source.pawn && typeof source.pawn === "object"
+    ? (source.pawn as Record<string, unknown>)
+    : {};
+}
+
+function addDaysToIso(value: string, days: number) {
+  const date = new Date(value);
+  const base = Number.isNaN(date.getTime()) ? new Date() : date;
+  base.setDate(base.getDate() + days);
+  return base.toISOString();
 }
 
 function buildAssets(input: CreateCardBankEntriesInput) {
@@ -643,6 +694,125 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
   const { syncSourcePayload, ...publicResult } = result;
   void syncSourcePayload;
   return publicResult;
+}
+
+export async function applyCardBankPawnAction(input: CardBankPawnActionInput) {
+  const assetId = String(input.assetId || "").trim();
+  const action = input.action;
+  const amountTHB = toNonNegativeNumber(input.amountTHB);
+  const extendDays = Math.max(0, Math.floor(toNumber(input.extendDays)));
+  const note = String(input.note || "").trim();
+
+  if (!assetId) {
+    throw new Error("Missing asset id");
+  }
+  if (action !== "payment" && action !== "renew" && action !== "forfeit") {
+    throw new Error("Invalid pawn action");
+  }
+
+  const now = new Date().toISOString();
+
+  const buildAfterState = (asset: CardBankAsset): CardBankAsset => {
+    if (asset.entryMode !== "pawn") {
+      throw new Error("Asset is not a deposit asset");
+    }
+    if (asset.status === "withdrawn" || asset.status === "converted") {
+      throw new Error("Asset is already closed");
+    }
+
+    const pawn = getPawnLikePayload(asset);
+    const currentDueDate = String(pawn.dueDate || "").trim() || addDaysToIso(asset.createdAt, Math.max(1, Math.floor(toNumber(pawn.dueDays || 30)) || 30));
+    const nextDueDate =
+      action === "renew" || action === "payment"
+        ? addDaysToIso(currentDueDate, extendDays || Math.max(1, Math.floor(toNumber(pawn.dueDays || 30)) || 30))
+        : currentDueDate;
+    const nextStatus: CardBankStatus = action === "forfeit" ? "forfeited" : "pawned";
+    const actionLabel =
+      action === "payment"
+        ? "ชำระดอกเบี้ย"
+        : action === "renew"
+          ? "ต่ออายุรับฝาก"
+          : "ปิดสิทธิ์รับฝาก";
+
+    return {
+      ...asset,
+      status: nextStatus,
+      updatedAt: now,
+      sourcePayload: mergePawnPayload(asset, {
+        ...pawn,
+        dueDate: nextDueDate,
+        lastAction: action,
+        lastActionLabel: actionLabel,
+        lastActionAt: now,
+        lastPaymentTHB: action === "payment" ? amountTHB : pawn.lastPaymentTHB || 0,
+        paidInterestTHB:
+          action === "payment"
+            ? toNonNegativeNumber(pawn.paidInterestTHB) + amountTHB
+            : toNonNegativeNumber(pawn.paidInterestTHB),
+        note: [String(pawn.note || "").trim(), note || actionLabel].filter(Boolean).join(" | "),
+      }),
+    };
+  };
+
+  if (!hasDatabaseConfig()) {
+    const current = await readLocalAssets();
+    const asset = current.find((item) => item.id === assetId);
+    if (!asset) throw new Error("Asset not found");
+    const afterState = buildAfterState(asset);
+    await writeLocalAssets(current.map((item) => (item.id === assetId ? afterState : item)));
+    try {
+      const syncResult = await syncPawnLedgerEntries([afterState]);
+      if (!syncResult.ok) {
+        console.warn("Pawn ledger sync failed (local action):", syncResult.error || "unknown");
+      }
+    } catch (error) {
+      console.warn("Pawn ledger sync error (local action):", error);
+    }
+    return stripSourcePayload(afterState);
+  }
+
+  await ensureCardBankSchema();
+  const result = await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRawUnsafe<DbRow[]>(
+      'SELECT * FROM "CardBankAsset" WHERE "id" = $1 FOR UPDATE',
+      assetId
+    );
+    const asset = rows[0] ? toAssetRecord(rows[0]) : null;
+    if (!asset) throw new Error("Asset not found");
+    const afterState = buildAfterState(asset);
+
+    await tx.$executeRawUnsafe(
+      'UPDATE "CardBankAsset" SET "status" = $1, "sourcePayload" = $2::jsonb, "updatedAt" = NOW() WHERE "id" = $3',
+      afterState.status,
+      JSON.stringify(afterState.sourcePayload || {}),
+      assetId
+    );
+    await tx.$executeRawUnsafe(
+      'INSERT INTO "CardBankMovement" ("id", "assetId", "ownerId", "action", "beforeState", "afterState", "staffId", "staffName", "note") VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9)',
+      randomUUID(),
+      asset.id,
+      asset.ownerId,
+      `pawn_${action}`,
+      JSON.stringify(asset),
+      JSON.stringify(afterState),
+      input.actor.id,
+      input.actor.name,
+      note || `Pawn action: ${action}`
+    );
+
+    return afterState;
+  });
+
+  try {
+    const syncResult = await syncPawnLedgerEntries([result]);
+    if (!syncResult.ok) {
+      console.warn("Pawn ledger sync failed (db action):", syncResult.error || "unknown");
+    }
+  } catch (error) {
+    console.warn("Pawn ledger sync error (db action):", error);
+  }
+
+  return stripSourcePayload(result);
 }
 
 export async function getCardBankAssetsForUser(userId: string) {
