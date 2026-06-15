@@ -57,6 +57,7 @@ type DepositItem = {
   rarity?: string;
   quantity: number;
   imageUrl: string;
+  pawn: PawnTermsSnapshot | null;
 };
 
 type DepositSetItem = {
@@ -70,6 +71,21 @@ type DepositSetItem = {
   reward: string;
   withFoilBonus: boolean;
   cardTotal: number;
+  pawn: PawnTermsSnapshot | null;
+};
+
+type PawnTermsDraft = {
+  principalTHB: string;
+  interestRate: string;
+  dueDays: string;
+  note: string;
+};
+
+type PawnTermsSnapshot = {
+  principalTHB: number;
+  interestRate: number;
+  dueDays: number;
+  note: string | null;
 };
 
 type EntryMode = "bank" | "pawn";
@@ -89,6 +105,24 @@ function normalizeCardNo(value: string) {
 
 function formatNumber(value: number) {
   return value.toLocaleString("th-TH");
+}
+
+function createDefaultPawnDraft(): PawnTermsDraft {
+  return {
+    principalTHB: "",
+    interestRate: "10",
+    dueDays: "30",
+    note: "",
+  };
+}
+
+function normalizePawnDraft(draft: PawnTermsDraft): PawnTermsSnapshot {
+  return {
+    principalTHB: Math.max(0, Number(draft.principalTHB || 0)),
+    interestRate: Math.max(0, Number(draft.interestRate || 10)),
+    dueDays: Math.max(1, Math.floor(Number(draft.dueDays || 30)) || 30),
+    note: draft.note.trim() || null,
+  };
 }
 
 function normalizeAssetTier(value?: string | null): BulkCategory | "unknown" {
@@ -184,10 +218,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const [bulkNex, setBulkNex] = useState("");
   const [bulkCoin, setBulkCoin] = useState("");
   const [bulkCategory, setBulkCategory] = useState<BulkCategory>("pure");
-  const [pawnPrincipal, setPawnPrincipal] = useState("");
-  const [pawnInterestRate, setPawnInterestRate] = useState("10");
-  const [pawnDueDays, setPawnDueDays] = useState("30");
-  const [pawnNote, setPawnNote] = useState("");
+  const [pawnDraft, setPawnDraft] = useState<PawnTermsDraft>(() => createDefaultPawnDraft());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -286,6 +317,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         : "กองรวม";
   const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const forcedFoil = isForcedFoilCard(previewCardNo);
+  const resetPawnDraft = () => setPawnDraft(createDefaultPawnDraft());
 
   const openQuantityModal = () => {
     if (!cardPreview) return;
@@ -313,18 +345,21 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         rarity: cardPreview.rarity || normalizeAssetTier(cardPreview.cardName),
         quantity,
         imageUrl: cardPreview.imageUrl,
+        pawn: entryMode === "pawn" ? normalizePawnDraft(pawnDraft) : null,
       },
     ]);
     setQuantityModalOpen(false);
     setCardQuery("");
     setCardPreview(null);
+    resetPawnDraft();
   };
 
   const addSetItem = (
     set: NexoraCollectionSet,
     quantity: number,
     withFoilBonus: boolean,
-    receivedNexValue?: number
+    receivedNexValue?: number,
+    pawn?: PawnTermsSnapshot
   ) => {
     const safeQuantity = Math.max(1, Math.floor(quantity));
     if (!Number.isFinite(safeQuantity) || safeQuantity <= 0) return;
@@ -347,6 +382,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         reward: set.reward,
         withFoilBonus,
         cardTotal: set.officialTotal || getCollectionCardIds(set).length,
+        pawn: pawn || null,
       },
     ]);
   };
@@ -374,11 +410,6 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       return;
     }
 
-    if (entryMode === "pawn" && !pawnPrincipal.trim()) {
-      alert("กรอกเงินต้นสำหรับระบบจำนำก่อน");
-      return;
-    }
-
     setSaving(true);
 
     try {
@@ -402,15 +433,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
             coinValue: Number(bulkCoin || 0),
             category: bulkCategory,
           },
-          pawn:
-            entryMode === "pawn"
-              ? {
-                  principalTHB: Number(pawnPrincipal || 0),
-                  interestRate: Number(pawnInterestRate || 10),
-                  dueDays: Number(pawnDueDays || 30),
-                  note: pawnNote,
-                }
-              : undefined,
+          pawn: undefined,
         }),
       });
       const result = (await response.json().catch(() => ({}))) as {
@@ -433,13 +456,10 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       setBulkNex("");
       setBulkCoin("");
       setBulkCategory("pure");
-      setPawnPrincipal("");
-      setPawnInterestRate("10");
-      setPawnDueDays("30");
-      setPawnNote("");
+      resetPawnDraft();
       setCardQuery("");
       setCardPreview(null);
-            router.refresh();
+      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error
@@ -635,35 +655,35 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     <h3 className="mt-2 text-xl font-black text-white">ข้อมูลจำนำที่จะส่งลงชีต</h3>
                   </div>
                   <div className="text-xs font-bold text-amber-100/65">
-                    ใช้สำหรับคำนวณดอกและวันครบกำหนดอัตโนมัติ
+                    ค่านี้จะถูกบันทึกแยกเป็นรายรายการ แล้วล้างช่องหลังเพิ่มรายการ
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <LabeledInput
                     label="เงินต้น (THB)"
-                    value={pawnPrincipal}
-                    onChange={setPawnPrincipal}
+                    value={pawnDraft.principalTHB}
+                    onChange={(value) => setPawnDraft((current) => ({ ...current, principalTHB: value }))}
                     inputMode="decimal"
                     placeholder="0"
                   />
                   <LabeledInput
                     label="ดอกเบี้ย / เดือน (%)"
-                    value={pawnInterestRate}
-                    onChange={setPawnInterestRate}
+                    value={pawnDraft.interestRate}
+                    onChange={(value) => setPawnDraft((current) => ({ ...current, interestRate: value }))}
                     inputMode="decimal"
                     placeholder="10"
                   />
                   <LabeledInput
                     label="ครบกำหนด (วัน)"
-                    value={pawnDueDays}
-                    onChange={setPawnDueDays}
+                    value={pawnDraft.dueDays}
+                    onChange={(value) => setPawnDraft((current) => ({ ...current, dueDays: value }))}
                     inputMode="numeric"
                     placeholder="30"
                   />
                   <LabeledInput
                     label="หมายเหตุ"
-                    value={pawnNote}
-                    onChange={setPawnNote}
+                    value={pawnDraft.note}
+                    onChange={(value) => setPawnDraft((current) => ({ ...current, note: value }))}
                     placeholder="เช่น รับฝากจากลูกค้าประจำ"
                   />
                 </div>
@@ -762,6 +782,9 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         <CardSetModal
           onClose={() => setSetModalOpen(false)}
           onAddSet={addSetItem}
+          pawnDraft={pawnDraft}
+          onResetPawnDraft={resetPawnDraft}
+          capturePawnTerms={entryMode === "pawn"}
         />
       ) : null}
     </div>
@@ -1298,6 +1321,14 @@ function SpecificSummary({
             <div className="mt-2 text-sm font-bold text-white/55">
               จำนวน {item.quantity.toLocaleString("th-TH")} ใบ
             </div>
+            {item.pawn ? (
+              <div className="mt-2 space-y-1 text-xs font-bold leading-5 text-amber-100/78">
+                <div>เงินต้น {formatNumber(item.pawn.principalTHB)} THB</div>
+                <div>ดอกเบี้ย {formatNumber(item.pawn.interestRate)}% / เดือน</div>
+                <div>ครบกำหนด {formatNumber(item.pawn.dueDays)} วัน</div>
+                {item.pawn.note ? <div>หมายเหตุ {item.pawn.note}</div> : null}
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -1358,6 +1389,14 @@ function CardSetSummary({
                   </span>
                 ) : null}
               </div>
+              {item.pawn ? (
+                <div className="mt-3 space-y-1 rounded-[16px] border border-amber-200/14 bg-amber-300/[0.06] p-3 text-xs font-bold leading-5 text-amber-50/84">
+                  <div>เงินต้น {formatNumber(item.pawn.principalTHB)} THB</div>
+                  <div>ดอกเบี้ย {formatNumber(item.pawn.interestRate)}% / เดือน</div>
+                  <div>ครบกำหนด {formatNumber(item.pawn.dueDays)} วัน</div>
+                  {item.pawn.note ? <div>หมายเหตุ {item.pawn.note}</div> : null}
+                </div>
+              ) : null}
             </div>
             <button
               type="button"
@@ -1379,14 +1418,21 @@ function CardSetSummary({
 function CardSetModal({
   onClose,
   onAddSet,
+  pawnDraft,
+  onResetPawnDraft,
+  capturePawnTerms,
 }: {
   onClose: () => void;
   onAddSet: (
     set: NexoraCollectionSet,
     quantity: number,
     withFoilBonus: boolean,
-    receivedNexValue?: number
+    receivedNexValue?: number,
+    pawn?: PawnTermsSnapshot
   ) => void;
+  pawnDraft: PawnTermsDraft;
+  onResetPawnDraft: () => void;
+  capturePawnTerms: boolean;
 }) {
   const [quantityBySet, setQuantityBySet] = useState<Record<string, string>>({});
   const [foilBonusBySet, setFoilBonusBySet] = useState<Record<string, boolean>>({});
@@ -1549,8 +1595,22 @@ function CardSetModal({
                             set,
                             Number(quantityValue || 1),
                             withFoilBonus,
-                            finalReceived
+                            finalReceived,
+                            capturePawnTerms ? normalizePawnDraft(pawnDraft) : undefined
                           );
+                          onResetPawnDraft();
+                          setQuantityBySet((current) => ({
+                            ...current,
+                            [set.id]: "1",
+                          }));
+                          setReceivedNexBySet((current) => ({
+                            ...current,
+                            [set.id]: "",
+                          }));
+                          setFoilBonusBySet((current) => ({
+                            ...current,
+                            [set.id]: false,
+                          }));
                           showAddedToast(set.id, set.name);
                         }}
                         className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200 active:scale-[0.98]"

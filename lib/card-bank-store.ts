@@ -61,6 +61,12 @@ export type CreateCardBankEntriesInput = {
     assetTier?: string | null;
     quantity: number;
     imageUrl?: string | null;
+    pawn?: {
+      principalTHB: number;
+      interestRate: number;
+      dueDays: number;
+      note?: string | null;
+    } | null;
   }>;
   setItems?: Array<{
     setId: string;
@@ -71,6 +77,12 @@ export type CreateCardBankEntriesInput = {
     reward?: string;
     withFoilBonus: boolean;
     cardTotal: number;
+    pawn?: {
+      principalTHB: number;
+      interestRate: number;
+      dueDays: number;
+      note?: string | null;
+    } | null;
   }>;
   bulk?: {
     nexValue: number;
@@ -298,28 +310,31 @@ function buildAssets(input: CreateCardBankEntriesInput) {
   };
 
   if (input.intakeMode === "sets") {
-      return (input.setItems || []).map((item) => ({
+    return (input.setItems || []).map((item) => {
+      const pawn = item.pawn || pawnSource;
+      return {
         ...base,
         id: randomUUID(),
-      cardNo: null,
-      cardName: item.setName,
-      cardType: item.withFoilBonus ? "foil-set" : "set",
-      assetTier: "set" as CardBankAssetTier,
-      quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
-      imageUrl: null,
-      setId: item.setId,
-      setName: item.setName,
-      setOrder: Math.floor(Number(item.order || 0)),
-      setCardTotal: Math.floor(Number(item.cardTotal || 0)),
+        cardNo: null,
+        cardName: item.setName,
+        cardType: item.withFoilBonus ? "foil-set" : "set",
+        assetTier: "set" as CardBankAssetTier,
+        quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
+        imageUrl: null,
+        setId: item.setId,
+        setName: item.setName,
+        setOrder: Math.floor(Number(item.order || 0)),
+        setCardTotal: Math.floor(Number(item.cardTotal || 0)),
         withFoilBonus: Boolean(item.withFoilBonus),
-      valueTHB: pawnSource?.principalTHB ? Number(pawnSource.principalTHB || 0) : 0,
+        valueTHB: Number(pawn?.principalTHB || 0),
         nexValue: Number(item.nexValue || 0),
         coinValue: 0,
-      sourcePayload: {
-        ...item,
-        pawn: pawnSource,
-      },
-      }));
+        sourcePayload: {
+          ...item,
+          pawn,
+        },
+      };
+    });
   }
 
   if (input.intakeMode === "bulk") {
@@ -349,28 +364,31 @@ function buildAssets(input: CreateCardBankEntriesInput) {
     ];
   }
 
-  return (input.items || []).map((item) => ({
-    ...base,
-    id: randomUUID(),
-    cardNo: item.cardNo,
-    cardName: item.cardName,
-    cardType: item.cardType,
-    assetTier: normalizeAssetTier(item.assetTier || item.rarity),
-    quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
-    imageUrl: item.imageUrl || null,
-    setId: null,
-    setName: null,
-    setOrder: null,
-    setCardTotal: null,
-    withFoilBonus: item.cardType === "foil",
-    valueTHB: pawnSource?.principalTHB ? Number(pawnSource.principalTHB || 0) : 0,
-    nexValue: 0,
-    coinValue: 0,
-    sourcePayload: {
-      ...item,
-      pawn: pawnSource,
-    },
-  }));
+  return (input.items || []).map((item) => {
+    const pawn = item.pawn || pawnSource;
+    return {
+      ...base,
+      id: randomUUID(),
+      cardNo: item.cardNo,
+      cardName: item.cardName,
+      cardType: item.cardType,
+      assetTier: normalizeAssetTier(item.assetTier || item.rarity),
+      quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
+      imageUrl: item.imageUrl || null,
+      setId: null,
+      setName: null,
+      setOrder: null,
+      setCardTotal: null,
+      withFoilBonus: item.cardType === "foil",
+      valueTHB: Number(pawn?.principalTHB || 0),
+      nexValue: 0,
+      coinValue: 0,
+      sourcePayload: {
+        ...item,
+        pawn,
+      },
+    };
+  });
 }
 
 export async function createCardBankEntries(input: CreateCardBankEntriesInput) {

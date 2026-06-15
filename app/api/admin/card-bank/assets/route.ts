@@ -81,6 +81,14 @@ export async function POST(request: Request) {
           assetTier: cleanText(item.assetTier),
           quantity: cleanQuantity(item.quantity),
           imageUrl: cleanText(item.imageUrl) || null,
+          pawn: asObject(item.pawn).principalTHB !== undefined
+            ? {
+                principalTHB: Math.max(0, cleanNumber(asObject(item.pawn).principalTHB)),
+                interestRate: Math.max(0, cleanNumber(asObject(item.pawn).interestRate || 10)),
+                dueDays: Math.max(1, Math.floor(cleanNumber(asObject(item.pawn).dueDays || 30)) || 30),
+                note: cleanText(asObject(item.pawn).note) || null,
+              }
+            : undefined,
         }))
         .filter((item) => item.cardNo && item.cardName)
     : [];
@@ -97,6 +105,14 @@ export async function POST(request: Request) {
           reward: cleanText(item.reward),
           withFoilBonus: Boolean(item.withFoilBonus),
           cardTotal: Math.floor(cleanNumber(item.cardTotal)),
+          pawn: asObject(item.pawn).principalTHB !== undefined
+            ? {
+                principalTHB: Math.max(0, cleanNumber(asObject(item.pawn).principalTHB)),
+                interestRate: Math.max(0, cleanNumber(asObject(item.pawn).interestRate || 10)),
+                dueDays: Math.max(1, Math.floor(cleanNumber(asObject(item.pawn).dueDays || 30)) || 30),
+                note: cleanText(asObject(item.pawn).note) || null,
+              }
+            : undefined,
         }))
         .filter((item) => item.setId && item.setName)
     : [];
