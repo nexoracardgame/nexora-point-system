@@ -26,7 +26,7 @@ const items = [
   { href: "/admin/point-logs", label: "Point Logs", icon: ScrollText },
   { href: "/admin/card-bank", label: "Card Bank", icon: Landmark },
   { href: "/admin/card-bank/pawn", label: "Pawn Ledger", icon: WalletCards },
-  { href: "/admin/exchange-calculator", label: "เธเธณเธเธงเธ“เธเธฒเธฃเนเธฅเธ", icon: Calculator },
+  { href: "/admin/exchange-calculator", label: "เครื่องคำนวณแลก", icon: Calculator },
   { href: "/admin/staff-scan", label: "Staff Scan", icon: ScanLine },
 ];
 
@@ -52,7 +52,7 @@ function HomeLink({
       }`}
     >
       <ArrowLeft className="h-4 w-4 shrink-0" />
-      <span className={compact ? "hidden sm:inline" : undefined}>เธเธฅเธฑเธเธซเธเนเธฒเธซเธฅเธฑเธ</span>
+      <span className={compact ? "hidden sm:inline" : undefined}>กลับหน้าหลัก</span>
     </Link>
   );
 }
