@@ -548,7 +548,7 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
   }
 
   await ensureCardBankSchema();
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRawUnsafe<DbRow[]>(
       'SELECT * FROM "CardBankAsset" WHERE "id" = $1 FOR UPDATE',
       assetId
@@ -615,19 +615,9 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
       String(input.note || "Return card asset to customer").trim()
     );
 
-    if (asset.entryMode === "pawn") {
-      try {
-        const syncResult = await syncPawnLedgerEntries([{ ...afterState, sourcePayload: asset.sourcePayload }]);
-        if (!syncResult.ok) {
-          console.warn("Pawn ledger sync failed (db withdraw):", syncResult.error || "unknown");
-        }
-      } catch (error) {
-        console.warn("Pawn ledger sync error (db withdraw):", error);
-      }
-    }
-
     return {
       asset: afterState,
+      syncSourcePayload: asset.sourcePayload,
       withdrawnQuantity: withdrawQuantity,
       withdrawnNexValue: withdrawNexValue,
       withdrawnCoinValue: withdrawCoinValue,
@@ -636,6 +626,23 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
       remainingCoinValue: afterState.coinValue,
     };
   });
+
+  if (result.asset.entryMode === "pawn") {
+    try {
+      const syncResult = await syncPawnLedgerEntries([
+        { ...result.asset, sourcePayload: result.syncSourcePayload },
+      ]);
+      if (!syncResult.ok) {
+        console.warn("Pawn ledger sync failed (db withdraw):", syncResult.error || "unknown");
+      }
+    } catch (error) {
+      console.warn("Pawn ledger sync error (db withdraw):", error);
+    }
+  }
+
+  const { syncSourcePayload, ...publicResult } = result;
+  void syncSourcePayload;
+  return publicResult;
 }
 
 export async function getCardBankAssetsForUser(userId: string) {
@@ -672,6 +679,25 @@ export async function getCardBankPawnAssets() {
     const rows = await prisma.$queryRawUnsafe<DbRow[]>(
       'SELECT * FROM "CardBankAsset" WHERE "entryMode" = $1 ORDER BY "createdAt" DESC, "id" ASC',
       "pawn"
+    );
+    return rows.map(toAssetRecord);
+  } catch {
+    return [];
+  }
+}
+
+export async function getCardBankAssetsByEntryMode(entryMode: CardBankEntryMode) {
+  if (!hasDatabaseConfig()) {
+    return (await readLocalAssets())
+      .filter((asset) => asset.entryMode === entryMode)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  try {
+    await ensureCardBankSchema();
+    const rows = await prisma.$queryRawUnsafe<DbRow[]>(
+      'SELECT * FROM "CardBankAsset" WHERE "entryMode" = $1 ORDER BY "createdAt" DESC, "id" ASC',
+      entryMode
     );
     return rows.map(toAssetRecord);
   } catch {

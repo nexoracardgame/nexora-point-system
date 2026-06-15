@@ -17,7 +17,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { getCardBankAdminSummary, type CardBankAdminSummary } from "@/lib/card-bank-store";
+import {
+  getCardBankAssetsByEntryMode,
+  type CardBankAdminSummary,
+  type CardBankAsset,
+} from "@/lib/card-bank-store";
 import CardBankWithdrawPanel from "./CardBankWithdrawPanel";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +30,28 @@ function buildOverview(summary: CardBankAdminSummary) {
   return [
     { label: "รอรับฝาก/ตรวจสภาพ", value: `${summary.pendingCount.toLocaleString("th-TH")} รายการ`, icon: ClipboardCheck },
     { label: "ฝากอยู่ในธนาคาร", value: `${summary.storedQuantity.toLocaleString("th-TH")} ใบ`, icon: Landmark },
-    { label: "อยู่ในโรงรับจำนำ", value: `${summary.pawnedQuantity.toLocaleString("th-TH")} ใบ`, icon: Banknote },
+    { label: "จำนำแยกเมนู", value: `${summary.pawnedQuantity.toLocaleString("th-TH")} ใบ`, icon: Banknote },
     { label: "เสี่ยงหลุดถาวร", value: `${summary.forfeitedQuantity.toLocaleString("th-TH")} ใบ`, icon: AlertTriangle },
   ];
+}
+
+function buildDepositSummary(assets: CardBankAsset[]): CardBankAdminSummary {
+  const latestAssets = assets
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 80);
+
+  return {
+    pendingCount: assets.filter((asset) => asset.status === "stored" && asset.intakeMode !== "bulk").length,
+    storedQuantity: assets
+      .filter((asset) => asset.status === "stored")
+      .reduce((sum, asset) => sum + asset.quantity, 0),
+    pawnedQuantity: 0,
+    forfeitedQuantity: assets
+      .filter((asset) => asset.status === "forfeited")
+      .reduce((sum, asset) => sum + asset.quantity, 0),
+    latestAssets,
+  };
 }
 
 const adminModules = [
@@ -48,7 +71,7 @@ const adminModules = [
     icon: ReceiptText,
   },
   {
-    title: "คำขอเข้าโรงรับจำนำ",
+    title: "คำขอเข้าระบบจำนำ",
     desc: "อนุมัติการย้ายการ์ดจากธนาคารไปโหมดจำนำ คำนวณเงินสด ดอกเบี้ย 10% และวันครบกำหนดรายเดือนอัตโนมัติ",
     icon: Banknote,
   },
@@ -146,7 +169,8 @@ function formatDateTime(value: string) {
 }
 
 export default async function AdminCardBankPage() {
-  const summary = await getCardBankAdminSummary();
+  const depositAssets = await getCardBankAssetsByEntryMode("bank");
+  const summary = buildDepositSummary(depositAssets);
   const overview = buildOverview(summary);
 
   return (
@@ -160,11 +184,11 @@ export default async function AdminCardBankPage() {
                 Admin Card Bank
               </div>
               <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">
-                หลังบ้านธนาคารการ์ดและโรงรับจำนำ
+                หลังบ้านรับฝากการ์ด
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/62">
                 ศูนย์ควบคุมการ์ดจริงของลูกค้า ตั้งแต่รับฝาก ตรวจสภาพ คิดค่าฝาก
-                อนุมัติจำนำ คิดดอกเบี้ยรายเดือน และล็อกสถานะหลุดถาวร
+                เบิกถอนคืนลูกค้า และแยกงานจำนำไปเมนูจำนำการ์ดโดยเฉพาะ
                 โดยทุกขั้นตอนต้องตรวจสอบย้อนหลังได้
               </p>
             </div>
@@ -196,7 +220,9 @@ export default async function AdminCardBankPage() {
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {adminModules.map((module) => (
+            {adminModules
+              .filter((module) => !["คำขอเข้าระบบจำนำ", "ปฏิทินดอกเบี้ย"].includes(module.title))
+              .map((module) => (
               <AdminModule key={module.title} {...module} />
             ))}
           </div>
@@ -219,7 +245,7 @@ export default async function AdminCardBankPage() {
           </section>
 
           <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-xl font-black">สูตรคำนวณโรงรับจำนำ</h2>
+            <h2 className="text-xl font-black">สูตรคำนวณระบบจำนำ</h2>
             <div className="mt-4 space-y-3">
               <RuleLine label="ฐานมูลค่า" value="valueTHB ของการ์ด" />
               <RuleLine label="ดอกเบี้ยรายเดือน" value="10%" />
@@ -277,7 +303,7 @@ export default async function AdminCardBankPage() {
             <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
               Real Assets
             </div>
-            <h2 className="mt-2 text-2xl font-black">รายการ Card Bank ล่าสุด</h2>
+            <h2 className="mt-2 text-2xl font-black">รายการรับฝากการ์ดล่าสุด</h2>
           </div>
           <Link
             href="/admin/card-bank/create"
@@ -334,7 +360,12 @@ export default async function AdminCardBankPage() {
         </div>
       </section>
 
-      <CardBankWithdrawPanel assets={summary.latestAssets} />
+      <CardBankWithdrawPanel
+        assets={summary.latestAssets}
+        eyebrow="Deposit Return Desk"
+        title="เบิก / ถอนการ์ดรับฝากคืนลูกค้า"
+        description="เฉพาะรายการรับฝากการ์ด"
+      />
 
       <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#101010,#050505)] p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

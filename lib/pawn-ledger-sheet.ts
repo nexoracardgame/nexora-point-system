@@ -28,7 +28,7 @@ const DEFAULT_PAWN_SHEET_CSV_URL =
 
 const HEADER_ALIASES = {
   recordId: ["record id", "record_id", "id", "เลขรายการ", "รหัสรายการ"],
-  assetId: ["asset id", "asset_id", "รหัสการ์ด", "asset", "id การ์ด"],
+  assetId: ["asset id", "asset_id", "__sync asset id", "รหัสการ์ด", "asset", "id การ์ด"],
   ownerId: ["owner id", "owner_id", "รหัสผู้จำนำ"],
   ownerLineId: ["owner line id", "owner_line_id", "line id ผู้จำนำ", "line id"],
   rowNumber: ["no", "no.", "ลำดับ", "ลำดับที่", "รายการที่", "เลขที่"],
@@ -226,32 +226,32 @@ function toEntry(
   fallbackRowNumber: number
 ): PawnLedgerEntry {
   const rowNumberValue = getComparableRowValue(row, headerMap.rowNumber, 0);
-  const ownerIdValue = getComparableRowValue(row, headerMap.ownerId, 2);
-  const ownerLineIdValue = getComparableRowValue(row, headerMap.ownerLineId, 3);
-  const cardCountValue = getComparableRowValue(row, headerMap.cardCount, 5);
-  const principalValue = getComparableRowValue(row, headerMap.principalTHB, 6);
-  const interestRateValue = getComparableRowValue(row, headerMap.monthlyInterestRate, 7);
-  const interestTHBValue = getComparableRowValue(row, headerMap.monthlyInterestTHB, 8);
+  const ownerIdValue = getComparableRowValue(row, headerMap.ownerId, 13);
+  const ownerLineIdValue = getComparableRowValue(row, headerMap.ownerLineId, 2);
+  const cardCountValue = getComparableRowValue(row, headerMap.cardCount, 4);
+  const principalValue = getComparableRowValue(row, headerMap.principalTHB, 5);
+  const interestRateValue = getComparableRowValue(row, headerMap.monthlyInterestRate, 6);
+  const interestTHBValue = getComparableRowValue(row, headerMap.monthlyInterestTHB, 7);
 
   return {
     rowNumber: Math.max(1, Math.floor(parseNumber(rowNumberValue) || fallbackRowNumber)),
     recordId: normalizeText(getComparableRowValue(row, headerMap.recordId, 0)) || "",
-    assetId: normalizeText(getComparableRowValue(row, headerMap.assetId, 1)) || "",
+    assetId: normalizeText(getComparableRowValue(row, headerMap.assetId, 13)) || "",
     ownerId: normalizeText(ownerIdValue),
     ownerLineId: normalizeText(ownerLineIdValue),
-    pledgeDate: parseDateValue(getComparableRowValue(row, headerMap.pledgeDate, 1)),
-    borrowerName: normalizeText(getComparableRowValue(row, headerMap.borrowerName, 2)) || "ไม่ระบุชื่อ",
-    borrowerContact: normalizeText(getComparableRowValue(row, headerMap.borrowerContact, 3)),
-    cardLabel: normalizeText(getComparableRowValue(row, headerMap.cardLabel, 4)) || "ยังไม่ระบุการ์ด",
+    pledgeDate: parseDateValue(getComparableRowValue(row, headerMap.pledgeDate, 0)),
+    borrowerName: normalizeText(getComparableRowValue(row, headerMap.borrowerName, 1)) || "ไม่ระบุชื่อ",
+    borrowerContact: normalizeText(getComparableRowValue(row, headerMap.borrowerContact, 2)),
+    cardLabel: normalizeText(getComparableRowValue(row, headerMap.cardLabel, 3)) || "ยังไม่ระบุการ์ด",
     cardCount: Math.max(1, Math.floor(parseNumber(cardCountValue) || 1)),
     principalTHB: Math.max(0, parseNumber(principalValue)),
     monthlyInterestRate: Math.max(0, parseNumber(interestRateValue)),
     monthlyInterestTHB: Math.max(0, parseNumber(interestTHBValue)),
-    dueDate: parseDateValue(getComparableRowValue(row, headerMap.dueDate, 9)),
-    status: normalizeStatus(getComparableRowValue(row, headerMap.status, 10)),
-    note: normalizeText(getComparableRowValue(row, headerMap.note, 11)),
-    staffName: normalizeText(getComparableRowValue(row, headerMap.staffName, 12)),
-    updatedAt: parseDateValue(getComparableRowValue(row, headerMap.updatedAt, 13)),
+    dueDate: parseDateValue(getComparableRowValue(row, headerMap.dueDate, 8)),
+    status: normalizeStatus(getComparableRowValue(row, headerMap.status, 9)),
+    note: normalizeText(getComparableRowValue(row, headerMap.note, 10)),
+    staffName: normalizeText(getComparableRowValue(row, headerMap.staffName, 11)),
+    updatedAt: parseDateValue(getComparableRowValue(row, headerMap.updatedAt, 12)),
   };
 }
 

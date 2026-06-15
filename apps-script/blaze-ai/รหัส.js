@@ -34,10 +34,6 @@ const CARD_DB_MAX_RESULTS = 50;
 const PAWN_LEDGER_SPREADSHEET_ID = "1r7tgannnDyOE052jBHk2OOZ23FhJR-5AlO_Tvsy56A4";
 const PAWN_LEDGER_SHEET_NAME = "";
 const PAWN_LEDGER_HEADER_ROW = [
-  "Record ID",
-  "Asset ID",
-  "Owner ID",
-  "Owner Line ID",
   "วันที่จำนำ",
   "ชื่อผู้จำนำ",
   "เบอร์ติดต่อ / LINE",
@@ -52,6 +48,8 @@ const PAWN_LEDGER_HEADER_ROW = [
   "ผู้รับเรื่อง",
   "อัปเดตล่าสุด",
 ];
+const PAWN_LEDGER_SYNC_KEY_HEADER = "__Sync Asset ID";
+const PAWN_LEDGER_REMOVED_HEADERS = ["Record ID", "Asset ID", "Owner ID", "Owner Line ID"];
 
 const BLAZE_RESPONSE_POLICY = [
   "Blaze answer policy:",
@@ -2247,24 +2245,58 @@ function pawnLedgerGetSheet_() {
 }
 
 function pawnLedgerEnsureHeaderRow_(sheet) {
-  const lastColumn = Math.max(sheet.getLastColumn(), PAWN_LEDGER_HEADER_ROW.length);
+  const targetHeaders = [...PAWN_LEDGER_HEADER_ROW, PAWN_LEDGER_SYNC_KEY_HEADER];
+  const lastColumn = Math.max(sheet.getLastColumn(), targetHeaders.length);
   const existing = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
   const hasAnyValue = existing.some((value) => String(value || "").trim());
 
   if (!hasAnyValue) {
-    sheet.getRange(1, 1, 1, PAWN_LEDGER_HEADER_ROW.length).setValues([PAWN_LEDGER_HEADER_ROW]);
-    return PAWN_LEDGER_HEADER_ROW.slice();
+    sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+    sheet.hideColumns(targetHeaders.length);
+    return targetHeaders.slice();
   }
 
-  const currentHeaders = existing.map((value) => String(value || "").trim());
-  const currentNormalized = currentHeaders.map(normalizeHeaderKey);
-  const missing = PAWN_LEDGER_HEADER_ROW.filter(
+  let currentHeaders = existing.map((value) => String(value || "").trim());
+  let currentNormalized = currentHeaders.map(normalizeHeaderKey);
+  let syncColumn = currentNormalized.indexOf(normalizeHeaderKey(PAWN_LEDGER_SYNC_KEY_HEADER)) + 1;
+  const oldAssetIdColumn = currentNormalized.indexOf(normalizeHeaderKey("Asset ID")) + 1;
+
+  if (!syncColumn) {
+    syncColumn = currentHeaders.length + 1;
+    sheet.getRange(1, syncColumn).setValue(PAWN_LEDGER_SYNC_KEY_HEADER);
+    currentHeaders.push(PAWN_LEDGER_SYNC_KEY_HEADER);
+    currentNormalized.push(normalizeHeaderKey(PAWN_LEDGER_SYNC_KEY_HEADER));
+  }
+
+  if (oldAssetIdColumn && sheet.getLastRow() > 1) {
+    const values = sheet.getRange(2, oldAssetIdColumn, sheet.getLastRow() - 1, 1).getValues();
+    sheet.getRange(2, syncColumn, values.length, 1).setValues(values);
+  }
+
+  const removedColumns = PAWN_LEDGER_REMOVED_HEADERS
+    .map((header) => currentNormalized.indexOf(normalizeHeaderKey(header)) + 1)
+    .filter((column) => column > 0)
+    .sort((a, b) => b - a);
+
+  removedColumns.forEach((column) => sheet.deleteColumn(column));
+
+  const refreshedLastColumn = Math.max(sheet.getLastColumn(), targetHeaders.length);
+  currentHeaders = sheet.getRange(1, 1, 1, refreshedLastColumn).getValues()[0]
+    .map((value) => String(value || "").trim());
+  currentNormalized = currentHeaders.map(normalizeHeaderKey);
+  const missing = targetHeaders.filter(
     (header) => !currentNormalized.includes(normalizeHeaderKey(header))
   );
 
   if (missing.length > 0) {
     sheet.getRange(1, currentHeaders.length + 1, 1, missing.length).setValues([missing]);
-    return currentHeaders.concat(missing);
+    currentHeaders = currentHeaders.concat(missing);
+  }
+
+  const finalSyncColumn =
+    currentHeaders.map(normalizeHeaderKey).indexOf(normalizeHeaderKey(PAWN_LEDGER_SYNC_KEY_HEADER)) + 1;
+  if (finalSyncColumn) {
+    sheet.hideColumns(finalSyncColumn);
   }
 
   return currentHeaders;
@@ -2342,10 +2374,6 @@ function pawnLedgerNormalizeEntry_(raw) {
 
 function pawnLedgerBuildRow_(entry) {
   return [
-    entry.recordId,
-    entry.assetId,
-    entry.ownerId,
-    entry.ownerLineId,
     entry.pledgeDate,
     entry.borrowerName,
     entry.borrowerContact,
@@ -2359,6 +2387,7 @@ function pawnLedgerBuildRow_(entry) {
     entry.note,
     entry.staffName,
     entry.updatedAt,
+    entry.assetId,
   ];
 }
 
@@ -2368,7 +2397,10 @@ function pawnLedgerUpsertEntries_(sheet, entries) {
     acc[normalizeHeaderKey(header)] = index + 1;
     return acc;
   }, {});
-  const assetIdColumn = headerIndex[normalizeHeaderKey("Asset ID")] || 2;
+  const assetIdColumn =
+    headerIndex[normalizeHeaderKey(PAWN_LEDGER_SYNC_KEY_HEADER)] ||
+    headerIndex[normalizeHeaderKey("Asset ID")] ||
+    0;
   const lastRow = sheet.getLastRow();
   const dataRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, headers.length).getValues() : [];
   let inserted = 0;
@@ -2384,7 +2416,9 @@ function pawnLedgerUpsertEntries_(sheet, entries) {
         return;
       }
 
-      const rowIndex = dataRows.findIndex((row) => sanitizeText(row[assetIdColumn - 1]) === assetId);
+      const rowIndex = assetIdColumn
+        ? dataRows.findIndex((row) => sanitizeText(row[assetIdColumn - 1]) === assetId)
+        : -1;
       const rowValues = pawnLedgerBuildRow_(entry);
 
       if (rowIndex >= 0) {
@@ -2441,10 +2475,24 @@ function pawnLedgerHandleSync_(payload) {
   });
 }
 
+function pawnLedgerCleanupSheet_() {
+  const sheet = pawnLedgerGetSheet_();
+  const headers = pawnLedgerEnsureHeaderRow_(sheet);
+  return jsonOut({
+    ok: true,
+    action: "cleanupPawnLedgerSheet",
+    visibleColumns: headers.filter((header) => header !== PAWN_LEDGER_SYNC_KEY_HEADER).length,
+  });
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || "{}");
     const syncAction = String(data.action || "").trim();
+
+    if (syncAction === "cleanupPawnLedgerSheet") {
+      return pawnLedgerCleanupSheet_();
+    }
 
     if (syncAction === "upsertPawnEntries" || syncAction === "upsertPawnEntry") {
       return pawnLedgerHandleSync_(data);

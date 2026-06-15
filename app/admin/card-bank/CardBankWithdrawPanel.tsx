@@ -44,7 +44,17 @@ function withdrawModeLabel(asset: CardBankAsset) {
   return "ถอนคืนเป็นใบ";
 }
 
-export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsset[] }) {
+export default function CardBankWithdrawPanel({
+  assets,
+  eyebrow = "Return Desk",
+  title = "เบิก / ถอนการ์ดคืนลูกค้า",
+  description = "ลดจำนวนจริงและลง movement ทุกครั้ง",
+}: {
+  assets: CardBankAsset[];
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [busyAssetId, setBusyAssetId] = useState("");
@@ -190,12 +200,12 @@ export default function CardBankWithdrawPanel({ assets }: { assets: CardBankAsse
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
-            Return Desk
+            {eyebrow}
           </div>
-          <h2 className="mt-2 text-2xl font-black">เบิก / ถอนการ์ดคืนลูกค้า</h2>
+          <h2 className="mt-2 text-2xl font-black">{title}</h2>
         </div>
         <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-white/55">
-          ลดจำนวนจริงและลง movement ทุกครั้ง
+          {description}
         </div>
       </div>
 

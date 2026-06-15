@@ -14,6 +14,7 @@ import {
   type CardBankStatus,
 } from "@/lib/card-bank-store";
 import { getPawnLedgerEntries, type PawnLedgerEntry } from "@/lib/pawn-ledger-sheet";
+import CardBankWithdrawPanel from "../CardBankWithdrawPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -436,6 +437,13 @@ export default async function PawnLedgerPage() {
           </section>
         </div>
       </section>
+
+      <CardBankWithdrawPanel
+        assets={pawnAssets}
+        eyebrow="Pawn Return Desk"
+        title="เบิก / ถอนการ์ดจำนำคืนลูกค้า"
+        description="เฉพาะรายการจำนำการ์ด"
+      />
 
       <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

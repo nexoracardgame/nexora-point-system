@@ -1,10 +1,6 @@
 const DEFAULT_SPREADSHEET_ID = "1r7tgannnDyOE052jBHk2OOZ23FhJR-5AlO_Tvsy56A4";
 const DEFAULT_SHEET_NAME = "";
 const HEADER_ROW = [
-  "Record ID",
-  "Asset ID",
-  "Owner ID",
-  "Owner Line ID",
   "วันที่จำนำ",
   "ชื่อผู้จำนำ",
   "เบอร์ติดต่อ / LINE",
@@ -19,6 +15,8 @@ const HEADER_ROW = [
   "ผู้รับเรื่อง",
   "อัปเดตล่าสุด",
 ];
+const SYNC_KEY_HEADER = "__Sync Asset ID";
+const REMOVED_HEADERS = ["Record ID", "Asset ID", "Owner ID", "Owner Line ID"];
 
 function doGet() {
   return jsonResponse_({
@@ -98,22 +96,54 @@ function getLedgerSheet_() {
 }
 
 function ensureHeaderRow_(sheet) {
-  const lastColumn = Math.max(sheet.getLastColumn(), HEADER_ROW.length);
+  const targetHeaders = [...HEADER_ROW, SYNC_KEY_HEADER];
+  const lastColumn = Math.max(sheet.getLastColumn(), targetHeaders.length);
   const existing = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
   const hasAnyValue = existing.some((value) => String(value || "").trim());
 
   if (!hasAnyValue) {
-    sheet.getRange(1, 1, 1, HEADER_ROW.length).setValues([HEADER_ROW]);
-    return HEADER_ROW.slice();
+    sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+    sheet.hideColumns(targetHeaders.length);
+    return targetHeaders.slice();
   }
 
-  const currentHeaders = existing.map((value) => String(value || "").trim());
-  const currentNormalized = currentHeaders.map(normalizeHeader_);
-  const missing = HEADER_ROW.filter((header) => !currentNormalized.includes(normalizeHeader_(header)));
+  let currentHeaders = existing.map((value) => String(value || "").trim());
+  let currentNormalized = currentHeaders.map(normalizeHeader_);
+  let syncColumn = currentNormalized.indexOf(normalizeHeader_(SYNC_KEY_HEADER)) + 1;
+  const oldAssetIdColumn = currentNormalized.indexOf(normalizeHeader_("Asset ID")) + 1;
+
+  if (!syncColumn) {
+    syncColumn = currentHeaders.length + 1;
+    sheet.getRange(1, syncColumn).setValue(SYNC_KEY_HEADER);
+    currentHeaders.push(SYNC_KEY_HEADER);
+    currentNormalized.push(normalizeHeader_(SYNC_KEY_HEADER));
+  }
+
+  if (oldAssetIdColumn && sheet.getLastRow() > 1) {
+    const values = sheet.getRange(2, oldAssetIdColumn, sheet.getLastRow() - 1, 1).getValues();
+    sheet.getRange(2, syncColumn, values.length, 1).setValues(values);
+  }
+
+  REMOVED_HEADERS
+    .map((header) => currentNormalized.indexOf(normalizeHeader_(header)) + 1)
+    .filter((column) => column > 0)
+    .sort((a, b) => b - a)
+    .forEach((column) => sheet.deleteColumn(column));
+
+  const refreshedLastColumn = Math.max(sheet.getLastColumn(), targetHeaders.length);
+  currentHeaders = sheet.getRange(1, 1, 1, refreshedLastColumn).getValues()[0]
+    .map((value) => String(value || "").trim());
+  currentNormalized = currentHeaders.map(normalizeHeader_);
+  const missing = targetHeaders.filter((header) => !currentNormalized.includes(normalizeHeader_(header)));
 
   if (missing.length > 0) {
     sheet.getRange(1, currentHeaders.length + 1, 1, missing.length).setValues([missing]);
-    return currentHeaders.concat(missing);
+    currentHeaders = currentHeaders.concat(missing);
+  }
+
+  const finalSyncColumn = currentHeaders.map(normalizeHeader_).indexOf(normalizeHeader_(SYNC_KEY_HEADER)) + 1;
+  if (finalSyncColumn) {
+    sheet.hideColumns(finalSyncColumn);
   }
 
   return currentHeaders;
@@ -223,10 +253,6 @@ function normalizeEntry_(raw) {
 
 function buildRow_(entry) {
   return [
-    entry.recordId,
-    entry.assetId,
-    entry.ownerId,
-    entry.ownerLineId,
     entry.pledgeDate,
     entry.borrowerName,
     entry.borrowerContact,
@@ -240,6 +266,7 @@ function buildRow_(entry) {
     entry.note,
     entry.staffName,
     entry.updatedAt,
+    entry.assetId,
   ];
 }
 
@@ -249,7 +276,10 @@ function upsertEntries_(sheet, entries) {
     acc[normalizeHeader_(header)] = index + 1;
     return acc;
   }, {});
-  const assetIdColumn = headerIndex[normalizeHeader_("Asset ID")] || 2;
+  const assetIdColumn =
+    headerIndex[normalizeHeader_(SYNC_KEY_HEADER)] ||
+    headerIndex[normalizeHeader_("Asset ID")] ||
+    0;
   const lastRow = sheet.getLastRow();
   const dataRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, headers.length).getValues() : [];
   let inserted = 0;
@@ -261,7 +291,9 @@ function upsertEntries_(sheet, entries) {
       return;
     }
 
-    const rowIndex = dataRows.findIndex((row) => normalizeText_(row[assetIdColumn - 1]) === assetId);
+    const rowIndex = assetIdColumn
+      ? dataRows.findIndex((row) => normalizeText_(row[assetIdColumn - 1]) === assetId)
+      : -1;
     const rowValues = buildRow_(entry);
 
     if (rowIndex >= 0) {
