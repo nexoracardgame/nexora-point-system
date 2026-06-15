@@ -274,6 +274,16 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     (sum, item) => sum + item.quantity * item.nexValue,
     0
   );
+  const saveButtonLabel =
+    entryMode === "pawn" ? "บันทึกเข้าโรงจำนำการ์ดจริง" : "บันทึกเข้าธนาคารการ์ดจริง";
+  const saveButtonBusyLabel =
+    entryMode === "pawn" ? "กำลังบันทึกเข้าโรงจำนำจริง..." : "กำลังบันทึกเข้าธนาคารจริง...";
+  const summaryBadgeLabel =
+    intakeMode === "specific"
+      ? `${totalSpecificCards} ใบ`
+      : intakeMode === "sets"
+        ? `${formatNumber(totalSetCount)} เซ็ต`
+        : "กองรวม";
   const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const forcedFoil = isForcedFoilCard(previewCardNo);
 
@@ -413,7 +423,11 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         throw new Error(result.error || "Save failed");
       }
 
-      alert(`บันทึกเข้าธนาคารการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`);
+      alert(
+        entryMode === "pawn"
+          ? `บันทึกเข้าโรงจำนำการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`
+          : `บันทึกเข้าธนาคารการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`
+      );
       setItems([]);
       setCardSetItems([]);
       setBulkNex("");
@@ -691,13 +705,12 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-black">สรุปรายการก่อนบันทึก</h2>
                 <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-black text-white/55">
-                  {intakeMode === "specific"
-                    ? `${totalSpecificCards} ใบ`
-                    : intakeMode === "sets"
-                      ? `${formatNumber(totalSetCount)} เซ็ต`
-                      : "กองรวม"}
+                  {summaryBadgeLabel}
                 </span>
               </div>
+              <p className="mt-2 text-sm leading-6 text-white/52">
+                เพิ่มรายการได้หลายชิ้นตามรูปแบบที่เลือก แล้วตรวจสรุปตรงนี้ก่อนกดบันทึกจริง เพื่อให้ข้อมูลถูกส่งไปทีเดียวแบบไม่ตกหล่น
+              </p>
 
               {intakeMode === "specific" ? (
                 <SpecificSummary items={items} setItems={setItems} />
@@ -726,7 +739,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 ) : (
                   <PackagePlus className="h-4 w-4" />
                 )}
-                {saving ? "กำลังบันทึกเข้าระบบจริง..." : "บันทึกเข้าธนาคารการ์ดจริง"}
+                {saving ? saveButtonBusyLabel : saveButtonLabel}
               </button>
             </div>
           </>
@@ -1353,10 +1366,36 @@ function CardSetModal({
   const [quantityBySet, setQuantityBySet] = useState<Record<string, string>>({});
   const [foilBonusBySet, setFoilBonusBySet] = useState<Record<string, boolean>>({});
   const [receivedNexBySet, setReceivedNexBySet] = useState<Record<string, string>>({});
+  const [recentlyAddedSetId, setRecentlyAddedSetId] = useState<string>("");
+  const [toastText, setToastText] = useState("");
+  const toastTimerRef = useRef<number | null>(null);
   const allSets = useMemo(
     () => [...nexoraCollectionSets].sort((a, b) => a.order - b.order),
     []
   );
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showAddedToast = (setId: string, setName: string) => {
+    setRecentlyAddedSetId(setId);
+    setToastText(`เพิ่มรายการแล้ว: ${setName}`);
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setRecentlyAddedSetId("");
+      setToastText("");
+      toastTimerRef.current = null;
+    }, 1400);
+  };
 
   return (
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-3 sm:p-5">
@@ -1400,8 +1439,20 @@ function CardSetModal({
               return (
                 <div
                   key={set.id}
-                  className="flex min-h-full flex-col rounded-[22px] border border-white/10 bg-black/24 p-3 sm:p-4"
+                  className={`relative flex min-h-full flex-col rounded-[22px] border bg-black/24 p-3 sm:p-4 transition duration-300 ${
+                    recentlyAddedSetId === set.id
+                      ? "border-amber-200/35 shadow-[0_0_0_1px_rgba(252,211,77,0.15),0_0_38px_rgba(250,204,21,0.22)] ring-1 ring-amber-200/25"
+                      : "border-white/10"
+                  }`}
                 >
+                  {recentlyAddedSetId === set.id ? (
+                    <div className="pointer-events-none absolute inset-0 rounded-[22px] bg-[radial-gradient(circle_at_center,rgba(250,204,21,0.12),transparent_55%)] animate-pulse" />
+                  ) : null}
+                  {recentlyAddedSetId === set.id ? (
+                    <div className="absolute right-3 top-3 rounded-full border border-amber-200/25 bg-amber-300/12 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-amber-100 shadow-[0_0_18px_rgba(250,204,21,0.25)]">
+                      เพิ่มรายการแล้ว
+                    </div>
+                  ) : null}
                   <div className="grid flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -1475,8 +1526,9 @@ function CardSetModal({
                             withFoilBonus,
                             finalReceived
                           );
+                          showAddedToast(set.id, set.name);
                         }}
-                        className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200 active:scale-[0.98]"
                       >
                         <PackagePlus className="h-4 w-4" />
                         เพิ่ม
@@ -1518,6 +1570,13 @@ function CardSetModal({
           </button>
         </div>
       </div>
+      {toastText ? (
+        <div className="pointer-events-none fixed bottom-5 left-1/2 z-[1450] -translate-x-1/2">
+          <div className="rounded-full border border-amber-200/20 bg-[linear-gradient(180deg,rgba(255,244,184,0.95),rgba(245,158,11,0.82))] px-4 py-2 text-xs font-black tracking-[0.16em] text-black shadow-[0_14px_40px_rgba(251,191,36,0.35)] animate-pulse">
+            {toastText}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
