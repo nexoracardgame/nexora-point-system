@@ -7,6 +7,7 @@ import {
   readLocalStoreJson,
   writeLocalStoreJson,
 } from "@/lib/local-store-dir";
+import { syncPawnLedgerEntries } from "@/lib/pawn-ledger-sync";
 
 type DbRow = Record<string, unknown>;
 
@@ -41,6 +42,7 @@ export type CardBankAsset = {
   createdByName: string | null;
   createdAt: string;
   updatedAt: string;
+  sourcePayload?: Record<string, unknown> | null;
 };
 
 export type CreateCardBankEntriesInput = {
@@ -74,6 +76,12 @@ export type CreateCardBankEntriesInput = {
     nexValue: number;
     coinValue: number;
     category?: string | null;
+  };
+  pawn?: {
+    principalTHB: number;
+    interestRate: number;
+    dueDays: number;
+    note?: string | null;
   };
   actor: {
     id: string;
@@ -184,6 +192,19 @@ function toNullableString(value: unknown) {
 }
 
 function toAssetRecord(row: DbRow): CardBankAsset {
+  const rawSourcePayload = rowValue(row, "sourcePayload", "sourcepayload");
+  let sourcePayload: Record<string, unknown> | null = null;
+  if (rawSourcePayload && typeof rawSourcePayload === "object" && !Array.isArray(rawSourcePayload)) {
+    sourcePayload = rawSourcePayload as Record<string, unknown>;
+  } else if (typeof rawSourcePayload === "string") {
+    try {
+      const parsed = JSON.parse(rawSourcePayload);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        sourcePayload = parsed as Record<string, unknown>;
+      }
+    } catch {}
+  }
+
   return {
     id: String(row.id || ""),
     ownerId: String(rowValue(row, "ownerId", "ownerid") || ""),
@@ -210,6 +231,7 @@ function toAssetRecord(row: DbRow): CardBankAsset {
     createdByName: toNullableString(rowValue(row, "createdByName", "createdbyname")),
     createdAt: normalizeDate(rowValue(row, "createdAt", "createdat")),
     updatedAt: normalizeDate(rowValue(row, "updatedAt", "updatedat")),
+    sourcePayload,
   };
 }
 
@@ -252,9 +274,16 @@ async function writeLocalAssets(items: CardBankAsset[]) {
   );
 }
 
+function stripSourcePayload(asset: CardBankAsset) {
+  const { sourcePayload, ...rest } = asset;
+  void sourcePayload;
+  return rest;
+}
+
 function buildAssets(input: CreateCardBankEntriesInput) {
   const now = new Date().toISOString();
   const status: CardBankStatus = input.entryMode === "pawn" ? "pawned" : "stored";
+  const pawnSource = input.entryMode === "pawn" ? input.pawn || null : null;
   const base = {
     ownerId: input.owner.id,
     ownerLineId: input.owner.lineId || null,
@@ -269,9 +298,9 @@ function buildAssets(input: CreateCardBankEntriesInput) {
   };
 
   if (input.intakeMode === "sets") {
-    return (input.setItems || []).map((item) => ({
-      ...base,
-      id: randomUUID(),
+      return (input.setItems || []).map((item) => ({
+        ...base,
+        id: randomUUID(),
       cardNo: null,
       cardName: item.setName,
       cardType: item.withFoilBonus ? "foil-set" : "set",
@@ -282,12 +311,15 @@ function buildAssets(input: CreateCardBankEntriesInput) {
       setName: item.setName,
       setOrder: Math.floor(Number(item.order || 0)),
       setCardTotal: Math.floor(Number(item.cardTotal || 0)),
-      withFoilBonus: Boolean(item.withFoilBonus),
-      valueTHB: 0,
-      nexValue: Number(item.nexValue || 0),
-      coinValue: 0,
-      sourcePayload: item,
-    }));
+        withFoilBonus: Boolean(item.withFoilBonus),
+      valueTHB: pawnSource?.principalTHB ? Number(pawnSource.principalTHB || 0) : 0,
+        nexValue: Number(item.nexValue || 0),
+        coinValue: 0,
+      sourcePayload: {
+        ...item,
+        pawn: pawnSource,
+      },
+      }));
   }
 
   if (input.intakeMode === "bulk") {
@@ -306,10 +338,13 @@ function buildAssets(input: CreateCardBankEntriesInput) {
         setOrder: null,
         setCardTotal: null,
         withFoilBonus: false,
-        valueTHB: 0,
+        valueTHB: pawnSource?.principalTHB ? Number(pawnSource.principalTHB || 0) : 0,
         nexValue: Number(input.bulk?.nexValue || 0),
         coinValue: Math.floor(Number(input.bulk?.coinValue || 0)),
-        sourcePayload: input.bulk || {},
+        sourcePayload: {
+          ...(input.bulk || {}),
+          pawn: pawnSource,
+        },
       },
     ];
   }
@@ -328,10 +363,13 @@ function buildAssets(input: CreateCardBankEntriesInput) {
     setOrder: null,
     setCardTotal: null,
     withFoilBonus: item.cardType === "foil",
-    valueTHB: 0,
+    valueTHB: pawnSource?.principalTHB ? Number(pawnSource.principalTHB || 0) : 0,
     nexValue: 0,
     coinValue: 0,
-    sourcePayload: item,
+    sourcePayload: {
+      ...item,
+      pawn: pawnSource,
+    },
   }));
 }
 
@@ -341,8 +379,18 @@ export async function createCardBankEntries(input: CreateCardBankEntriesInput) {
 
   if (!hasDatabaseConfig()) {
     const current = await readLocalAssets();
-    await writeLocalAssets([...assets.map(({ sourcePayload: _sourcePayload, ...asset }) => asset), ...current]);
-    return assets.map(({ sourcePayload: _sourcePayload, ...asset }) => asset);
+    await writeLocalAssets([...assets.map(stripSourcePayload), ...current]);
+    if (assets.some((asset) => asset.entryMode === "pawn")) {
+      try {
+        const syncResult = await syncPawnLedgerEntries(assets);
+        if (!syncResult.ok) {
+          console.warn("Pawn ledger sync failed (local store):", syncResult.error || "unknown");
+        }
+      } catch (error) {
+        console.warn("Pawn ledger sync error (local store):", error);
+      }
+    }
+    return assets.map(stripSourcePayload);
   }
 
   await ensureCardBankSchema();
@@ -396,7 +444,18 @@ export async function createCardBankEntries(input: CreateCardBankEntriesInput) {
     )
   );
 
-  return assets.map(({ sourcePayload: _sourcePayload, ...asset }) => asset);
+  if (assets.some((asset) => asset.entryMode === "pawn")) {
+    try {
+      const syncResult = await syncPawnLedgerEntries(assets);
+      if (!syncResult.ok) {
+        console.warn("Pawn ledger sync failed:", syncResult.error || "unknown");
+      }
+    } catch (error) {
+      console.warn("Pawn ledger sync error:", error);
+    }
+  }
+
+  return assets.map(stripSourcePayload);
 }
 
 export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
@@ -449,6 +508,16 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
     await writeLocalAssets(
       current.map((item) => (item.id === assetId ? updatedAsset : item))
     );
+    if (asset.entryMode === "pawn") {
+      try {
+        const syncResult = await syncPawnLedgerEntries([updatedAsset]);
+        if (!syncResult.ok) {
+          console.warn("Pawn ledger sync failed (local withdraw):", syncResult.error || "unknown");
+        }
+      } catch (error) {
+        console.warn("Pawn ledger sync error (local withdraw):", error);
+      }
+    }
     return {
       asset: updatedAsset,
       withdrawnQuantity: withdrawQuantity,
@@ -527,6 +596,17 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
       input.actor.name,
       String(input.note || "Return card asset to customer").trim()
     );
+
+    if (asset.entryMode === "pawn") {
+      try {
+        const syncResult = await syncPawnLedgerEntries([{ ...afterState, sourcePayload: asset.sourcePayload }]);
+        if (!syncResult.ok) {
+          console.warn("Pawn ledger sync failed (db withdraw):", syncResult.error || "unknown");
+        }
+      } catch (error) {
+        console.warn("Pawn ledger sync error (db withdraw):", error);
+      }
+    }
 
     return {
       asset: afterState,

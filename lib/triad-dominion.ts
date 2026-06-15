@@ -529,6 +529,10 @@ function applySkill(
     return { unresolved, events };
   }
 
+  if (rule.shape === "swap-control") {
+    return { unresolved, events };
+  }
+
   if (rule.needsReview && rule.shape !== "stat") {
     unresolved.push(rule);
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: รอยืนยันกติกาสกิลพิเศษ`);
@@ -696,10 +700,13 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
       item.rule?.shape === "swap-control" && item.rule.allowedTurns.includes(turn)
   );
 
-  for (const item of swapSkills) {
+  if (swapSkills.length > 0) {
     const playerTop = effectivePlayer.top;
     effectivePlayer.top = effectiveOpponent.top;
     effectiveOpponent.top = playerTop;
+  }
+
+  for (const item of swapSkills) {
     events.push({
       cardNo: item.rule.cardNo,
       name: item.rule.name,

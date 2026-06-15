@@ -107,6 +107,16 @@ export async function POST(request: Request) {
     coinValue: Math.floor(cleanNumber(bulkObject.coinValue)),
     category: cleanText(bulkObject.category) || "pure",
   };
+  const pawnObject = asObject(body.pawn);
+  const pawn =
+    entryMode === "pawn"
+      ? {
+          principalTHB: Math.max(0, cleanNumber(pawnObject.principalTHB)),
+          interestRate: Math.max(0, cleanNumber(pawnObject.interestRate || 10)),
+          dueDays: Math.max(1, Math.floor(cleanNumber(pawnObject.dueDays || 30)) || 30),
+          note: cleanText(pawnObject.note) || null,
+        }
+      : undefined;
 
   if (intakeMode === "specific" && items.length === 0) {
     return badRequest("Specific intake requires at least one card");
@@ -129,6 +139,7 @@ export async function POST(request: Request) {
     items,
     setItems,
     bulk,
+    pawn,
     actor: {
       id: sessionUser.id,
       name: cleanText(sessionUser.name) || cleanText(sessionUser.lineId) || "NEXORA Staff",

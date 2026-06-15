@@ -66,6 +66,7 @@ type DepositSetItem = {
   setName: string;
   quantity: number;
   nexValue: number;
+  fullNexValue: number;
   reward: string;
   withFoilBonus: boolean;
   cardTotal: number;
@@ -183,6 +184,10 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const [bulkNex, setBulkNex] = useState("");
   const [bulkCoin, setBulkCoin] = useState("");
   const [bulkCategory, setBulkCategory] = useState<BulkCategory>("pure");
+  const [pawnPrincipal, setPawnPrincipal] = useState("");
+  const [pawnInterestRate, setPawnInterestRate] = useState("10");
+  const [pawnDueDays, setPawnDueDays] = useState("30");
+  const [pawnNote, setPawnNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -210,9 +215,9 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       .slice(0, 8);
   }, [query, users]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const cardNo = normalizeCardNo(cardQuery);
-    setCardError("");
 
     if (!cardNo) {
       setCardPreview(null);
@@ -228,7 +233,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     setCardPreview(localPreview);
     setCardLoading(true);
 
-    const timer = window.setTimeout(async () => {
+  const timer = window.setTimeout(async () => {
       try {
         const response = await fetch(`/api/card?cardNo=${encodeURIComponent(cardNo)}`, {
           cache: "no-store",
@@ -254,6 +259,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
     return () => window.clearTimeout(timer);
   }, [cardQuery]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!quantityModalOpen) return;
@@ -270,12 +276,6 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   );
   const previewCardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
   const forcedFoil = isForcedFoilCard(previewCardNo);
-
-  useEffect(() => {
-    if (forcedFoil && cardType !== "foil") {
-      setCardType("foil");
-    }
-  }, [cardType, forcedFoil]);
 
   const openQuantityModal = () => {
     if (!cardPreview) return;
@@ -313,10 +313,16 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const addSetItem = (
     set: NexoraCollectionSet,
     quantity: number,
-    withFoilBonus: boolean
+    withFoilBonus: boolean,
+    receivedNexValue?: number
   ) => {
     const safeQuantity = Math.max(1, Math.floor(quantity));
     if (!Number.isFinite(safeQuantity) || safeQuantity <= 0) return;
+    const baseNexValue = parseNexReward(set.reward, withFoilBonus);
+    const safeReceivedNexValue = Math.max(
+      1,
+      Math.floor(Number(receivedNexValue || baseNexValue))
+    );
 
     setCardSetItems((current) => [
       ...current,
@@ -326,7 +332,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         order: set.order,
         setName: set.name,
         quantity: safeQuantity,
-        nexValue: parseNexReward(set.reward, withFoilBonus),
+        nexValue: safeReceivedNexValue,
+        fullNexValue: baseNexValue,
         reward: set.reward,
         withFoilBonus,
         cardTotal: set.officialTotal || getCollectionCardIds(set).length,
@@ -357,6 +364,11 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       return;
     }
 
+    if (entryMode === "pawn" && !pawnPrincipal.trim()) {
+      alert("เธเธฃเธญเธเธขเธญเธ”เธเธณเธเธงเธเธเธดเธเธเนเธฒเธเธฒเธฃเนเธ”");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -380,6 +392,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
             coinValue: Number(bulkCoin || 0),
             category: bulkCategory,
           },
+          pawn:
+            entryMode === "pawn"
+              ? {
+                  principalTHB: Number(pawnPrincipal || 0),
+                  interestRate: Number(pawnInterestRate || 10),
+                  dueDays: Number(pawnDueDays || 30),
+                  note: pawnNote,
+                }
+              : undefined,
         }),
       });
       const result = (await response.json().catch(() => ({}))) as {
@@ -398,6 +419,10 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       setBulkNex("");
       setBulkCoin("");
       setBulkCategory("pure");
+      setPawnPrincipal("");
+      setPawnInterestRate("10");
+      setPawnDueDays("30");
+      setPawnNote("");
       setCardQuery("");
       setCardPreview(null);
       router.refresh();
@@ -586,6 +611,51 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
               </div>
             </div>
 
+            {entryMode === "pawn" ? (
+              <div className="rounded-[28px] border border-amber-300/18 bg-amber-300/[0.06] p-4 sm:p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-100/55">
+                      Pawn Terms
+                    </div>
+                    <h3 className="mt-2 text-xl font-black text-white">ข้อมูลจำนำที่จะส่งลงชีต</h3>
+                  </div>
+                  <div className="text-xs font-bold text-amber-100/65">
+                    ใช้สำหรับคำนวณดอกและวันครบกำหนดอัตโนมัติ
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <LabeledInput
+                    label="เงินต้น (THB)"
+                    value={pawnPrincipal}
+                    onChange={setPawnPrincipal}
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                  <LabeledInput
+                    label="ดอกเบี้ย / เดือน (%)"
+                    value={pawnInterestRate}
+                    onChange={setPawnInterestRate}
+                    inputMode="decimal"
+                    placeholder="10"
+                  />
+                  <LabeledInput
+                    label="ครบกำหนด (วัน)"
+                    value={pawnDueDays}
+                    onChange={setPawnDueDays}
+                    inputMode="numeric"
+                    placeholder="30"
+                  />
+                  <LabeledInput
+                    label="หมายเหตุ"
+                    value={pawnNote}
+                    onChange={setPawnNote}
+                    placeholder="เช่น รับฝากจากลูกค้าประจำ"
+                  />
+                </div>
+              </div>
+            ) : null}
+
             {intakeMode === "specific" ? (
               <SpecificCardForm
                 cardType={cardType}
@@ -593,6 +663,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 forcedFoil={forcedFoil}
                 cardQuery={cardQuery}
                 setCardQuery={setCardQuery}
+                setCardError={setCardError}
                 cardPreview={cardPreview}
                 cardLoading={cardLoading}
                 cardError={cardError}
@@ -692,6 +763,35 @@ function EmptyHint({ text }: { text: string }) {
   );
 }
 
+function LabeledInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  inputMode,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+}) {
+  return (
+    <label className="block">
+      <div className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-white/45">
+        {label}
+      </div>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        className="h-11 w-full rounded-[16px] border border-white/10 bg-black/30 px-3 text-sm font-bold text-white outline-none placeholder:text-white/30 focus:border-white/30"
+      />
+    </label>
+  );
+}
+
 function MiniBalance({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-[16px] border border-white/10 bg-black/24 px-3 py-2">
@@ -766,6 +866,7 @@ function SpecificCardForm({
   forcedFoil,
   cardQuery,
   setCardQuery,
+  setCardError,
   cardPreview,
   cardLoading,
   cardError,
@@ -776,6 +877,7 @@ function SpecificCardForm({
   forcedFoil: boolean;
   cardQuery: string;
   setCardQuery: (value: string) => void;
+  setCardError: (value: string) => void;
   cardPreview: CardPreview | null;
   cardLoading: boolean;
   cardError: string;
@@ -838,7 +940,10 @@ function SpecificCardForm({
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35" />
               <input
                 value={cardQuery}
-                onChange={(event) => setCardQuery(event.target.value)}
+                onChange={(event) => {
+                  setCardQuery(event.target.value);
+                  setCardError("");
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && cardPreview) {
                     event.preventDefault();
@@ -1204,6 +1309,11 @@ function CardSetSummary({
                 <span className="rounded-full border border-emerald-200/18 bg-emerald-400/10 px-3 py-1 text-emerald-100">
                   {formatNumber(item.nexValue * item.quantity)} NEX
                 </span>
+                {item.nexValue !== item.fullNexValue ? (
+                  <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-white/55">
+                    เต็ม {formatNumber(item.fullNexValue * item.quantity)} NEX
+                  </span>
+                ) : null}
                 {item.withFoilBonus ? (
                   <span className="rounded-full border border-amber-200/18 bg-amber-300/10 px-3 py-1 text-amber-100">
                     รวมเงื่อนไขฟอยล์
@@ -1236,11 +1346,13 @@ function CardSetModal({
   onAddSet: (
     set: NexoraCollectionSet,
     quantity: number,
-    withFoilBonus: boolean
+    withFoilBonus: boolean,
+    receivedNexValue?: number
   ) => void;
 }) {
   const [quantityBySet, setQuantityBySet] = useState<Record<string, string>>({});
   const [foilBonusBySet, setFoilBonusBySet] = useState<Record<string, boolean>>({});
+  const [receivedNexBySet, setReceivedNexBySet] = useState<Record<string, string>>({});
   const allSets = useMemo(
     () => [...nexoraCollectionSets].sort((a, b) => a.order - b.order),
     []
@@ -1281,6 +1393,7 @@ function CardSetModal({
               const withFoilBonus = Boolean(foilBonusBySet[set.id]);
               const baseValue = parseNexReward(set.reward, false);
               const activeValue = parseNexReward(set.reward, withFoilBonus);
+              const receivedValue = receivedNexBySet[set.id] ?? "";
               const conditionText = getSetConditionText(set);
               const cardTotal = set.officialTotal || getCollectionCardIds(set).length;
 
@@ -1318,23 +1431,51 @@ function CardSetModal({
                     </div>
 
                     <div className="grid grid-cols-[minmax(76px,1fr)_104px] gap-2">
-                      <input
-                        value={quantityValue}
-                        onChange={(event) =>
-                          setQuantityBySet((current) => ({
-                            ...current,
-                            [set.id]: event.target.value,
-                          }))
-                        }
-                        inputMode="numeric"
-                        aria-label={`จำนวนเซ็ต ${set.order}`}
-                        className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-base font-black text-white outline-none placeholder:text-white/25 focus:border-white/35"
-                      />
+                      <div className="space-y-2">
+                        <input
+                          value={quantityValue}
+                          onChange={(event) =>
+                            setQuantityBySet((current) => ({
+                              ...current,
+                              [set.id]: event.target.value,
+                            }))
+                          }
+                          inputMode="numeric"
+                          aria-label={`จำนวนเซ็ต ${set.order}`}
+                          className="h-12 min-w-0 w-full rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-base font-black text-white outline-none placeholder:text-white/25 focus:border-white/35"
+                        />
+                        <input
+                          value={receivedValue}
+                          onChange={(event) =>
+                            setReceivedNexBySet((current) => ({
+                              ...current,
+                              [set.id]: event.target.value,
+                            }))
+                          }
+                          inputMode="numeric"
+                          aria-label={`ยอดที่รับสำหรับเซ็ต ${set.order}`}
+                          placeholder={`เต็ม ${formatNumber(activeValue)} NEX`}
+                          className="h-12 min-w-0 w-full rounded-[16px] border border-white/10 bg-black/40 px-3 text-center text-sm font-black text-white outline-none placeholder:text-white/28 focus:border-white/35"
+                        />
+                        <div className="text-[11px] font-bold tracking-[0.08em] text-white/34">
+                          เว้นว่าง = รับยอดเต็มของเซ็ต
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          onAddSet(set, Number(quantityValue || 1), withFoilBonus)
-                        }
+                        onClick={() => {
+                          const parsedReceived = Number(receivedValue);
+                          const finalReceived =
+                            Number.isFinite(parsedReceived) && parsedReceived > 0
+                              ? Math.min(parsedReceived, activeValue || parsedReceived)
+                              : activeValue;
+                          onAddSet(
+                            set,
+                            Number(quantityValue || 1),
+                            withFoilBonus,
+                            finalReceived
+                          );
+                        }}
                         className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-sm font-black text-black transition hover:bg-zinc-200"
                       >
                         <PackagePlus className="h-4 w-4" />
