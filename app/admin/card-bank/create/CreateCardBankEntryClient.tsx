@@ -949,23 +949,39 @@ function SpecificCardForm({
 
           <div>
             <div className="text-sm font-black text-white">ค้นหาการ์ด</div>
-            <div className="relative mt-3">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35" />
-              <input
-                value={cardQuery}
-                onChange={(event) => {
-                  setCardQuery(event.target.value);
-                  setCardError("");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && cardPreview) {
-                    event.preventDefault();
-                    onEnterCard();
-                  }
-                }}
-                placeholder="พิมพ์เลขการ์ด เช่น 010, 90, No.200 แล้วกด Enter"
-                className="h-14 w-full rounded-[20px] border border-white/10 bg-black/32 pl-12 pr-4 text-base font-bold text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:ring-2 focus:ring-white/10"
-              />
+            <div className="mt-3 space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35" />
+                <input
+                  value={cardQuery}
+                  onChange={(event) => {
+                    setCardQuery(event.target.value);
+                    setCardError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && cardPreview) {
+                      event.preventDefault();
+                      onEnterCard();
+                    }
+                  }}
+                  placeholder="พิมพ์เลขการ์ด เช่น 010, 90, No.200 แล้วกด Enter"
+                  className="h-14 w-full rounded-[20px] border border-white/10 bg-black/32 pl-12 pr-4 text-base font-bold text-white outline-none transition placeholder:text-white/35 focus:border-white/30 focus:ring-2 focus:ring-white/10"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onEnterCard}
+                  disabled={!cardPreview}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-[18px] border border-amber-300/18 bg-amber-300/[0.08] px-4 text-sm font-black text-amber-100 transition hover:bg-amber-300/[0.12] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/28"
+                >
+                  <PackagePlus className="h-4 w-4" />
+                  เพิ่มรายการใบนี้
+                </button>
+                <div className="text-xs font-bold text-white/38">
+                  กดปุ่มนี้หรือกด Enter เพื่อยืนยันจำนวนใบ
+                </div>
+              </div>
             </div>
             <div className="mt-2 min-h-5 text-xs font-bold text-white/38">
               {cardLoading ? "กำลังดึงข้อมูลการ์ด..." : cardError || "พิมพ์แล้วรูปการ์ดจะแสดงด้านข้างทันที"}
@@ -975,7 +991,7 @@ function SpecificCardForm({
 
         <div className="rounded-[22px] border border-white/10 bg-black/28 p-3">
           {cardPreview ? (
-            <div>
+            <div className="relative">
               <div className="overflow-hidden rounded-[18px] border border-white/10 bg-white/[0.035]">
                 <img
                   src={cardPreview.imageUrl}
@@ -986,6 +1002,15 @@ function SpecificCardForm({
                   }}
                 />
               </div>
+              <button
+                type="button"
+                onClick={onEnterCard}
+                disabled={!cardPreview}
+                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-amber-300/18 bg-amber-300/[0.08] text-sm font-black text-amber-100 transition hover:bg-amber-300/[0.12] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/28"
+              >
+                <PackagePlus className="h-4 w-4" />
+                เพิ่มรายการใบนี้
+              </button>
               <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
                 No.{cardPreview.cardNo}
               </div>
