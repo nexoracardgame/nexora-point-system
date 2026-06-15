@@ -67,14 +67,14 @@ function getAssetTierLabel(tier: string) {
 
 const bankTerms = [
   "ระบบธนาคารการ์ดจะแสดงข้อมูลเฉพาะการ์ดจริงที่ลูกค้านำมาฝาก และแอดมินคีย์เข้าหลังบ้านแล้วเท่านั้น",
-  "การ์ดที่ฝากในธนาคารมีค่าฝากรายเดือน แยกจากดอกเบี้ยของโหมดโรงรับจำนำ",
-  "ลูกค้าสามารถเลือกการ์ดในธนาคารเพื่อโยกย้ายไปแปลงเป็น NEX / COIN หรือเข้าโหมดจำนำได้เอง เมื่อระบบหลังบ้านเปิดใช้งานครบ",
+  "การ์ดที่ฝากในธนาคารมีค่าฝากรายเดือน แยกจากดอกเบี้ยของโหมดรับฝากการ์ด",
+  "ลูกค้าสามารถเลือกการ์ดในธนาคารเพื่อโยกย้ายไปแปลงเป็น NEX / COIN หรือเข้าโหมดรับฝากการ์ดได้เอง เมื่อระบบหลังบ้านเปิดใช้งานครบ",
   "ถ้าแปลงการ์ดเป็น NEX / COIN แล้ว การ์ดใบนั้นจะถูกตัดออกจากธนาคารทันทีและไม่สามารถไถ่ถอนคืนได้",
 ];
 
 const pawnTerms = [
-  "โรงรับจำนำใช้ได้เฉพาะการ์ดที่อยู่ในระบบธนาคารการ์ดแล้วเท่านั้น",
-  "ดอกเบี้ยรายเดือนคิด 10% ของมูลค่าการ์ด และครบกำหนดทุกเดือนตามวันที่นำการ์ดเข้าโหมดจำนำ",
+  "รับฝากการ์ดใช้ได้เฉพาะการ์ดที่อยู่ในระบบธนาคารการ์ดแล้วเท่านั้น",
+  "ดอกเบี้ยรายเดือนคิด 10% ของมูลค่าการ์ด และครบกำหนดทุกเดือนตามวันที่นำการ์ดเข้าโหมดรับฝาก",
   "ล่าช้า 1-3 วันแรกไม่คิดค่าปรับเพิ่ม แต่ยังขึ้นสถานะแจ้งเตือนให้ชำระ",
   "ล่าช้าได้สูงสุดไม่เกิน 7 วัน หากเกิน 7 วัน การ์ดจะหลุดถาวรและไม่สามารถไถ่ถอนได้",
 ];
@@ -97,7 +97,7 @@ const processSteps = [
   },
   {
     title: "โยกย้ายสินทรัพย์",
-    desc: "เลือกถอนจริง แปลงเป็น NEX / COIN หรือเข้าโหมดจำนำตามเงื่อนไขของระบบ",
+    desc: "เลือกถอนจริง แปลงเป็น NEX / COIN หรือเข้าโหมดรับฝากตามเงื่อนไขของระบบ",
     icon: ArrowRightLeft,
   },
 ];
@@ -237,7 +237,7 @@ export default async function CardBankPage() {
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/64 sm:text-base">
                 ศูนย์จัดการการ์ดจริงของลูกค้า สำหรับฝาก ตรวจสอบ โยกย้าย
-                แปลงเป็น NEX / COIN และนำการ์ดที่ฝากแล้วเข้าโหมดโรงรับจำนำ
+                แปลงเป็น NEX / COIN และนำการ์ดที่ฝากแล้วเข้าโหมดรับฝากการ์ด
                 ด้วยกติกาที่ชัดเจนและตรวจสอบได้
               </p>
             </div>
@@ -279,7 +279,7 @@ export default async function CardBankPage() {
           action="ยังไม่มีการ์ดให้จัดการ"
         />
         <ModePanel
-          title="โหมดโรงรับจำนำ"
+          title="โหมดรับฝากการ์ด"
           subtitle="ใช้การ์ดในธนาคารเป็นหลักประกัน"
           icon={Banknote}
           items={pawnTerms}
@@ -318,7 +318,7 @@ export default async function CardBankPage() {
             <div>
               <h2 className="text-xl font-black text-white">ตารางกำหนดชำระ</h2>
               <p className="mt-2 text-sm leading-7 text-white/58">
-                ค่าฝากธนาคารและดอกเบี้ยจำนำเป็นคนละรายการ ระบบควรออกบิลแยก
+                ค่าฝากธนาคารและดอกเบี้ยรับฝากเป็นคนละรายการ ระบบควรออกบิลแยก
                 พร้อมวันครบกำหนด สถานะล่าช้า และประวัติการชำระครบทุกเดือน
               </p>
             </div>
@@ -326,8 +326,8 @@ export default async function CardBankPage() {
 
           <div className="mt-5 space-y-3">
             <RuleLine label="ค่าฝากรายเดือน" value="กำหนดเรทในหลังบ้าน" />
-            <RuleLine label="ดอกเบี้ยจำนำ" value="10% ต่อเดือนของมูลค่าการ์ด" />
-            <RuleLine label="ครบกำหนด" value="วันเดียวกับวันที่เข้าโหมดจำนำของทุกเดือน" />
+            <RuleLine label="ดอกเบี้ยรับฝาก" value="10% ต่อเดือนของมูลค่าการ์ด" />
+            <RuleLine label="ครบกำหนด" value="วันเดียวกับวันที่เข้าโหมดรับฝากของทุกเดือน" />
             <RuleLine label="หลุดถาวร" value="เกินกำหนดชำระมากกว่า 7 วัน" danger />
           </div>
         </div>
@@ -348,7 +348,7 @@ export default async function CardBankPage() {
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <SafetyCard icon={ReceiptText} title="ใบรับฝาก" desc="ผูกกับเจ้าของ การ์ด รูปหลักฐาน serial และวันที่รับเข้า" />
-            <SafetyCard icon={CircleDollarSign} title="มูลค่าการ์ด" desc="ใช้เป็นฐานคิด NEX / COIN / เงินสด และดอกเบี้ยจำนำ" />
+            <SafetyCard icon={CircleDollarSign} title="มูลค่าการ์ด" desc="ใช้เป็นฐานคิด NEX / COIN / เงินสด และดอกเบี้ยรับฝาก" />
             <SafetyCard icon={AlertTriangle} title="สถานะหลุด" desc="เกิน 7 วันต้องล็อกถาวร ถอนหรือย้ายกลับไม่ได้" />
             <SafetyCard icon={FileText} title="Audit Log" desc="บันทึกทุก action เพื่อกันข้อมูลคลาดเคลื่อน" />
           </div>
@@ -372,7 +372,7 @@ function EmptyBankNotice() {
         รายการการ์ดของท่านจะแสดงในหน้านี้แบบเรียลไทม์
       </p>
       <div className="mx-auto mt-5 grid max-w-4xl gap-3 text-left md:grid-cols-3">
-        <InfoPill title="ยังจัดการไม่ได้" desc="ยังไม่มีการ์ดให้ถอน แปลง หรือจำนำ" />
+        <InfoPill title="ยังจัดการไม่ได้" desc="ยังไม่มีการ์ดให้ถอน แปลง หรือรับฝาก" />
         <InfoPill title="อ่านเงื่อนไขก่อน" desc="ดูค่าฝาก ดอกเบี้ย และกติกาหลุดถาวรได้ด้านล่าง" />
         <InfoPill title="รอหลังบ้านยืนยัน" desc="ข้อมูลจะขึ้นเมื่อแอดมินคีย์การ์ดเข้าระบบแล้ว" />
       </div>
@@ -411,7 +411,7 @@ function AssetSummaryPanel({
         <Metric label="มูลค่าทรัพย์สินรวม" value={`${totalNexValue.toLocaleString("th-TH")} NEX`} />
         <Metric label="COIN รวม" value={totalCoinValue.toLocaleString("th-TH")} />
         <Metric label="อยู่ในธนาคาร" value={`${depositedQuantity.toLocaleString("th-TH")} ใบ/ชุด/กอง`} />
-        <Metric label="อยู่ในโรงรับจำนำ" value={`${pawnedQuantity.toLocaleString("th-TH")} ใบ/ชุด/กอง`} />
+        <Metric label="อยู่ในรับฝากการ์ด" value={`${pawnedQuantity.toLocaleString("th-TH")} ใบ/ชุด/กอง`} />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -502,7 +502,7 @@ function CardList({ title, cards }: { title: string; cards: BankCard[] }) {
 function PawnList({ cards }: { cards: PawnCard[] }) {
   return (
     <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
-      <h2 className="text-xl font-black text-white">รายการโรงรับจำนำ</h2>
+      <h2 className="text-xl font-black text-white">รายการรับฝากการ์ด</h2>
       <div className="mt-4 space-y-3">
         {cards.map((card) => (
           <div key={card.id} className="rounded-[20px] border border-white/10 bg-black/30 p-4">

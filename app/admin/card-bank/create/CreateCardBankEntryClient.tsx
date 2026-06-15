@@ -306,9 +306,9 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     0
   );
   const saveButtonLabel =
-    entryMode === "pawn" ? "บันทึกเข้าระบบจำนำการ์ดจริง" : "บันทึกรับฝากการ์ดจริง";
+    entryMode === "pawn" ? "บันทึกรับฝากการ์ดจริง" : "บันทึกเข้าธนาคารการ์ดจริง";
   const saveButtonBusyLabel =
-    entryMode === "pawn" ? "กำลังบันทึกเข้าระบบจำนำการ์ดจริง..." : "กำลังบันทึกรับฝากการ์ดจริง...";
+    entryMode === "pawn" ? "กำลังบันทึกรับฝากการ์ดจริง..." : "กำลังบันทึกเข้าธนาคารการ์ดจริง...";
   const summaryBadgeLabel =
     intakeMode === "specific"
       ? `${totalSpecificCards} ใบ`
@@ -448,8 +448,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
       alert(
         entryMode === "pawn"
-          ? `บันทึกเข้าระบบจำนำการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`
-          : `บันทึกรับฝากการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`
+          ? `บันทึกรับฝากการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`
+          : `บันทึกเข้าธนาคารการ์ดจริงแล้ว ${result.createdCount || 0} รายการ`
       );
       setItems([]);
       setCardSetItems([]);
@@ -580,15 +580,15 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <ModeButton
                 active={entryMode === "bank"}
-                title="รับฝากการ์ด"
+                title="ธนาคารการ์ด"
                 desc="คีย์การ์ดจริงเข้าระบบฝากสินทรัพย์ของลูกค้า"
                 icon={Landmark}
                 onClick={() => setEntryMode("bank")}
               />
               <ModeButton
                 active={entryMode === "pawn"}
-                title="จำนำการ์ด"
-                desc="ย้ายเข้าระบบจำนำ คิดดอก 10% รายเดือน"
+                title="รับฝากการ์ด"
+                desc="รับฝากพร้อมเงื่อนไขเงินต้นและดอก 10% รายเดือน"
                 icon={Banknote}
                 onClick={() => setEntryMode("pawn")}
               />
@@ -615,7 +615,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     {entryMode === "bank" ? "Deposit Intake" : "Pawn Intake"}
                   </div>
                   <h2 className="mt-2 text-2xl font-black">
-                    {entryMode === "bank" ? "คีย์รับฝากการ์ด" : "คีย์เข้าระบบจำนำ"}
+                    {entryMode === "bank" ? "คีย์เข้าธนาคารการ์ด" : "คีย์รับฝากการ์ด"}
                   </h2>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-black text-white/55">
@@ -652,7 +652,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     <div className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-100/55">
                       Pawn Terms
                     </div>
-                    <h3 className="mt-2 text-xl font-black text-white">ข้อมูลจำนำที่จะส่งลงชีต</h3>
+                    <h3 className="mt-2 text-xl font-black text-white">ข้อมูลรับฝากที่จะส่งลงชีต</h3>
                   </div>
                   <div className="text-xs font-bold text-amber-100/65">
                     ค่านี้จะถูกบันทึกแยกเป็นรายรายการ แล้วล้างช่องหลังเพิ่มรายการ
@@ -1099,7 +1099,7 @@ function CardTypeButton({
 function SecurityLogPanel() {
   const rows = [
     "บันทึกผู้ทำรายการ, role, userId ลูกค้า, IP/device, เวลา และ session id",
-    "เก็บ before/after snapshot ทุกครั้งที่รับฝาก แก้ไข ย้ายเข้าระบบจำนำ หรือแปลงเป็น NEX / COIN",
+    "เก็บ before/after snapshot ทุกครั้งที่เข้าธนาคาร แก้ไข ย้ายเข้ารับฝากการ์ด หรือแปลงเป็น NEX / COIN",
     "รายการแบบกองรวมต้องมีคำยืนยันจากลูกค้าและเหตุผลของแอดมินก่อนบันทึก",
     "รายการ forced foil ต้องล็อก finish เป็น foil และบันทึกเหตุผลว่าเป็น Master forced-foil",
   ];

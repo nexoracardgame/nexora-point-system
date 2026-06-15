@@ -30,7 +30,7 @@ function buildOverview(summary: CardBankAdminSummary) {
   return [
     { label: "รอรับฝาก/ตรวจสภาพ", value: `${summary.pendingCount.toLocaleString("th-TH")} รายการ`, icon: ClipboardCheck },
     { label: "ฝากอยู่ในธนาคาร", value: `${summary.storedQuantity.toLocaleString("th-TH")} ใบ`, icon: Landmark },
-    { label: "จำนำแยกเมนู", value: `${summary.pawnedQuantity.toLocaleString("th-TH")} ใบ`, icon: Banknote },
+    { label: "รับฝากแยกเมนู", value: `${summary.pawnedQuantity.toLocaleString("th-TH")} ใบ`, icon: Banknote },
     { label: "เสี่ยงหลุดถาวร", value: `${summary.forfeitedQuantity.toLocaleString("th-TH")} ใบ`, icon: AlertTriangle },
   ];
 }
@@ -56,23 +56,23 @@ function buildDepositSummary(assets: CardBankAsset[]): CardBankAdminSummary {
 
 const adminModules = [
   {
-    title: "รับฝากการ์ดจริง",
-    desc: "สร้างใบรับฝาก ผูก userId / lineId เจ้าของจริง รูปหน้า-หลัง serial สภาพการ์ด และพนักงานผู้รับเรื่อง",
+    title: "ธนาคารการ์ดจริง",
+    desc: "สร้างใบเข้าธนาคาร ผูก userId / lineId เจ้าของจริง รูปหน้า-หลัง serial สภาพการ์ด และพนักงานผู้รับเรื่อง",
     icon: PackageCheck,
   },
   {
     title: "ตรวจสภาพและประเมินมูลค่า",
-    desc: "คีย์ประเภท ระดับ ธาตุ grade มูลค่าเงินบาท มูลค่า NEX / COIN และสถานะว่าสามารถถอน แปลง หรือจำนำได้หรือไม่",
+    desc: "คีย์ประเภท ระดับ ธาตุ grade มูลค่าเงินบาท มูลค่า NEX / COIN และสถานะว่าสามารถถอน แปลง หรือรับฝากได้หรือไม่",
     icon: FileCheck2,
   },
   {
     title: "ค่าฝากรายเดือน",
-    desc: "กำหนดเรทค่าฝากแยกจากดอกเบี้ยจำนำ พร้อมรอบบิล วันที่ครบกำหนด และสถานะชำระของลูกค้าแต่ละคน",
+    desc: "กำหนดเรทค่าฝากแยกจากดอกเบี้ยรับฝาก พร้อมรอบบิล วันที่ครบกำหนด และสถานะชำระของลูกค้าแต่ละคน",
     icon: ReceiptText,
   },
   {
-    title: "คำขอเข้าระบบจำนำ",
-    desc: "อนุมัติการย้ายการ์ดจากธนาคารไปโหมดจำนำ คำนวณเงินสด ดอกเบี้ย 10% และวันครบกำหนดรายเดือนอัตโนมัติ",
+    title: "คำขอเข้ารับฝากการ์ด",
+    desc: "อนุมัติการย้ายการ์ดจากธนาคารไปโหมดรับฝาก คำนวณเงินสด ดอกเบี้ย 10% และวันครบกำหนดรายเดือนอัตโนมัติ",
     icon: Banknote,
   },
   {
@@ -82,7 +82,7 @@ const adminModules = [
   },
   {
     title: "Audit Ledger",
-    desc: "ทุกการรับฝาก แก้ไข โยกย้าย แปลง ถอน จำนำ ชำระ หรือหลุดถาวรต้องมี before/after snapshot และผู้อนุมัติ",
+    desc: "ทุกการเข้าธนาคาร แก้ไข โยกย้าย แปลง ถอน รับฝาก ชำระ หรือปิดถาวรต้องมี before/after snapshot และผู้อนุมัติ",
     icon: ShieldCheck,
   },
 ];
@@ -98,13 +98,13 @@ const queues = [
     lane: "Storage Billing",
     title: "รอบบิลค่าฝากธนาคาร",
     status: "รอกำหนดเรท",
-    detail: "ค่าฝากเป็นคนละระบบกับดอกจำนำ ต้องเลือกเรทตามประเภท/มูลค่าการ์ด",
+    detail: "ค่าฝากเป็นคนละระบบกับดอกรับฝาก ต้องเลือกเรทตามประเภท/มูลค่าการ์ด",
   },
   {
     lane: "Pawn Desk",
-    title: "คำขอจำนำจากการ์ดที่ฝากอยู่",
+    title: "คำขอรับฝากจากการ์ดที่อยู่ในธนาคาร",
     status: "ยังไม่มีคำขอ",
-    detail: "คิดดอก 10% ต่อเดือนจากมูลค่าการ์ด ครบกำหนดทุกเดือนตามวันที่เข้าโหมดจำนำ",
+    detail: "คิดดอก 10% ต่อเดือนจากมูลค่าการ์ด ครบกำหนดทุกเดือนตามวันที่เข้าโหมดรับฝาก",
   },
   {
     lane: "Forfeit Lock",
@@ -127,7 +127,7 @@ const auditLogRows = [
   {
     event: "Deposit Created",
     scope: "Card Bank",
-    detail: "รับฝากการ์ด, userId, lineId, cardNo/finish/quantity, รูปหลักฐาน, staffId, timestamp",
+    detail: "ธนาคารการ์ด, userId, lineId, cardNo/finish/quantity, รูปหลักฐาน, staffId, timestamp",
   },
   {
     event: "Finish Locked",
@@ -184,11 +184,11 @@ export default async function AdminCardBankPage() {
                 Admin Card Bank
               </div>
               <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">
-                หลังบ้านรับฝากการ์ด
+                หลังบ้านธนาคารการ์ด
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/62">
-                ศูนย์ควบคุมการ์ดจริงของลูกค้า ตั้งแต่รับฝาก ตรวจสภาพ คิดค่าฝาก
-                เบิกถอนคืนลูกค้า และแยกงานจำนำไปเมนูจำนำการ์ดโดยเฉพาะ
+                ศูนย์ควบคุมการ์ดจริงของลูกค้า ตั้งแต่เข้าธนาคาร ตรวจสภาพ คิดค่าฝาก
+                เบิกถอนคืนลูกค้า และแยกงานรับฝากไปเมนูรับฝากการ์ดโดยเฉพาะ
                 โดยทุกขั้นตอนต้องตรวจสอบย้อนหลังได้
               </p>
             </div>
@@ -221,7 +221,7 @@ export default async function AdminCardBankPage() {
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {adminModules
-              .filter((module) => !["คำขอเข้าระบบจำนำ", "ปฏิทินดอกเบี้ย"].includes(module.title))
+              .filter((module) => !["คำขอเข้ารับฝากการ์ด", "ปฏิทินดอกเบี้ย"].includes(module.title))
               .map((module) => (
               <AdminModule key={module.title} {...module} />
             ))}
@@ -237,7 +237,7 @@ export default async function AdminCardBankPage() {
               <div>
                 <h2 className="text-xl font-black text-red-50">กติกาห้ามพลาด</h2>
                 <p className="mt-2 text-sm leading-7 text-red-100/78">
-                  การ์ดที่ถูกแปลงเป็น NEX / COIN หรือหลุดจำนำเกิน 7 วัน
+                  การ์ดที่ถูกแปลงเป็น NEX / COIN หรือปิดสิทธิ์รับฝากเกิน 7 วัน
                   ต้องถูกตัดสิทธิ์ไถ่ถอนถาวร และระบบต้องล็อกไม่ให้แอดมินเผลอย้ายกลับ
                 </p>
               </div>
@@ -245,7 +245,7 @@ export default async function AdminCardBankPage() {
           </section>
 
           <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-xl font-black">สูตรคำนวณระบบจำนำ</h2>
+            <h2 className="text-xl font-black">สูตรคำนวณระบบรับฝาก</h2>
             <div className="mt-4 space-y-3">
               <RuleLine label="ฐานมูลค่า" value="valueTHB ของการ์ด" />
               <RuleLine label="ดอกเบี้ยรายเดือน" value="10%" />
@@ -303,7 +303,7 @@ export default async function AdminCardBankPage() {
             <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
               Real Assets
             </div>
-            <h2 className="mt-2 text-2xl font-black">รายการรับฝากการ์ดล่าสุด</h2>
+            <h2 className="mt-2 text-2xl font-black">รายการธนาคารการ์ดล่าสุด</h2>
           </div>
           <Link
             href="/admin/card-bank/create"
@@ -363,8 +363,8 @@ export default async function AdminCardBankPage() {
       <CardBankWithdrawPanel
         assets={summary.latestAssets}
         eyebrow="Deposit Return Desk"
-        title="เบิก / ถอนการ์ดรับฝากคืนลูกค้า"
-        description="เฉพาะรายการรับฝากการ์ด"
+        title="เบิก / ถอนการ์ดธนาคารคืนลูกค้า"
+        description="เฉพาะรายการธนาคารการ์ด"
       />
 
       <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#101010,#050505)] p-4 sm:p-5">
@@ -377,7 +377,7 @@ export default async function AdminCardBankPage() {
             <p className="mt-2 max-w-3xl text-sm leading-7 text-white/55">
               ระบบจริงต้องบันทึกทุก movement แบบ immutable audit trail:
               ใครทำ, ทำเมื่อไร, ทำจากเครื่องไหน, ก่อน/หลังเป็นอะไร, เหตุผลคืออะไร
-              และ action นี้กระทบธนาคารการ์ด จำนำ หรือกองรวม NEX / COIN อย่างไร
+              และ action นี้กระทบธนาคารการ์ด รับฝากการ์ด หรือกองรวม NEX / COIN อย่างไร
             </p>
           </div>
           <div className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-black text-white/55">
@@ -419,9 +419,9 @@ export default async function AdminCardBankPage() {
           icon={UserCheck}
           items={[
             "ถ้ายังไม่มีการ์ดจากหลังบ้าน ต้องโชว์สถานะว่างและเงื่อนไขเท่านั้น",
-            "แสดงการ์ดที่ฝากจริง แยกจากการ์ดที่เข้าโหมดจำนำ",
+            "แสดงการ์ดที่อยู่ในธนาคารจริง แยกจากการ์ดที่เข้าโหมดรับฝาก",
             "ลูกค้าเห็นค่าฝากรายเดือน ดอกเบี้ย วันครบกำหนด และสถานะล่าช้า",
-            "ปุ่มแปลงเป็น NEX / COIN หรือจำนำต้องใช้ได้เฉพาะการ์ดที่มีสิทธิ์",
+            "ปุ่มแปลงเป็น NEX / COIN หรือรับฝากต้องใช้ได้เฉพาะการ์ดที่มีสิทธิ์",
           ]}
         />
         <RequirementCard
@@ -429,8 +429,8 @@ export default async function AdminCardBankPage() {
           icon={DatabaseZap}
           items={[
             "แอดมินคีย์การ์ดเข้าธนาคารก่อน ลูกค้าจึงเห็นข้อมูล",
-            "ตั้งเรทค่าฝากธนาคารแยกจากดอกเบี้ยจำนำ",
-            "อนุมัติการจำนำและคำนวณวันครบกำหนดอัตโนมัติ",
+            "ตั้งเรทค่าฝากธนาคารแยกจากดอกเบี้ยรับฝาก",
+            "อนุมัติการรับฝากและคำนวณวันครบกำหนดอัตโนมัติ",
             "ล็อก converted / forfeited asset ไม่ให้ถอนคืนถาวร",
           ]}
         />

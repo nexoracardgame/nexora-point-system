@@ -34,10 +34,10 @@ const CARD_DB_MAX_RESULTS = 50;
 const PAWN_LEDGER_SPREADSHEET_ID = "1r7tgannnDyOE052jBHk2OOZ23FhJR-5AlO_Tvsy56A4";
 const PAWN_LEDGER_SHEET_NAME = "";
 const PAWN_LEDGER_HEADER_ROW = [
-  "วันที่จำนำ",
-  "ชื่อผู้จำนำ",
+  "วันที่รับฝาก",
+  "ชื่อผู้ฝาก",
   "เบอร์ติดต่อ / LINE",
-  "การ์ดที่จำนำ",
+  "การ์ดที่รับฝาก",
   "จำนวน",
   "เงินต้น (THB)",
   "ดอกเบี้ย / เดือน (%)",

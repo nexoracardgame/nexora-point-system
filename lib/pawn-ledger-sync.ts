@@ -99,7 +99,7 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
     status: cleanText(asset.status) || "กำลังใช้งาน",
     note:
       cleanText(pawn?.note || "") ||
-      (asset.status === "forfeited" ? "หลุดจำนำ" : asset.status === "withdrawn" ? "ปิดบัญชี" : ""),
+      (asset.status === "forfeited" ? "ปิดสิทธิ์รับฝาก" : asset.status === "withdrawn" ? "ปิดบัญชี" : ""),
     staffName: cleanText(asset.createdByName) || "NEXORA Staff",
     updatedAt: cleanText(asset.updatedAt) || new Date().toISOString(),
   };

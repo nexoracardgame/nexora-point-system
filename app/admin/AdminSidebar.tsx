@@ -24,8 +24,8 @@ const items = [
   { href: "/admin/rewards", label: "Rewards", icon: Gift },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/point-logs", label: "Point Logs", icon: ScrollText },
-  { href: "/admin/card-bank", label: "รับฝากการ์ด", icon: Landmark, exact: true },
-  { href: "/admin/card-bank/pawn", label: "จำนำการ์ด", icon: WalletCards },
+  { href: "/admin/card-bank", label: "ธนาคารการ์ด", icon: Landmark, exact: true },
+  { href: "/admin/card-bank/pawn", label: "รับฝากการ์ด", icon: WalletCards },
   { href: "/admin/exchange-calculator", label: "เครื่องคำนวณแลก", icon: Calculator },
   { href: "/admin/staff-scan", label: "Staff Scan", icon: ScanLine },
 ];

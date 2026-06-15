@@ -46,7 +46,7 @@ const fallbackEntries: PawnLedgerEntry[] = [
     ownerId: "sample-owner-2",
     ownerLineId: "sample-line-2",
     pledgeDate: "2026-06-10T09:00:00.000Z",
-    borrowerName: "ผู้จำนำรายที่ 2",
+    borrowerName: "ผู้ฝากรายที่ 2",
     borrowerContact: "089-123-4567",
     cardLabel: "Set Bundle - Foil Pack",
     cardCount: 3,
@@ -159,7 +159,7 @@ function addDays(value: string, days: number) {
 }
 
 function getAssetStatusLabel(status: CardBankStatus) {
-  if (status === "forfeited") return "หลุดจำนำ";
+  if (status === "forfeited") return "ปิดสิทธิ์รับฝาก";
   if (status === "withdrawn" || status === "converted") return "ปิดบัญชี";
   return "กำลังใช้งาน";
 }
@@ -283,11 +283,11 @@ export default async function PawnLedgerPage() {
                 Pawn Ledger
               </div>
               <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">
-                ทะเบียนจำนำการ์ด
+                ทะเบียนรับฝากการ์ด
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/62">
-                หน้านี้ทำเป็น “ส่วนแรก” ของระบบจำนำการ์ด โดยยึดข้อมูลจาก Google Sheet เป็นหลัก
-                เพื่อให้มองภาพรวมได้เร็ว ดูรายการค้างชำระได้ง่าย และต่อยอดไปเป็นระบบรับจำนำ/ชำระ/หลุดจำนำในขั้นถัดไป
+                หน้านี้ทำเป็น “ส่วนแรก” ของระบบรับฝากการ์ด โดยยึดข้อมูลจาก Google Sheet เป็นหลัก
+                เพื่อให้มองภาพรวมได้เร็ว ดูรายการค้างชำระได้ง่าย และต่อยอดไปเป็นระบบรับฝาก/ชำระ/ปิดสิทธิ์ในขั้นถัดไป
               </p>
             </div>
 
@@ -296,7 +296,7 @@ export default async function PawnLedgerPage() {
               <SummaryCard label="ดอกเบี้ย/เดือนรวม" value={formatTHB(totalInterest)} icon={Banknote} />
               <SummaryCard label="รายการใช้งาน" value={`${activeCount.toLocaleString("th-TH")} รายการ`} icon={BadgeCheck} />
               <SummaryCard label="ค้างชำระ" value={`${overdueCount.toLocaleString("th-TH")} รายการ`} icon={TimerReset} />
-              <SummaryCard label="หลุดจำนำ" value={`${forfeitedCount.toLocaleString("th-TH")} รายการ`} icon={Landmark} />
+              <SummaryCard label="ปิดสิทธิ์รับฝาก" value={`${forfeitedCount.toLocaleString("th-TH")} รายการ`} icon={Landmark} />
             </div>
           </div>
         </div>
@@ -309,7 +309,7 @@ export default async function PawnLedgerPage() {
               <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
                 Live Table
               </div>
-              <h2 className="mt-2 text-2xl font-black">ตารางจำนำหลัก</h2>
+              <h2 className="mt-2 text-2xl font-black">ตารางรับฝากหลัก</h2>
             </div>
             <div className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-bold text-white/55">
               แหล่งข้อมูล: {sourceLabel}
@@ -320,9 +320,9 @@ export default async function PawnLedgerPage() {
             <div className="min-w-[1420px]">
               <div className="grid grid-cols-[88px_180px_220px_280px_110px_150px_150px_170px_130px_220px_150px] bg-white/[0.045] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
                 <div>ลำดับ</div>
-                <div>วันจำนำ</div>
-                <div>ชื่อผู้จำนำ</div>
-                <div>การ์ดที่จำนำ</div>
+                <div>วันรับฝาก</div>
+                <div>ชื่อผู้ฝาก</div>
+                <div>การ์ดที่รับฝาก</div>
                 <div>จำนวน</div>
                 <div>เงินต้น</div>
                 <div>ดอกเบี้ย</div>
@@ -341,7 +341,7 @@ export default async function PawnLedgerPage() {
                   <div className="space-y-1 text-white/72">
                     <div className="font-bold text-white">{formatThaiDate(row.pledgeDate)}</div>
                     <div className="text-[11px] text-white/42">
-                      {safeDate(row.pledgeDate) ? "รับจำนำเรียบร้อย" : "ยังไม่ระบุวันที่"}
+                      {safeDate(row.pledgeDate) ? "รับฝากเรียบร้อย" : "ยังไม่ระบุวันที่"}
                     </div>
                   </div>
                   <div className="space-y-1 min-w-0">
@@ -402,8 +402,8 @@ export default async function PawnLedgerPage() {
 
             <div className="mt-5 space-y-2">
               {[
-                "ลำดับ / วันที่จำนำ / ชื่อผู้จำนำ",
-                "การ์ดที่จำนำ / จำนวน / เงินต้น",
+                "ลำดับ / วันที่รับฝาก / ชื่อผู้ฝาก",
+                "การ์ดที่รับฝาก / จำนวน / เงินต้น",
                 "ดอกเบี้ยรายเดือน / วันครบกำหนด / สถานะ",
                 "หมายเหตุ / ผู้รับเรื่อง / อัปเดตล่าสุด",
               ].map((item) => (
@@ -423,13 +423,13 @@ export default async function PawnLedgerPage() {
               <div>
                 <h2 className="text-xl font-black">โครงสร้างที่แนะนำ</h2>
                 <p className="mt-2 text-sm leading-7 text-white/58">
-                  ถ้าจะให้ระบบนิ่ง ควรมีสถานะชัด ๆ เช่น กำลังใช้งาน, ค้างชำระ, ปิดบัญชี, หลุดจำนำ
+                  ถ้าจะให้ระบบนิ่ง ควรมีสถานะชัด ๆ เช่น กำลังใช้งาน, ค้างชำระ, ปิดบัญชี, ปิดสิทธิ์รับฝาก
                 </p>
               </div>
             </div>
 
             <div className="mt-5 grid gap-3">
-              <InfoLine label="คำนวณเงินต้น" value="ใช้ยอดจำนำเป็นฐาน" />
+              <InfoLine label="คำนวณเงินต้น" value="ใช้ยอดรับฝากเป็นฐาน" />
               <InfoLine label="คิดดอก" value="ดอกเบี้ยรายเดือน 10% หรือค่าที่ตั้งในชีต" />
               <InfoLine label="ครบกำหนด" value="แสดงวันที่หมดอายุ + จำนวนวันที่เลยกำหนด" />
               <InfoLine label="หมายเหตุ" value="ใช้เก็บเงื่อนไขพิเศษ / ข้อมูลติดต่อ / ประวัติ" />
@@ -441,8 +441,8 @@ export default async function PawnLedgerPage() {
       <CardBankWithdrawPanel
         assets={pawnAssets}
         eyebrow="Pawn Return Desk"
-        title="เบิก / ถอนการ์ดจำนำคืนลูกค้า"
-        description="เฉพาะรายการจำนำการ์ด"
+        title="เบิก / ถอนการ์ดรับฝากคืนลูกค้า"
+        description="เฉพาะรายการรับฝากการ์ด"
       />
 
       <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
@@ -460,15 +460,15 @@ export default async function PawnLedgerPage() {
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <PhaseCard
-            title="ฟอร์มรับจำนำ"
-            desc="เพิ่มฟอร์มกรอกชื่อผู้จำนำ การ์ด จำนวน เงินต้น และดอกเบี้ยจากหน้าแอดมิน"
+            title="ฟอร์มรับฝากการ์ด"
+            desc="เพิ่มฟอร์มกรอกชื่อผู้ฝาก การ์ด จำนวน เงินต้น และดอกเบี้ยจากหน้าแอดมิน"
           />
           <PhaseCard
             title="ปุ่มชำระ / ต่ออายุ"
             desc="ทำ action สำหรับรับชำระดอกเบี้ย เลื่อนครบกำหนด และบันทึกประวัติ"
           />
           <PhaseCard
-            title="สถานะหลุดจำนำ"
+            title="สถานะปิดสิทธิ์รับฝาก"
             desc="ล็อกการ์ดที่เกินกำหนดและแสดงผลแยกชัดเจนในตาราง"
           />
         </div>

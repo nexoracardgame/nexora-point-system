@@ -29,15 +29,15 @@ const DEFAULT_PAWN_SHEET_CSV_URL =
 const HEADER_ALIASES = {
   recordId: ["record id", "record_id", "id", "เลขรายการ", "รหัสรายการ"],
   assetId: ["asset id", "asset_id", "__sync asset id", "รหัสการ์ด", "asset", "id การ์ด"],
-  ownerId: ["owner id", "owner_id", "รหัสผู้จำนำ"],
-  ownerLineId: ["owner line id", "owner_line_id", "line id ผู้จำนำ", "line id"],
+  ownerId: ["owner id", "owner_id", "รหัสผู้ฝาก"],
+  ownerLineId: ["owner line id", "owner_line_id", "line id ผู้ฝาก", "line id"],
   rowNumber: ["no", "no.", "ลำดับ", "ลำดับที่", "รายการที่", "เลขที่"],
-  pledgeDate: ["วันที่จำนำ", "วันที่รับจำนำ", "วันที่เข้า", "pledgedate", "date", "createdat"],
-  borrowerName: ["ชื่อผู้จำนำ", "ผู้จำนำ", "ชื่อลูกค้า", "customer", "borrower", "name"],
+  pledgeDate: ["วันที่รับฝาก", "วันที่เข้า", "pledgedate", "date", "createdat"],
+  borrowerName: ["ชื่อผู้ฝาก", "ผู้ฝาก", "ชื่อลูกค้า", "customer", "borrower", "name"],
   borrowerContact: ["เบอร์ติดต่อ", "ติดต่อ", "line", "line id", "โทร", "phone", "contact"],
-  cardLabel: ["การ์ดที่จำนำ", "รายการการ์ด", "การ์ด", "card", "card name", "รายการ"],
+  cardLabel: ["การ์ดที่รับฝาก", "รายการการ์ด", "การ์ด", "card", "card name", "รายการ"],
   cardCount: ["จำนวน", "qty", "quantity", "card count", "จำนวนการ์ด"],
-  principalTHB: ["ยอดจำนำ", "เงินต้น", "มูลค่าจำนำ", "principal", "amount", "ยอดเงิน"],
+  principalTHB: ["ยอดรับฝาก", "เงินต้น", "มูลค่ารับฝาก", "principal", "amount", "ยอดเงิน"],
   monthlyInterestRate: ["ดอกเบี้ย", "ดอกเบี้ยต่อเดือน", "%ดอก", "interest rate", "rate"],
   monthlyInterestTHB: ["ดอกเบี้ย/เดือน", "ดอกเบี้ยรายเดือน", "interest", "monthly interest", "ดอก"],
   dueDate: ["วันครบกำหนด", "กำหนดคืน", "ครบกำหนด", "duedate", "due date"],
@@ -213,7 +213,7 @@ function parseDateValue(value: string) {
 
 function normalizeStatus(value: string) {
   const text = normalizeText(value).toLowerCase();
-  if (text.includes("หลุด") || text.includes("forfeit")) return "หลุดจำนำ";
+  if (text.includes("หลุด") || text.includes("forfeit")) return "ปิดสิทธิ์รับฝาก";
   if (text.includes("ปิด") || text.includes("paid") || text.includes("redeem")) return "ปิดบัญชี";
   if (text.includes("ค้าง") || text.includes("overdue")) return "ค้างชำระ";
   if (text.includes("ครบ") || text.includes("due")) return "ครบกำหนด";
