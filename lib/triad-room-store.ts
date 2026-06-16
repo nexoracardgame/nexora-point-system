@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import {
+  getTriadCardRpsChoice,
   resolveTriadTurn,
   triadCardByNo,
   triadCards,
   triadSkillRuleByNo,
+  type TriadRpsChoice,
   type TriadTriangle,
   type TriadTurn,
   type TriadTurnResult,
@@ -14,6 +16,17 @@ export type TriadRoomStatus = "waiting" | "playing";
 export type TriadRoomSlot = "host" | "challenger";
 export type TriadDeckMode = "all" | "monster" | "skill";
 type TriadBlessingChoice = "draw-skill" | "reroll-own" | "reroll-opponent";
+
+export type TriadOpeningTieBreak = {
+  fightNo: number;
+  turn: TriadTurn;
+  status: "idle" | "waiting" | "resolved";
+  reason: "first_turn_score_draw" | "";
+  choices: Partial<Record<TriadRoomSlot, TriadRpsChoice>>;
+  winner: TriadRoomSlot | "";
+  source: "card-icon" | "manual" | "";
+  message: string;
+};
 
 export type TriadRoomSkillChoice = {
   fightNo: number;
@@ -73,6 +86,7 @@ export type TriadRoomGame = {
     challenger: TriadTriangle;
   };
   skillChoices: TriadRoomSkillChoice[];
+  openerTieBreak: TriadOpeningTieBreak;
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
   fightNo: number;
@@ -100,6 +114,10 @@ type TriadRoomRow = {
 };
 
 const SPECTATOR_LIMIT = 10;
+const TRIAD_DECK_SIZE = 20;
+const TRIAD_MONSTER_DECK_SIZE = 20;
+const TRIAD_SKILL_MODE_MONSTERS = 10;
+const TRIAD_SKILL_MODE_SKILLS = 10;
 const TURN_TIMEOUT_MS = 120_000;
 const SKILL_CHOICE_TIMEOUT_MS = 30_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
@@ -159,6 +177,19 @@ function emptyTriangle(): TriadTriangle {
   return { top: "", left: "", right: "" };
 }
 
+function emptyOpeningTieBreak(): TriadOpeningTieBreak {
+  return {
+    fightNo: 1,
+    turn: 1,
+    status: "idle",
+    reason: "",
+    choices: {},
+    winner: "",
+    source: "",
+    message: "",
+  };
+}
+
 function normalizeDeck(value: unknown) {
   return Array.isArray(value) ? value.map((item) => cleanText(item)).filter(Boolean).slice(0, 40) : [];
 }
@@ -193,8 +224,8 @@ function validateDeckForMode(mode: TriadDeckMode, deck: string[]) {
   const counts = deckCardCounts(deck);
   const errors: string[] = [];
 
-  if (counts.total !== 13) {
-    errors.push("เด็คต้องมีการ์ดทั้งหมด 13 ใบ");
+  if (counts.total !== TRIAD_DECK_SIZE) {
+    errors.push(`เด็คต้องมีการ์ดทั้งหมด ${TRIAD_DECK_SIZE} ใบ`);
   }
 
   if (mode === "all") {
@@ -203,14 +234,14 @@ function validateDeckForMode(mode: TriadDeckMode, deck: string[]) {
   }
 
   if (mode === "monster") {
-    if (counts.monsters !== 13 || counts.skills > 0) {
-      errors.push("โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ 13 ใบ");
+    if (counts.monsters !== TRIAD_MONSTER_DECK_SIZE || counts.skills > 0) {
+      errors.push(`โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ ${TRIAD_MONSTER_DECK_SIZE} ใบ`);
     }
     return { ok: errors.length === 0, errors };
   }
 
-  if (counts.monsters !== 5 || counts.skills !== 8) {
-    errors.push("โหมด SKILL ต้องมีการ์ดมอนสเตอร์ 5 ใบ และการ์ดสกิล 8 ใบ");
+  if (counts.monsters !== TRIAD_SKILL_MODE_MONSTERS || counts.skills !== TRIAD_SKILL_MODE_SKILLS) {
+    errors.push(`โหมด SKILL ต้องมีการ์ดมอนสเตอร์ ${TRIAD_SKILL_MODE_MONSTERS} ใบ และการ์ดสกิล ${TRIAD_SKILL_MODE_SKILLS} ใบ`);
   }
 
   return { ok: errors.length === 0, errors };
@@ -247,6 +278,29 @@ function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
   return mapped.filter((item): item is TriadRoomSkillChoice => item !== null);
 }
 
+function normalizeRpsChoice(value: unknown): TriadRpsChoice {
+  return value === "rock" || value === "scissors" || value === "paper" ? value : "unknown";
+}
+
+function normalizeOpeningTieBreak(value: unknown): TriadOpeningTieBreak {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const choices = raw.choices && typeof raw.choices === "object" ? (raw.choices as Record<string, unknown>) : {};
+  const status = raw.status === "waiting" || raw.status === "resolved" ? raw.status : "idle";
+  return {
+    fightNo: Number(raw.fightNo || 1),
+    turn: raw.turn === 2 || raw.turn === 3 ? raw.turn : 1,
+    status,
+    reason: raw.reason === "first_turn_score_draw" ? "first_turn_score_draw" : "",
+    choices: {
+      host: normalizeRpsChoice(choices.host),
+      challenger: normalizeRpsChoice(choices.challenger),
+    },
+    winner: raw.winner === "host" || raw.winner === "challenger" ? raw.winner : "",
+    source: raw.source === "card-icon" || raw.source === "manual" ? raw.source : "",
+    message: cleanText(raw.message),
+  };
+}
+
 function normalizeGame(value: unknown): TriadRoomGame {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
@@ -273,6 +327,7 @@ function normalizeGame(value: unknown): TriadRoomGame {
       challenger: { ...emptyTriangle(), ...((triangles.challenger as TriadTriangle | undefined) || {}) },
     },
     skillChoices: normalizeSkillChoices(raw.skillChoices),
+    openerTieBreak: normalizeOpeningTieBreak(raw.openerTieBreak),
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
@@ -678,6 +733,7 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   room.game.deckReady = { host: true, challenger: true };
   room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
   room.game.turns = [];
+  room.game.openerTieBreak = emptyOpeningTieBreak();
   room.game.activeTurn = 1;
   room.game.fightNo = 1;
   room.game.matchWinner = "";
@@ -796,12 +852,63 @@ function skillChoicesResolved(room: StoredTriadRoom) {
   return choices.every((choice) => choice.selectedTarget || choice.skipped);
 }
 
+function rpsWinner(hostChoice: TriadRpsChoice, challengerChoice: TriadRpsChoice): TriadRoomSlot | "draw" | "" {
+  if (hostChoice === "unknown" || challengerChoice === "unknown") return "";
+  if (hostChoice === challengerChoice) return "draw";
+  if (
+    (hostChoice === "rock" && challengerChoice === "scissors") ||
+    (hostChoice === "scissors" && challengerChoice === "paper") ||
+    (hostChoice === "paper" && challengerChoice === "rock")
+  ) {
+    return "host";
+  }
+  return "challenger";
+}
+
+function updateOpeningTieBreakAfterResult(room: StoredTriadRoom, result: TriadTurnResult) {
+  if (room.game.activeTurn !== 1 || result.winner !== "draw") {
+    room.game.openerTieBreak = emptyOpeningTieBreak();
+    return;
+  }
+
+  const hostChoice = getTriadCardRpsChoice(room.game.triangles.host.top);
+  const challengerChoice = getTriadCardRpsChoice(room.game.triangles.challenger.top);
+  const winner = rpsWinner(hostChoice, challengerChoice);
+  const base = {
+    fightNo: room.game.fightNo,
+    turn: 1 as TriadTurn,
+    reason: "first_turn_score_draw" as const,
+    choices: { host: hostChoice, challenger: challengerChoice },
+  };
+
+  if (winner === "host" || winner === "challenger") {
+    room.game.openerTieBreak = {
+      ...base,
+      status: "resolved",
+      winner,
+      source: "card-icon",
+      message: "ตาแรกคะแนนเสมอแล้ว จึงใช้สัญลักษณ์เป่ายิงฉุบบนขวาของการ์ดเพื่อเลือกฝ่ายเปิดสกิลในตาถัดไปเท่านั้น คะแนนตาแรกยังเป็นเสมอ",
+    };
+    return;
+  }
+
+  room.game.openerTieBreak = {
+    ...base,
+    status: "waiting",
+    choices: {},
+    winner: "",
+    source: "manual",
+    message: "ตาแรกคะแนนเสมอ และสัญลักษณ์เป่ายิงฉุบบนการ์ดตัดสินไม่ได้ ให้ทั้งสองฝ่ายเลือก ค้อน กรรไกร หรือกระดาษ จนกว่าจะมีผู้ชนะ ผู้ชนะจะได้เปิดสกิลก่อนในตาถัดไปเท่านั้น",
+  };
+}
+
 function resolveIfBothLocked(room: StoredTriadRoom) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
   if (!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) return;
   if (!skillChoicesResolved(room)) return;
   const opener = getOpeningSide(room);
+  if (!opener) return;
   const skippedSkillCardNos = currentTurnChoices(room)
     .filter((choice) => choice.skipped && !choice.selectedTarget)
     .map((choice) => choice.cardNo);
@@ -824,7 +931,9 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     text: triadCards.find((card) => card.cardNo === choice.cardNo)?.skillText || "",
     summary,
   }));
-  room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), { ...result, skillEvents: [...blessingEvents, ...result.skillEvents] }].sort((a, b) => a.turn - b.turn);
+  const nextResult = { ...result, skillEvents: [...blessingEvents, ...result.skillEvents] };
+  room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), nextResult].sort((a, b) => a.turn - b.turn);
+  updateOpeningTieBreakAfterResult(room, nextResult);
 }
 
 function resolveTimeout(room: StoredTriadRoom) {
@@ -865,11 +974,22 @@ function resolveTimeout(room: StoredTriadRoom) {
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
 }
 
-function getOpeningSide(room: StoredTriadRoom): "host" | "challenger" {
+function getOpeningSide(room: StoredTriadRoom): "host" | "challenger" | null {
   if (room.game.activeTurn === 1) return "host";
   const previousTurn = (room.game.activeTurn - 1) as TriadTurn;
   const previousResult = room.game.turns.find((turn) => turn.turn === previousTurn);
-  if (!previousResult || previousResult.winner === "draw") return "host";
+  if (!previousResult) return "host";
+  if (previousResult.winner === "draw") {
+    if (previousTurn === 1 && room.game.openerTieBreak.status === "resolved" && room.game.openerTieBreak.winner) {
+      return room.game.openerTieBreak.winner;
+    }
+    if (previousTurn === 1) return null;
+    const latestResolvedWinner = room.game.turns
+      .filter((turn) => turn.turn < previousTurn && turn.winner !== "draw")
+      .sort((a, b) => b.turn - a.turn)[0];
+    if (latestResolvedWinner) return latestResolvedWinner.winner === "player" ? "host" : "challenger";
+    return "host";
+  }
   return previousResult.winner === "player" ? "host" : "challenger";
 }
 
@@ -1014,6 +1134,41 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
   };
 }
 
+export async function chooseTriadRoomOpeningTieBreak(code: string, participantId: string, choice: TriadRpsChoice) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  const cleanChoice = normalizeRpsChoice(choice);
+  if (cleanChoice === "unknown") return { ok: false as const, reason: "invalid_choice" as const, room: publicRoom(room) };
+  const tieBreak = room.game.openerTieBreak;
+  if (tieBreak.status !== "waiting" || tieBreak.fightNo !== room.game.fightNo) {
+    return { ok: false as const, reason: "not_waiting" as const, room: publicRoom(room) };
+  }
+
+  const nextChoices = { ...tieBreak.choices, [side]: cleanChoice };
+  const winner = rpsWinner(nextChoices.host || "unknown", nextChoices.challenger || "unknown");
+  room.game.openerTieBreak = {
+    ...tieBreak,
+    choices: nextChoices,
+    status: winner === "host" || winner === "challenger" ? "resolved" : "waiting",
+    winner: winner === "host" || winner === "challenger" ? winner : "",
+    source: "manual",
+    message:
+      winner === "draw"
+        ? "เป่ายิงฉุบเสมออีกครั้ง เลือกใหม่จนกว่าจะมีผู้ชนะ ผู้ชนะจะได้เปิดสกิลก่อนในตาถัดไปเท่านั้น"
+        : tieBreak.message,
+  };
+
+  if (winner === "draw") {
+    room.game.openerTieBreak.choices = {};
+  }
+
+  resolveIfBothLocked(room);
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
+}
+
 export async function advanceTriadRoomTurn(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
@@ -1029,6 +1184,7 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
     room.game.activeTurn = 1;
     room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
     room.game.turns = [];
+    room.game.openerTieBreak = emptyOpeningTieBreak();
     room.game.turnStartedAt = Date.now();
   }
   await upsertStoredRoom(room);
@@ -1041,7 +1197,7 @@ export async function timeoutTriadRoomTurn(code: string, participantId: string) 
   if (!participantId || !participantInStoredRoom(room, participantId)) {
     return { ok: false as const, reason: "not_in_room" as const, room: publicRoom(room) };
   }
-  if (room.status !== "playing" || room.game.decks.host.length < 13 || room.game.decks.challenger.length < 13) {
+  if (room.status !== "playing" || room.game.decks.host.length < TRIAD_DECK_SIZE || room.game.decks.challenger.length < TRIAD_DECK_SIZE) {
     return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
   }
   if (room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {

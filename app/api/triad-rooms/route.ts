@@ -5,6 +5,7 @@ import {
   createTriadRoom,
   advanceTriadRoomTurn,
   clearTriadRooms,
+  chooseTriadRoomOpeningTieBreak,
   chooseTriadRoomSkillTarget,
   disbandTriadRoom,
   joinTriadRoom,
@@ -212,6 +213,19 @@ export async function POST(request: Request) {
 
   if (action === "choose-skill-target") {
     const result = await chooseTriadRoomSkillTarget(cleanText(body.code), participant.id, cleanText(body.selectedTarget));
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      "room" in result ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "choose-opening-tiebreak") {
+    const result = await chooseTriadRoomOpeningTieBreak(
+      cleanText(body.code),
+      participant.id,
+      body.choice === "rock" || body.choice === "scissors" || body.choice === "paper" ? body.choice : "unknown"
+    );
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

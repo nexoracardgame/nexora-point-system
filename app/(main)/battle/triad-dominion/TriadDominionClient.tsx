@@ -11,6 +11,7 @@ import {
   Crown,
   Eye,
   Flame,
+  Hand,
   KeyRound,
   Layers3,
   Lock,
@@ -19,6 +20,7 @@ import {
   Search,
   Shield,
   Sparkles,
+  Scissors,
   Swords,
   Trophy,
   UserCheck,
@@ -30,6 +32,7 @@ import {
   triadSkillRuleByNo,
   type TriadCardKind,
   type TriadElement,
+  type TriadRpsChoice,
   type TriadTriangle,
   type TriadTurn,
   type TriadTurnResult,
@@ -118,6 +121,7 @@ type RoomGame = {
   deckStartedAt: number;
   triangles: Record<RoomPlayerSide, TriadTriangle>;
   skillChoices: RoomSkillChoice[];
+  openerTieBreak: OpeningTieBreak;
   turns: TriadTurnResult[];
   activeTurn: TriadTurn;
   fightNo: number;
@@ -125,6 +129,17 @@ type RoomGame = {
   matchWinner: RoomPlayerSide | "";
   surrenderedBy: RoomPlayerSide | "";
   matchEndedAt: number;
+};
+
+type OpeningTieBreak = {
+  fightNo: number;
+  turn: TriadTurn;
+  status: "idle" | "waiting" | "resolved";
+  reason: "first_turn_score_draw" | "";
+  choices: Partial<Record<RoomPlayerSide, TriadRpsChoice>>;
+  winner: RoomPlayerSide | "";
+  source: "card-icon" | "manual" | "";
+  message: string;
 };
 
 type RoomSkillChoice = {
@@ -155,7 +170,9 @@ type TurnReveal = {
   scored: boolean;
 };
 
-const DECK_SIZE = 13;
+const DECK_SIZE = 20;
+const SKILL_MODE_MONSTER_LIMIT = 10;
+const SKILL_MODE_SKILL_LIMIT = 10;
 const TURN_SECONDS = 120;
 const RESULT_SECONDS = 60;
 const SPECTATOR_LIMIT = 10;
@@ -408,6 +425,25 @@ function normalizeRoomGame(value: unknown): RoomGame {
   const activeTurn = Number(raw.activeTurn || 1);
   const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
   const cleanPool = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, 40) : [];
+  const cleanRpsChoice = (choice: unknown): TriadRpsChoice =>
+    choice === "rock" || choice === "scissors" || choice === "paper" ? choice : "unknown";
+  const cleanOpeningTieBreak = (tieBreak: unknown): OpeningTieBreak => {
+    const rawTieBreak = tieBreak && typeof tieBreak === "object" ? (tieBreak as Record<string, unknown>) : {};
+    const choices = rawTieBreak.choices && typeof rawTieBreak.choices === "object" ? (rawTieBreak.choices as Record<string, unknown>) : {};
+    return {
+      fightNo: Number(rawTieBreak.fightNo || 1),
+      turn: rawTieBreak.turn === 2 || rawTieBreak.turn === 3 ? rawTieBreak.turn : 1,
+      status: rawTieBreak.status === "waiting" || rawTieBreak.status === "resolved" ? rawTieBreak.status : "idle",
+      reason: rawTieBreak.reason === "first_turn_score_draw" ? "first_turn_score_draw" : "",
+      choices: {
+        host: cleanRpsChoice(choices.host),
+        challenger: cleanRpsChoice(choices.challenger),
+      },
+      winner: rawTieBreak.winner === "host" || rawTieBreak.winner === "challenger" ? rawTieBreak.winner : "",
+      source: rawTieBreak.source === "card-icon" || rawTieBreak.source === "manual" ? rawTieBreak.source : "",
+      message: safeText(rawTieBreak.message),
+    };
+  };
   const cleanSkillChoices = (choices: unknown): RoomSkillChoice[] => Array.isArray(choices)
     ? choices
         .map((choice) => {
@@ -450,6 +486,7 @@ function normalizeRoomGame(value: unknown): RoomGame {
       challenger: { top: "", left: "", right: "", ...((triangles.challenger as TriadTriangle | undefined) || {}) },
     },
     skillChoices: cleanSkillChoices(raw.skillChoices),
+    openerTieBreak: cleanOpeningTieBreak(raw.openerTieBreak),
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
@@ -721,11 +758,11 @@ function validateDeckForMode(cards: CardView[], mode: DeckMode) {
 
   if (mode === "monster") {
     if (monsters !== DECK_SIZE) {
-      errors.push("โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ 13 ใบ");
+      errors.push(`โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ ${DECK_SIZE} ใบ`);
     }
   } else if (mode === "skill") {
-    if (monsters !== 5 || skills !== 8) {
-      errors.push("โหมด SKILL ต้องมีการ์ดมอนสเตอร์ 5 ใบ และการ์ดสกิล 8 ใบ");
+    if (monsters !== SKILL_MODE_MONSTER_LIMIT || skills !== SKILL_MODE_SKILL_LIMIT) {
+      errors.push(`โหมด SKILL ต้องมีการ์ดมอนสเตอร์ ${SKILL_MODE_MONSTER_LIMIT} ใบ และการ์ดสกิล ${SKILL_MODE_SKILL_LIMIT} ใบ`);
     }
   } else if (monsters < 3) {
     errors.push("โหมด ALL IN ONE ต้องมีการ์ดมอนสเตอร์อย่างน้อย 3 ใบ");
@@ -1364,7 +1401,7 @@ function HandCard({
         if (lane) onDropToLane(lane, card.cardNo);
       }}
       disabled={disabled || used}
-      className={`group relative min-w-[64px] max-w-[126px] flex-[0_0_clamp(72px,8.2vw,126px)] touch-none overflow-hidden rounded-xl border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+      className={`group relative min-w-[50px] max-w-[104px] flex-[0_0_clamp(54px,5.6vw,104px)] touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
         used
           ? "border-white/8 opacity-25"
           : placedLane
@@ -1442,7 +1479,7 @@ function PlayerHand({
           ))}
         </div>
       </div>
-      <div className="flex min-h-0 gap-2 overflow-x-auto pb-1 xl:justify-center">
+      <div className="flex min-h-0 gap-1.5 overflow-x-auto overscroll-x-contain pb-2 pr-1 scrollbar-thin xl:justify-start">
         {cards.map((card) => (
             <HandCard
               key={card.cardNo}
@@ -1479,7 +1516,7 @@ function SpectatorDeckRail({
     <div className={`rounded-xl border bg-black/28 p-3 ${border} ${glow}`}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="text-xs font-black uppercase tracking-[0.16em] text-white/52">{title}</div>
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/34">13 ใบ</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/34">{DECK_SIZE} ใบ</div>
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3.6rem,1fr))]">
         {cards.map((card) => (
@@ -1580,6 +1617,97 @@ function SpectatorBattleOverview({
   );
 }
 
+const rpsLabel: Record<TriadRpsChoice, string> = {
+  rock: "ค้อน",
+  scissors: "กรรไกร",
+  paper: "กระดาษ",
+  unknown: "ยังไม่เลือก",
+};
+
+function rpsIcon(choice: TriadRpsChoice) {
+  if (choice === "paper") return <Hand className="h-5 w-5" />;
+  if (choice === "scissors") return <Scissors className="h-5 w-5" />;
+  return <Swords className="h-5 w-5" />;
+}
+
+function OpeningTieBreakOverlay({
+  tieBreak,
+  hostName,
+  challengerName,
+  ownSide,
+  isSpectator,
+  onChoose,
+}: {
+  tieBreak?: OpeningTieBreak | null;
+  hostName: string;
+  challengerName: string;
+  ownSide: RoomPlayerSide | null;
+  isSpectator: boolean;
+  onChoose: (choice: TriadRpsChoice) => void;
+}) {
+  if (!tieBreak || tieBreak.status === "idle") return null;
+  const hostChoice = tieBreak.choices.host || "unknown";
+  const challengerChoice = tieBreak.choices.challenger || "unknown";
+  const ownChoice = ownSide ? tieBreak.choices[ownSide] || "unknown" : "unknown";
+  const winnerName = tieBreak.winner === "host" ? hostName : tieBreak.winner === "challenger" ? challengerName : "";
+  const canChoose = tieBreak.status === "waiting" && !isSpectator && ownSide && ownChoice === "unknown";
+
+  return (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/72 px-4 backdrop-blur-md">
+      <div className="w-[min(560px,94vw)] rounded-2xl border border-amber-200/36 bg-[#080a12] p-5 text-white shadow-[0_28px_110px_rgba(0,0,0,0.62)]">
+        <div className="text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-amber-200/25 bg-amber-200/10 text-amber-100">
+            <Swords className="h-6 w-6" />
+          </div>
+          <div className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/62">ตัดสินฝ่ายเปิดสกิลตาถัดไป</div>
+          <div className="mt-1 text-2xl font-black">ตาแรกคะแนนเสมอแล้ว</div>
+          <p className="mt-3 text-sm font-semibold leading-6 text-white/68">
+            {tieBreak.message || "ใช้เป่ายิงฉุบเพื่อเลือกฝ่ายเปิดการ์ดสกิลในตาถัดไปเท่านั้น คะแนนตาแรกยังนับเป็นเสมอ"}
+          </p>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          {[
+            ["host" as const, hostName, hostChoice],
+            ["challenger" as const, challengerName, challengerChoice],
+          ].map(([side, name, choice]) => (
+            <div key={side} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-center">
+              <div className="truncate text-sm font-black text-white">{name}</div>
+              <div className={`mt-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${choice === "unknown" ? "border-white/10 bg-black/30 text-white/42" : "border-emerald-200/30 bg-emerald-300/10 text-emerald-100"}`}>
+                {choice === "unknown" ? "ยังไม่ล็อก" : "ล็อกแล้ว"}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {tieBreak.status === "resolved" ? (
+          <div className="mt-5 rounded-xl border border-emerald-200/24 bg-emerald-300/10 p-4 text-center text-sm font-black text-emerald-100">
+            {winnerName} ได้เปิดสกิลก่อนในตาถัดไป
+          </div>
+        ) : canChoose ? (
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {(["rock", "scissors", "paper"] as TriadRpsChoice[]).map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                onClick={() => onChoose(choice)}
+                className="inline-flex h-14 items-center justify-center gap-2 rounded-xl border border-amber-200/24 bg-amber-200/10 text-sm font-black text-amber-100 transition hover:border-amber-100/70 hover:bg-amber-200/18"
+              >
+                {rpsIcon(choice)}
+                {rpsLabel[choice]}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-white/10 bg-black/28 p-4 text-center text-sm font-semibold text-white/58">
+            {isSpectator ? "ผู้ชมกำลังรอดูผลการล็อกของทั้งสองฝ่าย" : "ล็อกคำตอบแล้ว รออีกฝ่าย"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CardHoverPreview({ card }: { card: CardView | null }) {
   if (!card) return null;
   return (
@@ -1674,7 +1802,7 @@ function SpectatorDeckStrip({
           {cards.length} ใบ
         </div>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(2.7rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] md:grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))]">
+      <div className="grid grid-cols-10 gap-1 md:grid-cols-[repeat(20,minmax(0,1fr))]">
         {cards.map((card) => (
           <button
             key={card.cardNo}
@@ -1684,13 +1812,13 @@ function SpectatorDeckStrip({
             onFocus={() => onPreview?.(card)}
             onBlur={() => onPreview?.(null)}
             onClick={() => onPreview?.(card)}
-            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/55 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
+            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-md border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/55 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
           >
             <Image
               src={card.sourceImage}
               alt={card.name}
               fill
-              sizes="72px"
+              sizes="54px"
               quality={92}
               unoptimized
               loading="eager"
@@ -2441,17 +2569,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
   const deckSelectionGuide =
     currentDeckMode === "skill"
-      ? `โหมด SKILL: มอนสเตอร์ ${deckSelectionCounts.monsters}/5 ใบ · สกิล ${deckSelectionCounts.skills}/8 ใบ · รวม ${playerDeck.length}/13 ใบ`
+      ? `โหมด SKILL: มอนสเตอร์ ${deckSelectionCounts.monsters}/${SKILL_MODE_MONSTER_LIMIT} ใบ · สกิล ${deckSelectionCounts.skills}/${SKILL_MODE_SKILL_LIMIT} ใบ · รวม ${playerDeck.length}/${DECK_SIZE} ใบ`
       : currentDeckMode === "monster"
-        ? `โหมด MONSTER: มอนสเตอร์ ${playerDeckCards.length}/13 ใบ`
-        : `โหมด ALL IN ONE: มอนสเตอร์อย่างน้อย 3 ใบ · รวม ${playerDeck.length}/13 ใบ`;
+        ? `โหมด MONSTER: มอนสเตอร์ ${playerDeckCards.length}/${DECK_SIZE} ใบ`
+        : `โหมด ALL IN ONE: มอนสเตอร์อย่างน้อย 3 ใบ · รวม ${playerDeck.length}/${DECK_SIZE} ใบ`;
   const deckSelectionNotice =
-    currentDeckMode === "skill" && (deckSelectionCounts.monsters >= 5 || deckSelectionCounts.skills >= 8)
+    currentDeckMode === "skill" && (deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT || deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT)
       ? "ครบโควตาแล้ว กดใบเดิมเพื่อยกเลิกก่อนถึงจะเลือกใบใหม่ได้"
       : currentDeckMode === "skill"
-        ? "มอนสเตอร์ได้ 5 ใบ สกิลได้ 8 ใบ เท่านั้น"
+        ? `มอนสเตอร์ได้ ${SKILL_MODE_MONSTER_LIMIT} ใบ สกิลได้ ${SKILL_MODE_SKILL_LIMIT} ใบ เท่านั้น`
         : currentDeckMode === "monster"
-          ? "โหมดนี้ใช้การ์ดมอนสเตอร์ทั้งหมด 13 ใบ"
+          ? `โหมดนี้ใช้การ์ดมอนสเตอร์ทั้งหมด ${DECK_SIZE} ใบ`
           : "โหมดนี้ต้องมีมอนสเตอร์อย่างน้อย 3 ใบ ที่เหลือเลือกการ์ดใดก็ได้";
   const ownPendingRoomSkillChoice = currentRoom && roomPlayerSide
     ? currentRoom.game.skillChoices.find(
@@ -2626,6 +2754,33 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     window.setTimeout(() => void syncRooms({ force: true }).catch(() => null), 60);
     return { ok: response.ok, status: response.status, payload };
+  };
+
+  const chooseOpeningTieBreak = (choice: TriadRpsChoice) => {
+    if (!currentRoom || !roomPlayerSide || choice === "unknown") return;
+    patchCurrentRoom((room) => ({
+      ...room,
+      game: {
+        ...room.game,
+        openerTieBreak: {
+          ...room.game.openerTieBreak,
+          choices: {
+            ...room.game.openerTieBreak.choices,
+            [roomPlayerSide]: choice,
+          },
+        },
+      },
+    }));
+    void postRoomAction({
+      action: "choose-opening-tiebreak",
+      code: currentRoom.code,
+      choice,
+    }).then((result) => {
+      if (!result.ok) {
+        void syncRooms({ force: true }).catch(() => null);
+        setBattleLog((current) => ["เลือกเป่ายิงฉุบไม่สำเร็จ ระบบจะซิงก์สถานะล่าสุดอีกครั้ง", ...current]);
+      }
+    });
   };
 
   const createRoom = async (deckMode: DeckMode) => {
@@ -3002,12 +3157,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         setBattleLog((current) => [`เลือกได้ทั้งหมด ${DECK_SIZE} ใบเท่านั้น`, ...current]);
         return;
       }
-      if (currentDeckMode === "skill" && card.kind === "monster" && deckSelectionCounts.monsters >= 5) {
-        setBattleLog((current) => ["โหมด SKILL เลือกมอนสเตอร์ได้ 5 ใบเท่านั้น ต้องยกเลิกใบเดิมก่อน", ...current]);
+      if (currentDeckMode === "skill" && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT) {
+        setBattleLog((current) => [`โหมด SKILL เลือกมอนสเตอร์ได้ ${SKILL_MODE_MONSTER_LIMIT} ใบเท่านั้น ต้องยกเลิกใบเดิมก่อน`, ...current]);
         return;
       }
-      if (currentDeckMode === "skill" && card.kind === "skill" && deckSelectionCounts.skills >= 8) {
-        setBattleLog((current) => ["โหมด SKILL เลือกการ์ดสกิลได้ 8 ใบเท่านั้น ต้องยกเลิกใบเดิมก่อน", ...current]);
+      if (currentDeckMode === "skill" && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT) {
+        setBattleLog((current) => [`โหมด SKILL เลือกการ์ดสกิลได้ ${SKILL_MODE_SKILL_LIMIT} ใบเท่านั้น ต้องยกเลิกใบเดิมก่อน`, ...current]);
         return;
       }
     }
@@ -3799,7 +3954,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 {[
                   { id: "all" as DeckMode, title: "ALL IN ONE", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
                   { id: "monster" as DeckMode, title: "MONSTER", detail: "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้" },
-                  { id: "skill" as DeckMode, title: "SKILL", detail: "บังคับเด็ค 5 มอนสเตอร์ + 8 สกิล และให้กติกาตรงตามโหมดสกิล" },
+                  { id: "skill" as DeckMode, title: "SKILL", detail: `บังคับเด็ค ${SKILL_MODE_MONSTER_LIMIT} มอนสเตอร์ + ${SKILL_MODE_SKILL_LIMIT} สกิล และให้กติกาตรงตามโหมดสกิล` },
                 ].map((mode) => {
                   const selected = createRoomMode === mode.id;
                   return (
@@ -4198,7 +4353,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 เลือกเด็คของคุณ
               </h1>
               <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/62 sm:text-base">
-                เลือกการ์ด 13 ใบสำหรับ 3 รอบสู้ การ์ดแต่ละใบใช้ได้ครั้งเดียวในเกมนี้
+                เลือกการ์ด {DECK_SIZE} ใบสำหรับ 3 รอบสู้ การ์ดแต่ละใบใช้ได้ครั้งเดียวในเกมนี้
               </p>
               <div className="mt-4 max-w-2xl rounded-2xl border border-amber-200/16 bg-black/30 px-4 py-3 text-sm font-bold leading-6 text-amber-100/86">
                 {deckSelectionGuide}
@@ -4251,19 +4406,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         ) : null}
 
         <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
             {selectableDeckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
               const disabled =
                 ownDeckReady ||
                 (playerDeck.length >= DECK_SIZE && !selected) ||
-                (currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= 5) ||
-                (currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= 8);
+                (currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT) ||
+                (currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT);
               const disabledReason =
-                currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= 5
-                  ? "โหมด SKILL เลือกมอนสเตอร์ได้ 5 ใบเท่านั้น"
-                  : currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= 8
-                    ? "โหมด SKILL เลือกการ์ดสกิลได้ 8 ใบเท่านั้น"
+                currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT
+                  ? `โหมด SKILL เลือกมอนสเตอร์ได้ ${SKILL_MODE_MONSTER_LIMIT} ใบเท่านั้น`
+                  : currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT
+                    ? `โหมด SKILL เลือกการ์ดสกิลได้ ${SKILL_MODE_SKILL_LIMIT} ใบเท่านั้น`
                     : playerDeck.length >= DECK_SIZE && !selected
                       ? `เลือกได้ ${DECK_SIZE} ใบเท่านั้น`
                       : undefined;
@@ -4344,6 +4499,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       {matchDone && forcedWinnerLabel ? (
         <MatchFinalOverlay winner={forcedWinnerLabel} surrendered={surrenderedLabel} score={finalMatchScore} />
       ) : null}
+      <OpeningTieBreakOverlay
+        tieBreak={currentRoom?.game.openerTieBreak}
+        hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+        challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+        ownSide={roomPlayerSide}
+        isSpectator={isSpectator}
+        onChoose={chooseOpeningTieBreak}
+      />
       {currentRoom ? (
         <button
           type="button"

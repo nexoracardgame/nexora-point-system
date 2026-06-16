@@ -5,6 +5,7 @@ export type TriadCardKind = "monster" | "skill" | "unknown";
 export type TriadLane = "top" | "left" | "right";
 export type TriadTurn = 1 | 2 | 3;
 export type TriadMetric = "attack" | "support";
+export type TriadRpsChoice = "rock" | "scissors" | "paper" | "unknown";
 export type TriadSkillShape =
   | "stat"
   | "block-stat-gain"
@@ -61,6 +62,10 @@ export type TriadSkillRule = {
   duration: "turn";
   allowedTurns: TriadTurn[];
   elementHint: TriadElement;
+  elementCondition?: {
+    mode: "include" | "exclude";
+    elements: TriadElement[];
+  };
   blockedMetric?: TriadMetric;
   blockedUseMetric?: TriadMetric;
   transformElement?: TriadElement;
@@ -189,6 +194,16 @@ function normalizeElement(value?: string, cardNo?: string): TriadElement {
   return "unknown";
 }
 
+export function getTriadCardRpsChoice(cardNo?: string): TriadRpsChoice {
+  const normalized = normalizeCardNo(cardNo || "");
+  const card = sourceCards.find((item) => normalizeCardNo(item.cardNo) === normalized);
+  const raw = `${card?.type || ""} ${card?.rarity || ""} ${card?.notes || ""} ${card?.rawText || ""}`.toLowerCase();
+  if (/fist|rock|ค้อน/.test(raw)) return "rock";
+  if (/peace|scissors|กรรไกร/.test(raw)) return "scissors";
+  if (/hand|paper|กระดาษ/.test(raw)) return "paper";
+  return "unknown";
+}
+
 function getKind(card: SourceCard): TriadCardKind {
   const hasSkill = Boolean(String(card.skill || "").trim());
   const hasStats = parseNumber(card.atk) > 0 || parseNumber(card.sup) > 0;
@@ -273,6 +288,41 @@ function inferTransformElement(text: string): TriadElement | undefined {
   return undefined;
 }
 
+function uniqueElements(elements: TriadElement[]) {
+  return Array.from(new Set(elements.filter((element) => element !== "unknown")));
+}
+
+function inferElementsFromText(text: string): TriadElement[] {
+  const elements: TriadElement[] = [];
+  if (/Fire|ไฟ|เพลิง|🔴/i.test(text)) elements.push("fire");
+  if (/Water|น้ำ|วารี|🔵/i.test(text)) elements.push("water");
+  if (/Green|Nature|Wood|ไม้|พฤกษ|♠|🟢/i.test(text)) elements.push("wood");
+  if (/Gold|ทอง|coin|สุวรรณ|🟡/i.test(text)) elements.push("gold");
+  if (/Earth|Rock|Sand|ดิน|ปฐพี|หิน|ธรณี|triangle|orange/i.test(text)) elements.push("earth");
+  return uniqueElements(elements);
+}
+
+function inferElementCondition(card: TriadCard): TriadSkillRule["elementCondition"] {
+  const text = card.skillText;
+  const explicitElements = inferElementsFromText(text);
+  const fallbackElements = card.element !== "unknown" ? [card.element] : [];
+  const elements = explicitElements.length > 0 ? explicitElements : fallbackElements;
+  if (elements.length === 0) return undefined;
+
+  if (/ไม่ใช่|ยกเว้น|except|non[-\s]?/i.test(text)) {
+    return { mode: "exclude", elements };
+  }
+
+  if (
+    /ที่เป็น|ธาตุ|Element|Symbol|icon|🔴|🔵|🟢|♠|coin|triangle|ไฟ|น้ำ|วารี|ไม้|พฤกษ|ทอง|ดิน|ปฐพี|หิน/i.test(text) &&
+    /เลือกมอนสเตอร์|มอนสเตอร์บนสนาม|monster/i.test(text)
+  ) {
+    return { mode: "include", elements };
+  }
+
+  return undefined;
+}
+
 function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   if (card.kind !== "skill") return null;
 
@@ -306,6 +356,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
+    elementCondition: inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -388,6 +439,7 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
     return {
       metric: "total" as const,
       total: topAttack + topSupport,
+      contributions: top ? [{ card: top, lane: "top" as TriadLane, value: topAttack + topSupport }] : [],
       breakdown: top ? [`No.${top.cardNo} ${top.name}: ATK ${topAttack} + SUP ${topSupport}`] : [],
     };
   }
@@ -400,6 +452,10 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
   return {
     metric,
     total: topValue + laneValue,
+    contributions: [
+      top ? { card: top, lane: "top" as TriadLane, value: topValue } : null,
+      laneCard?.kind === "monster" ? { card: laneCard, lane: selectedLane(turn), value: laneValue } : null,
+    ].filter((item): item is { card: TriadCard; lane: TriadLane; value: number } => Boolean(item)),
     breakdown: [
       top ? `No.${top.cardNo} ${top.name}: ${label} ${topValue}` : "",
       laneCard?.kind === "monster" ? `No.${laneCard.cardNo} ${laneCard.name}: ${label} ${laneValue}` : "",
@@ -413,6 +469,18 @@ type StatUseBlocker = {
   metric: TriadMetric;
   rule: TriadSkillRule;
 };
+
+function elementConditionMatches(rule: TriadSkillRule, card: TriadCard) {
+  if (!rule.elementCondition) return true;
+  const listed = rule.elementCondition.elements.includes(card.element);
+  return rule.elementCondition.mode === "include" ? listed : !listed;
+}
+
+function elementConditionLabel(rule: TriadSkillRule) {
+  if (!rule.elementCondition) return "";
+  const elements = rule.elementCondition.elements.join("/");
+  return rule.elementCondition.mode === "include" ? `ต้องเป็นธาตุ ${elements}` : `ต้องไม่ใช่ธาตุ ${elements}`;
+}
 
 function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
   const blockers: StatUseBlocker[] = [];
@@ -556,6 +624,25 @@ function applySkill(
 
   for (const effect of rule.effects) {
     if (targetScore.metric !== "total" && effect.metric === targetScore.metric) {
+      const eligibleContributions = targetScore.contributions.filter((item) => elementConditionMatches(rule, item.card));
+      const affectsAll = rule.target === "all" || rule.target.endsWith("-all");
+      const affectedCount = affectsAll ? eligibleContributions.length : eligibleContributions.length > 0 ? 1 : 0;
+      if (affectedCount === 0) {
+        const condition = elementConditionLabel(rule);
+        events.push({
+          cardNo: rule.cardNo,
+          name: rule.name,
+          side,
+          type: rule.shape,
+          text: rule.text,
+          summary: condition
+            ? `ไม่เข้าเงื่อนไขธาตุ (${condition}) จึงไม่มีผลในตานี้`
+            : "ไม่พบมอนสเตอร์เป้าหมายที่เข้าเงื่อนไข สกิลจึงไม่มีผลในตานี้",
+          blocked: true,
+        });
+        ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: element condition not met`);
+        continue;
+      }
       const effectTargetSide = targetIsOpponent ? (side === "player" ? "opponent" : "player") : side;
       const blockedBy = effect.delta > 0
         ? blockers.find((blocker) => blocker.targetSide === effectTargetSide && (!blocker.metric || blocker.metric === effect.metric))
@@ -574,9 +661,10 @@ function applySkill(
         ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} +${effect.delta} ถูกบล็อก`);
         continue;
       }
-      targetScore.total += effect.delta;
+      const totalDelta = effect.delta * affectedCount;
+      targetScore.total += totalDelta;
       const label = effect.metric === "attack" ? "ATK" : "SUP";
-      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${effect.delta >= 0 ? "+" : ""}${effect.delta}`);
+      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${totalDelta >= 0 ? "+" : ""}${totalDelta}`);
       const metricLabel = effect.metric === "attack" ? "โจมตี" : "ช่วยเหลือ";
       const directionLabel = effect.delta >= 0 ? "เพิ่ม" : "ลด";
       const targetLabel = targetIsOpponent ? "ฝั่งตรงข้าม" : "ฝั่งผู้ใช้สกิล";
@@ -586,7 +674,7 @@ function applySkill(
         side,
         type: rule.shape,
         text: rule.text,
-        summary: `${targetLabel} ${directionLabel}${metricLabel} ${Math.abs(effect.delta).toLocaleString()} แต้ม`,
+        summary: `${targetLabel} ${directionLabel}${metricLabel} ${Math.abs(totalDelta).toLocaleString()} แต้ม${affectedCount > 1 ? ` (${affectedCount} ใบเข้าเงื่อนไข)` : ""}`,
       });
     }
   }
@@ -659,9 +747,8 @@ function collectSkillCancels(player: TriadTriangle, opponent: TriadTriangle, tur
   const events: TriadSkillEvent[] = [];
   const items = [
     { side: "player" as const, rule: getLaneSkillRule(player, turn) },
-    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn) },
   ].filter(
-    (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
+    (item): item is { side: "player"; rule: TriadSkillRule } =>
       item.rule?.shape === "skill-cancel" && item.rule.allowedTurns.includes(turn)
   );
 
