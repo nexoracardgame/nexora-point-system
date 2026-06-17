@@ -152,7 +152,7 @@ function toDisplayRows(entries: PawnLedgerEntry[]) {
 function getLedgerRowState(row: PawnLedgerEntry & { overdueDays: number }) {
   const status = String(row.status || "");
   const closed = status.includes("ไถ่ถอน") || status.includes("ปิดบัญชี");
-  const forfeited = status.includes("ปิดสิทธิ์") || status.includes("หลุด") || row.overdueDays > 7;
+  const forfeited = status.includes("หมดสิทธิ์") || status.includes("ปิดสิทธิ์") || status.includes("หลุด") || row.overdueDays > 7;
   const warning = !closed && !forfeited && row.overdueDays > 0 && row.overdueDays <= 7;
 
   if (forfeited) return "forfeited";
@@ -184,7 +184,7 @@ function addDays(value: string, days: number) {
 }
 
 function getAssetStatusLabel(status: CardBankStatus) {
-  if (status === "forfeited") return "ปิดสิทธิ์รับฝาก";
+  if (status === "forfeited") return "หมดสิทธิ์ไถ่ถอน";
   if (status === "withdrawn") return "ไถ่ถอนเรียบร้อย";
   if (status === "converted") return "ปิดบัญชี";
   return "กำลังใช้งาน";
@@ -299,9 +299,9 @@ export default async function PawnLedgerPage() {
   const redemptionRows = rows.filter((row) => row.status.includes("ไถ่ถอน"));
   const totalPrincipal = activeRows.reduce((sum, row) => sum + row.principalTHB, 0);
   const totalInterest = activeRows.reduce((sum, row) => sum + row.monthlyInterestTHB, 0);
-  const activeCount = activeRows.filter((row) => row.status.includes("เธเธณเธฅเธฑเธ") || row.status.includes("เธเธฃเธ")).length;
-  const overdueCount = activeRows.filter((row) => row.overdueDays > 0 && !row.status.includes("เธเธดเธ”") && !row.status.includes("เธซเธฅเธธเธ”")).length;
-  const forfeitedCount = activeRows.filter((row) => row.status.includes("เธซเธฅเธธเธ”")).length;
+  const activeCount = activeRows.filter((row) => row.status.includes("กำลัง") || row.status.includes("ครบ")).length;
+  const overdueCount = activeRows.filter((row) => row.overdueDays > 0 && !row.status.includes("ปิด") && !row.status.includes("หมดสิทธิ์")).length;
+  const forfeitedCount = activeRows.filter((row) => row.status.includes("หมดสิทธิ์")).length;
 
   return (
     <div className="space-y-5 text-white">
@@ -327,7 +327,7 @@ export default async function PawnLedgerPage() {
               <SummaryCard label="ดอกเบี้ย/เดือนรวม" value={formatTHB(totalInterest)} icon={Banknote} />
               <SummaryCard label="รายการใช้งาน" value={`${activeCount.toLocaleString("th-TH")} รายการ`} icon={BadgeCheck} />
               <SummaryCard label="ค้างชำระ" value={`${overdueCount.toLocaleString("th-TH")} รายการ`} icon={TimerReset} />
-              <SummaryCard label="ปิดสิทธิ์รับฝาก" value={`${forfeitedCount.toLocaleString("th-TH")} รายการ`} icon={Landmark} />
+              <SummaryCard label="หมดสิทธิ์ไถ่ถอน" value={`${forfeitedCount.toLocaleString("th-TH")} รายการ`} icon={Landmark} />
             </div>
           </div>
         </div>
@@ -456,14 +456,14 @@ export default async function PawnLedgerPage() {
               <div>
                 <h2 className="text-xl font-black">โครงสร้างที่แนะนำ</h2>
                 <p className="mt-2 text-sm leading-7 text-white/58">
-                  ถ้าจะให้ระบบนิ่ง ควรมีสถานะชัด ๆ เช่น กำลังใช้งาน, ค้างชำระ, ปิดบัญชี, ปิดสิทธิ์รับฝาก
+                  ถ้าจะให้ระบบนิ่ง ควรมีสถานะชัด ๆ เช่น กำลังใช้งาน, ค้างชำระ, ปิดบัญชี, หมดสิทธิ์ไถ่ถอน
                 </p>
               </div>
             </div>
 
             <div className="mt-5 grid gap-3">
               <InfoLine label="คำนวณเงินต้น" value="ใช้ยอดรับฝากเป็นฐาน" />
-              <InfoLine label="คิดดอก" value="ดอกเบี้ยรายเดือน 10% หรือค่าที่ตั้งในชีต" />
+              <InfoLine label="คิดดอก" value="ดอกเบี้ยรายเดือน 5% จากเงินต้น + ค่ารักษา 200 บาท" />
               <InfoLine label="ครบกำหนด" value="แสดงวันที่หมดอายุ + จำนวนวันที่เลยกำหนด" />
               <InfoLine label="หมายเหตุ" value="ใช้เก็บเงื่อนไขพิเศษ / ข้อมูลติดต่อ / ประวัติ" />
             </div>
@@ -496,7 +496,7 @@ export default async function PawnLedgerPage() {
             desc="ชำระดอกและต่ออายุใช้ปุ่มเดียว ส่วนไถ่ถอนคือการปิดยอดและคืนการ์ด"
           />
           <PhaseCard
-            title="สถานะปิดสิทธิ์รับฝาก"
+            title="สถานะหมดสิทธิ์ไถ่ถอน"
             desc="ล็อกการ์ดที่เกินกำหนดและแสดงผลแยกชัดเจนในตาราง"
           />
         </div>

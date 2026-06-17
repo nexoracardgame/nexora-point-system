@@ -33,15 +33,20 @@ const CARD_DB_MAX_RESULTS = 50;
 
 const PAWN_LEDGER_SPREADSHEET_ID = "1r7tgannnDyOE052jBHk2OOZ23FhJR-5AlO_Tvsy56A4";
 const PAWN_LEDGER_SHEET_NAME = "";
+const PAWN_STANDARD_INTEREST_RATE = 5;
+const PAWN_STANDARD_MAINTENANCE_FEE_THB = 200;
 const PAWN_LEDGER_HEADER_ROW = [
   "วันที่รับฝาก",
   "ชื่อผู้ฝาก",
   "เบอร์ติดต่อ / LINE",
   "การ์ดที่รับฝาก",
   "จำนวน",
-  "เงินต้น (THB)",
+  "มูลค่าจริง (THB)",
+  "เงินต้น / ยอดรับฝาก (THB)",
   "ดอกเบี้ย / เดือน (%)",
   "ดอกเบี้ย / เดือน (THB)",
+  "ค่ารักษา (THB)",
+  "ยอดชำระจริง (THB)",
   "วันครบกำหนด",
   "สถานะ",
   "หมายเหตุ",
@@ -2293,6 +2298,9 @@ function pawnLedgerEnsureHeaderRow_(sheet) {
     currentHeaders = currentHeaders.concat(missing);
   }
 
+  sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+  currentHeaders = targetHeaders.slice();
+
   const finalSyncColumn =
     currentHeaders.map(normalizeHeaderKey).indexOf(normalizeHeaderKey(PAWN_LEDGER_SYNC_KEY_HEADER)) + 1;
   if (finalSyncColumn) {
@@ -2334,11 +2342,10 @@ function pawnLedgerNormalizeEntry_(raw) {
 
   const entry = raw;
   const principal = Math.max(0, pawnLedgerParseNumber_(entry.principalTHB ?? entry.principal_thb ?? 0));
-  const interestRate = Math.max(0, pawnLedgerParseNumber_(entry.monthlyInterestRate ?? entry.interestRate ?? 10));
-  const interestTHB = Math.max(
-    0,
-    pawnLedgerParseNumber_(entry.monthlyInterestTHB ?? Math.round(principal * (interestRate / 100)))
-  );
+  const interestRate = PAWN_STANDARD_INTEREST_RATE;
+  const interestTHB = Math.max(0, Math.round(principal * (interestRate / 100)));
+  const maintenanceFeeTHB = PAWN_STANDARD_MAINTENANCE_FEE_THB;
+  const totalDueTHB = interestTHB + maintenanceFeeTHB;
   const dueDays = Math.max(1, Math.floor(pawnLedgerParseNumber_(entry.dueDays ?? 30)) || 30);
   const updatedAt = sanitizeText(entry.updatedAt || new Date().toISOString());
   const dueDate =
@@ -2361,9 +2368,12 @@ function pawnLedgerNormalizeEntry_(raw) {
     borrowerContact: sanitizeText(entry.borrowerContact || ownerLineId),
     cardLabel: sanitizeText(entry.cardLabel || entry.cardName || "Pawned Card"),
     quantity: Math.max(1, Math.floor(pawnLedgerParseNumber_(entry.quantity || 1))),
+    collateralValueTHB: Math.max(0, pawnLedgerParseNumber_(entry.collateralValueTHB || entry.valueTHB || principal)),
     principalTHB: principal,
     monthlyInterestRate: interestRate,
     monthlyInterestTHB: interestTHB,
+    maintenanceFeeTHB,
+    totalDueTHB,
     dueDate,
     status,
     note: sanitizeText(entry.note || ""),
@@ -2379,9 +2389,12 @@ function pawnLedgerBuildRow_(entry) {
     entry.borrowerContact,
     entry.cardLabel,
     entry.quantity,
+    entry.collateralValueTHB,
     entry.principalTHB,
     entry.monthlyInterestRate,
     entry.monthlyInterestTHB,
+    entry.maintenanceFeeTHB,
+    entry.totalDueTHB,
     entry.dueDate,
     entry.status,
     entry.note,

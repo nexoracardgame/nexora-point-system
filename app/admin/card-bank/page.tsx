@@ -72,7 +72,7 @@ const adminModules = [
   },
   {
     title: "คำขอเข้ารับฝากการ์ด",
-    desc: "อนุมัติการย้ายการ์ดจากธนาคารไปโหมดรับฝาก คำนวณเงินสด ดอกเบี้ย 10% และวันครบกำหนดรายเดือนอัตโนมัติ",
+    desc: "อนุมัติการย้ายการ์ดจากธนาคารไปโหมดรับฝาก คำนวณเพดานรับยอด 80%, ดอกเบี้ย 5%, ค่ารักษา 200 บาท และวันครบกำหนดอัตโนมัติ",
     icon: Banknote,
   },
   {
@@ -104,7 +104,7 @@ const queues = [
     lane: "Pawn Desk",
     title: "คำขอรับฝากจากการ์ดที่อยู่ในธนาคาร",
     status: "ยังไม่มีคำขอ",
-    detail: "คิดดอก 10% ต่อเดือนจากมูลค่าการ์ด ครบกำหนดทุกเดือนตามวันที่เข้าโหมดรับฝาก",
+    detail: "รับยอดได้ไม่เกิน 80% ของมูลค่าจริง คิดดอก 5% จากเงินต้น และบวกค่ารักษา 200 บาทต่อรายการ",
   },
   {
     lane: "Forfeit Lock",
@@ -118,7 +118,7 @@ const schemaItems = [
   "CardBankAsset: เจ้าของ, เลขการ์ด, serial, รูปหลักฐาน, grade, vault slot, valueTHB, nexValue, coinValue, status",
   "CardBankMovement: deposit, edit, convert, withdraw, pawn_start, pawn_redeem, forfeit พร้อม before/after",
   "StorageBilling: เรทค่าฝาก, รอบบิล, วันครบกำหนด, สถานะชำระ, ใบเสร็จ",
-  "PawnLoan: assetId, principal, monthlyInterest 10%, startedAt, dueDate, lateDays, status",
+  "PawnLoan: assetId, principal, monthlyInterest 5%, maintenanceFee 200, startedAt, dueDate, lateDays, status",
   "PaymentLedger: แยก storage fee, pawn interest, penalty, wallet/NEX/COIN movement",
   "AdminAuditLog: staffId, role, reason, IP/device, snapshot ก่อนและหลังทุก action",
 ];
@@ -142,7 +142,7 @@ const auditLogRows = [
   {
     event: "Pawn Started",
     scope: "Pawn Desk",
-    detail: "assetId, มูลค่าหลักประกัน, ดอก 10%, dueDate, grace window, ผู้อนุมัติ",
+    detail: "assetId, มูลค่าหลักประกัน, เพดานรับยอด 80%, ดอก 5%, ค่ารักษา 200, dueDate, grace window, ผู้อนุมัติ",
   },
   {
     event: "Payment / Overdue",
@@ -237,7 +237,7 @@ export default async function AdminCardBankPage() {
               <div>
                 <h2 className="text-xl font-black text-red-50">กติกาห้ามพลาด</h2>
                 <p className="mt-2 text-sm leading-7 text-red-100/78">
-                  การ์ดที่ถูกแปลงเป็น NEX / COIN หรือปิดสิทธิ์รับฝากเกิน 7 วัน
+                  การ์ดที่ถูกแปลงเป็น NEX / COIN หรือหมดสิทธิ์ไถ่ถอนเกิน 7 วัน
                   ต้องถูกตัดสิทธิ์ไถ่ถอนถาวร และระบบต้องล็อกไม่ให้แอดมินเผลอย้ายกลับ
                 </p>
               </div>
@@ -248,7 +248,9 @@ export default async function AdminCardBankPage() {
             <h2 className="text-xl font-black">สูตรคำนวณระบบรับฝาก</h2>
             <div className="mt-4 space-y-3">
               <RuleLine label="ฐานมูลค่า" value="valueTHB ของการ์ด" />
-              <RuleLine label="ดอกเบี้ยรายเดือน" value="10%" />
+              <RuleLine label="ดอกเบี้ยรายเดือน" value="5%" />
+              <RuleLine label="เพดานรับยอด" value="ไม่เกิน 80% ของมูลค่าจริง" />
+              <RuleLine label="ค่ารักษา" value="200 บาทต่อรายการ" />
               <RuleLine label="ฟรีค่าปรับ" value="1-3 วันแรก" />
               <RuleLine label="ล่าช้าสูงสุด" value="ไม่เกิน 7 วัน" />
               <RuleLine label="เกิน 7 วัน" value="หลุดถาวร" danger />

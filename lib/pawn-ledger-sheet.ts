@@ -227,7 +227,7 @@ function parseDateValue(value: string) {
 
 function normalizeStatus(value: string) {
   const text = normalizeText(value).toLowerCase();
-  if (text.includes("หลุด") || text.includes("forfeit")) return "ปิดสิทธิ์รับฝาก";
+  if (text.includes("หมดสิทธิ์") || text.includes("หลุด") || text.includes("forfeit")) return "หมดสิทธิ์ไถ่ถอน";
   if (text.includes("ปิด") || text.includes("paid") || text.includes("redeem")) return "ปิดบัญชี";
   if (text.includes("ค้าง") || text.includes("overdue")) return "ค้างชำระ";
   if (text.includes("ครบ") || text.includes("due")) return "ครบกำหนด";

@@ -60,7 +60,7 @@ function parseNumber(value: unknown) {
 }
 
 function getSyncStatusLabel(status: string) {
-  if (status === "forfeited") return "ปิดสิทธิ์รับฝาก";
+  if (status === "forfeited") return "หมดสิทธิ์ไถ่ถอน";
   if (status === "withdrawn") return "ไถ่ถอนเรียบร้อย";
   if (status === "converted") return "ปิดบัญชี";
   return "กำลังใช้งาน";
@@ -121,7 +121,7 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
     status: getSyncStatusLabel(asset.status),
     note:
       cleanText(pawn?.note || "") ||
-      (asset.status === "forfeited" ? "ปิดสิทธิ์รับฝาก" : asset.status === "withdrawn" ? "ไถ่ถอนเรียบร้อย" : ""),
+      (asset.status === "forfeited" ? "หมดสิทธิ์ไถ่ถอน" : asset.status === "withdrawn" ? "ไถ่ถอนเรียบร้อย" : ""),
     staffName: cleanText(asset.createdByName) || "NEXORA Staff",
     updatedAt: cleanText(asset.updatedAt) || new Date().toISOString(),
   };

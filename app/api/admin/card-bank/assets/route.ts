@@ -199,7 +199,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : String(error || "");
     if (message.startsWith("principal_over_limit:")) {
       const limit = Number(message.split(":")[1] || 0);
-      return badRequest(`เงินต้นเกินเพดาน รับได้ไม่เกิน ${limit.toLocaleString("th-TH")} บาท`);
+      return badRequest(`เงินต้นเกินเพดาน รับยอดได้ไม่เกิน ${limit.toLocaleString("th-TH")} บาท`);
     }
     if (message === "invalid_collateral_value") {
       return badRequest("ยังไม่พบมูลค่าจริงของการ์ด กรุณารอข้อมูลการ์ดก่อนบันทึก");
