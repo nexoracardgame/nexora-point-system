@@ -163,14 +163,14 @@ export default function PawnLedgerTable({
   };
 
   return (
-    <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+    <section className="w-full rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">Live Table</div>
           <h2 className="mt-2 text-2xl font-black">ตารางรับฝากหลัก</h2>
           <div className="mt-2 text-sm text-white/50">แหล่งข้อมูล: {sourceLabel}</div>
         </div>
-        <div className="relative w-full sm:w-[360px]">
+        <div className="relative w-full sm:w-[420px] xl:w-[520px]">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/34" />
           <input
             value={query}
@@ -188,9 +188,10 @@ export default function PawnLedgerTable({
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-x-auto rounded-[22px] border border-white/10">
-        <div className="min-w-[1440px]">
-          <div className="grid grid-cols-[88px_180px_220px_280px_110px_150px_150px_170px_160px_220px_150px] bg-white/[0.045] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+      <div className="mt-5 overflow-hidden rounded-[22px] border border-white/10">
+        <div className="max-h-[calc(100vh-300px)] overflow-auto">
+          <div className="min-w-[1320px]">
+            <div className="sticky top-0 z-20 grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] bg-[#121216]/98 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38 backdrop-blur">
             <div>ลำดับ</div>
             <div>วันรับฝาก</div>
             <div>ชื่อผู้ฝาก</div>
@@ -212,7 +213,7 @@ export default function PawnLedgerTable({
               return (
                 <div
                   key={`${row.rowNumber}-${row.assetId}`}
-                  className={`grid grid-cols-[88px_180px_220px_280px_110px_150px_150px_170px_160px_220px_150px] items-start gap-0 border-t border-white/8 border-l-4 px-4 py-4 text-sm ${state.rowTone}`}
+                  className={`grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] items-start gap-0 border-t border-white/8 border-l-4 px-4 py-3 text-sm ${state.rowTone}`}
                 >
                   <div className="font-black text-white">{row.rowNumber.toLocaleString("th-TH")}</div>
                   <div className="space-y-1 text-white/72">
@@ -254,7 +255,7 @@ export default function PawnLedgerTable({
                     <button
                       type="button"
                       onClick={() => setOpenRowId(expanded ? "" : row.assetId)}
-                      className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-white/10 bg-black/35 px-3 text-xs font-black text-white/78 transition hover:border-white/24 hover:bg-black/55"
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-black/35 px-3 text-xs font-black text-white/78 transition hover:border-white/24 hover:bg-black/55"
                     >
                       <MoreVertical className="h-4 w-4" />
                       จัดการ
@@ -298,6 +299,7 @@ export default function PawnLedgerTable({
           )}
         </div>
       </div>
-    </section>
+    </div>
+  </section>
   );
 }
