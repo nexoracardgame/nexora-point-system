@@ -35,6 +35,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   PAWN_STANDARD_INTEREST_RATE,
   PAWN_STANDARD_MAINTENANCE_FEE_THB,
+  getPawnCollateralSummary,
+  resolvePawnPrincipalTHB,
 } from "@/lib/pawn-terms";
 
 type UserRow = {
@@ -129,18 +131,15 @@ function createDefaultPawnDraft(): PawnTermsDraft {
 }
 
 function normalizePawnDraft(draft: PawnTermsDraft, collateralValueTHB = 0): PawnTermsSnapshot {
-  const safeCollateralValueTHB = Math.max(0, Number(collateralValueTHB || 0));
-  const maxPrincipalTHB = Math.max(
-    0,
-    Math.floor(safeCollateralValueTHB * 0.8)
-  );
+  const collateralSummary = getPawnCollateralSummary(collateralValueTHB);
   const requestedPrincipalTHB = Math.max(0, Number(draft.principalTHB || 0));
+  const principalTHB = resolvePawnPrincipalTHB(requestedPrincipalTHB, collateralSummary.collateralValueTHB);
   return {
-    principalTHB: Math.min(requestedPrincipalTHB, maxPrincipalTHB || requestedPrincipalTHB),
+    principalTHB,
     interestRate: PAWN_STANDARD_INTEREST_RATE,
     maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
-    collateralValueTHB: safeCollateralValueTHB,
-    maxPrincipalTHB,
+    collateralValueTHB: collateralSummary.collateralValueTHB,
+    maxPrincipalTHB: collateralSummary.maxPrincipalTHB,
     dueDays: Math.max(1, Math.floor(Number(draft.dueDays || 30)) || 30),
     note: draft.note.trim() || null,
   };
@@ -164,16 +163,44 @@ function parseNexReward(reward: string, withFoilBonus: boolean) {
   return withFoilBonus ? Math.max(...amounts) : amounts[0];
 }
 
-function estimateCardCollateralValueTHB(card: {
-  singleCardNexValue?: number;
-  coinValue?: number;
-  rawReward?: string;
+function parseCardValueTHB(card: {
+  valueTHB?: unknown;
+  value_thb?: unknown;
+  valuationTHB?: unknown;
+  marketValueTHB?: unknown;
+  value?: unknown;
+  price?: unknown;
+  singleCardNexValue?: unknown;
+  coinValue?: unknown;
+  rawReward?: unknown;
+  cardNo?: string;
 }) {
+  const directFields = [
+    card.valueTHB,
+    card.value_thb,
+    card.valuationTHB,
+    card.marketValueTHB,
+    card.value,
+    card.price,
+  ]
+    .map((value) => Number(value || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (directFields.length > 0) {
+    return Math.round(directFields[0]);
+  }
+
+  const rawText = String(card.rawReward || card.value || card.price || "").trim();
+  const fromText = Number(rawText.replace(/[^\d.-]/g, ""));
+  if (Number.isFinite(fromText) && fromText > 0 && /thb|บาท|฿/i.test(rawText)) {
+    return Math.round(fromText);
+  }
+
   return Math.max(
     0,
     Number(card.singleCardNexValue || 0) +
       Number(card.coinValue || 0) +
-      parseNexReward(card.rawReward || "", false)
+      parseNexReward(String(card.rawReward || ""), false)
   );
 }
 
@@ -230,10 +257,17 @@ function resolveApiCard(data: Record<string, unknown>, fallbackCardNo: string): 
     rarity: String(nested.rarity || nested.value || nested.tier || "").trim() || undefined,
     reward: String(nested.reward || "").trim() || undefined,
     imageUrl,
-    estimatedValueTHB: estimateCardCollateralValueTHB({
+    estimatedValueTHB: parseCardValueTHB({
+      valueTHB: nested.valueTHB,
+      value_thb: nested.value_thb,
+      valuationTHB: nested.valuationTHB,
+      marketValueTHB: nested.marketValueTHB,
+      value: nested.value,
+      price: nested.price,
       singleCardNexValue: getNexoraSingleCardNexReward(cardNo)?.nexValue || 0,
       coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
       rawReward: String(nested.reward || nested.rewardText || nested.value || nested.rarity || "").trim(),
+      cardNo,
     }),
   };
 }
@@ -253,6 +287,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
   const [cardPreview, setCardPreview] = useState<CardPreview | null>(null);
   const [cardLoading, setCardLoading] = useState(false);
   const [cardError, setCardError] = useState("");
+  const [pawnDraftError, setPawnDraftError] = useState("");
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
   const [setModalOpen, setSetModalOpen] = useState(false);
   const [quantityInput, setQuantityInput] = useState("1");
@@ -303,11 +338,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       cardNo,
       cardName: `NEXORA Card No.${cardNo}`,
       imageUrl: `/cards/${cardNo}.jpg`,
-      estimatedValueTHB: estimateCardCollateralValueTHB({
-        singleCardNexValue: getNexoraSingleCardNexReward(cardNo)?.nexValue || 0,
-        coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
-        rawReward: "",
-      }),
+      estimatedValueTHB: 0,
     };
     setCardPreview(localPreview);
     setCardLoading(true);
@@ -353,6 +384,43 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     return () => window.clearTimeout(timer);
   }, [quantityModalOpen]);
 
+  const activeCollateralValueTHB = cardPreview?.estimatedValueTHB || 0;
+  const activeCollateralSummary = useMemo(
+    () => getPawnCollateralSummary(activeCollateralValueTHB),
+    [activeCollateralValueTHB]
+  );
+  const activePawnDraft = useMemo(
+    () => normalizePawnDraft(pawnDraft, activeCollateralValueTHB),
+    [pawnDraft, activeCollateralValueTHB]
+  );
+
+  useEffect(() => {
+    if (entryMode !== "pawn") {
+      setPawnDraftError("");
+      return;
+    }
+
+    if (!cardPreview || cardLoading || activeCollateralValueTHB <= 0) {
+      setPawnDraftError("");
+      return;
+    }
+
+    const requestedPrincipalTHB = Math.max(0, Number(pawnDraft.principalTHB || 0));
+    if (requestedPrincipalTHB > 0 && requestedPrincipalTHB > activeCollateralSummary.maxPrincipalTHB) {
+      setPawnDraftError(`ใบนี้รับยอดได้ไม่เกิน ${formatNumber(activeCollateralSummary.maxPrincipalTHB)} บาท`);
+      return;
+    }
+
+    setPawnDraftError("");
+  }, [
+    activeCollateralSummary.maxPrincipalTHB,
+    activeCollateralValueTHB,
+    cardLoading,
+    cardPreview,
+    entryMode,
+    pawnDraft.principalTHB,
+  ]);
+
   const selectedUsername = String(selectedUser?.username || "").trim().replace(/^@+/, "");
   const totalSpecificCards = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalSetCount = cardSetItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -382,6 +450,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
   const confirmQuantity = () => {
     if (!cardPreview) return;
+    if (entryMode === "pawn" && (pawnDraftError || activeCollateralValueTHB <= 0)) return;
     const quantity = Math.max(1, Math.floor(Number(quantityInput || 0)));
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -757,6 +826,20 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     placeholder="เช่น รับฝากจากลูกค้าประจำ"
                   />
                 </div>
+                <div className={`mt-3 rounded-[18px] border p-3 text-xs font-bold leading-6 ${
+                  pawnDraftError
+                    ? "border-red-300/20 bg-red-500/10 text-red-100"
+                    : "border-white/10 bg-black/18 text-white/62"
+                }`}>
+                  <div>มูลค่าจริง {formatNumber(activeCollateralValueTHB)} THB</div>
+                  <div>เงินต้นที่รับได้สูงสุด {formatNumber(activeCollateralSummary.maxPrincipalTHB)} THB</div>
+                  <div>เงินต้นที่จะบันทึก {formatNumber(activePawnDraft.principalTHB)} THB</div>
+                  <div>ดอกเบี้ยต่อเดือน {formatNumber(activePawnDraft.principalTHB * 0.05)} THB</div>
+                  <div>ยอดชำระจริง {formatNumber(activePawnDraft.principalTHB * 0.05 + 200)} THB</div>
+                  <div className={pawnDraftError ? "mt-1 text-red-100" : "mt-1 text-white/45"}>
+                    {pawnDraftError || "เว้นช่องเงินต้นว่าง = ระบบรับเต็มตามเพดาน 80% ทันที"}
+                  </div>
+                </div>
               </div>
             ) : null}
 
@@ -771,6 +854,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 cardPreview={cardPreview}
                 cardLoading={cardLoading}
                 cardError={cardError}
+                pawnDraftError={pawnDraftError}
+                collateralValueTHB={activeCollateralValueTHB}
                 onEnterCard={openQuantityModal}
               />
             ) : intakeMode === "sets" ? (
@@ -979,6 +1064,8 @@ function SpecificCardForm({
   cardPreview,
   cardLoading,
   cardError,
+  pawnDraftError,
+  collateralValueTHB,
   onEnterCard,
 }: {
   cardType: CardType;
@@ -990,6 +1077,8 @@ function SpecificCardForm({
   cardPreview: CardPreview | null;
   cardLoading: boolean;
   cardError: string;
+  pawnDraftError: string;
+  collateralValueTHB: number;
   onEnterCard: () => void;
 }) {
   const cardNo = cardPreview?.cardNo || normalizeCardNo(cardQuery);
@@ -1055,7 +1144,7 @@ function SpecificCardForm({
                     setCardError("");
                   }}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && cardPreview) {
+                    if (event.key === "Enter" && cardPreview && !cardLoading && collateralValueTHB > 0) {
                       event.preventDefault();
                       onEnterCard();
                     }
@@ -1068,7 +1157,7 @@ function SpecificCardForm({
                 <button
                   type="button"
                   onClick={onEnterCard}
-                  disabled={!cardPreview}
+                  disabled={!cardPreview || cardLoading || collateralValueTHB <= 0 || Boolean(pawnDraftError)}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-[18px] border border-amber-300/18 bg-amber-300/[0.08] px-4 text-sm font-black text-amber-100 transition hover:bg-amber-300/[0.12] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/28"
                 >
                   <PackagePlus className="h-4 w-4" />
@@ -1117,6 +1206,13 @@ function SpecificCardForm({
                   Syncing
                 </div>
               ) : null}
+              <div className="mt-3 space-y-1 rounded-[16px] border border-white/10 bg-white/[0.035] p-3 text-xs font-bold leading-6 text-white/64">
+                <div>มูลค่าจริง {formatNumber(collateralValueTHB)} THB</div>
+                <div>กู้ได้ไม่เกิน {formatNumber(getPawnCollateralSummary(collateralValueTHB).maxPrincipalTHB)} THB</div>
+                <div className={pawnDraftError ? "text-red-200" : "text-white/42"}>
+                  {pawnDraftError || "เว้นช่องเงินต้นว่าง = รับเต็มตามเพดาน"}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex aspect-[815/1110] items-center justify-center rounded-[18px] border border-dashed border-white/12 text-center text-sm font-bold leading-6 text-white/35">

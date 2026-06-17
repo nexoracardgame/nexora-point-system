@@ -51,3 +51,12 @@ export function getPawnCollateralSummary(collateralValueTHB: number): PawnCollat
     maxPrincipalTHB,
   };
 }
+
+export function resolvePawnPrincipalTHB(
+  principalTHB: number,
+  collateralValueTHB: number
+) {
+  const { maxPrincipalTHB } = getPawnCollateralSummary(collateralValueTHB);
+  const requestedPrincipalTHB = Math.max(0, toNumber(principalTHB));
+  return requestedPrincipalTHB > 0 ? requestedPrincipalTHB : maxPrincipalTHB;
+}

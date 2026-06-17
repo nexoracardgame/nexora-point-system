@@ -12,7 +12,7 @@ import { isStaffRole } from "@/lib/staff-auth";
 import {
   PAWN_STANDARD_INTEREST_RATE,
   PAWN_STANDARD_MAINTENANCE_FEE_THB,
-  PAWN_STANDARD_LOAN_TO_VALUE_RATIO,
+  getPawnCollateralSummary,
 } from "@/lib/pawn-terms";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,36 @@ function cleanNumber(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
-function clampPawnPrincipal(principalTHB: number, collateralValueTHB: number) {
-  const maxPrincipalTHB = Math.floor(Math.max(0, collateralValueTHB) * PAWN_STANDARD_LOAN_TO_VALUE_RATIO);
-  return Math.max(0, Math.min(Math.floor(principalTHB), maxPrincipalTHB));
+function normalizePawnPayload(rawPawn: Record<string, unknown> | undefined, fallbackCollateralValueTHB = 0) {
+  if (!rawPawn || rawPawn.principalTHB === undefined) return null;
+
+  const collateralValueTHB = Math.max(
+    0,
+    cleanNumber(rawPawn.collateralValueTHB || fallbackCollateralValueTHB)
+  );
+  const collateralSummary = getPawnCollateralSummary(collateralValueTHB);
+  const requestedPrincipalTHB = Math.max(0, cleanNumber(rawPawn.principalTHB));
+  const principalTHB =
+    requestedPrincipalTHB > 0 ? requestedPrincipalTHB : collateralSummary.maxPrincipalTHB;
+
+  if (collateralSummary.maxPrincipalTHB <= 0) {
+    throw new Error("invalid_collateral_value");
+  }
+
+  if (principalTHB > collateralSummary.maxPrincipalTHB) {
+    throw new Error(
+      `principal_over_limit:${collateralSummary.maxPrincipalTHB}`
+    );
+  }
+
+  return {
+    principalTHB,
+    interestRate: PAWN_STANDARD_INTEREST_RATE,
+    maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+    collateralValueTHB: collateralSummary.collateralValueTHB,
+    dueDays: Math.max(1, Math.floor(cleanNumber(rawPawn.dueDays || 30)) || 30),
+    note: cleanText(rawPawn.note) || null,
+  };
 }
 
 function cleanQuantity(value: unknown) {
@@ -69,21 +96,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = asObject(await request.json().catch(() => ({})));
-  const owner = asObject(body.owner);
-  const ownerId = cleanText(owner.id);
-  const ownerName = cleanText(owner.name) || "NEXORA Customer";
-  const entryMode = normalizeEntryMode(body.entryMode);
-  const intakeMode = normalizeIntakeMode(body.intakeMode);
+  try {
+    const body = asObject(await request.json().catch(() => ({})));
+    const owner = asObject(body.owner);
+    const ownerId = cleanText(owner.id);
+    const ownerName = cleanText(owner.name) || "NEXORA Customer";
+    const entryMode = normalizeEntryMode(body.entryMode);
+    const intakeMode = normalizeIntakeMode(body.intakeMode);
 
-  if (!ownerId) return badRequest("Missing owner id");
-  if (!entryMode) return badRequest("Invalid entry mode");
-  if (!intakeMode) return badRequest("Invalid intake mode");
+    if (!ownerId) return badRequest("Missing owner id");
+    if (!entryMode) return badRequest("Invalid entry mode");
+    if (!intakeMode) return badRequest("Invalid intake mode");
 
-  const items = Array.isArray(body.items)
-    ? body.items
-        .map((item) => asObject(item))
-        .map((item) => ({
+    const items = Array.isArray(body.items)
+      ? body.items
+          .map((item) => asObject(item))
+          .map((item) => ({
           cardNo: cleanText(item.cardNo).replace(/\D/g, "").padStart(3, "0").slice(-3),
           cardName: cleanText(item.cardName),
           cardType: cleanText(item.cardType).toLowerCase() === "foil" ? ("foil" as const) : ("normal" as const),
@@ -91,23 +119,15 @@ export async function POST(request: Request) {
           assetTier: cleanText(item.assetTier),
           quantity: cleanQuantity(item.quantity),
           imageUrl: cleanText(item.imageUrl) || null,
-          pawn: asObject(item.pawn).principalTHB !== undefined
-            ? {
-                principalTHB: Math.max(0, cleanNumber(asObject(item.pawn).principalTHB)),
-                interestRate: PAWN_STANDARD_INTEREST_RATE,
-                maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
-                dueDays: Math.max(1, Math.floor(cleanNumber(asObject(item.pawn).dueDays || 30)) || 30),
-                note: cleanText(asObject(item.pawn).note) || null,
-              }
-            : undefined,
-        }))
-        .filter((item) => item.cardNo && item.cardName)
-    : [];
+          pawn: normalizePawnPayload(asObject(item.pawn)) || undefined,
+          }))
+          .filter((item) => item.cardNo && item.cardName)
+      : [];
 
-  const setItems = Array.isArray(body.setItems)
-    ? body.setItems
-        .map((item) => asObject(item))
-        .map((item) => ({
+    const setItems = Array.isArray(body.setItems)
+      ? body.setItems
+          .map((item) => asObject(item))
+          .map((item) => ({
           setId: cleanText(item.setId),
           order: Math.floor(cleanNumber(item.order)),
           setName: cleanText(item.setName),
@@ -116,95 +136,80 @@ export async function POST(request: Request) {
           reward: cleanText(item.reward),
           withFoilBonus: Boolean(item.withFoilBonus),
           cardTotal: Math.floor(cleanNumber(item.cardTotal)),
-          pawn: asObject(item.pawn).principalTHB !== undefined
-            ? {
-                principalTHB: Math.max(0, cleanNumber(asObject(item.pawn).principalTHB)),
-                interestRate: PAWN_STANDARD_INTEREST_RATE,
-                maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
-                dueDays: Math.max(1, Math.floor(cleanNumber(asObject(item.pawn).dueDays || 30)) || 30),
-                note: cleanText(asObject(item.pawn).note) || null,
-              }
-            : undefined,
-        }))
-        .filter((item) => item.setId && item.setName)
-    : [];
+          pawn: normalizePawnPayload(asObject(item.pawn)) || undefined,
+          }))
+          .filter((item) => item.setId && item.setName)
+      : [];
 
-  const bulkObject = asObject(body.bulk);
-  const bulk = {
-    nexValue: cleanNumber(bulkObject.nexValue),
-    coinValue: Math.floor(cleanNumber(bulkObject.coinValue)),
-    category: cleanText(bulkObject.category) || "pure",
-    pawn: asObject(bulkObject.pawn).principalTHB !== undefined
-      ? {
-          principalTHB: Math.max(0, cleanNumber(asObject(bulkObject.pawn).principalTHB)),
-          interestRate: PAWN_STANDARD_INTEREST_RATE,
-          maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
-          collateralValueTHB: Math.max(0, cleanNumber(asObject(bulkObject.pawn).collateralValueTHB || cleanNumber(bulkObject.nexValue) + cleanNumber(bulkObject.coinValue))),
-          dueDays: Math.max(1, Math.floor(cleanNumber(asObject(bulkObject.pawn).dueDays || 30)) || 30),
-          note: cleanText(asObject(bulkObject.pawn).note) || null,
-        }
-      : undefined,
-  };
-  const pawnObject = asObject(body.pawn);
-  const pawn =
-    entryMode === "pawn"
-      ? {
-          principalTHB: Math.max(0, cleanNumber(pawnObject.principalTHB)),
-          interestRate: PAWN_STANDARD_INTEREST_RATE,
-          maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
-          collateralValueTHB: Math.max(0, cleanNumber(pawnObject.collateralValueTHB || cleanNumber(pawnObject.principalTHB) / PAWN_STANDARD_LOAN_TO_VALUE_RATIO)),
-          dueDays: Math.max(1, Math.floor(cleanNumber(pawnObject.dueDays || 30)) || 30),
-          note: cleanText(pawnObject.note) || null,
-      }
-      : undefined;
+    const bulkObject = asObject(body.bulk);
+    const bulk = {
+      nexValue: cleanNumber(bulkObject.nexValue),
+      coinValue: Math.floor(cleanNumber(bulkObject.coinValue)),
+      category: cleanText(bulkObject.category) || "pure",
+      pawn: normalizePawnPayload(
+        asObject(bulkObject.pawn),
+        cleanNumber(bulkObject.nexValue) + cleanNumber(bulkObject.coinValue)
+      ) || undefined,
+    };
+    const pawn = undefined;
 
-  if (pawn) {
-    pawn.principalTHB = clampPawnPrincipal(pawn.principalTHB, pawn.collateralValueTHB);
+    if (intakeMode === "specific" && items.length === 0) {
+      return badRequest("Specific intake requires at least one card");
+    }
+    if (intakeMode === "sets" && setItems.length === 0) {
+      return badRequest("Set intake requires at least one set");
+    }
+    if (intakeMode === "bulk" && bulk.nexValue <= 0 && bulk.coinValue <= 0) {
+      return badRequest("Bulk intake requires NEX or COIN value");
+    }
+
+    const assets = await createCardBankEntries({
+      owner: {
+        id: ownerId,
+        lineId: cleanText(owner.lineId) || null,
+        name: ownerName,
+      },
+      entryMode,
+      intakeMode,
+      items,
+      setItems,
+      bulk,
+      pawn,
+      actor: {
+        id: sessionUser.id,
+        name: cleanText(sessionUser.name) || cleanText(sessionUser.lineId) || "NEXORA Staff",
+      },
+    });
+
+    revalidatePath("/admin/card-bank");
+    revalidatePath("/admin/card-bank/pawn");
+    revalidatePath("/admin/card-bank/create");
+    revalidatePath("/card-bank");
+    publishCardBankEvent({
+      ownerId,
+      action: "deposit",
+    });
+
+    return NextResponse.json({
+      ok: true,
+      createdCount: assets.length,
+      assets,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    if (message.startsWith("principal_over_limit:")) {
+      const limit = Number(message.split(":")[1] || 0);
+      return badRequest(`เงินต้นเกินเพดาน รับได้ไม่เกิน ${limit.toLocaleString("th-TH")} บาท`);
+    }
+    if (message === "invalid_collateral_value") {
+      return badRequest("ยังไม่พบมูลค่าจริงของการ์ด กรุณารอข้อมูลการ์ดก่อนบันทึก");
+    }
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message || "sync_failed",
+      },
+      { status: 400 }
+    );
   }
-  if (bulk.pawn) {
-    bulk.pawn.principalTHB = clampPawnPrincipal(bulk.pawn.principalTHB, bulk.pawn.collateralValueTHB);
-  }
-
-  if (intakeMode === "specific" && items.length === 0) {
-    return badRequest("Specific intake requires at least one card");
-  }
-  if (intakeMode === "sets" && setItems.length === 0) {
-    return badRequest("Set intake requires at least one set");
-  }
-  if (intakeMode === "bulk" && bulk.nexValue <= 0 && bulk.coinValue <= 0) {
-    return badRequest("Bulk intake requires NEX or COIN value");
-  }
-
-  const assets = await createCardBankEntries({
-    owner: {
-      id: ownerId,
-      lineId: cleanText(owner.lineId) || null,
-      name: ownerName,
-    },
-    entryMode,
-    intakeMode,
-    items,
-    setItems,
-    bulk,
-    pawn,
-    actor: {
-      id: sessionUser.id,
-      name: cleanText(sessionUser.name) || cleanText(sessionUser.lineId) || "NEXORA Staff",
-    },
-  });
-
-  revalidatePath("/admin/card-bank");
-  revalidatePath("/admin/card-bank/pawn");
-  revalidatePath("/admin/card-bank/create");
-  revalidatePath("/card-bank");
-  publishCardBankEvent({
-    ownerId,
-    action: "deposit",
-  });
-
-  return NextResponse.json({
-    ok: true,
-    createdCount: assets.length,
-    assets,
-  });
 }
