@@ -2706,6 +2706,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (!Array.isArray(payload.rooms)) return [];
     const nextRooms = normalizeApiRooms(payload.rooms);
     const activeCode = activeRoomCodeRef.current;
+    const snapshotCode = activeRoomSnapshotRef.current?.code || "";
+    const knownActiveCode = activeCode || snapshotCode;
     const reconnectRoom = !activeCode ? nextRooms.find((room) => participantInRoom(room, participant.id)) : null;
     if (reconnectRoom) {
       activeRoomCodeRef.current = reconnectRoom.code;
@@ -2715,7 +2717,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase(reconnectRoom.status === "playing" ? phaseForPlayingRoom(reconnectRoom, participant.id) || "battle" : "room");
       setLobbyMessage("");
     }
-    if (activeCode && !nextRooms.some((room) => room.code === activeCode)) {
+    if (knownActiveCode && !nextRooms.some((room) => room.code === knownActiveCode)) {
       activeRoomCodeRef.current = "";
       activeRoomSnapshotRef.current = null;
       setActiveRoomCode("");
