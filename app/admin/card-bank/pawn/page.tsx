@@ -37,6 +37,7 @@ const fallbackEntries: PawnLedgerEntry[] = [
     borrowerContact: "LINE: sample-user",
     cardLabel: "Blue-Eyes White Dragon x1",
     cardCount: 1,
+    collateralValueTHB: 12000,
     principalTHB: 12000,
     monthlyInterestRate: PAWN_STANDARD_INTEREST_RATE,
     monthlyInterestTHB: 600,
@@ -59,6 +60,7 @@ const fallbackEntries: PawnLedgerEntry[] = [
     borrowerContact: "089-123-4567",
     cardLabel: "Set Bundle - Foil Pack",
     cardCount: 3,
+    collateralValueTHB: 28000,
     principalTHB: 28000,
     monthlyInterestRate: PAWN_STANDARD_INTEREST_RATE,
     monthlyInterestTHB: 1400,
@@ -208,7 +210,7 @@ function pawnAssetToLedgerEntry(asset: CardBankAsset, index: number): PawnLedger
   const pawn = getPawnSource(asset);
   const principalTHB = Math.max(
     0,
-    parseNumber(pawn?.principalTHB ?? asset.valueTHB ?? 0)
+    parseNumber(pawn?.principalTHB ?? Math.round(parseNumber(asset.valueTHB || 0) * 0.8))
   );
   const billing = getPawnChargeSummary(
     principalTHB,
@@ -229,6 +231,10 @@ function pawnAssetToLedgerEntry(asset: CardBankAsset, index: number): PawnLedger
     borrowerContact: asset.ownerLineId ? `LINE: ${asset.ownerLineId}` : "",
     cardLabel: getAssetCardLabel(asset),
     cardCount: Math.max(1, Math.floor(asset.quantity || 1)),
+    collateralValueTHB: Math.max(
+      0,
+      parseNumber((pawn?.collateralValueTHB ?? asset.valueTHB) || 0)
+    ),
     principalTHB,
     monthlyInterestRate: billing.interestRate,
     monthlyInterestTHB: billing.monthlyInterestTHB,

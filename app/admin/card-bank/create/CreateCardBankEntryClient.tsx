@@ -26,6 +26,10 @@ import {
   nexoraCollectionSets,
   type NexoraCollectionSet,
 } from "@/lib/nexora-collection-sets";
+import {
+  getNexoraCoinReward,
+  getNexoraSingleCardNexReward,
+} from "@/lib/nexora-card-rewards";
 import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -51,6 +55,7 @@ type CardPreview = {
   rarity?: string;
   reward?: string;
   imageUrl: string;
+  estimatedValueTHB: number;
 };
 
 type DepositItem = {
@@ -89,6 +94,8 @@ type PawnTermsSnapshot = {
   principalTHB: number;
   interestRate: number;
   maintenanceFeeTHB: number;
+  collateralValueTHB: number;
+  maxPrincipalTHB: number;
   dueDays: number;
   note: string | null;
 };
@@ -121,11 +128,19 @@ function createDefaultPawnDraft(): PawnTermsDraft {
   };
 }
 
-function normalizePawnDraft(draft: PawnTermsDraft): PawnTermsSnapshot {
+function normalizePawnDraft(draft: PawnTermsDraft, collateralValueTHB = 0): PawnTermsSnapshot {
+  const safeCollateralValueTHB = Math.max(0, Number(collateralValueTHB || 0));
+  const maxPrincipalTHB = Math.max(
+    0,
+    Math.floor(safeCollateralValueTHB * 0.8)
+  );
+  const requestedPrincipalTHB = Math.max(0, Number(draft.principalTHB || 0));
   return {
-    principalTHB: Math.max(0, Number(draft.principalTHB || 0)),
+    principalTHB: Math.min(requestedPrincipalTHB, maxPrincipalTHB || requestedPrincipalTHB),
     interestRate: PAWN_STANDARD_INTEREST_RATE,
     maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+    collateralValueTHB: safeCollateralValueTHB,
+    maxPrincipalTHB,
     dueDays: Math.max(1, Math.floor(Number(draft.dueDays || 30)) || 30),
     note: draft.note.trim() || null,
   };
@@ -147,6 +162,19 @@ function parseNexReward(reward: string, withFoilBonus: boolean) {
 
   if (amounts.length === 0) return 0;
   return withFoilBonus ? Math.max(...amounts) : amounts[0];
+}
+
+function estimateCardCollateralValueTHB(card: {
+  singleCardNexValue?: number;
+  coinValue?: number;
+  rawReward?: string;
+}) {
+  return Math.max(
+    0,
+    Number(card.singleCardNexValue || 0) +
+      Number(card.coinValue || 0) +
+      parseNexReward(card.rawReward || "", false)
+  );
 }
 
 function hasFoilBonusOption(set: NexoraCollectionSet) {
@@ -202,6 +230,11 @@ function resolveApiCard(data: Record<string, unknown>, fallbackCardNo: string): 
     rarity: String(nested.rarity || nested.value || nested.tier || "").trim() || undefined,
     reward: String(nested.reward || "").trim() || undefined,
     imageUrl,
+    estimatedValueTHB: estimateCardCollateralValueTHB({
+      singleCardNexValue: getNexoraSingleCardNexReward(cardNo)?.nexValue || 0,
+      coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
+      rawReward: String(nested.reward || nested.rewardText || nested.value || nested.rarity || "").trim(),
+    }),
   };
 }
 
@@ -270,6 +303,11 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       cardNo,
       cardName: `NEXORA Card No.${cardNo}`,
       imageUrl: `/cards/${cardNo}.jpg`,
+      estimatedValueTHB: estimateCardCollateralValueTHB({
+        singleCardNexValue: getNexoraSingleCardNexReward(cardNo)?.nexValue || 0,
+        coinValue: getNexoraCoinReward(cardNo)?.coinValue || 0,
+        rawReward: "",
+      }),
     };
     setCardPreview(localPreview);
     setCardLoading(true);
@@ -352,6 +390,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
 
     const safeCardType = isForcedFoilCard(cardPreview.cardNo) ? "foil" : cardType;
     const itemId = `${cardPreview.cardNo}-${safeCardType}-${Date.now()}`;
+    const collateralValueTHB = cardPreview.estimatedValueTHB * quantity;
     setItems((current) => [
       ...current,
       {
@@ -362,7 +401,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         rarity: cardPreview.rarity || normalizeAssetTier(cardPreview.cardName),
         quantity,
         imageUrl: cardPreview.imageUrl,
-        pawn: entryMode === "pawn" ? normalizePawnDraft(pawnDraft) : null,
+        pawn: entryMode === "pawn" ? normalizePawnDraft(pawnDraft, collateralValueTHB) : null,
       },
     ]);
     setQuantityModalOpen(false);
@@ -385,6 +424,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
       1,
       Math.floor(Number(receivedNexValue || baseNexValue))
     );
+    const collateralValueTHB = baseNexValue * safeQuantity;
 
     setCardSetItems((current) => [
       ...current,
@@ -399,7 +439,10 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
         reward: set.reward,
         withFoilBonus,
         cardTotal: set.officialTotal || getCollectionCardIds(set).length,
-        pawn: pawn || null,
+        pawn:
+          entryMode === "pawn"
+            ? pawn ?? normalizePawnDraft(pawnDraft, collateralValueTHB)
+            : pawn || null,
       },
     ]);
   };
@@ -430,6 +473,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
     setSaving(true);
 
     try {
+      const bulkCollateralValueTHB = Number(bulkNex || 0) + Number(bulkCoin || 0);
       const response = await fetch("/api/admin/card-bank/assets", {
         method: "POST",
         headers: {
@@ -449,6 +493,10 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
             nexValue: Number(bulkNex || 0),
             coinValue: Number(bulkCoin || 0),
             category: bulkCategory,
+            pawn:
+              entryMode === "pawn"
+                ? normalizePawnDraft(pawnDraft, bulkCollateralValueTHB)
+                : undefined,
           },
           pawn: undefined,
         }),
@@ -608,7 +656,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                 <ModeButton
                   active={entryMode === "pawn"}
                   title="รับฝากการ์ด"
-                  desc="รับฝากพร้อมเงื่อนไขเงินต้นและดอก 10% รายเดือน"
+                  desc="รับฝากพร้อมเงื่อนไขเงินต้น 80% ของมูลค่าจริง ดอก 5% รายเดือน"
                   icon={Banknote}
                   onClick={() => setEntryMode("pawn")}
                 />
@@ -640,7 +688,7 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                   </h2>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-black text-white/55">
-                  {entryMode === "pawn" ? "ดอก 10% / เดือน" : "ค่าฝากรายเดือน"}
+                  {entryMode === "pawn" ? "ดอก 5% / เดือน + ค่ารักษา 200" : "ค่าฝากรายเดือน"}
                 </div>
               </div>
 
@@ -692,7 +740,8 @@ export default function CreateCardBankEntryClient({ users }: { users: UserRow[] 
                     value={pawnDraft.interestRate}
                     onChange={(value) => setPawnDraft((current) => ({ ...current, interestRate: value }))}
                     inputMode="decimal"
-                    placeholder="10"
+                    placeholder="5"
+                    readOnly
                   />
                   <LabeledInput
                     label="ครบกำหนด (วัน)"
@@ -826,12 +875,14 @@ function LabeledInput({
   onChange,
   placeholder,
   inputMode,
+  readOnly,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  readOnly?: boolean;
 }) {
   return (
     <label className="block">
@@ -843,6 +894,7 @@ function LabeledInput({
         onChange={(event) => onChange(event.target.value)}
         inputMode={inputMode}
         placeholder={placeholder}
+        readOnly={readOnly}
         className="h-11 w-full rounded-[16px] border border-white/10 bg-black/30 px-3 text-sm font-bold text-white outline-none placeholder:text-white/30 focus:border-white/30"
       />
     </label>
@@ -1345,6 +1397,8 @@ function SpecificSummary({
             {item.pawn ? (
               <div className="mt-2 space-y-1 text-xs font-bold leading-5 text-amber-100/78">
                 <div>เงินต้น {formatNumber(item.pawn.principalTHB)} THB</div>
+                <div>มูลค่าเต็ม {formatNumber(item.pawn.collateralValueTHB)} THB</div>
+                <div>กู้ได้สูงสุด {formatNumber(item.pawn.maxPrincipalTHB)} THB</div>
                 <div>ดอกเบี้ย {formatNumber(item.pawn.interestRate)}% / เดือน</div>
                 <div>ครบกำหนด {formatNumber(item.pawn.dueDays)} วัน</div>
                 {item.pawn.note ? <div>หมายเหตุ {item.pawn.note}</div> : null}
@@ -1413,6 +1467,8 @@ function CardSetSummary({
               {item.pawn ? (
                 <div className="mt-3 space-y-1 rounded-[16px] border border-amber-200/14 bg-amber-300/[0.06] p-3 text-xs font-bold leading-5 text-amber-50/84">
                   <div>เงินต้น {formatNumber(item.pawn.principalTHB)} THB</div>
+                  <div>มูลค่าเต็ม {formatNumber(item.pawn.collateralValueTHB)} THB</div>
+                  <div>กู้ได้สูงสุด {formatNumber(item.pawn.maxPrincipalTHB)} THB</div>
                   <div>ดอกเบี้ย {formatNumber(item.pawn.interestRate)}% / เดือน</div>
                   <div>ครบกำหนด {formatNumber(item.pawn.dueDays)} วัน</div>
                   {item.pawn.note ? <div>หมายเหตุ {item.pawn.note}</div> : null}
@@ -1612,12 +1668,14 @@ function CardSetModal({
                             Number.isFinite(parsedReceived) && parsedReceived > 0
                               ? Math.min(parsedReceived, activeValue || parsedReceived)
                               : activeValue;
+                          const setQuantity = Number(quantityValue || 1);
+                          const collateralValueTHB = activeValue * setQuantity;
                           onAddSet(
                             set,
-                            Number(quantityValue || 1),
+                            setQuantity,
                             withFoilBonus,
                             finalReceived,
-                            capturePawnTerms ? normalizePawnDraft(pawnDraft) : undefined
+                            capturePawnTerms ? normalizePawnDraft(pawnDraft, collateralValueTHB) : undefined
                           );
                           onResetPawnDraft();
                           setQuantityBySet((current) => ({

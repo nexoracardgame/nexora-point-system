@@ -71,6 +71,7 @@ export type CreateCardBankEntriesInput = {
       principalTHB: number;
       interestRate: number;
       maintenanceFeeTHB?: number;
+      collateralValueTHB?: number;
       dueDays: number;
       note?: string | null;
     } | null;
@@ -88,6 +89,7 @@ export type CreateCardBankEntriesInput = {
       principalTHB: number;
       interestRate: number;
       maintenanceFeeTHB?: number;
+      collateralValueTHB?: number;
       dueDays: number;
       note?: string | null;
     } | null;
@@ -96,11 +98,20 @@ export type CreateCardBankEntriesInput = {
     nexValue: number;
     coinValue: number;
     category?: string | null;
+    pawn?: {
+      principalTHB: number;
+      interestRate: number;
+      maintenanceFeeTHB?: number;
+      collateralValueTHB?: number;
+      dueDays: number;
+      note?: string | null;
+    } | null;
   };
   pawn?: {
     principalTHB: number;
     interestRate: number;
     maintenanceFeeTHB?: number;
+    collateralValueTHB?: number;
     dueDays: number;
     note?: string | null;
   };
@@ -402,6 +413,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
           principalTHB: Math.max(0, toNumber(input.pawn?.principalTHB || 0)),
           interestRate: PAWN_STANDARD_INTEREST_RATE,
           maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+          collateralValueTHB: Math.max(0, toNumber(input.pawn?.collateralValueTHB || input.pawn?.principalTHB || 0)),
           dueDays: Math.max(1, Math.floor(toNumber(input.pawn?.dueDays || 30)) || 30),
           note: input.pawn?.note || null,
         }
@@ -440,7 +452,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
         setOrder: Math.floor(Number(item.order || 0)),
         setCardTotal: Math.floor(Number(item.cardTotal || 0)),
         withFoilBonus: Boolean(item.withFoilBonus),
-        valueTHB: Number(pawn?.principalTHB || 0),
+        valueTHB: Number(pawn?.collateralValueTHB || pawn?.principalTHB || 0),
         nexValue: Number(item.nexValue || 0),
         coinValue: 0,
         sourcePayload: {
@@ -467,12 +479,12 @@ function buildAssets(input: CreateCardBankEntriesInput) {
         setOrder: null,
         setCardTotal: null,
         withFoilBonus: false,
-        valueTHB: pawnSource?.principalTHB ? Number(pawnSource.principalTHB || 0) : 0,
+        valueTHB: Number(input.bulk?.pawn?.collateralValueTHB || input.bulk?.pawn?.principalTHB || pawnSource?.collateralValueTHB || pawnSource?.principalTHB || 0),
         nexValue: Number(input.bulk?.nexValue || 0),
         coinValue: Math.floor(Number(input.bulk?.coinValue || 0)),
         sourcePayload: {
           ...(input.bulk || {}),
-          pawn: standardizedPawnSource || pawnSource,
+          pawn: input.bulk?.pawn || standardizedPawnSource || pawnSource,
         },
       },
     ];
@@ -498,7 +510,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
       setOrder: null,
       setCardTotal: null,
       withFoilBonus: item.cardType === "foil",
-      valueTHB: Number(pawn?.principalTHB || 0),
+      valueTHB: Number(pawn?.collateralValueTHB || pawn?.principalTHB || 0),
       nexValue: 0,
       coinValue: 0,
       sourcePayload: {

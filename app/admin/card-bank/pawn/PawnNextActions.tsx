@@ -24,7 +24,7 @@ function getPawnPaymentAmount(asset: CardBankAsset) {
     source && typeof source === "object" && "pawn" in source && typeof source.pawn === "object"
       ? (source.pawn as Record<string, unknown>)
       : {};
-  const billing = getPawnChargeSummary(Number(pawn.principalTHB || asset.valueTHB || 0));
+  const billing = getPawnChargeSummary(Number(pawn.principalTHB || 0));
   return billing.totalDueTHB;
 }
 

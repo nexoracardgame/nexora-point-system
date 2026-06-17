@@ -12,6 +12,7 @@ import { isStaffRole } from "@/lib/staff-auth";
 import {
   PAWN_STANDARD_INTEREST_RATE,
   PAWN_STANDARD_MAINTENANCE_FEE_THB,
+  PAWN_STANDARD_LOAN_TO_VALUE_RATIO,
 } from "@/lib/pawn-terms";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,11 @@ function cleanText(value: unknown) {
 function cleanNumber(value: unknown) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? number : 0;
+}
+
+function clampPawnPrincipal(principalTHB: number, collateralValueTHB: number) {
+  const maxPrincipalTHB = Math.floor(Math.max(0, collateralValueTHB) * PAWN_STANDARD_LOAN_TO_VALUE_RATIO);
+  return Math.max(0, Math.min(Math.floor(principalTHB), maxPrincipalTHB));
 }
 
 function cleanQuantity(value: unknown) {
@@ -128,6 +134,16 @@ export async function POST(request: Request) {
     nexValue: cleanNumber(bulkObject.nexValue),
     coinValue: Math.floor(cleanNumber(bulkObject.coinValue)),
     category: cleanText(bulkObject.category) || "pure",
+    pawn: asObject(bulkObject.pawn).principalTHB !== undefined
+      ? {
+          principalTHB: Math.max(0, cleanNumber(asObject(bulkObject.pawn).principalTHB)),
+          interestRate: PAWN_STANDARD_INTEREST_RATE,
+          maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+          collateralValueTHB: Math.max(0, cleanNumber(asObject(bulkObject.pawn).collateralValueTHB || cleanNumber(bulkObject.nexValue) + cleanNumber(bulkObject.coinValue))),
+          dueDays: Math.max(1, Math.floor(cleanNumber(asObject(bulkObject.pawn).dueDays || 30)) || 30),
+          note: cleanText(asObject(bulkObject.pawn).note) || null,
+        }
+      : undefined,
   };
   const pawnObject = asObject(body.pawn);
   const pawn =
@@ -136,10 +152,18 @@ export async function POST(request: Request) {
           principalTHB: Math.max(0, cleanNumber(pawnObject.principalTHB)),
           interestRate: PAWN_STANDARD_INTEREST_RATE,
           maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+          collateralValueTHB: Math.max(0, cleanNumber(pawnObject.collateralValueTHB || cleanNumber(pawnObject.principalTHB) / PAWN_STANDARD_LOAN_TO_VALUE_RATIO)),
           dueDays: Math.max(1, Math.floor(cleanNumber(pawnObject.dueDays || 30)) || 30),
           note: cleanText(pawnObject.note) || null,
-        }
+      }
       : undefined;
+
+  if (pawn) {
+    pawn.principalTHB = clampPawnPrincipal(pawn.principalTHB, pawn.collateralValueTHB);
+  }
+  if (bulk.pawn) {
+    bulk.pawn.principalTHB = clampPawnPrincipal(bulk.pawn.principalTHB, bulk.pawn.collateralValueTHB);
+  }
 
   if (intakeMode === "specific" && items.length === 0) {
     return badRequest("Specific intake requires at least one card");

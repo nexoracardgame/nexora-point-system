@@ -1,5 +1,6 @@
 export const PAWN_STANDARD_INTEREST_RATE = 5;
 export const PAWN_STANDARD_MAINTENANCE_FEE_THB = 200;
+export const PAWN_STANDARD_LOAN_TO_VALUE_RATIO = 0.8;
 
 export type PawnChargeSummary = {
   principalTHB: number;
@@ -7,6 +8,11 @@ export type PawnChargeSummary = {
   monthlyInterestTHB: number;
   maintenanceFeeTHB: number;
   totalDueTHB: number;
+};
+
+export type PawnCollateralSummary = {
+  collateralValueTHB: number;
+  maxPrincipalTHB: number;
 };
 
 function toNumber(value: unknown) {
@@ -30,5 +36,18 @@ export function getPawnChargeSummary(
     monthlyInterestTHB,
     maintenanceFeeTHB: safeMaintenanceFee,
     totalDueTHB: monthlyInterestTHB + safeMaintenanceFee,
+  };
+}
+
+export function getPawnCollateralSummary(collateralValueTHB: number): PawnCollateralSummary {
+  const safeCollateral = Math.max(0, toNumber(collateralValueTHB));
+  const maxPrincipalTHB = Math.max(
+    0,
+    Math.floor(safeCollateral * PAWN_STANDARD_LOAN_TO_VALUE_RATIO)
+  );
+
+  return {
+    collateralValueTHB: safeCollateral,
+    maxPrincipalTHB,
   };
 }

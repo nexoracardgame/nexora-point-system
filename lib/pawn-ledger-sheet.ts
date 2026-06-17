@@ -18,6 +18,7 @@ export type PawnLedgerEntry = {
   borrowerContact: string;
   cardLabel: string;
   cardCount: number;
+  collateralValueTHB: number;
   principalTHB: number;
   monthlyInterestRate: number;
   monthlyInterestTHB: number;
@@ -45,6 +46,7 @@ const HEADER_ALIASES = {
   cardLabel: ["การ์ดที่รับฝาก", "รายการการ์ด", "การ์ด", "card", "card name", "รายการ"],
   cardCount: ["จำนวน", "qty", "quantity", "card count", "จำนวนการ์ด"],
   principalTHB: ["ยอดรับฝาก", "เงินต้น", "มูลค่ารับฝาก", "principal", "amount", "ยอดเงิน"],
+  collateralValueTHB: ["มูลค่าเต็ม", "มูลค่าจริง", "collateral value", "full value", "value"],
   monthlyInterestRate: ["ดอกเบี้ย", "ดอกเบี้ยต่อเดือน", "%ดอก", "interest rate", "rate"],
   monthlyInterestTHB: ["ดอกเบี้ย/เดือน", "ดอกเบี้ยรายเดือน", "interest", "monthly interest", "ดอก"],
   maintenanceFeeTHB: ["ค่ารักษา", "ค่ารักษา/เดือน", "maintenance fee", "maintenance"],
@@ -184,6 +186,7 @@ function getHeaderMap(headers: string[]) {
     borrowerContact: findHeader(HEADER_ALIASES.borrowerContact),
     cardLabel: findHeader(HEADER_ALIASES.cardLabel),
     cardCount: findHeader(HEADER_ALIASES.cardCount),
+    collateralValueTHB: findHeader(HEADER_ALIASES.collateralValueTHB),
     principalTHB: findHeader(HEADER_ALIASES.principalTHB),
     monthlyInterestRate: findHeader(HEADER_ALIASES.monthlyInterestRate),
     monthlyInterestTHB: findHeader(HEADER_ALIASES.monthlyInterestTHB),
@@ -240,7 +243,8 @@ function toEntry(
   const ownerIdValue = getComparableRowValue(row, headerMap.ownerId, 13);
   const ownerLineIdValue = getComparableRowValue(row, headerMap.ownerLineId, 2);
   const cardCountValue = getComparableRowValue(row, headerMap.cardCount, 4);
-  const principalValue = getComparableRowValue(row, headerMap.principalTHB, 5);
+  const collateralValue = getComparableRowValue(row, headerMap.collateralValueTHB, 5);
+  const principalValue = getComparableRowValue(row, headerMap.principalTHB, 6);
   const billing = getPawnChargeSummary(
     Math.max(0, parseNumber(principalValue)),
     PAWN_STANDARD_INTEREST_RATE,
@@ -258,6 +262,7 @@ function toEntry(
     borrowerContact: normalizeText(getComparableRowValue(row, headerMap.borrowerContact, 2)),
     cardLabel: normalizeText(getComparableRowValue(row, headerMap.cardLabel, 3)) || "ยังไม่ระบุการ์ด",
     cardCount: Math.max(1, Math.floor(parseNumber(cardCountValue) || 1)),
+    collateralValueTHB: Math.max(0, parseNumber(collateralValue || principalValue)),
     principalTHB: Math.max(0, parseNumber(principalValue)),
     monthlyInterestRate: billing.interestRate,
     monthlyInterestTHB: billing.monthlyInterestTHB,

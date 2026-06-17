@@ -20,6 +20,7 @@ type PawnLedgerSyncEntry = {
   createdAt: string;
   cardLabel: string;
   quantity: number;
+  collateralValueTHB: number;
   principalTHB: number;
   monthlyInterestRate: number;
   monthlyInterestTHB: number;
@@ -79,7 +80,14 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
   }
 
   const pawn = getPawnSource(asset);
-  const principalTHB = Math.max(0, parseNumber(pawn?.principalTHB ?? asset.valueTHB ?? 0));
+  const collateralValueTHB = Math.max(
+    0,
+    parseNumber(pawn?.collateralValueTHB ?? asset.valueTHB ?? 0)
+  );
+  const principalTHB = Math.max(
+    0,
+    parseNumber(pawn?.principalTHB ?? Math.round(collateralValueTHB * 0.8))
+  );
   const billing = getPawnChargeSummary(
     principalTHB,
     PAWN_STANDARD_INTEREST_RATE,
@@ -103,6 +111,7 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
           ? `No.${cleanText(asset.cardNo)} ${cleanText(asset.cardName)}`
           : cleanText(asset.cardName),
     quantity: Math.max(1, Math.floor(parseNumber(asset.quantity || 1))),
+    collateralValueTHB,
     principalTHB,
     monthlyInterestRate: billing.interestRate,
     monthlyInterestTHB: billing.monthlyInterestTHB,

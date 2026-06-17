@@ -152,6 +152,13 @@ function mapPawnCard(asset: CardBankAsset): PawnCard {
   const base = mapBankCard(asset);
   const dueDate = addMonths(asset.createdAt, 1);
   const today = new Date();
+  const pawn = asset.sourcePayload && typeof asset.sourcePayload === "object"
+    ? (asset.sourcePayload.pawn as Record<string, unknown> | undefined)
+    : undefined;
+  const principalTHB = Math.max(
+    0,
+    Number(pawn?.principalTHB || Math.round(asset.valueTHB * 0.8))
+  );
   const lateDays = Math.max(
     0,
     Math.floor((today.getTime() - dueDate.getTime()) / 86_400_000)
@@ -162,7 +169,7 @@ function mapPawnCard(asset: CardBankAsset): PawnCard {
     status: "pawned",
     pawnStartedAt: formatThaiDate(asset.createdAt),
     interestDueDate: formatThaiDate(dueDate.toISOString()),
-    monthlyInterestTHB: Math.round(asset.valueTHB * 0.1),
+    monthlyInterestTHB: Math.round(principalTHB * 0.05) + 200,
     lateDays,
   };
 }
