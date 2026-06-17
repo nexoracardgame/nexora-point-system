@@ -23,6 +23,7 @@ export type TriadOpeningTieBreak = {
   status: "idle" | "waiting" | "resolved";
   reason: "first_turn_score_draw" | "";
   choices: Partial<Record<TriadRoomSlot, TriadRpsChoice>>;
+  revealChoices?: Partial<Record<TriadRoomSlot, TriadRpsChoice>>;
   winner: TriadRoomSlot | "";
   source: "card-icon" | "manual" | "";
   message: string;
@@ -285,6 +286,10 @@ function normalizeRpsChoice(value: unknown): TriadRpsChoice {
 function normalizeOpeningTieBreak(value: unknown): TriadOpeningTieBreak {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const choices = raw.choices && typeof raw.choices === "object" ? (raw.choices as Record<string, unknown>) : {};
+  const revealChoices =
+    raw.revealChoices && typeof raw.revealChoices === "object"
+      ? (raw.revealChoices as Record<string, unknown>)
+      : null;
   const status = raw.status === "waiting" || raw.status === "resolved" ? raw.status : "idle";
   return {
     fightNo: Number(raw.fightNo || 1),
@@ -295,6 +300,14 @@ function normalizeOpeningTieBreak(value: unknown): TriadOpeningTieBreak {
       host: normalizeRpsChoice(choices.host),
       challenger: normalizeRpsChoice(choices.challenger),
     },
+    ...(revealChoices
+      ? {
+          revealChoices: {
+            host: normalizeRpsChoice(revealChoices.host),
+            challenger: normalizeRpsChoice(revealChoices.challenger),
+          },
+        }
+      : {}),
     winner: raw.winner === "host" || raw.winner === "challenger" ? raw.winner : "",
     source: raw.source === "card-icon" || raw.source === "manual" ? raw.source : "",
     message: cleanText(raw.message),
@@ -1158,6 +1171,7 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
       winner === "draw"
         ? "เป่ายิงฉุบเสมออีกครั้ง เลือกใหม่จนกว่าจะมีผู้ชนะ ผู้ชนะจะได้เปิดสกิลก่อนในตาถัดไปเท่านั้น"
         : tieBreak.message,
+    revealChoices: winner === "draw" ? nextChoices : undefined,
   };
 
   if (winner === "draw") {

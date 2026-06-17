@@ -137,6 +137,7 @@ type OpeningTieBreak = {
   status: "idle" | "waiting" | "resolved";
   reason: "first_turn_score_draw" | "";
   choices: Partial<Record<RoomPlayerSide, TriadRpsChoice>>;
+  revealChoices?: Partial<Record<RoomPlayerSide, TriadRpsChoice>>;
   winner: RoomPlayerSide | "";
   source: "card-icon" | "manual" | "";
   message: string;
@@ -430,6 +431,10 @@ function normalizeRoomGame(value: unknown): RoomGame {
   const cleanOpeningTieBreak = (tieBreak: unknown): OpeningTieBreak => {
     const rawTieBreak = tieBreak && typeof tieBreak === "object" ? (tieBreak as Record<string, unknown>) : {};
     const choices = rawTieBreak.choices && typeof rawTieBreak.choices === "object" ? (rawTieBreak.choices as Record<string, unknown>) : {};
+    const revealChoices =
+      rawTieBreak.revealChoices && typeof rawTieBreak.revealChoices === "object"
+        ? (rawTieBreak.revealChoices as Record<string, unknown>)
+        : null;
     return {
       fightNo: Number(rawTieBreak.fightNo || 1),
       turn: rawTieBreak.turn === 2 || rawTieBreak.turn === 3 ? rawTieBreak.turn : 1,
@@ -439,6 +444,14 @@ function normalizeRoomGame(value: unknown): RoomGame {
         host: cleanRpsChoice(choices.host),
         challenger: cleanRpsChoice(choices.challenger),
       },
+      ...(revealChoices
+        ? {
+            revealChoices: {
+              host: cleanRpsChoice(revealChoices.host),
+              challenger: cleanRpsChoice(revealChoices.challenger),
+            },
+          }
+        : {}),
       winner: rawTieBreak.winner === "host" || rawTieBreak.winner === "challenger" ? rawTieBreak.winner : "",
       source: rawTieBreak.source === "card-icon" || rawTieBreak.source === "manual" ? rawTieBreak.source : "",
       message: safeText(rawTieBreak.message),
@@ -1648,8 +1661,9 @@ function OpeningTieBreakOverlay({
   onChoose: (choice: TriadRpsChoice) => void;
 }) {
   if (!tieBreak || tieBreak.status === "idle") return null;
-  const hostChoice = tieBreak.choices.host || "unknown";
-  const challengerChoice = tieBreak.choices.challenger || "unknown";
+  const revealedChoices = tieBreak.revealChoices || tieBreak.choices;
+  const hostChoice = revealedChoices.host || "unknown";
+  const challengerChoice = revealedChoices.challenger || "unknown";
   const ownChoice = pendingChoice || (ownSide ? tieBreak.choices[ownSide] || "unknown" : "unknown");
   const winnerName = tieBreak.winner === "host" ? hostName : tieBreak.winner === "challenger" ? challengerName : "";
   const canChoose = tieBreak.status === "waiting" && !isSpectator && ownSide && ownChoice === "unknown";
@@ -1685,6 +1699,10 @@ function OpeningTieBreakOverlay({
         {tieBreak.status === "resolved" ? (
           <div className="mt-5 rounded-xl border border-emerald-200/24 bg-emerald-300/10 p-4 text-center text-sm font-black text-emerald-100">
             {winnerName} ได้เปิดสกิลก่อนในตาถัดไป
+          </div>
+        ) : tieBreak.reason === "first_turn_score_draw" && revealedChoices.host !== "unknown" && revealedChoices.challenger !== "unknown" ? (
+          <div className="mt-5 rounded-xl border border-amber-200/24 bg-amber-300/10 p-4 text-center text-sm font-black text-amber-100">
+            เสมออีกครั้ง เลือกใหม่จนกว่าจะมีผู้ชนะ ฝ่ายที่ชนะจะได้เปิดสกิลก่อนในตาถัดไป
           </div>
         ) : canChoose ? (
           <div className="mt-5 grid grid-cols-3 gap-2">
