@@ -14,6 +14,8 @@ export type PawnLedgerTableRow = {
   principalTHB: number;
   monthlyInterestRate: number;
   monthlyInterestTHB: number;
+  maintenanceFeeTHB: number;
+  totalDueTHB: number;
   pledgeDate: string;
   dueDate: string;
   status: string;
@@ -133,7 +135,7 @@ export default function PawnLedgerTable({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 action: "payment",
-                amountTHB: row.monthlyInterestTHB,
+                amountTHB: row.totalDueTHB,
                 extendDays: 30,
                 note: `ชำระดอกอัตโนมัติจากตาราง #${row.rowNumber}`,
               }),
@@ -191,7 +193,7 @@ export default function PawnLedgerTable({
       <div className="mt-5 overflow-hidden rounded-[22px] border border-white/10 bg-black/20">
         <div className="max-h-[640px] overflow-auto">
           <div className="min-w-[1320px]">
-            <div className="sticky top-0 z-20 grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] bg-[#14171f]/98 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38 backdrop-blur">
+            <div className="sticky top-0 z-20 grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_132px_148px_154px_132px_180px_112px] bg-[#14171f]/98 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38 backdrop-blur">
             <div>ลำดับ</div>
             <div>วันรับฝาก</div>
             <div>ชื่อผู้ฝาก</div>
@@ -199,6 +201,8 @@ export default function PawnLedgerTable({
             <div>จำนวน</div>
             <div>เงินต้น</div>
             <div>ดอกเบี้ย</div>
+            <div>ค่ารักษา</div>
+            <div>ยอดจ่ายจริง</div>
             <div>วันครบกำหนด</div>
             <div>สถานะ</div>
             <div>หมายเหตุ</div>
@@ -213,7 +217,7 @@ export default function PawnLedgerTable({
               return (
                 <div
                   key={`${row.rowNumber}-${row.assetId}`}
-                    className={`grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] items-start gap-0 border-t border-white/8 border-l-4 px-4 py-3 text-sm ${state.rowTone}`}
+                    className={`grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_132px_148px_154px_132px_180px_112px] items-start gap-0 border-t border-white/8 border-l-4 px-4 py-3 text-sm ${state.rowTone}`}
                 >
                   <div className="font-black text-white">{row.rowNumber.toLocaleString("th-TH")}</div>
                   <div className="space-y-1 text-white/72">
@@ -235,6 +239,14 @@ export default function PawnLedgerTable({
                   <div className="space-y-1">
                     <div className="font-black text-white">{formatTHB(row.monthlyInterestTHB)}</div>
                     <div className="text-xs text-white/45">{formatPercent(row.monthlyInterestRate)}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-black text-white">{formatTHB(row.maintenanceFeeTHB)}</div>
+                    <div className="text-xs text-white/45">ค่ารักษา</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-black text-amber-100">{formatTHB(row.totalDueTHB)}</div>
+                    <div className="text-xs text-white/45">ดอกเบี้ย + ค่ารักษา</div>
                   </div>
                   <div className="space-y-1">
                     <div className="font-bold text-white">{formatThaiDate(row.dueDate)}</div>

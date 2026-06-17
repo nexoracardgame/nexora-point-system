@@ -14,7 +14,11 @@ import {
   type CardBankStatus,
 } from "@/lib/card-bank-store";
 import { getPawnLedgerEntries, type PawnLedgerEntry } from "@/lib/pawn-ledger-sheet";
-import CardBankWithdrawPanel from "../CardBankWithdrawPanel";
+import {
+  PAWN_STANDARD_INTEREST_RATE,
+  PAWN_STANDARD_MAINTENANCE_FEE_THB,
+  getPawnChargeSummary,
+} from "@/lib/pawn-terms";
 import PawnNextActions from "./PawnNextActions";
 import PawnRedemptionHistoryTable from "./PawnRedemptionHistoryTable";
 import PawnLedgerTable from "./PawnLedgerTable";
@@ -34,8 +38,10 @@ const fallbackEntries: PawnLedgerEntry[] = [
     cardLabel: "Blue-Eyes White Dragon x1",
     cardCount: 1,
     principalTHB: 12000,
-    monthlyInterestRate: 10,
-    monthlyInterestTHB: 1200,
+    monthlyInterestRate: PAWN_STANDARD_INTEREST_RATE,
+    monthlyInterestTHB: 600,
+    maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+    totalDueTHB: 800,
     dueDate: "2026-07-15T09:00:00.000Z",
     status: "กำลังใช้งาน",
     note: "ใช้เป็นข้อมูลตัวอย่างก่อนผูกชีตจริง",
@@ -54,8 +60,10 @@ const fallbackEntries: PawnLedgerEntry[] = [
     cardLabel: "Set Bundle - Foil Pack",
     cardCount: 3,
     principalTHB: 28000,
-    monthlyInterestRate: 10,
-    monthlyInterestTHB: 2800,
+    monthlyInterestRate: PAWN_STANDARD_INTEREST_RATE,
+    monthlyInterestTHB: 1400,
+    maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+    totalDueTHB: 1600,
     dueDate: "2026-07-10T09:00:00.000Z",
     status: "ค้างชำระ",
     note: "เตือนชำระก่อนครบกำหนด",
@@ -202,13 +210,10 @@ function pawnAssetToLedgerEntry(asset: CardBankAsset, index: number): PawnLedger
     0,
     parseNumber(pawn?.principalTHB ?? asset.valueTHB ?? 0)
   );
-  const monthlyInterestRate = Math.max(0, parseNumber(pawn?.interestRate ?? 10));
-  const monthlyInterestTHB = Math.max(
-    0,
-    parseNumber(
-      pawn?.monthlyInterestTHB ??
-        Math.round(principalTHB * (monthlyInterestRate / 100))
-    )
+  const billing = getPawnChargeSummary(
+    principalTHB,
+    PAWN_STANDARD_INTEREST_RATE,
+    PAWN_STANDARD_MAINTENANCE_FEE_THB
   );
   const dueDays = Math.max(1, Math.floor(parseNumber(pawn?.dueDays ?? 30)) || 30);
   const dueDate = String(pawn?.dueDate || "").trim() || addDays(asset.createdAt, dueDays);
@@ -225,8 +230,10 @@ function pawnAssetToLedgerEntry(asset: CardBankAsset, index: number): PawnLedger
     cardLabel: getAssetCardLabel(asset),
     cardCount: Math.max(1, Math.floor(asset.quantity || 1)),
     principalTHB,
-    monthlyInterestRate,
-    monthlyInterestTHB,
+    monthlyInterestRate: billing.interestRate,
+    monthlyInterestTHB: billing.monthlyInterestTHB,
+    maintenanceFeeTHB: billing.maintenanceFeeTHB,
+    totalDueTHB: billing.totalDueTHB,
     dueDate,
     status: getAssetStatusLabel(asset.status),
     note: String(pawn?.note || "").trim(),
@@ -457,13 +464,6 @@ export default async function PawnLedgerPage() {
           </section>
         </div>
       </section>
-
-      <CardBankWithdrawPanel
-        assets={pawnAssets}
-        eyebrow="Pawn Return Desk"
-        title="เบิก / ถอนการ์ดรับฝากคืนลูกค้า"
-        description="เฉพาะรายการรับฝากการ์ด"
-      />
 
       <PawnNextActions assets={pawnAssets} />
 

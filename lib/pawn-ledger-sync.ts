@@ -1,6 +1,11 @@
 import "server-only";
 
 import type { CardBankAsset } from "@/lib/card-bank-store";
+import {
+  PAWN_STANDARD_INTEREST_RATE,
+  PAWN_STANDARD_MAINTENANCE_FEE_THB,
+  getPawnChargeSummary,
+} from "@/lib/pawn-terms";
 
 const DEFAULT_PAWN_LEDGER_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbw8RJSG7jX4wKKSApM3q7M630zLQzLla-MEUZKyMN_uYc2BvFeNPchxUt9hBg3fgzaU/exec";
@@ -18,6 +23,8 @@ type PawnLedgerSyncEntry = {
   principalTHB: number;
   monthlyInterestRate: number;
   monthlyInterestTHB: number;
+  maintenanceFeeTHB: number;
+  totalDueTHB: number;
   dueDate: string;
   status: string;
   note: string;
@@ -72,14 +79,11 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
   }
 
   const pawn = getPawnSource(asset);
-  const principalTHB = Math.max(
-    0,
-    parseNumber(pawn?.principalTHB ?? asset.valueTHB ?? 0)
-  );
-  const monthlyInterestRate = Math.max(0, parseNumber(pawn?.interestRate ?? 10));
-  const monthlyInterestTHB = Math.max(
-    0,
-    parseNumber(pawn?.monthlyInterestTHB ?? Math.round(principalTHB * (monthlyInterestRate / 100)))
+  const principalTHB = Math.max(0, parseNumber(pawn?.principalTHB ?? asset.valueTHB ?? 0));
+  const billing = getPawnChargeSummary(
+    principalTHB,
+    PAWN_STANDARD_INTEREST_RATE,
+    PAWN_STANDARD_MAINTENANCE_FEE_THB
   );
   const dueDays = Math.max(1, Math.floor(parseNumber(pawn?.dueDays ?? 30)) || 30);
   const dueDate = cleanText(pawn?.dueDate || "");
@@ -100,8 +104,10 @@ function buildEntry(asset: CardBankAsset): PawnLedgerSyncEntry | null {
           : cleanText(asset.cardName),
     quantity: Math.max(1, Math.floor(parseNumber(asset.quantity || 1))),
     principalTHB,
-    monthlyInterestRate,
-    monthlyInterestTHB,
+    monthlyInterestRate: billing.interestRate,
+    monthlyInterestTHB: billing.monthlyInterestTHB,
+    maintenanceFeeTHB: billing.maintenanceFeeTHB,
+    totalDueTHB: billing.totalDueTHB,
     dueDate: dueDate || addDays(asset.createdAt, dueDays).toISOString(),
     status: getSyncStatusLabel(asset.status),
     note:

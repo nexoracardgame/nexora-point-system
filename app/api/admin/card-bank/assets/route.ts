@@ -9,6 +9,10 @@ import {
 } from "@/lib/card-bank-store";
 import { publishCardBankEvent } from "@/lib/card-bank-realtime";
 import { isStaffRole } from "@/lib/staff-auth";
+import {
+  PAWN_STANDARD_INTEREST_RATE,
+  PAWN_STANDARD_MAINTENANCE_FEE_THB,
+} from "@/lib/pawn-terms";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +88,8 @@ export async function POST(request: Request) {
           pawn: asObject(item.pawn).principalTHB !== undefined
             ? {
                 principalTHB: Math.max(0, cleanNumber(asObject(item.pawn).principalTHB)),
-                interestRate: Math.max(0, cleanNumber(asObject(item.pawn).interestRate || 10)),
+                interestRate: PAWN_STANDARD_INTEREST_RATE,
+                maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
                 dueDays: Math.max(1, Math.floor(cleanNumber(asObject(item.pawn).dueDays || 30)) || 30),
                 note: cleanText(asObject(item.pawn).note) || null,
               }
@@ -108,7 +113,8 @@ export async function POST(request: Request) {
           pawn: asObject(item.pawn).principalTHB !== undefined
             ? {
                 principalTHB: Math.max(0, cleanNumber(asObject(item.pawn).principalTHB)),
-                interestRate: Math.max(0, cleanNumber(asObject(item.pawn).interestRate || 10)),
+                interestRate: PAWN_STANDARD_INTEREST_RATE,
+                maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
                 dueDays: Math.max(1, Math.floor(cleanNumber(asObject(item.pawn).dueDays || 30)) || 30),
                 note: cleanText(asObject(item.pawn).note) || null,
               }
@@ -128,7 +134,8 @@ export async function POST(request: Request) {
     entryMode === "pawn"
       ? {
           principalTHB: Math.max(0, cleanNumber(pawnObject.principalTHB)),
-          interestRate: Math.max(0, cleanNumber(pawnObject.interestRate || 10)),
+          interestRate: PAWN_STANDARD_INTEREST_RATE,
+          maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
           dueDays: Math.max(1, Math.floor(cleanNumber(pawnObject.dueDays || 30)) || 30),
           note: cleanText(pawnObject.note) || null,
         }

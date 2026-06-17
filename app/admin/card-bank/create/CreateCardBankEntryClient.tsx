@@ -28,6 +28,10 @@ import {
 } from "@/lib/nexora-collection-sets";
 import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  PAWN_STANDARD_INTEREST_RATE,
+  PAWN_STANDARD_MAINTENANCE_FEE_THB,
+} from "@/lib/pawn-terms";
 
 type UserRow = {
   id: string;
@@ -84,6 +88,7 @@ type PawnTermsDraft = {
 type PawnTermsSnapshot = {
   principalTHB: number;
   interestRate: number;
+  maintenanceFeeTHB: number;
   dueDays: number;
   note: string | null;
 };
@@ -110,7 +115,7 @@ function formatNumber(value: number) {
 function createDefaultPawnDraft(): PawnTermsDraft {
   return {
     principalTHB: "",
-    interestRate: "10",
+    interestRate: String(PAWN_STANDARD_INTEREST_RATE),
     dueDays: "30",
     note: "",
   };
@@ -119,7 +124,8 @@ function createDefaultPawnDraft(): PawnTermsDraft {
 function normalizePawnDraft(draft: PawnTermsDraft): PawnTermsSnapshot {
   return {
     principalTHB: Math.max(0, Number(draft.principalTHB || 0)),
-    interestRate: Math.max(0, Number(draft.interestRate || 10)),
+    interestRate: PAWN_STANDARD_INTEREST_RATE,
+    maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
     dueDays: Math.max(1, Math.floor(Number(draft.dueDays || 30)) || 30),
     note: draft.note.trim() || null,
   };

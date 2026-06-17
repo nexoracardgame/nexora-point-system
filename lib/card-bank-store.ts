@@ -8,6 +8,11 @@ import {
   writeLocalStoreJson,
 } from "@/lib/local-store-dir";
 import { syncPawnLedgerEntries } from "@/lib/pawn-ledger-sync";
+import {
+  PAWN_STANDARD_INTEREST_RATE,
+  PAWN_STANDARD_MAINTENANCE_FEE_THB,
+  getPawnChargeSummary,
+} from "@/lib/pawn-terms";
 
 type DbRow = Record<string, unknown>;
 
@@ -65,6 +70,7 @@ export type CreateCardBankEntriesInput = {
     pawn?: {
       principalTHB: number;
       interestRate: number;
+      maintenanceFeeTHB?: number;
       dueDays: number;
       note?: string | null;
     } | null;
@@ -81,6 +87,7 @@ export type CreateCardBankEntriesInput = {
     pawn?: {
       principalTHB: number;
       interestRate: number;
+      maintenanceFeeTHB?: number;
       dueDays: number;
       note?: string | null;
     } | null;
@@ -93,6 +100,7 @@ export type CreateCardBankEntriesInput = {
   pawn?: {
     principalTHB: number;
     interestRate: number;
+    maintenanceFeeTHB?: number;
     dueDays: number;
     note?: string | null;
   };
@@ -388,6 +396,16 @@ function buildAssets(input: CreateCardBankEntriesInput) {
   const now = new Date().toISOString();
   const status: CardBankStatus = input.entryMode === "pawn" ? "pawned" : "stored";
   const pawnSource = input.entryMode === "pawn" ? input.pawn || null : null;
+  const standardizedPawnSource =
+    input.entryMode === "pawn"
+      ? {
+          principalTHB: Math.max(0, toNumber(input.pawn?.principalTHB || 0)),
+          interestRate: PAWN_STANDARD_INTEREST_RATE,
+          maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+          dueDays: Math.max(1, Math.floor(toNumber(input.pawn?.dueDays || 30)) || 30),
+          note: input.pawn?.note || null,
+        }
+      : null;
   const base = {
     ownerId: input.owner.id,
     ownerLineId: input.owner.lineId || null,
@@ -404,6 +422,10 @@ function buildAssets(input: CreateCardBankEntriesInput) {
   if (input.intakeMode === "sets") {
     return (input.setItems || []).map((item) => {
       const pawn = item.pawn || pawnSource;
+      const standardizedPawn =
+        input.entryMode === "pawn" && standardizedPawnSource
+          ? standardizedPawnSource
+          : pawn;
       return {
         ...base,
         id: randomUUID(),
@@ -423,7 +445,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
         coinValue: 0,
         sourcePayload: {
           ...item,
-          pawn,
+          pawn: standardizedPawn,
         },
       };
     });
@@ -450,7 +472,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
         coinValue: Math.floor(Number(input.bulk?.coinValue || 0)),
         sourcePayload: {
           ...(input.bulk || {}),
-          pawn: pawnSource,
+          pawn: standardizedPawnSource || pawnSource,
         },
       },
     ];
@@ -458,6 +480,10 @@ function buildAssets(input: CreateCardBankEntriesInput) {
 
   return (input.items || []).map((item) => {
     const pawn = item.pawn || pawnSource;
+    const standardizedPawn =
+      input.entryMode === "pawn" && standardizedPawnSource
+        ? standardizedPawnSource
+        : pawn;
     return {
       ...base,
       id: randomUUID(),
@@ -477,7 +503,7 @@ function buildAssets(input: CreateCardBankEntriesInput) {
       coinValue: 0,
       sourcePayload: {
         ...item,
-        pawn,
+        pawn: standardizedPawn,
       },
     };
   });
@@ -772,6 +798,11 @@ export async function applyCardBankPawnAction(input: CardBankPawnActionInput) {
 
     const pawn = getPawnLikePayload(asset);
     const currentDueDate = String(pawn.dueDate || "").trim() || addDaysToIso(asset.createdAt, Math.max(1, Math.floor(toNumber(pawn.dueDays || 30)) || 30));
+    const billing = getPawnChargeSummary(
+      toNumber(pawn.principalTHB || asset.valueTHB || 0),
+      PAWN_STANDARD_INTEREST_RATE,
+      PAWN_STANDARD_MAINTENANCE_FEE_THB
+    );
     const nextDueDate =
       action === "renew" || action === "payment"
         ? addDaysToIso(currentDueDate, extendDays || Math.max(1, Math.floor(toNumber(pawn.dueDays || 30)) || 30))
@@ -790,15 +821,23 @@ export async function applyCardBankPawnAction(input: CardBankPawnActionInput) {
       updatedAt: now,
       sourcePayload: mergePawnPayload(asset, {
         ...pawn,
+        interestRate: PAWN_STANDARD_INTEREST_RATE,
+        monthlyInterestTHB: billing.monthlyInterestTHB,
+        maintenanceFeeTHB: PAWN_STANDARD_MAINTENANCE_FEE_THB,
+        totalDueTHB: billing.totalDueTHB,
         dueDate: nextDueDate,
         lastAction: action,
         lastActionLabel: actionLabel,
         lastActionAt: now,
-        lastPaymentTHB: action === "payment" ? amountTHB : pawn.lastPaymentTHB || 0,
+        lastPaymentTHB: action === "payment" ? Math.max(amountTHB, billing.totalDueTHB) : pawn.lastPaymentTHB || 0,
         paidInterestTHB:
           action === "payment"
-            ? toNonNegativeNumber(pawn.paidInterestTHB) + amountTHB
+            ? toNonNegativeNumber(pawn.paidInterestTHB) + billing.monthlyInterestTHB
             : toNonNegativeNumber(pawn.paidInterestTHB),
+        paidMaintenanceFeeTHB:
+          action === "payment"
+            ? toNonNegativeNumber(pawn.paidMaintenanceFeeTHB) + PAWN_STANDARD_MAINTENANCE_FEE_THB
+            : toNonNegativeNumber(pawn.paidMaintenanceFeeTHB),
         note: [String(pawn.note || "").trim(), note || actionLabel].filter(Boolean).join(" | "),
       }),
     };

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { BadgeCheck, CreditCard, FilePlus2, LockKeyhole } from "lucide-react";
 import type { CardBankAsset } from "@/lib/card-bank-store";
+import { getPawnChargeSummary } from "@/lib/pawn-terms";
 
 type ActionMode = "payment" | "redeem";
 
@@ -12,6 +13,19 @@ function assetLabel(asset: CardBankAsset) {
   const name = asset.setName || asset.cardName || "รายการรับฝาก";
   const owner = asset.ownerName || asset.ownerLineId || asset.ownerId;
   return `${owner} - ${name} (${asset.quantity.toLocaleString("th-TH")})`;
+}
+
+function getPawnPaymentAmount(asset: CardBankAsset) {
+  const source =
+    asset.sourcePayload && typeof asset.sourcePayload === "object"
+      ? asset.sourcePayload
+      : {};
+  const pawn =
+    source && typeof source === "object" && "pawn" in source && typeof source.pawn === "object"
+      ? (source.pawn as Record<string, unknown>)
+      : {};
+  const billing = getPawnChargeSummary(Number(pawn.principalTHB || asset.valueTHB || 0));
+  return billing.totalDueTHB;
 }
 
 export default function PawnNextActions({ assets }: { assets: CardBankAsset[] }) {
@@ -25,6 +39,14 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
   const [message, setMessage] = useState("");
 
   const getSelectedAsset = () => activeAssets.find((asset) => asset.id === assetId) || null;
+  const selectedAsset = getSelectedAsset();
+  const suggestedPaymentTHB = selectedAsset ? getPawnPaymentAmount(selectedAsset) : 0;
+
+  useEffect(() => {
+    if (suggestedPaymentTHB > 0) {
+      setAmountTHB(String(suggestedPaymentTHB));
+    }
+  }, [assetId, suggestedPaymentTHB]);
 
   const runAction = (action: ActionMode) => {
     if (!assetId) {
@@ -40,6 +62,7 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
 
     setMessage("");
     startTransition(async () => {
+      const paymentAmountTHB = Number(amountTHB || suggestedPaymentTHB || 0);
       const response =
         action === "payment"
           ? await fetch(`/api/admin/card-bank/assets/${encodeURIComponent(assetId)}/pawn-action`, {
@@ -47,7 +70,7 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 action: "payment",
-                amountTHB: Number(amountTHB || 0),
+                amountTHB: paymentAmountTHB,
                 extendDays: Number(extendDays || 30),
                 note,
               }),
@@ -137,7 +160,7 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
                 value={amountTHB}
                 onChange={(event) => setAmountTHB(event.target.value)}
                 inputMode="numeric"
-                placeholder="ยอดชำระ THB"
+                placeholder={suggestedPaymentTHB > 0 ? `ยอดมาตรฐาน ${suggestedPaymentTHB.toLocaleString("th-TH")} THB` : "ยอดชำระ THB"}
                 className="h-11 rounded-[16px] border border-white/10 bg-black/40 px-3 text-sm font-bold text-white outline-none placeholder:text-white/30"
               />
               <input
@@ -154,6 +177,9 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
               placeholder="หมายเหตุ"
               className="h-11 w-full rounded-[16px] border border-white/10 bg-black/40 px-3 text-sm font-bold text-white outline-none placeholder:text-white/30"
             />
+            <div className="text-[11px] font-bold tracking-[0.12em] text-white/42">
+              มาตรฐานคำนวณ: ดอกเบี้ย 5% + ค่ารักษา 200 บาท = {suggestedPaymentTHB.toLocaleString("th-TH")} บาท
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"

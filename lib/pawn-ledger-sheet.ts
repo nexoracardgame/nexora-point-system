@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  PAWN_STANDARD_INTEREST_RATE,
+  PAWN_STANDARD_MAINTENANCE_FEE_THB,
+  getPawnChargeSummary,
+} from "@/lib/pawn-terms";
 
 type PawnLedgerRow = Record<string, string>;
 
@@ -16,6 +21,8 @@ export type PawnLedgerEntry = {
   principalTHB: number;
   monthlyInterestRate: number;
   monthlyInterestTHB: number;
+  maintenanceFeeTHB: number;
+  totalDueTHB: number;
   dueDate: string;
   status: string;
   note: string;
@@ -40,6 +47,8 @@ const HEADER_ALIASES = {
   principalTHB: ["ยอดรับฝาก", "เงินต้น", "มูลค่ารับฝาก", "principal", "amount", "ยอดเงิน"],
   monthlyInterestRate: ["ดอกเบี้ย", "ดอกเบี้ยต่อเดือน", "%ดอก", "interest rate", "rate"],
   monthlyInterestTHB: ["ดอกเบี้ย/เดือน", "ดอกเบี้ยรายเดือน", "interest", "monthly interest", "ดอก"],
+  maintenanceFeeTHB: ["ค่ารักษา", "ค่ารักษา/เดือน", "maintenance fee", "maintenance"],
+  totalDueTHB: ["ยอดที่ต้องจ่าย", "ยอดต่อดอก", "total due", "payment due", "total payment"],
   dueDate: ["วันครบกำหนด", "กำหนดคืน", "ครบกำหนด", "duedate", "due date"],
   status: ["สถานะ", "status", "state"],
   note: ["หมายเหตุ", "note", "remark", "memo"],
@@ -178,6 +187,8 @@ function getHeaderMap(headers: string[]) {
     principalTHB: findHeader(HEADER_ALIASES.principalTHB),
     monthlyInterestRate: findHeader(HEADER_ALIASES.monthlyInterestRate),
     monthlyInterestTHB: findHeader(HEADER_ALIASES.monthlyInterestTHB),
+    maintenanceFeeTHB: findHeader(HEADER_ALIASES.maintenanceFeeTHB),
+    totalDueTHB: findHeader(HEADER_ALIASES.totalDueTHB),
     dueDate: findHeader(HEADER_ALIASES.dueDate),
     status: findHeader(HEADER_ALIASES.status),
     note: findHeader(HEADER_ALIASES.note),
@@ -230,8 +241,11 @@ function toEntry(
   const ownerLineIdValue = getComparableRowValue(row, headerMap.ownerLineId, 2);
   const cardCountValue = getComparableRowValue(row, headerMap.cardCount, 4);
   const principalValue = getComparableRowValue(row, headerMap.principalTHB, 5);
-  const interestRateValue = getComparableRowValue(row, headerMap.monthlyInterestRate, 6);
-  const interestTHBValue = getComparableRowValue(row, headerMap.monthlyInterestTHB, 7);
+  const billing = getPawnChargeSummary(
+    Math.max(0, parseNumber(principalValue)),
+    PAWN_STANDARD_INTEREST_RATE,
+    PAWN_STANDARD_MAINTENANCE_FEE_THB
+  );
 
   return {
     rowNumber: Math.max(1, Math.floor(parseNumber(rowNumberValue) || fallbackRowNumber)),
@@ -245,8 +259,10 @@ function toEntry(
     cardLabel: normalizeText(getComparableRowValue(row, headerMap.cardLabel, 3)) || "ยังไม่ระบุการ์ด",
     cardCount: Math.max(1, Math.floor(parseNumber(cardCountValue) || 1)),
     principalTHB: Math.max(0, parseNumber(principalValue)),
-    monthlyInterestRate: Math.max(0, parseNumber(interestRateValue)),
-    monthlyInterestTHB: Math.max(0, parseNumber(interestTHBValue)),
+    monthlyInterestRate: billing.interestRate,
+    monthlyInterestTHB: billing.monthlyInterestTHB,
+    maintenanceFeeTHB: billing.maintenanceFeeTHB,
+    totalDueTHB: billing.totalDueTHB,
     dueDate: parseDateValue(getComparableRowValue(row, headerMap.dueDate, 8)),
     status: normalizeStatus(getComparableRowValue(row, headerMap.status, 9)),
     note: normalizeText(getComparableRowValue(row, headerMap.note, 10)),
