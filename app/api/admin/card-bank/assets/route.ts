@@ -14,6 +14,10 @@ import {
   PAWN_STANDARD_MAINTENANCE_FEE_THB,
   getPawnCollateralSummary,
 } from "@/lib/pawn-terms";
+import {
+  getNexoraCoinReward,
+  getNexoraSingleCardNexReward,
+} from "@/lib/nexora-card-rewards";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +78,42 @@ function cleanQuantity(value: unknown) {
   return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
 }
 
+function normalizeCardNo(value: unknown) {
+  const digits = cleanText(value).replace(/\D/g, "");
+  if (!digits) return "";
+  const number = Number(digits.slice(-3));
+  if (!Number.isFinite(number) || number < 1 || number > 293) return "";
+  return String(number).padStart(3, "0");
+}
+
+function resolveSpecificCardCollateralValueTHB(item: Record<string, unknown>, quantity: number) {
+  const explicitTotalValue = Math.max(0, cleanNumber(item.collateralValueTHB));
+  if (explicitTotalValue > 0) return explicitTotalValue;
+
+  const perCardValue = Math.max(0, cleanNumber(item.valueTHB || item.estimatedValueTHB));
+  if (perCardValue > 0) return perCardValue * quantity;
+
+  const cardNo = normalizeCardNo(item.cardNo);
+  const coinValue = getNexoraCoinReward(cardNo)?.coinValue || 0;
+  if (coinValue > 0) return coinValue * quantity;
+
+  const singleCardNexValue = getNexoraSingleCardNexReward(cardNo)?.nexValue || 0;
+  if (singleCardNexValue > 0) return Math.round(singleCardNexValue / 2) * quantity;
+
+  return 0;
+}
+
+function resolveSetCollateralValueTHB(item: Record<string, unknown>, quantity: number) {
+  const explicitTotalValue = Math.max(0, cleanNumber(item.collateralValueTHB));
+  if (explicitTotalValue > 0) return explicitTotalValue;
+
+  const fullValuePerSet = Math.max(
+    0,
+    cleanNumber(item.fullNexValue || item.valueTHB || item.nexValue)
+  );
+  return fullValuePerSet * quantity;
+}
+
 function normalizeEntryMode(value: unknown): CardBankEntryMode | null {
   const mode = cleanText(value).toLowerCase();
   return mode === "bank" || mode === "pawn" ? mode : null;
@@ -111,33 +151,41 @@ export async function POST(request: Request) {
     const items = Array.isArray(body.items)
       ? body.items
           .map((item) => asObject(item))
-          .map((item) => ({
-          cardNo: cleanText(item.cardNo).replace(/\D/g, "").padStart(3, "0").slice(-3),
-          cardName: cleanText(item.cardName),
-          cardType: cleanText(item.cardType).toLowerCase() === "foil" ? ("foil" as const) : ("normal" as const),
-          rarity: cleanText(item.rarity),
-          assetTier: cleanText(item.assetTier),
-          quantity: cleanQuantity(item.quantity),
-          imageUrl: cleanText(item.imageUrl) || null,
-          pawn: normalizePawnPayload(asObject(item.pawn)) || undefined,
-          }))
+          .map((item) => {
+            const quantity = cleanQuantity(item.quantity);
+            const fallbackCollateralValueTHB = resolveSpecificCardCollateralValueTHB(item, quantity);
+            return {
+              cardNo: normalizeCardNo(item.cardNo),
+              cardName: cleanText(item.cardName),
+              cardType: cleanText(item.cardType).toLowerCase() === "foil" ? ("foil" as const) : ("normal" as const),
+              rarity: cleanText(item.rarity),
+              assetTier: cleanText(item.assetTier),
+              quantity,
+              imageUrl: cleanText(item.imageUrl) || null,
+              pawn: normalizePawnPayload(asObject(item.pawn), fallbackCollateralValueTHB) || undefined,
+            };
+          })
           .filter((item) => item.cardNo && item.cardName)
       : [];
 
     const setItems = Array.isArray(body.setItems)
       ? body.setItems
           .map((item) => asObject(item))
-          .map((item) => ({
-          setId: cleanText(item.setId),
-          order: Math.floor(cleanNumber(item.order)),
-          setName: cleanText(item.setName),
-          quantity: cleanQuantity(item.quantity),
-          nexValue: cleanNumber(item.nexValue),
-          reward: cleanText(item.reward),
-          withFoilBonus: Boolean(item.withFoilBonus),
-          cardTotal: Math.floor(cleanNumber(item.cardTotal)),
-          pawn: normalizePawnPayload(asObject(item.pawn)) || undefined,
-          }))
+          .map((item) => {
+            const quantity = cleanQuantity(item.quantity);
+            const fallbackCollateralValueTHB = resolveSetCollateralValueTHB(item, quantity);
+            return {
+              setId: cleanText(item.setId),
+              order: Math.floor(cleanNumber(item.order)),
+              setName: cleanText(item.setName),
+              quantity,
+              nexValue: cleanNumber(item.nexValue),
+              reward: cleanText(item.reward),
+              withFoilBonus: Boolean(item.withFoilBonus),
+              cardTotal: Math.floor(cleanNumber(item.cardTotal)),
+              pawn: normalizePawnPayload(asObject(item.pawn), fallbackCollateralValueTHB) || undefined,
+            };
+          })
           .filter((item) => item.setId && item.setName)
       : [];
 

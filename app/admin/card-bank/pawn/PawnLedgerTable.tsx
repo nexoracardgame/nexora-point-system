@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { BadgeCheck, ChevronDown, MoreVertical, RotateCcw, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -106,8 +107,10 @@ export default function PawnLedgerTable({
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [openRowId, setOpenRowId] = useState("");
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [busyRowId, setBusyRowId] = useState("");
   const [message, setMessage] = useState("");
+  const actionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -119,6 +122,71 @@ export default function PawnLedgerTable({
         .includes(needle)
     );
   }, [query, rows]);
+
+  const closeMenu = () => {
+    setOpenRowId("");
+    setMenuPosition(null);
+  };
+
+  const updateMenuPosition = (rowId: string) => {
+    const button = actionButtonRefs.current[rowId];
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const width = 244;
+    const estimatedHeight = 132;
+    const margin = 12;
+    const left = Math.min(
+      window.innerWidth - width - margin,
+      Math.max(margin, rect.right - width)
+    );
+    const belowTop = rect.bottom + 10;
+    const top =
+      belowTop + estimatedHeight > window.innerHeight - margin
+        ? Math.max(margin, rect.top - estimatedHeight - 10)
+        : belowTop;
+
+    setMenuPosition({ top, left, width });
+  };
+
+  const toggleMenu = (rowId: string) => {
+    if (!rowId) return;
+    if (openRowId === rowId) {
+      closeMenu();
+      return;
+    }
+    setOpenRowId(rowId);
+    window.requestAnimationFrame(() => updateMenuPosition(rowId));
+  };
+
+  useEffect(() => {
+    if (!openRowId) return;
+
+    const syncPosition = () => updateMenuPosition(openRowId);
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      const button = actionButtonRefs.current[openRowId];
+      const menu = document.getElementById(`pawn-action-menu-${openRowId}`);
+      if ((target && button?.contains(target)) || (target && menu?.contains(target))) return;
+      closeMenu();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu();
+    };
+
+    syncPosition();
+    window.addEventListener("resize", syncPosition);
+    window.addEventListener("scroll", syncPosition, true);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("resize", syncPosition);
+      window.removeEventListener("scroll", syncPosition, true);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openRowId]);
 
   const runAction = async (row: PawnLedgerTableRow, action: "payment" | "redeem") => {
     if (!row.assetId) return;
@@ -154,7 +222,7 @@ export default function PawnLedgerTable({
         throw new Error(data.error || "ทำรายการไม่สำเร็จ");
       }
 
-      setOpenRowId("");
+      closeMenu();
       setMessage(action === "payment" ? "ชำระดอก / ต่ออายุสำเร็จแล้ว" : "ไถ่ถอนสำเร็จแล้ว");
       startTransition(() => router.refresh());
     } catch (error) {
@@ -263,23 +331,39 @@ export default function PawnLedgerTable({
                       {row.staffName ? `โดย ${row.staffName}` : "ยังไม่ระบุผู้รับเรื่อง"}
                     </div>
                   </div>
-                  <div className="relative">
+                  <div>
                     <button
                       type="button"
-                      onClick={() => setOpenRowId(expanded ? "" : row.assetId)}
-                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border border-white/12 bg-white/[0.05] px-3 text-xs font-black text-white/82 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:border-white/24 hover:bg-white/[0.08]"
+                      ref={(node) => {
+                        actionButtonRefs.current[row.assetId] = node;
+                      }}
+                      onClick={() => toggleMenu(row.assetId)}
+                      className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border px-3 text-xs font-black shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition ${
+                        expanded
+                          ? "border-white/70 bg-white/[0.12] text-white ring-2 ring-white/25"
+                          : "border-white/12 bg-white/[0.05] text-white/82 hover:border-white/24 hover:bg-white/[0.08]"
+                      }`}
                     >
                       <MoreVertical className="h-4 w-4" />
                       จัดการ
                       <ChevronDown className={`h-4 w-4 transition ${expanded ? "rotate-180" : ""}`} />
                     </button>
-                    {expanded ? (
-                      <div className="absolute right-0 top-[42px] z-10 w-[220px] rounded-[18px] border border-white/10 bg-[#11131a] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
+                    {expanded && menuPosition && typeof document !== "undefined"
+                      ? createPortal(
+                        <div
+                          id={`pawn-action-menu-${row.assetId}`}
+                          style={{
+                            top: menuPosition.top,
+                            left: menuPosition.left,
+                            width: menuPosition.width,
+                          }}
+                          className="fixed z-[2200] rounded-[18px] border border-white/16 bg-[#14171f]/98 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.72)] ring-1 ring-white/10 backdrop-blur-xl"
+                        >
                         <button
                           type="button"
                           disabled={busy || !state.actionable}
                           onClick={() => void runAction(row, "payment")}
-                          className="flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border border-emerald-200/20 bg-emerald-400/12 text-xs font-black text-emerald-100 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-emerald-200/24 bg-emerald-400/14 text-xs font-black text-emerald-100 shadow-inner shadow-white/5 transition hover:border-emerald-100/42 hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <RotateCcw className="h-4 w-4" />
                           ชำระดอก / ต่ออายุ
@@ -288,7 +372,7 @@ export default function PawnLedgerTable({
                           type="button"
                           disabled={busy || !state.actionable}
                           onClick={() => void runAction(row, "redeem")}
-                          className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border border-sky-200/20 bg-sky-400/12 text-xs font-black text-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-sky-200/24 bg-sky-400/14 text-xs font-black text-sky-100 shadow-inner shadow-white/5 transition hover:border-sky-100/42 hover:bg-sky-400/20 disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <BadgeCheck className="h-4 w-4" />
                           ไถ่ถอน
@@ -298,8 +382,10 @@ export default function PawnLedgerTable({
                             {state.hint}
                           </div>
                         ) : null}
-                      </div>
-                    ) : null}
+                        </div>,
+                        document.body
+                      )
+                      : null}
                   </div>
                 </div>
               );
