@@ -161,7 +161,8 @@ function addDays(value: string, days: number) {
 
 function getAssetStatusLabel(status: CardBankStatus) {
   if (status === "forfeited") return "ปิดสิทธิ์รับฝาก";
-  if (status === "withdrawn" || status === "converted") return "ปิดบัญชี";
+  if (status === "withdrawn") return "ไถ่ถอนเรียบร้อย";
+  if (status === "converted") return "ปิดบัญชี";
   return "กำลังใช้งาน";
 }
 
@@ -457,7 +458,7 @@ export default async function PawnLedgerPage() {
             <h2 className="mt-2 text-2xl font-black">ส่วนถัดไปที่ควรต่อ</h2>
           </div>
           <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-white/55">
-            พร้อมต่อเป็น CRUD / อนุมัติ / ชำระดอกเบี้ย
+            พร้อมต่อเป็น CRUD / อนุมัติ / ชำระดอก / ต่ออายุ / ไถ่ถอน
           </div>
         </div>
 
@@ -467,8 +468,8 @@ export default async function PawnLedgerPage() {
             desc="เพิ่มฟอร์มกรอกชื่อผู้ฝาก การ์ด จำนวน เงินต้น และดอกเบี้ยจากหน้าแอดมิน"
           />
           <PhaseCard
-            title="ปุ่มชำระ / ต่ออายุ"
-            desc="ทำ action สำหรับรับชำระดอกเบี้ย เลื่อนครบกำหนด และบันทึกประวัติ"
+            title="ชำระดอก / ต่ออายุ / ไถ่ถอน"
+            desc="ชำระดอกและต่ออายุใช้ปุ่มเดียว ส่วนไถ่ถอนคือการปิดยอดและคืนการ์ด"
           />
           <PhaseCard
             title="สถานะปิดสิทธิ์รับฝาก"

@@ -1636,6 +1636,7 @@ function OpeningTieBreakOverlay({
   challengerName,
   ownSide,
   isSpectator,
+  pendingChoice,
   onChoose,
 }: {
   tieBreak?: OpeningTieBreak | null;
@@ -1643,12 +1644,13 @@ function OpeningTieBreakOverlay({
   challengerName: string;
   ownSide: RoomPlayerSide | null;
   isSpectator: boolean;
+  pendingChoice: TriadRpsChoice | null;
   onChoose: (choice: TriadRpsChoice) => void;
 }) {
   if (!tieBreak || tieBreak.status === "idle") return null;
   const hostChoice = tieBreak.choices.host || "unknown";
   const challengerChoice = tieBreak.choices.challenger || "unknown";
-  const ownChoice = ownSide ? tieBreak.choices[ownSide] || "unknown" : "unknown";
+  const ownChoice = pendingChoice || (ownSide ? tieBreak.choices[ownSide] || "unknown" : "unknown");
   const winnerName = tieBreak.winner === "host" ? hostName : tieBreak.winner === "challenger" ? challengerName : "";
   const canChoose = tieBreak.status === "waiting" && !isSpectator && ownSide && ownChoice === "unknown";
 
@@ -2426,6 +2428,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [matchScore, setMatchScore] = useState({ player: 0, bot: 0 });
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [spectatorPreviewCard, setSpectatorPreviewCard] = useState<CardView | null>(null);
+  const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
+  const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
 
   const playerDeckCards = playerDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botDeckCards = botDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -2459,10 +2463,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const isRoomController = Boolean(
     currentRoom && (currentRoom.hostId === participant.id || currentRoom.seats.host?.id === participant.id)
   );
-  const isSpectator = Boolean(currentRoom?.spectators.some((viewer) => viewer.id === participant.id));
   const isFieldPlayer = Boolean(
     currentRoom?.seats.host?.id === participant.id || currentRoom?.seats.challenger?.id === participant.id
   );
+  const isSpectator = Boolean(currentRoom && !isFieldPlayer && currentRoom.spectators.some((viewer) => viewer.id === participant.id));
   const roomPlayerSide: RoomPlayerSide | null = currentRoom?.seats.host?.id === participant.id
     ? "host"
     : currentRoom?.seats.challenger?.id === participant.id
@@ -2758,6 +2762,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const chooseOpeningTieBreak = (choice: TriadRpsChoice) => {
     if (!currentRoom || !roomPlayerSide || choice === "unknown") return;
+    if (openingTieBreakPendingChoiceRef.current || currentRoom.game.openerTieBreak.choices[roomPlayerSide] !== "unknown") return;
+    openingTieBreakPendingChoiceRef.current = choice;
+    setOpeningTieBreakPendingChoice(choice);
     patchCurrentRoom((room) => ({
       ...room,
       game: {
@@ -2777,11 +2784,33 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       choice,
     }).then((result) => {
       if (!result.ok) {
+        openingTieBreakPendingChoiceRef.current = null;
+        setOpeningTieBreakPendingChoice(null);
         void syncRooms({ force: true }).catch(() => null);
         setBattleLog((current) => ["เลือกเป่ายิงฉุบไม่สำเร็จ ระบบจะซิงก์สถานะล่าสุดอีกครั้ง", ...current]);
       }
     });
   };
+
+  useEffect(() => {
+    const tieBreak = currentRoom?.game.openerTieBreak;
+    if (!tieBreak || tieBreak.status !== "waiting" || !roomPlayerSide) {
+      openingTieBreakPendingChoiceRef.current = null;
+      setOpeningTieBreakPendingChoice(null);
+      return;
+    }
+    const serverChoice = tieBreak.choices[roomPlayerSide] || "unknown";
+    if (serverChoice !== "unknown") {
+      openingTieBreakPendingChoiceRef.current = serverChoice;
+      setOpeningTieBreakPendingChoice(null);
+    }
+  }, [
+    currentRoom?.game.openerTieBreak.fightNo,
+    currentRoom?.game.openerTieBreak.status,
+    currentRoom?.game.openerTieBreak.choices.host,
+    currentRoom?.game.openerTieBreak.choices.challenger,
+    roomPlayerSide,
+  ]);
 
   const createRoom = async (deckMode: DeckMode) => {
     const access = roomAccess;
@@ -4505,6 +4534,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
         ownSide={roomPlayerSide}
         isSpectator={isSpectator}
+        pendingChoice={openingTieBreakPendingChoice}
         onChoose={chooseOpeningTieBreak}
       />
       {currentRoom ? (

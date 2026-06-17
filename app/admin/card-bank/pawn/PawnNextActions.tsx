@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { BadgeCheck, CreditCard, FilePlus2, LockKeyhole } from "lucide-react";
 import type { CardBankAsset } from "@/lib/card-bank-store";
 
-type ActionMode = "payment" | "renew" | "forfeit";
+type ActionMode = "payment" | "redeem";
 
 function assetLabel(asset: CardBankAsset) {
   const name = asset.setName || asset.cardName || "รายการรับฝาก";
@@ -24,24 +24,43 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
 
+  const getSelectedAsset = () => activeAssets.find((asset) => asset.id === assetId) || null;
+
   const runAction = (action: ActionMode) => {
     if (!assetId) {
-      setMessage("เลือกรายการรับฝากก่อน");
+      setMessage("เลือกการ์ดรับฝากก่อน");
+      return;
+    }
+
+    const selectedAsset = getSelectedAsset();
+    if (!selectedAsset) {
+      setMessage("ไม่พบรายการรับฝากที่เลือก");
       return;
     }
 
     setMessage("");
     startTransition(async () => {
-      const response = await fetch(`/api/admin/card-bank/assets/${encodeURIComponent(assetId)}/pawn-action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          amountTHB: Number(amountTHB || 0),
-          extendDays: Number(extendDays || 30),
-          note,
-        }),
-      });
+      const response =
+        action === "payment"
+          ? await fetch(`/api/admin/card-bank/assets/${encodeURIComponent(assetId)}/pawn-action`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "payment",
+                amountTHB: Number(amountTHB || 0),
+                extendDays: Number(extendDays || 30),
+                note,
+              }),
+            })
+          : await fetch(`/api/admin/card-bank/assets/${encodeURIComponent(assetId)}/withdraw`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                quantity: selectedAsset.quantity,
+                note: note || "ไถ่ถอน",
+              }),
+            });
+
       const data = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
         error?: string;
@@ -52,8 +71,13 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
         return;
       }
 
-      setMessage("บันทึกสำเร็จ และซิงก์ข้อมูลไปชีตแล้ว");
+      setMessage(
+        action === "payment"
+          ? "ชำระดอก / ต่ออายุเรียบร้อย และซิงก์ข้อมูลไปทั่วระบบแล้ว"
+          : "ไถ่ถอนเรียบร้อย และซิงก์ข้อมูลไปทั่วระบบแล้ว"
+      );
       setAmountTHB("");
+      setExtendDays("30");
       setNote("");
       router.refresh();
     });
@@ -63,9 +87,7 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
     <section className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">
-            Next Phase
-          </div>
+          <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">Next Phase</div>
           <h2 className="mt-2 text-2xl font-black">ส่วนถัดไปที่ควรต่อ</h2>
         </div>
         <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-white/55">
@@ -90,9 +112,9 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
 
         <div className="rounded-[22px] border border-white/10 bg-black/24 p-4">
           <CreditCard className="h-5 w-5 text-white/64" />
-          <h3 className="mt-4 text-lg font-black text-white">ปุ่มชำระ / ต่ออายุ</h3>
+          <h3 className="mt-4 text-lg font-black text-white">ชำระดอก / ต่ออายุ / ไถ่ถอน</h3>
           <p className="mt-2 text-sm leading-6 text-white/55">
-            ทำ action สำหรับรับชำระดอกเบี้ย เลื่อนครบกำหนด และบันทึกประวัติ
+            ชำระดอกเบี้ยและเลื่อนครบกำหนดใช้ปุ่มเดียว ส่วนปิดยอดครบแล้วให้กดไถ่ถอนเพื่อคืนการ์ดและซิงก์ข้อมูล
           </p>
           <div className="mt-4 space-y-2">
             <select
@@ -139,15 +161,15 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
                 onClick={() => runAction("payment")}
                 className="h-11 rounded-[16px] border border-emerald-200/20 bg-emerald-400/12 text-sm font-black text-emerald-100 disabled:opacity-45"
               >
-                ชำระดอก
+                ชำระดอก / ต่ออายุ
               </button>
               <button
                 type="button"
                 disabled={isPending || !assetId}
-                onClick={() => runAction("renew")}
+                onClick={() => runAction("redeem")}
                 className="h-11 rounded-[16px] border border-sky-200/20 bg-sky-400/12 text-sm font-black text-sky-100 disabled:opacity-45"
               >
-                ต่ออายุ
+                ไถ่ถอน
               </button>
             </div>
           </div>
@@ -155,18 +177,10 @@ export default function PawnNextActions({ assets }: { assets: CardBankAsset[] })
 
         <div className="rounded-[22px] border border-white/10 bg-black/24 p-4">
           <LockKeyhole className="h-5 w-5 text-white/64" />
-          <h3 className="mt-4 text-lg font-black text-white">สถานะปิดสิทธิ์รับฝาก</h3>
+          <h3 className="mt-4 text-lg font-black text-white">สถานะไถ่ถอน</h3>
           <p className="mt-2 text-sm leading-6 text-white/55">
-            ล็อกการ์ดที่เกินกำหนดและแสดงผลแยกชัดเจนในตาราง
+            เมื่อกดไถ่ถอน ระบบจะปิดยอด คืนการ์ด และซิงก์สถานะให้ทุกหน้าที่เชื่อมอยู่เห็นตรงกัน
           </p>
-          <button
-            type="button"
-            disabled={isPending || !assetId}
-            onClick={() => runAction("forfeit")}
-            className="mt-4 h-11 w-full rounded-[16px] border border-red-200/20 bg-red-500/14 text-sm font-black text-red-100 disabled:opacity-45"
-          >
-            ปิดสิทธิ์รับฝากรายการที่เลือก
-          </button>
           {message ? (
             <div className="mt-4 flex gap-2 rounded-[16px] border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/70">
               <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" />

@@ -729,7 +729,7 @@ export async function applyCardBankPawnAction(input: CardBankPawnActionInput) {
     const nextStatus: CardBankStatus = action === "forfeit" ? "forfeited" : "pawned";
     const actionLabel =
       action === "payment"
-        ? "ชำระดอกเบี้ย"
+        ? "ชำระดอก / ต่ออายุ"
         : action === "renew"
           ? "ต่ออายุรับฝาก"
           : "ปิดสิทธิ์รับฝาก";
