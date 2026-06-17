@@ -15,6 +15,7 @@ export type CardBankEntryMode = "bank" | "pawn";
 export type CardBankIntakeMode = "specific" | "sets" | "bulk";
 export type CardBankStatus = "stored" | "pawned" | "converted" | "withdrawn" | "forfeited";
 export type CardBankAssetTier = "bronze" | "silver" | "gold" | "set" | "pure" | "unknown";
+const PAWN_GRACE_DAYS = 7;
 
 export type CardBankAsset = {
   id: string;
@@ -187,6 +188,45 @@ function normalizeStatus(value: unknown): CardBankStatus {
   return "stored";
 }
 
+function getPawnDueDate(asset: CardBankAsset) {
+  const pawn = getPawnLikePayload(asset);
+  const dueDays = Math.max(1, Math.floor(toNumber(pawn.dueDays || 30)) || 30);
+  return String(pawn.dueDate || "").trim() || addDaysToIso(asset.createdAt, dueDays);
+}
+
+function getPawnOverdueDays(asset: CardBankAsset, now = Date.now()) {
+  const dueDate = new Date(getPawnDueDate(asset)).getTime();
+  if (Number.isNaN(dueDate)) return 0;
+  return Math.max(0, Math.floor((now - dueDate) / 86_400_000));
+}
+
+function applyPawnLifecycleState(asset: CardBankAsset): CardBankAsset {
+  if (asset.entryMode !== "pawn") return asset;
+  if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
+    return asset;
+  }
+
+  const overdueDays = getPawnOverdueDays(asset);
+  if (overdueDays <= PAWN_GRACE_DAYS) {
+    return asset;
+  }
+
+  const pawn = getPawnLikePayload(asset);
+  const now = new Date().toISOString();
+  return {
+    ...asset,
+    status: "forfeited" as const,
+    updatedAt: now,
+    sourcePayload: mergePawnPayload(asset, {
+      ...pawn,
+      lastAction: "forfeit",
+      lastActionLabel: "หมดสิทธิ์ไถ่ถอน",
+      lastActionAt: now,
+      note: [String(pawn.note || "").trim(), "หมดสิทธิ์ไถ่ถอน"].filter(Boolean).join(" | "),
+    }),
+  } as CardBankAsset;
+}
+
 function normalizeAssetTier(value: unknown): CardBankAssetTier {
   const normalized = String(value || "").trim().toLowerCase();
   if (/bronze|บรอนซ์/.test(normalized)) return "bronze";
@@ -288,7 +328,8 @@ async function ensureCardBankSchema() {
 
 async function readLocalAssets() {
   await ensureLocalStoreFile("local-card-bank-assets.json");
-  return readLocalStoreJson<CardBankAsset>("local-card-bank-assets.json");
+  const items = await readLocalStoreJson<CardBankAsset>("local-card-bank-assets.json");
+  return items.map(applyPawnLifecycleState);
 }
 
 async function writeLocalAssets(items: CardBankAsset[]) {
@@ -540,6 +581,9 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
     const current = await readLocalAssets();
     const asset = current.find((item) => item.id === assetId);
     if (!asset) throw new Error("Asset not found");
+    if (applyPawnLifecycleState(asset).status === "forfeited") {
+      throw new Error("Asset is already forfeited");
+    }
     if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
       throw new Error("Asset is already closed");
     }
@@ -606,6 +650,9 @@ export async function withdrawCardBankAsset(input: WithdrawCardBankAssetInput) {
     );
     const asset = rows[0] ? toAssetRecord(rows[0]) : null;
     if (!asset) throw new Error("Asset not found");
+    if (applyPawnLifecycleState(asset).status === "forfeited") {
+      throw new Error("Asset is already forfeited");
+    }
     if (asset.status === "withdrawn" || asset.status === "converted" || asset.status === "forfeited") {
       throw new Error("Asset is already closed");
     }
@@ -715,6 +762,9 @@ export async function applyCardBankPawnAction(input: CardBankPawnActionInput) {
   const buildAfterState = (asset: CardBankAsset): CardBankAsset => {
     if (asset.entryMode !== "pawn") {
       throw new Error("Asset is not a deposit asset");
+    }
+    if (applyPawnLifecycleState(asset).status === "forfeited") {
+      throw new Error("Asset is already forfeited");
     }
     if (asset.status === "withdrawn" || asset.status === "converted") {
       throw new Error("Asset is already closed");

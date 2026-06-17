@@ -16,6 +16,7 @@ import {
 import { getPawnLedgerEntries, type PawnLedgerEntry } from "@/lib/pawn-ledger-sheet";
 import CardBankWithdrawPanel from "../CardBankWithdrawPanel";
 import PawnNextActions from "./PawnNextActions";
+import PawnLedgerTable from "./PawnLedgerTable";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +136,18 @@ function toDisplayRows(entries: PawnLedgerEntry[]) {
     ...entry,
     overdueDays: getOverdueDays(entry.dueDate),
   }));
+}
+
+function getLedgerRowState(row: PawnLedgerEntry & { overdueDays: number }) {
+  const status = String(row.status || "");
+  const closed = status.includes("ไถ่ถอน") || status.includes("ปิดบัญชี");
+  const forfeited = status.includes("ปิดสิทธิ์") || status.includes("หลุด") || row.overdueDays > 7;
+  const warning = !closed && !forfeited && row.overdueDays > 0 && row.overdueDays <= 7;
+
+  if (forfeited) return "forfeited";
+  if (closed) return "closed";
+  if (warning) return "warning";
+  return "active";
 }
 
 function parseNumber(value: unknown) {
@@ -304,7 +317,8 @@ export default async function PawnLedgerPage() {
         </div>
       </section>
 
-      <section>
+      <PawnLedgerTable rows={rows} sourceLabel={sourceLabel} />
+      <section className="hidden">
         <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
