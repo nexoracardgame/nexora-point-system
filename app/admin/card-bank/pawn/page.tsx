@@ -16,6 +16,7 @@ import {
 import { getPawnLedgerEntries, type PawnLedgerEntry } from "@/lib/pawn-ledger-sheet";
 import CardBankWithdrawPanel from "../CardBankWithdrawPanel";
 import PawnNextActions from "./PawnNextActions";
+import PawnRedemptionHistoryTable from "./PawnRedemptionHistoryTable";
 import PawnLedgerTable from "./PawnLedgerTable";
 
 export const dynamic = "force-dynamic";
@@ -281,11 +282,13 @@ export default async function PawnLedgerPage() {
   }
 
   const rows = toDisplayRows(entries);
-  const totalPrincipal = rows.reduce((sum, row) => sum + row.principalTHB, 0);
-  const totalInterest = rows.reduce((sum, row) => sum + row.monthlyInterestTHB, 0);
-  const activeCount = rows.filter((row) => row.status.includes("กำลัง") || row.status.includes("ครบ")).length;
-  const overdueCount = rows.filter((row) => row.overdueDays > 0 && !row.status.includes("ปิด") && !row.status.includes("หลุด")).length;
-  const forfeitedCount = rows.filter((row) => row.status.includes("หลุด")).length;
+  const activeRows = rows.filter((row) => !row.status.includes("ไถ่ถอน"));
+  const redemptionRows = rows.filter((row) => row.status.includes("ไถ่ถอน"));
+  const totalPrincipal = activeRows.reduce((sum, row) => sum + row.principalTHB, 0);
+  const totalInterest = activeRows.reduce((sum, row) => sum + row.monthlyInterestTHB, 0);
+  const activeCount = activeRows.filter((row) => row.status.includes("เธเธณเธฅเธฑเธ") || row.status.includes("เธเธฃเธ")).length;
+  const overdueCount = activeRows.filter((row) => row.overdueDays > 0 && !row.status.includes("เธเธดเธ”") && !row.status.includes("เธซเธฅเธธเธ”")).length;
+  const forfeitedCount = activeRows.filter((row) => row.status.includes("เธซเธฅเธธเธ”")).length;
 
   return (
     <div className="space-y-5 text-white">
@@ -317,7 +320,8 @@ export default async function PawnLedgerPage() {
         </div>
       </section>
 
-      <PawnLedgerTable rows={rows} sourceLabel={sourceLabel} />
+      <PawnLedgerTable rows={activeRows} sourceLabel={sourceLabel} />
+      <PawnRedemptionHistoryTable rows={redemptionRows} />
       <section className="hidden">
         <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

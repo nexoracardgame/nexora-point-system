@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { BadgeCheck, ChevronDown, MoreVertical, RotateCcw, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-type PawnLedgerTableRow = {
+export type PawnLedgerTableRow = {
   rowNumber: number;
   assetId: string;
   borrowerName: string;
@@ -57,7 +57,7 @@ function classifyRow(row: PawnLedgerTableRow) {
     return {
       label: "หมดสิทธิ์ไถ่ถอน",
       tone: "border-red-300/20 bg-red-500/12 text-red-100",
-      rowTone: "border-l-red-400/70 bg-red-500/[0.03]",
+      rowTone: "border-l-red-400/70 bg-red-500/[0.05]",
       actionable: false,
       hint: "เกิน 7 วันแล้ว",
     };
@@ -67,7 +67,7 @@ function classifyRow(row: PawnLedgerTableRow) {
     return {
       label: "ไถ่ถอนเรียบร้อย",
       tone: "border-emerald-300/20 bg-emerald-400/12 text-emerald-100",
-      rowTone: "border-l-emerald-400/60 bg-emerald-500/[0.03]",
+      rowTone: "border-l-emerald-400/60 bg-emerald-500/[0.05]",
       actionable: false,
       hint: "ปิดยอดแล้ว",
     };
@@ -78,7 +78,7 @@ function classifyRow(row: PawnLedgerTableRow) {
     return {
       label: `เหลือ ${left} วันก่อนหมดสิทธิ์`,
       tone: "border-amber-300/20 bg-amber-400/12 text-amber-100",
-      rowTone: "border-l-amber-300/60 bg-amber-500/[0.03]",
+      rowTone: "border-l-amber-300/60 bg-amber-500/[0.05]",
       actionable: true,
       hint: "ใกล้ตัดสิทธิ์",
     };
@@ -87,7 +87,7 @@ function classifyRow(row: PawnLedgerTableRow) {
   return {
     label: status.includes("กำลัง") || status.includes("ใช้งาน") ? "กำลังใช้งาน" : "ปกติ",
     tone: "border-white/10 bg-white/[0.06] text-white/75",
-    rowTone: "border-l-white/0 bg-white/[0.01]",
+    rowTone: "border-l-white/0 bg-white/[0.035]",
     actionable: true,
     hint: "ยังปกติ",
   };
@@ -163,7 +163,7 @@ export default function PawnLedgerTable({
   };
 
   return (
-    <section className="w-full rounded-[28px] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+    <section className="w-full rounded-[28px] border border-white/10 bg-[#0b0d12] p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/35">Live Table</div>
@@ -188,10 +188,10 @@ export default function PawnLedgerTable({
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-hidden rounded-[22px] border border-white/10">
-        <div className="max-h-[calc(100vh-300px)] overflow-auto">
+      <div className="mt-5 overflow-hidden rounded-[22px] border border-white/10 bg-black/20">
+        <div className="max-h-[640px] overflow-auto">
           <div className="min-w-[1320px]">
-            <div className="sticky top-0 z-20 grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] bg-[#121216]/98 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38 backdrop-blur">
+            <div className="sticky top-0 z-20 grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] bg-[#14171f]/98 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38 backdrop-blur">
             <div>ลำดับ</div>
             <div>วันรับฝาก</div>
             <div>ชื่อผู้ฝาก</div>
@@ -213,7 +213,7 @@ export default function PawnLedgerTable({
               return (
                 <div
                   key={`${row.rowNumber}-${row.assetId}`}
-                  className={`grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] items-start gap-0 border-t border-white/8 border-l-4 px-4 py-3 text-sm ${state.rowTone}`}
+                    className={`grid grid-cols-[72px_148px_210px_258px_92px_132px_132px_154px_132px_180px_112px] items-start gap-0 border-t border-white/8 border-l-4 px-4 py-3 text-sm ${state.rowTone}`}
                 >
                   <div className="font-black text-white">{row.rowNumber.toLocaleString("th-TH")}</div>
                   <div className="space-y-1 text-white/72">
@@ -255,14 +255,14 @@ export default function PawnLedgerTable({
                     <button
                       type="button"
                       onClick={() => setOpenRowId(expanded ? "" : row.assetId)}
-                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-black/35 px-3 text-xs font-black text-white/78 transition hover:border-white/24 hover:bg-black/55"
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[14px] border border-white/12 bg-white/[0.05] px-3 text-xs font-black text-white/82 shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:border-white/24 hover:bg-white/[0.08]"
                     >
                       <MoreVertical className="h-4 w-4" />
                       จัดการ
                       <ChevronDown className={`h-4 w-4 transition ${expanded ? "rotate-180" : ""}`} />
                     </button>
                     {expanded ? (
-                      <div className="absolute right-0 top-[46px] z-10 w-[220px] rounded-[18px] border border-white/10 bg-[#09090f] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
+                      <div className="absolute right-0 top-[42px] z-10 w-[220px] rounded-[18px] border border-white/10 bg-[#11131a] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)]">
                         <button
                           type="button"
                           disabled={busy || !state.actionable}
