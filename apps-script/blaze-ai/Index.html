@@ -37,7 +37,9 @@
     html,
     body {
       margin: 0;
+      width: 100%;
       height: 100%;
+      min-height: 100%;
       font-family: "Noto Sans Thai", sans-serif;
       color: var(--text);
 
@@ -47,10 +49,10 @@
         radial-gradient(circle at bottom center, rgba(214, 168, 78, 0.08), transparent 24%),
         linear-gradient(180deg, #060607 0%, #0a0a0d 45%, #050506 100%);
 
-     overflow: hidden;            /* 🔥 ตัวสำคัญ */
+      overflow: hidden;
       overflow-x: hidden;
-
-     -webkit-overflow-scrolling: touch;
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
     }
 
     body::before {
@@ -81,28 +83,24 @@
       position: relative;
       z-index: 1;
       width: 100%;
-
-      /* 🔥 แก้ตรงนี้ */
-      min-height: 100vh;
-      height: auto;
-
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
       padding: 22px;
-
       display: flex;
       justify-content: center;
       align-items: stretch;
-
-      /* 🔥 สำคัญมาก */
-      overflow: visible;
-}
+      overflow: hidden;
+    }
 
     .chat-shell {
       width: min(1180px, calc(100% - 160px));
       max-width: 1180px;
       height: 100%;
+      min-height: 0;
       margin-right: auto;
       position: relative;
-      overflow: visible;
+      overflow: hidden;
       background: transparent;
       border: 0;
       box-shadow: none;
@@ -132,13 +130,13 @@
       position: relative;
       z-index: 2;
       width: 100%;
-      height: auto;
-      min-height: 100vh;
+      height: 100%;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       backdrop-filter: blur(8px);
       border-radius: 28px;
-      overflow: visible;
+      overflow: hidden;
       background: linear-gradient(180deg, rgba(10,10,14,0.92), rgba(8,8,11,0.94));
       box-shadow: var(--shadow);
     }
@@ -291,6 +289,7 @@
       flex: 1;
       min-height: 0;
       min-width: 0;
+      overflow: hidden;
       background: radial-gradient(circle at center top, rgba(214,168,78,0.04), transparent 30%);
     }
 
@@ -325,6 +324,8 @@
       padding: 24px;
       padding-right: 24px;
       scroll-behavior: smooth;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     .messages::-webkit-scrollbar {
@@ -504,6 +505,10 @@
       background: linear-gradient(180deg, rgba(17,17,21,0.98), rgba(10,10,13,0.98));
       box-shadow: inset 0 0 20px rgba(247,215,123,0.03);
       padding: 14px;
+    }
+
+    .composer {
+      flex-shrink: 0;
     }
 
     .attachment-preview {
@@ -807,20 +812,22 @@
 
     @media (max-width: 768px) {
       .wrap {
-        min-height: 100vh;
-        height: auto;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
         padding: 0;
       }
 
       .chat-shell {
         width: 100% !important;
         height: 100%;
+        min-height: 0;
         margin-right: 0;
       }
 
       .chat-box {
-        height: auto;
-        min-height: 100vh;
+        height: 100%;
+        min-height: 0;
         border-radius: 0;
       }
 
@@ -1043,6 +1050,65 @@
       requestAnimationFrame(() => {
         messages.scrollTop = messages.scrollHeight;
       });
+    }
+
+    function canScrollMessages(deltaY) {
+      if (!messages) return false;
+      if (deltaY < 0) return messages.scrollTop > 0;
+      if (deltaY > 0) {
+        return messages.scrollTop + messages.clientHeight < messages.scrollHeight - 1;
+      }
+      return false;
+    }
+
+    function isComposerScrollTarget(target) {
+      return Boolean(
+        target &&
+        target.closest &&
+        target.closest("textarea, input, emoji-picker, .emoji-picker-wrap, .input, .composer")
+      );
+    }
+
+    function bindMessageScrollFallback() {
+      let lastTouchY = 0;
+
+      document.addEventListener(
+        "wheel",
+        function(e) {
+          if (isComposerScrollTarget(e.target)) return;
+          if (!canScrollMessages(e.deltaY)) return;
+
+          messages.scrollTop += e.deltaY;
+          e.preventDefault();
+        },
+        { passive: false }
+      );
+
+      document.addEventListener(
+        "touchstart",
+        function(e) {
+          if (!e.touches || !e.touches.length) return;
+          lastTouchY = e.touches[0].clientY;
+        },
+        { passive: true }
+      );
+
+      document.addEventListener(
+        "touchmove",
+        function(e) {
+          if (isComposerScrollTarget(e.target)) return;
+          if (!e.touches || !e.touches.length) return;
+
+          const currentY = e.touches[0].clientY;
+          const deltaY = lastTouchY - currentY;
+          lastTouchY = currentY;
+
+          if (!canScrollMessages(deltaY)) return;
+          messages.scrollTop += deltaY;
+          e.preventDefault();
+        },
+        { passive: false }
+      );
     }
 
     function autoResizeTextarea(el) {
@@ -1540,6 +1606,7 @@
     });
 
     autoResizeTextarea(userInput);
+    bindMessageScrollFallback();
     scrollMessagesToBottom();
 
     bootstrapPresenceClient();

@@ -180,6 +180,16 @@ function safeText(value?: string | number | null) {
   return String(value || "").trim();
 }
 
+function buildFloatingBlazeFallbackReply(message: string) {
+  const text = safeText(message);
+
+  if (!text) {
+    return "ข้าเชื่อมต่อสมองหลักสะดุดชั่วคราว ลองส่งคำถามใหม่อีกครั้งได้เลย";
+  }
+
+  return `ข้ารับคำถามแล้ว แต่สมองหลักสะดุดชั่วคราวกับคำถามนี้: ${text}\n\nลองถามใหม่อีกครั้งได้เลย หรือถามเป็นคำสั้นลงนิดหนึ่ง`;
+}
+
 function readFileAsDataUrlForBlaze(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -2300,7 +2310,7 @@ export default function FloatingChatDock({
       } | null;
 
       if (!res.ok || !payload?.reply) {
-        throw new Error(payload?.error || "ท่านเบลซยังตอบไม่ได้ในตอนนี้");
+        throw new Error(payload?.error || "EMPTY_BLAZE_REPLY");
       }
 
       setBlazeMessages((current) => [
@@ -2316,14 +2326,18 @@ export default function FloatingChatDock({
       const message =
         err instanceof Error && err.message
           ? err.message
-          : "ท่านเบลซเชื่อมต่อไม่สำเร็จ";
+          : "EMPTY_BLAZE_REPLY";
       setBlazeError("");
       setBlazeMessages((current) => [
         ...current,
         {
           id: `blaze-error-${Date.now()}`,
           role: "model",
-          text: `ข้าเชื่อมต่อไม่สำเร็จ: ${message}`,
+          text:
+            message === "EMPTY_BLAZE_REPLY" ||
+            message.includes("Blaze AI did not return text")
+              ? buildFloatingBlazeFallbackReply(text)
+              : "ข้าเชื่อมต่อสมองหลักสะดุดชั่วคราว ลองถามใหม่อีกครั้งได้เลย",
           createdAt: new Date().toISOString(),
         },
       ]);
