@@ -330,6 +330,30 @@ function sanitizeText(value: unknown) {
   return String(value || "").trim();
 }
 
+function isErrorLikeReply(value: unknown) {
+  const text = sanitizeText(value).toLowerCase();
+
+  if (!text) {
+    return true;
+  }
+
+  return [
+    "error:",
+    "temporary service disruptions",
+    "unrestricted key",
+    "api key",
+    "invalid api key",
+    "permission denied",
+    "forbidden",
+    "unauthenticated",
+    "quota",
+    "rate limit",
+    "missing api key",
+    "api_fail",
+    "invalid_json_response",
+  ].some((needle) => text.includes(needle));
+}
+
 function getGeminiApiKey() {
   return (
     process.env.GEMINI_API_KEY ||
@@ -4366,7 +4390,7 @@ function stripLineContactForNonSales(reply: string, message: string) {
 }
 
 function formatBlazeReplyLayout(reply: string) {
-  let text = sanitizeText(reply)
+  const text = sanitizeText(reply)
     .replace(/^\s*\*\s+/gm, "- ")
     .replace(/\s+\|\s+/g, "\n")
     .replace(/\s+(?=(?:ข้อมูลการ์ด|ค่าสเตตัส|รางวัล\/ชุดสะสม|สกิล\/วิธีใช้|หมายเหตุ):)/g, "\n\n")
@@ -4520,7 +4544,7 @@ async function askAppsScriptBridge({
     }
 
     const rawReply = sanitizeText(data.reply);
-    if (!rawReply || rawReply === "[object Object]") {
+    if (!rawReply || rawReply === "[object Object]" || isErrorLikeReply(rawReply)) {
       lastReply = "";
       continue;
     }
@@ -4811,8 +4835,12 @@ export async function POST(req: NextRequest) {
         knowledgeContext,
       }));
 
+    const rawReply = sanitizeText(result.reply);
+    const polishedReply = !isErrorLikeReply(rawReply)
+      ? sanitizeText(polishBlazeReply(rawReply, effectiveMessage))
+      : "";
     const finalReply =
-      sanitizeText(polishBlazeReply(result.reply, effectiveMessage)) ||
+      polishedReply ||
       buildBlazeSafeFallbackReply(effectiveMessage, knowledgeContext);
 
     return NextResponse.json(

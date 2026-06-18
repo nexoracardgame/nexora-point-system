@@ -2243,6 +2243,28 @@ function normalizeApiReply(reply) {
   return sanitizeText(String(reply));
 }
 
+function isErrorLikeReply(reply) {
+  const text = normalizeThaiText(reply).toLowerCase();
+
+  if (!text) return true;
+
+  return [
+    "error:",
+    "temporary service disruptions",
+    "unrestricted key",
+    "api key",
+    "invalid api key",
+    "permission denied",
+    "forbidden",
+    "unauthenticated",
+    "quota",
+    "rate limit",
+    "missing api key",
+    "api_fail",
+    "invalid_json_response"
+  ].some((needle) => text.includes(needle));
+}
+
 function pawnLedgerGetSheet_() {
   const ss = SpreadsheetApp.openById(PAWN_LEDGER_SPREADSHEET_ID);
   const configuredName = String(PAWN_LEDGER_SHEET_NAME || "").trim();
@@ -2522,6 +2544,14 @@ function doPost(e) {
         forceTextMode: data.fromCentralBrain === true
       });
       const apiTextReply = normalizeApiReply(apiReply);
+
+      if (isErrorLikeReply(apiTextReply)) {
+        return jsonOut({
+          ok: false,
+          mode: "chat",
+          reply: "BLAZE_UPSTREAM_ERROR"
+        });
+      }
 
       return jsonOut({
         ok: true,
