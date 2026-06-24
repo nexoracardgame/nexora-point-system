@@ -13,6 +13,12 @@ type FacebookSubscribedApp = {
   subscribed_fields?: string[];
 };
 
+type OptionalGraphResult<T> = {
+  ok: boolean;
+  data: T | null;
+  error: string | null;
+};
+
 function getRequiredEnv(name: string) {
   const value = process.env[name];
 
@@ -41,6 +47,25 @@ function hasMessagesSubscription(data: FacebookSubscribedApp[]) {
   return data.some((item) => item.subscribed_fields?.includes("messages"));
 }
 
+async function tryReadFacebookJson<T>(
+  url: string,
+  init?: RequestInit
+): Promise<OptionalGraphResult<T>> {
+  try {
+    return {
+      ok: true,
+      data: await readFacebookJson<T>(url, init),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: null,
+      error: error instanceof Error ? error.message : "Facebook request failed",
+    };
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
@@ -58,22 +83,23 @@ export async function GET(request: Request) {
   try {
     const pageAccessToken = getRequiredEnv("FACEBOOK_PAGE_ACCESS_TOKEN");
     const accessToken = encodeURIComponent(pageAccessToken);
-    const page = await readFacebookJson<{ id: string; name?: string }>(
+    const page = await tryReadFacebookJson<{ id: string; name?: string }>(
       `${GRAPH_API_BASE_URL}/me?fields=id,name&access_token=${accessToken}`
     );
-    const before = await readFacebookJson<{ data: FacebookSubscribedApp[] }>(
+    const before = await tryReadFacebookJson<{ data: FacebookSubscribedApp[] }>(
       `${GRAPH_API_BASE_URL}/me/subscribed_apps?access_token=${accessToken}`
     );
-    const alreadySubscribed = hasMessagesSubscription(before.data || []);
+    const beforeData = before.data?.data || [];
+    const alreadySubscribed = hasMessagesSubscription(beforeData);
     let subscribeResult: unknown = null;
-    let after = before;
+    let after: OptionalGraphResult<{ data: FacebookSubscribedApp[] }> = before;
 
     if (!alreadySubscribed) {
       subscribeResult = await readFacebookJson<{ success?: boolean }>(
         `${GRAPH_API_BASE_URL}/me/subscribed_apps?subscribed_fields=${SUBSCRIBED_FIELDS}&access_token=${accessToken}`,
         { method: "POST" }
       );
-      after = await readFacebookJson<{ data: FacebookSubscribedApp[] }>(
+      after = await tryReadFacebookJson<{ data: FacebookSubscribedApp[] }>(
         `${GRAPH_API_BASE_URL}/me/subscribed_apps?access_token=${accessToken}`
       );
     }
@@ -85,8 +111,8 @@ export async function GET(request: Request) {
         alreadySubscribed,
         subscribedFieldsRequested: SUBSCRIBED_FIELDS.split(","),
         subscribeResult,
-        before: before.data || [],
-        after: after.data || [],
+        before,
+        after,
       },
       {
         headers: {
