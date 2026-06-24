@@ -118,6 +118,15 @@ export async function GET(request: Request) {
   const verifyToken = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge") || "";
 
+  console.log("Messenger Webhook GET", {
+    url: request.url,
+    method: request.method,
+    mode,
+    hasVerifyToken: Boolean(verifyToken),
+    verifyTokenMatches: verifyToken === process.env.FACEBOOK_VERIFY_TOKEN,
+    hasChallenge: Boolean(challenge),
+  });
+
   console.log("Messenger Webhook Verify", {
     mode,
     hasVerifyToken: Boolean(verifyToken),
@@ -137,6 +146,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  console.log("Messenger Webhook POST", {
+    url: request.url,
+    method: request.method,
+    contentType: request.headers.get("content-type"),
+  });
+
   try {
     const body = (await request.json()) as MessengerWebhookPayload;
     console.log("Messenger Webhook Payload", body);
