@@ -2580,23 +2580,28 @@ function ReadyAdvanceButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group relative inline-flex min-h-16 flex-1 items-center justify-center overflow-hidden rounded-2xl border px-5 text-sm font-black transition md:flex-none ${
+      className={`group relative flex min-h-[74px] w-full items-center justify-between overflow-hidden rounded-2xl border px-4 text-left font-black transition active:scale-[0.985] disabled:cursor-not-allowed ${
         myReady
-          ? "border-emerald-200/30 bg-emerald-300/12 text-emerald-50 shadow-[0_0_34px_rgba(16,185,129,0.18)]"
-          : "border-amber-100/40 bg-[linear-gradient(135deg,#ffe58a,#fbbf24)] text-black shadow-[0_0_34px_rgba(251,191,36,0.28)] hover:-translate-y-0.5 hover:shadow-[0_0_46px_rgba(251,191,36,0.42)]"
-      } disabled:cursor-not-allowed`}
+          ? "border-emerald-200/32 bg-[linear-gradient(135deg,rgba(16,185,129,0.24),rgba(6,78,59,0.28))] text-emerald-50 shadow-[0_0_34px_rgba(16,185,129,0.18),inset_0_0_0_1px_rgba(255,255,255,0.05)]"
+          : "border-amber-100/45 bg-[linear-gradient(135deg,#ffe58a,#f59e0b)] text-black shadow-[0_0_36px_rgba(251,191,36,0.30),inset_0_0_0_1px_rgba(255,255,255,0.30)] hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(251,191,36,0.46)]"
+      }`}
     >
       {!myReady ? <span className="absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.5),transparent)] opacity-0 transition group-hover:translate-x-full group-hover:opacity-80" /> : null}
       {myReady ? <span className="absolute inset-0 animate-pulse bg-emerald-300/10" /> : null}
-      <span className="relative z-10 flex flex-col items-center leading-tight">
-        <span className="inline-flex items-center gap-2 text-base">
+      <span className="relative z-10 flex min-w-0 items-center gap-3">
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border ${myReady ? "border-emerald-100/25 bg-emerald-200/12 text-emerald-100" : "border-black/10 bg-black/14 text-black"}`}>
           {myReady ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-          {myReady ? `พร้อมแล้ว (${readyCount}/2)` : `พร้อม (${readyCount}/2)`}
         </span>
-        <span className={`mt-1 text-[10px] font-black uppercase tracking-[0.12em] ${myReady ? "text-emerald-100/65" : "text-black/55"}`}>
-          {opponentReady ? `${opponentName} พร้อมแล้ว` : label}
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-base">
+            {myReady ? `พร้อมแล้ว (${readyCount}/2)` : `พร้อม (${readyCount}/2)`}
+          </span>
+          <span className={`mt-1 block truncate text-[10px] uppercase tracking-[0.12em] ${myReady ? "text-emerald-100/68" : "text-black/60"}`}>
+            {opponentReady ? `${opponentName} พร้อมแล้ว` : label}
+          </span>
         </span>
       </span>
+      <ChevronRight className={`relative z-10 h-5 w-5 shrink-0 ${myReady ? "text-emerald-100/48" : "text-black/56"}`} />
     </button>
   );
 }
@@ -4502,7 +4507,30 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const revealState = displayRevealed[displayActiveTurn];
   const activeTurnScored = Boolean(revealState?.scored);
   const canRevealTurn = Boolean(displayCurrentResult) && (displayTurnLocked || Boolean(isPvpRoom && roomTurnResolved));
-  const readyAdvanceLabel = myTurnReady ? `รออีกฝ่าย (${readyCount}/2)` : `พร้อม (${readyCount}/2)`;
+  const showReadyAdvanceButton = Boolean(
+    !isSpectator &&
+      isPvpRoom &&
+      roomPlayerSide &&
+      displayTurnLocked &&
+      displayLockedFight &&
+      activeTurnScored &&
+      !matchDone &&
+      (displayActiveTurn < 3 || displayRevealed[3].scored)
+  );
+  const readyAdvanceTargetLabel =
+    displayActiveTurn >= 3 ? (displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป") : "ตาถัดไป";
+  const renderReadyAdvanceButton = () =>
+    showReadyAdvanceButton ? (
+      <ReadyAdvanceButton
+        label={readyAdvanceTargetLabel}
+        readyCount={readyCount}
+        myReady={myTurnReady}
+        opponentReady={opponentTurnReady}
+        opponentName={opponentLabel}
+        onClick={displayActiveTurn >= 3 ? nextFight : nextTurn}
+        disabled={myTurnReady}
+      />
+    ) : null;
   useEffect(() => {
     if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored || isPvpRoom) {
       resultAdvanceKeyRef.current = "";
@@ -5455,15 +5483,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   )
                 ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && displayRevealed[3].scored ? (
                   isPvpRoom ? (
-                    <ReadyAdvanceButton
-                      label={displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
-                      readyCount={readyCount}
-                      myReady={myTurnReady}
-                      opponentReady={opponentTurnReady}
-                      opponentName={opponentLabel}
-                      onClick={nextFight}
-                      disabled={myTurnReady}
-                    />
+                    null
                   ) : (
                     <button
                       type="button"
@@ -5476,15 +5496,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   )
                 ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && activeTurnScored && displayActiveTurn < 3 ? (
                   isPvpRoom ? (
-                    <ReadyAdvanceButton
-                      label="ตาถัดไป"
-                      readyCount={readyCount}
-                      myReady={myTurnReady}
-                      opponentReady={opponentTurnReady}
-                      opponentName={opponentLabel}
-                      onClick={nextTurn}
-                      disabled={myTurnReady}
-                    />
+                    null
                   ) : (
                     <button
                       type="button"
@@ -5548,15 +5560,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ) : null}
 
           {currentRoom ? (
-            <div className="2xl:hidden">
+            <div className="space-y-2 2xl:hidden">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              {renderReadyAdvanceButton()}
             </div>
           ) : null}
         </section>
 
         <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex 2xl:h-[calc(100vh-136px)] 2xl:max-h-[calc(100vh-136px)]">
           {currentRoom ? (
-            <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+            <div className="space-y-2">
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              {renderReadyAdvanceButton()}
+            </div>
           ) : null}
 
           <div className="hidden min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
