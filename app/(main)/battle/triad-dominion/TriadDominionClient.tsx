@@ -197,6 +197,7 @@ const LOBBY_SYNC_MS = 1800;
 const ACTIVE_ROOM_SYNC_MS = 1000;
 const HIDDEN_SYNC_MS = 4000;
 const MIN_SYNC_GAP_MS = 140;
+const TRIAD_CHAT_EMOJIS = ["🔥", "👏", "💪", "😆", "😎", "😭", "🤝", "❤️", "⚡", "🎯", "🏆", "✨"];
 
 const rankFrames = [
   { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
@@ -1987,6 +1988,20 @@ function BattleRoomChatPanel({
           void submit();
         }}
       >
+        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          {TRIAD_CHAT_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              disabled={!room?.code}
+              onClick={() => setDraft((current) => `${current}${emoji}`.slice(0, 240))}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.055] text-lg transition hover:border-cyan-200/45 hover:bg-cyan-300/12 disabled:cursor-not-allowed disabled:opacity-35"
+              aria-label={`emoji ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <input
             value={draft}
@@ -2816,6 +2831,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const availableBotCards = botDeckCards.filter((card) => !usedBotSet.has(card.cardNo));
   const currentRoom = rooms.find((room) => room.code === activeRoomCode) || activeRoomSnapshot;
   const currentDeckMode: DeckMode = currentRoom?.game.deckMode || "all";
+  const currentDeckModeTitle =
+    currentDeckMode === "monster"
+      ? "โหมดมอนสเตอร์"
+      : currentDeckMode === "skill"
+        ? "โหมดสกิล"
+        : "โหมดรวม";
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const roomTurnResolved = Boolean(currentRoom?.game.turns.some((turn) => turn.turn === activeTurn));
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
@@ -5020,7 +5041,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       ) : null}
       {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} /> : null}
-      <section className="relative z-20 mx-2 mt-14 rounded-2xl border border-white/8 bg-black/30 px-3 py-3 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4 2xl:mt-3">
+      <section className="relative z-20 mx-2 mt-12 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4 2xl:mt-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/52">
@@ -5028,7 +5049,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               Battle Room
             </div>
             <div className="mt-1 truncate text-xl font-black uppercase tracking-normal text-white sm:text-2xl">
-              Triad Dominion
+              {currentDeckModeTitle}
             </div>
           </div>
           <div className="min-w-0">
@@ -5074,7 +5095,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       </section>
 
-      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(380px,24vw,460px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-16 sm:pt-16"}`}>
+      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(380px,24vw,460px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
         <section className="grid min-h-0 max-w-full grid-rows-[minmax(360px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(480px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
           {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
