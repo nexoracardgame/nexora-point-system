@@ -1328,7 +1328,7 @@ function RevealSpotlight({
         ];
 
   return (
-    <div className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3 ${isScored ? "top-[29%] sm:top-[30%] lg:top-[31%]" : "top-[28%] sm:top-[32%]"}`}>
+    <div className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3 ${isScored ? "top-[25%] sm:top-[27%] lg:top-[28%]" : "top-[28%] sm:top-[32%]"}`}>
       {isScored ? (
         <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
@@ -1368,7 +1368,7 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="pointer-events-auto absolute right-[clamp(14px,3cqw,44px)] top-1/2 z-30 grid w-[clamp(280px,36cqw,460px)] -translate-y-1/2 gap-1.5">
+        <div className="pointer-events-auto absolute right-[clamp(84px,11cqw,150px)] top-1/2 z-30 grid w-[clamp(260px,28cqw,390px)] -translate-y-1/2 gap-1.5">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -1460,7 +1460,7 @@ function BoardTriangle({
     {
       lane: "top",
       label: "หลัก",
-      className: `col-span-2 mx-auto w-[var(--triad-top-card-size,var(--triad-card-size,clamp(52px,7vw,104px)))] ${tone === "bot" ? "translate-y-0.5" : "-translate-y-0.5"}`,
+      className: `col-span-2 mx-auto w-[var(--triad-top-card-size,var(--triad-card-size,clamp(52px,7vw,104px)))] ${tone === "bot" ? "translate-y-0.5" : "translate-y-3 sm:translate-y-5"}`,
     },
     {
       lane: "left",
