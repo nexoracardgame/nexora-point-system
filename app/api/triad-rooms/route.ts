@@ -16,6 +16,7 @@ import {
   resetTriadRoomBattle,
   readyTriadRoomDeck,
   setTriadRoomDeck,
+  sendTriadRoomChatMessage,
   startTriadRoom,
   surrenderTriadRoom,
   takeTriadRoomSlot,
@@ -257,6 +258,15 @@ export async function POST(request: Request) {
       result,
       { status: result.ok ? 200 : 409 },
       result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "chat") {
+    const result = await sendTriadRoomChatMessage(cleanText(body.code), participant, cleanText(body.text));
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : result.reason === "not_found" ? 404 : 409 },
+      "room" in result ? { action, code: getPayloadRoomCode(result), room: result.room } : null
     );
   }
 

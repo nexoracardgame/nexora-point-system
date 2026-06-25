@@ -15,9 +15,11 @@ import {
   KeyRound,
   Layers3,
   Lock,
+  MessageCircle,
   Plus,
   RotateCcw,
   Search,
+  SendHorizontal,
   Shield,
   Sparkles,
   Scissors,
@@ -97,6 +99,16 @@ type RoomParticipant = {
   joinedAt: number;
 };
 
+type RoomChatMessage = {
+  id: string;
+  roomCode: string;
+  senderId: string;
+  senderName: string;
+  senderImage: string;
+  text: string;
+  createdAt: number;
+};
+
 type TriadRoom = {
   code: string;
   access: RoomAccess;
@@ -129,6 +141,7 @@ type RoomGame = {
   matchWinner: RoomPlayerSide | "";
   surrenderedBy: RoomPlayerSide | "";
   matchEndedAt: number;
+  chat: RoomChatMessage[];
 };
 
 type OpeningTieBreak = {
@@ -426,6 +439,28 @@ function normalizeRoomGame(value: unknown): RoomGame {
   const activeTurn = Number(raw.activeTurn || 1);
   const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
   const cleanPool = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, 40) : [];
+  const cleanChat = (messages: unknown): RoomChatMessage[] => Array.isArray(messages)
+    ? messages
+        .map((message) => {
+          const rawMessage = message && typeof message === "object" ? (message as Record<string, unknown>) : {};
+          const senderId = safeText(rawMessage.senderId);
+          const text = safeText(rawMessage.text).slice(0, 240);
+          const createdAt = Number(rawMessage.createdAt || Date.now());
+          if (!senderId || !text) return null;
+          return {
+            id: safeText(rawMessage.id) || `${createdAt}-${senderId}`,
+            roomCode: safeText(rawMessage.roomCode),
+            senderId,
+            senderName: safeText(rawMessage.senderName) || "PLAYER",
+            senderImage: safeText(rawMessage.senderImage) || "/avatar.png",
+            text,
+            createdAt,
+          } satisfies RoomChatMessage;
+        })
+        .filter((message): message is RoomChatMessage => Boolean(message))
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .slice(-80)
+    : [];
   const cleanRpsChoice = (choice: unknown): TriadRpsChoice =>
     choice === "rock" || choice === "scissors" || choice === "paper" ? choice : "unknown";
   const cleanOpeningTieBreak = (tieBreak: unknown): OpeningTieBreak => {
@@ -507,6 +542,7 @@ function normalizeRoomGame(value: unknown): RoomGame {
     matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
     surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
     matchEndedAt: Number(raw.matchEndedAt || 0),
+    chat: cleanChat(raw.chat),
   };
 }
 
@@ -1289,6 +1325,8 @@ function BoardTriangle({
   onSlotClick,
   onDropCard,
   selectedLane,
+  onPreview,
+  onPreviewEnd,
 }: {
   cardsByNo: Map<string, CardView>;
   triangle: TriadTriangle;
@@ -1300,6 +1338,8 @@ function BoardTriangle({
   onSlotClick?: (lane: Lane) => void;
   onDropCard?: (lane: Lane, cardNo: string) => void;
   selectedLane?: Lane;
+  onPreview?: (card: CardView) => void;
+  onPreviewEnd?: () => void;
 }) {
   const lanes: { lane: Lane; label: string; className: string }[] = [
     {
@@ -1323,12 +1363,23 @@ function BoardTriangle({
     <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[var(--triad-slot-gap,clamp(5px,1vw,14px))] gap-y-0 ${tone === "player" ? "-translate-y-0.5 sm:-translate-y-2" : "translate-y-0.5 sm:translate-y-2"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
+        const card = cardNo ? cardsByNo.get(cardNo) : undefined;
+        const visible = isVisible(lane);
+        const canPreview = Boolean(card && visible);
         return (
           <button
             key={lane}
             type="button"
             data-triad-lane={lane}
             onClick={() => onSlotClick?.(lane)}
+            onMouseEnter={() => {
+              if (card && canPreview) onPreview?.(card);
+            }}
+            onMouseLeave={onPreviewEnd}
+            onFocus={() => {
+              if (card && canPreview) onPreview?.(card);
+            }}
+            onBlur={onPreviewEnd}
             onDragOver={(event) => {
               if (onDropCard) event.preventDefault();
             }}
@@ -1336,7 +1387,7 @@ function BoardTriangle({
               const cardNo = event.dataTransfer.getData("text/plain");
               if (cardNo) onDropCard?.(lane, cardNo);
             }}
-            disabled={!onSlotClick}
+            disabled={!onSlotClick && !canPreview}
             style={
               swapActive && lane === "top"
                 ? ({ "--triad-swap-from": tone === "player" ? "220px" : "-220px" } as CSSProperties)
@@ -1349,8 +1400,8 @@ function BoardTriangle({
             }`}
           >
             <BoardCardSlot
-              card={cardNo ? cardsByNo.get(cardNo) : undefined}
-              hidden={!isVisible(lane)}
+              card={card}
+              hidden={!visible}
               active={activeLane === lane}
               aura={auraByLane?.[lane]}
               label={label}
@@ -1749,6 +1800,135 @@ function CardHoverPreview({ card }: { card: CardView | null }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function BattleRoomChatPanel({
+  room,
+  currentUserId,
+  onSend,
+}: {
+  room: TriadRoom | null | undefined;
+  currentUserId: string;
+  onSend: (text: string) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const messages = room?.game.chat || [];
+  const memberCount =
+    (room?.seats.host ? 1 : 0) +
+    (room?.seats.challenger ? 1 : 0) +
+    (room?.spectators.length || 0);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length, room?.code]);
+
+  const submit = async () => {
+    const text = draft.trim();
+    if (!text || sending || !room?.code) return;
+    setSending(true);
+    setDraft("");
+    const ok = await onSend(text);
+    if (!ok) setDraft(text);
+    setSending(false);
+  };
+
+  return (
+    <section className="flex min-h-[360px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)]">
+      <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-300/12 text-cyan-100 shadow-[0_0_26px_rgba(34,211,238,0.16)]">
+              <MessageCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-black text-white">แชทสดสนาม</div>
+              <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/54">
+                ห้อง {room?.code || "------"} • {memberCount} คน
+              </div>
+            </div>
+          </div>
+          <div className="rounded-full border border-emerald-200/24 bg-emerald-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100">
+            LIVE
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
+        {messages.length > 0 ? (
+          messages.map((message) => {
+            const mine = message.senderId === currentUserId;
+            return (
+              <div key={message.id} className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+                {!mine ? (
+                  <Image
+                    src={message.senderImage || "/avatar.png"}
+                    alt={message.senderName}
+                    width={28}
+                    height={28}
+                    className="mt-1 h-7 w-7 shrink-0 rounded-lg border border-white/10 object-cover"
+                  />
+                ) : null}
+                <div className={`max-w-[86%] ${mine ? "text-right" : "text-left"}`}>
+                  <div className={`mb-1 flex items-center gap-2 text-[10px] font-bold text-white/38 ${mine ? "justify-end" : ""}`}>
+                    <span className="max-w-[130px] truncate">{mine ? "เรา" : message.senderName}</span>
+                    <span>{new Date(message.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <div
+                    className={`break-words rounded-2xl border px-3 py-2 text-sm font-semibold leading-5 ${
+                      mine
+                        ? "border-amber-200/26 bg-amber-300/14 text-amber-50"
+                        : "border-cyan-200/16 bg-white/[0.055] text-white/78"
+                    }`}
+                  >
+                    {message.text}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="grid h-full min-h-[190px] place-items-center text-center">
+            <div>
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-white/16 bg-white/[0.035] text-cyan-100/54">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <div className="mt-3 text-sm font-black text-white/62">ยังไม่มีข้อความ</div>
+              <div className="mt-1 text-xs font-semibold text-white/38">พิมพ์คุยกับผู้เล่นและผู้ชมในห้องนี้ได้เลย</div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <form
+        className="border-t border-white/8 bg-black/24 p-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value.slice(0, 240))}
+            disabled={!room?.code || sending}
+            placeholder="พิมพ์แชทสด..."
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim() || !room?.code || sending}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-300 text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25"
+            aria-label="ส่งข้อความ"
+          >
+            <SendHorizontal className="h-4 w-4" />
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -2176,6 +2356,45 @@ function BlessingChoiceOverlay({
   );
 }
 
+function TimeoutWarningOverlay({
+  secondsLeft,
+  missingNames,
+}: {
+  secondsLeft: number;
+  missingNames: string[];
+}) {
+  if (secondsLeft > 30 || secondsLeft <= 0 || missingNames.length === 0) return null;
+  const nameText = missingNames.length === 1 ? missingNames[0] : missingNames.join(" และ ");
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center px-4">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(248,113,113,0.24),rgba(0,0,0,0.18)_34%,transparent_68%)]" />
+      <div className="absolute h-[min(420px,72vw)] w-[min(420px,72vw)] animate-ping rounded-full border border-red-300/25 bg-red-500/8" />
+      <div className="relative w-[min(760px,94vw)] overflow-hidden rounded-[28px] border border-red-200/45 bg-black/78 p-5 text-center shadow-[0_0_92px_rgba(248,113,113,0.44),inset_0_0_0_1px_rgba(255,255,255,0.08)] backdrop-blur-md sm:p-7">
+        <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-red-100 to-transparent" />
+        <div className="absolute inset-0 bg-[conic-gradient(from_180deg_at_50%_50%,rgba(248,113,113,0.22),rgba(251,191,36,0.16),rgba(34,211,238,0.10),rgba(248,113,113,0.22))] opacity-30" />
+        <div className="relative">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl border border-red-100/35 bg-red-500/18 text-red-100 shadow-[0_0_34px_rgba(248,113,113,0.38)]">
+            <Flame className="h-6 w-6" />
+          </div>
+          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-red-100/70">
+            Turn timeout warning
+          </div>
+          <div className="mt-2 text-[clamp(1.15rem,3vw,2rem)] font-black leading-tight text-white">
+            ผู้เล่น {nameText} ยังไม่ลงการ์ด
+          </div>
+          <div className="mx-auto mt-4 grid h-[clamp(112px,18vw,180px)] w-[clamp(112px,18vw,180px)] place-items-center rounded-full border-[6px] border-red-100 bg-[radial-gradient(circle,#fb7185,#b91c1c_58%,#450a0a)] text-[clamp(4rem,10vw,8rem)] font-black leading-none text-white shadow-[0_0_70px_rgba(248,113,113,0.72)]">
+            {secondsLeft}
+          </div>
+          <div className="mx-auto mt-4 max-w-2xl rounded-full border border-amber-100/28 bg-amber-300/12 px-4 py-2 text-sm font-black text-amber-50 shadow-[0_0_32px_rgba(251,191,36,0.18)]">
+            จะถูกปรับแพ้ใน {secondsLeft} วินาที หากไม่ลงการ์ด
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CompactBattleBoard({
   cardsByNo,
   lockedFight,
@@ -2237,6 +2456,7 @@ function CompactBattleBoard({
   onPlaceCard: (lane: Lane, cardNo: string) => void;
   blessingAuras?: { player?: TargetAura; bot?: TargetAura } | null;
 }) {
+  const [previewCard, setPreviewCard] = useState<CardView | null>(null);
   const playerTriangle = lockedFight?.player || player;
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
@@ -2256,6 +2476,13 @@ function CompactBattleBoard({
   const pendingTarget = pendingSkillChoice?.selectedTarget || (pendingFallbackTargets.length === 1 ? pendingFallbackTargets[0] : "");
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
   const botAuraByLane: Partial<Record<Lane, TargetAura>> = {};
+  const timeoutMissingNames =
+    timeLeft <= 30 && timeLeft > 0 && !currentResult
+      ? [
+          !displayPlayerTriangle[activeLane] ? playerName : "",
+          !displayBotTriangle[activeLane] ? botName : "",
+        ].filter(Boolean)
+      : [];
   if (skillChoiceForAura) {
     const sourceAura: TargetAura = skillChoiceForAura === pendingSkillChoice ? "pending" : "enemy";
     if (skillChoiceForAura.side === "player") playerAuraByLane[skillChoiceForAura.lane] = sourceAura;
@@ -2272,6 +2499,7 @@ function CompactBattleBoard({
 
   return (
     <div className="relative h-full min-h-[clamp(360px,72dvh,680px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(42px,14cqw,92px)] [--triad-pile-size:clamp(36px,10cqw,74px)] [--triad-slot-gap:clamp(4px,2cqw,12px)] [--triad-top-card-size:clamp(46px,15cqw,98px)] [container-type:inline-size] sm:min-h-[clamp(440px,74dvh,720px)] 2xl:min-h-0">
+      <CardHoverPreview card={previewCard} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
@@ -2320,6 +2548,9 @@ function CompactBattleBoard({
         }}
         onConfirm={onConfirmSkillTarget}
       />
+      {!pendingSkillChoice && !waitingSkillChoice ? (
+        <TimeoutWarningOverlay secondsLeft={timeLeft} missingNames={timeoutMissingNames} />
+      ) : null}
       {!pendingSkillChoice && waitingSkillChoice ? (
         <div className="absolute bottom-4 right-4 top-16 z-40 flex w-[min(430px,calc(100%-2rem))] items-center">
           <div className="w-full rounded-2xl border border-red-300/35 bg-[#090507]/94 p-5 text-center shadow-[0_0_72px_rgba(248,113,113,0.34)] backdrop-blur-md">
@@ -2348,6 +2579,8 @@ function CompactBattleBoard({
             isVisible={(lane) => botVisible(lane)}
             swapActive={hasSwapResult && showResolvedBoard}
             auraByLane={botAuraByLane}
+            onPreview={setPreviewCard}
+            onPreviewEnd={() => setPreviewCard(null)}
           />
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
@@ -2376,6 +2609,8 @@ function CompactBattleBoard({
             onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
             onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}
+            onPreview={setPreviewCard}
+            onPreviewEnd={() => setPreviewCard(null)}
           />
           <BoardPile label="ทิ้ง" sublabel={`${playerGraveCards.length}`} tone="red" cards={playerGraveCards} />
         </div>
@@ -2778,6 +3013,41 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     window.setTimeout(() => void syncRooms({ force: true }).catch(() => null), 60);
     return { ok: response.ok, status: response.status, payload };
+  };
+
+  const sendRoomChat = async (textInput: string) => {
+    const text = textInput.trim().replace(/\s+/g, " ").slice(0, 240);
+    if (!currentRoom?.code || !text) return false;
+
+    const optimisticMessage: RoomChatMessage = {
+      id: `local-${Date.now()}-${participant.id}`,
+      roomCode: currentRoom.code,
+      senderId: participant.id,
+      senderName: participant.name,
+      senderImage: participant.image,
+      text,
+      createdAt: Date.now(),
+    };
+
+    patchCurrentRoom((room) => ({
+      ...room,
+      game: {
+        ...room.game,
+        chat: [...(room.game.chat || []), optimisticMessage].slice(-80),
+      },
+    }));
+
+    const result = await postRoomAction({
+      action: "chat",
+      code: currentRoom.code,
+      text,
+    });
+
+    if (!result.ok) {
+      void syncRooms({ force: true }).catch(() => null);
+      return false;
+    }
+    return true;
   };
 
   const chooseOpeningTieBreak = (choice: TriadRpsChoice) => {
@@ -4878,19 +5148,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               </div>
             </div>
           ) : null}
+
+          {currentRoom ? (
+            <div className="2xl:hidden">
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+            </div>
+          ) : null}
         </section>
 
         <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex">
-          <FighterPanel
-            name={displayBotName}
-            image={displayBotImage}
-            score={displayMatchScore.bot}
-            tone="bot"
-            deckLeft={Math.max(0, displayBotDeckCards.length)}
-            side="left"
-          />
+          {currentRoom ? (
+            <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+          ) : null}
 
-          <div className="min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
+          <div className="hidden min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Trophy className="h-4 w-4 text-amber-300" />
               บันทึกการต่อสู้
@@ -4910,7 +5181,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </div>
 
-          <div className="hidden rounded-xl border border-white/8 bg-white/[0.035] p-4 xl:block">
+          <div className="hidden rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
               <Bot className="h-4 w-4 text-cyan-200" />
               เด็คคู่แข่ง
@@ -4927,7 +5198,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </div>
 
-          <div className="mt-auto pb-16 xl:pb-20">
+          <div className="hidden mt-auto pb-16 xl:pb-20">
           <FighterPanel
             name={displayPlayerName}
             image={displayPlayerImage}

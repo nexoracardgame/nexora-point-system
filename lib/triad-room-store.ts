@@ -44,6 +44,16 @@ export type TriadRoomSkillChoice = {
   blessingPreviewTopNo?: string;
 };
 
+export type TriadRoomChatMessage = {
+  id: string;
+  roomCode: string;
+  senderId: string;
+  senderName: string;
+  senderImage: string;
+  text: string;
+  createdAt: number;
+};
+
 export type TriadRoomParticipant = {
   id: string;
   name: string;
@@ -95,6 +105,7 @@ export type TriadRoomGame = {
   matchWinner: TriadRoomSlot | "";
   surrenderedBy: TriadRoomSlot | "";
   matchEndedAt: number;
+  chat: TriadRoomChatMessage[];
 };
 
 export type PublicTriadRoom = Omit<StoredTriadRoom, "password"> & {
@@ -123,6 +134,8 @@ const TURN_TIMEOUT_MS = 120_000;
 const SKILL_CHOICE_TIMEOUT_MS = 30_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
 const PLAYING_ROOM_TTL_MS = 30 * 60_000;
+const TRIAD_CHAT_LIMIT = 80;
+const TRIAD_CHAT_MAX_LENGTH = 240;
 
 const globalForTriadRooms = globalThis as {
   nexoraTriadRooms?: StoredTriadRoom[];
@@ -279,6 +292,30 @@ function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
   return mapped.filter((item): item is TriadRoomSkillChoice => item !== null);
 }
 
+function normalizeChatMessages(value: unknown, roomCode = ""): TriadRoomChatMessage[] {
+  if (!Array.isArray(value)) return [];
+  const messages: TriadRoomChatMessage[] = [];
+  for (const item of value) {
+    const raw = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const senderId = cleanText(raw.senderId);
+    const text = cleanText(raw.text).slice(0, TRIAD_CHAT_MAX_LENGTH);
+    if (!senderId || !text) continue;
+    const createdAt = Number(raw.createdAt || Date.now());
+    messages.push({
+      id: cleanText(raw.id) || `${createdAt}-${senderId}`,
+      roomCode: cleanText(raw.roomCode) || roomCode,
+      senderId,
+      senderName: cleanText(raw.senderName) || "PLAYER",
+      senderImage: cleanText(raw.senderImage) || "/avatar.png",
+      text,
+      createdAt,
+    });
+  }
+  return messages
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(-TRIAD_CHAT_LIMIT);
+}
+
 function normalizeRpsChoice(value: unknown): TriadRpsChoice {
   return value === "rock" || value === "scissors" || value === "paper" ? value : "unknown";
 }
@@ -348,6 +385,7 @@ function normalizeGame(value: unknown): TriadRoomGame {
     matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
     surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
     matchEndedAt: Number(raw.matchEndedAt || 0),
+    chat: normalizeChatMessages(raw.chat),
   };
 }
 
@@ -1327,14 +1365,42 @@ export async function resetTriadRoomBattle(code: string, participantId: string) 
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  const chat = room.game.chat;
   room.status = "waiting";
   room.game = {
     ...freshGame(),
     deckMode: room.game.deckMode || "all",
     selectionPools: buildSelectionPools(room.game.deckMode || "all", `${room.code}:${Date.now()}`),
+    chat,
   };
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
+}
+
+export async function sendTriadRoomChatMessage(code: string, participant: TriadRoomParticipant, textInput: string) {
+  const room = await getStoredRoom(code);
+  if (!room) return { ok: false as const, reason: "not_found" as const };
+  if (!participantInStoredRoom(room, participant.id)) {
+    return { ok: false as const, reason: "not_in_room" as const, room: publicRoom(room) };
+  }
+
+  const text = cleanText(textInput).replace(/\s+/g, " ").slice(0, TRIAD_CHAT_MAX_LENGTH);
+  if (!text) return { ok: false as const, reason: "empty_message" as const, room: publicRoom(room) };
+
+  const now = Date.now();
+  const message: TriadRoomChatMessage = {
+    id: `${now}-${participant.id}-${Math.random().toString(36).slice(2, 8)}`,
+    roomCode: room.code,
+    senderId: participant.id,
+    senderName: cleanText(participant.name) || "PLAYER",
+    senderImage: cleanText(participant.image) || "/avatar.png",
+    text,
+    createdAt: now,
+  };
+
+  room.game.chat = [...normalizeChatMessages(room.game.chat, room.code), message].slice(-TRIAD_CHAT_LIMIT);
+  await upsertStoredRoom(room);
+  return { ok: true as const, room: publicRoom(room), message };
 }
 
 export async function disbandTriadRoom(code: string, participantId: string) {
