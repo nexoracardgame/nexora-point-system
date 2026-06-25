@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Brain,
@@ -1440,6 +1440,7 @@ function BoardTriangle({
   onSlotClick,
   onDropCard,
   selectedLane,
+  footer,
   onPreview,
   onPreviewEnd,
 }: {
@@ -1453,6 +1454,7 @@ function BoardTriangle({
   onSlotClick?: (lane: Lane) => void;
   onDropCard?: (lane: Lane, cardNo: string) => void;
   selectedLane?: Lane;
+  footer?: ReactNode;
   onPreview?: (card: CardView) => void;
   onPreviewEnd?: () => void;
 }) {
@@ -1482,47 +1484,49 @@ function BoardTriangle({
         const visible = isVisible(lane);
         const canPreview = Boolean(card && visible);
         return (
-          <button
-            key={lane}
-            type="button"
-            data-triad-lane={lane}
-            onClick={() => onSlotClick?.(lane)}
-            onMouseEnter={() => {
-              if (card && canPreview) onPreview?.(card);
-            }}
-            onMouseLeave={onPreviewEnd}
-            onFocus={() => {
-              if (card && canPreview) onPreview?.(card);
-            }}
-            onBlur={onPreviewEnd}
-            onDragOver={(event) => {
-              if (onDropCard) event.preventDefault();
-            }}
-            onDrop={(event) => {
-              const cardNo = event.dataTransfer.getData("text/plain");
-              if (cardNo) onDropCard?.(lane, cardNo);
-            }}
-            disabled={!onSlotClick && !canPreview}
-            style={
-              swapActive && lane === "top"
-                ? ({ "--triad-swap-from": tone === "player" ? "220px" : "-220px" } as CSSProperties)
-                : undefined
-            }
-            className={`${className} rounded-xl text-left transition ${
-              selectedLane === lane ? "ring-2 ring-amber-300/80" : "ring-0"
-            } ${swapActive && lane === "top" ? "animate-[triad-swap-land_700ms_ease-out]" : ""} ${
-              onSlotClick ? "hover:-translate-y-1 disabled:hover:translate-y-0" : ""
-            }`}
-          >
-            <BoardCardSlot
-              card={card}
-              hidden={!visible}
-              active={activeLane === lane}
-              aura={auraByLane?.[lane]}
-              label={label}
-              tone={tone}
-            />
-          </button>
+          <Fragment key={lane}>
+            <button
+              type="button"
+              data-triad-lane={lane}
+              onClick={() => onSlotClick?.(lane)}
+              onMouseEnter={() => {
+                if (card && canPreview) onPreview?.(card);
+              }}
+              onMouseLeave={onPreviewEnd}
+              onFocus={() => {
+                if (card && canPreview) onPreview?.(card);
+              }}
+              onBlur={onPreviewEnd}
+              onDragOver={(event) => {
+                if (onDropCard) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                const cardNo = event.dataTransfer.getData("text/plain");
+                if (cardNo) onDropCard?.(lane, cardNo);
+              }}
+              disabled={!onSlotClick && !canPreview}
+              style={
+                swapActive && lane === "top"
+                  ? ({ "--triad-swap-from": tone === "player" ? "220px" : "-220px" } as CSSProperties)
+                  : undefined
+              }
+              className={`${className} rounded-xl text-left transition ${
+                selectedLane === lane ? "ring-2 ring-amber-300/80" : "ring-0"
+              } ${swapActive && lane === "top" ? "animate-[triad-swap-land_700ms_ease-out]" : ""} ${
+                onSlotClick ? "hover:-translate-y-1 disabled:hover:translate-y-0" : ""
+              }`}
+            >
+              <BoardCardSlot
+                card={card}
+                hidden={!visible}
+                active={activeLane === lane}
+                aura={auraByLane?.[lane]}
+                label={label}
+                tone={tone}
+              />
+            </button>
+            {footer && lane === "top" ? <div className="col-span-2 w-[min(500px,82cqw)]">{footer}</div> : null}
+          </Fragment>
         );
       })}
       <style jsx>{`
@@ -1876,27 +1880,32 @@ function OpeningTieBreakOverlay({
           <div className="mt-5 rounded-xl border border-emerald-200/24 bg-emerald-300/10 p-4 text-center text-sm font-black text-emerald-100">
             {winnerName} ได้เปิดสกิลก่อนในตาถัดไป
           </div>
-        ) : tieBreak.reason === "first_turn_score_draw" && revealedChoices.host !== "unknown" && revealedChoices.challenger !== "unknown" ? (
-          <div className="mt-5 rounded-xl border border-amber-200/24 bg-amber-300/10 p-4 text-center text-sm font-black text-amber-100">
-            เสมออีกครั้ง เลือกใหม่จนกว่าจะมีผู้ชนะ ฝ่ายที่ชนะจะได้เปิดสกิลก่อนในตาถัดไป
-          </div>
-        ) : canChoose ? (
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            {(["rock", "scissors", "paper"] as TriadRpsChoice[]).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                onClick={() => onChoose(choice)}
-                className="inline-flex h-14 items-center justify-center gap-2 rounded-xl border border-amber-200/24 bg-amber-200/10 text-sm font-black text-amber-100 transition hover:border-amber-100/70 hover:bg-amber-200/18"
-              >
-                {rpsIcon(choice)}
-                {rpsLabel[choice]}
-              </button>
-            ))}
-          </div>
         ) : (
-          <div className="mt-5 rounded-xl border border-white/10 bg-black/28 p-4 text-center text-sm font-semibold text-white/58">
-            {isSpectator ? "ผู้ชมกำลังรอดูผลการล็อกของทั้งสองฝ่าย" : "ล็อกคำตอบแล้ว รออีกฝ่าย"}
+          <div className="mt-5 space-y-3">
+            {tieBreak.reason === "first_turn_score_draw" && revealedChoices.host !== "unknown" && revealedChoices.challenger !== "unknown" ? (
+              <div className="rounded-xl border border-amber-200/24 bg-amber-300/10 p-3 text-center text-sm font-black text-amber-100">
+                เสมออีกครั้ง เลือกใหม่จนกว่าจะมีผู้ชนะ ฝ่ายที่ชนะจะได้เปิดสกิลก่อนในตาถัดไป
+              </div>
+            ) : null}
+            {canChoose ? (
+              <div className="grid grid-cols-3 gap-2">
+                {(["rock", "scissors", "paper"] as TriadRpsChoice[]).map((choice) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    onClick={() => onChoose(choice)}
+                    className="inline-flex h-14 items-center justify-center gap-2 rounded-xl border border-amber-200/24 bg-amber-200/10 text-sm font-black text-amber-100 transition hover:border-amber-100/70 hover:bg-amber-200/18"
+                  >
+                    {rpsIcon(choice)}
+                    {rpsLabel[choice]}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-black/28 p-4 text-center text-sm font-semibold text-white/58">
+                {isSpectator ? "ผู้ชมกำลังรอดูผลการล็อกของทั้งสองฝ่าย" : "ล็อกคำตอบแล้ว รออีกฝ่าย"}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1975,7 +1984,7 @@ function BattleRoomChatPanel({
   };
 
   return (
-    <section className="flex min-h-[360px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-full 2xl:min-h-0">
+    <section className="flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-[min(500px,calc(100vh-330px))] 2xl:min-h-[340px]">
       <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -1995,7 +2004,7 @@ function BattleRoomChatPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length > 0 ? (
           messages.map((message) => {
             const mine = message.senderId === currentUserId;
@@ -2043,13 +2052,13 @@ function BattleRoomChatPanel({
       </div>
 
       <form
-        className="border-t border-white/8 bg-black/24 p-3"
+        className="border-t border-white/8 bg-black/24 p-2.5"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
-        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <div ref={emojiRef} className="relative shrink-0">
             {emojiOpen ? (
               <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[90]">
@@ -2066,7 +2075,7 @@ function BattleRoomChatPanel({
               type="button"
               disabled={!room?.code}
               onClick={() => setEmojiOpen((current) => !current)}
-              className={`grid h-11 w-11 place-items-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-35 ${
+              className={`grid h-10 w-10 place-items-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-35 ${
                 emojiOpen
                   ? "border-cyan-200/45 bg-cyan-300/14 text-cyan-100"
                   : "border-white/10 bg-white/[0.055] text-white/58 hover:border-cyan-200/35 hover:text-cyan-100"
@@ -2082,12 +2091,12 @@ function BattleRoomChatPanel({
             onChange={(event) => setDraft(event.target.value.slice(0, 240))}
             disabled={!room?.code}
             placeholder="พิมพ์แชทสด..."
-            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[14px] font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-[14px] font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
             disabled={!draft.trim() || !room?.code}
-            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-cyan-200" : "bg-cyan-300 hover:bg-cyan-200"}`}
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-cyan-200" : "bg-cyan-300 hover:bg-cyan-200"}`}
             aria-label="ส่งข้อความ"
           >
             <SendHorizontal className="h-4 w-4" />
@@ -2699,11 +2708,11 @@ function CompactBattleBoard({
   const waitingCard = waitingSkillChoice ? cardsByNo.get(waitingSkillChoice.cardNo) : undefined;
 
   return (
-    <div className="relative h-full min-h-[clamp(360px,72dvh,680px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(42px,14cqw,92px)] [--triad-pile-size:clamp(36px,10cqw,74px)] [--triad-slot-gap:clamp(4px,2cqw,12px)] [--triad-top-card-size:clamp(46px,15cqw,98px)] [container-type:inline-size] sm:min-h-[clamp(440px,74dvh,720px)] 2xl:min-h-0">
+    <div className="relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
       <CardHoverPreview card={previewCard} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
-      <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
-      <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
+      <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
+      <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
       <div className="pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" />
@@ -2767,7 +2776,7 @@ function CompactBattleBoard({
         </div>
       ) : null}
 
-      <div className="relative grid h-full min-h-0 grid-rows-[4px_minmax(116px,1fr)_auto_minmax(116px,1fr)_4px] gap-y-1 px-[clamp(4px,2cqw,14px)] py-[clamp(6px,2cqw,14px)] sm:grid-rows-[6px_minmax(132px,1fr)_auto_minmax(132px,1fr)_6px]">
+      <div className="relative grid h-full min-h-0 grid-rows-[2px_minmax(100px,1fr)_auto_minmax(100px,1fr)_2px] gap-y-1 px-[clamp(4px,1.7cqw,12px)] py-[clamp(4px,1.5cqw,10px)] sm:grid-rows-[4px_minmax(112px,1fr)_auto_minmax(112px,1fr)_4px]">
         <div />
 
         <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(4px,2cqw,12px)]">
@@ -2786,16 +2795,7 @@ function CompactBattleBoard({
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
 
-        <div className="relative z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-[clamp(6px,1.8cqw,12px)]">
-          <div />
-          <div className="mx-auto w-full max-w-[min(520px,82cqw)] space-y-2 sm:space-y-3">
-            <PhaseTrack activeTurn={activeTurn} />
-            <div className="rounded-full border border-amber-100/14 bg-black/32 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
-              เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
-            </div>
-          </div>
-          <div />
-        </div>
+        <div className="h-[clamp(4px,1cqw,8px)]" />
 
         <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(4px,2cqw,12px)]">
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" />
@@ -2810,6 +2810,14 @@ function CompactBattleBoard({
             onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
             onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}
+            footer={
+              <div className="relative z-30 mx-auto space-y-1.5">
+                <PhaseTrack activeTurn={activeTurn} />
+                <div className="rounded-full border border-amber-100/14 bg-black/42 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+                  เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+                </div>
+              </div>
+            }
             onPreview={setPreviewCard}
             onPreviewEnd={() => setPreviewCard(null)}
           />
@@ -3277,7 +3285,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const chooseOpeningTieBreak = (choice: TriadRpsChoice) => {
     if (!currentRoom || !roomPlayerSide || choice === "unknown") return;
-    if (openingTieBreakPendingChoiceRef.current || currentRoom.game.openerTieBreak.choices[roomPlayerSide] !== "unknown") return;
+    if (openingTieBreakPendingChoiceRef.current || (currentRoom.game.openerTieBreak.choices[roomPlayerSide] || "unknown") !== "unknown") return;
     openingTieBreakPendingChoiceRef.current = choice;
     setOpeningTieBreakPendingChoice(choice);
     patchCurrentRoom((room) => ({
@@ -3318,7 +3326,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (serverChoice !== "unknown") {
       openingTieBreakPendingChoiceRef.current = serverChoice;
       setOpeningTieBreakPendingChoice(null);
+      return;
     }
+    openingTieBreakPendingChoiceRef.current = null;
+    setOpeningTieBreakPendingChoice(null);
   }, [
     currentRoom?.game.openerTieBreak.fightNo,
     currentRoom?.game.openerTieBreak.status,
@@ -5192,7 +5203,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       </section>
 
       <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(300px,18vw,340px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
-        <section className="grid min-h-0 max-w-full grid-rows-[minmax(360px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(480px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
+        <section className="grid min-h-0 max-w-full grid-rows-[minmax(330px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(420px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(470px,calc(100vh-390px))_auto_auto]">
           {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
