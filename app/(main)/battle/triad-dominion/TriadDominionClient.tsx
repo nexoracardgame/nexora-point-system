@@ -1368,7 +1368,7 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="pointer-events-auto absolute right-[clamp(84px,11cqw,150px)] top-1/2 z-30 grid w-[clamp(260px,28cqw,390px)] -translate-y-1/2 gap-1.5">
+        <div className="pointer-events-auto absolute right-[clamp(84px,11cqw,150px)] top-[calc(100%+clamp(68px,10cqw,120px))] z-30 grid w-[clamp(260px,28cqw,390px)] gap-1.5">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -2558,6 +2558,49 @@ function BlessingChoiceOverlay({
   );
 }
 
+function ReadyAdvanceButton({
+  label,
+  readyCount,
+  myReady,
+  opponentReady,
+  opponentName,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  readyCount: number;
+  myReady: boolean;
+  opponentReady: boolean;
+  opponentName: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`group relative inline-flex min-h-16 flex-1 items-center justify-center overflow-hidden rounded-2xl border px-5 text-sm font-black transition md:flex-none ${
+        myReady
+          ? "border-emerald-200/30 bg-emerald-300/12 text-emerald-50 shadow-[0_0_34px_rgba(16,185,129,0.18)]"
+          : "border-amber-100/40 bg-[linear-gradient(135deg,#ffe58a,#fbbf24)] text-black shadow-[0_0_34px_rgba(251,191,36,0.28)] hover:-translate-y-0.5 hover:shadow-[0_0_46px_rgba(251,191,36,0.42)]"
+      } disabled:cursor-not-allowed`}
+    >
+      {!myReady ? <span className="absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.5),transparent)] opacity-0 transition group-hover:translate-x-full group-hover:opacity-80" /> : null}
+      {myReady ? <span className="absolute inset-0 animate-pulse bg-emerald-300/10" /> : null}
+      <span className="relative z-10 flex flex-col items-center leading-tight">
+        <span className="inline-flex items-center gap-2 text-base">
+          {myReady ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+          {myReady ? `พร้อมแล้ว (${readyCount}/2)` : `พร้อม (${readyCount}/2)`}
+        </span>
+        <span className={`mt-1 text-[10px] font-black uppercase tracking-[0.12em] ${myReady ? "text-emerald-100/65" : "text-black/55"}`}>
+          {opponentReady ? `${opponentName} พร้อมแล้ว` : label}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function TimeoutWarningOverlay({
   secondsLeft,
   missingNames,
@@ -2944,6 +2987,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   ]);
   const turnReadyState = currentRoom?.game.turnReady || { host: false, challenger: false };
   const myTurnReady = Boolean(roomPlayerSide && turnReadyState[roomPlayerSide]);
+  const opponentTurnReady = Boolean(opponentSide && turnReadyState[opponentSide]);
   const readyCount = Number(Boolean(turnReadyState.host)) + Number(Boolean(turnReadyState.challenger));
   const spectatorBattleState = useMemo(() => {
     if (!isSpectator || !currentRoom) return null;
@@ -4326,6 +4370,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (!currentResult) return current;
     const state = current[turn];
     if (state.scored) return current;
+    if (turn === 1) {
+      const next = {
+        ...current,
+        [turn]: { ...state, player: true, bot: true },
+      };
+      return scoreTurnIfReady(turn, next);
+    }
     const priorityKey = currentResult.prioritySide === "opponent" ? "bot" : "player";
     const secondaryKey = priorityKey === "player" ? "bot" : "player";
     const nextState = { ...state };
@@ -5345,6 +5396,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 ) : displayCurrentResult && activeTurnScored ? (
                   <div>
                     <ResultBanner result={displayCurrentResult} activeTurn={displayActiveTurn} />
+                    {isPvpRoom && opponentTurnReady && !myTurnReady ? (
+                      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-200/24 bg-emerald-300/10 px-3 py-2 text-xs font-black text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.14)]">
+                        <Check className="h-4 w-4 shrink-0" />
+                        <span>{opponentLabel} กดพร้อมแล้ว รอคุณกดพร้อมเพื่อไปต่อ</span>
+                      </div>
+                    ) : null}
                     <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-200/20 bg-amber-200/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-amber-100">
                       ตาถัดไปอัตโนมัติใน {Math.floor(resultTimeLeft / 60)}:{String(resultTimeLeft % 60).padStart(2, "0")}
                     </div>
@@ -5397,35 +5454,47 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     </button>
                   )
                 ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && displayRevealed[3].scored ? (
-                  <button
-                    type="button"
-                    onClick={nextFight}
-                    disabled={Boolean(isPvpRoom && myTurnReady)}
-                    className="relative inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/35 md:flex-none"
-                  >
-                    {isPvpRoom ? (
-                      <span className={`absolute inset-0 z-10 grid place-items-center rounded-xl ${myTurnReady ? "bg-white/12 text-white/72" : "bg-white text-black"}`}>
-                        {readyAdvanceLabel}
-                      </span>
-                    ) : null}
-                    {displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  isPvpRoom ? (
+                    <ReadyAdvanceButton
+                      label={displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
+                      readyCount={readyCount}
+                      myReady={myTurnReady}
+                      opponentReady={opponentTurnReady}
+                      opponentName={opponentLabel}
+                      onClick={nextFight}
+                      disabled={myTurnReady}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={nextFight}
+                      className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
+                    >
+                      {displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  )
                 ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && activeTurnScored && displayActiveTurn < 3 ? (
-                  <button
-                    type="button"
-                    onClick={nextTurn}
-                    disabled={Boolean(isPvpRoom && myTurnReady)}
-                    className="relative inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/35 md:flex-none"
-                  >
-                    {isPvpRoom ? (
-                      <span className={`absolute inset-0 z-10 grid place-items-center rounded-xl ${myTurnReady ? "bg-white/12 text-white/72" : "bg-white text-black"}`}>
-                        {readyAdvanceLabel}
-                      </span>
-                    ) : null}
-                    ตาถัดไป
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  isPvpRoom ? (
+                    <ReadyAdvanceButton
+                      label="ตาถัดไป"
+                      readyCount={readyCount}
+                      myReady={myTurnReady}
+                      opponentReady={opponentTurnReady}
+                      opponentName={opponentLabel}
+                      onClick={nextTurn}
+                      disabled={myTurnReady}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={nextTurn}
+                      className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
+                    >
+                      ตาถัดไป
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  )
                 ) : (
                   <>
                     {!displayTurnLocked && !displayCurrentResult ? (

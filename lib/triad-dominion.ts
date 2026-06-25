@@ -211,6 +211,13 @@ function formatElementName(element: TriadElement) {
 
 function normalizeSkillElementText(value: string) {
   return value
+    .replace(/\[(?:Water|Blue)\s+Element\s+(?:Symbol|Icon)\]|\((?:Water|Blue)\s+element\s+(?:symbol|icon)\)/gi, "ธาตุน้ำ")
+    .replace(/\[(?:Fire|Red)\s+Element\s+(?:Symbol|Icon)\]|\((?:Fire|Red)\s+element\s+(?:symbol|icon)\)/gi, "ธาตุไฟ")
+    .replace(/\[(?:Green|Nature|Wood)\s+(?:Spade\s+)?(?:Element\s+)?(?:Symbol|Icon)\]|\((?:Green|Nature|Wood)\s+(?:spade\s+)?(?:element\s+)?(?:symbol|icon)\)/gi, "ธาตุไม้")
+    .replace(/\[(?:Gold|Yellow|Metal|C)[-\s]*(?:Element\s+)?(?:Symbol|Icon)?\]|\((?:Gold|Yellow|Metal|C)[-\s]*(?:element\s+)?(?:symbol|icon)?\)/gi, "ธาตุทอง")
+    .replace(/\[(?:Earth|Rock|Stone|Orange|Red\/Orange|red\/orange)\s+(?:triangle\s+)?(?:Element\s+)?(?:Symbol|Icon)\]|\((?:Earth|Rock|Stone|Orange|Red\/Orange|red\/orange)\s+(?:triangle\s+)?(?:element\s+)?(?:symbol|icon)\)/gi, "ธาตุดิน")
+    .replace(/\b(?:element|elememt)\s+(?:symbol|simbol|icon)\b/gi, "")
+    .replace(/\b(?:symbol|simbol|icon)\b/gi, "")
     .replace(/\b(?:Earth|Rock|Sand)\b|🟠|▲|△|🔶|orange triangle|triangle/gi, "ธาตุดิน")
     .replace(/\bWater\b|🔵|💧|blue circle/gi, "ธาตุน้ำ")
     .replace(/\b(?:Green|Nature|Wood)\b|🟢|♠|♤|green spade|spade/gi, "ธาตุไม้")
