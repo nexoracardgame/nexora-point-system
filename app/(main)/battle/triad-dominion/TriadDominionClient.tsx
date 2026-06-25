@@ -395,6 +395,7 @@ function MiniProfileHover({
   image,
   label,
   align = "left",
+  placement = "bottom",
   size = "sm",
 }: {
   participant?: RoomParticipant | null;
@@ -402,6 +403,7 @@ function MiniProfileHover({
   image?: string;
   label?: string;
   align?: "left" | "right";
+  placement?: "top" | "bottom";
   size?: "sm" | "md";
 }) {
   const profileName = name || participant?.name || "ผู้เล่น";
@@ -421,7 +423,9 @@ function MiniProfileHover({
         </span>
       </button>
       <div
-        className={`pointer-events-none absolute top-[calc(100%+0.55rem)] z-[120] w-60 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 ${
+        className={`pointer-events-none absolute z-[160] w-60 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 ${
+          placement === "top" ? "bottom-[calc(100%+0.55rem)]" : "top-[calc(100%+0.55rem)]"
+        } ${
           align === "right" ? "right-0" : "left-0"
         }`}
       >
@@ -1364,7 +1368,7 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="pointer-events-auto absolute left-3 right-3 top-[calc(100%+0.65rem)] grid max-h-[min(34dvh,260px)] gap-2 overflow-y-auto pr-1 [scrollbar-width:thin] lg:left-auto lg:right-3 lg:top-1/2 lg:max-h-[78%] lg:w-[min(390px,32cqw)] lg:-translate-y-1/2">
+        <div className="pointer-events-auto absolute left-1/2 top-[calc(100%+0.65rem)] grid max-h-[min(26dvh,210px)] w-[min(520px,84cqw)] -translate-x-1/2 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -2697,7 +2701,7 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
-      <div className="pointer-events-auto absolute left-2 top-2 z-20 flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
+      <div className="pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" />
         <div className="min-w-0 max-w-[120px] sm:max-w-none">
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/58">คู่แข่ง</div>
@@ -2707,7 +2711,7 @@ function CompactBattleBoard({
           {matchScore.bot}
         </div>
       </div>
-      <div className="pointer-events-auto absolute bottom-2 right-2 z-20 flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
+      <div className="pointer-events-auto absolute bottom-2 right-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-red-100 bg-red-500 text-sm font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.32)] sm:h-9 sm:w-9 sm:text-lg">
           {matchScore.player}
         </div>
@@ -2715,7 +2719,7 @@ function CompactBattleBoard({
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-red-100/58">เรา</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{playerName}</div>
         </div>
-        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} label="เรา" align="right" />
+        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} label="เรา" align="right" placement="top" />
       </div>
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
