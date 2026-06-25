@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Brain,
@@ -1368,7 +1368,7 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="pointer-events-auto absolute right-[clamp(72px,8cqw,118px)] top-1/2 z-30 grid w-[clamp(250px,30cqw,370px)] -translate-y-1/2 gap-1.5">
+        <div className="pointer-events-auto absolute right-[clamp(14px,3cqw,44px)] top-1/2 z-30 grid w-[clamp(280px,36cqw,460px)] -translate-y-1/2 gap-1.5">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -1440,7 +1440,6 @@ function BoardTriangle({
   onSlotClick,
   onDropCard,
   selectedLane,
-  footer,
   onPreview,
   onPreviewEnd,
 }: {
@@ -1454,7 +1453,6 @@ function BoardTriangle({
   onSlotClick?: (lane: Lane) => void;
   onDropCard?: (lane: Lane, cardNo: string) => void;
   selectedLane?: Lane;
-  footer?: ReactNode;
   onPreview?: (card: CardView) => void;
   onPreviewEnd?: () => void;
 }) {
@@ -1525,7 +1523,6 @@ function BoardTriangle({
                 tone={tone}
               />
             </button>
-            {footer && lane === "top" ? <div className="col-span-2 w-[min(500px,82cqw)]">{footer}</div> : null}
           </Fragment>
         );
       })}
@@ -2810,14 +2807,6 @@ function CompactBattleBoard({
             onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
             onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}
-            footer={
-              <div className="relative z-30 mx-auto space-y-1.5">
-                <PhaseTrack activeTurn={activeTurn} />
-                <div className="rounded-full border border-amber-100/14 bg-black/42 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
-                  เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
-                </div>
-              </div>
-            }
             onPreview={setPreviewCard}
             onPreviewEnd={() => setPreviewCard(null)}
           />
@@ -2825,6 +2814,14 @@ function CompactBattleBoard({
         </div>
 
         <div />
+      </div>
+      <div className="pointer-events-none absolute inset-x-2 bottom-1 z-[65] flex justify-center sm:bottom-2">
+        <div className="pointer-events-auto w-[min(500px,82cqw)] space-y-1.5">
+          <PhaseTrack activeTurn={activeTurn} />
+          <div className="rounded-full border border-amber-100/14 bg-black/48 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+            เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+          </div>
+        </div>
       </div>
     </div>
   );
