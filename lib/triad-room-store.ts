@@ -5,6 +5,7 @@ import {
   triadCardByNo,
   triadCards,
   triadSkillRuleByNo,
+  type TriadLane,
   type TriadRpsChoice,
   type TriadTriangle,
   type TriadTurn,
@@ -86,6 +87,10 @@ export type TriadRoomGame = {
     host: boolean;
     challenger: boolean;
   };
+  usedCards: {
+    host: string[];
+    challenger: string[];
+  };
   deckMode: TriadDeckMode;
   selectionPools: {
     host: string[];
@@ -99,6 +104,10 @@ export type TriadRoomGame = {
   skillChoices: TriadRoomSkillChoice[];
   openerTieBreak: TriadOpeningTieBreak;
   turns: TriadTurnResult[];
+  turnReady: {
+    host: boolean;
+    challenger: boolean;
+  };
   activeTurn: TriadTurn;
   fightNo: number;
   turnStartedAt: number;
@@ -355,7 +364,9 @@ function normalizeGame(value: unknown): TriadRoomGame {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
   const deckReady = raw.deckReady && typeof raw.deckReady === "object" ? (raw.deckReady as Record<string, unknown>) : {};
+  const usedCards = raw.usedCards && typeof raw.usedCards === "object" ? (raw.usedCards as Record<string, unknown>) : {};
   const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
+  const turnReady = raw.turnReady && typeof raw.turnReady === "object" ? (raw.turnReady as Record<string, unknown>) : {};
   const activeTurn = Number(raw.activeTurn || 1);
   return {
     decks: {
@@ -365,6 +376,10 @@ function normalizeGame(value: unknown): TriadRoomGame {
     deckReady: {
       host: Boolean(deckReady.host),
       challenger: Boolean(deckReady.challenger),
+    },
+    usedCards: {
+      host: normalizeDeck(usedCards.host),
+      challenger: normalizeDeck(usedCards.challenger),
     },
     deckMode: normalizeDeckMode(raw.deckMode),
     selectionPools: {
@@ -379,6 +394,10 @@ function normalizeGame(value: unknown): TriadRoomGame {
     skillChoices: normalizeSkillChoices(raw.skillChoices),
     openerTieBreak: normalizeOpeningTieBreak(raw.openerTieBreak),
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
+    turnReady: {
+      host: Boolean(turnReady.host),
+      challenger: Boolean(turnReady.challenger),
+    },
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
     turnStartedAt: Number(raw.turnStartedAt || Date.now()),
@@ -782,8 +801,10 @@ function battleDecksReady(room: StoredTriadRoom) {
 function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   if (battleDecksReady(room) && !force) return false;
   room.game.deckReady = { host: true, challenger: true };
+  room.game.usedCards = { host: [], challenger: [] };
   room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
   room.game.turns = [];
+  room.game.turnReady = { host: false, challenger: false };
   room.game.openerTieBreak = emptyOpeningTieBreak();
   room.game.activeTurn = 1;
   room.game.fightNo = 1;
@@ -1128,7 +1149,21 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   if (turnResolved) {
     return { ok: false as const, reason: "already_resolved" as const, room: publicRoom(room), resolved: true };
   }
-  room.game.triangles[side][lane] = cleanText(cardNo);
+  const cleanedCardNo = cleanText(cardNo);
+  if ((room.game.usedCards?.[side] || []).includes(cleanedCardNo)) {
+    return { ok: false as const, reason: "already_played" as const, room: publicRoom(room), resolved: turnResolved };
+  }
+  const alreadyPlayed = (["top", "left", "right"] as TriadLane[]).some(
+    (item) => item !== lane && room.game.triangles[side][item] === cleanedCardNo
+  );
+  if (alreadyPlayed) {
+    return { ok: false as const, reason: "already_played" as const, room: publicRoom(room), resolved: turnResolved };
+  }
+  room.game.triangles[side][lane] = cleanedCardNo;
+  room.game.usedCards = {
+    ...room.game.usedCards,
+    [side]: Array.from(new Set([...(room.game.usedCards?.[side] || []), cleanedCardNo])),
+  };
   resolveIfBothLocked(room);
   await upsertStoredRoom(room);
   return {
@@ -1227,23 +1262,35 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
 export async function advanceTriadRoomTurn(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
-  if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  const side = sideForParticipant(room, participantId);
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   if (!room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {
     return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
   }
+  room.game.turnReady = {
+    host: Boolean(room.game.turnReady?.host),
+    challenger: Boolean(room.game.turnReady?.challenger),
+    [side]: true,
+  };
+  if (!room.game.turnReady.host || !room.game.turnReady.challenger) {
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), waitingReady: true as const };
+  }
   if (room.game.activeTurn < 3) {
     room.game.activeTurn = (room.game.activeTurn + 1) as TriadTurn;
+    room.game.turnReady = { host: false, challenger: false };
     room.game.turnStartedAt = Date.now();
   } else {
     room.game.fightNo = Math.min(4, room.game.fightNo + 1);
     room.game.activeTurn = 1;
     room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
     room.game.turns = [];
+    room.game.turnReady = { host: false, challenger: false };
     room.game.openerTieBreak = emptyOpeningTieBreak();
     room.game.turnStartedAt = Date.now();
   }
   await upsertStoredRoom(room);
-  return { ok: true as const, room: publicRoom(room) };
+  return { ok: true as const, room: publicRoom(room), advanced: true as const };
 }
 
 export async function timeoutTriadRoomTurn(code: string, participantId: string) {

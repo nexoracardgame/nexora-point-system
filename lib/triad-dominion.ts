@@ -6,6 +6,15 @@ export type TriadLane = "top" | "left" | "right";
 export type TriadTurn = 1 | 2 | 3;
 export type TriadMetric = "attack" | "support";
 export type TriadRpsChoice = "rock" | "scissors" | "paper" | "unknown";
+
+const triadElementThai: Record<TriadElement, string> = {
+  earth: "ดิน",
+  water: "น้ำ",
+  wood: "ไม้",
+  fire: "ไฟ",
+  gold: "ทอง",
+  unknown: "ไม่ทราบ",
+};
 export type TriadSkillShape =
   | "stat"
   | "block-stat-gain"
@@ -196,6 +205,25 @@ function normalizeElement(value?: string, cardNo?: string): TriadElement {
   return "unknown";
 }
 
+function formatElementName(element: TriadElement) {
+  return triadElementThai[element] || triadElementThai.unknown;
+}
+
+function normalizeSkillElementText(value: string) {
+  return value
+    .replace(/\b(?:Earth|Rock|Sand)\b|🟠|▲|△|🔶|orange triangle|triangle/gi, "ธาตุดิน")
+    .replace(/\bWater\b|🔵|💧|blue circle/gi, "ธาตุน้ำ")
+    .replace(/\b(?:Green|Nature|Wood)\b|🟢|♠|♤|green spade|spade/gi, "ธาตุไม้")
+    .replace(/\bFire\b|🔴|🔥|red circle/gi, "ธาตุไฟ")
+    .replace(/\bGold\b|🟡|🪙|coin|yellow circle/gi, "ธาตุทอง")
+    .replace(/ธาตุ\s*ธาตุ/g, "ธาตุ")
+    .replace(/ไม่ใช่\s*ธาตุ\s*(ดิน|น้ำ|ไม้|ไฟ|ทอง)/g, "ไม่ใช่ธาตุ$1")
+    .replace(/ที่ไม่ใช่\s*ธาตุ\s*(ดิน|น้ำ|ไม้|ไฟ|ทอง)/g, "ที่ไม่ใช่ธาตุ$1")
+    .replace(/ที่ไม่ใช่\s*(ดิน|น้ำ|ไม้|ไฟ|ทอง)/g, "ที่ไม่ใช่ธาตุ$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function getTriadCardRpsChoice(cardNo?: string): TriadRpsChoice {
   const normalized = normalizeCardNo(cardNo || "");
   const card = sourceCards.find((item) => normalizeCardNo(item.cardNo) === normalized);
@@ -226,7 +254,7 @@ export const triadCards: TriadCard[] = sourceCards.map((card) => ({
     `${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""} ${card.notes || ""}`,
     card.cardNo
   ),
-  skillText: String(card.skill || "").replace(/\s+/g, " ").trim(),
+  skillText: normalizeSkillElementText(String(card.skill || "").replace(/\s+/g, " ").trim()),
   sourceImage: card.sourceImage || `/cards/${normalizeCardNo(card.cardNo)}.jpg`,
 }));
 
@@ -480,8 +508,8 @@ function elementConditionMatches(rule: TriadSkillRule, card: TriadCard) {
 
 function elementConditionLabel(rule: TriadSkillRule) {
   if (!rule.elementCondition) return "";
-  const elements = rule.elementCondition.elements.join("/");
-  return rule.elementCondition.mode === "include" ? `ต้องเป็นธาตุ ${elements}` : `ต้องไม่ใช่ธาตุ ${elements}`;
+  const elements = rule.elementCondition.elements.map(formatElementName).join("/");
+  return rule.elementCondition.mode === "include" ? `ต้องเป็นธาตุ${elements}` : `ต้องไม่ใช่ธาตุ${elements}`;
 }
 
 function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {

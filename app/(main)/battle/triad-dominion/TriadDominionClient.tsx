@@ -128,6 +128,7 @@ type TriadRoom = {
 type RoomGame = {
   decks: Record<RoomPlayerSide, string[]>;
   deckReady: Record<RoomPlayerSide, boolean>;
+  usedCards: Record<RoomPlayerSide, string[]>;
   deckMode: DeckMode;
   selectionPools: Record<RoomPlayerSide, string[]>;
   deckStartedAt: number;
@@ -135,6 +136,7 @@ type RoomGame = {
   skillChoices: RoomSkillChoice[];
   openerTieBreak: OpeningTieBreak;
   turns: TriadTurnResult[];
+  turnReady: Record<RoomPlayerSide, boolean>;
   activeTurn: TriadTurn;
   fightNo: number;
   turnStartedAt: number;
@@ -386,6 +388,59 @@ function participantInRoom(room: TriadRoom | undefined, participantId: string) {
   );
 }
 
+function MiniProfileHover({
+  participant,
+  name,
+  image,
+  label,
+  align = "left",
+  size = "sm",
+}: {
+  participant?: RoomParticipant | null;
+  name?: string;
+  image?: string;
+  label?: string;
+  align?: "left" | "right";
+  size?: "sm" | "md";
+}) {
+  const profileName = name || participant?.name || "ผู้เล่น";
+  const profileImage = image || participant?.image || "/avatar.png";
+  const frame = rankFrames[rankIndexForParticipant(participant || { id: profileName })];
+  const avatarSize = size === "md" ? "h-11 w-11" : "h-9 w-9";
+
+  return (
+    <div className="group relative z-50 inline-flex shrink-0 items-center">
+      <button
+        type="button"
+        className={`relative grid ${avatarSize} place-items-center rounded-full border ${frame.ring} bg-black/70 p-[3px] outline-none transition hover:scale-105 focus:scale-105`}
+      >
+        <span className={`absolute -inset-2 rounded-full bg-gradient-to-br ${frame.aura} opacity-70 blur-lg`} />
+        <span className="relative h-full w-full overflow-hidden rounded-full border border-black/70 bg-black">
+          <Image src={profileImage} alt={profileName} width={48} height={48} className="h-full w-full object-cover" />
+        </span>
+      </button>
+      <div
+        className={`pointer-events-none absolute top-[calc(100%+0.55rem)] z-[120] w-60 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 ${
+          align === "right" ? "right-0" : "left-0"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <RankAvatar participant={participant || undefined} name={profileName} image={profileImage} size="md" />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-black text-white">{profileName}</div>
+            <div className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.16em] text-amber-100/56">
+              {label || frame.name}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.045] px-3 py-2 text-xs font-semibold leading-5 text-white/62">
+          กำลังอยู่ในสนาม Triad Dominion
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhase | null {
   const spectator = room.spectators.some((viewer) => viewer.id === participantId);
   const fieldPlayer = room.seats.host?.id === participantId || room.seats.challenger?.id === participantId;
@@ -434,8 +489,10 @@ function normalizeRoomGame(value: unknown): RoomGame {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const decks = raw.decks && typeof raw.decks === "object" ? (raw.decks as Record<string, unknown>) : {};
   const deckReady = raw.deckReady && typeof raw.deckReady === "object" ? (raw.deckReady as Record<string, unknown>) : {};
+  const usedCards = raw.usedCards && typeof raw.usedCards === "object" ? (raw.usedCards as Record<string, unknown>) : {};
   const selectionPools = raw.selectionPools && typeof raw.selectionPools === "object" ? (raw.selectionPools as Record<string, unknown>) : {};
   const triangles = raw.triangles && typeof raw.triangles === "object" ? (raw.triangles as Record<string, unknown>) : {};
+  const turnReady = raw.turnReady && typeof raw.turnReady === "object" ? (raw.turnReady as Record<string, unknown>) : {};
   const activeTurn = Number(raw.activeTurn || 1);
   const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
   const cleanPool = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, 40) : [];
@@ -523,6 +580,10 @@ function normalizeRoomGame(value: unknown): RoomGame {
       host: Boolean(deckReady.host),
       challenger: Boolean(deckReady.challenger),
     },
+    usedCards: {
+      host: cleanDeck(usedCards.host),
+      challenger: cleanDeck(usedCards.challenger),
+    },
     deckMode: raw.deckMode === "monster" || raw.deckMode === "skill" ? raw.deckMode : "all",
     selectionPools: {
       host: cleanPool(selectionPools.host),
@@ -536,6 +597,10 @@ function normalizeRoomGame(value: unknown): RoomGame {
     skillChoices: cleanSkillChoices(raw.skillChoices),
     openerTieBreak: cleanOpeningTieBreak(raw.openerTieBreak),
     turns: Array.isArray(raw.turns) ? (raw.turns as TriadTurnResult[]) : [],
+    turnReady: {
+      host: Boolean(turnReady.host),
+      challenger: Boolean(turnReady.challenger),
+    },
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
     turnStartedAt: Number(raw.turnStartedAt || Date.now()),
@@ -1218,13 +1283,13 @@ function RevealSpotlight({
         ];
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-[32%] z-20 flex justify-center px-3">
+    <div className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3 ${isScored ? "top-[14%] sm:top-[17%] lg:top-[19%]" : "top-[28%] sm:top-[32%]"}`}>
       {isScored ? (
         <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
       <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
-      <div className="relative grid w-[min(680px,86cqw)] items-center gap-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-3">
-        <div className={`mx-auto w-[clamp(82px,20cqw,160px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
+      <div className="relative grid w-[min(680px,88cqw)] items-center gap-2 sm:grid-cols-[1fr_minmax(150px,auto)_1fr] sm:gap-3">
+        <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
               {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -1235,18 +1300,18 @@ function RevealSpotlight({
           ) : null}
         </div>
 
-        <div className="text-center">
-          <div className="animate-[triad-flash_900ms_ease-out] rounded-2xl bg-black/34 px-3 py-2 text-[clamp(1.2rem,5.2cqw,2.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)] backdrop-blur-sm sm:rounded-3xl sm:px-4">
+        <div className="min-w-0 text-center">
+          <div className="mx-auto max-w-[min(420px,48cqw)] animate-[triad-flash_900ms_ease-out] rounded-2xl bg-black/44 px-3 py-2 text-[clamp(1rem,4.2cqw,2.35rem)] font-black uppercase leading-[1.06] text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)] backdrop-blur-sm sm:rounded-3xl sm:px-5 sm:py-3">
             {isSwapSkill ? "สลับ!" : isScored ? winnerText : "เปิดการ์ด"}
           </div>
           {isScored ? (
-            <div className="mt-2 rounded-full border border-amber-200/50 bg-black/70 px-3 py-2 text-[clamp(0.86rem,3cqw,1.22rem)] font-black text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)] sm:px-4">
+            <div className="mx-auto mt-2 max-w-[min(420px,52cqw)] rounded-full border border-amber-200/50 bg-black/76 px-3 py-2 text-[clamp(0.78rem,2.3cqw,1.08rem)] font-black leading-tight text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)] sm:px-4">
               {scoreText}
             </div>
           ) : null}
         </div>
 
-        <div className={`mx-auto w-[clamp(82px,20cqw,160px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
           {showBot && botCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
               {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -1258,19 +1323,19 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="absolute right-2 top-1/2 hidden max-h-[82%] w-[min(320px,28cqw)] -translate-y-1/2 gap-2 overflow-hidden lg:grid">
+        <div className="pointer-events-auto absolute left-3 right-3 top-[calc(100%+0.65rem)] grid max-h-[min(34dvh,260px)] gap-2 overflow-y-auto pr-1 [scrollbar-width:thin] lg:left-auto lg:right-3 lg:top-1/2 lg:max-h-[78%] lg:w-[min(390px,32cqw)] lg:-translate-y-1/2">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
-              className="animate-[triad-effect-step_720ms_ease-out_both] rounded-xl border border-violet-200/35 bg-black/82 px-3 py-2 shadow-[0_0_34px_rgba(168,85,247,0.22)] backdrop-blur-md"
+              className="animate-[triad-effect-step_720ms_ease-out_both] rounded-xl border border-violet-200/35 bg-black/88 px-3 py-2.5 shadow-[0_0_34px_rgba(168,85,247,0.22)] backdrop-blur-md"
               style={{ animationDelay: `${index * 160}ms` }}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-violet-200/70">
+                  <div className="text-[9px] font-black uppercase leading-4 tracking-[0.14em] text-violet-200/70">
                     {event.cardNo ? `${event.side === "player" ? playerName : botName} ใช้สกิล No.${event.cardNo}` : "ผลการปะทะ"}
                   </div>
-                  <div className="mt-1 truncate text-sm font-black text-white">{event.name}</div>
+                  <div className="mt-1 text-sm font-black leading-5 text-white">{event.name}</div>
                 </div>
                 <div className="shrink-0 rounded-full border border-amber-200/30 bg-amber-200/10 px-2 py-1 text-[10px] font-black text-amber-100">
                   {index + 1}/{timeline.length}
@@ -1279,16 +1344,16 @@ function RevealSpotlight({
               {event.targetLabel ? (
                 <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-red-300/32 bg-red-500/12 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-100">
                   <Crosshair className="h-3 w-3 shrink-0" />
-                  <span className="truncate">ล็อกเป้า: {event.targetLabel}</span>
+                  <span className="min-w-0 whitespace-normal leading-4">ล็อกเป้า: {event.targetLabel}</span>
                 </div>
               ) : null}
               {event.blocked ? (
                 <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-300/32 bg-amber-300/12 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100">
                   <Lock className="h-3 w-3 shrink-0" />
-                  <span className="truncate">บัฟถูกบล็อก</span>
+                  <span className="min-w-0 whitespace-normal leading-4">บัฟถูกบล็อก</span>
                 </div>
               ) : null}
-              <div className="mt-1 text-xs font-semibold leading-5 text-white/72">
+              <div className="mt-2 whitespace-normal break-words text-xs font-semibold leading-5 text-white/76">
                 {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
               </div>
             </div>
@@ -1468,7 +1533,7 @@ function HandCard({
       disabled={disabled || used}
       className={`group relative min-w-[48px] max-w-[104px] flex-[0_0_clamp(50px,16cqw,96px)] touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
         used
-          ? "border-white/8 opacity-25"
+          ? "border-white/8 opacity-30 grayscale"
           : placedLane
             ? "border-amber-300/70 opacity-55"
             : highlighted
@@ -1478,7 +1543,13 @@ function HandCard({
     >
       <div className="relative aspect-[3/4]">
         <Image src={card.sourceImage} alt={card.name} fill sizes="110px" className="object-cover" />
+        {used ? <div className="absolute inset-0 bg-black/62" /> : null}
       </div>
+      {used ? (
+        <div className="absolute inset-x-1 bottom-1 rounded-md border border-white/10 bg-black/78 px-1 py-1 text-center text-[8px] font-black uppercase tracking-[0.08em] text-white/58">
+          ใช้แล้ว
+        </div>
+      ) : null}
       {highlighted ? <div className="absolute inset-0 animate-pulse rounded-[inherit] ring-4 ring-cyan-300/65" /> : null}
       {placedLane ? (
         <div className="absolute right-1 top-1 rounded-md bg-amber-300 px-1.5 py-0.5 text-[8px] font-black uppercase text-black">
@@ -1545,12 +1616,15 @@ function PlayerHand({
         </div>
       </div>
       <div className="flex min-h-0 gap-1.5 overflow-x-auto overscroll-x-contain pb-2 pr-1 scrollbar-thin xl:justify-start">
-        {cards.map((card) => (
+        {cards.map((card) => {
+          const placedLane = placedByNo.get(card.cardNo);
+          const unavailable = usedSet.has(card.cardNo) || Boolean(placedLane && placedLane !== activeLane);
+          return (
             <HandCard
               key={card.cardNo}
               card={card}
-              used={usedSet.has(card.cardNo)}
-              placedLane={placedByNo.get(card.cardNo)}
+              used={unavailable}
+              placedLane={placedLane}
               disabled={locked}
               highlighted={highlightCardNo === card.cardNo}
               onClick={() => onPlayCard(card.cardNo)}
@@ -1558,7 +1632,8 @@ function PlayerHand({
               onPreview={setPreviewCard}
               onPreviewEnd={() => setPreviewCard(null)}
             />
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1828,36 +1903,37 @@ function BattleRoomChatPanel({
 
   const submit = async () => {
     const text = draft.trim();
-    if (!text || sending || !room?.code) return;
-    setSending(true);
+    if (!text || !room?.code) return;
     setDraft("");
-    const ok = await onSend(text);
-    if (!ok) setDraft(text);
-    setSending(false);
+    setSending(true);
+    void onSend(text).then((ok) => {
+      if (!ok) setDraft((current) => current || text);
+      setSending(false);
+    });
   };
 
   return (
-    <section className="flex min-h-[360px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)]">
-      <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-4 py-3">
+    <section className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-full 2xl:min-h-0">
+      <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-300/12 text-cyan-100 shadow-[0_0_26px_rgba(34,211,238,0.16)]">
-              <MessageCircle className="h-4 w-4" />
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-300/12 text-cyan-100 shadow-[0_0_26px_rgba(34,211,238,0.16)]">
+              <MessageCircle className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-black text-white">แชทสดสนาม</div>
-              <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/54">
+              <div className="truncate text-base font-black text-white">แชทสดสนาม</div>
+              <div className="mt-0.5 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-100/54">
                 ห้อง {room?.code || "------"} • {memberCount} คน
               </div>
             </div>
           </div>
-          <div className="rounded-full border border-emerald-200/24 bg-emerald-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100">
+          <div className="rounded-full border border-emerald-200/24 bg-emerald-300/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-100">
             LIVE
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.length > 0 ? (
           messages.map((message) => {
             const mine = message.senderId === currentUserId;
@@ -1867,18 +1943,18 @@ function BattleRoomChatPanel({
                   <Image
                     src={message.senderImage || "/avatar.png"}
                     alt={message.senderName}
-                    width={28}
-                    height={28}
-                    className="mt-1 h-7 w-7 shrink-0 rounded-lg border border-white/10 object-cover"
+                    width={34}
+                    height={34}
+                    className="mt-1 h-8 w-8 shrink-0 rounded-lg border border-white/10 object-cover"
                   />
                 ) : null}
-                <div className={`max-w-[86%] ${mine ? "text-right" : "text-left"}`}>
-                  <div className={`mb-1 flex items-center gap-2 text-[10px] font-bold text-white/38 ${mine ? "justify-end" : ""}`}>
-                    <span className="max-w-[130px] truncate">{mine ? "เรา" : message.senderName}</span>
+                <div className={`max-w-[88%] ${mine ? "text-right" : "text-left"}`}>
+                  <div className={`mb-1 flex items-center gap-2 text-[11px] font-bold text-white/38 ${mine ? "justify-end" : ""}`}>
+                    <span className="max-w-[190px] truncate">{mine ? "เรา" : message.senderName}</span>
                     <span>{new Date(message.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                   <div
-                    className={`break-words rounded-2xl border px-3 py-2 text-sm font-semibold leading-5 ${
+                    className={`break-words rounded-2xl border px-4 py-2.5 text-[15px] font-semibold leading-6 ${
                       mine
                         ? "border-amber-200/26 bg-amber-300/14 text-amber-50"
                         : "border-cyan-200/16 bg-white/[0.055] text-white/78"
@@ -1892,7 +1968,7 @@ function BattleRoomChatPanel({
           })
         ) : (
           <div className="grid h-full min-h-[190px] place-items-center text-center">
-            <div>
+            <div className="px-6">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-white/16 bg-white/[0.035] text-cyan-100/54">
                 <MessageCircle className="h-5 w-5" />
               </div>
@@ -1905,24 +1981,24 @@ function BattleRoomChatPanel({
       </div>
 
       <form
-        className="border-t border-white/8 bg-black/24 p-3"
+        className="border-t border-white/8 bg-black/24 p-4"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
-        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value.slice(0, 240))}
-            disabled={!room?.code || sending}
+            disabled={!room?.code}
             placeholder="พิมพ์แชทสด..."
-            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-[15px] font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
-            disabled={!draft.trim() || !room?.code || sending}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-300 text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25"
+            disabled={!draft.trim() || !room?.code}
+            className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-cyan-200" : "bg-cyan-300 hover:bg-cyan-200"}`}
             aria-label="ส่งข้อความ"
           >
             <SendHorizontal className="h-4 w-4" />
@@ -2157,6 +2233,36 @@ function SpectatorPanel({
   );
 }
 
+function SpectatorAvatarRail({
+  spectators,
+}: {
+  spectators: RoomParticipant[];
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end">
+      {Array.from({ length: SPECTATOR_LIMIT }).map((_, index) => {
+        const spectator = spectators[index];
+        return spectator ? (
+          <MiniProfileHover
+            key={spectator.id}
+            participant={spectator}
+            label={`ผู้ชม ${index + 1}`}
+            align={index > 5 ? "right" : "left"}
+          />
+        ) : (
+          <div
+            key={`empty-${index}`}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-dashed border-white/10 bg-black/32 text-[10px] font-black text-white/20"
+            title={`ที่นั่งผู้ชม ${index + 1}`}
+          >
+            {index + 1}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeTurn: TriadTurn }) {
   const title =
     result.winner === "draw"
@@ -2368,10 +2474,11 @@ function TimeoutWarningOverlay({
   const nameText = missingNames.length === 1 ? missingNames[0] : missingNames.join(" และ ");
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center px-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(248,113,113,0.24),rgba(0,0,0,0.18)_34%,transparent_68%)]" />
-      <div className="absolute h-[min(420px,72vw)] w-[min(420px,72vw)] animate-ping rounded-full border border-red-300/25 bg-red-500/8" />
-      <div className="relative w-[min(760px,94vw)] overflow-hidden rounded-[28px] border border-red-200/45 bg-black/78 p-5 text-center shadow-[0_0_92px_rgba(248,113,113,0.44),inset_0_0_0_1px_rgba(255,255,255,0.08)] backdrop-blur-md sm:p-7">
+    <div className="pointer-events-none absolute inset-0 z-[80] grid place-items-center px-4">
+      <div className="absolute inset-0 bg-black/42 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(248,113,113,0.28),rgba(0,0,0,0.28)_34%,transparent_68%)]" />
+      <div className="absolute z-[81] h-[min(420px,72vw)] w-[min(420px,72vw)] animate-ping rounded-full border border-red-300/25 bg-red-500/8" />
+      <div className="relative z-[90] w-[min(760px,94vw)] overflow-hidden rounded-[28px] border border-red-200/45 bg-black/86 p-5 text-center shadow-[0_0_92px_rgba(248,113,113,0.52),inset_0_0_0_1px_rgba(255,255,255,0.08)] backdrop-blur-md sm:p-7">
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-red-100 to-transparent" />
         <div className="absolute inset-0 bg-[conic-gradient(from_180deg_at_50%_50%,rgba(248,113,113,0.22),rgba(251,191,36,0.16),rgba(34,211,238,0.10),rgba(248,113,113,0.22))] opacity-30" />
         <div className="relative">
@@ -2413,6 +2520,8 @@ function CompactBattleBoard({
   botName,
   playerImage,
   botImage,
+  playerParticipant,
+  botParticipant,
   placementLane,
   timeLeft,
   turnLocked,
@@ -2443,6 +2552,8 @@ function CompactBattleBoard({
   botName: string;
   playerImage: string;
   botImage: string;
+  playerParticipant?: RoomParticipant | null;
+  botParticipant?: RoomParticipant | null;
   placementLane: Lane;
   timeLeft: number;
   turnLocked: boolean;
@@ -2505,8 +2616,8 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
-      <div className="pointer-events-none absolute left-2 top-2 z-20 flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
-        <Image src={botImage || "/avatar.png"} alt={botName} width={44} height={44} className="hidden h-10 w-10 shrink-0 rounded-xl border border-cyan-100/18 object-contain sm:block" />
+      <div className="pointer-events-auto absolute left-2 top-2 z-20 flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
+        <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" />
         <div className="min-w-0 max-w-[120px] sm:max-w-none">
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/58">คู่แข่ง</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{botName}</div>
@@ -2515,7 +2626,7 @@ function CompactBattleBoard({
           {matchScore.bot}
         </div>
       </div>
-      <div className="pointer-events-none absolute bottom-2 right-2 z-20 flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
+      <div className="pointer-events-auto absolute bottom-2 right-2 z-20 flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-red-100 bg-red-500 text-sm font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.32)] sm:h-9 sm:w-9 sm:text-lg">
           {matchScore.player}
         </div>
@@ -2523,7 +2634,7 @@ function CompactBattleBoard({
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-red-100/58">เรา</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{playerName}</div>
         </div>
-        <Image src={playerImage || "/avatar.png"} alt={playerName} width={44} height={44} className="hidden h-10 w-10 shrink-0 rounded-xl border border-red-100/18 object-contain sm:block" />
+        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} label="เรา" align="right" />
       </div>
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
@@ -2727,6 +2838,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ? "challenger"
       : null;
   const opponentSide: RoomPlayerSide | null = roomPlayerSide === "host" ? "challenger" : roomPlayerSide === "challenger" ? "host" : null;
+  const displayUsedPlayerSet = new Set([
+    ...usedPlayerSet,
+    ...((roomPlayerSide && currentRoom?.game.usedCards[roomPlayerSide]) || []),
+  ]);
+  const turnReadyState = currentRoom?.game.turnReady || { host: false, challenger: false };
+  const myTurnReady = Boolean(roomPlayerSide && turnReadyState[roomPlayerSide]);
+  const readyCount = Number(Boolean(turnReadyState.host)) + Number(Boolean(turnReadyState.challenger));
   const spectatorBattleState = useMemo(() => {
     if (!isSpectator || !currentRoom) return null;
     const revealState = buildRevealStateForTurns(currentRoom.game.turns);
@@ -2816,6 +2934,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const displayBotName = spectatorBattleState?.botName || opponentLabel;
   const displayPlayerImage = spectatorBattleState?.playerImage || playerImage;
   const displayBotImage = spectatorBattleState?.botImage || opponentImage;
+  const displayPlayerParticipant = isSpectator
+    ? currentRoom?.seats.host || null
+    : roomPlayerSide
+      ? currentRoom?.seats[roomPlayerSide] || null
+      : makeParticipant(currentUser);
+  const displayBotParticipant = isSpectator
+    ? currentRoom?.seats.challenger || null
+    : opponentSide
+      ? currentRoom?.seats[opponentSide] || null
+      : null;
   const displayPlayerDeckCards = spectatorBattleState?.playerDeckCards || playerDeckCards;
   const displayBotDeckCards = spectatorBattleState?.botDeckCards || botDeckCards;
   const displayBattleLog = spectatorBattleState?.battleLog || battleLog;
@@ -3646,7 +3774,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
-    if (turnLocked || matchDone || usedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;
+    if (turnLocked || matchDone || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;
+    const alreadyPlayedLane = (["top", "left", "right"] as Lane[]).find((item) => item !== lane && player[item] === cardNo);
+    if (alreadyPlayedLane) return;
     const card = cardsByNo.get(cardNo);
     if (lane === "top" && card?.kind !== "monster") {
       setBattleLog((current) => ["ตาแรกต้องวางการ์ดมอนสเตอร์เท่านั้น", ...current]);
@@ -3719,6 +3849,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               ...room.game.triangles[roomPlayerSide],
               [lane]: player[lane],
             },
+          },
+          usedCards: {
+            ...room.game.usedCards,
+            [roomPlayerSide]: Array.from(new Set([...(room.game.usedCards[roomPlayerSide] || []), player[lane]].filter(Boolean))),
           },
           skillChoices: needsSkillChoice
             ? [
@@ -4126,8 +4260,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const nextTurn = () => {
     if (!lockedFight || activeTurn >= 3) return;
-    if (currentRoom && isRoomController) {
+    if (currentRoom && roomPlayerSide) {
+      patchCurrentRoom((room) => ({
+        ...room,
+        game: {
+          ...room.game,
+          turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
+        },
+      }));
       void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+      return;
     }
     const lane = laneForTurn(activeTurn);
     const nextActiveTurn = (activeTurn + 1) as TriadTurn;
@@ -4150,8 +4292,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const nextFight = () => {
     if (!lockedFight) return;
-    if (currentRoom && isRoomController) {
+    if (currentRoom && roomPlayerSide) {
+      patchCurrentRoom((room) => ({
+        ...room,
+        game: {
+          ...room.game,
+          turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
+        },
+      }));
       void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+      return;
     }
 
     const nextUsedPlayer = [
@@ -4197,8 +4347,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const revealState = displayRevealed[displayActiveTurn];
   const activeTurnScored = Boolean(revealState?.scored);
   const canRevealTurn = Boolean(displayCurrentResult) && (displayTurnLocked || Boolean(isPvpRoom && roomTurnResolved));
+  const readyAdvanceLabel = myTurnReady ? `รออีกฝ่าย (${readyCount}/2)` : `พร้อม (${readyCount}/2)`;
   useEffect(() => {
-    if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored) {
+    if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored || isPvpRoom) {
       resultAdvanceKeyRef.current = "";
       return;
     }
@@ -4213,12 +4364,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setResultTimeLeft((current) => {
         if (current <= 1) {
           window.clearInterval(timer);
-          if (!isPvpRoom || isRoomController) {
-            setTimeout(() => {
-              if (activeTurn >= 3) nextFight();
-              else nextTurn();
-            }, 0);
-          }
+          setTimeout(() => {
+            if (activeTurn >= 3) nextFight();
+            else nextTurn();
+          }, 0);
           return 0;
         }
         return current - 1;
@@ -4226,7 +4375,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [activeRoomCode, activeTurn, activeTurnScored, currentResult?.winner, fightNo, isPvpRoom, isRoomController, lockedFight, matchDone, phase]);
+  }, [activeRoomCode, activeTurn, activeTurnScored, currentResult?.winner, fightNo, isPvpRoom, lockedFight, matchDone, phase]);
 
   const revealButtonLabel =
     !canRevealTurn
@@ -4871,6 +5020,25 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       ) : null}
       {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} /> : null}
+      <section className="relative z-20 mx-2 mt-14 rounded-2xl border border-white/8 bg-black/30 px-3 py-3 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4 2xl:mt-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/52">
+              <Swords className="h-3.5 w-3.5 text-amber-300" />
+              Battle Room
+            </div>
+            <div className="mt-1 truncate text-xl font-black uppercase tracking-normal text-white sm:text-2xl">
+              Triad Dominion
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/38 sm:text-right">
+              ผู้ชม {currentRoom?.spectators.length || 0}/{SPECTATOR_LIMIT}
+            </div>
+            <SpectatorAvatarRail spectators={currentRoom?.spectators || []} />
+          </div>
+        </div>
+      </section>
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -4906,7 +5074,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       </section>
 
-      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_240px] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-16 sm:pt-16"}`}>
+      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(380px,24vw,460px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-16 sm:pt-16"}`}>
         <section className="grid min-h-0 max-w-full grid-rows-[minmax(360px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(480px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
           {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
@@ -4950,6 +5118,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 botName={displayBotName}
                 playerImage={displayPlayerImage}
                 botImage={displayBotImage}
+                playerParticipant={displayPlayerParticipant}
+                botParticipant={displayBotParticipant}
                 placementLane={placementLane}
                 timeLeft={displayTimeLeft}
                 turnLocked={displayTurnLocked}
@@ -4991,6 +5161,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               botName={displayBotName}
               playerImage={displayPlayerImage}
               botImage={displayBotImage}
+              playerParticipant={displayPlayerParticipant}
+              botParticipant={displayBotParticipant}
               placementLane={placementLane}
               timeLeft={displayTimeLeft}
               turnLocked={displayTurnLocked}
@@ -5018,7 +5190,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           {!isSpectator ? (
             <PlayerHand
               cards={playerDeckCards}
-              usedSet={usedPlayerSet}
+              usedSet={displayUsedPlayerSet}
               player={player}
               placementLane={placementLane}
               activeLane={laneForTurn(activeTurn)}
@@ -5099,21 +5271,33 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                       เริ่มใหม่
                     </button>
                   )
-                ) : !isSpectator && (!isPvpRoom || isRoomController) && displayTurnLocked && displayLockedFight && displayRevealed[3].scored ? (
+                ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && displayRevealed[3].scored ? (
                   <button
                     type="button"
                     onClick={nextFight}
-                    className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
+                    disabled={Boolean(isPvpRoom && myTurnReady)}
+                    className="relative inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/35 md:flex-none"
                   >
+                    {isPvpRoom ? (
+                      <span className={`absolute inset-0 z-10 grid place-items-center rounded-xl ${myTurnReady ? "bg-white/12 text-white/72" : "bg-white text-black"}`}>
+                        {readyAdvanceLabel}
+                      </span>
+                    ) : null}
                     {displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                ) : !isSpectator && (!isPvpRoom || isRoomController) && displayTurnLocked && displayLockedFight && activeTurnScored && displayActiveTurn < 3 ? (
+                ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && activeTurnScored && displayActiveTurn < 3 ? (
                   <button
                     type="button"
                     onClick={nextTurn}
-                    className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
+                    disabled={Boolean(isPvpRoom && myTurnReady)}
+                    className="relative inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/35 md:flex-none"
                   >
+                    {isPvpRoom ? (
+                      <span className={`absolute inset-0 z-10 grid place-items-center rounded-xl ${myTurnReady ? "bg-white/12 text-white/72" : "bg-white text-black"}`}>
+                        {readyAdvanceLabel}
+                      </span>
+                    ) : null}
                     ตาถัดไป
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -5176,7 +5360,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ) : null}
         </section>
 
-        <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex">
+        <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex 2xl:h-[calc(100vh-142px)] 2xl:max-h-[calc(100vh-142px)]">
           {currentRoom ? (
             <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
           ) : null}
