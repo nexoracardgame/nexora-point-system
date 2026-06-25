@@ -21,6 +21,7 @@ import {
   Search,
   SendHorizontal,
   Shield,
+  Smile,
   Sparkles,
   Scissors,
   Swords,
@@ -29,6 +30,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import {
   resolveTriadTurn,
   triadSkillRuleByNo,
@@ -197,8 +199,6 @@ const LOBBY_SYNC_MS = 1800;
 const ACTIVE_ROOM_SYNC_MS = 1000;
 const HIDDEN_SYNC_MS = 4000;
 const MIN_SYNC_GAP_MS = 140;
-const TRIAD_CHAT_EMOJIS = ["🔥", "👏", "💪", "😆", "😎", "😭", "🤝", "❤️", "⚡", "🎯", "🏆", "✨"];
-
 const rankFrames = [
   { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
   { name: "เหล็กดำ", aura: "from-slate-300/30 via-slate-800/20 to-black/20", ring: "border-slate-300/55 shadow-[0_0_24px_rgba(148,163,184,0.22)]", badge: "bg-slate-200 text-black" },
@@ -615,7 +615,47 @@ function normalizeRoomGame(value: unknown): RoomGame {
 function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
   if (!room?.code) return rooms;
   const exists = rooms.some((item) => item.code === room.code);
-  return exists ? rooms.map((item) => (item.code === room.code ? room : item)) : [room, ...rooms];
+  return exists ? rooms.map((item) => (item.code === room.code ? mergeRoomWithStableChat(item, room) : item)) : [room, ...rooms];
+}
+
+function mergeRoomListsWithStableChat(currentRooms: TriadRoom[], nextRooms: TriadRoom[]) {
+  return nextRooms.map((room) => mergeRoomWithStableChat(currentRooms.find((item) => item.code === room.code), room));
+}
+
+function mergeRoomWithStableChat(currentRoom: TriadRoom | null | undefined, nextRoom: TriadRoom) {
+  if (!currentRoom || currentRoom.code !== nextRoom.code) return nextRoom;
+  const chat = mergeRoomChatMessages(currentRoom.game.chat || [], nextRoom.game.chat || []);
+  return {
+    ...nextRoom,
+    game: {
+      ...nextRoom.game,
+      chat,
+    },
+  };
+}
+
+function mergeRoomChatMessages(currentMessages: RoomChatMessage[], nextMessages: RoomChatMessage[]) {
+  const merged: RoomChatMessage[] = [];
+  const pushStable = (message: RoomChatMessage) => {
+    const duplicateIndex = merged.findIndex((item) => {
+      if (item.id === message.id) return true;
+      const sameOptimisticEcho =
+        item.senderId === message.senderId &&
+        item.text === message.text &&
+        Math.abs(item.createdAt - message.createdAt) < 8000 &&
+        (item.id.startsWith("local-") || message.id.startsWith("local-"));
+      return sameOptimisticEcho;
+    });
+    if (duplicateIndex >= 0) {
+      const existing = merged[duplicateIndex];
+      merged[duplicateIndex] = existing.id.startsWith("local-") && !message.id.startsWith("local-") ? message : existing;
+      return;
+    }
+    merged.push(message);
+  };
+  currentMessages.forEach(pushStable);
+  nextMessages.forEach(pushStable);
+  return merged.sort((a, b) => a.createdAt - b.createdAt).slice(-80);
 }
 
 function roomTurnSecondsLeft(room: TriadRoom) {
@@ -1532,7 +1572,7 @@ function HandCard({
         if (lane) onDropToLane(lane, card.cardNo);
       }}
       disabled={disabled || used}
-      className={`group relative min-w-[48px] max-w-[104px] flex-[0_0_clamp(50px,16cqw,96px)] touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+      className={`group relative min-w-0 touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
         used
           ? "border-white/8 opacity-30 grayscale"
           : placedLane
@@ -1616,7 +1656,7 @@ function PlayerHand({
           ))}
         </div>
       </div>
-      <div className="flex min-h-0 gap-1.5 overflow-x-auto overscroll-x-contain pb-2 pr-1 scrollbar-thin xl:justify-start">
+      <div className="grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1">
         {cards.map((card) => {
           const placedLane = placedByNo.get(card.cardNo);
           const unavailable = usedSet.has(card.cardNo) || Boolean(placedLane && placedLane !== activeLane);
@@ -1891,7 +1931,9 @@ function BattleRoomChatPanel({
 }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const emojiRef = useRef<HTMLDivElement>(null);
   const messages = room?.game.chat || [];
   const memberCount =
     (room?.seats.host ? 1 : 0) +
@@ -1901,6 +1943,17 @@ function BattleRoomChatPanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, room?.code]);
+
+  useEffect(() => {
+    if (!emojiOpen) return;
+    const closeEmojiPicker = (event: MouseEvent) => {
+      if (!emojiRef.current?.contains(event.target as Node)) {
+        setEmojiOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", closeEmojiPicker);
+    return () => document.removeEventListener("mousedown", closeEmojiPicker);
+  }, [emojiOpen]);
 
   const submit = async () => {
     const text = draft.trim();
@@ -1914,11 +1967,11 @@ function BattleRoomChatPanel({
   };
 
   return (
-    <section className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-full 2xl:min-h-0">
-      <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-5 py-4">
+    <section className="flex min-h-[360px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-full 2xl:min-h-0">
+      <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-300/12 text-cyan-100 shadow-[0_0_26px_rgba(34,211,238,0.16)]">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-300/12 text-cyan-100 shadow-[0_0_26px_rgba(34,211,238,0.16)]">
               <MessageCircle className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -1982,38 +2035,51 @@ function BattleRoomChatPanel({
       </div>
 
       <form
-        className="border-t border-white/8 bg-black/24 p-4"
+        className="border-t border-white/8 bg-black/24 p-3"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
-        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
-          {TRIAD_CHAT_EMOJIS.map((emoji) => (
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+          <div ref={emojiRef} className="relative shrink-0">
+            {emojiOpen ? (
+              <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[90]">
+                <ChatEmojiPicker
+                  onSelect={(emoji) => {
+                    setDraft((current) => `${current}${emoji}`.slice(0, 240));
+                    setEmojiOpen(false);
+                  }}
+                  onClose={() => setEmojiOpen(false)}
+                />
+              </div>
+            ) : null}
             <button
-              key={emoji}
               type="button"
               disabled={!room?.code}
-              onClick={() => setDraft((current) => `${current}${emoji}`.slice(0, 240))}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.055] text-lg transition hover:border-cyan-200/45 hover:bg-cyan-300/12 disabled:cursor-not-allowed disabled:opacity-35"
-              aria-label={`emoji ${emoji}`}
+              onClick={() => setEmojiOpen((current) => !current)}
+              className={`grid h-11 w-11 place-items-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                emojiOpen
+                  ? "border-cyan-200/45 bg-cyan-300/14 text-cyan-100"
+                  : "border-white/10 bg-white/[0.055] text-white/58 hover:border-cyan-200/35 hover:text-cyan-100"
+              }`}
+              aria-label="เลือกอีโมจิ"
+              aria-expanded={emojiOpen}
             >
-              {emoji}
+              <Smile className="h-4.5 w-4.5" />
             </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+          </div>
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value.slice(0, 240))}
             disabled={!room?.code}
             placeholder="พิมพ์แชทสด..."
-            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-[15px] font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[14px] font-semibold text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
             disabled={!draft.trim() || !room?.code}
-            className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-cyan-200" : "bg-cyan-300 hover:bg-cyan-200"}`}
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-cyan-200" : "bg-cyan-300 hover:bg-cyan-200"}`}
             aria-label="ส่งข้อความ"
           >
             <SendHorizontal className="h-4 w-4" />
@@ -3110,7 +3176,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase("lobby");
       setLobbyMessage("ห้องถูกปิดแล้ว");
     }
-    setRooms(nextRooms);
+    setRooms((current) => mergeRoomListsWithStableChat(current, nextRooms));
     return nextRooms;
     } finally {
       syncInFlightRef.current = false;
@@ -3146,12 +3212,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if ((body.action === "disband" || (body.action === "leave" && !actionRoom)) && activeRoomCodeRef.current) {
       nextRooms = nextRooms.filter((room) => room.code !== activeRoomCodeRef.current);
     }
-    setRooms(actionRoom ? mergeRoomByCode(nextRooms, actionRoom) : nextRooms);
+    setRooms((current) => (actionRoom ? mergeRoomByCode(mergeRoomListsWithStableChat(current, nextRooms), actionRoom) : mergeRoomListsWithStableChat(current, nextRooms)));
     if (actionRoom) {
-      activeRoomSnapshotRef.current = actionRoom;
-      setActiveRoomSnapshot(actionRoom);
-      if (participantInRoom(actionRoom, participant.id) && actionRoom.status === "playing") {
-        const nextPhase = phaseForPlayingRoom(actionRoom, participant.id);
+      const stableActionRoom = mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom);
+      activeRoomSnapshotRef.current = stableActionRoom;
+      setActiveRoomSnapshot(stableActionRoom);
+      if (participantInRoom(stableActionRoom, participant.id) && stableActionRoom.status === "playing") {
+        const nextPhase = phaseForPlayingRoom(stableActionRoom, participant.id);
         if (nextPhase) setPhase(nextPhase);
       }
     } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
@@ -4995,7 +5062,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   return (
     <main className="relative min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px] 2xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] 2xl:min-h-0">
-      {currentRoom && isFieldPlayer && !matchDone ? (
+      {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
           type="button"
           onClick={surrenderBattle}
@@ -5017,7 +5084,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         pendingChoice={openingTieBreakPendingChoice}
         onChoose={chooseOpeningTieBreak}
       />
-      {currentRoom ? (
+      {false && currentRoom ? (
         <button
           type="button"
           onClick={leaveRoom}
@@ -5041,10 +5108,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       ) : null}
       {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} /> : null}
-      <section className="relative z-20 mx-2 mt-12 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4 2xl:mt-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/52">
+      <section className="relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(230px,0.85fr)_minmax(260px,1fr)_auto] lg:items-center">
+          <div className="flex min-w-0 items-center gap-2">
+            {currentRoom && isFieldPlayer && !matchDone ? (
+              <button
+                type="button"
+                onClick={surrenderBattle}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-200/35 bg-red-500 px-3 text-[11px] font-black uppercase tracking-[0.1em] text-white shadow-[0_0_30px_rgba(239,68,68,0.22)] transition hover:bg-red-400 sm:px-4"
+              >
+                <Swords className="h-4 w-4" />
+                ยอมแพ้
+              </button>
+            ) : null}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/52">
               <Swords className="h-3.5 w-3.5 text-amber-300" />
               Battle Room
             </div>
@@ -5052,12 +5130,22 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               {currentDeckModeTitle}
             </div>
           </div>
-          <div className="min-w-0">
-            <div className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/38 sm:text-right">
+          </div>
+          <div className="min-w-0 lg:justify-self-end">
+            <div className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/38 lg:text-right">
               ผู้ชม {currentRoom?.spectators.length || 0}/{SPECTATOR_LIMIT}
             </div>
             <SpectatorAvatarRail spectators={currentRoom?.spectators || []} />
           </div>
+          {currentRoom ? (
+            <button
+              type="button"
+              onClick={leaveRoom}
+              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/55 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/70 transition hover:border-white/30 lg:justify-self-end"
+            >
+              ออกห้อง
+            </button>
+          ) : null}
         </div>
       </section>
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
@@ -5095,7 +5183,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       </section>
 
-      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(380px,24vw,460px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
+      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(300px,18vw,340px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
         <section className="grid min-h-0 max-w-full grid-rows-[minmax(360px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(480px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
           {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
@@ -5381,7 +5469,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ) : null}
         </section>
 
-        <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex 2xl:h-[calc(100vh-142px)] 2xl:max-h-[calc(100vh-142px)]">
+        <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex 2xl:h-[calc(100vh-136px)] 2xl:max-h-[calc(100vh-136px)]">
           {currentRoom ? (
             <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
           ) : null}
