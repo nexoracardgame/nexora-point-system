@@ -971,6 +971,7 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     turn,
     player: opener === "host" ? playerTriangles : opponentTriangles,
     opponent: opener === "host" ? opponentTriangles : playerTriangles,
+    prioritySide: "player",
     skippedSkillCardNos,
   });
   const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
@@ -1003,6 +1004,7 @@ function resolveTimeout(room: StoredTriadRoom) {
   const challengerTotal = winner === "opponent" ? 1 : 0;
   const result: TriadTurnResult = {
     turn,
+    prioritySide: "player",
     metric: metricForTurn(turn),
     playerTotal: hostTotal,
     opponentTotal: challengerTotal,
@@ -1055,6 +1057,7 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
         : result.winner === "opponent"
           ? "player"
           : "draw",
+    prioritySide: result.prioritySide === "player" ? "opponent" : "player",
     effectivePlayer: result.effectiveOpponent,
     effectiveOpponent: result.effectivePlayer,
     playerBreakdown: result.opponentBreakdown,

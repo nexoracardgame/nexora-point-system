@@ -573,6 +573,7 @@ function flipTriadResult(result: TriadTurnResult): TriadTurnResult {
         : result.winner === "opponent"
           ? "player"
           : "draw",
+    prioritySide: result.prioritySide === "player" ? "opponent" : "player",
     effectivePlayer: result.effectiveOpponent,
     effectiveOpponent: result.effectivePlayer,
     playerBreakdown: result.opponentBreakdown,
@@ -3703,6 +3704,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     const playerCard = cardsByNo.get(player[lane] || "");
+    const turnPrioritySide = lastTurnWinner === "bot" ? "opponent" : "player";
 
     if (currentRoom && roomPlayerSide && opponentSide) {
       const needsSkillChoice = Boolean(playerCard && skillNeedsChoice(playerCard));
@@ -3785,7 +3787,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (playerCard && skillNeedsChoice(playerCard)) {
       const targets = getSelectableSkillTargetIds(playerCard, "player");
       if (targets.length === 1) {
-        const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot });
+        const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot, prioritySide: turnPrioritySide });
         const turns = [
           ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
           result,
@@ -3806,7 +3808,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
-    const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot });
+    const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot, prioritySide: turnPrioritySide });
     const turns = [
       ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
       result,
@@ -3872,6 +3874,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       turn: activeTurn,
       player: lockedFight.player,
       opponent: lockedFight.bot,
+      prioritySide: lastTurnWinner === "bot" ? "opponent" : "player",
     });
     const turns = [
       ...lockedFight.turns.filter((turn) => turn.turn !== activeTurn),
@@ -3943,6 +3946,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       turn: activeTurn,
       player: nextPlayer,
       opponent: nextBot,
+      prioritySide: lastTurnWinner === "bot" ? "opponent" : "player",
       skippedSkillCardNos: ["254"],
     });
     const blessingEvent = {
@@ -4077,30 +4081,46 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     };
   };
 
+  const advanceRevealForTurn = (
+    turn: TriadTurn,
+    current: Record<TriadTurn, TurnReveal>
+  ) => {
+    if (!currentResult) return current;
+    const state = current[turn];
+    if (state.scored) return current;
+    const priorityKey = currentResult.prioritySide === "opponent" ? "bot" : "player";
+    const secondaryKey = priorityKey === "player" ? "bot" : "player";
+    const nextState = { ...state };
+
+    if (!nextState[priorityKey]) {
+      nextState[priorityKey] = true;
+    } else if (!nextState[secondaryKey]) {
+      nextState[secondaryKey] = true;
+    }
+
+    const next = {
+      ...current,
+      [turn]: nextState,
+    };
+    return scoreTurnIfReady(turn, next);
+  };
+
   useEffect(() => {
     if (!isPvpRoom || !currentResult || !roomTurnResolved || pendingSkillChoice) return;
-    setRevealed((current) => {
-      const state = current[activeTurn];
-      if (state.scored) return current;
-      const next = {
-        ...current,
-        [activeTurn]: { ...state, player: true, bot: true },
-      };
-      return scoreTurnIfReady(activeTurn, next);
-    });
-  }, [activeTurn, currentResult, isPvpRoom, pendingSkillChoice, roomTurnResolved]);
+    const state = revealed[activeTurn];
+    if (state.scored) return;
+    const delay = state.player || state.bot ? 760 : 0;
+    const timer = window.setTimeout(() => {
+      setRevealed((current) => advanceRevealForTurn(activeTurn, current));
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [activeTurn, currentResult, isPvpRoom, pendingSkillChoice, revealed, roomTurnResolved]);
 
   const revealNext = () => {
     if (!lockedFight || !canRevealTurn || pendingSkillChoice || !currentResult) return;
 
     setRevealed((current) => {
-      const state = current[activeTurn];
-      if (state.scored) return current;
-      const next = {
-        ...current,
-        [activeTurn]: { ...state, player: true, bot: true },
-      };
-      return scoreTurnIfReady(activeTurn, next);
+      return advanceRevealForTurn(activeTurn, current);
     });
   };
 
