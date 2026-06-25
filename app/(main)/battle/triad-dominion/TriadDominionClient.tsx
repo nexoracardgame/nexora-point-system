@@ -2606,6 +2606,37 @@ function ReadyAdvanceButton({
   );
 }
 
+function RoomLockCardButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="group relative flex min-h-[68px] w-full items-center justify-between overflow-hidden rounded-2xl border border-cyan-100/26 bg-[linear-gradient(135deg,rgba(34,211,238,0.18),rgba(251,191,36,0.14),rgba(255,255,255,0.055))] px-4 text-left font-black text-white shadow-[0_0_34px_rgba(34,211,238,0.18),inset_0_0_0_1px_rgba(255,255,255,0.04)] transition hover:-translate-y-0.5 hover:border-amber-100/45 hover:shadow-[0_0_48px_rgba(251,191,36,0.20)] active:scale-[0.985] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.045] disabled:text-white/30 disabled:shadow-none"
+    >
+      <span className="absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.18),transparent)] opacity-0 transition group-hover:translate-x-full group-hover:opacity-100" />
+      <span className="relative z-10 flex min-w-0 items-center gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-200/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.14)]">
+          <Brain className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-base">ล็อกการ์ด</span>
+          <span className="mt-1 block truncate text-[10px] uppercase tracking-[0.12em] text-cyan-100/58">
+            ยืนยันการ์ดตานี้
+          </span>
+        </span>
+      </span>
+      <Lock className="relative z-10 h-5 w-5 shrink-0 text-amber-100/68" />
+    </button>
+  );
+}
+
 function TimeoutWarningOverlay({
   secondsLeft,
   missingNames,
@@ -4531,6 +4562,26 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         disabled={myTurnReady}
       />
     ) : null;
+  const showRoomLockCardButton = Boolean(
+    !isSpectator &&
+      isPvpRoom &&
+      roomPlayerSide &&
+      !displayTurnLocked &&
+      !displayCurrentResult &&
+      !matchDone
+  );
+  const renderRoomBattleActions = () =>
+    showReadyAdvanceButton || showRoomLockCardButton ? (
+      <div className="space-y-2">
+        {renderReadyAdvanceButton()}
+        {showRoomLockCardButton ? (
+          <RoomLockCardButton
+            onClick={lockFight}
+            disabled={matchDone || isSpectator}
+          />
+        ) : null}
+      </div>
+    ) : null;
   useEffect(() => {
     if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored || isPvpRoom) {
       resultAdvanceKeyRef.current = "";
@@ -5510,15 +5561,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 ) : (
                   <>
                     {!displayTurnLocked && !displayCurrentResult ? (
-                      <button
-                        type="button"
-                        onClick={lockFight}
-                        disabled={matchDone || isSpectator}
-                        className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 md:flex-none"
-                      >
-                        <Brain className="h-4 w-4" />
-                        ล็อกการ์ด
-                      </button>
+                      isPvpRoom ? null : (
+                        <button
+                          type="button"
+                          onClick={lockFight}
+                          disabled={matchDone || isSpectator}
+                          className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 md:flex-none"
+                        >
+                          <Brain className="h-4 w-4" />
+                          ล็อกการ์ด
+                        </button>
+                      )
                     ) : null}
                     <button
                       type="button"
@@ -5562,7 +5615,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           {currentRoom ? (
             <div className="space-y-2 2xl:hidden">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
-              {renderReadyAdvanceButton()}
+              {renderRoomBattleActions()}
             </div>
           ) : null}
         </section>
@@ -5571,7 +5624,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           {currentRoom ? (
             <div className="space-y-2">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
-              {renderReadyAdvanceButton()}
+              {renderRoomBattleActions()}
             </div>
           ) : null}
 
