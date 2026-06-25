@@ -1354,6 +1354,48 @@ function RevealSpotlight({
               {scoreText}
             </div>
           ) : null}
+          {isScored ? (
+            <div className="pointer-events-auto mx-auto mt-2 grid w-[min(520px,78cqw)] gap-1.5">
+              {timeline.map((event, index) => (
+                <div
+                  key={`${event.cardNo || "basic"}-${index}`}
+                  className="animate-[triad-effect-step_720ms_ease-out_both] rounded-xl border border-violet-200/35 bg-black/88 px-3 py-2 text-left shadow-[0_0_34px_rgba(168,85,247,0.22)] backdrop-blur-md"
+                  style={{ animationDelay: `${index * 160}ms` }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[8px] font-black uppercase leading-3 tracking-[0.14em] text-violet-200/70">
+                        {event.cardNo ? `${event.side === "player" ? playerName : botName} ใช้สกิล No.${event.cardNo}` : "ผลการปะทะ"}
+                      </div>
+                      <div className="mt-0.5 text-[clamp(0.75rem,1.7cqw,0.95rem)] font-black leading-5 text-white">{event.name}</div>
+                    </div>
+                    <div className="shrink-0 rounded-full border border-amber-200/30 bg-amber-200/10 px-2 py-1 text-[10px] font-black text-amber-100">
+                      {index + 1}/{timeline.length}
+                    </div>
+                  </div>
+                  <div className="mt-1 whitespace-normal break-words text-[clamp(0.68rem,1.45cqw,0.82rem)] font-semibold leading-5 text-white/76">
+                    {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
+                  </div>
+                  {event.targetLabel || event.blocked ? (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {event.targetLabel ? (
+                        <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-red-300/32 bg-red-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-red-100">
+                          <Crosshair className="h-3 w-3 shrink-0" />
+                          <span className="min-w-0 break-words leading-4">ล็อกเป้า: {event.targetLabel}</span>
+                        </span>
+                      ) : null}
+                      {event.blocked ? (
+                        <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-300/32 bg-amber-300/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
+                          <Lock className="h-3 w-3 shrink-0" />
+                          <span className="min-w-0 break-words leading-4">บัฟถูกบล็อก</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
@@ -1367,44 +1409,6 @@ function RevealSpotlight({
           ) : null}
         </div>
       </div>
-      {isScored ? (
-        <div className="pointer-events-auto absolute left-1/2 top-[calc(100%+0.65rem)] grid max-h-[min(26dvh,210px)] w-[min(520px,84cqw)] -translate-x-1/2 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
-          {timeline.map((event, index) => (
-            <div
-              key={`${event.cardNo || "basic"}-${index}`}
-              className="animate-[triad-effect-step_720ms_ease-out_both] rounded-xl border border-violet-200/35 bg-black/88 px-3 py-2.5 shadow-[0_0_34px_rgba(168,85,247,0.22)] backdrop-blur-md"
-              style={{ animationDelay: `${index * 160}ms` }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[9px] font-black uppercase leading-4 tracking-[0.14em] text-violet-200/70">
-                    {event.cardNo ? `${event.side === "player" ? playerName : botName} ใช้สกิล No.${event.cardNo}` : "ผลการปะทะ"}
-                  </div>
-                  <div className="mt-1 text-sm font-black leading-5 text-white">{event.name}</div>
-                </div>
-                <div className="shrink-0 rounded-full border border-amber-200/30 bg-amber-200/10 px-2 py-1 text-[10px] font-black text-amber-100">
-                  {index + 1}/{timeline.length}
-                </div>
-              </div>
-              {event.targetLabel ? (
-                <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-red-300/32 bg-red-500/12 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-100">
-                  <Crosshair className="h-3 w-3 shrink-0" />
-                  <span className="min-w-0 whitespace-normal leading-4">ล็อกเป้า: {event.targetLabel}</span>
-                </div>
-              ) : null}
-              {event.blocked ? (
-                <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-300/32 bg-amber-300/12 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100">
-                  <Lock className="h-3 w-3 shrink-0" />
-                  <span className="min-w-0 whitespace-normal leading-4">บัฟถูกบล็อก</span>
-                </div>
-              ) : null}
-              <div className="mt-2 whitespace-normal break-words text-xs font-semibold leading-5 text-white/76">
-                {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
       <style jsx global>{`
         @keyframes triad-card-pop {
           0% { transform: translateY(24px) scale(0.82) rotate(-2deg); opacity: 0; filter: blur(8px); }
