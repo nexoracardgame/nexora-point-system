@@ -252,6 +252,23 @@ const BLAZE_FORMATTING_POLICY = [
   "- Do not use Markdown styling characters such as **, *, #, or code fences. Plain text with line breaks is the standard.",
 ].join("\n");
 
+const NEXORA_CARD_FEST_KNOWLEDGE = [
+  "NEXORA Card Fest / เนคโชร่าเฟส canonical event update:",
+  "- Nexora Card Fest คือคอนเสิร์ตการ์ดเกมครั้งแรกของเมืองไทยในโลก NEXORA รวมบรรยากาศการ์ดเกม คอนเสิร์ต กิจกรรมแฟนด้อม และความสนุกแบบเฟสติวัลไว้ในงานเดียว",
+  "- ชื่องานที่ใช้สื่อสาร: เนคโชร่าเฟส, Nexora Card Fest, NEXORA Card Fest",
+  "- วันที่จัดงาน: 24 ตุลาคม 2569",
+  "- สถานที่: แฟชั่น ไอส์แลนด์ ฮอลล์ ชั้น 3 / ไอส์แลนด์ ฮอลล์ แฟชั่นไอส์แลนด์ รามอินทรา ชั้น 3",
+  "- ภายในงานมีคอนเสิร์ตการ์ดเกมในฮอลล์ติดแอร์ รวมสายการ์ดเกมและศิลปิน",
+  "- มีการจัดแข่งขันหรือประกวดคอสเพลย์ภายในงาน",
+  "- รายชื่อศิลปิน/ไลน์อัปเบื้องต้นที่ประกาศ: DAOU, PIXXIE, MEAN, WONDERFRAME, F.HERO",
+  "- เปิดจำหน่ายบัตรวันที่ 1 กรกฎาคม 2569 เวลา 09:09 น.",
+  "- ช่องทางจำหน่ายบัตรที่ประกาศ: alticket ทั่วประเทศ, เคาน์เตอร์เซอร์วิสที่ 7-11 ทุกสาขา, เพจ Nexora เนคโชร่าการ์ดเกมส์, จุดจำหน่ายตัวแทนเนคโชร่าการ์ดมากกว่า 10 สาขา และ QR code ตามสื่อประชาสัมพันธ์",
+  "- ราคาบัตรเบื้องต้น: โซน A 4,500 บาท; โซน B/C/D 3,500 บาท; โซน F 2,500 บาท; โซน G/H 2,000 บาท; โซน J 1,500 บาท. จำนวนบัตรมีจำกัด",
+  "- จุดขายของงาน: ครั้งแรกในประเทศสำหรับคอนเสิร์ตการ์ดเกม, งานสบายๆ ในฮอลล์ติดแอร์, เดินทางง่าย ใกล้ถนนหลัก และมีป้ายบอกทางชัดเจน",
+  "- ข้อมูลคอนเสิร์ต ตาราง ศิลปิน กิจกรรม คอสเพลย์ ราคาบัตร ช่องทางจอง และรายละเอียดหน้างานอาจอัปเดตได้ตลอดเวลา ให้แนะนำติดตามประกาศล่าสุดจากเพจ Facebook ทางการ Nexora เนคโชร่าการ์ดเกมส์เสมอ: https://www.facebook.com/NexoraCardGame/",
+  "- เมื่อตอบเรื่อง Nexora Card Fest หรือคอนเสิร์ต ให้แปะลิงก์เพจ https://www.facebook.com/NexoraCardGame/ เป็นช่องทางอัปเดตล่าสุดเสมอ",
+].join("\n");
+
 const POINT_REDEMPTION_LOCATION_URL = "https://maps.app.goo.gl/oUfs7y5LtNaBTSzm7";
 
 function createRewardAliases(amount: string, ...extraAliases: string[]) {
@@ -482,6 +499,46 @@ function normalizeSearchText(value: string) {
     .replace(/[^\p{L}\p{N}\s]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isNexoraCardFestQuestion(message: string) {
+  const text = normalizeSearchText(message);
+
+  return [
+    "nexora card fest",
+    "card fest",
+    "nexora fest",
+    "เนคโชร่าเฟส",
+    "เนคโชร่า เฟส",
+    "คอนเสิร์ตการ์ด",
+    "คอนเสิร์ต การ์ด",
+    "งานคอนเสิร์ต",
+  ].some((keyword) => text.includes(normalizeSearchText(keyword)));
+}
+
+function buildDirectNexoraCardFestReply(message: string) {
+  if (!isNexoraCardFestQuestion(message)) {
+    return "";
+  }
+
+  return [
+    "Nexora Card Fest หรือ เนคโชร่าเฟส คือคอนเสิร์ตการ์ดเกมครั้งแรกของเมืองไทยในโลก NEXORA ที่รวมคอนเสิร์ต การ์ดเกม กิจกรรมแฟนด้อม และบรรยากาศเฟสติวัลไว้ในงานเดียว",
+    "",
+    "ข้อมูลเบื้องต้น",
+    "- วันที่: 24 ตุลาคม 2569",
+    "- สถานที่: แฟชั่น ไอส์แลนด์ ฮอลล์ ชั้น 3 / ไอส์แลนด์ ฮอลล์ แฟชั่นไอส์แลนด์ รามอินทรา",
+    "- ภายในงานมีคอนเสิร์ตการ์ดเกมในฮอลล์ติดแอร์",
+    "- มีการแข่งขันหรือประกวดคอสเพลย์ภายในงาน",
+    "- ศิลปินเบื้องต้น: DAOU, PIXXIE, MEAN, WONDERFRAME, F.HERO",
+    "",
+    "บัตร",
+    "- เปิดจำหน่ายวันที่ 1 กรกฎาคม 2569 เวลา 09:09 น.",
+    "- ช่องทางที่ประกาศ: alticket, เคาน์เตอร์เซอร์วิสที่ 7-11, เพจ Nexora, จุดจำหน่ายตัวแทน และ QR code ตามสื่อประชาสัมพันธ์",
+    "- ราคาเบื้องต้น: โซน A 4,500 / B-C-D 3,500 / F 2,500 / G-H 2,000 / J 1,500 บาท",
+    "",
+    "ข้อมูลคอนเสิร์ต ศิลปิน ตาราง กิจกรรม คอสเพลย์ ราคาบัตร และช่องทางจองอาจอัปเดตได้ตลอดเวลา ให้ติดตามประกาศล่าสุดจากเพจทางการเสมอ:",
+    "https://www.facebook.com/NexoraCardGame/",
+  ].join("\n");
 }
 
 function normalizeThaiDigits(value: string) {
@@ -4001,6 +4058,7 @@ async function buildKnowledgeContext(
 
 const BLAZE_CORE_KNOWLEDGE = [
   "ฐานข้อมูล NEXORA สำหรับท่านเบลซ:",
+  NEXORA_CARD_FEST_KNOWLEDGE,
   "- NEXORA CARDGAME คือการ์ดเกมสะสมและแข่งขันที่รวมโลกแฟนตาซี 5 ธาตุ การสะสม การดวล การซื้อขาย และระบบรางวัลจริงเข้าไว้ด้วยกัน",
   "- จุดยืนของแบรนด์: Collect Duel Conquer. ทุกการ์ดมีคุณค่า ทุกการครอบครองคือจุดเริ่มต้นของตำนาน",
   "- รางวัลรวมที่สื่อสารบนเว็บหลัก: มากกว่า 10,000,000 บาท",
@@ -4070,6 +4128,7 @@ const BLAZE_CORE_KNOWLEDGE = [
 function buildSystemPrompt(userName: string, knowledgeContext: string) {
   const productContext = [
     knowledgeContext || BLAZE_CORE_KNOWLEDGE,
+    NEXORA_CARD_FEST_KNOWLEDGE,
     BLAZE_CARD_REWARD_INDEX,
     process.env.BLAZE_PRODUCT_CONTEXT || "",
   ]
@@ -4625,6 +4684,19 @@ export async function POST(req: NextRequest) {
           ),
           source: result?.source || "gemini",
           native: Boolean(result),
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    const directNexoraCardFestReply = buildDirectNexoraCardFestReply(effectiveMessage);
+    if (directNexoraCardFestReply) {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply: polishBlazeReply(directNexoraCardFestReply, effectiveMessage),
+          source: "canonical",
+          native: true,
         },
         { headers: { "Cache-Control": "no-store" } }
       );

@@ -10,3 +10,4 @@ node_modules/
 .env.local.venv-ai/
 .venv-ai/
 .venv-ai/
+.vercel

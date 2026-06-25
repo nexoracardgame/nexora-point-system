@@ -1047,7 +1047,7 @@ function BoardCardSlot({
 
   return (
     <div
-      className={`relative w-[clamp(48px,7vw,112px)] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border} ${
+      className={`relative w-[var(--triad-card-size,clamp(48px,7vw,112px))] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border} ${
         aura === "own"
           ? "ring-4 ring-cyan-300/85 shadow-[0_0_42px_rgba(34,211,238,0.62)]"
           : aura === "enemy"
@@ -1111,7 +1111,7 @@ function BoardPile({
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`relative grid w-[clamp(42px,6vw,88px)] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${onClick ? "hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-200/70" : ""} ${color} ${
+      className={`relative grid w-[var(--triad-pile-size,clamp(42px,6vw,88px))] place-items-center overflow-hidden rounded-lg border bg-[#08080c] shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${onClick ? "hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-200/70" : ""} ${color} ${
         rotate ? "rotate-180" : ""
       }`}
       style={{ aspectRatio: "3 / 4" }}
@@ -1126,10 +1126,10 @@ function BoardPile({
         </div>
       ))}
       <div className="relative z-10 rounded-md bg-black/55 px-2 py-1 text-center backdrop-blur-sm">
-        <div className="text-[clamp(0.55rem,1.1vw,0.9rem)] font-black uppercase leading-none text-white">
+        <div className="text-[clamp(0.52rem,2.2cqw,0.78rem)] font-black uppercase leading-none text-white">
           {label}
         </div>
-        <div className="mt-1 text-[clamp(0.45rem,0.9vw,0.72rem)] font-bold text-white/62">
+        <div className="mt-1 text-[clamp(0.44rem,1.8cqw,0.64rem)] font-bold text-white/62">
           {sublabel}
         </div>
       </div>
@@ -1186,8 +1186,8 @@ function RevealSpotlight({
         <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
       <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
-      <div className="relative grid w-[min(720px,76%)] items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
-        <div className={`mx-auto w-[clamp(96px,13vw,174px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
+      <div className="relative grid w-[min(680px,86cqw)] items-center gap-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-3">
+        <div className={`mx-auto w-[clamp(82px,20cqw,160px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
               {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -1199,17 +1199,17 @@ function RevealSpotlight({
         </div>
 
         <div className="text-center">
-          <div className="animate-[triad-flash_900ms_ease-out] rounded-3xl bg-black/34 px-4 py-2 text-[clamp(1.65rem,3.9vw,3.6rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)] backdrop-blur-sm">
+          <div className="animate-[triad-flash_900ms_ease-out] rounded-2xl bg-black/34 px-3 py-2 text-[clamp(1.2rem,5.2cqw,2.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(255,255,255,0.75)] backdrop-blur-sm sm:rounded-3xl sm:px-4">
             {isSwapSkill ? "สลับ!" : isScored ? winnerText : "เปิดการ์ด"}
           </div>
           {isScored ? (
-            <div className="mt-2 rounded-full border border-amber-200/50 bg-black/70 px-4 py-2 text-[clamp(1rem,2vw,1.45rem)] font-black text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)]">
+            <div className="mt-2 rounded-full border border-amber-200/50 bg-black/70 px-3 py-2 text-[clamp(0.86rem,3cqw,1.22rem)] font-black text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)] sm:px-4">
               {scoreText}
             </div>
           ) : null}
         </div>
 
-        <div className={`mx-auto w-[clamp(96px,13vw,174px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(82px,20cqw,160px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
           {showBot && botCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
               {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -1221,7 +1221,7 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="absolute right-2 top-1/2 grid max-h-[82%] w-[min(380px,32vw)] -translate-y-1/2 gap-2 overflow-hidden sm:right-4">
+        <div className="absolute right-2 top-1/2 hidden max-h-[82%] w-[min(320px,28cqw)] -translate-y-1/2 gap-2 overflow-hidden lg:grid">
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -1305,22 +1305,22 @@ function BoardTriangle({
     {
       lane: "top",
       label: "หลัก",
-      className: `col-span-2 mx-auto w-[clamp(52px,7vw,104px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-1"}`,
+      className: `col-span-2 mx-auto w-[var(--triad-top-card-size,var(--triad-card-size,clamp(52px,7vw,104px)))] ${tone === "bot" ? "translate-y-0.5" : "-translate-y-0.5"}`,
     },
     {
       lane: "left",
       label: "โจมตี",
-      className: `w-[clamp(48px,6.4vw,96px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-1"}`,
+      className: `w-[var(--triad-card-size,clamp(48px,6.4vw,96px))] ${tone === "bot" ? "translate-y-0.5" : "-translate-y-0.5"}`,
     },
     {
       lane: "right",
       label: "ช่วย",
-      className: `w-[clamp(48px,6.4vw,96px)] ${tone === "bot" ? "translate-y-1" : "-translate-y-1"}`,
+      className: `w-[var(--triad-card-size,clamp(48px,6.4vw,96px))] ${tone === "bot" ? "translate-y-0.5" : "-translate-y-0.5"}`,
     },
   ];
 
   return (
-    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[clamp(5px,1vw,14px)] gap-y-0 ${tone === "player" ? "-translate-y-1 sm:-translate-y-3" : "translate-y-1 sm:translate-y-3"}`}>
+    <div className={`grid grid-cols-2 items-end justify-items-center gap-x-[var(--triad-slot-gap,clamp(5px,1vw,14px))] gap-y-0 ${tone === "player" ? "-translate-y-0.5 sm:-translate-y-2" : "translate-y-0.5 sm:translate-y-2"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         return (
@@ -1414,7 +1414,7 @@ function HandCard({
         if (lane) onDropToLane(lane, card.cardNo);
       }}
       disabled={disabled || used}
-      className={`group relative min-w-[50px] max-w-[104px] flex-[0_0_clamp(54px,5.6vw,104px)] touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+      className={`group relative min-w-[48px] max-w-[104px] flex-[0_0_clamp(50px,16cqw,96px)] touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
         used
           ? "border-white/8 opacity-25"
           : placedLane
@@ -1468,7 +1468,7 @@ function PlayerHand({
   });
 
   return (
-    <div className="rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)]">
+    <div className="rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
       <CardHoverPreview card={previewCard} />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
@@ -2271,7 +2271,7 @@ function CompactBattleBoard({
   const waitingCard = waitingSkillChoice ? cardsByNo.get(waitingSkillChoice.cardNo) : undefined;
 
   return (
-    <div className="relative h-full min-h-[360px] overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:min-h-[460px] xl:min-h-0">
+    <div className="relative h-full min-h-[clamp(360px,72dvh,680px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(42px,14cqw,92px)] [--triad-pile-size:clamp(36px,10cqw,74px)] [--triad-slot-gap:clamp(4px,2cqw,12px)] [--triad-top-card-size:clamp(46px,15cqw,98px)] [container-type:inline-size] sm:min-h-[clamp(440px,74dvh,720px)] 2xl:min-h-0">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[13%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
       <div className="absolute inset-x-0 bottom-0 h-[13%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.34),rgba(0,0,0,0.18))]" />
@@ -2335,10 +2335,10 @@ function CompactBattleBoard({
         </div>
       ) : null}
 
-      <div className="relative grid h-full min-h-0 grid-rows-[8px_minmax(126px,1fr)_auto_minmax(126px,1fr)_8px] gap-y-1 px-[clamp(6px,1.2vw,18px)] py-[clamp(8px,1.1vw,16px)]">
+      <div className="relative grid h-full min-h-0 grid-rows-[4px_minmax(116px,1fr)_auto_minmax(116px,1fr)_4px] gap-y-1 px-[clamp(4px,2cqw,14px)] py-[clamp(6px,2cqw,14px)] sm:grid-rows-[6px_minmax(132px,1fr)_auto_minmax(132px,1fr)_6px]">
         <div />
 
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(4px,2cqw,12px)]">
           <BoardPile label="ทิ้ง" sublabel={`${botGraveCards.length}`} tone="red" rotate cards={botGraveCards} />
           <BoardTriangle
             cardsByNo={cardsByNo}
@@ -2352,9 +2352,9 @@ function CompactBattleBoard({
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
 
-        <div className="relative z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-3">
+        <div className="relative z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-[clamp(6px,1.8cqw,12px)]">
           <div />
-          <div className="mx-auto w-full max-w-[520px] space-y-3">
+          <div className="mx-auto w-full max-w-[min(520px,82cqw)] space-y-2 sm:space-y-3">
             <PhaseTrack activeTurn={activeTurn} />
             <div className="rounded-full border border-amber-100/14 bg-black/32 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
               เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
@@ -2363,7 +2363,7 @@ function CompactBattleBoard({
           <div />
         </div>
 
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(4px,2cqw,12px)]">
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" />
           <BoardTriangle
             cardsByNo={cardsByNo}
@@ -4534,7 +4534,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main className="relative min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:min-h-0">
+    <main className="relative min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px] 2xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] 2xl:min-h-0">
       {currentRoom && isFieldPlayer && !matchDone ? (
         <button
           type="button"
@@ -4616,8 +4616,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       </section>
 
-      <section className={`grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 xl:grid-cols-[minmax(0,1fr)_220px] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-16 sm:pt-16"}`}>
-        <section className="grid min-h-0 grid-rows-[minmax(390px,1fr)_auto_auto] gap-2 sm:grid-rows-[minmax(500px,1fr)_auto_auto] sm:gap-3 xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
+      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_240px] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-16 sm:pt-16"}`}>
+        <section className="grid min-h-0 max-w-full grid-rows-[minmax(360px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(480px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(580px,calc(100vh-300px))_auto_auto]">
           {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -4880,7 +4880,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ) : null}
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-3 overflow-visible">
+        <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex">
           <FighterPanel
             name={displayBotName}
             image={displayBotImage}

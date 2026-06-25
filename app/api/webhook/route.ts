@@ -35,9 +35,27 @@ function getRequiredEnv(name: string) {
   return value;
 }
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return error;
+}
+
 async function getOpenAIReply(message: string) {
   const client = new OpenAI({
     apiKey: getRequiredEnv("OPENAI_API_KEY"),
+  });
+
+  console.log("Messenger OpenAI Request", {
+    model: OPENAI_MODEL,
+    messageLength: message.length,
+    message,
   });
 
   const response = await client.responses.create({
@@ -55,14 +73,27 @@ async function getOpenAIReply(message: string) {
     ],
   });
 
-  return (
+  const reply =
     response.output_text?.trim() ||
-    "ขออภัย ตอนนี้ระบบ AI ยังไม่สามารถตอบกลับได้ กรุณาลองใหม่อีกครั้ง"
-  );
+    "ขออภัย ตอนนี้ระบบ AI ยังไม่สามารถตอบกลับได้ กรุณาลองใหม่อีกครั้ง";
+
+  console.log("Messenger OpenAI Response", {
+    model: OPENAI_MODEL,
+    replyLength: reply.length,
+    reply,
+  });
+
+  return reply;
 }
 
 export async function sendMessengerMessage(recipientId: string, text: string) {
   const pageAccessToken = getRequiredEnv("FACEBOOK_PAGE_ACCESS_TOKEN");
+  console.log("Messenger Send Request", {
+    recipientId,
+    textLength: text.length,
+    text,
+  });
+
   const response = await fetch(
     `${MESSENGER_GRAPH_API_URL}?access_token=${encodeURIComponent(
       pageAccessToken
@@ -85,6 +116,12 @@ export async function sendMessengerMessage(recipientId: string, text: string) {
 
   const responseText = await response.text();
 
+  console.log("Messenger Send Result", {
+    status: response.status,
+    ok: response.ok,
+    body: responseText,
+  });
+
   if (!response.ok) {
     throw new Error(
       `Facebook Messenger send failed: ${response.status} ${responseText}`
@@ -100,6 +137,12 @@ async function handleMessengerEvent(event: MessengerEvent) {
   const senderId = event.sender?.id;
   const messageText = event.message?.text?.trim();
 
+  console.log("Messenger Incoming Message", {
+    senderId,
+    messageText,
+    messageLength: messageText?.length || 0,
+  });
+
   if (!senderId || !messageText) {
     console.log("Messenger Event skipped", {
       hasSenderId: Boolean(senderId),
@@ -110,6 +153,11 @@ async function handleMessengerEvent(event: MessengerEvent) {
 
   const reply = await getOpenAIReply(messageText);
   await sendMessengerMessage(senderId, reply);
+  console.log("Messenger Reply Complete", {
+    senderId,
+    userMessageLength: messageText.length,
+    replyLength: reply.length,
+  });
 }
 
 export async function GET(request: Request) {
@@ -166,14 +214,14 @@ export async function POST(request: Request) {
         try {
           await handleMessengerEvent(event);
         } catch (eventError) {
-          console.error("Messenger Event Error", eventError);
+          console.error("Messenger Event Error", serializeError(eventError));
         }
       }
     }
 
     return Response.json({ ok: true });
   } catch (error) {
-    console.error("Messenger Webhook Error", error);
+    console.error("Messenger Webhook Error", serializeError(error));
     return Response.json({ ok: false }, { status: 500 });
   }
 }

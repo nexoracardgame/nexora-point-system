@@ -90,7 +90,7 @@
       display: flex;
       justify-content: center;
       align-items: stretch;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .chat-shell {
@@ -100,7 +100,7 @@
       min-height: 0;
       margin-right: auto;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       background: transparent;
       border: 0;
       box-shadow: none;
@@ -1369,10 +1369,6 @@
     function setLoading(isLoading) {
       sendBtn.disabled = isLoading;
       sendBtn.textContent = isLoading ? "กำลังส่ง..." : "ส่งข้อความ";
-      userInput.disabled = isLoading;
-      imageInput.disabled = isLoading;
-      emojiBtn.disabled = isLoading;
-      removeAttachmentBtn.disabled = isLoading;
     }
 
     function appendBotReply(reply) {
@@ -1499,7 +1495,9 @@
 
       userInput.value = "";
       autoResizeTextarea(userInput);
+      clearPendingImage();
       setLoading(true);
+      userInput.focus();
       addTypingIndicator();
       emojiPickerWrap.classList.remove("show");
       setComposerStatus("กำลังประมวลผล...");
@@ -1516,7 +1514,6 @@
             chatHistory = chatHistory.slice(-16);
           }
 
-          clearPendingImage();
           setLoading(false);
           userInput.focus();
           scrollMessagesToBottom();
