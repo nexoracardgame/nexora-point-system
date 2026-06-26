@@ -62,6 +62,16 @@ function isStandaloneMode() {
   );
 }
 
+function isMobileGameDevice() {
+  if (typeof window === "undefined") return false;
+
+  return (
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 900px)").matches ||
+    isIosDevice()
+  );
+}
+
 async function requestGameViewport() {
   if (typeof window === "undefined") return;
 
@@ -91,11 +101,18 @@ export default function BattleAppLauncher({
   const router = useRouter();
   const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [installState, setInstallState] = useState<InstallState>("loading");
-  const [open, setOpen] = useState(mode === "page");
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    const mobileMedia = window.matchMedia("(max-width: 900px)");
+    const coarseMedia = window.matchMedia("(hover: none) and (pointer: coarse)");
+    const syncDeviceMode = () => {
+      setIsMobileDevice(isMobileGameDevice());
+    };
 
     const registerServiceWorker = async () => {
       if (!("serviceWorker" in navigator)) return;
@@ -128,9 +145,12 @@ export default function BattleAppLauncher({
       setInstallState("installed");
     };
 
+    syncDeviceMode();
     void registerServiceWorker();
     syncInstallState();
 
+    mobileMedia.addEventListener("change", syncDeviceMode);
+    coarseMedia.addEventListener("change", syncDeviceMode);
     window.addEventListener(
       "beforeinstallprompt",
       handleBeforeInstallPrompt as EventListener
@@ -148,6 +168,8 @@ export default function BattleAppLauncher({
         "beforeinstallprompt",
         handleBeforeInstallPrompt as EventListener
       );
+      mobileMedia.removeEventListener("change", syncDeviceMode);
+      coarseMedia.removeEventListener("change", syncDeviceMode);
       window.removeEventListener("appinstalled", handleInstalled);
       window.clearTimeout(fallbackTimer);
     };
@@ -155,9 +177,15 @@ export default function BattleAppLauncher({
 
   useEffect(() => {
     if (mode === "page") {
-      setOpen(true);
+      setOpen(isMobileDevice !== false);
     }
-  }, [mode]);
+  }, [isMobileDevice, mode]);
+
+  useEffect(() => {
+    if (mode !== "page" || isMobileDevice !== false) return;
+
+    router.replace("/battle/triad-dominion");
+  }, [isMobileDevice, mode, router]);
 
   useEffect(() => {
     if (!open || mode === "page" || typeof window === "undefined") return;
@@ -210,6 +238,15 @@ export default function BattleAppLauncher({
     router.push("/battle/triad-dominion");
   };
 
+  const handleButtonClick = async () => {
+    if (isMobileDevice === false) {
+      await enterGame();
+      return;
+    }
+
+    setOpen(true);
+  };
+
   const installLabel =
     installState === "installed"
       ? "Installed"
@@ -219,8 +256,19 @@ export default function BattleAppLauncher({
           ? "iPhone setup"
           : "App setup";
 
+  if (mode === "page" && isMobileDevice !== true) {
+    return (
+      <section className="flex h-full min-h-[100dvh] items-center justify-center bg-[#050507] px-4 text-center text-white">
+        <div className="inline-flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black uppercase tracking-[0.12em] text-white/70">
+          <Swords className="h-4 w-4 text-amber-300" />
+          Opening battle
+        </div>
+      </section>
+    );
+  }
+
   const launcher = (
-    <section className="relative mx-auto flex h-full min-h-[100dvh] w-full max-w-[1180px] flex-col justify-center overflow-hidden bg-[#050507] px-4 py-[max(16px,env(safe-area-inset-top))] pb-[max(18px,env(safe-area-inset-bottom))] text-white sm:px-6">
+    <section className="relative mx-auto flex h-full min-h-[100dvh] w-full max-w-[1180px] touch-pan-y flex-col justify-center overflow-x-hidden overflow-y-auto bg-[#050507] px-4 py-[max(16px,env(safe-area-inset-top))] pb-[max(18px,env(safe-area-inset-bottom))] text-white sm:px-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(251,191,36,0.16),transparent_28%),radial-gradient(circle_at_88%_86%,rgba(14,165,233,0.12),transparent_30%),linear-gradient(135deg,#050507_0%,#080b12_48%,#030405_100%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:48px_48px]" />
 
@@ -346,7 +394,7 @@ export default function BattleAppLauncher({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleButtonClick}
         className="pointer-events-auto inline-flex min-h-12 items-center gap-2 rounded-2xl bg-[#10141c] px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_rgba(0,0,0,0.18)] ring-1 ring-black/10 transition hover:scale-[1.03] hover:bg-black active:scale-[0.98]"
       >
         <Swords className="h-4 w-4 text-amber-300" />
