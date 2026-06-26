@@ -72,15 +72,8 @@ function isMobileGameDevice() {
   );
 }
 
-async function requestGameViewport() {
+export async function requestGameViewport() {
   if (typeof window === "undefined") return;
-
-  try {
-    const orientation = window.screen.orientation as ScreenOrientationWithLock;
-    await orientation.lock?.("landscape");
-  } catch {
-    // Browsers can reject orientation lock unless the app is installed or fullscreen.
-  }
 
   try {
     if (!document.fullscreenElement) {
@@ -90,6 +83,13 @@ async function requestGameViewport() {
     }
   } catch {
     // iOS Safari does not support fullscreen for normal web pages.
+  }
+
+  try {
+    const orientation = window.screen.orientation as ScreenOrientationWithLock;
+    await orientation.lock?.("landscape");
+  } catch {
+    // Browsers can reject orientation lock unless the app is installed or fullscreen.
   }
 }
 
@@ -177,9 +177,12 @@ export default function BattleAppLauncher({
 
   useEffect(() => {
     if (mode === "page") {
-      setOpen(isMobileDevice !== false);
+      setBusy(true);
+      void requestGameViewport().finally(() => {
+        router.replace("/battle/triad-dominion");
+      });
     }
-  }, [isMobileDevice, mode]);
+  }, [mode, router]);
 
   useEffect(() => {
     if (mode !== "page" || isMobileDevice !== false) return;
@@ -239,12 +242,7 @@ export default function BattleAppLauncher({
   };
 
   const handleButtonClick = async () => {
-    if (isMobileDevice === false) {
-      await enterGame();
-      return;
-    }
-
-    setOpen(true);
+    await enterGame();
   };
 
   const installLabel =
@@ -256,12 +254,12 @@ export default function BattleAppLauncher({
           ? "iPhone setup"
           : "App setup";
 
-  if (mode === "page" && isMobileDevice !== true) {
+  if (mode === "page") {
     return (
       <section className="flex h-full min-h-[100dvh] items-center justify-center bg-[#050507] px-4 text-center text-white">
         <div className="inline-flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black uppercase tracking-[0.12em] text-white/70">
           <Swords className="h-4 w-4 text-amber-300" />
-          Opening battle
+          Opening fullscreen battle
         </div>
       </section>
     );
@@ -385,10 +383,6 @@ export default function BattleAppLauncher({
       </div>
     </section>
   );
-
-  if (mode === "page") {
-    return launcher;
-  }
 
   return (
     <>

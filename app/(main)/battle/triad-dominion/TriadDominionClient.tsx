@@ -30,6 +30,7 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
@@ -1700,7 +1701,10 @@ function BoardTriangle({
             <button
               type="button"
               data-triad-lane={lane}
-              onClick={() => onSlotClick?.(lane)}
+              onClick={() => {
+                if (card && canPreview) onPreview?.(card);
+                onSlotClick?.(lane);
+              }}
               onMouseEnter={() => {
                 if (card && canPreview) onPreview?.(card);
               }}
@@ -1795,7 +1799,7 @@ function HandCard({
         if (lane) onDropToLane(lane, card.cardNo);
       }}
       disabled={disabled || used}
-      className={`group relative min-w-0 touch-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+      className={`group relative min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
         used
           ? "border-white/8 opacity-30 grayscale"
           : placedLane
@@ -1856,7 +1860,7 @@ function PlayerHand({
 
   return (
     <div className="triad-player-hand rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
-      <CardHoverPreview card={previewCard} />
+      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
           การ์ดในมือ
@@ -1975,7 +1979,7 @@ function SpectatorBattleOverview({
 
   return (
     <div className="rounded-xl border border-violet-200/18 bg-black/28 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.28)]">
-      <CardHoverPreview card={previewCard} />
+      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} />
       <div className="mb-3 flex items-center gap-2 text-sm font-black text-violet-100">
         <Eye className="h-4 w-4 text-violet-200" />
         มุมมองผู้ชมสด
@@ -2124,22 +2128,39 @@ function OpeningTieBreakOverlay({
   );
 }
 
-function CardHoverPreview({ card }: { card: CardView | null }) {
+function CardHoverPreview({ card, onClose }: { card: CardView | null; onClose?: () => void }) {
   if (!card) return null;
   return (
-    <div className="pointer-events-none fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px]">
-      <div className="w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]">
-        <div className="relative mx-auto aspect-[3/4] w-[min(330px,70vw)] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)]">
+    <div
+      className="triad-card-preview-overlay pointer-events-none fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      onClick={(event) => {
+        if (event.currentTarget === event.target) onClose?.();
+      }}
+    >
+      <div className="triad-card-preview-panel relative w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]">
+        {onClose ? (
+          <button
+            type="button"
+            aria-label="ปิดหน้าต่างการ์ด"
+            onClick={onClose}
+            className="triad-card-preview-close absolute right-2 top-2 z-20 hidden h-9 w-9 place-items-center rounded-full border border-white/16 bg-black/72 text-white shadow-[0_10px_28px_rgba(0,0,0,0.36)]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+        <div className="triad-card-preview-image relative mx-auto aspect-[3/4] w-[min(330px,70vw)] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)]">
           <Image src={card.sourceImage} alt={card.name} fill sizes="360px" className="object-cover" />
         </div>
-        <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+        <div className="triad-card-preview-info mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3">
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/58">No.{card.cardNo}</div>
           <div className="mt-1 line-clamp-2 text-xl font-black leading-tight text-white">{card.name}</div>
           <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-black text-black">
             <span className="rounded-md bg-amber-200 px-2 py-1">ATK {card.attack.toLocaleString()}</span>
             <span className="rounded-md bg-cyan-200 px-2 py-1">SUP {card.support.toLocaleString()}</span>
           </div>
-          <div className="mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
+          <div className="triad-card-preview-text mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
             {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
           </div>
         </div>
@@ -2977,7 +2998,7 @@ function CompactBattleBoard({
   if (blessingAuras?.bot) botAuraByLane.top = blessingAuras.bot;
   return (
     <div className="triad-compact-board relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
-      <CardHoverPreview card={previewCard} />
+      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
@@ -5581,7 +5602,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </div>
       ) : null}
-      {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} /> : null}
+      {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} onClose={() => setSpectatorPreviewCard(null)} /> : null}
       <section className="triad-game-roombar relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(230px,0.85fr)_minmax(260px,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-2">

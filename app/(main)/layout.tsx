@@ -10,6 +10,7 @@ import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
 import LiveFloatingPlayer from "@/components/LiveFloatingPlayer";
 import FloatingChatDock from "@/components/FloatingChatDock";
+import { requestGameViewport } from "@/components/BattleAppLauncher";
 import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useLanguage } from "@/lib/i18n";
 import { listenProfileSync } from "@/lib/profile-sync";
@@ -1051,6 +1052,11 @@ export default function MainLayout({
     }).catch(() => undefined);
   };
 
+  const prepareBattleViewport = (href: string) => {
+    if (href !== "/battle" && href !== "/battle/triad-dominion") return;
+    void requestGameViewport();
+  };
+
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
   const isAdminModeUser = isAdminRole(session?.user?.role);
   const hideMobileBottomNav = isChatRoomPage || isBattleRoute || mobileChatComposerActive;
@@ -1426,6 +1432,7 @@ export default function MainLayout({
                   <PrefetchLink
                     key={item.href}
                     href={item.href}
+                    onClick={() => prepareBattleViewport(item.href)}
                     className={`group relative flex h-12 w-12 items-center justify-center rounded-2xl border transition ${
                       item.active
                         ? "border-amber-300/20 bg-amber-300/12 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.18)]"
@@ -1793,6 +1800,7 @@ export default function MainLayout({
                   key={item.href}
                   href={item.href}
                   onClick={() => {
+                    prepareBattleViewport(item.href);
                     if (item.href === "/wallet") {
                       markWalletSeen();
                     }
@@ -1863,7 +1871,10 @@ export default function MainLayout({
                 <PrefetchLink
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMobileNavOpen(false)}
+                  onClick={() => {
+                    prepareBattleViewport(item.href);
+                    setMobileNavOpen(false);
+                  }}
                   className={`relative flex min-h-[56px] flex-col items-center justify-center overflow-hidden rounded-[17px] border px-0.5 transition-all duration-200 sm:min-h-[62px] sm:rounded-[19px] ${
                     item.active
                       ? "border-amber-300/28 bg-[linear-gradient(180deg,rgba(251,191,36,0.18),rgba(251,191,36,0.055))] text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_24px_rgba(251,191,36,0.14)]"
