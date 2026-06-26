@@ -354,44 +354,6 @@ function RankAvatar({
   );
 }
 
-function RankFramePicker({
-  selected,
-  onSelect,
-}: {
-  selected: number;
-  onSelect: (index: number) => void;
-}) {
-  return (
-    <div className="rounded-[18px] border border-amber-200/16 bg-black/36 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/48">กรอบแรงค์ทดลอง</div>
-          <div className="mt-1 text-sm font-black text-white">{rankFrames[selected]?.name}</div>
-        </div>
-        <div className="rounded-full border border-red-300/35 bg-red-500/16 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-red-100">
-          9 ระดับ
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        {rankFrames.map((frame, index) => (
-          <button
-            key={frame.name}
-            type="button"
-            onClick={() => onSelect(index)}
-            className={`group rounded-xl border p-2 text-left transition ${
-              selected === index ? "border-red-300 bg-red-500/18" : "border-white/10 bg-white/[0.035] hover:border-amber-200/42"
-            }`}
-            title={frame.name}
-          >
-            <div className={`mx-auto h-9 w-9 rounded-full border bg-gradient-to-br ${frame.aura} ${frame.ring}`} />
-            <div className="mt-2 truncate text-center text-[10px] font-black text-white/70">{index + 1}</div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function participantInRoom(room: TriadRoom | undefined, participantId: string) {
   if (!room) return false;
   return (
@@ -2447,8 +2409,6 @@ function RoomSeatCard({
   emptyText,
   canTake,
   onTake,
-  currentId,
-  selectedFrameIndex,
 }: {
   label: string;
   participant: RoomParticipant | null;
@@ -2457,15 +2417,11 @@ function RoomSeatCard({
   emptyText: string;
   canTake: boolean;
   onTake: () => void;
-  currentId: string;
-  selectedFrameIndex: number;
 }) {
   const toneClass =
     tone === "host"
       ? "border-amber-300/45 from-amber-300/18 via-[#120806]/82 to-black"
       : "border-amber-200/28 from-[#2a1112]/82 via-[#120608]/88 to-black";
-  const isCurrent = participant?.id === currentId;
-
   return (
     <div className={`relative min-h-[320px] overflow-hidden rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.1),transparent)] opacity-30" />
@@ -2476,11 +2432,11 @@ function RoomSeatCard({
       </div>
       {participant ? (
         <div className="relative flex min-h-[248px] flex-col items-center justify-center text-center">
-          <RankAvatar participant={participant} size="xl" crown={isLeader} rankIndex={isCurrent ? selectedFrameIndex : undefined} />
+          <RankAvatar participant={participant} size="xl" crown={isLeader} />
           <div className="mt-5 w-full border-y border-white/10 bg-black/34 px-3 py-3">
             <div className="truncate text-2xl font-black uppercase tracking-normal text-white">{participant.name}</div>
             <div className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-amber-100/62">
-              {rankFrames[isCurrent ? selectedFrameIndex : rankIndexForParticipant(participant)].name}
+              {rankFrames[rankIndexForParticipant(participant)].name}
             </div>
           </div>
           <div className="mt-3 rounded-full border border-emerald-200/25 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
@@ -3166,7 +3122,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [joinPassword, setJoinPassword] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
   const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
-  const [selectedFrameIndex, setSelectedFrameIndex] = useState(4);
   const activeRoomCodeRef = useRef("");
   const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
   const pvpTurnKeyRef = useRef("");
@@ -3575,7 +3530,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setActiveRoomSnapshot(null);
       setPhase("lobby");
     }
-    window.setTimeout(() => void syncRooms({ force: true }).catch(() => null), 60);
+    const syncAfterAction = () => void syncRooms({ force: true }).catch(() => null);
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(syncAfterAction, { timeout: 900 });
+    } else {
+      globalThis.setTimeout(syncAfterAction, 260);
+    }
     return { ok: response.ok, status: response.status, payload };
   };
 
@@ -5196,7 +5156,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 {lobbyMessage}
               </div>
             ) : null}
-            <RankFramePicker selected={selectedFrameIndex} onSelect={setSelectedFrameIndex} />
           </div>
 
           <div className="rounded-[18px] border border-amber-200/16 bg-black/36 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
@@ -5357,8 +5316,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               emptyText="ช่องเจ้าของห้องว่าง"
               canTake={currentIsSpectator && !currentRoom.seats.host}
               onTake={() => takeFieldSlot("host")}
-              currentId={participant.id}
-              selectedFrameIndex={selectedFrameIndex}
             />
             <RoomSeatCard
               label="ฝั่งผู้ท้าชิง"
@@ -5368,8 +5325,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               emptyText="รอผู้ท้าชิง"
               canTake={currentIsSpectator && !currentRoom.seats.challenger}
               onTake={() => takeFieldSlot("challenger")}
-              currentId={participant.id}
-              selectedFrameIndex={selectedFrameIndex}
             />
             <div className="md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
               <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">กติกาห้อง</div>
@@ -5399,7 +5354,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               canWatch={!currentIsSpectator && currentRoom.status === "waiting"}
               onWatch={moveToSpectator}
             />
-            <RankFramePicker selected={selectedFrameIndex} onSelect={setSelectedFrameIndex} />
           </aside>
         </section>
       </main>

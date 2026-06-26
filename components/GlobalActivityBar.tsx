@@ -12,21 +12,32 @@ export default function GlobalActivityBar() {
   const [progress, setProgress] = useState(0);
   const activeCountRef = useRef(0);
   const settleTimeoutRef = useRef<number | null>(null);
+  const progressTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const progressTimer = window.setInterval(() => {
-      if (activeCountRef.current <= 0) {
-        return;
-      }
+    const stopProgressTimer = () => {
+      if (progressTimerRef.current === null) return;
+      window.clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    };
 
-      setProgress((current) => {
-        if (current < 28) return Math.min(current + 11, 28);
-        if (current < 56) return Math.min(current + 6, 56);
-        if (current < 78) return Math.min(current + 3.5, 78);
-        if (current < 90) return Math.min(current + 1.25, 90);
-        return Math.min(current + 0.35, 94);
-      });
-    }, 110);
+    const startProgressTimer = () => {
+      if (progressTimerRef.current !== null) return;
+      progressTimerRef.current = window.setInterval(() => {
+        if (activeCountRef.current <= 0) {
+          stopProgressTimer();
+          return;
+        }
+
+        setProgress((current) => {
+          if (current < 28) return Math.min(current + 11, 28);
+          if (current < 56) return Math.min(current + 6, 56);
+          if (current < 78) return Math.min(current + 3.5, 78);
+          if (current < 90) return Math.min(current + 1.25, 90);
+          return Math.min(current + 0.35, 94);
+        });
+      }, 110);
+    };
 
     const handleActivity = (event: Event) => {
       const detail = (event as CustomEvent<UiActivityDetail>).detail;
@@ -44,12 +55,14 @@ export default function GlobalActivityBar() {
         activeCountRef.current += 1;
         setVisible(true);
         setProgress((current) => (current > 12 ? current : 12));
+        startProgressTimer();
         return;
       }
 
       activeCountRef.current = Math.max(0, activeCountRef.current - 1);
 
       if (activeCountRef.current === 0) {
+        stopProgressTimer();
         setProgress(100);
         settleTimeoutRef.current = window.setTimeout(() => {
           setVisible(false);
@@ -65,7 +78,7 @@ export default function GlobalActivityBar() {
     );
 
     return () => {
-      window.clearInterval(progressTimer);
+      stopProgressTimer();
       window.removeEventListener(
         getUiActivityEventName(),
         handleActivity as EventListener

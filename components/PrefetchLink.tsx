@@ -115,7 +115,7 @@ export default function PrefetchLink({
   return (
     <Link
       href={href}
-      prefetch="auto"
+      prefetch={false}
       onPointerEnter={(event) => {
         prefetchRoute();
         onPointerEnter?.(event);

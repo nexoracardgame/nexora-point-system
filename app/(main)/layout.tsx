@@ -81,8 +81,17 @@ function shouldUseLightWarmups() {
 
   const connection = (navigator as NavigatorWithConnection).connection;
   const effectiveType = String(connection?.effectiveType || "").toLowerCase();
+  const isTouchOrSmall =
+    typeof window !== "undefined" &&
+    (window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 900px)").matches);
 
-  return Boolean(connection?.saveData || effectiveType === "slow-2g" || effectiveType === "2g");
+  return Boolean(
+    isTouchOrSmall ||
+      connection?.saveData ||
+      effectiveType === "slow-2g" ||
+      effectiveType === "2g"
+  );
 }
 
 function dispatchChatUnreadCount(count: number, source = "layout") {
@@ -1100,6 +1109,7 @@ export default function MainLayout({
   }, []);
 
   useEffect(() => {
+    if (isBattleRoute) return;
     const importantRoutes = [
       "/",
       "/market",
@@ -1195,7 +1205,7 @@ export default function MainLayout({
       globalThis.clearTimeout(timeoutId);
       warmTimers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [isAdminModeUser, ownProfileHref, router, session?.user?.id]);
+  }, [isAdminModeUser, isBattleRoute, ownProfileHref, router, session?.user?.id]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -1209,6 +1219,7 @@ export default function MainLayout({
   }, [mobileNavOpen]);
 
   useEffect(() => {
+    if (isBattleRoute) return;
     if (typeof window === "undefined") return;
 
     const prefetchedRoutes = new Map<string, number>();
@@ -1246,7 +1257,7 @@ export default function MainLayout({
       window.removeEventListener("pointerover", prefetchRoute, options);
       window.removeEventListener("focusin", prefetchRoute, true);
     };
-  }, [pathname, router]);
+  }, [isBattleRoute, pathname, router]);
 
   const pageContext = useMemo(() => {
     if (pathname.startsWith("/buy-market")) return "ตลาดรับซื้อการ์ดใบเดียว";
