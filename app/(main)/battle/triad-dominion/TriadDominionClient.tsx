@@ -2143,7 +2143,7 @@ function BattleRoomChatPanel({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
   const messages = room?.game.chat || [];
   const memberCount =
@@ -2152,7 +2152,9 @@ function BattleRoomChatPanel({
     (room?.spectators.length || 0);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    const messagesEl = messagesRef.current;
+    if (!messagesEl) return;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }, [messages.length, room?.code]);
 
   useEffect(() => {
@@ -2178,7 +2180,7 @@ function BattleRoomChatPanel({
   };
 
   return (
-    <section className="flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-[min(500px,calc(100vh-330px))] 2xl:min-h-[340px]">
+    <section className="triad-battle-chat-panel flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-[min(500px,calc(100vh-330px))] 2xl:min-h-[340px]">
       <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -2198,7 +2200,7 @@ function BattleRoomChatPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div ref={messagesRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length > 0 ? (
           messages.map((message) => {
             const mine = message.senderId === currentUserId;
@@ -2242,7 +2244,6 @@ function BattleRoomChatPanel({
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       <form
