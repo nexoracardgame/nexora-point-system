@@ -211,6 +211,7 @@ const LOBBY_SYNC_MS = 1800;
 const ACTIVE_ROOM_SYNC_MS = 1000;
 const HIDDEN_SYNC_MS = 4000;
 const MIN_SYNC_GAP_MS = 140;
+const TRIAD_RESUME_ROOM_CACHE_KEY = "nexora:triad:active-room";
 const rankFrames = [
   { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
   { name: "เหล็กดำ", aura: "from-slate-300/30 via-slate-800/20 to-black/20", ring: "border-slate-300/55 shadow-[0_0_24px_rgba(148,163,184,0.22)]", badge: "bg-slate-200 text-black" },
@@ -362,6 +363,37 @@ function participantInRoom(room: TriadRoom | undefined, participantId: string) {
     room.spectators.some((viewer) => viewer.id === participantId)
   );
 }
+
+function readCachedTriadRoom(participantId: string) {
+  if (typeof window === "undefined" || !participantId) return null;
+  try {
+    const raw = window.sessionStorage.getItem(TRIAD_RESUME_ROOM_CACHE_KEY) || window.localStorage.getItem(TRIAD_RESUME_ROOM_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { participantId?: string; room?: unknown };
+    if (safeText(parsed.participantId) !== participantId) return null;
+    const room = normalizeApiRooms(parsed.room ? [parsed.room] : [])[0] || null;
+    return room && participantInRoom(room, participantId) ? room : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedTriadRoom(participantId: string, room: TriadRoom | null) {
+  if (typeof window === "undefined" || !participantId) return;
+  try {
+    if (!room || !participantInRoom(room, participantId)) {
+      window.sessionStorage.removeItem(TRIAD_RESUME_ROOM_CACHE_KEY);
+      window.localStorage.removeItem(TRIAD_RESUME_ROOM_CACHE_KEY);
+      return;
+    }
+    const payload = JSON.stringify({ participantId, room });
+    window.sessionStorage.setItem(TRIAD_RESUME_ROOM_CACHE_KEY, payload);
+    window.localStorage.setItem(TRIAD_RESUME_ROOM_CACHE_KEY, payload);
+  } catch {
+    return;
+  }
+}
+
 function BattleMiniFriendButton({
   targetUserId,
   currentUserId,
@@ -3181,6 +3213,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const participant = useMemo(() => makeParticipant(currentUser), [currentUser.id, currentUser.image, currentUser.name]);
   const [phase, setPhase] = useState<BattlePhase>("lobby");
+  const [resumeChecking, setResumeChecking] = useState(true);
   const [rooms, setRooms] = useState<TriadRoom[]>([]);
   const [activeRoomCode, setActiveRoomCode] = useState("");
   const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
@@ -3227,6 +3260,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
+
+  useEffect(() => {
+    const cachedRoom = readCachedTriadRoom(participant.id);
+    if (!cachedRoom) return;
+
+    activeRoomCodeRef.current = cachedRoom.code;
+    activeRoomSnapshotRef.current = cachedRoom;
+    setActiveRoomCode(cachedRoom.code);
+    setActiveRoomSnapshot(cachedRoom);
+    setRooms((current) => mergeRoomByCode(current, cachedRoom));
+    setPhase(cachedRoom.status === "playing" ? phaseForPlayingRoom(cachedRoom, participant.id) || "battle" : "room");
+  }, [participant.id]);
 
   const playerDeckCards = playerDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botDeckCards = botDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -3461,6 +3506,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     : null;
   const forcedWinnerLabel = forcedWinnerSide ? currentRoom?.seats[forcedWinnerSide]?.name || "ผู้ชนะ" : "";
   const surrenderedLabel = surrenderedSide ? currentRoom?.seats[surrenderedSide]?.name || "ผู้ยอมแพ้" : "";
+
+  useEffect(() => {
+    if (currentRoom && participantInRoom(currentRoom, participant.id)) {
+      writeCachedTriadRoom(participant.id, currentRoom);
+    }
+  }, [currentRoom, participant.id]);
   const winnerText =
     forcedWinnerLabel
       ? `${forcedWinnerLabel} ชนะ`
@@ -3532,6 +3583,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       activeRoomSnapshotRef.current = reconnectRoom;
       setActiveRoomCode(reconnectRoom.code);
       setActiveRoomSnapshot(reconnectRoom);
+      writeCachedTriadRoom(participant.id, reconnectRoom);
       setPhase(reconnectRoom.status === "playing" ? phaseForPlayingRoom(reconnectRoom, participant.id) || "battle" : "room");
       setLobbyMessage("");
     }
@@ -3540,12 +3592,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       activeRoomSnapshotRef.current = null;
       setActiveRoomCode("");
       setActiveRoomSnapshot(null);
+      writeCachedTriadRoom(participant.id, null);
       setPhase("lobby");
       setLobbyMessage("ห้องถูกปิดแล้ว");
     }
     setRooms((current) => mergeIncomingRooms(current, nextRooms));
     return nextRooms;
     } finally {
+      setResumeChecking(false);
       syncInFlightRef.current = false;
       if (syncQueuedRef.current) {
         syncQueuedRef.current = false;
@@ -3560,6 +3614,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setRooms((current) => mergeIncomingRoom(current, nextRoom));
     activeRoomSnapshotRef.current = nextRoom;
     setActiveRoomSnapshot(nextRoom);
+    writeCachedTriadRoom(participant.id, nextRoom);
     if (activeRoomCodeRef.current === nextRoom.code) {
       setActiveRoomCode(nextRoom.code);
     }
@@ -3588,6 +3643,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const stableActionRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom));
       activeRoomSnapshotRef.current = stableActionRoom;
       setActiveRoomSnapshot(stableActionRoom);
+      writeCachedTriadRoom(participant.id, stableActionRoom);
       if (participantInRoom(stableActionRoom, participant.id) && stableActionRoom.status === "playing") {
         const nextPhase = phaseForPlayingRoom(stableActionRoom, participant.id);
         if (nextPhase) setPhase(nextPhase);
@@ -3597,6 +3653,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       activeRoomSnapshotRef.current = null;
       setActiveRoomCode("");
       setActiveRoomSnapshot(null);
+      writeCachedTriadRoom(participant.id, null);
       setPhase("lobby");
     }
     const syncAfterAction = () => void syncRooms({ force: true }).catch(() => null);
@@ -3807,6 +3864,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     activeRoomSnapshotRef.current = null;
     setActiveRoomCode("");
     setActiveRoomSnapshot(null);
+    writeCachedTriadRoom(participant.id, null);
     setPhase("lobby");
   };
 
@@ -3828,6 +3886,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     activeRoomSnapshotRef.current = null;
     setActiveRoomCode("");
     setActiveRoomSnapshot(null);
+    writeCachedTriadRoom(participant.id, null);
     setPhase("lobby");
     setLobbyMessage("ยุบห้องแล้ว");
   };
@@ -3908,6 +3967,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           activeRoomSnapshotRef.current = null;
           setActiveRoomCode("");
           setActiveRoomSnapshot(null);
+          writeCachedTriadRoom(participant.id, null);
           setPhase("lobby");
         }
         return;
@@ -3925,6 +3985,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (activeRoomCodeRef.current === room.code || roomIncludesMe) {
         activeRoomSnapshotRef.current = stableRoom;
         setActiveRoomSnapshot(stableRoom);
+        writeCachedTriadRoom(participant.id, stableRoom);
       }
 
       if (!activeRoomCodeRef.current && roomIncludesMe) {
@@ -4993,6 +5054,31 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     !canRevealTurn
       ? "ล็อกการ์ดก่อน"
       : "เปิดทั้งสองฝั่ง";
+
+  if (resumeChecking && phase === "lobby") {
+    return (
+      <main className="triad-lobby-screen grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center overflow-hidden rounded-[24px] border border-amber-200/12 bg-[#050507] px-4 text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
+        <div className="w-[min(420px,92vw)] rounded-2xl border border-amber-200/22 bg-black/54 p-5 text-center shadow-[0_0_60px_rgba(251,191,36,0.16)] backdrop-blur-md">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-amber-200/40 bg-amber-200/12 text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.22)]">
+            <Swords className="h-7 w-7" />
+          </div>
+          <div className="mt-4 text-xl font-black text-white">กำลังกลับเข้าสนาม</div>
+          <div className="mt-2 text-sm font-semibold leading-6 text-white/56">
+            กำลังเชื่อมต่อเกมที่กำลังดำเนินอยู่แบบเรียลไทม์
+          </div>
+          <div className="mx-auto mt-5 h-1.5 w-44 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full w-1/2 animate-[triad-reconnect_1.05s_ease-in-out_infinite] rounded-full bg-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.65)]" />
+          </div>
+        </div>
+        <style jsx>{`
+          @keyframes triad-reconnect {
+            0% { transform: translateX(-110%); }
+            100% { transform: translateX(230%); }
+          }
+        `}</style>
+      </main>
+    );
+  }
 
   if (phase === "lobby") {
     const visibleRooms = rooms
