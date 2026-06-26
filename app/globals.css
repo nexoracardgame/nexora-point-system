@@ -769,6 +769,7 @@ textarea {
     height: min(100%, calc(min(100svh, 100svw) - 6rem)) !important;
     max-height: calc(min(100svh, 100svw) - 5.2rem) !important;
     border-radius: 0.75rem !important;
+    overflow: visible !important;
     --triad-card-size: clamp(30px, 9.8cqw, 64px);
     --triad-pile-size: clamp(24px, 6.6cqw, 46px);
     --triad-slot-gap: clamp(2px, 0.8cqw, 6px);
@@ -949,6 +950,79 @@ textarea {
     letter-spacing: 0.08em !important;
   }
 
+  .nexora-battle-shell .triad-skill-target-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 100 !important;
+    display: grid !important;
+    width: auto !important;
+    place-items: center !important;
+    padding: max(0.45rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left)) !important;
+    background: radial-gradient(circle at 52% 46%, rgba(124, 58, 237, 0.22), rgba(0, 0, 0, 0.72) 54%, rgba(0, 0, 0, 0.9) 100%);
+    backdrop-filter: blur(5px);
+  }
+
+  .nexora-battle-shell .triad-skill-target-panel {
+    display: grid !important;
+    width: min(92svw, 720px) !important;
+    max-height: calc(100svh - max(0.9rem, env(safe-area-inset-top) + env(safe-area-inset-bottom))) !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+    border-radius: clamp(0.8rem, 2.4svh, 1.2rem) !important;
+    padding: clamp(0.55rem, 1.7svh, 0.9rem) !important;
+    box-shadow: 0 0 58px rgba(168, 85, 247, 0.42) !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-header .text-2xl {
+    font-size: clamp(0.98rem, 3.8svh, 1.5rem) !important;
+    line-height: 1.06 !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-header .text-sm {
+    max-height: 13svh;
+    overflow: auto;
+    font-size: clamp(0.58rem, 1.8svh, 0.76rem) !important;
+    line-height: 1.38 !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-header .text-lg {
+    margin-top: 0.25rem !important;
+    font-size: clamp(0.95rem, 3.4svh, 1.35rem) !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-list {
+    margin-top: clamp(0.45rem, 1.5svh, 0.75rem) !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: clamp(0.45rem, 1.4svw, 0.75rem) !important;
+    overflow: auto !important;
+    padding: 0.05rem 0.1rem 0.15rem !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nexora-battle-shell .triad-skill-target-choice {
+    min-height: 0 !important;
+    border-radius: clamp(0.65rem, 2svh, 1rem) !important;
+    padding: clamp(0.45rem, 1.55svh, 0.75rem) !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-choice > div:first-child {
+    margin-bottom: 0.35rem !important;
+    font-size: clamp(0.48rem, 1.55svh, 0.64rem) !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-card {
+    width: min(20svh, 18svw, 120px) !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-confirm {
+    margin-top: clamp(0.45rem, 1.6svh, 0.8rem) !important;
+    height: clamp(2.35rem, 7svh, 3rem) !important;
+    border-radius: clamp(0.7rem, 2svh, 1rem) !important;
+    font-size: clamp(0.66rem, 2svh, 0.86rem) !important;
+  }
+
   .nexora-battle-shell .triad-dominion-game {
     display: flex;
     flex-direction: column;
@@ -1046,7 +1120,7 @@ textarea {
   }
 
   .nexora-battle-shell .triad-board-phase-hud {
-    bottom: 0.22rem !important;
+    bottom: clamp(-1.15rem, -4.6svh, -0.75rem) !important;
     inset-inline: clamp(72px, 13svw, 150px) !important;
   }
 
@@ -1256,6 +1330,7 @@ textarea {
   }
 
   .nexora-battle-shell .triad-board-phase-hud {
+    bottom: clamp(-1.05rem, -4.2svh, -0.7rem) !important;
     inset-inline: clamp(58px, 11svw, 120px) !important;
   }
 
@@ -1270,6 +1345,32 @@ textarea {
 
   .nexora-battle-shell .triad-board-phase-meta {
     display: none !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-panel {
+    width: min(96svw, 660px) !important;
+    max-height: calc(100svh - 0.55rem) !important;
+    padding: 0.5rem !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-header .text-sm {
+    max-height: 10svh;
+  }
+
+  .nexora-battle-shell .triad-skill-target-list {
+    gap: 0.4rem !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-choice {
+    padding: 0.42rem !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-card {
+    width: min(18svh, 16svw, 104px) !important;
+  }
+
+  .nexora-battle-shell .triad-skill-target-confirm {
+    height: clamp(2rem, 6.5svh, 2.6rem) !important;
   }
 }
 

@@ -1066,6 +1066,93 @@ export default function MainLayout({
     void requestGameViewport();
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const isMobileBattleDevice = () =>
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 900px)").matches;
+
+    if (!isBattleRoute) {
+      window.sessionStorage.removeItem("nexora:battle:sticky-viewport");
+      if (document.fullscreenElement) {
+        void document.exitFullscreen?.().catch(() => undefined);
+      }
+      return;
+    }
+
+    if (!isMobileBattleDevice()) return;
+
+    window.sessionStorage.setItem("nexora:battle:sticky-viewport", "1");
+
+    let rafId = 0;
+    const timeoutIds = new Set<number>();
+
+    const scheduleGameViewport = () => {
+      if (
+        document.visibilityState !== "visible" ||
+        window.sessionStorage.getItem("nexora:battle:sticky-viewport") !== "1"
+      ) {
+        return;
+      }
+
+      void requestGameViewport();
+
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+
+      rafId = window.requestAnimationFrame(() => {
+        void requestGameViewport();
+      });
+
+      [120, 420, 900].forEach((delay) => {
+        const timeoutId = window.setTimeout(() => {
+          timeoutIds.delete(timeoutId);
+          void requestGameViewport();
+        }, delay);
+        timeoutIds.add(timeoutId);
+      });
+    };
+
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") {
+        scheduleGameViewport();
+      }
+    };
+
+    const handleUserResume = () => {
+      scheduleGameViewport();
+    };
+
+    scheduleGameViewport();
+    window.addEventListener("focus", scheduleGameViewport);
+    window.addEventListener("pageshow", scheduleGameViewport);
+    window.addEventListener("orientationchange", scheduleGameViewport);
+    window.addEventListener("resize", scheduleGameViewport);
+    document.addEventListener("visibilitychange", handleVisible);
+    document.addEventListener("fullscreenchange", scheduleGameViewport);
+    window.addEventListener("pointerdown", handleUserResume, { capture: true, passive: true });
+    window.addEventListener("touchstart", handleUserResume, { capture: true, passive: true });
+    window.addEventListener("click", handleUserResume, { capture: true, passive: true });
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.removeEventListener("focus", scheduleGameViewport);
+      window.removeEventListener("pageshow", scheduleGameViewport);
+      window.removeEventListener("orientationchange", scheduleGameViewport);
+      window.removeEventListener("resize", scheduleGameViewport);
+      document.removeEventListener("visibilitychange", handleVisible);
+      document.removeEventListener("fullscreenchange", scheduleGameViewport);
+      window.removeEventListener("pointerdown", handleUserResume, true);
+      window.removeEventListener("touchstart", handleUserResume, true);
+      window.removeEventListener("click", handleUserResume, true);
+    };
+  }, [isBattleRoute]);
+
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
   const isAdminModeUser = isAdminRole(session?.user?.role);
   const hideMobileBottomNav = isChatRoomPage || isBattleRoute || mobileChatComposerActive;

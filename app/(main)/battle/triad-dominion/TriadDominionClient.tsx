@@ -2728,9 +2728,9 @@ function SkillTargetOverlay({
   const effectiveSelectedTarget = selectedTarget || (targets.length === 1 ? targets[0].id : "");
 
   return (
-    <div className="absolute bottom-4 right-4 top-16 z-40 flex w-[min(430px,calc(100%-2rem))] items-center">
-      <div className="max-h-full w-full overflow-auto rounded-2xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] backdrop-blur-md sm:p-5">
-        <div className="text-center">
+    <div className="triad-skill-target-overlay absolute bottom-4 right-4 top-16 z-[90] flex w-[min(430px,calc(100%-2rem))] items-center">
+      <div className="triad-skill-target-panel max-h-full w-full overflow-auto rounded-2xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] backdrop-blur-md sm:p-5">
+        <div className="triad-skill-target-header text-center">
           <div className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-200/70">เลือกเป้าหมายสกิล</div>
           <div className="mt-1 text-2xl font-black uppercase text-white">{card.name}</div>
           <div className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/62">{card.skillText}</div>
@@ -2739,18 +2739,18 @@ function SkillTargetOverlay({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="triad-skill-target-list mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
           {targets.map((target) => (
             <button
               key={target.id}
               type="button"
               onClick={() => onSelect(target.id)}
-              className={`rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
+              className={`triad-skill-target-choice rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
                 effectiveSelectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
               }`}
             >
               <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white/56">{target.label}</div>
-              <div className="mx-auto w-[clamp(90px,18vw,150px)]">
+              <div className="triad-skill-target-card mx-auto w-[clamp(90px,18vw,150px)]">
                 <BoardCardSlot card={target.card} label={target.label} tone={target.id === "player-top" ? "player" : "bot"} />
               </div>
             </button>
@@ -2764,7 +2764,7 @@ function SkillTargetOverlay({
             onConfirm();
           }}
           disabled={!effectiveSelectedTarget}
-          className="mt-5 h-12 w-full rounded-2xl bg-violet-300 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/30"
+          className="triad-skill-target-confirm mt-5 h-12 w-full rounded-2xl bg-violet-300 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/30"
         >
           ยืนยันเป้าหมาย
         </button>
