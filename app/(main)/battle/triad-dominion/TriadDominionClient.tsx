@@ -2923,27 +2923,27 @@ function TimeoutWarningOverlay({
   const nameText = missingNames.length === 1 ? missingNames[0] : missingNames.join(" และ ");
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[80] grid place-items-center px-4">
+    <div className="triad-timeout-warning-overlay pointer-events-none absolute inset-0 z-[80] grid place-items-center px-4">
       <div className="absolute inset-0 bg-black/42 backdrop-blur-[2px]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(248,113,113,0.28),rgba(0,0,0,0.28)_34%,transparent_68%)]" />
-      <div className="absolute z-[81] h-[min(420px,72vw)] w-[min(420px,72vw)] animate-ping rounded-full border border-red-300/25 bg-red-500/8" />
-      <div className="relative z-[90] w-[min(760px,94vw)] overflow-hidden rounded-[28px] border border-red-200/45 bg-black/86 p-5 text-center shadow-[0_0_92px_rgba(248,113,113,0.52),inset_0_0_0_1px_rgba(255,255,255,0.08)] backdrop-blur-md sm:p-7">
+      <div className="triad-timeout-warning-pulse absolute z-[81] h-[min(420px,72vw)] w-[min(420px,72vw)] animate-ping rounded-full border border-red-300/25 bg-red-500/8" />
+      <div className="triad-timeout-warning-panel relative z-[90] w-[min(760px,94vw)] overflow-hidden rounded-[28px] border border-red-200/45 bg-black/86 p-5 text-center shadow-[0_0_92px_rgba(248,113,113,0.52),inset_0_0_0_1px_rgba(255,255,255,0.08)] backdrop-blur-md sm:p-7">
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-red-100 to-transparent" />
         <div className="absolute inset-0 bg-[conic-gradient(from_180deg_at_50%_50%,rgba(248,113,113,0.22),rgba(251,191,36,0.16),rgba(34,211,238,0.10),rgba(248,113,113,0.22))] opacity-30" />
         <div className="relative">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl border border-red-100/35 bg-red-500/18 text-red-100 shadow-[0_0_34px_rgba(248,113,113,0.38)]">
+          <div className="triad-timeout-warning-icon mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl border border-red-100/35 bg-red-500/18 text-red-100 shadow-[0_0_34px_rgba(248,113,113,0.38)]">
             <Flame className="h-6 w-6" />
           </div>
           <div className="text-[10px] font-black uppercase tracking-[0.24em] text-red-100/70">
             Turn timeout warning
           </div>
-          <div className="mt-2 text-[clamp(1.15rem,3vw,2rem)] font-black leading-tight text-white">
+          <div className="triad-timeout-warning-title mt-2 text-[clamp(1.15rem,3vw,2rem)] font-black leading-tight text-white">
             ผู้เล่น {nameText} ยังไม่ลงการ์ด
           </div>
-          <div className="mx-auto mt-4 grid h-[clamp(112px,18vw,180px)] w-[clamp(112px,18vw,180px)] place-items-center rounded-full border-[6px] border-red-100 bg-[radial-gradient(circle,#fb7185,#b91c1c_58%,#450a0a)] text-[clamp(4rem,10vw,8rem)] font-black leading-none text-white shadow-[0_0_70px_rgba(248,113,113,0.72)]">
+          <div className="triad-timeout-warning-count mx-auto mt-4 grid h-[clamp(112px,18vw,180px)] w-[clamp(112px,18vw,180px)] place-items-center rounded-full border-[6px] border-red-100 bg-[radial-gradient(circle,#fb7185,#b91c1c_58%,#450a0a)] text-[clamp(4rem,10vw,8rem)] font-black leading-none text-white shadow-[0_0_70px_rgba(248,113,113,0.72)]">
             {secondsLeft}
           </div>
-          <div className="mx-auto mt-4 max-w-2xl rounded-full border border-amber-100/28 bg-amber-300/12 px-4 py-2 text-sm font-black text-amber-50 shadow-[0_0_32px_rgba(251,191,36,0.18)]">
+          <div className="triad-timeout-warning-note mx-auto mt-4 max-w-2xl rounded-full border border-amber-100/28 bg-amber-300/12 px-4 py-2 text-sm font-black text-amber-50 shadow-[0_0_32px_rgba(251,191,36,0.18)]">
             จะถูกปรับแพ้ใน {secondsLeft} วินาที หากไม่ลงการ์ด
           </div>
         </div>
@@ -3243,6 +3243,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const lastSyncAtRef = useRef(0);
   const resultAdvanceKeyRef = useRef("");
   const deckBattleStartKeyRef = useRef("");
+  const optimisticRoomLockUntilRef = useRef(0);
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
@@ -3564,10 +3565,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const mergeIncomingRooms = (current: TriadRoom[], nextRooms: TriadRoom[]) =>
-    mergeRoomListsWithStableChat(current, nextRooms).map(keepPendingOpeningTieBreakChoice);
+    mergeRoomListsWithStableChat(current, nextRooms).map((room) => {
+      const optimisticRoom = activeRoomSnapshotRef.current;
+      if (
+        optimisticRoom &&
+        optimisticRoom.code === room.code &&
+        Date.now() < optimisticRoomLockUntilRef.current
+      ) {
+        return keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(room, optimisticRoom));
+      }
+      return keepPendingOpeningTieBreakChoice(room);
+    });
 
-  const mergeIncomingRoom = (current: TriadRoom[], room: TriadRoom) =>
-    mergeRoomByCode(current, keepPendingOpeningTieBreakChoice(room));
+  const mergeIncomingRoom = (current: TriadRoom[], room: TriadRoom) => {
+    const optimisticRoom = activeRoomSnapshotRef.current;
+    const stableRoom =
+      optimisticRoom &&
+      optimisticRoom.code === room.code &&
+      Date.now() < optimisticRoomLockUntilRef.current
+        ? mergeRoomWithStableChat(room, optimisticRoom)
+        : room;
+    return mergeRoomByCode(current, keepPendingOpeningTieBreakChoice(stableRoom));
+  };
 
   const syncRooms = async (options: { force?: boolean } = {}) => {
     const now = Date.now();
@@ -3640,6 +3659,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
     const payload = await response.json().catch(() => ({}));
     const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
+    if (actionRoom) optimisticRoomLockUntilRef.current = 0;
     let nextRooms = Array.isArray(payload.rooms) ? normalizeApiRooms(payload.rooms) : rooms;
     if ((body.action === "disband" || (body.action === "leave" && !actionRoom)) && activeRoomCodeRef.current) {
       nextRooms = nextRooms.filter((room) => room.code !== activeRoomCodeRef.current);
@@ -4434,6 +4454,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(playerForLock.top), previewOpponentTop).length > 0
       );
       const previousRoom = currentRoom;
+      optimisticRoomLockUntilRef.current = Date.now() + 3200;
       patchCurrentRoom((room) => ({
         ...room,
         game: {
@@ -4479,6 +4500,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         cardNo: playerForLock[lane],
       }).then((result) => {
         if (!result.ok) {
+          optimisticRoomLockUntilRef.current = 0;
           setTurnLocked(false);
           if (previousRoom) patchCurrentRoom(() => previousRoom);
           void syncRooms({ force: true }).catch(() => null);
@@ -4615,6 +4637,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
+      optimisticRoomLockUntilRef.current = Date.now() + 3200;
       patchCurrentRoom((room) => ({
         ...room,
         game: {
@@ -4637,6 +4660,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         selectedTarget,
       }).then((result) => {
         if (!result.ok) {
+          optimisticRoomLockUntilRef.current = 0;
           void syncRooms({ force: true }).catch(() => null);
           setBattleLog((current) => ["เลือกเป้าหมายสกิลไม่สำเร็จ หรือหมดเวลา 30 วินาทีแล้ว", ...current]);
           return;

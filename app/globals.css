@@ -1053,6 +1053,57 @@ textarea {
     letter-spacing: 0.08em !important;
   }
 
+  .nexora-battle-shell .triad-timeout-warning-overlay {
+    padding: max(0.45rem, env(safe-area-inset-top)) max(0.55rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.55rem, env(safe-area-inset-left)) !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-pulse {
+    height: min(46svh, 38svw, 230px) !important;
+    width: min(46svh, 38svw, 230px) !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-panel {
+    width: min(54svw, 420px) !important;
+    max-height: calc(100svh - 1rem) !important;
+    border-radius: clamp(0.9rem, 2.8svh, 1.25rem) !important;
+    padding: clamp(0.7rem, 2.1svh, 1rem) !important;
+    box-shadow: 0 0 48px rgba(248, 113, 113, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.07) !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-icon {
+    height: clamp(2rem, 6.6svh, 2.75rem) !important;
+    width: clamp(2rem, 6.6svh, 2.75rem) !important;
+    margin-bottom: clamp(0.35rem, 1.3svh, 0.55rem) !important;
+    border-radius: 0.85rem !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-icon svg {
+    height: 52% !important;
+    width: 52% !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-title {
+    margin-top: clamp(0.25rem, 1svh, 0.45rem) !important;
+    font-size: clamp(0.9rem, 3.2svh, 1.28rem) !important;
+    line-height: 1.12 !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-count {
+    height: clamp(4.6rem, 20svh, 7.4rem) !important;
+    width: clamp(4.6rem, 20svh, 7.4rem) !important;
+    margin-top: clamp(0.55rem, 1.8svh, 0.8rem) !important;
+    border-width: clamp(3px, 0.8svh, 5px) !important;
+    font-size: clamp(2.7rem, 10svh, 5rem) !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-note {
+    margin-top: clamp(0.55rem, 1.8svh, 0.8rem) !important;
+    border-radius: 999px !important;
+    padding: 0.38rem 0.65rem !important;
+    font-size: clamp(0.58rem, 1.75svh, 0.72rem) !important;
+    line-height: 1.25 !important;
+  }
+
   .nexora-battle-shell .triad-dominion-game {
     display: flex;
     flex-direction: column;
@@ -1413,6 +1464,25 @@ textarea {
   .nexora-battle-shell .triad-ready-advance-spotlight button {
     min-height: clamp(2.25rem, 6.7svh, 2.8rem) !important;
     padding: 0.25rem 0.55rem !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-panel {
+    width: min(48svw, 350px) !important;
+    padding: 0.62rem !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-title {
+    font-size: clamp(0.78rem, 2.7svh, 1.05rem) !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-count {
+    height: clamp(3.8rem, 17svh, 5.8rem) !important;
+    width: clamp(3.8rem, 17svh, 5.8rem) !important;
+    font-size: clamp(2.2rem, 8.4svh, 3.7rem) !important;
+  }
+
+  .nexora-battle-shell .triad-timeout-warning-note {
+    font-size: clamp(0.5rem, 1.45svh, 0.62rem) !important;
   }
 }
 
