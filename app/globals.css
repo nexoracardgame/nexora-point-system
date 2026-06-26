@@ -974,14 +974,102 @@ textarea {
     padding: 0.35rem !important;
   }
 
+  .nexora-battle-shell .triad-board-phase-hud {
+    bottom: 0.22rem !important;
+    inset-inline: clamp(72px, 13svw, 150px) !important;
+  }
+
+  .nexora-battle-shell .triad-board-phase-card {
+    width: min(48svw, 360px) !important;
+    max-width: calc(100svw - 8.5rem) !important;
+    gap: 0.18rem !important;
+  }
+
+  .nexora-battle-shell .triad-phase-track {
+    border-radius: 999px !important;
+    padding: 0.16rem !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34) !important;
+  }
+
+  .nexora-battle-shell .triad-phase-track-grid {
+    gap: 0.12rem !important;
+  }
+
+  .nexora-battle-shell .triad-phase-step {
+    min-width: 0;
+    border-radius: 999px !important;
+    padding: 0.28rem 0.36rem !important;
+    font-size: clamp(0.48rem, 1.45svh, 0.62rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0.04em !important;
+    white-space: nowrap;
+  }
+
+  .nexora-battle-shell .triad-board-phase-meta {
+    padding: 0.22rem 0.45rem !important;
+    font-size: clamp(0.46rem, 1.35svh, 0.58rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0.06em !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28) !important;
+  }
+
   .nexora-battle-shell .triad-card-preview-overlay {
     pointer-events: auto !important;
     background: rgba(0, 0, 0, 0.58) !important;
     backdrop-filter: blur(4px);
   }
 
+  .nexora-battle-shell .triad-card-preview-panel {
+    display: grid !important;
+    width: min(92svw, 620px) !important;
+    max-height: calc(100svh - 0.7rem) !important;
+    grid-template-columns: minmax(0, auto) minmax(118px, 0.42fr) !important;
+    justify-content: center;
+    align-items: center;
+    gap: 0.45rem !important;
+    padding: 0.42rem !important;
+    border-radius: 0.85rem !important;
+    overflow: hidden !important;
+  }
+
+  .nexora-battle-shell .triad-card-preview-image {
+    width: min(56svh, 54svw, 320px) !important;
+    max-width: calc(100svw - 9.5rem) !important;
+    max-height: calc(100svh - 1rem) !important;
+    border-radius: 0.65rem !important;
+    background: #000;
+  }
+
+  .nexora-battle-shell .triad-card-preview-info {
+    margin-top: 0 !important;
+    max-height: calc(100svh - 1rem) !important;
+    overflow: auto !important;
+    border-radius: 0.65rem !important;
+    padding: 0.5rem !important;
+  }
+
+  .nexora-battle-shell .triad-card-preview-info .text-xl {
+    font-size: clamp(0.74rem, 2.1svh, 1rem) !important;
+    line-height: 1.12 !important;
+  }
+
+  .nexora-battle-shell .triad-card-preview-info .text-\[10px\] {
+    font-size: clamp(0.48rem, 1.4svh, 0.6rem) !important;
+  }
+
+  .nexora-battle-shell .triad-card-preview-text {
+    max-height: 31svh !important;
+    overflow: auto !important;
+    font-size: clamp(0.58rem, 1.65svh, 0.72rem) !important;
+    line-height: 1.32 !important;
+  }
+
   .nexora-battle-shell .triad-card-preview-close {
     display: grid !important;
+    right: 0.35rem !important;
+    top: 0.35rem !important;
+    height: 2rem !important;
+    width: 2rem !important;
   }
 }
 
@@ -1066,10 +1154,15 @@ textarea {
   }
 
   .nexora-battle-shell .triad-card-preview-panel {
-    width: min(96svw, 680px) !important;
-    grid-template-columns: minmax(104px, min(34svw, 220px)) minmax(0, 1fr);
+    width: min(96svw, 620px) !important;
+    grid-template-columns: minmax(0, auto) minmax(96px, 0.38fr) !important;
     gap: 0.45rem;
     padding: 0.45rem !important;
+  }
+
+  .nexora-battle-shell .triad-card-preview-image {
+    width: min(54svh, 58svw, 290px) !important;
+    max-width: calc(100svw - 7.8rem) !important;
   }
 
   .nexora-battle-shell .triad-card-preview-info {
@@ -1078,6 +1171,23 @@ textarea {
 
   .nexora-battle-shell .triad-card-preview-text {
     max-height: 26svh !important;
+  }
+
+  .nexora-battle-shell .triad-board-phase-hud {
+    inset-inline: clamp(58px, 11svw, 120px) !important;
+  }
+
+  .nexora-battle-shell .triad-board-phase-card {
+    width: min(42svw, 300px) !important;
+  }
+
+  .nexora-battle-shell .triad-phase-step {
+    padding: 0.22rem 0.28rem !important;
+    font-size: clamp(0.42rem, 1.3svh, 0.54rem) !important;
+  }
+
+  .nexora-battle-shell .triad-board-phase-meta {
+    display: none !important;
   }
 }
 

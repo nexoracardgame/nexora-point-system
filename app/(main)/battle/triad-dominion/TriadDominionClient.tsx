@@ -1322,13 +1322,13 @@ function PhaseTrack({ activeTurn }: { activeTurn: TriadTurn }) {
   ] as const;
 
   return (
-    <div className="relative overflow-hidden rounded-[18px] border border-amber-100/24 bg-[linear-gradient(180deg,rgba(30,21,9,0.94),rgba(9,7,5,0.88))] p-1.5 shadow-[0_16px_46px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
+    <div className="triad-phase-track relative overflow-hidden rounded-[18px] border border-amber-100/24 bg-[linear-gradient(180deg,rgba(30,21,9,0.94),rgba(9,7,5,0.88))] p-1.5 shadow-[0_16px_46px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
       <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/55 to-transparent" />
-      <div className="grid grid-cols-5 gap-1">
+      <div className="triad-phase-track-grid grid grid-cols-5 gap-1">
         {steps.map(([label, value]) => (
           <div
             key={label}
-            className={`rounded-xl px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-xs ${
+            className={`triad-phase-step rounded-xl px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-xs ${
               value === activeTurn ? "bg-amber-200 text-black shadow-[0_0_26px_rgba(251,191,36,0.34)]" : "text-amber-100/38"
             }`}
           >
@@ -1820,6 +1820,25 @@ function PlayerHand({
     if (cardNo) placedByNo.set(cardNo, lane);
   });
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const preloadHandImages = () => {
+      cards.forEach((card) => {
+        const img = new window.Image();
+        img.decoding = "async";
+        img.src = card.sourceImage;
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(preloadHandImages, { timeout: 700 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(preloadHandImages, 180);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [cards]);
+
   return (
     <div className="triad-player-hand rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
       <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} />
@@ -2113,7 +2132,16 @@ function CardHoverPreview({ card, onClose }: { card: CardView | null; onClose?: 
           </button>
         ) : null}
         <div className="triad-card-preview-image relative mx-auto aspect-[3/4] w-[min(330px,70vw)] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)]">
-          <Image src={card.sourceImage} alt={card.name} fill sizes="360px" className="object-cover" />
+          <Image
+            src={card.sourceImage}
+            alt={card.name}
+            fill
+            sizes="(hover: none) and (pointer: coarse) 72svh, 360px"
+            className="object-contain"
+            priority
+            loading="eager"
+            unoptimized
+          />
         </div>
         <div className="triad-card-preview-info mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3">
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/58">No.{card.cardNo}</div>
@@ -3067,10 +3095,10 @@ function CompactBattleBoard({
 
         <div />
       </div>
-      <div className="pointer-events-none absolute inset-x-2 bottom-1 z-[65] flex justify-center sm:bottom-2">
-        <div className="pointer-events-auto w-[min(500px,82cqw)] space-y-1.5">
+      <div className="triad-board-phase-hud pointer-events-none absolute inset-x-2 bottom-1 z-[65] flex justify-center sm:bottom-2">
+        <div className="triad-board-phase-card pointer-events-auto w-[min(500px,82cqw)] space-y-1.5">
           <PhaseTrack activeTurn={activeTurn} />
-          <div className="rounded-full border border-amber-100/14 bg-black/48 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+          <div className="triad-board-phase-meta rounded-full border border-amber-100/14 bg-black/48 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
             เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
           </div>
         </div>
