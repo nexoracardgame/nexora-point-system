@@ -1109,6 +1109,40 @@ textarea {
     letter-spacing: 0.08em !important;
   }
 
+  .nexora-battle-shell .triad-effect-timeline {
+    top: clamp(-5.8rem, -16.5svh, -3.25rem) !important;
+    right: clamp(2.6rem, 13svw, 7.8rem) !important;
+    width: min(44svw, 390px) !important;
+    max-height: min(38svh, 220px) !important;
+    overflow: auto !important;
+    gap: 0.28rem !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline > div {
+    border-radius: 0.7rem !important;
+    padding: clamp(0.42rem, 1.45svh, 0.62rem) clamp(0.55rem, 1.8svh, 0.78rem) !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .text-\[8px\] {
+    font-size: clamp(0.46rem, 1.32svh, 0.58rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .text-\[10px\] {
+    font-size: clamp(0.52rem, 1.5svh, 0.66rem) !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .mt-0\.5 {
+    font-size: clamp(0.72rem, 2svh, 0.92rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .mt-1.whitespace-normal {
+    font-size: clamp(0.62rem, 1.75svh, 0.78rem) !important;
+    line-height: 1.32 !important;
+  }
+
   .nexora-battle-shell .triad-timeout-warning-overlay {
     padding: max(0.45rem, env(safe-area-inset-top)) max(0.55rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.55rem, env(safe-area-inset-left)) !important;
   }

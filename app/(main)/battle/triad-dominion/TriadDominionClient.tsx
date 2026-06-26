@@ -1607,7 +1607,7 @@ function RevealSpotlight({
       </div>
       {isScored ? (
         <div
-          className={`pointer-events-auto absolute z-30 grid gap-1.5 ${
+          className={`triad-effect-timeline pointer-events-auto absolute z-30 grid gap-1.5 ${
             spectatorView
               ? "right-[clamp(12px,2.6cqw,30px)] top-[clamp(70px,16cqw,118px)] w-[clamp(280px,34cqw,430px)]"
               : "right-[clamp(84px,11cqw,150px)] top-[calc(100%+clamp(68px,10cqw,120px))] w-[clamp(260px,28cqw,390px)]"
