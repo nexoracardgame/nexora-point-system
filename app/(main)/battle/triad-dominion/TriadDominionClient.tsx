@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Check,
@@ -1495,6 +1495,7 @@ function RevealSpotlight({
   playerName,
   botName,
   spectatorView = false,
+  readyAdvanceSlot,
 }: {
   playerCard?: CardView;
   botCard?: CardView;
@@ -1504,6 +1505,7 @@ function RevealSpotlight({
   playerName: string;
   botName: string;
   spectatorView?: boolean;
+  readyAdvanceSlot?: ReactNode;
 }) {
   if (!showPlayer && !showBot) return null;
 
@@ -1555,6 +1557,11 @@ function RevealSpotlight({
           {isScored ? (
             <div className="mx-auto mt-2 max-w-[min(420px,52cqw)] rounded-full border border-amber-200/50 bg-black/76 px-3 py-2 text-[clamp(0.78rem,2.3cqw,1.08rem)] font-black leading-tight text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.35)] sm:px-4">
               {scoreText}
+            </div>
+          ) : null}
+          {isScored && readyAdvanceSlot ? (
+            <div className="triad-ready-advance-spotlight pointer-events-auto mx-auto mt-2 hidden w-[min(330px,72cqw)]">
+              {readyAdvanceSlot}
             </div>
           ) : null}
         </div>
@@ -2978,6 +2985,7 @@ function CompactBattleBoard({
   onSelectLane,
   onPlaceCard,
   blessingAuras = null,
+  readyAdvanceSlot,
 }: {
   cardsByNo: Map<string, CardView>;
   lockedFight: LockedFight | null;
@@ -3011,6 +3019,7 @@ function CompactBattleBoard({
   onSelectLane: (lane: Lane) => void;
   onPlaceCard: (lane: Lane, cardNo: string) => void;
   blessingAuras?: { player?: TargetAura; bot?: TargetAura } | null;
+  readyAdvanceSlot?: ReactNode;
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
   const playerTriangle = lockedFight?.player || player;
@@ -3089,6 +3098,7 @@ function CompactBattleBoard({
         playerName={playerName}
         botName={botName}
         spectatorView={revealAllCards}
+        readyAdvanceSlot={readyAdvanceSlot}
       />
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
@@ -5017,7 +5027,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     ) : null;
   const renderRoomBattleActions = () =>
     showReadyAdvanceButton ? (
-      <div className="space-y-2">
+      <div className="triad-ready-advance-sidebar space-y-2">
         {renderReadyAdvanceButton()}
       </div>
     ) : null;
@@ -5892,6 +5902,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               }}
               onSelectLane={setPlacementLane}
               onPlaceCard={placeAndLockCard}
+              readyAdvanceSlot={showReadyAdvanceButton ? renderReadyAdvanceButton() : null}
             />
           )}
           <BlessingChoiceOverlay card={pendingBlessingChoice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
