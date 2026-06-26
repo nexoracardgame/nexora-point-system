@@ -1255,6 +1255,12 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
     room.game.openerTieBreak.choices = {};
   }
 
+  if (winner === "host" || winner === "challenger") {
+    room.game.activeTurn = 2;
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.turnStartedAt = Date.now();
+  }
+
   resolveIfBothLocked(room);
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
@@ -1264,7 +1270,9 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side = sideForParticipant(room, participantId);
-  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  if (!side && !participantInStoredRoom(room, participantId)) {
+    return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  }
   const activeResult = room.game.turns.find((turn) => turn.turn === room.game.activeTurn);
   if (!activeResult) {
     return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
@@ -1276,6 +1284,19 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
   ) {
     return { ok: false as const, reason: "opener_tiebreak_waiting" as const, room: publicRoom(room) };
   }
+  if (
+    room.game.activeTurn === 1 &&
+    activeResult.winner === "draw" &&
+    room.game.openerTieBreak.status === "resolved" &&
+    room.game.openerTieBreak.winner
+  ) {
+    room.game.activeTurn = 2;
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.turnStartedAt = Date.now();
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), advanced: true as const };
+  }
+  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   room.game.turnReady = {
     host: Boolean(room.game.turnReady?.host),
     challenger: Boolean(room.game.turnReady?.challenger),

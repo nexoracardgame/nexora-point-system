@@ -1845,7 +1845,7 @@ function OpeningTieBreakOverlay({
   pendingChoice: TriadRpsChoice | null;
   onChoose: (choice: TriadRpsChoice) => void;
 }) {
-  if (!tieBreak || tieBreak.status === "idle") return null;
+  if (!tieBreak || tieBreak.status !== "waiting") return null;
   const revealedChoices = tieBreak.revealChoices || tieBreak.choices;
   const hostChoice = revealedChoices.host || "unknown";
   const challengerChoice = revealedChoices.challenger || "unknown";
@@ -1881,7 +1881,7 @@ function OpeningTieBreakOverlay({
           ))}
         </div>
 
-        {tieBreak.status === "resolved" ? (
+        {false ? (
           <div className="mt-5 rounded-xl border border-emerald-200/24 bg-emerald-300/10 p-4 text-center text-sm font-black text-emerald-100">
             {winnerName} ได้เปิดสกิลก่อนในตาถัดไป
           </div>
@@ -2946,6 +2946,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const activeRoomCodeRef = useRef("");
   const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
   const pvpTurnKeyRef = useRef("");
+  const openerTieBreakAdvanceKeyRef = useRef("");
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
@@ -2977,6 +2978,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [spectatorPreviewCard, setSpectatorPreviewCard] = useState<CardView | null>(null);
   const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
+  const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
 
   const playerDeckCards = playerDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botDeckCards = botDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -3243,6 +3245,36 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         : matchScore
     : matchScore;
 
+  const keepPendingOpeningTieBreakChoice = (room: TriadRoom) => {
+    const pendingChoice = openingTieBreakPendingChoiceRef.current;
+    const pendingSide = roomPlayerSideRef.current;
+    if (!pendingChoice || !pendingSide) return room;
+    const tieBreak = room.game.openerTieBreak;
+    if (room.code !== activeRoomCodeRef.current || tieBreak.status !== "waiting") return room;
+    if (tieBreak.revealChoices?.[pendingSide] && tieBreak.revealChoices[pendingSide] !== "unknown") return room;
+    if ((tieBreak.choices[pendingSide] || "unknown") !== "unknown") return room;
+
+    return {
+      ...room,
+      game: {
+        ...room.game,
+        openerTieBreak: {
+          ...tieBreak,
+          choices: {
+            ...tieBreak.choices,
+            [pendingSide]: pendingChoice,
+          },
+        },
+      },
+    };
+  };
+
+  const mergeIncomingRooms = (current: TriadRoom[], nextRooms: TriadRoom[]) =>
+    mergeRoomListsWithStableChat(current, nextRooms).map(keepPendingOpeningTieBreakChoice);
+
+  const mergeIncomingRoom = (current: TriadRoom[], room: TriadRoom) =>
+    mergeRoomByCode(current, keepPendingOpeningTieBreakChoice(room));
+
   const syncRooms = async (options: { force?: boolean } = {}) => {
     const now = Date.now();
     if (!options.force && now - lastSyncAtRef.current < MIN_SYNC_GAP_MS) return [];
@@ -3278,7 +3310,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase("lobby");
       setLobbyMessage("ห้องถูกปิดแล้ว");
     }
-    setRooms((current) => mergeRoomListsWithStableChat(current, nextRooms));
+    setRooms((current) => mergeIncomingRooms(current, nextRooms));
     return nextRooms;
     } finally {
       syncInFlightRef.current = false;
@@ -3292,7 +3324,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const patchCurrentRoom = (updater: (room: TriadRoom) => TriadRoom) => {
     if (!currentRoom) return null;
     const nextRoom = updater(currentRoom);
-    setRooms((current) => mergeRoomByCode(current, nextRoom));
+    setRooms((current) => mergeIncomingRoom(current, nextRoom));
     activeRoomSnapshotRef.current = nextRoom;
     setActiveRoomSnapshot(nextRoom);
     if (activeRoomCodeRef.current === nextRoom.code) {
@@ -3314,9 +3346,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if ((body.action === "disband" || (body.action === "leave" && !actionRoom)) && activeRoomCodeRef.current) {
       nextRooms = nextRooms.filter((room) => room.code !== activeRoomCodeRef.current);
     }
-    setRooms((current) => (actionRoom ? mergeRoomByCode(mergeRoomListsWithStableChat(current, nextRooms), actionRoom) : mergeRoomListsWithStableChat(current, nextRooms)));
+    setRooms((current) =>
+      actionRoom
+        ? mergeIncomingRoom(mergeIncomingRooms(current, nextRooms), actionRoom)
+        : mergeIncomingRooms(current, nextRooms)
+    );
     if (actionRoom) {
-      const stableActionRoom = mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom);
+      const stableActionRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom));
       activeRoomSnapshotRef.current = stableActionRoom;
       setActiveRoomSnapshot(stableActionRoom);
       if (participantInRoom(stableActionRoom, participant.id) && stableActionRoom.status === "playing") {
@@ -3644,12 +3680,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         return;
       }
 
-      setRooms((current) => mergeRoomByCode(current, room));
+      const stableRoom = keepPendingOpeningTieBreakChoice(room);
+      setRooms((current) => mergeIncomingRoom(current, stableRoom));
 
       const roomIncludesMe = participantInRoom(room, participant.id);
       if (activeRoomCodeRef.current === room.code || roomIncludesMe) {
-        activeRoomSnapshotRef.current = room;
-        setActiveRoomSnapshot(room);
+        activeRoomSnapshotRef.current = stableRoom;
+        setActiveRoomSnapshot(stableRoom);
       }
 
       if (!activeRoomCodeRef.current && roomIncludesMe) {
@@ -3682,8 +3719,41 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [activeRoomCode]);
 
   useEffect(() => {
+    roomPlayerSideRef.current = roomPlayerSide;
+  }, [roomPlayerSide]);
+
+  useEffect(() => {
     activeRoomSnapshotRef.current = activeRoomSnapshot;
   }, [activeRoomSnapshot]);
+
+  useEffect(() => {
+    const tieBreak = currentRoom?.game.openerTieBreak;
+    const firstTurnResult = currentRoom?.game.turns.find((turn) => turn.turn === 1);
+    if (
+      !currentRoom ||
+      !roomPlayerSide ||
+      currentRoom.game.activeTurn !== 1 ||
+      firstTurnResult?.winner !== "draw" ||
+      tieBreak?.status !== "resolved" ||
+      !tieBreak.winner
+    ) {
+      openerTieBreakAdvanceKeyRef.current = "";
+      return;
+    }
+
+    const advanceKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${tieBreak.winner}`;
+    if (openerTieBreakAdvanceKeyRef.current === advanceKey) return;
+    openerTieBreakAdvanceKeyRef.current = advanceKey;
+    void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+  }, [
+    currentRoom?.code,
+    currentRoom?.game.activeTurn,
+    currentRoom?.game.fightNo,
+    currentRoom?.game.openerTieBreak.status,
+    currentRoom?.game.openerTieBreak.winner,
+    currentRoom?.game.turns,
+    roomPlayerSide,
+  ]);
 
   useEffect(() => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
@@ -5231,7 +5301,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         <MatchFinalOverlay winner={forcedWinnerLabel} surrendered={surrenderedLabel} score={finalMatchScore} />
       ) : null}
       <OpeningTieBreakOverlay
-        tieBreak={currentRoom?.game.openerTieBreak}
+        tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
         hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
         challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
         ownSide={roomPlayerSide}
