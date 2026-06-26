@@ -49,6 +49,7 @@ export default function InstantNavigationFeedback() {
   const pathname = usePathname() || "";
   const [targetHref, setTargetHref] = useState("");
   const timeoutRef = useRef<number | null>(null);
+  const showDelayRef = useRef<number | null>(null);
   const targetRef = useRef("");
 
   useEffect(() => {
@@ -78,7 +79,16 @@ export default function InstantNavigationFeedback() {
   }, [targetHref]);
 
   useEffect(() => {
-    setTargetHref("");
+    if (showDelayRef.current) {
+      window.clearTimeout(showDelayRef.current);
+      showDelayRef.current = null;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setTargetHref("");
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [pathname]);
 
   useEffect(() => {
@@ -99,7 +109,22 @@ export default function InstantNavigationFeedback() {
         return;
       }
 
-      setTargetHref(href);
+      if (showDelayRef.current) {
+        window.clearTimeout(showDelayRef.current);
+      }
+
+      showDelayRef.current = window.setTimeout(() => {
+        setTargetHref(href);
+        showDelayRef.current = null;
+      }, 180);
+    };
+
+    const clearNavigation = () => {
+      if (showDelayRef.current) {
+        window.clearTimeout(showDelayRef.current);
+        showDelayRef.current = null;
+      }
+      setTargetHref("");
     };
 
     const options: AddEventListenerOptions = {
@@ -108,14 +133,15 @@ export default function InstantNavigationFeedback() {
     };
 
     window.addEventListener("click", startNavigation, options);
-    window.addEventListener("pointerdown", startNavigation, options);
-    window.addEventListener("touchstart", startNavigation, options);
-    window.addEventListener("pageshow", () => setTargetHref(""), options);
+    window.addEventListener("pageshow", clearNavigation, options);
 
     return () => {
       window.removeEventListener("click", startNavigation, options);
-      window.removeEventListener("pointerdown", startNavigation, options);
-      window.removeEventListener("touchstart", startNavigation, options);
+      window.removeEventListener("pageshow", clearNavigation, options);
+      if (showDelayRef.current) {
+        window.clearTimeout(showDelayRef.current);
+        showDelayRef.current = null;
+      }
     };
   }, [pathname]);
 
@@ -127,33 +153,14 @@ export default function InstantNavigationFeedback() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[2100] overflow-hidden bg-[#08090d] text-white"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[2100] px-3 pt-[calc(env(safe-area-inset-top)+8px)] text-white"
       aria-hidden="true"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(250,204,21,0.20),transparent_30%),linear-gradient(180deg,#101117_0%,#08090d_58%,#050507_100%)]" />
-      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col gap-4 px-3 py-4 sm:px-6">
+      <div className="mx-auto w-full max-w-md overflow-hidden rounded-full border border-amber-200/20 bg-black/78 p-1 shadow-[0_14px_42px_rgba(0,0,0,0.42)] backdrop-blur-xl">
         <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
-          <div className="h-full w-2/3 animate-[nexora-route-progress_0.7s_ease-out_infinite] rounded-full bg-[linear-gradient(90deg,#f6b73c,#fff1ad,#f6b73c)] shadow-[0_0_24px_rgba(250,204,21,0.55)]" />
+          <div className="h-full w-2/3 animate-[nexora-route-progress_0.72s_ease-out_infinite] rounded-full bg-[linear-gradient(90deg,#f6b73c,#fff1ad,#f6b73c)] shadow-[0_0_22px_rgba(250,204,21,0.52)]" />
         </div>
-        <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] shadow-[0_24px_90px_rgba(0,0,0,0.5)]">
-          <div className="h-[210px] animate-pulse bg-white/[0.055] sm:h-[310px]" />
-          <div className="space-y-4 p-4 sm:p-6">
-            <div className="flex items-end gap-4">
-              <div className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-white/12 sm:h-28 sm:w-28" />
-              <div className="min-w-0 flex-1 space-y-3">
-                <div className="h-3 w-24 rounded-full bg-amber-200/40" />
-                <div className="h-8 w-2/3 animate-pulse rounded-2xl bg-white/12" />
-                <div className="h-4 w-1/2 animate-pulse rounded-full bg-white/8" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[0, 1, 2, 3].map((item) => (
-                <div key={item} className="h-20 animate-pulse rounded-2xl bg-white/[0.06]" />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="text-center text-xs font-black uppercase tracking-[0.28em] text-amber-100/70">
+        <div className="px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-100/70">
           {label}
         </div>
       </div>

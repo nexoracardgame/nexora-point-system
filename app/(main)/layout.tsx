@@ -43,7 +43,6 @@ import {
   User,
   Radio,
   PackageOpen,
-  BadgeDollarSign,
   ShieldCheck,
   Swords,
   Landmark,
@@ -254,7 +253,8 @@ export default function MainLayout({
     pathname.startsWith("/dm/") ||
     pathname.startsWith("/market/deals/chat/") ||
     pathname.startsWith("/buy-market/deals/chat/");
-  const hideFloatingChatOnMobile = pathname === "/dm" || isChatRoomPage;
+  const isBattleCardPage = pathname.startsWith("/battle/triad-dominion");
+  const hideFloatingChatOnMobile = pathname === "/dm" || isChatRoomPage || isBattleCardPage;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1052,7 +1052,7 @@ export default function MainLayout({
 
   const displayedProfileName = profileName || session?.user?.name || "NEXORA USER";
   const isAdminModeUser = isAdminRole(session?.user?.role);
-  const hideMobileBottomNav = isChatRoomPage || mobileChatComposerActive;
+  const hideMobileBottomNav = isChatRoomPage || isBattleCardPage || mobileChatComposerActive;
 
   useEffect(() => {
     const handleChatComposerState = (event: Event) => {
@@ -1096,7 +1096,7 @@ export default function MainLayout({
     const importantRoutes = [
       "/",
       "/market",
-      "/buy-market",
+      "/battle/triad-dominion",
       "/box-market",
       "/card-bank",
       "/market/deals",
@@ -1104,7 +1104,6 @@ export default function MainLayout({
       "/redeem",
       "/collections",
       "/community",
-      "/battle/triad-dominion",
       "/live",
       "/wallet",
       "/dm",
@@ -1233,14 +1232,10 @@ export default function MainLayout({
     };
 
     window.addEventListener("pointerover", prefetchRoute, options);
-    window.addEventListener("pointerdown", prefetchRoute, options);
-    window.addEventListener("touchstart", prefetchRoute, options);
     window.addEventListener("focusin", prefetchRoute, true);
 
     return () => {
       window.removeEventListener("pointerover", prefetchRoute, options);
-      window.removeEventListener("pointerdown", prefetchRoute, options);
-      window.removeEventListener("touchstart", prefetchRoute, options);
       window.removeEventListener("focusin", prefetchRoute, true);
     };
   }, [pathname, router]);
@@ -1271,12 +1266,6 @@ export default function MainLayout({
         active: pathname.startsWith("/market"),
       },
       {
-        href: "/buy-market",
-        label: "รับซื้อการ์ด",
-        icon: BadgeDollarSign,
-        active: pathname.startsWith("/buy-market"),
-      },
-      {
         href: "/box-market",
         label: "ซอง/กล่องแท้",
         icon: PackageOpen,
@@ -1290,7 +1279,7 @@ export default function MainLayout({
       },
       {
         href: "/battle/triad-dominion",
-        label: "Triad",
+        label: "Battle Card",
         icon: Swords,
         active: pathname.startsWith("/battle"),
       },
@@ -1356,10 +1345,10 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
-        href: "/buy-market",
-        label: "รับซื้อการ์ด",
-        icon: BadgeDollarSign,
-        active: pathname.startsWith("/buy-market"),
+        href: "/battle/triad-dominion",
+        label: "Battle",
+        icon: Swords,
+        active: pathname.startsWith("/battle"),
       },
       {
         href: "/dm",
@@ -1459,7 +1448,7 @@ export default function MainLayout({
           {/* TOPBAR */}
           <header
             className={`top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl ${
-              isChatRoomPage ? "hidden xl:sticky xl:block" : "sticky"
+              isChatRoomPage || isBattleCardPage ? "hidden xl:sticky xl:block" : "sticky"
             }`}
           >
             <div className="flex min-h-[var(--app-header-height)] items-center justify-between gap-2 px-3 pb-2 pt-[calc(var(--app-safe-top)+8px)] sm:px-5 xl:min-h-[74px] xl:px-6 xl:py-0">
@@ -1694,13 +1683,17 @@ export default function MainLayout({
             className={`relative z-0 min-w-0 flex-1 bg-[#07080b] ${
               isChatRoomPage
                 ? "overflow-hidden p-0 pb-0"
+                : isBattleCardPage
+                  ? "overflow-hidden p-0 pb-0 xl:p-2"
                 : "p-3 pb-[var(--app-content-bottom-gap)] sm:p-4 sm:pb-[calc(var(--app-mobile-nav-height-sm)+14px)] xl:p-6 xl:pb-6"
             }`}
           >
             <div
-              className={`${
+              className={`${isBattleCardPage ? "nexora-battle-shell" : ""} ${
                 isChatRoomPage
                   ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(var(--app-shell-height)-var(--app-header-height))]"
+                  : isBattleCardPage
+                    ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(var(--app-shell-height)-var(--app-header-height)-16px)]"
                   : "min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height-sm))] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:p-6"
               }`}
             >

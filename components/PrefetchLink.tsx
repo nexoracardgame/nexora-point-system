@@ -121,11 +121,9 @@ export default function PrefetchLink({
         onPointerEnter?.(event);
       }}
       onPointerDown={(event) => {
-        prefetchRoute();
         onPointerDown?.(event);
       }}
       onTouchStart={(event) => {
-        prefetchRoute();
         onTouchStart?.(event);
       }}
       onMouseEnter={(event) => {

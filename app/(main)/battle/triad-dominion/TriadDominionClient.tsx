@@ -2946,6 +2946,23 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     [cards]
   );
 
+  useEffect(() => {
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: "landscape" | "portrait" | "any" | "natural") => Promise<void>;
+      unlock?: () => void;
+    };
+
+    void orientation.lock?.("landscape").catch(() => null);
+
+    return () => {
+      try {
+        orientation.unlock?.();
+      } catch {
+        return;
+      }
+    };
+  }, []);
+
   const participant = useMemo(() => makeParticipant(currentUser), [currentUser.id, currentUser.image, currentUser.name]);
   const [phase, setPhase] = useState<BattlePhase>("lobby");
   const [rooms, setRooms] = useState<TriadRoom[]>([]);

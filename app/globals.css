@@ -310,6 +310,63 @@ textarea {
 }
 
 /* รองรับเครื่องช้า */
+/* ================== MOBILE BATTLE SHELL ================== */
+.nexora-battle-shell {
+  background: #050507;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+.nexora-battle-shell main {
+  min-height: 100% !important;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0 !important;
+  border-width: 0 !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .nexora-battle-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    width: 100dvh;
+    height: 100dvw;
+    min-height: 100dvw !important;
+    transform: rotate(90deg) translateY(-100%);
+    transform-origin: top left;
+    overflow: hidden;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .nexora-battle-shell main {
+    width: 100dvh;
+    height: 100dvw;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .nexora-battle-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    width: 100dvw;
+    height: 100dvh;
+    min-height: 100dvh !important;
+    overflow: hidden;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .nexora-battle-shell main {
+    width: 100dvw;
+    height: 100dvh;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
