@@ -1741,7 +1741,16 @@ function HandCard({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => {
+        const touchPreviewMode =
+          typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+        if (touchPreviewMode) {
+          event.preventDefault();
+          if (!used) onPreview(card);
+          return;
+        }
+        onClick();
+      }}
       onMouseEnter={() => !used && onPreview(card)}
       onMouseLeave={onPreviewEnd}
       onFocus={() => !used && onPreview(card)}
@@ -1839,9 +1848,20 @@ function PlayerHand({
     return () => globalThis.clearTimeout(timeoutId);
   }, [cards]);
 
+  const canUsePreviewCard =
+    previewCard &&
+    !locked &&
+    !usedSet.has(previewCard.cardNo) &&
+    !(placedByNo.has(previewCard.cardNo) && placedByNo.get(previewCard.cardNo) !== activeLane);
+
+  const usePreviewCard = (cardNo: string) => {
+    onPlayCard(cardNo);
+    setPreviewCard(null);
+  };
+
   return (
     <div className="triad-player-hand rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
-      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} />
+      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} onUseCard={canUsePreviewCard ? usePreviewCard : undefined} />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
           การ์ดในมือ
@@ -2109,7 +2129,15 @@ function OpeningTieBreakOverlay({
   );
 }
 
-function CardHoverPreview({ card, onClose }: { card: CardView | null; onClose?: () => void }) {
+function CardHoverPreview({
+  card,
+  onClose,
+  onUseCard,
+}: {
+  card: CardView | null;
+  onClose?: () => void;
+  onUseCard?: (cardNo: string) => void;
+}) {
   if (!card) return null;
   return (
     <div
@@ -2153,6 +2181,18 @@ function CardHoverPreview({ card, onClose }: { card: CardView | null; onClose?: 
           <div className="triad-card-preview-text mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
             {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
           </div>
+          {onUseCard ? (
+            <button
+              type="button"
+              className="triad-card-preview-use mt-3 hidden w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
+              onClick={(event) => {
+                event.stopPropagation();
+                onUseCard(card.cardNo);
+              }}
+            >
+              เลือกใช้การ์ดใบนี้
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -2628,25 +2668,25 @@ function MatchFinalOverlay({
   score: { player: number; bot: number };
 }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(251,191,36,0.22),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.9)_100%)] backdrop-blur-sm">
-      <div className="relative w-[min(760px,92vw)] overflow-hidden rounded-[28px] border border-amber-100/45 bg-black/82 p-6 text-center shadow-[0_0_90px_rgba(251,191,36,0.34)]">
+    <div className="triad-match-final-overlay pointer-events-none fixed inset-0 z-[95] grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(251,191,36,0.22),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.9)_100%)] p-4 backdrop-blur-sm">
+      <div className="triad-match-final-panel relative grid w-[min(680px,calc(100svw-24px))] max-h-[calc(100svh-24px)] place-items-center overflow-hidden rounded-[24px] border border-amber-100/45 bg-black/84 p-6 text-center shadow-[0_0_90px_rgba(251,191,36,0.34)]">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-200 to-transparent" />
         <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.12),transparent)] opacity-40" />
-        <div className="relative">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-100/70 bg-amber-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.55)]">
+        <div className="triad-match-final-content relative">
+          <div className="triad-match-final-icon mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-100/70 bg-amber-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.55)]">
             <Trophy className="h-8 w-8" />
           </div>
-          <div className="mt-5 text-[clamp(2.2rem,8vw,5.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.65)]">
+          <div className="triad-match-final-title mt-5 text-[clamp(2.1rem,6vw,4.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.65)]">
             ชนะที่แท้จริง
           </div>
-          <div className="mt-4 text-[clamp(1.35rem,4vw,2.5rem)] font-black text-amber-100">{winner}</div>
+          <div className="triad-match-final-winner mt-4 text-[clamp(1.25rem,3.2vw,2.15rem)] font-black text-amber-100">{winner}</div>
           {surrendered ? (
-            <div className="mt-2 text-sm font-bold text-white/58">{surrendered} ยอมแพ้ การต่อสู้จบลงทันที</div>
+            <div className="triad-match-final-surrender mt-2 text-sm font-bold text-white/58">{surrendered} ยอมแพ้ การต่อสู้จบลงทันที</div>
           ) : null}
-          <div className="mx-auto mt-5 w-fit rounded-full border border-red-200/35 bg-red-500/16 px-5 py-2 text-xl font-black text-white">
+          <div className="triad-match-final-score mx-auto mt-5 w-fit rounded-full border border-red-200/35 bg-red-500/16 px-5 py-2 text-xl font-black text-white">
             คะแนนรวม {score.player}-{score.bot}
           </div>
-          <div className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/42">
+          <div className="triad-match-final-note mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/42">
             กำลังพาทุกคนกลับห้องรอ
           </div>
         </div>

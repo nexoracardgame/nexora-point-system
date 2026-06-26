@@ -877,7 +877,78 @@ textarea {
   }
 }
 
+.nexora-battle-shell .triad-match-final-overlay {
+  display: grid !important;
+  place-items: center !important;
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left)) !important;
+}
+
+.nexora-battle-shell .triad-match-final-panel {
+  width: min(680px, calc(100% - 1.5rem)) !important;
+  max-height: calc(100% - 1.5rem) !important;
+  margin: auto !important;
+  transform: translateZ(0);
+}
+
+.nexora-battle-shell .triad-match-final-content {
+  width: 100%;
+  max-width: 100%;
+}
+
 @media (hover: none) and (pointer: coarse) {
+  .nexora-battle-shell .triad-match-final-overlay {
+    align-items: center !important;
+    justify-items: center !important;
+    padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left)) !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-panel {
+    width: min(520px, 54%) !important;
+    min-width: min(280px, calc(100% - 0.9rem)) !important;
+    max-height: calc(100% - 0.9rem) !important;
+    border-radius: clamp(0.8rem, 2.6svh, 1.15rem) !important;
+    padding: clamp(0.65rem, 2.2svh, 1rem) !important;
+    box-shadow: 0 0 42px rgba(251, 191, 36, 0.28) !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-icon {
+    height: clamp(2rem, 7svh, 3rem) !important;
+    width: clamp(2rem, 7svh, 3rem) !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-icon svg {
+    height: 52% !important;
+    width: 52% !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-title {
+    margin-top: clamp(0.45rem, 1.8svh, 0.8rem) !important;
+    font-size: clamp(1.55rem, 8svh, 3.15rem) !important;
+    line-height: 0.98 !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-winner {
+    margin-top: clamp(0.35rem, 1.4svh, 0.65rem) !important;
+    font-size: clamp(0.95rem, 3.5svh, 1.45rem) !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-surrender {
+    margin-top: 0.25rem !important;
+    font-size: clamp(0.56rem, 1.8svh, 0.72rem) !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-score {
+    margin-top: clamp(0.45rem, 1.7svh, 0.75rem) !important;
+    padding: clamp(0.22rem, 0.8svh, 0.38rem) clamp(0.62rem, 2.5svh, 0.95rem) !important;
+    font-size: clamp(0.72rem, 2.55svh, 1rem) !important;
+  }
+
+  .nexora-battle-shell .triad-match-final-note {
+    margin-top: clamp(0.35rem, 1.4svh, 0.6rem) !important;
+    font-size: clamp(0.5rem, 1.6svh, 0.64rem) !important;
+    letter-spacing: 0.08em !important;
+  }
+
   .nexora-battle-shell .triad-dominion-game {
     display: flex;
     flex-direction: column;
@@ -1021,20 +1092,20 @@ textarea {
 
   .nexora-battle-shell .triad-card-preview-panel {
     display: grid !important;
-    width: min(92svw, 620px) !important;
+    width: min(96svw, 760px) !important;
     max-height: calc(100svh - 0.7rem) !important;
-    grid-template-columns: minmax(0, auto) minmax(118px, 0.42fr) !important;
+    grid-template-columns: minmax(0, auto) minmax(178px, 0.58fr) !important;
     justify-content: center;
     align-items: center;
-    gap: 0.45rem !important;
+    gap: clamp(0.45rem, 1.8svw, 0.9rem) !important;
     padding: 0.42rem !important;
     border-radius: 0.85rem !important;
     overflow: hidden !important;
   }
 
   .nexora-battle-shell .triad-card-preview-image {
-    width: min(56svh, 54svw, 320px) !important;
-    max-width: calc(100svw - 9.5rem) !important;
+    width: min(58svh, 50svw, 340px) !important;
+    max-width: calc(100svw - 13rem) !important;
     max-height: calc(100svh - 1rem) !important;
     border-radius: 0.65rem !important;
     background: #000;
@@ -1042,10 +1113,12 @@ textarea {
 
   .nexora-battle-shell .triad-card-preview-info {
     margin-top: 0 !important;
+    width: min(34svw, 300px) !important;
+    min-width: min(178px, 34svw) !important;
     max-height: calc(100svh - 1rem) !important;
     overflow: auto !important;
     border-radius: 0.65rem !important;
-    padding: 0.5rem !important;
+    padding: clamp(0.55rem, 1.8svh, 0.85rem) !important;
   }
 
   .nexora-battle-shell .triad-card-preview-info .text-xl {
@@ -1058,10 +1131,17 @@ textarea {
   }
 
   .nexora-battle-shell .triad-card-preview-text {
-    max-height: 31svh !important;
+    max-height: 36svh !important;
     overflow: auto !important;
-    font-size: clamp(0.58rem, 1.65svh, 0.72rem) !important;
-    line-height: 1.32 !important;
+    font-size: clamp(0.62rem, 1.8svh, 0.78rem) !important;
+    line-height: 1.38 !important;
+  }
+
+  .nexora-battle-shell .triad-card-preview-use {
+    display: flex !important;
+    min-height: clamp(2.1rem, 6svh, 2.8rem);
+    font-size: clamp(0.68rem, 2svh, 0.86rem) !important;
+    touch-action: manipulation;
   }
 
   .nexora-battle-shell .triad-card-preview-close {
@@ -1154,23 +1234,25 @@ textarea {
   }
 
   .nexora-battle-shell .triad-card-preview-panel {
-    width: min(96svw, 620px) !important;
-    grid-template-columns: minmax(0, auto) minmax(96px, 0.38fr) !important;
+    width: min(98svw, 720px) !important;
+    grid-template-columns: minmax(0, auto) minmax(150px, 0.52fr) !important;
     gap: 0.45rem;
     padding: 0.45rem !important;
   }
 
   .nexora-battle-shell .triad-card-preview-image {
-    width: min(54svh, 58svw, 290px) !important;
-    max-width: calc(100svw - 7.8rem) !important;
+    width: min(55svh, 49svw, 300px) !important;
+    max-width: calc(100svw - 10.5rem) !important;
   }
 
   .nexora-battle-shell .triad-card-preview-info {
+    width: min(38svw, 260px) !important;
+    min-width: min(150px, 38svw) !important;
     padding: 0.5rem !important;
   }
 
   .nexora-battle-shell .triad-card-preview-text {
-    max-height: 26svh !important;
+    max-height: 29svh !important;
   }
 
   .nexora-battle-shell .triad-board-phase-hud {
