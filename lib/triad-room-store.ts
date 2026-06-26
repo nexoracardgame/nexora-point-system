@@ -858,6 +858,13 @@ function metalSwordTargets(room: StoredTriadRoom) {
   ].filter((side): side is TriadRoomSlot => Boolean(side));
 }
 
+function parseBoardTargetSequence(value = "") {
+  return value
+    .split(">")
+    .map((item) => item.trim())
+    .filter((item): item is "player-top" | "bot-top" => item === "player-top" || item === "bot-top");
+}
+
 function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
   if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;
   return skillNeedsManualChoice(cardNo);
@@ -941,10 +948,15 @@ function applyTurnBlessings(room: StoredTriadRoom) {
   return { player: hostTriangle, opponent: challengerTriangle, events };
 }
 
-function targetToHostPerspective(choice: TriadRoomSkillChoice): "player-top" | "bot-top" | "" {
-  if (choice.selectedTarget !== "player-top" && choice.selectedTarget !== "bot-top") return "";
-  if (choice.side === "host") return choice.selectedTarget;
-  return choice.selectedTarget === "player-top" ? "bot-top" : "player-top";
+function targetTokenToHostPerspective(side: TriadRoomSlot, target: "player-top" | "bot-top") {
+  if (side === "host") return target;
+  return target === "player-top" ? "bot-top" : "player-top";
+}
+
+function targetToHostPerspective(choice: TriadRoomSkillChoice): string {
+  const targets = parseBoardTargetSequence(choice.selectedTarget);
+  if (targets.length === 0) return "";
+  return targets.map((target) => targetTokenToHostPerspective(choice.side, target)).join(">");
 }
 
 function selectedTargetSlot(side: TriadRoomSlot, selectedTarget: string): TriadRoomSlot | "" {
@@ -962,9 +974,9 @@ function selectedSkillTargets(room: StoredTriadRoom, opener: TriadRoomSlot) {
       const target =
         opener === "host"
           ? hostPerspectiveTarget
-          : hostPerspectiveTarget === "player-top"
-            ? "bot-top"
-            : "player-top";
+          : parseBoardTargetSequence(hostPerspectiveTarget)
+              .map((item) => (item === "player-top" ? "bot-top" : "player-top"))
+              .join(">");
       targets[side] = {
         ...(targets[side] || {}),
         [choice.cardNo]: target,
@@ -1323,6 +1335,16 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     if (choice.cardNo === "231") {
       const targetSlot = selectedTargetSlot(side, cleanTarget);
       if (!targetSlot || !metalSwordTargets(room).includes(targetSlot)) {
+        return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+      }
+    } else if (choice.cardNo === "232") {
+      const targetSequence = parseBoardTargetSequence(cleanTarget);
+      const uniqueTargets = new Set(targetSequence);
+      if (targetSequence.length !== 2 || uniqueTargets.size !== 2) {
+        return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+      }
+      const targetSlots = targetSequence.map((target) => selectedTargetSlot(side, target));
+      if (targetSlots.some((slot) => !slot || !room.game.triangles[slot].top)) {
         return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
       }
     }

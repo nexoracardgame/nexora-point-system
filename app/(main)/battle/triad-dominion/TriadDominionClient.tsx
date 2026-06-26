@@ -36,6 +36,7 @@ import {
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import {
   resolveTriadTurn,
+  triadCardByNo,
   triadSkillRuleByNo,
   type TriadCardKind,
   type TriadElement,
@@ -224,14 +225,15 @@ const rankFrames = [
   { name: "ราชันออร่า", aura: "from-yellow-100/75 via-rose-400/34 to-violet-500/24", ring: "border-yellow-100 shadow-[0_0_58px_rgba(250,204,21,0.58)]", badge: "bg-gradient-to-r from-yellow-200 to-rose-300 text-black" },
 ] as const;
 
+type SkillTargetId = "player-top" | "bot-top";
+type SkillTargetSelection = SkillTargetId | `${SkillTargetId}>${SkillTargetId}` | "";
+
 type PendingSkillChoice = {
   side: Side;
   lane: Lane;
   cardNo: string;
-  selectedTarget: "player-top" | "bot-top" | "";
+  selectedTarget: SkillTargetSelection;
 };
-
-type SkillTargetId = Exclude<PendingSkillChoice["selectedTarget"], "">;
 type TargetAura = "own" | "enemy" | "pending";
 
 type BlessingChoice = "draw-skill" | "reroll-own" | "reroll-opponent";
@@ -1136,12 +1138,38 @@ function monsterHasUnequalStats(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.attack !== card.support);
 }
 
+function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): SkillTargetId[] {
+  return value
+    .split(">")
+    .map((item) => item.trim())
+    .filter((item): item is SkillTargetId => item === "player-top" || item === "bot-top");
+}
+
+function isTwoStepTargetSkill(card?: CardView) {
+  return card?.cardNo === "232";
+}
+
+function nextTwoStepTargetSelection(current: SkillTargetSelection, target: SkillTargetId): SkillTargetSelection {
+  const selected = parseSkillTargetSelection(current);
+  if (selected.includes(target)) {
+    return selected.filter((item) => item !== target).join(">") as SkillTargetSelection;
+  }
+  if (selected.length === 0) return target;
+  return `${selected[0]}>${target}` as SkillTargetSelection;
+}
+
 function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView): SkillTargetId[] {
   const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
   const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
 
   if (!rule) return [ownTarget];
+  if (card?.cardNo === "232") {
+    return [
+      playerTop?.kind === "monster" ? "player-top" as const : null,
+      botTop?.kind === "monster" ? "bot-top" as const : null,
+    ].filter((target): target is SkillTargetId => Boolean(target));
+  }
   if (card?.cardNo === "231") {
     return [
       monsterHasUnequalStats(playerTop) ? "player-top" as const : null,
@@ -1585,44 +1613,47 @@ function RevealSpotlight({
               : "right-[clamp(84px,11cqw,150px)] top-[calc(100%+clamp(68px,10cqw,120px))] w-[clamp(260px,28cqw,390px)]"
           }`}
         >
-          {timeline.map((event, index) => (
-            <div
-              key={`${event.cardNo || "basic"}-${index}`}
-              className="animate-[triad-effect-step_720ms_ease-out_both] rounded-xl border border-violet-200/35 bg-black/88 px-3 py-2 text-left shadow-[0_0_34px_rgba(168,85,247,0.22)] backdrop-blur-md"
-              style={{ animationDelay: `${index * 160}ms` }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[8px] font-black uppercase leading-3 tracking-[0.14em] text-violet-200/70">
-                    {event.cardNo ? `${event.side === "player" ? playerName : botName} ใช้สกิล No.${event.cardNo}` : "ผลการปะทะ"}
+          {timeline.map((event, index) => {
+            const eventName = event.cardNo ? triadCardByNo.get(event.cardNo)?.name || event.name : event.name;
+            return (
+              <div
+                key={`${event.cardNo || "basic"}-${index}`}
+                className="animate-[triad-effect-step_720ms_ease-out_both] rounded-xl border border-violet-200/35 bg-black/88 px-3 py-2 text-left shadow-[0_0_34px_rgba(168,85,247,0.22)] backdrop-blur-md"
+                style={{ animationDelay: `${index * 160}ms` }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[8px] font-black uppercase leading-3 tracking-[0.14em] text-violet-200/70">
+                      {event.cardNo ? `${event.side === "player" ? playerName : botName} ใช้สกิล No.${event.cardNo}` : "ผลการปะทะ"}
+                    </div>
+                    <div className="mt-0.5 text-[clamp(0.75rem,1.6cqw,0.95rem)] font-black leading-5 text-white">{eventName}</div>
                   </div>
-                  <div className="mt-0.5 text-[clamp(0.75rem,1.6cqw,0.95rem)] font-black leading-5 text-white">{event.name}</div>
+                  <div className="shrink-0 rounded-full border border-amber-200/30 bg-amber-200/10 px-2 py-1 text-[10px] font-black text-amber-100">
+                    {index + 1}/{timeline.length}
+                  </div>
                 </div>
-                <div className="shrink-0 rounded-full border border-amber-200/30 bg-amber-200/10 px-2 py-1 text-[10px] font-black text-amber-100">
-                  {index + 1}/{timeline.length}
+                <div className="mt-1 whitespace-normal break-words text-[clamp(0.68rem,1.35cqw,0.82rem)] font-semibold leading-5 text-white/76">
+                  {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
                 </div>
+                {event.targetLabel || event.blocked ? (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {event.targetLabel ? (
+                      <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-red-300/32 bg-red-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-red-100">
+                        <Crosshair className="h-3 w-3 shrink-0" />
+                        <span className="min-w-0 break-words leading-4">ล็อกเป้า: {event.targetLabel}</span>
+                      </span>
+                    ) : null}
+                    {event.blocked ? (
+                      <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-300/32 bg-amber-300/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
+                        <Lock className="h-3 w-3 shrink-0" />
+                        <span className="min-w-0 break-words leading-4">บัฟถูกบล็อก</span>
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-              <div className="mt-1 whitespace-normal break-words text-[clamp(0.68rem,1.35cqw,0.82rem)] font-semibold leading-5 text-white/76">
-                {event.summary || skillText || "ระบบกำลังจัดการผลสกิลของการ์ดนี้"}
-              </div>
-              {event.targetLabel || event.blocked ? (
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {event.targetLabel ? (
-                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-red-300/32 bg-red-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-red-100">
-                      <Crosshair className="h-3 w-3 shrink-0" />
-                      <span className="min-w-0 break-words leading-4">ล็อกเป้า: {event.targetLabel}</span>
-                    </span>
-                  ) : null}
-                  {event.blocked ? (
-                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-300/32 bg-amber-300/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-100">
-                      <Lock className="h-3 w-3 shrink-0" />
-                      <span className="min-w-0 break-words leading-4">บัฟถูกบล็อก</span>
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
       <style jsx global>{`
@@ -1801,6 +1832,12 @@ function HandCard({
       }}
       onPointerUp={(event) => {
         if (disabled || used) return;
+        const touchPreviewMode =
+          typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+        if (touchPreviewMode) {
+          onPreview(card);
+          return;
+        }
         onPreview(card);
         const target = document
           .elementFromPoint(event.clientX, event.clientY)
@@ -2078,6 +2115,64 @@ function rpsIcon(choice: TriadRpsChoice) {
   return <Swords className="h-5 w-5" />;
 }
 
+function OpeningTieBreakResultOverlay({
+  tieBreak,
+  hostName,
+  challengerName,
+  visible,
+}: {
+  tieBreak?: OpeningTieBreak | null;
+  hostName: string;
+  challengerName: string;
+  visible: boolean;
+}) {
+  if (!visible || !tieBreak || tieBreak.status !== "resolved" || !tieBreak.winner) return null;
+
+  const revealedChoices = tieBreak.revealChoices || tieBreak.choices;
+  const hostChoice = revealedChoices.host || "unknown";
+  const challengerChoice = revealedChoices.challenger || "unknown";
+  const winnerName = tieBreak.winner === "host" ? hostName : challengerName;
+  const choiceRows: Array<[RoomPlayerSide, string, TriadRpsChoice]> = [
+    ["host", hostName, hostChoice],
+    ["challenger", challengerName, challengerChoice],
+  ];
+
+  return (
+    <div className="triad-tiebreak-result-overlay fixed inset-0 z-[96] grid place-items-center bg-black/78 px-4 backdrop-blur-lg">
+      <div className="triad-tiebreak-result-panel overflow-hidden rounded-[26px] border border-amber-100/32 bg-[#07070b]/96 p-6 text-center text-white shadow-[0_0_100px_rgba(251,191,36,0.26)]">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-amber-100/35 bg-amber-300 text-black shadow-[0_0_34px_rgba(251,191,36,0.36)]">
+          <Trophy className="h-7 w-7" />
+        </div>
+        <div className="mt-4 text-[11px] font-black uppercase tracking-[0.22em] text-amber-100/70">เป่ายิงฉุบตัดสินสิทธิ์เปิดก่อน</div>
+        <div className="mt-2 text-4xl font-black leading-none text-white triad-tiebreak-result-title">{winnerName}</div>
+        <div className="mt-3 inline-flex rounded-full border border-emerald-200/30 bg-emerald-300/12 px-4 py-2 text-sm font-black text-emerald-50">
+          ชนะจากการตัดสินเป่ายิงฉุบ
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 triad-tiebreak-result-choices">
+          {choiceRows.map(([side, name, choice]) => (
+            <div
+              key={side}
+              className={`rounded-2xl border p-3 ${side === tieBreak.winner ? "border-amber-200/55 bg-amber-200/13 text-amber-50" : "border-white/10 bg-white/[0.035] text-white/62"}`}
+            >
+              <div className="truncate text-xs font-black uppercase tracking-[0.1em]">{name}</div>
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/28 px-3 py-1 text-sm font-black">
+                {rpsIcon(choice)}
+                {rpsLabel[choice]}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-amber-100/26 bg-amber-200/10 px-4 py-3 text-base font-black leading-7 text-amber-50 triad-tiebreak-result-note">
+          {winnerName} ได้เป็นฝ่ายเปิดการ์ดและเริ่มใช้สกิลก่อน
+        </div>
+        <div className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-white/36">กำลังเข้าสู่ตาถัดไปอัตโนมัติ</div>
+      </div>
+    </div>
+  );
+}
+
 function OpeningTieBreakOverlay({
   tieBreak,
   hostName,
@@ -2095,12 +2190,13 @@ function OpeningTieBreakOverlay({
   pendingChoice: TriadRpsChoice | null;
   onChoose: (choice: TriadRpsChoice) => void;
 }) {
-  if (!tieBreak || tieBreak.status !== "waiting") return null;
+  if (!tieBreak || (tieBreak.status !== "waiting" && tieBreak.status !== "resolved")) return null;
   const revealedChoices = tieBreak.revealChoices || tieBreak.choices;
   const hostChoice = revealedChoices.host || "unknown";
   const challengerChoice = revealedChoices.challenger || "unknown";
   const ownChoice = pendingChoice || (ownSide ? tieBreak.choices[ownSide] || "unknown" : "unknown");
   const winnerName = tieBreak.winner === "host" ? hostName : tieBreak.winner === "challenger" ? challengerName : "";
+  const resolved = tieBreak.status === "resolved" && Boolean(tieBreak.winner);
   const canChoose = tieBreak.status === "waiting" && !isSpectator && ownSide && ownChoice === "unknown";
 
   return (
@@ -2111,9 +2207,11 @@ function OpeningTieBreakOverlay({
             <Swords className="h-6 w-6" />
           </div>
           <div className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/62">ตัดสินฝ่ายเปิดสกิลตาถัดไป</div>
-          <div className="mt-1 text-2xl font-black">ตาแรกคะแนนเสมอแล้ว</div>
+          <div className="mt-1 text-2xl font-black">{resolved ? "ตัดสินเป่ายิงฉุบแล้ว" : "ตาแรกคะแนนเสมอแล้ว"}</div>
           <p className="mt-3 text-sm font-semibold leading-6 text-white/68">
-            {tieBreak.message || "ใช้เป่ายิงฉุบเพื่อเลือกฝ่ายเปิดการ์ดสกิลในตาถัดไปเท่านั้น คะแนนตาแรกยังนับเป็นเสมอ"}
+            {resolved && winnerName
+              ? `${winnerName} ชนะจากการตัดสินเป่ายิงฉุบ และจะเป็นฝ่ายเปิดการ์ด/ใช้สกิลก่อนในตาถัดไป`
+              : tieBreak.message || "ใช้เป่ายิงฉุบเพื่อเลือกฝ่ายเปิดการ์ดสกิลในตาถัดไปเท่านั้น คะแนนตาแรกยังนับเป็นเสมอ"}
           </p>
         </div>
 
@@ -2131,9 +2229,9 @@ function OpeningTieBreakOverlay({
           ))}
         </div>
 
-        {false ? (
+        {resolved ? (
           <div className="mt-5 rounded-xl border border-emerald-200/24 bg-emerald-300/10 p-4 text-center text-sm font-black text-emerald-100">
-            {winnerName} ได้เปิดสกิลก่อนในตาถัดไป
+            {winnerName} ชนะจากการเป่ายิงฉุบ และได้เปิดสกิลก่อนในตาถัดไป
           </div>
         ) : (
           <div className="mt-5 space-y-3">
@@ -2754,17 +2852,21 @@ function SkillTargetOverlay({
   targetBotTop?: CardView;
   selectedTarget: PendingSkillChoice["selectedTarget"];
   timeLeft: number;
-  onSelect: (target: SkillTargetId) => void;
+  onSelect: (target: SkillTargetSelection) => void;
   onConfirm: () => void;
 }) {
   if (!card) return null;
 
+  const requiresTwoTargets = isTwoStepTargetSkill(card);
+  const selectedTargets = parseSkillTargetSelection(selectedTarget);
   const selectableTargetIds = new Set(getSelectableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop));
   const targets = [
     { id: "player-top" as const, label: "การ์ดหลักเรา", card: playerTop, tone: "border-red-300/60" },
     { id: "bot-top" as const, label: "การ์ดหลักคู่แข่ง", card: botTop, tone: "border-cyan-300/60" },
   ].filter((target) => selectableTargetIds.has(target.id));
-  const effectiveSelectedTarget = selectedTarget || (targets.length === 1 ? targets[0].id : "");
+  const effectiveSelectedTarget = requiresTwoTargets
+    ? selectedTargets.length === 2 ? selectedTarget : ""
+    : selectedTarget || (targets.length === 1 ? targets[0].id : "");
 
   return (
     <div className="triad-skill-target-overlay absolute bottom-4 right-4 top-16 z-[90] flex w-[min(430px,calc(100%-2rem))] items-center">
@@ -2776,6 +2878,16 @@ function SkillTargetOverlay({
           <div className="mt-3 text-lg font-black text-amber-200">
             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
           </div>
+          {requiresTwoTargets ? (
+            <div className="mx-auto mt-3 grid max-w-xl gap-2 text-left text-xs font-black text-white/68 sm:grid-cols-2">
+              <div className="rounded-xl border border-rose-200/28 bg-rose-400/10 px-3 py-2">
+                ตัวที่ 1: ATK -2,000 {selectedTargets[0] ? `(${selectedTargets[0] === "player-top" ? "การ์ดหลักเรา" : "การ์ดหลักคู่แข่ง"})` : ""}
+              </div>
+              <div className="rounded-xl border border-emerald-200/28 bg-emerald-400/10 px-3 py-2">
+                ตัวที่ 2: ATK +2,000 {selectedTargets[1] ? `(${selectedTargets[1] === "player-top" ? "การ์ดหลักเรา" : "การ์ดหลักคู่แข่ง"})` : ""}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="triad-skill-target-list mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -2783,12 +2895,17 @@ function SkillTargetOverlay({
             <button
               key={target.id}
               type="button"
-              onClick={() => onSelect(target.id)}
+              onClick={() => onSelect(requiresTwoTargets ? nextTwoStepTargetSelection(selectedTarget, target.id) : target.id)}
               className={`triad-skill-target-choice rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
-                effectiveSelectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
+                selectedTargets.includes(target.id) || effectiveSelectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
               }`}
             >
               <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white/56">{target.label}</div>
+              {requiresTwoTargets && selectedTargets.includes(target.id) ? (
+                <div className="mb-2 text-center text-[11px] font-black text-amber-100">
+                  {selectedTargets[0] === target.id ? "ตัวที่ 1: ลด ATK" : "ตัวที่ 2: เพิ่ม ATK"}
+                </div>
+              ) : null}
               <div className="triad-skill-target-card mx-auto w-[clamp(90px,18vw,150px)]">
                 <BoardCardSlot card={target.card} label={target.label} tone={target.id === "player-top" ? "player" : "bot"} />
               </div>
@@ -2799,7 +2916,7 @@ function SkillTargetOverlay({
         <button
           type="button"
           onClick={() => {
-            if (!selectedTarget && targets.length === 1) onSelect(targets[0].id);
+            if (!requiresTwoTargets && !selectedTarget && targets.length === 1) onSelect(targets[0].id);
             onConfirm();
           }}
           disabled={!effectiveSelectedTarget}
@@ -3055,10 +3172,10 @@ function CompactBattleBoard({
     if (skillChoiceForAura.side === "player") playerAuraByLane[skillChoiceForAura.lane] = sourceAura;
     else botAuraByLane[skillChoiceForAura.lane] = sourceAura;
   }
-  if (pendingTarget) {
-    const aura: TargetAura = pendingTarget === "player-top" ? "own" : "enemy";
-    if (pendingTarget === "player-top") playerAuraByLane.top = aura;
-    if (pendingTarget === "bot-top") botAuraByLane.top = aura;
+  for (const pendingTargetId of parseSkillTargetSelection(pendingTarget)) {
+    const aura: TargetAura = pendingTargetId === "player-top" ? "own" : "enemy";
+    if (pendingTargetId === "player-top") playerAuraByLane.top = aura;
+    if (pendingTargetId === "bot-top") botAuraByLane.top = aura;
   }
   if (blessingAuras?.player) playerAuraByLane.top = blessingAuras.player;
   if (blessingAuras?.bot) botAuraByLane.top = blessingAuras.bot;
@@ -3112,7 +3229,8 @@ function CompactBattleBoard({
         onSelect={(target) => {
           if (!pendingSkillChoice) return;
           const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-          if (!getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined).includes(target)) return;
+          const selectable = new Set(getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined));
+          if (!parseSkillTargetSelection(target).every((item) => selectable.has(item))) return;
           onSelectSkillTarget(target);
         }}
         onConfirm={onConfirmSkillTarget}
@@ -3238,6 +3356,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
   const pvpTurnKeyRef = useRef("");
   const openerTieBreakAdvanceKeyRef = useRef("");
+  const openerTieBreakAdvanceTimerRef = useRef<number | null>(null);
+  const openerTieBreakResultKeyRef = useRef("");
+  const openerTieBreakResultTimerRef = useRef<number | null>(null);
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
@@ -3269,6 +3390,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [spectatorPreviewCard, setSpectatorPreviewCard] = useState<CardView | null>(null);
   const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
+  const [openingTieBreakResultVisible, setOpeningTieBreakResultVisible] = useState(false);
+  const [openingTieBreakResultKey, setOpeningTieBreakResultKey] = useState("");
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
 
@@ -4056,6 +4179,57 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [activeRoomSnapshot]);
 
   useEffect(() => {
+    return () => {
+      if (openerTieBreakAdvanceTimerRef.current) window.clearTimeout(openerTieBreakAdvanceTimerRef.current);
+      if (openerTieBreakResultTimerRef.current) window.clearTimeout(openerTieBreakResultTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const tieBreak = currentRoom?.game.openerTieBreak;
+    const firstTurnResult = currentRoom?.game.turns.find((turn) => turn.turn === 1);
+    if (
+      !currentRoom ||
+      currentRoom.game.activeTurn !== 1 ||
+      firstTurnResult?.winner !== "draw" ||
+      tieBreak?.status !== "resolved" ||
+      !tieBreak.winner
+    ) {
+      if (openerTieBreakResultTimerRef.current) {
+        window.clearTimeout(openerTieBreakResultTimerRef.current);
+        openerTieBreakResultTimerRef.current = null;
+      }
+      setOpeningTieBreakResultVisible(false);
+      return;
+    }
+
+    const hostChoice = tieBreak.revealChoices?.host || tieBreak.choices.host || "unknown";
+    const challengerChoice = tieBreak.revealChoices?.challenger || tieBreak.choices.challenger || "unknown";
+    const resultKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${tieBreak.winner}:${hostChoice}:${challengerChoice}`;
+    if (openerTieBreakResultKeyRef.current === resultKey) return;
+
+    openerTieBreakResultKeyRef.current = resultKey;
+    setOpeningTieBreakResultKey(resultKey);
+    setOpeningTieBreakResultVisible(true);
+    if (openerTieBreakResultTimerRef.current) window.clearTimeout(openerTieBreakResultTimerRef.current);
+    openerTieBreakResultTimerRef.current = window.setTimeout(() => {
+      openerTieBreakResultTimerRef.current = null;
+      setOpeningTieBreakResultVisible(false);
+    }, 4600);
+  }, [
+    currentRoom?.code,
+    currentRoom?.game.activeTurn,
+    currentRoom?.game.fightNo,
+    currentRoom?.game.openerTieBreak.status,
+    currentRoom?.game.openerTieBreak.winner,
+    currentRoom?.game.openerTieBreak.choices.host,
+    currentRoom?.game.openerTieBreak.choices.challenger,
+    currentRoom?.game.openerTieBreak.revealChoices?.host,
+    currentRoom?.game.openerTieBreak.revealChoices?.challenger,
+    currentRoom?.game.turns,
+  ]);
+
+  useEffect(() => {
     const tieBreak = currentRoom?.game.openerTieBreak;
     const firstTurnResult = currentRoom?.game.turns.find((turn) => turn.turn === 1);
     if (
@@ -4067,13 +4241,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       !tieBreak.winner
     ) {
       openerTieBreakAdvanceKeyRef.current = "";
+      if (openerTieBreakAdvanceTimerRef.current) {
+        window.clearTimeout(openerTieBreakAdvanceTimerRef.current);
+        openerTieBreakAdvanceTimerRef.current = null;
+      }
       return;
     }
 
     const advanceKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${tieBreak.winner}`;
     if (openerTieBreakAdvanceKeyRef.current === advanceKey) return;
     openerTieBreakAdvanceKeyRef.current = advanceKey;
-    void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+    if (openerTieBreakAdvanceTimerRef.current) window.clearTimeout(openerTieBreakAdvanceTimerRef.current);
+    openerTieBreakAdvanceTimerRef.current = window.setTimeout(() => {
+      openerTieBreakAdvanceTimerRef.current = null;
+      void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+    }, 4600);
   }, [
     currentRoom?.code,
     currentRoom?.game.activeTurn,
@@ -4627,7 +4809,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const selectableTargetIds = new Set(
       getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top))
     );
-    if (!selectableTargetIds.has(selectedTarget)) {
+    const selectedTargets = parseSkillTargetSelection(selectedTarget);
+    const validTargetSelection = isTwoStepTargetSkill(skillCard)
+      ? selectedTargets.length === 2 && new Set(selectedTargets).size === 2 && selectedTargets.every((target) => selectableTargetIds.has(target))
+      : selectableTargetIds.has(selectedTarget as SkillTargetId);
+    if (!validTargetSelection) {
       setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: "" } : current));
       setBattleLog((current) => [
         `เป้าหมายสกิลไม่ถูกต้อง: ${selectedTarget} กรุณาเลือกเป้าหมายของ ${skillCard?.name || pendingSkillChoice.cardNo} ใหม่`,
@@ -5721,6 +5907,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         isSpectator={isSpectator}
         pendingChoice={openingTieBreakPendingChoice}
         onChoose={chooseOpeningTieBreak}
+      />
+      <OpeningTieBreakResultOverlay
+        key={openingTieBreakResultKey}
+        tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
+        hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+        challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+        visible={openingTieBreakResultVisible}
       />
       {false && currentRoom ? (
         <button

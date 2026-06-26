@@ -882,12 +882,21 @@ textarea {
   display: grid !important;
   place-items: center !important;
   padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left)) !important;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(251, 191, 36, 0.18), rgba(0, 0, 0, 0.86) 38%, rgba(0, 0, 0, 0.96) 72%, #000 100%) !important;
+  backdrop-filter: blur(14px) saturate(0.7) brightness(0.5) !important;
 }
 
 .nexora-battle-shell .triad-match-final-panel {
   width: min(680px, calc(100% - 1.5rem)) !important;
   max-height: calc(100% - 1.5rem) !important;
   margin: auto !important;
+  background: rgba(6, 5, 3, 0.94) !important;
+  border-color: rgba(254, 243, 199, 0.34) !important;
+  box-shadow:
+    0 0 95px rgba(251, 191, 36, 0.28),
+    0 34px 120px rgba(0, 0, 0, 0.88),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   transform: translateZ(0);
 }
 
@@ -896,11 +905,28 @@ textarea {
   max-width: 100%;
 }
 
+.nexora-battle-shell .triad-tiebreak-result-overlay {
+  padding: max(0.7rem, env(safe-area-inset-top)) max(0.7rem, env(safe-area-inset-right)) max(0.7rem, env(safe-area-inset-bottom)) max(0.7rem, env(safe-area-inset-left)) !important;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(251, 191, 36, 0.22), rgba(0, 0, 0, 0.78) 42%, rgba(0, 0, 0, 0.94) 100%) !important;
+}
+
+.nexora-battle-shell .triad-tiebreak-result-panel {
+  width: min(640px, calc(100% - 1.2rem)) !important;
+  max-height: calc(100% - 1.2rem) !important;
+  margin: auto !important;
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
+}
+
 @media (hover: none) and (pointer: coarse) {
   .nexora-battle-shell .triad-match-final-overlay {
     align-items: center !important;
     justify-items: center !important;
     padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left)) !important;
+    background: radial-gradient(circle at 50% 45%, rgba(251, 191, 36, 0.18), rgba(0, 0, 0, 0.78) 50%, rgba(0, 0, 0, 0.92) 100%) !important;
+    backdrop-filter: blur(8px) brightness(0.68) !important;
   }
 
   .nexora-battle-shell .triad-match-final-panel {
@@ -909,6 +935,7 @@ textarea {
     max-height: calc(100% - 0.9rem) !important;
     border-radius: clamp(0.8rem, 2.6svh, 1.15rem) !important;
     padding: clamp(0.65rem, 2.2svh, 1rem) !important;
+    background: rgba(8, 7, 5, 0.9) !important;
     box-shadow: 0 0 42px rgba(251, 191, 36, 0.28) !important;
   }
 
@@ -948,6 +975,35 @@ textarea {
     margin-top: clamp(0.35rem, 1.4svh, 0.6rem) !important;
     font-size: clamp(0.5rem, 1.6svh, 0.64rem) !important;
     letter-spacing: 0.08em !important;
+  }
+
+  .nexora-battle-shell .triad-tiebreak-result-overlay {
+    padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left)) !important;
+    backdrop-filter: blur(8px) brightness(0.72) !important;
+  }
+
+  .nexora-battle-shell .triad-tiebreak-result-panel {
+    width: min(560px, 62%) !important;
+    min-width: min(300px, calc(100% - 0.8rem)) !important;
+    max-height: calc(100% - 0.8rem) !important;
+    border-radius: clamp(0.9rem, 2.8svh, 1.35rem) !important;
+    padding: clamp(0.7rem, 2.4svh, 1.05rem) !important;
+  }
+
+  .nexora-battle-shell .triad-tiebreak-result-title {
+    font-size: clamp(1.35rem, 6.8svh, 2.65rem) !important;
+  }
+
+  .nexora-battle-shell .triad-tiebreak-result-choices {
+    gap: clamp(0.35rem, 1.6svh, 0.65rem) !important;
+    margin-top: clamp(0.6rem, 2svh, 0.9rem) !important;
+  }
+
+  .nexora-battle-shell .triad-tiebreak-result-note {
+    margin-top: clamp(0.55rem, 1.9svh, 0.85rem) !important;
+    padding: clamp(0.45rem, 1.6svh, 0.7rem) clamp(0.65rem, 2.4svh, 0.95rem) !important;
+    font-size: clamp(0.72rem, 2.6svh, 1rem) !important;
+    line-height: 1.35 !important;
   }
 
   .nexora-battle-shell .triad-skill-target-overlay {

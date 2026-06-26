@@ -252,19 +252,44 @@ function getKind(card: SourceCard): TriadCardKind {
   return "unknown";
 }
 
-export const triadCards: TriadCard[] = sourceCards.map((card) => ({
-  cardNo: normalizeCardNo(card.cardNo),
-  name: String(card.cardName || `Card ${card.cardNo}`).trim(),
-  kind: getKind(card),
-  attack: parseNumber(card.atk),
-  support: parseNumber(card.sup),
-  element: normalizeElement(
-    `${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""} ${card.notes || ""}`,
-    card.cardNo
-  ),
-  skillText: normalizeSkillElementText(String(card.skill || "").replace(/\s+/g, " ").trim()),
-  sourceImage: card.sourceImage || `/cards/${normalizeCardNo(card.cardNo)}.jpg`,
-}));
+function firstThaiToken(value: string) {
+  return value.match(/[\u0E00-\u0E7F]+/)?.[0] || "";
+}
+
+function displayCardName(card: SourceCard, kind: TriadCardKind) {
+  const fallback = String(card.cardName || `Card ${card.cardNo}`).trim();
+  if (kind !== "skill") return fallback;
+
+  const slashName = fallback.split(/[\/|]/).map((item) => firstThaiToken(item)).find(Boolean);
+  if (slashName) return slashName;
+  const directThaiName = firstThaiToken(fallback);
+  if (directThaiName) return directThaiName;
+
+  const normalizedNo = normalizeCardNo(card.cardNo);
+  const raw = String(card.rawText || "").replace(/\s+/g, " ").trim();
+  const afterCardNo = raw.match(new RegExp(`Card\\s*No\\.?\\s*${Number(normalizedNo)}\\s+([\\u0E00-\\u0E7F]+)`, "i"))?.[1];
+  if (afterCardNo) return afterCardNo;
+  const afterLeadingCode = raw.match(/^[A-Z0-9\s/.-]+(?:\d+)?\s+([\u0E00-\u0E7F]+)/)?.[1];
+  if (afterLeadingCode) return afterLeadingCode;
+  return fallback;
+}
+
+export const triadCards: TriadCard[] = sourceCards.map((card) => {
+  const kind = getKind(card);
+  return {
+    cardNo: normalizeCardNo(card.cardNo),
+    name: displayCardName(card, kind),
+    kind,
+    attack: parseNumber(card.atk),
+    support: parseNumber(card.sup),
+    element: normalizeElement(
+      `${card.element || ""} ${card.type || ""} ${card.cardName || ""} ${card.rawText || ""} ${card.notes || ""}`,
+      card.cardNo
+    ),
+    skillText: normalizeSkillElementText(String(card.skill || "").replace(/\s+/g, " ").trim()),
+    sourceImage: card.sourceImage || `/cards/${normalizeCardNo(card.cardNo)}.jpg`,
+  };
+});
 
 export const triadCardByNo = new Map(triadCards.map((card) => [card.cardNo, card]));
 
@@ -515,6 +540,13 @@ function cardHighestMetric(card: TriadCard): TriadMetric | "" {
   return card.attack > card.support ? "attack" : "support";
 }
 
+function parseBoardTargetSequence(value = "") {
+  return value
+    .split(">")
+    .map((item) => item.trim())
+    .filter((item): item is "player-top" | "bot-top" => item === "player-top" || item === "bot-top");
+}
+
 function applyMetalSword(
   rule: TriadSkillRule,
   side: "player" | "opponent",
@@ -582,6 +614,103 @@ function applyMetalSword(
       targetLabel,
     } satisfies TriadSkillEvent,
   };
+}
+
+function applyPowerSeal(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  selectedTarget: string,
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
+  blockers: StatGainBlocker[]
+) {
+  const events: TriadSkillEvent[] = [];
+  const targets = parseBoardTargetSequence(selectedTarget);
+  const [drainTarget, boostTarget] = targets;
+  const uniqueTargets = new Set(targets);
+
+  if (!drainTarget || !boostTarget || uniqueTargets.size < 2) {
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ต้องเลือกมอนสเตอร์ 2 ตัวตามลำดับ: ตัวแรก ATK -2000 และตัวที่สอง ATK +2000 สกิลจึงไม่ทำงาน",
+      blocked: true,
+    });
+    return events;
+  }
+
+  const scoreForTarget = (target: "player-top" | "bot-top") => {
+    if (target === "player-top") return side === "player" ? ownScore : opponentScore;
+    return side === "player" ? opponentScore : ownScore;
+  };
+  const sideForTarget = (target: "player-top" | "bot-top"): "player" | "opponent" =>
+    target === "player-top" ? "player" : "opponent";
+  const labelForTarget = (target: "player-top" | "bot-top") =>
+    target === (side === "player" ? "player-top" : "bot-top")
+      ? "มอนสเตอร์หลักฝ่ายผู้ใช้สกิล"
+      : "มอนสเตอร์หลักฝ่ายตรงข้าม";
+
+  const applyTargetDelta = (target: "player-top" | "bot-top", delta: number, order: 1 | 2) => {
+    const targetScore = scoreForTarget(target);
+    const contribution = targetScore.contributions.find((item) => item.lane === "top");
+    const targetLabel = labelForTarget(target);
+    const orderLabel = order === 1 ? "ตัวที่ 1" : "ตัวที่ 2";
+    if (!contribution) {
+      events.push({
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `${orderLabel} ไม่พบมอนสเตอร์เป้าหมาย สกิลส่วนนี้ไม่ทำงาน`,
+        targetLabel,
+        blocked: true,
+      });
+      return;
+    }
+
+    const blocker = blockers.find((item) =>
+      item.targetSide === sideForTarget(target) &&
+      statGainBlockerApplies(item, { metric: "attack", delta }, { lane: "top" })
+    );
+    if (blocker) {
+      events.push({
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `${orderLabel} ${delta > 0 ? "เพิ่ม" : "ลด"} ATK ${Math.abs(delta).toLocaleString()} ถูกล็อคโดย No.${blocker.rule.cardNo} ${blocker.rule.name} ค่าพลังไม่เปลี่ยน`,
+        targetLabel,
+        blocked: true,
+      });
+      return;
+    }
+
+    if (targetScore.metric === "attack") {
+      targetScore.total += delta;
+      contribution.value += delta;
+      targetScore.breakdown.push(
+        `No.${rule.cardNo} ${rule.name}: ${orderLabel} ${targetLabel} ATK ${delta >= 0 ? "+" : ""}${delta.toLocaleString()}`
+      );
+    }
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `${orderLabel} ${targetLabel} ${delta > 0 ? "เพิ่ม" : "ลด"} ATK ${Math.abs(delta).toLocaleString()} จนจบตา`,
+      targetLabel,
+    });
+  };
+
+  applyTargetDelta(drainTarget, -2000, 1);
+  applyTargetDelta(boostTarget, 2000, 2);
+  return events;
 }
 
 type StatUseBlocker = {
@@ -712,6 +841,13 @@ function applySkill(
     );
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${result.event.summary}`);
     events.push(result.event);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "232") {
+    const powerSealEvents = applyPowerSeal(rule, side, selectedTarget, ownScore, opponentScore, blockers);
+    events.push(...powerSealEvents);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: applied ordered two-target seal`);
     return { unresolved, events };
   }
 
