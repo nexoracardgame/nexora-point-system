@@ -1407,7 +1407,7 @@ export default function MainLayout({
 
       <div className="relative flex min-h-[var(--app-shell-height)]">
         {/* DESKTOP LEFT DOCK */}
-        <aside className="fixed left-0 top-0 z-[600] hidden h-[var(--app-shell-height)] w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex xl:flex-col xl:items-center">
+        {!isBattleCardPage ? <aside className="fixed left-0 top-0 z-[600] hidden h-[var(--app-shell-height)] w-[92px] min-w-[92px] border-r border-white/5 bg-[#0a0b0e]/95 xl:flex xl:flex-col xl:items-center">
           <div className="flex h-full w-full flex-col items-center py-5">
             <PrefetchLink
               href="/"
@@ -1441,14 +1441,14 @@ export default function MainLayout({
               })}
             </div>
           </div>
-        </aside>
+        </aside> : null}
 
         {/* MAIN */}
-        <div className="relative z-0 flex min-w-0 flex-1 flex-col xl:ml-[92px]">
+        <div className={`relative z-0 flex min-w-0 flex-1 flex-col ${isBattleCardPage ? "" : "xl:ml-[92px]"}`}>
           {/* TOPBAR */}
           <header
             className={`top-0 z-[500] border-b border-white/5 bg-[#0b0c10]/88 backdrop-blur-2xl ${
-              isChatRoomPage || isBattleCardPage ? "hidden xl:sticky xl:block" : "sticky"
+              isBattleCardPage ? "hidden" : isChatRoomPage ? "hidden xl:sticky xl:block" : "sticky"
             }`}
           >
             <div className="flex min-h-[var(--app-header-height)] items-center justify-between gap-2 px-3 pb-2 pt-[calc(var(--app-safe-top)+8px)] sm:px-5 xl:min-h-[74px] xl:px-6 xl:py-0">
@@ -1684,7 +1684,7 @@ export default function MainLayout({
               isChatRoomPage
                 ? "overflow-hidden p-0 pb-0"
                 : isBattleCardPage
-                  ? "overflow-hidden p-0 pb-0 xl:p-2"
+                  ? "overflow-hidden p-0 pb-0"
                 : "p-3 pb-[var(--app-content-bottom-gap)] sm:p-4 sm:pb-[calc(var(--app-mobile-nav-height-sm)+14px)] xl:p-6 xl:pb-6"
             }`}
           >
@@ -1693,7 +1693,7 @@ export default function MainLayout({
                 isChatRoomPage
                   ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(var(--app-shell-height)-var(--app-header-height))]"
                   : isBattleCardPage
-                    ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(var(--app-shell-height)-var(--app-header-height)-16px)]"
+                    ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none"
                   : "min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] rounded-[24px] border border-white/5 bg-[linear-gradient(180deg,#0b0d10_0%,#090a0d_100%)] p-3 shadow-[0_20px_80px_rgba(0,0,0,0.28)] sm:min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height-sm))] sm:rounded-[26px] sm:p-4 xl:min-h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] xl:p-6"
               }`}
             >
@@ -1703,7 +1703,7 @@ export default function MainLayout({
         </div>
       </div>
 
-      <LiveFloatingPlayer />
+      {!isBattleCardPage ? <LiveFloatingPlayer /> : null}
       <div className={hideFloatingChatOnMobile ? "hidden xl:block" : undefined}>
         <FloatingChatDock unreadCount={chatUnreadCount} />
       </div>

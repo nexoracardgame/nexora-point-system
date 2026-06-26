@@ -1855,7 +1855,7 @@ function PlayerHand({
   });
 
   return (
-    <div className="rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
+    <div className="triad-player-hand rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
       <CardHoverPreview card={previewCard} />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
@@ -1879,7 +1879,7 @@ function PlayerHand({
           ))}
         </div>
       </div>
-      <div className="grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1">
+      <div className="triad-hand-grid grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1">
         {cards.map((card) => {
           const placedLane = placedByNo.get(card.cardNo);
           const unavailable = usedSet.has(card.cardNo) || Boolean(placedLane && placedLane !== activeLane);
@@ -2976,7 +2976,7 @@ function CompactBattleBoard({
   if (blessingAuras?.player) playerAuraByLane.top = blessingAuras.player;
   if (blessingAuras?.bot) botAuraByLane.top = blessingAuras.bot;
   return (
-    <div className="relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
+    <div className="triad-compact-board relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
       <CardHoverPreview card={previewCard} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
@@ -5535,7 +5535,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main className="relative min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px] 2xl:h-[calc(var(--app-shell-height)-var(--app-desktop-chrome-height))] 2xl:min-h-0">
+    <main className="triad-dominion-game relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]">
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
           type="button"
@@ -5582,7 +5582,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       ) : null}
       {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} /> : null}
-      <section className="relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
+      <section className="triad-game-roombar relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(230px,0.85fr)_minmax(260px,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-2">
             {currentRoom && isFieldPlayer && !matchDone ? (
@@ -5657,8 +5657,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       </section>
 
-      <section className={`grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(300px,18vw,340px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
-        <section className="grid min-h-0 max-w-full grid-rows-[minmax(330px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(420px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(470px,calc(100vh-390px))_auto_auto]">
+      <section className={`triad-game-layout grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(300px,18vw,340px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
+        <section className="triad-game-playarea grid min-h-0 max-w-full grid-rows-[minmax(330px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(420px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(470px,calc(100vh-390px))_auto_auto]">
           {false && deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -5781,7 +5781,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             />
           ) : null}
 
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
+          <div className="triad-game-status grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
               <div className="rounded-xl border border-white/8 bg-black/24 p-4">
                 {matchDone ? (
                   <div className="flex items-center gap-3">
@@ -5922,7 +5922,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ) : null}
 
           {currentRoom ? (
-            <div className="space-y-2 2xl:hidden">
+            <div className="triad-room-actions-mobile space-y-2 2xl:hidden">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
               {renderRoomBattleActions()}
             </div>
