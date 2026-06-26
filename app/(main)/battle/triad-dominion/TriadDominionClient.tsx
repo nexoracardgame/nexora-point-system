@@ -5,6 +5,7 @@ import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } fr
 import {
   Bot,
   Check,
+  Clock3,
   ChevronRight,
   Crosshair,
   Crown,
@@ -14,6 +15,7 @@ import {
   KeyRound,
   Layers3,
   Lock,
+  Loader2,
   MessageCircle,
   Plus,
   RotateCcw,
@@ -26,6 +28,7 @@ import {
   Swords,
   Trophy,
   UserCheck,
+  UserPlus,
   Users,
   Zap,
 } from "lucide-react";
@@ -98,6 +101,15 @@ type RoomParticipant = {
   name: string;
   image: string;
   joinedAt: number;
+};
+
+type FriendRelationStatus = "self" | "none" | "outgoing" | "incoming" | "friends";
+
+type FriendRelationResponse = {
+  relation?: {
+    status?: FriendRelationStatus;
+    requestId?: string | null;
+  };
 };
 
 type RoomChatMessage = {
@@ -387,6 +399,149 @@ function participantInRoom(room: TriadRoom | undefined, participantId: string) {
     room.spectators.some((viewer) => viewer.id === participantId)
   );
 }
+function BattleMiniFriendButton({
+  targetUserId,
+  currentUserId,
+}: {
+  targetUserId?: string;
+  currentUserId?: string;
+}) {
+  const [relation, setRelation] = useState<FriendRelationStatus>("none");
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [message, setMessage] = useState("");
+  const cleanTargetId = safeText(targetUserId);
+  const cleanCurrentId = safeText(currentUserId);
+  const isSelf = !cleanTargetId || (cleanCurrentId ? cleanTargetId === cleanCurrentId : false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRelation = async () => {
+      if (isSelf) {
+        setRelation("self");
+        setRequestId(null);
+        return;
+      }
+
+      setChecking(true);
+      try {
+        const res = await fetch(`/api/community/status/${encodeURIComponent(cleanTargetId)}`, { cache: "no-store" });
+        const data = (await res.json().catch(() => ({}))) as FriendRelationResponse;
+        if (cancelled) return;
+        setRelation(data.relation?.status || "none");
+        setRequestId(safeText(data.relation?.requestId) || null);
+      } catch {
+        if (!cancelled) {
+          setRelation("none");
+          setRequestId(null);
+        }
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    };
+
+    void loadRelation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanTargetId, isSelf]);
+
+  const submitFriendAction = async (payload: Record<string, unknown>) => {
+    if (busy || isSelf) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/community/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(String(data?.error || "ทำรายการไม่สำเร็จ"));
+        return;
+      }
+
+      if (data?.relation?.status) {
+        setRelation(data.relation.status as FriendRelationStatus);
+        setRequestId(safeText(data.relation.requestId) || null);
+      } else if (data?.status === "accepted") {
+        setRelation("friends");
+        setRequestId(null);
+      } else {
+        setRelation("outgoing");
+      }
+      window.dispatchEvent(new CustomEvent("nexora:friends-updated", { detail: { targetUserId: cleanTargetId } }));
+    } catch {
+      setMessage("เชื่อมระบบเพื่อนไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (isSelf || relation === "self") return null;
+
+  if (relation === "friends") {
+    return (
+      <div className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200/28 bg-emerald-300/12 px-3 py-2 text-[11px] font-black text-emerald-100 shadow-[0_0_24px_rgba(52,211,153,0.12)]">
+        <UserCheck className="h-4 w-4" />
+        เป็นเพื่อนแล้ว
+      </div>
+    );
+  }
+
+  if (relation === "outgoing") {
+    return (
+      <div className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200/28 bg-amber-300/12 px-3 py-2 text-[11px] font-black text-amber-100">
+        <Clock3 className="h-4 w-4" />
+        ส่งคำขอแล้ว
+      </div>
+    );
+  }
+
+  if (relation === "incoming" && requestId) {
+    return (
+      <div className="mt-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void submitFriendAction({ action: "respond", requestId, decision: "accept" });
+          }}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200/32 bg-emerald-400/14 px-3 py-2 text-[11px] font-black text-emerald-50 shadow-[0_0_28px_rgba(52,211,153,0.14)] transition hover:scale-[1.02] hover:bg-emerald-400/20 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          รับเป็นเพื่อน
+        </button>
+        {message ? <div className="mt-2 text-center text-[10px] font-bold text-red-200">{message}</div> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        disabled={busy || checking}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void submitFriendAction({ action: "request", targetUserId: cleanTargetId });
+        }}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-200/30 bg-[linear-gradient(135deg,rgba(34,211,238,0.18),rgba(168,85,247,0.14))] px-3 py-2 text-[11px] font-black text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.14)] transition hover:scale-[1.02] hover:border-cyan-100/48 hover:bg-cyan-300/18 disabled:opacity-60"
+      >
+        {busy || checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+        {checking ? "เช็กสถานะ..." : busy ? "กำลังส่ง..." : "แอดเพื่อน"}
+      </button>
+      {message ? <div className="mt-2 text-center text-[10px] font-bold text-red-200">{message}</div> : null}
+    </div>
+  );
+}
 
 function MiniProfileHover({
   participant,
@@ -396,6 +551,7 @@ function MiniProfileHover({
   align = "left",
   placement = "bottom",
   size = "sm",
+  currentParticipantId,
 }: {
   participant?: RoomParticipant | null;
   name?: string;
@@ -404,6 +560,7 @@ function MiniProfileHover({
   align?: "left" | "right";
   placement?: "top" | "bottom";
   size?: "sm" | "md";
+  currentParticipantId?: string;
 }) {
   const profileName = name || participant?.name || "ผู้เล่น";
   const profileImage = image || participant?.image || "/avatar.png";
@@ -422,7 +579,7 @@ function MiniProfileHover({
         </span>
       </button>
       <div
-        className={`pointer-events-none absolute z-[160] w-60 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100 ${
+        className={`pointer-events-auto invisible absolute z-[160] w-60 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
           placement === "top" ? "bottom-[calc(100%+0.55rem)]" : "top-[calc(100%+0.55rem)]"
         } ${
           align === "right" ? "right-0" : "left-0"
@@ -440,6 +597,7 @@ function MiniProfileHover({
         <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.045] px-3 py-2 text-xs font-semibold leading-5 text-white/62">
           กำลังอยู่ในสนาม Triad Dominion
         </div>
+        <BattleMiniFriendButton targetUserId={participant?.id} currentUserId={currentParticipantId} />
       </div>
     </div>
   );
@@ -805,6 +963,13 @@ function applyRoomBlessingPreview(
       !choice.selectedTarget ||
       choice.skipped
     ) {
+      continue;
+    }
+    if (choice.selectedTarget === "draw-skill") {
+      const targetTriangle = choice.side === "host" ? nextHost : nextChallenger;
+      if (choice.blessingDrawCardNo) {
+        targetTriangle[choice.lane] = choice.blessingDrawCardNo;
+      }
       continue;
     }
     if (choice.selectedTarget === "reroll-own" || choice.selectedTarget === "reroll-opponent") {
@@ -2379,8 +2544,10 @@ function SpectatorPanel({
 
 function SpectatorAvatarRail({
   spectators,
+  currentParticipantId,
 }: {
   spectators: RoomParticipant[];
+  currentParticipantId?: string;
 }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end">
@@ -2392,6 +2559,7 @@ function SpectatorAvatarRail({
             participant={spectator}
             label={`ผู้ชม ${index + 1}`}
             align={index > 5 ? "right" : "left"}
+            currentParticipantId={currentParticipantId}
           />
         ) : (
           <div
@@ -2718,6 +2886,7 @@ function CompactBattleBoard({
   botImage,
   playerParticipant,
   botParticipant,
+  currentParticipantId,
   placementLane,
   timeLeft,
   turnLocked,
@@ -2750,6 +2919,7 @@ function CompactBattleBoard({
   botImage: string;
   playerParticipant?: RoomParticipant | null;
   botParticipant?: RoomParticipant | null;
+  currentParticipantId?: string;
   placementLane: Lane;
   timeLeft: number;
   turnLocked: boolean;
@@ -2813,7 +2983,7 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
       <div className="pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
-        <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" />
+        <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" currentParticipantId={currentParticipantId} />
         <div className="min-w-0 max-w-[120px] sm:max-w-none">
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/58">คู่แข่ง</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{botName}</div>
@@ -2830,7 +3000,7 @@ function CompactBattleBoard({
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-red-100/58">เรา</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{playerName}</div>
         </div>
-        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} label="เรา" align="right" placement="top" />
+        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />
       </div>
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
@@ -4095,8 +4265,30 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return card.cardNo;
   };
 
-  const randomCardNoByKind = (kind: TriadCardKind) => {
-    const pool = deckCatalog.filter((card) => card.kind === kind);
+  const randomCardNoByKind = (kind: TriadCardKind, extraExcluded: string[] = []) => {
+    const excluded = new Set(
+      [
+        ...playerDeck,
+        ...botDeck,
+        ...usedPlayerCards,
+        ...usedBotCards,
+        ...gravePlayerCards,
+        ...graveBotCards,
+        player.top,
+        player.left,
+        player.right,
+        lockedFight?.player.top,
+        lockedFight?.player.left,
+        lockedFight?.player.right,
+        lockedFight?.bot.top,
+        lockedFight?.bot.left,
+        lockedFight?.bot.right,
+        pendingBlessingChoice?.drawnCardNo,
+        pendingBlessingChoice?.previewTopCardNo,
+        ...extraExcluded,
+      ].filter(Boolean)
+    );
+    const pool = deckCatalog.filter((card) => card.kind === kind && !excluded.has(card.cardNo));
     const card = pool[Math.floor(Math.random() * Math.max(1, pool.length))];
     if (card) setRandomDrawCardNo(card.cardNo);
     return card?.cardNo || "";
@@ -4367,22 +4559,22 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     let previewTopCardNo = "";
 
     if (choice === "draw-skill") {
-      drawnCardNo = randomCardNoByKind("skill");
+      drawnCardNo = randomCardNoByKind("skill", ["254"]);
       if (drawnCardNo) {
-        setPlayerDeck((current) => (current.includes(drawnCardNo) ? current : [...current, drawnCardNo]));
-        summary = `ขอพรเปิดสกิลเพิ่ม ได้ No.${drawnCardNo}`;
+        nextPlayer = { ...nextPlayer, [pendingBlessingChoice.lane]: drawnCardNo };
+        summary = `ขอพรเปิดสกิลเพิ่ม No.${drawnCardNo} แทน No.254 เฉพาะตานี้ และใช้ผลสกิลทันที`;
       }
     } else if (choice === "reroll-own") {
       previewTopCardNo = randomCardNoByKind("monster");
       if (previewTopCardNo) {
         nextPlayer = { ...nextPlayer, top: previewTopCardNo };
-        summary = `ขอพรสุ่มเปลี่ยนมอนสเตอร์เราเป็น No.${previewTopCardNo}`;
+        summary = `ขอพรสุ่มมอนสเตอร์ใหม่ให้ฝั่งเราเป็น No.${previewTopCardNo} เฉพาะตานี้`;
       }
     } else {
       previewTopCardNo = randomCardNoByKind("monster");
       if (previewTopCardNo) {
         nextBot = { ...nextBot, top: previewTopCardNo };
-        summary = `ขอพรให้อีกฝ่ายสุ่มเปลี่ยนมอนสเตอร์เป็น No.${previewTopCardNo}`;
+        summary = `ขอพรสุ่มมอนสเตอร์ใหม่ให้ฝ่ายตรงข้ามเป็น No.${previewTopCardNo} เฉพาะตานี้`;
       }
     }
 
@@ -5417,7 +5609,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <div className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/38 lg:text-right">
               ผู้ชม {currentRoom?.spectators.length || 0}/{SPECTATOR_LIMIT}
             </div>
-            <SpectatorAvatarRail spectators={currentRoom?.spectators || []} />
+            <SpectatorAvatarRail spectators={currentRoom?.spectators || []} currentParticipantId={participant.id} />
           </div>
           {currentRoom ? (
             <button
@@ -5511,6 +5703,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 botImage={displayBotImage}
                 playerParticipant={displayPlayerParticipant}
                 botParticipant={displayBotParticipant}
+                currentParticipantId={participant.id}
                 placementLane={placementLane}
                 timeLeft={displayTimeLeft}
                 turnLocked={displayTurnLocked}
@@ -5551,6 +5744,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               botImage={displayBotImage}
               playerParticipant={displayPlayerParticipant}
               botParticipant={displayBotParticipant}
+              currentParticipantId={participant.id}
               placementLane={placementLane}
               timeLeft={displayTimeLeft}
               turnLocked={displayTurnLocked}

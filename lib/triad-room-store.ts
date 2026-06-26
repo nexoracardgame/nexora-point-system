@@ -759,10 +759,35 @@ function randomSkillPool(seed: string) {
   ).slice(0, 20).map((card) => card.cardNo);
 }
 
-function randomCardNoByKind(kind: "monster" | "skill") {
-  const pool = triadCards.filter((card) => card.kind === kind);
+function randomCardNoByKind(kind: "monster" | "skill", excludedCardNos: string[] = []) {
+  const excluded = new Set(excludedCardNos.map(cleanText).filter(Boolean));
+  const pool = triadCards.filter((card) => card.kind === kind && !excluded.has(card.cardNo));
   const card = pool[Math.floor(Math.random() * Math.max(1, pool.length))];
   return card?.cardNo || "";
+}
+
+function blessingRandomExcludedCards(room: StoredTriadRoom, extra: string[] = []) {
+  const triangles = [
+    room.game.triangles.host.top,
+    room.game.triangles.host.left,
+    room.game.triangles.host.right,
+    room.game.triangles.challenger.top,
+    room.game.triangles.challenger.left,
+    room.game.triangles.challenger.right,
+  ];
+  const blessingCards = room.game.skillChoices.flatMap((choice) => [
+    choice.blessingDrawCardNo || "",
+    choice.blessingPreviewTopNo || "",
+  ]);
+  return Array.from(new Set([
+    ...room.game.decks.host,
+    ...room.game.decks.challenger,
+    ...room.game.usedCards.host,
+    ...room.game.usedCards.challenger,
+    ...triangles,
+    ...blessingCards,
+    ...extra,
+  ].map(cleanText).filter(Boolean)));
 }
 
 function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["selectionPools"] {
@@ -878,11 +903,14 @@ function applyTurnBlessings(room: StoredTriadRoom) {
     const sideTriangle = choice.side === "host" ? hostTriangle : challengerTriangle;
     const opponentTriangle = choice.side === "host" ? challengerTriangle : hostTriangle;
     if (choice.selectedTarget === "draw-skill") {
+      if (choice.blessingDrawCardNo) {
+        sideTriangle[choice.lane] = choice.blessingDrawCardNo;
+      }
       events.push({
         choice,
         summary: choice.blessingDrawCardNo
-          ? `No.254 ขอพรศักดิ์สิทธิ์: สุ่มสกิลเพิ่ม No.${choice.blessingDrawCardNo}`
-          : "No.254 ขอพรศักดิ์สิทธิ์: สุ่มสกิลเพิ่ม",
+          ? `No.254 ขอพรศักดิ์สิทธิ์: เปิดสกิลเพิ่ม No.${choice.blessingDrawCardNo} แทน No.254 เฉพาะตานี้`
+          : "No.254 ขอพรศักดิ์สิทธิ์: สุ่มสกิลเพิ่มไม่สำเร็จ",
       });
       continue;
     }
@@ -1280,13 +1308,13 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     choice.selectedTarget = cleanTarget;
     choice.blessingChoice = cleanTarget as TriadBlessingChoice;
     if (cleanTarget === "draw-skill") {
-      const drawn = randomCardNoByKind("skill");
+      const drawn = randomCardNoByKind("skill", blessingRandomExcludedCards(room, ["254"]));
       if (drawn) {
         choice.blessingDrawCardNo = drawn;
-        room.game.decks[side] = [...room.game.decks[side], drawn];
+        room.game.usedCards[side] = Array.from(new Set([...(room.game.usedCards[side] || []), drawn]));
       }
     } else {
-      const drawn = randomCardNoByKind("monster");
+      const drawn = randomCardNoByKind("monster", blessingRandomExcludedCards(room));
       if (drawn) {
         choice.blessingPreviewTopNo = drawn;
       }
