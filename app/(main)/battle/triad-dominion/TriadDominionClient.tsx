@@ -1292,6 +1292,7 @@ function RevealSpotlight({
   result,
   playerName,
   botName,
+  spectatorView = false,
 }: {
   playerCard?: CardView;
   botCard?: CardView;
@@ -1300,6 +1301,7 @@ function RevealSpotlight({
   result?: TriadTurnResult;
   playerName: string;
   botName: string;
+  spectatorView?: boolean;
 }) {
   if (!showPlayer && !showBot) return null;
 
@@ -1368,7 +1370,13 @@ function RevealSpotlight({
         </div>
       </div>
       {isScored ? (
-        <div className="pointer-events-auto absolute right-[clamp(84px,11cqw,150px)] top-[calc(100%+clamp(68px,10cqw,120px))] z-30 grid w-[clamp(260px,28cqw,390px)] gap-1.5">
+        <div
+          className={`pointer-events-auto absolute z-30 grid gap-1.5 ${
+            spectatorView
+              ? "right-[clamp(12px,2.6cqw,30px)] top-[clamp(70px,16cqw,118px)] w-[clamp(280px,34cqw,430px)]"
+              : "right-[clamp(84px,11cqw,150px)] top-[calc(100%+clamp(68px,10cqw,120px))] w-[clamp(260px,28cqw,390px)]"
+          }`}
+        >
           {timeline.map((event, index) => (
             <div
               key={`${event.cardNo || "basic"}-${index}`}
@@ -2818,6 +2826,7 @@ function CompactBattleBoard({
         result={currentResult && revealed[activeTurn]?.scored ? currentResult : undefined}
         playerName={playerName}
         botName={botName}
+        spectatorView={revealAllCards}
       />
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}

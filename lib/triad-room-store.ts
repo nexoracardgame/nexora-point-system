@@ -976,6 +976,7 @@ function updateOpeningTieBreakAfterResult(room: StoredTriadRoom, result: TriadTu
 
 function resolveIfBothLocked(room: StoredTriadRoom) {
   const turn = room.game.activeTurn;
+  if (room.game.turns.some((item) => item.turn === turn)) return;
   const lane = laneForTurn(turn);
   if (!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) return;
   if (!skillChoicesResolved(room)) return;
@@ -1264,8 +1265,16 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
-  if (!room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {
+  const activeResult = room.game.turns.find((turn) => turn.turn === room.game.activeTurn);
+  if (!activeResult) {
     return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
+  }
+  if (
+    room.game.activeTurn === 1 &&
+    activeResult.winner === "draw" &&
+    room.game.openerTieBreak.status !== "resolved"
+  ) {
+    return { ok: false as const, reason: "opener_tiebreak_waiting" as const, room: publicRoom(room) };
   }
   room.game.turnReady = {
     host: Boolean(room.game.turnReady?.host),
