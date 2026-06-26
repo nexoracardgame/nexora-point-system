@@ -5235,7 +5235,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   if (phase === "room") {
     if (!currentRoom) {
       return (
-        <main className="grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center rounded-[24px] border border-white/8 bg-[#05070d] p-6 text-white">
+        <main className="triad-room-screen grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center overflow-y-auto rounded-[24px] border border-white/8 bg-[#05070d] p-6 text-white">
           <div className="w-[min(420px,94vw)] rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-center">
             <div className="text-lg font-black text-white">กำลังเชื่อมห้องใหม่</div>
             <div className="mt-2 text-sm font-semibold leading-6 text-white/50">
@@ -5272,8 +5272,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
 
     return (
-      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
-        <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
+      <main className="triad-room-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
+        <section className="triad-room-hero relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0">
             <Image
               src="/images/triad/battle-header-banner.webp"
@@ -5320,13 +5320,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </section>
 
-        <div className="px-4 pb-2 sm:px-6 xl:px-8">
+        <div className="triad-room-notice px-4 pb-2 sm:px-6 xl:px-8">
           <div className="rounded-2xl border border-cyan-200/14 bg-cyan-300/8 px-4 py-3 text-sm font-semibold leading-6 text-cyan-50/78">
             เมื่อเริ่มเกม ทั้งสองฝั่งจะเข้าสู่ช่วงเลือกเด็คพร้อมกัน ผู้ชมจะเห็นตัวนับถอยหลัง 5 นาทีและชื่อของฝั่งที่กำลังจัดเด็คอย่างชัดเจน
           </div>
         </div>
 
-        <section className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[1fr_320px] xl:p-8">
+        <section className="triad-room-content grid gap-4 p-4 sm:p-6 xl:grid-cols-[1fr_320px] xl:p-8">
           <div className="grid gap-4 md:grid-cols-2">
             <RoomSeatCard
               label="ฝั่งเจ้าของห้อง"
@@ -5455,8 +5455,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         ) : null}
 
-        <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+        <section className="triad-deck-content grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
+          <div className="triad-deck-card-grid grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
             {selectableDeckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
               const disabled =
@@ -5511,7 +5511,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </aside>
         </section>
         {currentRoom ? (
-          <div className="fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-amber-200/24 bg-black/78 p-3 shadow-[0_0_44px_rgba(251,191,36,0.12)] backdrop-blur-md xl:bottom-5">
+          <div className="triad-deck-readybar fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-amber-200/24 bg-black/78 p-3 shadow-[0_0_44px_rgba(251,191,36,0.12)] backdrop-blur-md xl:bottom-5">
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/62">
                 ล็อกเด็คอัตโนมัติใน {deckTimerText}
