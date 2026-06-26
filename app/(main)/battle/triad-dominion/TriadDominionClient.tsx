@@ -4951,7 +4951,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const searchedRoom = joinCode.length === 6 ? rooms.find((room) => room.code === joinCode) : null;
 
     return (
-      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
+      <main className="triad-lobby-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
         {passwordRoom ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
             <div className="w-[min(420px,94vw)] rounded-2xl border border-amber-200/28 bg-[#090b12] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
@@ -5060,7 +5060,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </div>
         ) : null}
-        <section className="relative min-h-[320px] overflow-hidden border-b border-amber-200/12 px-4 py-6 sm:px-6 lg:px-8">
+        <section className="triad-lobby-hero relative min-h-[320px] overflow-hidden border-b border-amber-200/12 px-4 py-6 sm:px-6 lg:px-8">
           <div className="absolute inset-0">
             <Image
               src="/images/triad/battle-header-banner.webp"
@@ -5101,7 +5101,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </section>
 
-        <section className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[380px_1fr] lg:p-8">
+        <section className="triad-lobby-content grid gap-4 p-4 sm:p-6 lg:grid-cols-[380px_1fr] lg:p-8">
           <div className="space-y-4">
             <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
               <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
@@ -5390,7 +5390,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const deckReadyLabel = ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
-      <main className="min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+      <main className="triad-deck-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
         <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(160,120,35,0.22),transparent_28%),linear-gradient(180deg,#090909,#050507_58%,#120d08)]" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

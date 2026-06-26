@@ -336,6 +336,16 @@ textarea {
   min-height: 0 !important;
 }
 
+.nexora-battle-shell .triad-lobby-screen,
+.nexora-battle-shell .triad-deck-screen {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 @media (max-width: 900px) and (orientation: portrait) {
   html:has(.nexora-battle-shell),
   body:has(.nexora-battle-shell) {
@@ -393,6 +403,104 @@ textarea {
 }
 
 @media (max-width: 900px) {
+  .nexora-battle-shell .triad-lobby-screen,
+  .nexora-battle-shell .triad-deck-screen {
+    border-radius: 0 !important;
+    padding: 0 !important;
+    scroll-snap-type: y proximity;
+    touch-action: pan-y;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero {
+    min-height: clamp(120px, 34dvh, 190px) !important;
+    padding: 0.75rem !important;
+    scroll-snap-align: start;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero > .relative.z-10 {
+    min-height: clamp(104px, 30dvh, 170px) !important;
+    gap: 0.65rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero h1 {
+    font-size: clamp(1.55rem, 7dvh, 3.2rem) !important;
+    line-height: 0.9 !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero p {
+    margin-top: 0.45rem !important;
+    max-width: 30rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero .grid.grid-cols-3 {
+    min-width: min(330px, 45dvw) !important;
+    gap: 0.35rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero .grid.grid-cols-3 > div {
+    padding: 0.45rem !important;
+    border-radius: 0.7rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-hero .grid.grid-cols-3 .text-2xl {
+    font-size: 1.05rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content {
+    grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.28fr) !important;
+    gap: 0.5rem !important;
+    padding: 0.5rem !important;
+    scroll-snap-align: start;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .space-y-4 {
+    display: grid;
+    gap: 0.5rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .rounded-\[18px\],
+  .nexora-battle-shell .triad-lobby-content .rounded-xl,
+  .nexora-battle-shell .triad-lobby-content .rounded-2xl {
+    border-radius: 0.75rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .p-4 {
+    padding: 0.6rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .h-12 {
+    height: 2.35rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .h-11 {
+    height: 2.25rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .text-xl {
+    font-size: 1rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .text-sm {
+    font-size: 0.72rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .grid.gap-3.md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.45rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .relative.overflow-hidden.rounded-\[18px\] {
+    padding: 0.6rem !important;
+  }
+
+  .nexora-battle-shell .triad-lobby-content .relative.overflow-hidden.rounded-\[18px\] .h-11,
+  .nexora-battle-shell .triad-lobby-content .relative.overflow-hidden.rounded-\[18px\] .h-10 {
+    height: 2.15rem !important;
+  }
+
   .nexora-battle-shell .triad-dominion-game {
     display: flex;
     flex-direction: column;
