@@ -821,10 +821,49 @@ function skillNeedsManualChoice(cardNo: string) {
   return /เลือก|choose|target/i.test(rule.text) || rule.target === "own-one" || rule.target === "opponent-one" || rule.target === "any-one";
 }
 
+function monsterHasUnequalStats(cardNo: string) {
+  const card = triadCardByNo.get(cleanText(cardNo));
+  return Boolean(card?.kind === "monster" && card.attack !== card.support);
+}
+
+function metalSwordTargets(room: StoredTriadRoom) {
+  return [
+    monsterHasUnequalStats(room.game.triangles.host.top) ? ("host" as const) : null,
+    monsterHasUnequalStats(room.game.triangles.challenger.top) ? ("challenger" as const) : null,
+  ].filter((side): side is TriadRoomSlot => Boolean(side));
+}
+
+function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
+  if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;
+  return skillNeedsManualChoice(cardNo);
+}
+
 function currentTurnChoices(room: StoredTriadRoom) {
   return room.game.skillChoices.filter(
     (choice) => choice.fightNo === room.game.fightNo && choice.turn === room.game.activeTurn
   );
+}
+
+function skillChoiceOrder(room: StoredTriadRoom): TriadRoomSlot[] {
+  const opener = getOpeningSide(room);
+  if (opener === "challenger") return ["challenger", "host"];
+  return ["host", "challenger"];
+}
+
+function orderedSkillChoiceCandidates(room: StoredTriadRoom) {
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  return skillChoiceOrder(room)
+    .map((side) => {
+      const cardNo = room.game.triangles[side][lane];
+      return cardNo && canUseManualSkillChoice(room, cardNo)
+        ? {
+            side,
+            cardNo,
+          }
+        : null;
+    })
+    .filter((choice): choice is { side: TriadRoomSlot; cardNo: string } => Boolean(choice));
 }
 
 function currentTurnBlessings(room: StoredTriadRoom) {
@@ -874,26 +913,65 @@ function applyTurnBlessings(room: StoredTriadRoom) {
   return { player: hostTriangle, opponent: challengerTriangle, events };
 }
 
+function targetToHostPerspective(choice: TriadRoomSkillChoice): "player-top" | "bot-top" | "" {
+  if (choice.selectedTarget !== "player-top" && choice.selectedTarget !== "bot-top") return "";
+  if (choice.side === "host") return choice.selectedTarget;
+  return choice.selectedTarget === "player-top" ? "bot-top" : "player-top";
+}
+
+function selectedTargetSlot(side: TriadRoomSlot, selectedTarget: string): TriadRoomSlot | "" {
+  if (selectedTarget !== "player-top" && selectedTarget !== "bot-top") return "";
+  if (side === "host") return selectedTarget === "player-top" ? "host" : "challenger";
+  return selectedTarget === "player-top" ? "challenger" : "host";
+}
+
+function selectedSkillTargets(room: StoredTriadRoom, opener: TriadRoomSlot) {
+  return currentTurnChoices(room).reduce<NonNullable<Parameters<typeof resolveTriadTurn>[0]["skillTargets"]>>(
+    (targets, choice) => {
+      const hostPerspectiveTarget = targetToHostPerspective(choice);
+      if (!hostPerspectiveTarget) return targets;
+      const side = choice.side === opener ? "player" : "opponent";
+      const target =
+        opener === "host"
+          ? hostPerspectiveTarget
+          : hostPerspectiveTarget === "player-top"
+            ? "bot-top"
+            : "player-top";
+      targets[side] = {
+        ...(targets[side] || {}),
+        [choice.cardNo]: target,
+      };
+      return targets;
+    },
+    {}
+  );
+}
+
 function ensureSkillChoices(room: StoredTriadRoom) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
   const now = Date.now();
-  const nextChoices = currentTurnChoices(room);
-  for (const side of ["host", "challenger"] as const) {
-    const cardNo = room.game.triangles[side][lane];
-    if (!cardNo || !skillNeedsManualChoice(cardNo)) continue;
-    if (nextChoices.some((choice) => choice.side === side && choice.cardNo === cardNo)) continue;
+  const existingChoices = currentTurnChoices(room);
+  const nextChoices: TriadRoomSkillChoice[] = [];
+  for (const candidate of orderedSkillChoiceCandidates(room)) {
+    const existing = existingChoices.find((choice) => choice.side === candidate.side && choice.cardNo === candidate.cardNo);
+    if (existing) {
+      nextChoices.push(existing);
+      if (!existing.selectedTarget && !existing.skipped) break;
+      continue;
+    }
     nextChoices.push({
       fightNo: room.game.fightNo,
       turn,
-      side,
+      side: candidate.side,
       lane,
-      cardNo,
+      cardNo: candidate.cardNo,
       startedAt: now,
       deadlineAt: now + SKILL_CHOICE_TIMEOUT_MS,
       selectedTarget: "",
       skipped: false,
     });
+    break;
   }
   room.game.skillChoices = [
     ...room.game.skillChoices.filter(
@@ -919,8 +997,8 @@ function markExpiredSkillChoices(room: StoredTriadRoom) {
 }
 
 function skillChoicesResolved(room: StoredTriadRoom) {
-  const choices = ensureSkillChoices(room);
   markExpiredSkillChoices(room);
+  const choices = ensureSkillChoices(room);
   return choices.every((choice) => choice.selectedTarget || choice.skipped);
 }
 
@@ -995,6 +1073,7 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     opponent: opener === "host" ? opponentTriangles : playerTriangles,
     prioritySide: "player",
     skippedSkillCardNos,
+    skillTargets: selectedSkillTargets(room, opener),
   });
   const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
   const blessingEvents = blessingState.events.map(({ choice, summary }) => ({
@@ -1213,6 +1292,12 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
       }
     }
   } else {
+    if (choice.cardNo === "231") {
+      const targetSlot = selectedTargetSlot(side, cleanTarget);
+      if (!targetSlot || !metalSwordTargets(room).includes(targetSlot)) {
+        return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+      }
+    }
     choice.selectedTarget = cleanTarget || "selected";
   }
   resolveIfBothLocked(room);

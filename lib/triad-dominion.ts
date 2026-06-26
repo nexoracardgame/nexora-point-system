@@ -107,6 +107,7 @@ export type TriadTurnInput = {
   opponent: TriadTriangle;
   prioritySide?: "player" | "opponent";
   skippedSkillCardNos?: string[];
+  skillTargets?: Partial<Record<"player" | "opponent", Partial<Record<string, "player-top" | "bot-top" | string>>>>;
 };
 
 export type TriadTurnResult = {
@@ -365,14 +366,23 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
 
   const effects = statEffects(card.skillText);
   const inferredShape = inferSkillShape(card.skillText, effects);
-  const shape: TriadSkillShape = card.cardNo === "284" ? "swap-control" : card.cardNo === "236" ? "skill-cancel" : inferredShape;
-  const blockedMetric = /Buff|บัฟ|พลังเสริม/i.test(card.skillText)
+  const shape: TriadSkillShape =
+    card.cardNo === "284"
+      ? "swap-control"
+      : card.cardNo === "236"
+        ? "skill-cancel"
+        : card.cardNo === "244"
+          ? "block-stat-gain"
+          : inferredShape;
+  const blockedMetric = card.cardNo === "244"
     ? undefined
-    : /ATTACK/i.test(card.skillText)
-    ? "attack"
-    : /SUPPORT|SUP\b/i.test(card.skillText)
-      ? "support"
-      : undefined;
+    : /Buff|บัฟ|พลังเสริม/i.test(card.skillText)
+      ? undefined
+      : /ATTACK/i.test(card.skillText)
+        ? "attack"
+        : /SUPPORT|SUP\b/i.test(card.skillText)
+          ? "support"
+          : undefined;
   const blockedUseMetric = /ไม่สามารถใช้(?:ค่า|คำ)?\s*ATTACK|cannot use ATTACK|cannot use ATK/i.test(card.skillText)
     ? "attack"
     : /ไม่สามารถใช้(?:ค่า|คำ)?\s*SUPPORT|cannot use SUPPORT|cannot use SUP/i.test(card.skillText)
@@ -500,6 +510,80 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
   };
 }
 
+function cardHighestMetric(card: TriadCard): TriadMetric | "" {
+  if (card.attack === card.support) return "";
+  return card.attack > card.support ? "attack" : "support";
+}
+
+function applyMetalSword(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  targetId: string | undefined,
+  playerScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>
+) {
+  const ownTarget = side === "player" ? "player-top" : "bot-top";
+  const opponentTarget = side === "player" ? "bot-top" : "player-top";
+  const normalizedTarget = targetId === ownTarget || targetId === opponentTarget ? targetId : opponentTarget;
+  const targetScore = normalizedTarget === "player-top" ? playerScore : opponentScore;
+  const targetContribution = targetScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = normalizedTarget === ownTarget ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝั่งตรงข้าม";
+
+  if (!targetContribution) {
+    return {
+      event: {
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: "ไม่พบมอนสเตอร์เป้าหมาย สกิลไม่เกิดผลและกลับไปวัดค่าพลังปกติ",
+        targetLabel,
+        blocked: true,
+      } satisfies TriadSkillEvent,
+    };
+  }
+
+  const metric = cardHighestMetric(targetContribution.card);
+  if (!metric) {
+    return {
+      event: {
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี ATK และ SUP เท่ากัน จึงไม่เข้าเงื่อนไข สกิลไม่เกิดผลและกลับไปวัดค่าพลังปกติ`,
+        targetLabel,
+        blocked: true,
+      } satisfies TriadSkillEvent,
+    };
+  }
+
+  const originalValue = targetContribution.card[metric];
+  const reducedValue = Math.min(originalValue, 2000);
+  const delta = reducedValue - originalValue;
+  if (targetScore.metric === metric) {
+    targetScore.total += delta;
+    const contribution = targetScore.contributions.find((item) => item.lane === "top");
+    if (contribution) contribution.value = Math.max(0, contribution.value + delta);
+  }
+  const label = metric === "attack" ? "ATK" : "SUP";
+  targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} ${originalValue.toLocaleString()} -> ${reducedValue.toLocaleString()}`);
+
+  return {
+    event: {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `เลือก ${targetLabel} No.${targetContribution.card.cardNo} ลดค่าที่สูงที่สุด (${label}) จาก ${originalValue.toLocaleString()} เหลือ ${reducedValue.toLocaleString()} จนจบตา`,
+      targetLabel,
+    } satisfies TriadSkillEvent,
+  };
+}
+
 type StatUseBlocker = {
   sourceSide: "player" | "opponent";
   targetSide: "player" | "opponent";
@@ -566,7 +650,8 @@ function applySkill(
   blockers: StatGainBlocker[] = [],
   skippedSkillCardNos: Set<string> = new Set(),
   cancelledSkillCardNos: Set<string> = new Set(),
-  canCancelOpponentSkill = false
+  canCancelOpponentSkill = false,
+  selectedTarget = ""
 ) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   const unresolved: TriadSkillRule[] = [];
@@ -617,6 +702,19 @@ function applySkill(
     return { unresolved, events };
   }
 
+  if (rule.cardNo === "231") {
+    const result = applyMetalSword(
+      rule,
+      side,
+      selectedTarget,
+      side === "player" ? ownScore : opponentScore,
+      side === "player" ? opponentScore : ownScore
+    );
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${result.event.summary}`);
+    events.push(result.event);
+    return { unresolved, events };
+  }
+
   if (rule.shape === "skill-cancel") {
     if (!canCancelOpponentSkill) {
       ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: cancel opened after the opposing skill already resolved`);
@@ -646,6 +744,28 @@ function applySkill(
   }
 
   if (rule.shape === "block-stat-gain") {
+    const { targetSide, targetLane } = statGainBlockerTarget(rule, side, selectedTarget);
+    const metricLabel = rule.cardNo === "244"
+      ? "ATK/SUP"
+      : rule.blockedMetric === "attack"
+        ? "ATK"
+        : rule.blockedMetric === "support"
+          ? "SUP"
+          : "ATK/SUP";
+    const targetLabel = targetSide === side ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝั่งตรงข้าม";
+    blockers.push({ sourceSide: side, targetSide, targetLane, metric: rule.blockedMetric, rule });
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: rule.cardNo === "244"
+        ? `ล็อกค่า ${metricLabel} ของ ${targetLabel} ไว้เท่าเดิมจนจบตา อีกฝ่ายไม่สามารถบัฟ ลด หรือเปลี่ยนค่านี้ได้`
+        : `ล็อกเป้า ${targetLabel} แล้ว บล็อกบัฟเพิ่ม ${metricLabel} จากสกิลทั้งหมดในตานี้`,
+      targetLabel,
+    });
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: locked ${metricLabel} changes on ${targetSide}${targetLane ? ` ${targetLane}` : ""}`);
     return { unresolved, events };
   }
 
@@ -678,7 +798,8 @@ function applySkill(
     if (targetScore.metric !== "total" && effect.metric === targetScore.metric) {
       const eligibleContributions = targetScore.contributions.filter((item) => elementConditionMatches(rule, item.card));
       const affectsAll = rule.target === "all" || rule.target.endsWith("-all");
-      const affectedCount = affectsAll ? eligibleContributions.length : eligibleContributions.length > 0 ? 1 : 0;
+      const intendedContributions = affectsAll ? eligibleContributions : eligibleContributions.slice(0, 1);
+      const affectedCount = intendedContributions.length;
       if (affectedCount === 0) {
         const condition = elementConditionLabel(rule);
         events.push({
@@ -696,10 +817,14 @@ function applySkill(
         continue;
       }
       const effectTargetSide = targetIsOpponent ? (side === "player" ? "opponent" : "player") : side;
-      const blockedBy = effect.delta > 0
-        ? blockers.find((blocker) => blocker.targetSide === effectTargetSide && (!blocker.metric || blocker.metric === effect.metric))
-        : undefined;
-      if (blockedBy) {
+      const blockedContributions = intendedContributions
+        .map((contribution) => ({
+          contribution,
+          blocker: blockers.find((blocker) => blocker.targetSide === effectTargetSide && statGainBlockerApplies(blocker, effect, contribution)),
+        }))
+        .filter((item): item is { contribution: { card: TriadCard; lane: TriadLane; value: number }; blocker: StatGainBlocker } => Boolean(item.blocker));
+      if (blockedContributions.length > 0) {
+        const blockedBy = blockedContributions[0].blocker;
         const label = effect.metric === "attack" ? "ATK" : "SUP";
         events.push({
           cardNo: rule.cardNo,
@@ -707,13 +832,14 @@ function applySkill(
           side,
           type: rule.shape,
           text: rule.text,
-          summary: `บัฟ ${label} +${effect.delta.toLocaleString()} ถูกบล็อกโดย No.${blockedBy.rule.cardNo} ${blockedBy.rule.name} ค่าเดิมไม่เปลี่ยน`,
+          summary: `${effect.delta > 0 ? "บัฟ" : "เปลี่ยนค่า"} ${label} ${effect.delta >= 0 ? "+" : ""}${effect.delta.toLocaleString()} ถูกบล็อกโดย No.${blockedBy.rule.cardNo} ${blockedBy.rule.name} ค่าเดิมไม่เปลี่ยน`,
           blocked: true,
         });
-        ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} +${effect.delta} ถูกบล็อก`);
-        continue;
+        ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${effect.delta >= 0 ? "+" : ""}${effect.delta} ถูกบล็อก`);
       }
-      const totalDelta = effect.delta * affectedCount;
+      const unblockedCount = intendedContributions.length - blockedContributions.length;
+      if (unblockedCount === 0) continue;
+      const totalDelta = effect.delta * unblockedCount;
       targetScore.total += totalDelta;
       const label = effect.metric === "attack" ? "ATK" : "SUP";
       targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${totalDelta >= 0 ? "+" : ""}${totalDelta}`);
@@ -755,43 +881,37 @@ function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn, skippedSkill
 type StatGainBlocker = {
   sourceSide: "player" | "opponent";
   targetSide: "player" | "opponent";
+  targetLane?: TriadLane;
   metric?: TriadMetric;
   rule: TriadSkillRule;
 };
 
-function collectStatGainBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
-  const blockers: StatGainBlocker[] = [];
-  const events: TriadSkillEvent[] = [];
-  const items = [
-    { side: "player" as const, rule: getLaneSkillRule(player, turn, skippedSkillCardNos) },
-    { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn, skippedSkillCardNos) },
-  ].filter(
-    (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
-      item.rule?.shape === "block-stat-gain" && item.rule.allowedTurns.includes(turn)
-  );
-
-  for (const item of items) {
-    const targetSide =
-      item.rule.target.startsWith("own")
-        ? item.side
-        : item.side === "player"
+function statGainBlockerTarget(rule: TriadSkillRule, side: "player" | "opponent", selectedTarget = ""): { targetSide: "player" | "opponent"; targetLane?: TriadLane } {
+  if (rule.cardNo === "244") {
+    const targetSide: "player" | "opponent" =
+      selectedTarget === "player-top"
+        ? "player"
+        : selectedTarget === "bot-top"
           ? "opponent"
-          : "player";
-    const metricLabel = item.rule.blockedMetric === "attack" ? "ATK" : item.rule.blockedMetric === "support" ? "SUP" : "ATK/SUP";
-    const targetLabel = targetSide === item.side ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝั่งตรงข้าม";
-    blockers.push({ sourceSide: item.side, targetSide, metric: item.rule.blockedMetric, rule: item.rule });
-    events.push({
-      cardNo: item.rule.cardNo,
-      name: item.rule.name,
-      side: item.side,
-      type: item.rule.shape,
-      text: item.rule.text,
-      summary: `ล็อกเป้า ${targetLabel} แล้ว บล็อกบัฟเพิ่ม ${metricLabel} จากสกิลทั้งหมดในตานี้`,
-      targetLabel,
-    });
+          : side === "player"
+            ? "opponent"
+            : "player";
+    return { targetSide, targetLane: "top" as TriadLane };
   }
+  const targetSide: "player" | "opponent" =
+    rule.target.startsWith("own")
+      ? side
+      : side === "player"
+        ? "opponent"
+        : "player";
+  return { targetSide, targetLane: undefined };
+}
 
-  return { blockers, events };
+function statGainBlockerApplies(blocker: StatGainBlocker, effect: TriadSkillEffect, contribution: { lane: TriadLane }) {
+  if (blocker.metric && blocker.metric !== effect.metric) return false;
+  if (blocker.targetLane && blocker.targetLane !== contribution.lane) return false;
+  if (blocker.rule.cardNo === "244") return effect.delta !== 0;
+  return effect.delta > 0;
 }
 
 function collectSkillCancels(
@@ -873,7 +993,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const blockedSkillCardNos = new Set([...skippedSkillCardNos, ...skillCancels.cancelledSkillCardNos]);
   const statUseBlocks = collectStatUseBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos);
-  const statGainBlocks = collectStatGainBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
+  const statGainBlockers: StatGainBlocker[] = [];
   const playerScore = baseScore(
     preScore.player,
     input.turn,
@@ -892,10 +1012,11 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
           opponentScore,
           input.turn,
           "player",
-          statGainBlocks.blockers,
+          statGainBlockers,
           skippedSkillCardNos,
           skillCancels.cancelledSkillCardNos,
-          prioritySide === "player"
+          prioritySide === "player",
+          input.skillTargets?.player?.[getCard(input.player[selectedLane(input.turn)])?.cardNo || ""]
         )
       : applySkill(
           input.opponent,
@@ -903,10 +1024,11 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
           playerScore,
           input.turn,
           "opponent",
-          statGainBlocks.blockers,
+          statGainBlockers,
           skippedSkillCardNos,
           skillCancels.cancelledSkillCardNos,
-          prioritySide === "opponent"
+          prioritySide === "opponent",
+          input.skillTargets?.opponent?.[getCard(input.opponent[selectedLane(input.turn)])?.cardNo || ""]
         );
   const orderedApplied =
     prioritySide === "player"
@@ -927,7 +1049,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: orderedApplied.flatMap((item) => item.unresolved),
-    skillEvents: [...statUseBlocks.events, ...preScore.events, ...statGainBlocks.events, ...orderedApplied.flatMap((item) => item.events)],
+    skillEvents: [...statUseBlocks.events, ...preScore.events, ...orderedApplied.flatMap((item) => item.events)],
   };
 }
 

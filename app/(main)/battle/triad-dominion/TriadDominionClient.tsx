@@ -4,7 +4,6 @@ import Image from "next/image";
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
-  Brain,
   Check,
   ChevronRight,
   Crosshair,
@@ -707,6 +706,39 @@ function turnForLane(lane: Lane): TriadTurn {
   return 3;
 }
 
+function roomOpeningSide(room: TriadRoom): RoomPlayerSide | null {
+  if (room.game.activeTurn === 1) return "host";
+  const previousTurn = (room.game.activeTurn - 1) as TriadTurn;
+  const previousResult = room.game.turns.find((turn) => turn.turn === previousTurn);
+  if (!previousResult) return "host";
+  if (previousResult.winner === "draw") {
+    if (previousTurn === 1 && room.game.openerTieBreak.status === "resolved" && room.game.openerTieBreak.winner) {
+      return room.game.openerTieBreak.winner;
+    }
+    if (previousTurn === 1) return null;
+    const latestResolvedWinner = room.game.turns
+      .filter((turn) => turn.turn < previousTurn && turn.winner !== "draw")
+      .sort((a, b) => b.turn - a.turn)[0];
+    if (latestResolvedWinner) return latestResolvedWinner.winner === "player" ? "host" : "challenger";
+    return "host";
+  }
+  return previousResult.winner === "player" ? "host" : "challenger";
+}
+
+function currentQueuedSkillChoice(room: TriadRoom) {
+  const opener = roomOpeningSide(room);
+  const order: RoomPlayerSide[] = opener === "challenger" ? ["challenger", "host"] : ["host", "challenger"];
+  const choices = room.game.skillChoices.filter(
+    (choice) => choice.fightNo === room.game.fightNo && choice.turn === room.game.activeTurn && !choice.skipped
+  );
+  for (const side of order) {
+    const choice = choices.find((item) => item.side === side);
+    if (!choice) continue;
+    if (!choice.selectedTarget) return choice;
+  }
+  return null;
+}
+
 function cardLabel(card?: CardView) {
   if (!card) return "ว่าง";
   return `โจมตี ${card.attack.toLocaleString()} / ช่วย ${card.support.toLocaleString()}`;
@@ -937,15 +969,25 @@ function validateDeckForMode(cards: CardView[], mode: DeckMode) {
 }
 
 function skillNeedsChoice(card?: CardView) {
-  return Boolean(card?.kind === "skill" && (card.cardNo === "254" || /เลือก|choose|target/i.test(card.skillText)));
+  return Boolean(card?.kind === "skill" && (card.cardNo === "254" || card.cardNo === "231" || /เลือก|choose|target/i.test(card.skillText)));
 }
 
-function getSelectableSkillTargetIds(card?: CardView, side: Side = "player"): SkillTargetId[] {
+function monsterHasUnequalStats(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.attack !== card.support);
+}
+
+function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView): SkillTargetId[] {
   const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
   const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
 
   if (!rule) return [ownTarget];
+  if (card?.cardNo === "231") {
+    return [
+      monsterHasUnequalStats(playerTop) ? "player-top" as const : null,
+      monsterHasUnequalStats(botTop) ? "bot-top" as const : null,
+    ].filter((target): target is SkillTargetId => Boolean(target));
+  }
   if (rule.target.startsWith("own")) return [ownTarget];
   if (rule.target.startsWith("opponent")) return [opponentTarget];
   if (rule.target === "any-one" || rule.target === "all") return [ownTarget, opponentTarget];
@@ -1334,7 +1376,6 @@ function RevealSpotlight({
       {isScored ? (
         <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
-      <div className="absolute inset-x-[12%] top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_34px_rgba(34,211,238,0.75)]" />
       <div className="relative grid w-[min(680px,88cqw)] items-center gap-2 sm:grid-cols-[1fr_minmax(150px,auto)_1fr] sm:gap-3">
         <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
           {showPlayer && playerCard ? (
@@ -2445,6 +2486,8 @@ function SkillTargetOverlay({
   side,
   playerTop,
   botTop,
+  targetPlayerTop,
+  targetBotTop,
   selectedTarget,
   timeLeft,
   onSelect,
@@ -2454,6 +2497,8 @@ function SkillTargetOverlay({
   side: Side;
   playerTop?: CardView;
   botTop?: CardView;
+  targetPlayerTop?: CardView;
+  targetBotTop?: CardView;
   selectedTarget: PendingSkillChoice["selectedTarget"];
   timeLeft: number;
   onSelect: (target: SkillTargetId) => void;
@@ -2461,7 +2506,7 @@ function SkillTargetOverlay({
 }) {
   if (!card) return null;
 
-  const selectableTargetIds = new Set(getSelectableSkillTargetIds(card, side));
+  const selectableTargetIds = new Set(getSelectableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop));
   const targets = [
     { id: "player-top" as const, label: "การ์ดหลักเรา", card: playerTop, tone: "border-red-300/60" },
     { id: "bot-top" as const, label: "การ์ดหลักคู่แข่ง", card: botTop, tone: "border-cyan-300/60" },
@@ -2614,37 +2659,6 @@ function ReadyAdvanceButton({
   );
 }
 
-function RoomLockCardButton({
-  onClick,
-  disabled,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="group relative flex min-h-[68px] w-full items-center justify-between overflow-hidden rounded-2xl border border-cyan-100/26 bg-[linear-gradient(135deg,rgba(34,211,238,0.18),rgba(251,191,36,0.14),rgba(255,255,255,0.055))] px-4 text-left font-black text-white shadow-[0_0_34px_rgba(34,211,238,0.18),inset_0_0_0_1px_rgba(255,255,255,0.04)] transition hover:-translate-y-0.5 hover:border-amber-100/45 hover:shadow-[0_0_48px_rgba(251,191,36,0.20)] active:scale-[0.985] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.045] disabled:text-white/30 disabled:shadow-none"
-    >
-      <span className="absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.18),transparent)] opacity-0 transition group-hover:translate-x-full group-hover:opacity-100" />
-      <span className="relative z-10 flex min-w-0 items-center gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-200/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.14)]">
-          <Brain className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 leading-tight">
-          <span className="block truncate text-base">ล็อกการ์ด</span>
-          <span className="mt-1 block truncate text-[10px] uppercase tracking-[0.12em] text-cyan-100/58">
-            ยืนยันการ์ดตานี้
-          </span>
-        </span>
-      </span>
-      <Lock className="relative z-10 h-5 w-5 shrink-0 text-amber-100/68" />
-    </button>
-  );
-}
-
 function TimeoutWarningOverlay({
   secondsLeft,
   missingNames,
@@ -2766,7 +2780,9 @@ function CompactBattleBoard({
   const canEditPlayerSlots = !turnLocked && !revealAllCards;
   const skillChoiceForAura = pendingSkillChoice || waitingSkillChoice || null;
   const pendingSkillCard = pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined;
-  const pendingFallbackTargets = pendingSkillChoice ? getSelectableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side) : [];
+  const pendingFallbackTargets = pendingSkillChoice
+    ? getSelectableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top))
+    : [];
   const pendingTarget = pendingSkillChoice?.selectedTarget || (pendingFallbackTargets.length === 1 ? pendingFallbackTargets[0] : "");
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
   const botAuraByLane: Partial<Record<Lane, TargetAura>> = {};
@@ -2789,8 +2805,6 @@ function CompactBattleBoard({
   }
   if (blessingAuras?.player) playerAuraByLane.top = blessingAuras.player;
   if (blessingAuras?.bot) botAuraByLane.top = blessingAuras.bot;
-  const waitingCard = waitingSkillChoice ? cardsByNo.get(waitingSkillChoice.cardNo) : undefined;
-
   return (
     <div className="relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
       <CardHoverPreview card={previewCard} />
@@ -2832,13 +2846,15 @@ function CompactBattleBoard({
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
         side={pendingSkillChoice?.side || "player"}
         playerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
-        botTop={displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined}
+        botTop={botVisible("top") && displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined}
+        targetPlayerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
+        targetBotTop={displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined}
         selectedTarget={pendingSkillChoice?.selectedTarget || ""}
         timeLeft={timeLeft}
         onSelect={(target) => {
           if (!pendingSkillChoice) return;
           const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-          if (!getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side).includes(target)) return;
+          if (!getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined).includes(target)) return;
           onSelectSkillTarget(target);
         }}
         onConfirm={onConfirmSkillTarget}
@@ -2850,7 +2866,7 @@ function CompactBattleBoard({
         <div className="absolute bottom-4 right-4 top-16 z-40 flex w-[min(430px,calc(100%-2rem))] items-center">
           <div className="w-full rounded-2xl border border-red-300/35 bg-[#090507]/94 p-5 text-center shadow-[0_0_72px_rgba(248,113,113,0.34)] backdrop-blur-md">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-red-100/64">รอฝ่ายตรงข้ามเลือกเป้าหมาย</div>
-            <div className="mt-2 text-2xl font-black uppercase text-white">{waitingCard?.name || `No.${waitingSkillChoice.cardNo}`}</div>
+            <div className="mt-2 text-2xl font-black uppercase text-white">กำลังเปิดสกิล</div>
             <div className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-6 text-white/60">
               อีกฝ่ายกำลังเลือกเป้าหมายสกิล การ์ดที่เกี่ยวข้องจะมีออร่าสีแดงจนกว่าตานี้จะตัดสินผล
             </div>
@@ -3158,16 +3174,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         : currentDeckMode === "monster"
           ? `โหมดนี้ใช้การ์ดมอนสเตอร์ทั้งหมด ${DECK_SIZE} ใบ`
           : "โหมดนี้ต้องมีมอนสเตอร์อย่างน้อย 3 ใบ ที่เหลือเลือกการ์ดใดก็ได้";
-  const ownPendingRoomSkillChoice = currentRoom && roomPlayerSide
-    ? currentRoom.game.skillChoices.find(
-        (choice) =>
-          choice.fightNo === currentRoom.game.fightNo &&
-          choice.turn === currentRoom.game.activeTurn &&
-          choice.side === roomPlayerSide &&
-          !choice.selectedTarget &&
-          !choice.skipped
-      ) || null
-    : null;
+  const queuedRoomSkillChoice = currentRoom ? currentQueuedSkillChoice(currentRoom) : null;
+  const ownPendingRoomSkillChoice =
+    queuedRoomSkillChoice && queuedRoomSkillChoice.side === roomPlayerSide ? queuedRoomSkillChoice : null;
   const ownPendingRoomBlessingChoice = currentRoom && roomPlayerSide
     ? currentRoom.game.skillChoices.find(
         (choice) =>
@@ -3208,21 +3217,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (affectedActualSide === botActualSide) return { bot: "pending" as TargetAura };
     return null;
   })();
-  const waitingPendingRoomSkillChoice = currentRoom
-    ? currentRoom.game.skillChoices.find(
-        (choice) =>
-          choice.fightNo === currentRoom.game.fightNo &&
-          choice.turn === currentRoom.game.activeTurn &&
-          choice.side !== roomPlayerSide &&
-          !choice.selectedTarget &&
-          !choice.skipped
-      ) || null
-    : null;
+  const waitingPendingRoomSkillChoice =
+    queuedRoomSkillChoice && queuedRoomSkillChoice.side !== roomPlayerSide ? queuedRoomSkillChoice : null;
   const waitingSkillChoice: PendingSkillChoice | null = waitingPendingRoomSkillChoice
     ? {
         side: "bot",
         lane: waitingPendingRoomSkillChoice.lane,
-        cardNo: waitingPendingRoomSkillChoice.cardNo,
+        cardNo: "",
         selectedTarget: "",
       }
     : null;
@@ -4037,27 +4038,27 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
-    if (turnLocked || matchDone || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return;
+    if (turnLocked || matchDone || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return false;
     const alreadyPlayedLane = (["top", "left", "right"] as Lane[]).find((item) => item !== lane && player[item] === cardNo);
-    if (alreadyPlayedLane) return;
+    if (alreadyPlayedLane) return false;
     const card = cardsByNo.get(cardNo);
     if (lane === "top" && card?.kind !== "monster") {
       setBattleLog((current) => ["ตาแรกต้องวางการ์ดมอนสเตอร์เท่านั้น", ...current]);
-      return;
+      return false;
     }
     if (lane === "top" && card?.kind !== "monster") {
       setBattleLog((current) => ["ตา 1 ต้องวางมอนสเตอร์เป็นการ์ดหลัก", ...current]);
-      return;
+      return false;
     }
     if (currentDeckMode === "monster" && card?.kind !== "monster") {
       setBattleLog((current) => ["โหมด MONSTER ใช้การ์ดมอนสเตอร์เท่านั้น", ...current]);
-      return;
+      return false;
     }
     if (currentDeckMode === "skill" && lane !== "top" && card?.kind !== "skill") {
       setBattleLog((current) => ["โหมด SKILL ใช้การ์ดสกิลในตานี้เท่านั้น", ...current]);
-      return;
+      return false;
     }
-    if (lane !== "top" && card?.kind !== "monster" && card?.kind !== "skill") return;
+    if (lane !== "top" && card?.kind !== "monster" && card?.kind !== "skill") return false;
     setPlayer((current) => {
       const next = { ...current };
       (["top", "left", "right"] as Lane[]).forEach((item) => {
@@ -4066,12 +4067,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       next[lane] = cardNo;
       return next;
     });
-  };
-
-  const placeCardFromHand = (cardNo: string) => {
-    const activeLane = laneForTurn(activeTurn);
-    setPlacementLane(activeLane);
-    setPlayerLane(activeLane, cardNo);
+    return true;
   };
 
   const drawRandomCard = () => {
@@ -4089,18 +4085,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return card?.cardNo || "";
   };
 
-  const lockFight = () => {
-    const lane = laneForTurn(activeTurn);
-    if (!player[lane]) {
+  const lockFight = (cardNoOverride = "", laneOverride?: Lane) => {
+    const lane = laneOverride || laneForTurn(activeTurn);
+    const playerForLock = cardNoOverride ? { ...player, [lane]: cardNoOverride } : player;
+    if (!playerForLock[lane]) {
       setBattleLog((current) => [`เลือกการ์ด 1 ใบสำหรับตาที่ ${activeTurn} ก่อนกดล็อก`, ...current]);
       return;
     }
 
-    const playerCard = cardsByNo.get(player[lane] || "");
+    const playerCard = cardsByNo.get(playerForLock[lane] || "");
     const turnPrioritySide = lastTurnWinner === "bot" ? "opponent" : "player";
 
     if (currentRoom && roomPlayerSide && opponentSide) {
-      const needsSkillChoice = Boolean(playerCard && skillNeedsChoice(playerCard));
+      const previewOpponentTop = opponentSide ? cardsByNo.get(currentRoom.game.triangles[opponentSide].top) : undefined;
+      const needsSkillChoice = Boolean(
+        playerCard &&
+          skillNeedsChoice(playerCard) &&
+          getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(playerForLock.top), previewOpponentTop).length > 0
+      );
       const previousRoom = currentRoom;
       patchCurrentRoom((room) => ({
         ...room,
@@ -4110,12 +4112,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             ...room.game.triangles,
             [roomPlayerSide]: {
               ...room.game.triangles[roomPlayerSide],
-              [lane]: player[lane],
+              [lane]: playerForLock[lane],
             },
           },
           usedCards: {
             ...room.game.usedCards,
-            [roomPlayerSide]: Array.from(new Set([...(room.game.usedCards[roomPlayerSide] || []), player[lane]].filter(Boolean))),
+            [roomPlayerSide]: Array.from(new Set([...(room.game.usedCards[roomPlayerSide] || []), playerForLock[lane]].filter(Boolean))),
           },
           skillChoices: needsSkillChoice
             ? [
@@ -4144,7 +4146,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       void postRoomAction({
         action: "lock-card",
         code: currentRoom.code,
-        cardNo: player[lane],
+        cardNo: playerForLock[lane],
       }).then((result) => {
         if (!result.ok) {
           setTurnLocked(false);
@@ -4166,30 +4168,59 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const baseBot = lockedFight?.bot || { top: "", left: "", right: "" };
     const botCardNo = chooseBotCardForTurn({
       turn: activeTurn,
-      player,
+      player: playerForLock,
       bot: baseBot,
       botDeckCards: availableBotCards,
       deckMode: currentDeckMode,
     });
     const bot = { ...baseBot, [lane]: botCardNo };
     if (playerCard?.cardNo === "254") {
-      setLockedFight({ fightNo, player, bot, turns: lockedFight?.turns || [] });
+      setLockedFight({ fightNo, player: playerForLock, bot, turns: lockedFight?.turns || [] });
       setTurnLocked(true);
-      setPendingBlessingChoice({ side: "player", lane, player, bot });
+      setPendingBlessingChoice({ side: "player", lane, player: playerForLock, bot });
       setTimeLeft(TURN_SECONDS);
       setBattleLog((current) => [`${playerCard.name}: เลือกพร 1 ข้อเพื่อให้ผลเกิดทันที`, ...current]);
       return;
     }
 
     if (playerCard && skillNeedsChoice(playerCard)) {
-      const targets = getSelectableSkillTargetIds(playerCard, "player");
-      if (targets.length === 1) {
-        const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot, prioritySide: turnPrioritySide });
+      const targets = getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top));
+      if (targets.length === 0) {
+        const result = resolveTriadTurn({
+          turn: activeTurn,
+          player: playerForLock,
+          opponent: bot,
+          prioritySide: turnPrioritySide,
+        });
         const turns = [
           ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
           result,
         ].sort((a, b) => a.turn - b.turn);
-        setLockedFight({ fightNo, player, bot, turns });
+        setLockedFight({ fightNo, player: playerForLock, bot, turns });
+        setTurnLocked(true);
+        setBattleLog((current) => [
+          `${playerCard.name}: ไม่มีเป้าหมายที่เข้าเงื่อนไข สกิลไม่เกิดผล`,
+          ...current,
+        ]);
+        return;
+      }
+      if (targets.length === 1) {
+        const result = resolveTriadTurn({
+          turn: activeTurn,
+          player: playerForLock,
+          opponent: bot,
+          prioritySide: turnPrioritySide,
+          skillTargets: {
+            player: {
+              [playerCard.cardNo]: targets[0],
+            },
+          },
+        });
+        const turns = [
+          ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
+          result,
+        ].sort((a, b) => a.turn - b.turn);
+        setLockedFight({ fightNo, player: playerForLock, bot, turns });
         setTurnLocked(true);
         setBattleLog((current) => [
           `${playerCard.name}: เลือกเป้าหมายอัตโนมัติแล้ว (${targets[0] === "bot-top" ? "มอนสเตอร์หลักฝั่งตรงข้าม" : "มอนสเตอร์หลักฝั่งเรา"})`,
@@ -4197,7 +4228,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         ]);
         return;
       }
-      setLockedFight({ fightNo, player, bot, turns: lockedFight?.turns || [] });
+      setLockedFight({ fightNo, player: playerForLock, bot, turns: lockedFight?.turns || [] });
       setTurnLocked(true);
       setPendingSkillChoice({ side: "player", lane, cardNo: playerCard.cardNo, selectedTarget: "" });
       setTimeLeft(TURN_SECONDS);
@@ -4205,27 +4236,45 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
-    const result = resolveTriadTurn({ turn: activeTurn, player, opponent: bot, prioritySide: turnPrioritySide });
+    const result = resolveTriadTurn({ turn: activeTurn, player: playerForLock, opponent: bot, prioritySide: turnPrioritySide });
     const turns = [
       ...(lockedFight?.turns.filter((turn) => turn.turn !== activeTurn) || []),
       result,
     ].sort((a, b) => a.turn - b.turn);
 
-    setLockedFight({ fightNo, player, bot, turns });
+    setLockedFight({ fightNo, player: playerForLock, bot, turns });
     setTurnLocked(true);
     setBattleLog((current) => [
-      `รอบสู้ ${fightNo} ตา ${activeTurn}: ล็อกการ์ด ${player[lane]} แล้ว`,
+      `รอบสู้ ${fightNo} ตา ${activeTurn}: ล็อกการ์ด ${playerForLock[lane]} แล้ว`,
       ...current,
     ]);
+  };
+
+  const placeAndLockCard = (lane: Lane, cardNo: string) => {
+    setPlacementLane(lane);
+    if (setPlayerLane(lane, cardNo)) {
+      lockFight(cardNo, lane);
+    }
+  };
+
+  const placeCardFromHand = (cardNo: string) => {
+    placeAndLockCard(laneForTurn(activeTurn), cardNo);
   };
 
   const confirmSkillTarget = () => {
     if (!pendingSkillChoice || !lockedFight) return;
     const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-    const fallbackTargets = getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side);
+    const fallbackTargets = getSelectableSkillTargetIds(
+      skillCard,
+      pendingSkillChoice.side,
+      cardsByNo.get(lockedFight.player.top),
+      cardsByNo.get(lockedFight.bot.top)
+    );
     const selectedTarget = pendingSkillChoice.selectedTarget || (fallbackTargets.length === 1 ? fallbackTargets[0] : "");
     if (!selectedTarget) return;
-    const selectableTargetIds = new Set(getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side));
+    const selectableTargetIds = new Set(
+      getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top))
+    );
     if (!selectableTargetIds.has(selectedTarget)) {
       setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: "" } : current));
       setBattleLog((current) => [
@@ -4272,6 +4321,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       player: lockedFight.player,
       opponent: lockedFight.bot,
       prioritySide: lastTurnWinner === "bot" ? "opponent" : "player",
+      skillTargets: {
+        player: {
+          [pendingSkillChoice.cardNo]: selectedTarget,
+        },
+      },
     });
     const turns = [
       ...lockedFight.turns.filter((turn) => turn.turn !== activeTurn),
@@ -4641,24 +4695,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         disabled={myTurnReady}
       />
     ) : null;
-  const showRoomLockCardButton = Boolean(
-    !isSpectator &&
-      isPvpRoom &&
-      roomPlayerSide &&
-      !displayTurnLocked &&
-      !displayCurrentResult &&
-      !matchDone
-  );
   const renderRoomBattleActions = () =>
-    showReadyAdvanceButton || showRoomLockCardButton ? (
+    showReadyAdvanceButton ? (
       <div className="space-y-2">
         {renderReadyAdvanceButton()}
-        {showRoomLockCardButton ? (
-          <RoomLockCardButton
-            onClick={lockFight}
-            disabled={matchDone || isSpectator}
-          />
-        ) : null}
       </div>
     ) : null;
   useEffect(() => {
@@ -5470,10 +5510,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   void drawRandomCard();
                 }}
                 onSelectLane={setPlacementLane}
-                onPlaceCard={(lane, cardNo) => {
-                  setPlacementLane(lane);
-                  setPlayerLane(lane, cardNo);
-                }}
+                onPlaceCard={placeAndLockCard}
               />
               <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" onPreview={setSpectatorPreviewCard} />
             </div>
@@ -5513,10 +5550,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 void drawRandomCard();
               }}
               onSelectLane={setPlacementLane}
-              onPlaceCard={(lane, cardNo) => {
-                setPlacementLane(lane);
-                setPlayerLane(lane, cardNo);
-              }}
+              onPlaceCard={placeAndLockCard}
             />
           )}
           <BlessingChoiceOverlay card={pendingBlessingChoice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
@@ -5532,10 +5566,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               highlightCardNo={displayRandomDrawCardNo}
               onSelectLane={setPlacementLane}
               onPlayCard={placeCardFromHand}
-              onDropToLane={(lane, cardNo) => {
-                setPlacementLane(lane);
-                setPlayerLane(lane, cardNo);
-              }}
+              onDropToLane={placeAndLockCard}
             />
           ) : null}
 
@@ -5639,28 +5670,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   )
                 ) : (
                   <>
-                    {!displayTurnLocked && !displayCurrentResult ? (
-                      isPvpRoom ? null : (
-                        <button
-                          type="button"
-                          onClick={lockFight}
-                          disabled={matchDone || isSpectator}
-                          className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 md:flex-none"
-                        >
-                          <Brain className="h-4 w-4" />
-                          ล็อกการ์ด
-                        </button>
-                      )
+                    {!isSpectator && canRevealTurn && displayLockedFight && !activeTurnScored ? (
+                      <button
+                        type="button"
+                        onClick={revealNext}
+                        className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
+                      >
+                        {revealButtonLabel}
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={revealNext}
-                      disabled={isSpectator || !canRevealTurn || !displayLockedFight || activeTurnScored}
-                      className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/32 md:flex-none"
-                    >
-                      {revealButtonLabel}
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
                   </>
                 )}
               </div>
