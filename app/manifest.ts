@@ -8,9 +8,12 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     start_url: "/",
     scope: "/",
-    display: "standalone",
+    display: "fullscreen",
+    display_override: ["fullscreen", "standalone"],
+    orientation: "any",
     background_color: "#050507",
     theme_color: "#050507",
+    categories: ["games", "entertainment"],
     icons: [
       {
         src: "/icon-192.png",

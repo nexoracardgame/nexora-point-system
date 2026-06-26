@@ -16,9 +16,20 @@ export default function RootChrome({
   const pathname = usePathname() || "";
   const isEmbedRoute =
     pathname.startsWith("/blaze-embed") || pathname.startsWith("/market-embed");
+  const isBattleRoute = pathname.startsWith("/battle");
 
   if (isEmbedRoute) {
     return children;
+  }
+
+  if (isBattleRoute) {
+    return (
+      <>
+        <NexoraDialogProvider />
+        <PushNotificationBootstrap />
+        {children}
+      </>
+    );
   }
 
   return (

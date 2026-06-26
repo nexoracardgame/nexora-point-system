@@ -3,9 +3,9 @@
 import Image from "next/image";
 import { Noto_Sans_Thai } from "next/font/google";
 import { useEffect, useState } from "react";
-import { Swords } from "lucide-react";
 import AppInstallButton from "@/components/AppInstallButton";
 import AppStoreButton from "@/components/AppStoreButton";
+import BattleAppLauncher from "@/components/BattleAppLauncher";
 import GooglePlayButton from "@/components/GooglePlayButton";
 import PrefetchLink from "@/components/PrefetchLink";
 import WindowsDownloadButton from "@/components/WindowsDownloadButton";
@@ -231,13 +231,7 @@ export default function NexoraLuxuryHome() {
 
       <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center gap-3 sm:flex">
         <AppInstallButton variant="dark" />
-        <PrefetchLink
-          href="/battle/triad-dominion"
-          className="pointer-events-auto inline-flex min-h-12 items-center gap-2 rounded-2xl bg-[#10141c] px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_rgba(0,0,0,0.18)] ring-1 ring-black/10 transition hover:scale-[1.03] hover:bg-black active:scale-[0.98]"
-        >
-          <Swords className="h-4 w-4 text-amber-300" />
-          TEST BATTLE
-        </PrefetchLink>
+        <BattleAppLauncher mode="button" />
         {showDownloadStoreButtons ? (
           <>
             <WindowsDownloadButton />

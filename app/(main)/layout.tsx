@@ -253,7 +253,7 @@ export default function MainLayout({
     pathname.startsWith("/dm/") ||
     pathname.startsWith("/market/deals/chat/") ||
     pathname.startsWith("/buy-market/deals/chat/");
-  const isBattleCardPage = pathname.startsWith("/battle/triad-dominion");
+  const isBattleCardPage = pathname.startsWith("/battle");
   const hideFloatingChatOnMobile = pathname === "/dm" || isChatRoomPage || isBattleCardPage;
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1096,6 +1096,7 @@ export default function MainLayout({
     const importantRoutes = [
       "/",
       "/market",
+      "/battle",
       "/battle/triad-dominion",
       "/box-market",
       "/card-bank",
@@ -1278,7 +1279,7 @@ export default function MainLayout({
         active: pathname.startsWith("/card-bank"),
       },
       {
-        href: "/battle/triad-dominion",
+        href: "/battle",
         label: "Battle Card",
         icon: Swords,
         active: pathname.startsWith("/battle"),
@@ -1345,7 +1346,7 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
-        href: "/battle/triad-dominion",
+        href: "/battle",
         label: "Battle",
         icon: Swords,
         active: pathname.startsWith("/battle"),
