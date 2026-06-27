@@ -1869,11 +1869,17 @@ function HandCard({
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
-  const touchPreviewHandledRef = useRef(false);
+  const previewTapStampRef = useRef(0);
   const isPreviewOnlyInput = () =>
     Boolean(previewOnly) ||
     (typeof window !== "undefined" &&
       (window.matchMedia("(hover: none), (pointer: coarse)").matches || window.navigator.maxTouchPoints > 0));
+  const openPreviewFromTap = () => {
+    const now = Date.now();
+    if (now - previewTapStampRef.current < 120) return;
+    previewTapStampRef.current = now;
+    onPreview(card);
+  };
 
   return (
     <button
@@ -1882,11 +1888,7 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          if (touchPreviewHandledRef.current) {
-            touchPreviewHandledRef.current = false;
-            return;
-          }
-          onPreview(card);
+          openPreviewFromTap();
           return;
         }
         if (disabled || used) {
@@ -1913,10 +1915,7 @@ function HandCard({
       }}
       onPointerDown={(event) => {
         if (!isPreviewOnlyInput()) return;
-        event.preventDefault();
         event.stopPropagation();
-        touchPreviewHandledRef.current = true;
-        onPreview(card);
       }}
       draggable={!previewOnly && !disabled && !used}
       onDragStart={(event) => {
@@ -1931,6 +1930,7 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
+          openPreviewFromTap();
           return;
         }
         if (disabled || used) return;
@@ -1940,6 +1940,14 @@ function HandCard({
           ?.closest<HTMLElement>("[data-triad-lane]");
         const lane = target?.dataset.triadLane as Lane | undefined;
         if (lane) onDropToLane(lane, card.cardNo);
+      }}
+      onTouchEnd={(event) => {
+        if (isPreviewOnlyInput()) {
+          event.preventDefault();
+          event.stopPropagation();
+          openPreviewFromTap();
+          return;
+        }
       }}
       aria-disabled={disabled || used}
       className={`group relative z-[2] min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [pointer-events:auto] ${
