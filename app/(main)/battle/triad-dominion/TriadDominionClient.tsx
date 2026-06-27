@@ -54,6 +54,8 @@ import {
   type TriadRoomRealtimePayload,
 } from "@/lib/triad-room-realtime";
 
+const TRIAD_CARD_BACK_SRC = "/cards/card-backs/card-backs.png";
+
 type CardView = {
   cardNo: string;
   name: string;
@@ -1192,15 +1194,9 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
 
 function hiddenCard() {
   return (
-    <div className="grid aspect-[3/4] place-items-center overflow-hidden rounded-2xl border border-cyan-200/20 bg-[radial-gradient(circle_at_50%_25%,rgba(34,211,238,0.28),rgba(7,12,22,0.98)_58%)] shadow-[0_22px_60px_rgba(0,0,0,0.38)]">
-      <div className="text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-cyan-200/20 bg-cyan-200/10">
-          <Lock className="h-7 w-7 text-cyan-100" />
-        </div>
-        <div className="mt-3 text-xs font-black uppercase tracking-[0.22em] text-white/48">
-          ปิดไว้
-        </div>
-      </div>
+    <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-200/20 bg-black shadow-[0_22px_60px_rgba(0,0,0,0.38)]">
+      <Image src={TRIAD_CARD_BACK_SRC} alt="Card back" fill sizes="260px" quality={72} className="object-cover" />
+      <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_24%,rgba(0,0,0,0.2))]" />
     </div>
   );
 }
@@ -1434,13 +1430,7 @@ function BoardCardSlot({
       : tone === "bot"
         ? "from-cyan-300/34 via-sky-200/10 to-transparent"
         : "from-amber-300/38 via-yellow-100/12 to-transparent";
-  const labelTone =
-    tone === "player"
-      ? "border-red-200/28 bg-red-500/12 text-red-50/78"
-      : tone === "bot"
-        ? "border-cyan-200/28 bg-cyan-400/12 text-cyan-50/78"
-        : "border-amber-200/34 bg-amber-300/14 text-amber-50/82";
-  const activeGlow = active ? "shadow-[0_0_42px_rgba(251,191,36,0.42),0_18px_42px_rgba(0,0,0,0.48)] ring-2 ring-amber-300/80" : "";
+  const activeGlow = active ? "shadow-[0_0_34px_rgba(251,191,36,0.34),0_18px_42px_rgba(0,0,0,0.48)]" : "";
 
   return (
     <div
@@ -1454,7 +1444,7 @@ function BoardCardSlot({
               : ""
       }`}
     >
-      <div className={`pointer-events-none absolute -inset-2 rounded-[18px] bg-gradient-to-br ${slotGlow} opacity-55 blur-xl transition-opacity duration-200 ${active ? "opacity-95" : ""}`} />
+      <div className={`pointer-events-none absolute -inset-2 rounded-[18px] bg-gradient-to-br ${slotGlow} opacity-45 blur-xl transition-opacity duration-200 ${active ? "opacity-80" : ""}`} />
       <div className="pointer-events-none absolute -inset-px rounded-[13px] bg-[linear-gradient(135deg,rgba(255,255,255,0.28),transparent_26%,rgba(255,255,255,0.08)_52%,transparent_72%)] opacity-55" />
       {aura ? (
         <div
@@ -1473,12 +1463,18 @@ function BoardCardSlot({
         {card && !hidden ? (
           <Image src={card.sourceImage} alt={card.name} fill sizes="128px" className="object-cover" />
         ) : (
-          <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),rgba(13,12,15,0.98)_44%,rgba(0,0,0,1)_72%)]">
-            <div className="absolute inset-2 rounded-[8px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]" />
-            <div className={`relative z-[4] rounded-full border px-2 py-1 text-center text-[10px] font-black uppercase tracking-[0.16em] backdrop-blur-sm ${labelTone}`}>
-              {hidden ? "ปิดไว้" : label}
-            </div>
-          </div>
+          <>
+            <Image
+              src={TRIAD_CARD_BACK_SRC}
+              alt={`${label} card back`}
+              fill
+              sizes="128px"
+              quality={72}
+              priority={active}
+              className="object-cover"
+            />
+            <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_22%,rgba(0,0,0,0.22))]" />
+          </>
         )}
       </div>
       <div className={`pointer-events-none absolute -bottom-2 left-1/2 h-3 w-[78%] -translate-x-1/2 rounded-full bg-black/70 blur-md ${active ? "opacity-90" : "opacity-55"}`} />
