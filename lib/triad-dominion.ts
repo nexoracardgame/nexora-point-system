@@ -266,10 +266,14 @@ function displayCardName(card: SourceCard, kind: TriadCardKind) {
   if (directThaiName) return directThaiName;
 
   const normalizedNo = normalizeCardNo(card.cardNo);
-  const raw = String(card.rawText || "").replace(/\s+/g, " ").trim();
-  const afterCardNo = raw.match(new RegExp(`Card\\s*No\\.?\\s*${Number(normalizedNo)}\\s+([\\u0E00-\\u0E7F]+)`, "i"))?.[1];
+  const rawOriginal = String(card.rawText || "").trim();
+  const raw = rawOriginal.replace(/\s+/g, " ").trim();
+  const numericNo = Number.parseInt(normalizedNo, 10);
+  const cardNoPattern = Number.isFinite(numericNo) ? `0*${numericNo}` : normalizedNo;
+  const afterCardNoSource = raw.match(new RegExp(`Card\\s*No\\.?\\s*${cardNoPattern}\\s+(.{0,90})`, "i"))?.[1] || "";
+  const afterCardNo = firstThaiToken(afterCardNoSource);
   if (afterCardNo) return afterCardNo;
-  const afterLeadingCode = raw.match(/^[A-Z0-9\s/.-]+(?:\d+)?\s+([\u0E00-\u0E7F]+)/)?.[1];
+  const afterLeadingCode = raw.match(/^[A-Z0-9\s/.-]+(?:\d+)?\s+([\u0E00-\u0E7F]+)/i)?.[1];
   if (afterLeadingCode) return afterLeadingCode;
   return fallback;
 }

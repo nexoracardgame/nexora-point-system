@@ -1549,6 +1549,15 @@ function RevealSpotlight({
   const isSwapSkill = skillEvent?.type === "swap-control";
   const scoreText = result ? `${result.playerTotal.toLocaleString()} ปะทะ ${result.opponentTotal.toLocaleString()}` : "";
   const winnerText = result?.winner === "draw" ? "เสมอ" : playerWins ? `${playerName} ได้แต้ม` : `${botName} ได้แต้ม`;
+  const hasThaiText = (value: string) => new RegExp("[\\u0E00-\\u0E7F]").test(value);
+  const skillNameForEvent = (cardNo: string, fallback: string) => {
+    const dbName = cardNo ? triadCardByNo.get(cardNo)?.name || "" : "";
+    if (dbName && hasThaiText(dbName)) return dbName;
+    if (fallback && hasThaiText(fallback)) return fallback;
+    return cardNo ? `สกิล No.${cardNo}` : fallback;
+  };
+  const priorityName = result?.prioritySide === "opponent" ? botName : playerName;
+  const secondPriorityName = result?.prioritySide === "opponent" ? playerName : botName;
   const timeline =
     skillEvents.length > 0
       ? skillEvents
@@ -1615,8 +1624,19 @@ function RevealSpotlight({
               : "right-[clamp(84px,11cqw,150px)] top-[calc(100%+clamp(68px,10cqw,120px))] w-[clamp(260px,28cqw,390px)]"
           }`}
         >
+          <div className="rounded-xl border border-amber-200/35 bg-amber-300/12 px-3 py-2 text-left shadow-[0_0_28px_rgba(251,191,36,0.16)] backdrop-blur-md">
+            <div className="text-[8px] font-black uppercase leading-3 tracking-[0.14em] text-amber-100/72">
+              ลำดับเปิดใช้ผลสกิล
+            </div>
+            <div className="mt-0.5 text-[clamp(0.72rem,1.55cqw,0.9rem)] font-black leading-5 text-white">
+              {priorityName} เปิดใช้ผลสกิลก่อน
+            </div>
+            <div className="mt-1 text-[clamp(0.58rem,1.2cqw,0.72rem)] font-semibold leading-4 text-amber-50/72">
+              ตามด้วย {secondPriorityName} หากมีสกิลในตานี้
+            </div>
+          </div>
           {timeline.map((event, index) => {
-            const eventName = event.cardNo ? triadCardByNo.get(event.cardNo)?.name || event.name : event.name;
+            const eventName = event.cardNo ? skillNameForEvent(event.cardNo, event.name) : event.name;
             return (
               <div
                 key={`${event.cardNo || "basic"}-${index}`}
@@ -1848,7 +1868,7 @@ function HandCard({
         if (lane) onDropToLane(lane, card.cardNo);
       }}
       disabled={disabled || used}
-      className={`group relative min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition ${
+      className={`group relative z-[2] min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [pointer-events:auto] ${
         used
           ? "border-white/8 opacity-30 grayscale"
           : placedLane
@@ -1938,7 +1958,7 @@ function PlayerHand({
   };
 
   return (
-    <div className="triad-player-hand rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
+    <div className="triad-player-hand relative z-[90] rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
       <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} onUseCard={canUsePreviewCard ? usePreviewCard : undefined} />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
