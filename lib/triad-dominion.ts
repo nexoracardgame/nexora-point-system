@@ -400,10 +400,10 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
       ? "swap-control"
       : card.cardNo === "236"
         ? "skill-cancel"
-        : card.cardNo === "244"
+        : card.cardNo === "244" || card.cardNo === "234"
           ? "block-stat-gain"
           : inferredShape;
-  const blockedMetric = card.cardNo === "244"
+  const blockedMetric = card.cardNo === "244" || card.cardNo === "234"
     ? undefined
     : /Buff|บัฟ|พลังเสริม/i.test(card.skillText)
       ? undefined
@@ -419,6 +419,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
       : undefined;
   const needsReview =
     card.cardNo !== "236" &&
+    card.cardNo !== "234" &&
     (shape === "unparsed" ||
       shape === "element-transform" ||
       /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText));
@@ -428,7 +429,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "258" ? "opponent-main" : inferTarget(card.skillText),
+    target: card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
@@ -556,7 +557,8 @@ function applyMetalSword(
   side: "player" | "opponent",
   targetId: string | undefined,
   playerScore: ReturnType<typeof baseScore>,
-  opponentScore: ReturnType<typeof baseScore>
+  opponentScore: ReturnType<typeof baseScore>,
+  blockers: StatGainBlocker[] = []
 ) {
   const ownTarget = side === "player" ? "player-top" : "bot-top";
   const opponentTarget = side === "player" ? "bot-top" : "player-top";
@@ -599,6 +601,25 @@ function applyMetalSword(
   const originalValue = targetContribution.card[metric];
   const reducedValue = Math.min(originalValue, 2000);
   const delta = reducedValue - originalValue;
+  const targetSide = normalizedTarget === "player-top" ? "player" : "opponent";
+  const blocker = blockers.find((item) =>
+    item.targetSide === targetSide &&
+    statGainBlockerApplies(item, { metric, delta }, { lane: "top" })
+  );
+  if (blocker) {
+    return {
+      event: {
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `No.${blocker.rule.cardNo} ${blocker.rule.name} ป้องกัน ${targetLabel} ไว้ ค่า ${metric.toUpperCase()} จึงไม่เปลี่ยนแปลง`,
+        targetLabel,
+        blocked: true,
+      } satisfies TriadSkillEvent,
+    };
+  }
   if (targetScore.metric === metric) {
     targetScore.total += delta;
     const contribution = targetScore.contributions.find((item) => item.lane === "top");
@@ -841,7 +862,8 @@ function applySkill(
       side,
       selectedTarget,
       side === "player" ? ownScore : opponentScore,
-      side === "player" ? opponentScore : ownScore
+      side === "player" ? opponentScore : ownScore,
+      blockers
     );
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${result.event.summary}`);
     events.push(result.event);
@@ -884,6 +906,19 @@ function applySkill(
   }
 
   if (rule.shape === "block-stat-gain") {
+    if (rule.cardNo === "234" && !canCancelOpponentSkill) {
+      ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: armor opened after the opposing skill already resolved`);
+      events.push({
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: "เปิดเกราะช้ากว่าอีกฝ่าย ผลสกิลที่กระทบมอนสเตอร์หลักถูกใช้งานไปแล้ว จึงไม่เกิดผลในตานี้",
+        blocked: true,
+      });
+      return { unresolved, events };
+    }
     const { targetSide, targetLane } = statGainBlockerTarget(rule, side, selectedTarget);
     const metricLabel = rule.cardNo === "244"
       ? "ATK/SUP"
@@ -900,9 +935,11 @@ function applySkill(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: rule.cardNo === "244"
-        ? `ล็อกค่า ${metricLabel} ของ ${targetLabel} ไว้เท่าเดิมจนจบตา อีกฝ่ายไม่สามารถบัฟ ลด หรือเปลี่ยนค่านี้ได้`
-        : `ล็อกเป้า ${targetLabel} แล้ว บล็อกบัฟเพิ่ม ${metricLabel} จากสกิลทั้งหมดในตานี้`,
+      summary: rule.cardNo === "234"
+        ? "สวมเกราะให้มอนสเตอร์หลักฝ่ายผู้ใช้สกิล ผลสกิลของอีกฝ่ายที่กระทบมอนสเตอร์นี้จะไร้ผลทันทีจนจบตา"
+        : rule.cardNo === "244"
+          ? `ล็อกค่า ${metricLabel} ของ ${targetLabel} ไว้เท่าเดิมจนจบตา อีกฝ่ายไม่สามารถบัฟ ลด หรือเปลี่ยนค่านี้ได้`
+          : `ล็อกเป้า ${targetLabel} แล้ว บล็อกบัฟเพิ่ม ${metricLabel} จากสกิลทั้งหมดในตานี้`,
       targetLabel,
     });
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: locked ${metricLabel} changes on ${targetSide}${targetLane ? ` ${targetLane}` : ""}`);
@@ -1027,6 +1064,9 @@ type StatGainBlocker = {
 };
 
 function statGainBlockerTarget(rule: TriadSkillRule, side: "player" | "opponent", selectedTarget = ""): { targetSide: "player" | "opponent"; targetLane?: TriadLane } {
+  if (rule.cardNo === "234") {
+    return { targetSide: side, targetLane: "top" as TriadLane };
+  }
   if (rule.cardNo === "244") {
     const targetSide: "player" | "opponent" =
       selectedTarget === "player-top"
@@ -1050,7 +1090,7 @@ function statGainBlockerTarget(rule: TriadSkillRule, side: "player" | "opponent"
 function statGainBlockerApplies(blocker: StatGainBlocker, effect: TriadSkillEffect, contribution: { lane: TriadLane }) {
   if (blocker.metric && blocker.metric !== effect.metric) return false;
   if (blocker.targetLane && blocker.targetLane !== contribution.lane) return false;
-  if (blocker.rule.cardNo === "244") return effect.delta !== 0;
+  if (blocker.rule.cardNo === "244" || blocker.rule.cardNo === "234") return effect.delta !== 0;
   return effect.delta > 0;
 }
 

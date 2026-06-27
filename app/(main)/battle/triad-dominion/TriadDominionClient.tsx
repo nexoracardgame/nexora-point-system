@@ -1170,6 +1170,7 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
 
   if (!rule) return [ownTarget];
+  if (card?.cardNo === "234") return [ownTarget];
   if (card?.cardNo === "232") {
     return [
       playerTop?.kind === "monster" ? "player-top" as const : null,
@@ -1427,10 +1428,23 @@ function BoardCardSlot({
       : tone === "bot"
         ? "border-cyan-300/55"
         : "border-amber-300/55";
+  const slotGlow =
+    tone === "player"
+      ? "from-red-400/34 via-rose-200/10 to-transparent"
+      : tone === "bot"
+        ? "from-cyan-300/34 via-sky-200/10 to-transparent"
+        : "from-amber-300/38 via-yellow-100/12 to-transparent";
+  const labelTone =
+    tone === "player"
+      ? "border-red-200/28 bg-red-500/12 text-red-50/78"
+      : tone === "bot"
+        ? "border-cyan-200/28 bg-cyan-400/12 text-cyan-50/78"
+        : "border-amber-200/34 bg-amber-300/14 text-amber-50/82";
+  const activeGlow = active ? "shadow-[0_0_42px_rgba(251,191,36,0.42),0_18px_42px_rgba(0,0,0,0.48)] ring-2 ring-amber-300/80" : "";
 
   return (
     <div
-      className={`relative w-[var(--triad-card-size,clamp(48px,7vw,112px))] overflow-hidden rounded-[10px] border bg-[#09090d] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${active ? "ring-2 ring-amber-300/70" : ""} ${border} ${
+      className={`group relative w-[var(--triad-card-size,clamp(48px,7vw,112px))] overflow-visible rounded-[12px] border bg-[#08070b] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${activeGlow} ${border} ${
         aura === "own"
           ? "ring-4 ring-cyan-300/85 shadow-[0_0_42px_rgba(34,211,238,0.62)]"
           : aura === "enemy"
@@ -1440,6 +1454,8 @@ function BoardCardSlot({
               : ""
       }`}
     >
+      <div className={`pointer-events-none absolute -inset-2 rounded-[18px] bg-gradient-to-br ${slotGlow} opacity-55 blur-xl transition-opacity duration-200 ${active ? "opacity-95" : ""}`} />
+      <div className="pointer-events-none absolute -inset-px rounded-[13px] bg-[linear-gradient(135deg,rgba(255,255,255,0.28),transparent_26%,rgba(255,255,255,0.08)_52%,transparent_72%)] opacity-55" />
       {aura ? (
         <div
           className={`pointer-events-none absolute inset-0 z-10 animate-pulse rounded-[inherit] ${
@@ -1451,17 +1467,21 @@ function BoardCardSlot({
           }`}
         />
       ) : null}
-      <div className="relative aspect-[3/4]">
+      <div className="relative overflow-hidden rounded-[10px] border border-white/10 bg-black aspect-[3/4]">
+        <div className="pointer-events-none absolute inset-0 z-[2] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),transparent_18%,transparent_68%,rgba(0,0,0,0.34))]" />
+        <div className="pointer-events-none absolute inset-x-[14%] top-0 z-[3] h-px bg-gradient-to-r from-transparent via-white/55 to-transparent" />
         {card && !hidden ? (
           <Image src={card.sourceImage} alt={card.name} fill sizes="128px" className="object-cover" />
         ) : (
-          <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_20%,rgba(251,191,36,0.14),rgba(5,5,8,1)_62%)]">
-            <div className="text-center text-[10px] font-black uppercase tracking-[0.16em] text-white/54">
+          <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_18%,rgba(251,191,36,0.2),rgba(13,12,15,0.98)_44%,rgba(0,0,0,1)_72%)]">
+            <div className="absolute inset-2 rounded-[8px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]" />
+            <div className={`relative z-[4] rounded-full border px-2 py-1 text-center text-[10px] font-black uppercase tracking-[0.16em] backdrop-blur-sm ${labelTone}`}>
               {hidden ? "ปิดไว้" : label}
             </div>
           </div>
         )}
       </div>
+      <div className={`pointer-events-none absolute -bottom-2 left-1/2 h-3 w-[78%] -translate-x-1/2 rounded-full bg-black/70 blur-md ${active ? "opacity-90" : "opacity-55"}`} />
     </div>
   );
 }
@@ -1832,6 +1852,7 @@ function HandCard({
   placedLane,
   disabled,
   highlighted,
+  previewOnly,
   onClick,
   onDropToLane,
   onPreview,
@@ -1842,21 +1863,25 @@ function HandCard({
   placedLane?: Lane;
   disabled: boolean;
   highlighted?: boolean;
+  previewOnly?: boolean;
   onClick: () => void;
   onDropToLane: (lane: Lane, cardNo: string) => void;
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
   const touchPreviewHandledRef = useRef(false);
-  const isTouchPreviewMode = () =>
-    typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  const isPreviewOnlyInput = () =>
+    Boolean(previewOnly) ||
+    (typeof window !== "undefined" &&
+      (window.matchMedia("(hover: none), (pointer: coarse)").matches || window.navigator.maxTouchPoints > 0));
 
   return (
     <button
       type="button"
       onClick={(event) => {
-        if (isTouchPreviewMode()) {
+        if (isPreviewOnlyInput()) {
           event.preventDefault();
+          event.stopPropagation();
           if (touchPreviewHandledRef.current) {
             touchPreviewHandledRef.current = false;
             return;
@@ -1871,31 +1896,41 @@ function HandCard({
         onClick();
       }}
       onMouseEnter={() => {
-        if (isTouchPreviewMode()) return;
+        if (isPreviewOnlyInput()) return;
         onPreview(card);
       }}
       onMouseLeave={() => {
-        if (isTouchPreviewMode()) return;
+        if (isPreviewOnlyInput()) return;
         onPreviewEnd();
       }}
       onFocus={() => {
-        if (isTouchPreviewMode()) return;
+        if (isPreviewOnlyInput()) return;
         onPreview(card);
       }}
       onBlur={() => {
-        if (isTouchPreviewMode()) return;
+        if (isPreviewOnlyInput()) return;
         onPreviewEnd();
       }}
-      draggable={!disabled && !used}
+      onPointerDown={(event) => {
+        if (!isPreviewOnlyInput()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        touchPreviewHandledRef.current = true;
+        onPreview(card);
+      }}
+      draggable={!previewOnly && !disabled && !used}
       onDragStart={(event) => {
+        if (isPreviewOnlyInput()) {
+          event.preventDefault();
+          return;
+        }
         event.dataTransfer.setData("text/plain", card.cardNo);
         event.dataTransfer.effectAllowed = "move";
       }}
       onPointerUp={(event) => {
-        if (isTouchPreviewMode()) {
+        if (isPreviewOnlyInput()) {
           event.preventDefault();
-          touchPreviewHandledRef.current = true;
-          onPreview(card);
+          event.stopPropagation();
           return;
         }
         if (disabled || used) return;
@@ -2027,6 +2062,7 @@ function PlayerHand({
         placedLane={placedLane}
         disabled={locked}
         highlighted={highlightCardNo === card.cardNo}
+        previewOnly={splitHandLayout}
         onClick={() => onPlayCard(card.cardNo)}
         onDropToLane={onDropToLane}
         onPreview={setPreviewCard}

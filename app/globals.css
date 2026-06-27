@@ -101,7 +101,7 @@ textarea {
   width: 100% !important;
   max-height: none !important;
   overflow: visible !important;
-  padding-inline: clamp(0.18rem, 0.5svw, 0.45rem) !important;
+  padding-inline: clamp(0.75rem, 1.5svw, 1.15rem) !important;
   touch-action: manipulation !important;
   -webkit-overflow-scrolling: auto !important;
   overscroll-behavior: none !important;
@@ -120,6 +120,8 @@ textarea {
   width: 100% !important;
   min-width: 0 !important;
   align-items: center !important;
+  position: relative !important;
+  z-index: 5 !important;
 }
 
 .triad-hand-grid.triad-hand-grid-split .triad-hand-row-label {
@@ -137,6 +139,13 @@ textarea {
   -webkit-user-select: none !important;
   -webkit-tap-highlight-color: transparent !important;
   transition-duration: 60ms !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button:first-of-type,
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button:last-of-type {
+  z-index: 20 !important;
 }
 
 .triad-hand-grid.triad-hand-grid-split .triad-hand-row > button:hover,
