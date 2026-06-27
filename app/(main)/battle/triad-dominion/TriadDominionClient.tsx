@@ -3012,7 +3012,7 @@ function ReadyAdvanceButton({
       }`}
     >
       {!myReady ? <span className="absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.5),transparent)] opacity-0 transition group-hover:translate-x-full group-hover:opacity-80" /> : null}
-      {myReady ? <span className="absolute inset-0 animate-pulse bg-emerald-300/10" /> : null}
+      {myReady ? <span className="absolute inset-0 bg-emerald-300/10" /> : null}
       <span className="relative z-10 flex min-w-0 items-center gap-3">
         <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border ${myReady ? "border-emerald-100/25 bg-emerald-200/12 text-emerald-100" : "border-black/10 bg-black/14 text-black"}`}>
           {myReady ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
@@ -3198,7 +3198,7 @@ function CompactBattleBoard({
           {matchScore.bot}
         </div>
       </div>
-      <div className="pointer-events-auto absolute bottom-2 right-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
+      <div className="triad-player-scoreplate pointer-events-auto absolute bottom-2 right-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-red-100 bg-red-500 text-sm font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.32)] sm:h-9 sm:w-9 sm:text-lg">
           {matchScore.player}
         </div>
@@ -3401,6 +3401,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
   const [openingTieBreakResultVisible, setOpeningTieBreakResultVisible] = useState(false);
   const [openingTieBreakResultKey, setOpeningTieBreakResultKey] = useState("");
+  const [pendingTurnReadyKey, setPendingTurnReadyKey] = useState("");
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
 
@@ -3472,9 +3473,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     ...((roomPlayerSide && currentRoom?.game.usedCards[roomPlayerSide]) || []),
   ]);
   const turnReadyState = currentRoom?.game.turnReady || { host: false, challenger: false };
-  const myTurnReady = Boolean(roomPlayerSide && turnReadyState[roomPlayerSide]);
-  const opponentTurnReady = Boolean(opponentSide && turnReadyState[opponentSide]);
-  const readyCount = Number(Boolean(turnReadyState.host)) + Number(Boolean(turnReadyState.challenger));
+  const currentTurnReadyKey =
+    currentRoom && roomPlayerSide ? `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}:${roomPlayerSide}` : "";
+  const pendingLocalTurnReady = Boolean(currentTurnReadyKey && pendingTurnReadyKey === currentTurnReadyKey);
+  const effectiveTurnReadyState = {
+    host: Boolean(turnReadyState.host || (pendingLocalTurnReady && roomPlayerSide === "host")),
+    challenger: Boolean(turnReadyState.challenger || (pendingLocalTurnReady && roomPlayerSide === "challenger")),
+  };
+  const myTurnReady = Boolean(roomPlayerSide && effectiveTurnReadyState[roomPlayerSide]);
+  const opponentTurnReady = Boolean(opponentSide && effectiveTurnReadyState[opponentSide]);
+  const readyCount = Number(effectiveTurnReadyState.host) + Number(effectiveTurnReadyState.challenger);
   const spectatorBattleState = useMemo(() => {
     if (!isSpectator || !currentRoom) return null;
     const revealState = buildRevealStateForTurns(currentRoom.game.turns);
@@ -4189,6 +4197,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   useEffect(() => {
     activeRoomSnapshotRef.current = activeRoomSnapshot;
   }, [activeRoomSnapshot]);
+
+  useEffect(() => {
+    if (!pendingTurnReadyKey) return;
+    if (!currentTurnReadyKey || pendingTurnReadyKey !== currentTurnReadyKey) {
+      setPendingTurnReadyKey("");
+    }
+  }, [currentTurnReadyKey, pendingTurnReadyKey]);
 
   useEffect(() => {
     return () => {
@@ -5137,6 +5152,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const nextTurn = () => {
     if (!lockedFight || activeTurn >= 3) return;
     if (currentRoom && roomPlayerSide) {
+      const readyKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}:${roomPlayerSide}`;
+      setPendingTurnReadyKey(readyKey);
+      optimisticRoomLockUntilRef.current = Date.now() + 1600;
       patchCurrentRoom((room) => ({
         ...room,
         game: {
@@ -5144,7 +5162,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
         },
       }));
-      void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+      void postRoomAction({ action: "advance-turn", code: currentRoom.code }).then((result) => {
+        if (!result.ok) setPendingTurnReadyKey("");
+      });
       return;
     }
     const lane = laneForTurn(activeTurn);
@@ -5169,6 +5189,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const nextFight = () => {
     if (!lockedFight) return;
     if (currentRoom && roomPlayerSide) {
+      const readyKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}:${roomPlayerSide}`;
+      setPendingTurnReadyKey(readyKey);
+      optimisticRoomLockUntilRef.current = Date.now() + 1600;
       patchCurrentRoom((room) => ({
         ...room,
         game: {
@@ -5176,7 +5199,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
         },
       }));
-      void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+      void postRoomAction({ action: "advance-turn", code: currentRoom.code }).then((result) => {
+        if (!result.ok) setPendingTurnReadyKey("");
+      });
       return;
     }
 
