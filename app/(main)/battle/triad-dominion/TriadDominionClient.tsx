@@ -1936,8 +1936,12 @@ function HandCard({
         event.stopPropagation();
         closeHoldPreview();
       }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       aria-disabled={disabled || used}
-      className={`group relative z-[2] min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [pointer-events:auto] ${
+      className={`group relative z-[2] min-w-0 touch-manipulation select-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [-webkit-touch-callout:none] [pointer-events:auto] ${
         used
           ? "border-white/8 opacity-30 grayscale"
           : placedLane
@@ -1948,7 +1952,7 @@ function HandCard({
       }`}
     >
       <div className="relative aspect-[3/4]">
-        <Image src={card.sourceImage} alt={card.name} fill sizes="110px" className="object-cover" />
+        <Image src={card.sourceImage} alt={card.name} fill sizes="110px" draggable={false} className="select-none object-cover [-webkit-touch-callout:none]" />
         {used ? <div className="absolute inset-0 bg-black/62" /> : null}
       </div>
       {used ? (

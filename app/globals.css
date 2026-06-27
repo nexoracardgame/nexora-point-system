@@ -421,10 +421,20 @@ textarea {
   background: #050507;
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   --app-header-height: 0px;
   --app-mobile-nav-height: 0px;
   --app-mobile-nav-height-sm: 0px;
   --app-content-bottom-gap: 0px;
+}
+
+.nexora-battle-shell img,
+.nexora-battle-shell button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .nexora-battle-shell main {
