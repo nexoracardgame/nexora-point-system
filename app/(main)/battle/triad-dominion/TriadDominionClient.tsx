@@ -1847,9 +1847,6 @@ function HandCard({
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const touchMovedRef = useRef(false);
-  const suppressTouchClickRef = useRef(false);
   const isTouchPreviewMode = () =>
     typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
@@ -1859,52 +1856,27 @@ function HandCard({
       onClick={(event) => {
         if (isTouchPreviewMode()) {
           event.preventDefault();
-          if (suppressTouchClickRef.current) {
-            suppressTouchClickRef.current = false;
-            return;
-          }
-          if (!used) onPreview(card);
+          onPreview(card);
+          return;
+        }
+        if (disabled || used) {
+          onPreview(card);
           return;
         }
         onClick();
       }}
-      onMouseEnter={() => !used && onPreview(card)}
+      onMouseEnter={() => onPreview(card)}
       onMouseLeave={onPreviewEnd}
-      onFocus={() => !used && onPreview(card)}
+      onFocus={() => onPreview(card)}
       onBlur={onPreviewEnd}
-      onPointerDown={(event) => {
-        if (!isTouchPreviewMode() || disabled || used) return;
-        touchStartRef.current = { x: event.clientX, y: event.clientY };
-        touchMovedRef.current = false;
-        suppressTouchClickRef.current = false;
-      }}
-      onPointerMove={(event) => {
-        if (!touchStartRef.current) return;
-        const deltaX = Math.abs(event.clientX - touchStartRef.current.x);
-        const deltaY = Math.abs(event.clientY - touchStartRef.current.y);
-        if (deltaX > 8 || deltaY > 8) {
-          touchMovedRef.current = true;
-          suppressTouchClickRef.current = true;
-        }
-      }}
       draggable={!disabled && !used}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", card.cardNo);
         event.dataTransfer.effectAllowed = "move";
       }}
       onPointerUp={(event) => {
+        if (isTouchPreviewMode()) return;
         if (disabled || used) return;
-        const touchPreviewMode =
-          typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-        if (touchPreviewMode) {
-          if (touchMovedRef.current) {
-            touchStartRef.current = null;
-            return;
-          }
-          onPreview(card);
-          touchStartRef.current = null;
-          return;
-        }
         onPreview(card);
         const target = document
           .elementFromPoint(event.clientX, event.clientY)
@@ -1912,7 +1884,7 @@ function HandCard({
         const lane = target?.dataset.triadLane as Lane | undefined;
         if (lane) onDropToLane(lane, card.cardNo);
       }}
-      disabled={disabled || used}
+      aria-disabled={disabled || used}
       className={`group relative z-[2] min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [pointer-events:auto] ${
         used
           ? "border-white/8 opacity-30 grayscale"

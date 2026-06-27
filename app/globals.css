@@ -103,6 +103,8 @@ textarea {
   overflow: visible !important;
   padding-inline: clamp(0.18rem, 0.5svw, 0.45rem) !important;
   touch-action: manipulation !important;
+  -webkit-overflow-scrolling: auto !important;
+  overscroll-behavior: none !important;
 }
 
 .triad-hand-grid.triad-hand-grid-split::before,
@@ -131,6 +133,9 @@ textarea {
   flex: none !important;
   pointer-events: auto !important;
   touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 .triad-hand-grid.triad-hand-grid-split .triad-hand-row > button .relative.aspect-\[3\/4\] {
