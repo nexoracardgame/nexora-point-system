@@ -1844,16 +1844,15 @@ function HandCard({
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
-  const previewTapStampRef = useRef(0);
+  const holdPreviewPointerRef = useRef<number | null>(null);
   const isPreviewOnlyInput = () =>
     Boolean(previewOnly) ||
     (typeof window !== "undefined" &&
       (window.matchMedia("(hover: none), (pointer: coarse)").matches || window.navigator.maxTouchPoints > 0));
-  const openPreviewFromTap = () => {
-    const now = Date.now();
-    if (now - previewTapStampRef.current < 120) return;
-    previewTapStampRef.current = now;
-    onPreview(card);
+  const closeHoldPreview = () => {
+    if (holdPreviewPointerRef.current === null) return;
+    holdPreviewPointerRef.current = null;
+    onPreviewEnd();
   };
 
   return (
@@ -1863,7 +1862,6 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          openPreviewFromTap();
           return;
         }
         if (disabled || used) {
@@ -1890,7 +1888,10 @@ function HandCard({
       }}
       onPointerDown={(event) => {
         if (!isPreviewOnlyInput()) return;
+        event.preventDefault();
         event.stopPropagation();
+        holdPreviewPointerRef.current = event.pointerId;
+        onPreview(card);
       }}
       draggable={!previewOnly && !disabled && !used}
       onDragStart={(event) => {
@@ -1905,7 +1906,7 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          openPreviewFromTap();
+          closeHoldPreview();
           return;
         }
         if (disabled || used) return;
@@ -1920,9 +1921,20 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          openPreviewFromTap();
+          closeHoldPreview();
           return;
         }
+      }}
+      onPointerCancel={(event) => {
+        if (!isPreviewOnlyInput()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeHoldPreview();
+      }}
+      onPointerLeave={(event) => {
+        if (!isPreviewOnlyInput()) return;
+        event.stopPropagation();
+        closeHoldPreview();
       }}
       aria-disabled={disabled || used}
       className={`group relative z-[2] min-w-0 touch-manipulation overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [pointer-events:auto] ${
@@ -3521,6 +3533,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [openingTieBreakResultVisible, setOpeningTieBreakResultVisible] = useState(false);
   const [openingTieBreakResultKey, setOpeningTieBreakResultKey] = useState("");
   const [pendingTurnReadyKey, setPendingTurnReadyKey] = useState("");
+  const [turnReadySubmittingKey, setTurnReadySubmittingKey] = useState("");
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
 
@@ -3594,7 +3607,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const turnReadyState = currentRoom?.game.turnReady || { host: false, challenger: false };
   const currentTurnReadyKey =
     currentRoom && roomPlayerSide ? `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}:${roomPlayerSide}` : "";
-  const pendingLocalTurnReady = Boolean(currentTurnReadyKey && pendingTurnReadyKey === currentTurnReadyKey);
+  const pendingLocalTurnReady = Boolean(
+    currentTurnReadyKey && (pendingTurnReadyKey === currentTurnReadyKey || turnReadySubmittingKey === currentTurnReadyKey)
+  );
   const effectiveTurnReadyState = {
     host: Boolean(turnReadyState.host || (pendingLocalTurnReady && roomPlayerSide === "host")),
     challenger: Boolean(turnReadyState.challenger || (pendingLocalTurnReady && roomPlayerSide === "challenger")),
@@ -4336,11 +4351,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [activeRoomSnapshot]);
 
   useEffect(() => {
-    if (!pendingTurnReadyKey) return;
-    if (!currentTurnReadyKey || pendingTurnReadyKey !== currentTurnReadyKey) {
+    if (pendingTurnReadyKey && (!currentTurnReadyKey || pendingTurnReadyKey !== currentTurnReadyKey)) {
       setPendingTurnReadyKey("");
     }
-  }, [currentTurnReadyKey, pendingTurnReadyKey]);
+    if (turnReadySubmittingKey && (!currentTurnReadyKey || turnReadySubmittingKey !== currentTurnReadyKey)) {
+      setTurnReadySubmittingKey("");
+    }
+  }, [currentTurnReadyKey, pendingTurnReadyKey, turnReadySubmittingKey]);
 
   useEffect(() => {
     return () => {
@@ -5286,22 +5303,47 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
   };
 
+  const markRoomTurnReady = () => {
+    if (!currentRoom || !roomPlayerSide || !currentTurnReadyKey) return false;
+    if (
+      pendingTurnReadyKey === currentTurnReadyKey ||
+      turnReadySubmittingKey === currentTurnReadyKey ||
+      Boolean(currentRoom.game.turnReady[roomPlayerSide])
+    ) {
+      return true;
+    }
+
+    const readyKey = currentTurnReadyKey;
+    setPendingTurnReadyKey(readyKey);
+    setTurnReadySubmittingKey(readyKey);
+    optimisticRoomLockUntilRef.current = Date.now() + 2600;
+    patchCurrentRoom((room) => ({
+      ...room,
+      game: {
+        ...room.game,
+        turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
+      },
+    }));
+
+    void postRoomAction({ action: "advance-turn", code: currentRoom.code })
+      .then((result) => {
+        if (!result.ok) {
+          setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
+        }
+      })
+      .catch(() => {
+        setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
+      })
+      .finally(() => {
+        setTurnReadySubmittingKey((current) => (current === readyKey ? "" : current));
+      });
+    return true;
+  };
+
   const nextTurn = () => {
     if (!lockedFight || activeTurn >= 3) return;
     if (currentRoom && roomPlayerSide) {
-      const readyKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}:${roomPlayerSide}`;
-      setPendingTurnReadyKey(readyKey);
-      optimisticRoomLockUntilRef.current = Date.now() + 1600;
-      patchCurrentRoom((room) => ({
-        ...room,
-        game: {
-          ...room.game,
-          turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
-        },
-      }));
-      void postRoomAction({ action: "advance-turn", code: currentRoom.code }).then((result) => {
-        if (!result.ok) setPendingTurnReadyKey("");
-      });
+      markRoomTurnReady();
       return;
     }
     const lane = laneForTurn(activeTurn);
@@ -5326,19 +5368,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const nextFight = () => {
     if (!lockedFight) return;
     if (currentRoom && roomPlayerSide) {
-      const readyKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}:${roomPlayerSide}`;
-      setPendingTurnReadyKey(readyKey);
-      optimisticRoomLockUntilRef.current = Date.now() + 1600;
-      patchCurrentRoom((room) => ({
-        ...room,
-        game: {
-          ...room.game,
-          turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
-        },
-      }));
-      void postRoomAction({ action: "advance-turn", code: currentRoom.code }).then((result) => {
-        if (!result.ok) setPendingTurnReadyKey("");
-      });
+      markRoomTurnReady();
       return;
     }
 
@@ -5406,7 +5436,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         opponentReady={opponentTurnReady}
         opponentName={opponentLabel}
         onClick={displayActiveTurn >= 3 ? nextFight : nextTurn}
-        disabled={myTurnReady}
+        disabled={myTurnReady || turnReadySubmittingKey === currentTurnReadyKey}
       />
     ) : null;
   const renderRoomBattleActions = () =>
