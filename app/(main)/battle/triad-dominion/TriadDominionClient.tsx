@@ -1569,7 +1569,7 @@ function RevealSpotlight({
         <div className="absolute inset-x-[18%] top-1/2 h-32 -translate-y-1/2 rounded-full bg-black/32 blur-2xl" />
       ) : null}
       <div className="relative grid w-[min(680px,88cqw)] items-center gap-2 sm:grid-cols-[1fr_minmax(150px,auto)_1fr] sm:gap-3">
-        <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${playerWins ? "scale-105" : botWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${playerWins ? "scale-105" : ""}`}>
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
               {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -1596,7 +1596,7 @@ function RevealSpotlight({
           ) : null}
         </div>
 
-        <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${botWins ? "scale-105" : playerWins ? "opacity-65" : ""}`}>
+        <div className={`mx-auto w-[clamp(72px,16cqw,148px)] ${botWins ? "scale-105" : ""}`}>
           {showBot && botCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
               {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
@@ -2387,27 +2387,27 @@ function BattleRoomChatPanel({
   };
 
   return (
-    <section className="triad-battle-chat-panel flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-cyan-200/18 bg-[linear-gradient(180deg,rgba(8,18,24,0.92),rgba(4,6,12,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.035)] 2xl:h-[min(500px,calc(100vh-330px))] 2xl:min-h-[340px]">
-      <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(251,191,36,0.08),transparent)] px-4 py-3">
+    <section className="triad-battle-chat-panel flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-amber-200/24 bg-[radial-gradient(circle_at_18%_0%,rgba(251,191,36,0.16),transparent_34%),linear-gradient(180deg,rgba(18,13,5,0.94),rgba(4,4,7,0.98))] shadow-[0_24px_70px_rgba(0,0,0,0.42),0_0_42px_rgba(251,191,36,0.08),inset_0_0_0_1px_rgba(255,244,214,0.055)] 2xl:h-[min(560px,calc(100vh-300px))] 2xl:min-h-[380px]">
+      <div className="border-b border-amber-200/14 bg-[linear-gradient(135deg,rgba(251,191,36,0.22),rgba(180,83,9,0.12),transparent)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-100/24 bg-cyan-300/12 text-cyan-100 shadow-[0_0_26px_rgba(34,211,238,0.16)]">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-amber-100/32 bg-amber-300/14 text-amber-100 shadow-[0_0_26px_rgba(251,191,36,0.2)]">
               <MessageCircle className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <div className="truncate text-base font-black text-white">แชทสดสนาม</div>
-              <div className="mt-0.5 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-100/54">
+              <div className="mt-0.5 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100/62">
                 ห้อง {room?.code || "------"} • {memberCount} คน
               </div>
             </div>
           </div>
-          <div className="rounded-full border border-emerald-200/24 bg-emerald-300/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-100">
+          <div className="rounded-full border border-amber-100/34 bg-amber-300/14 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.14)]">
             LIVE
           </div>
         </div>
       </div>
 
-      <div ref={messagesRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div ref={messagesRef} className="triad-battle-chat-messages min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length > 0 ? (
           messages.map((message) => {
             const mine = message.senderId === currentUserId;
@@ -2430,8 +2430,8 @@ function BattleRoomChatPanel({
                   <div
                     className={`break-words rounded-2xl border px-4 py-2.5 text-[15px] font-semibold leading-6 ${
                       mine
-                        ? "border-amber-200/26 bg-amber-300/14 text-amber-50"
-                        : "border-cyan-200/16 bg-white/[0.055] text-white/78"
+                        ? "border-amber-200/34 bg-[linear-gradient(135deg,rgba(251,191,36,0.22),rgba(180,83,9,0.12))] text-amber-50 shadow-[0_0_22px_rgba(251,191,36,0.08)]"
+                        : "border-amber-100/16 bg-white/[0.055] text-white/82"
                     }`}
                   >
                     {message.text}
@@ -2443,7 +2443,7 @@ function BattleRoomChatPanel({
         ) : (
           <div className="grid h-full min-h-[190px] place-items-center text-center">
             <div className="px-6">
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-white/16 bg-white/[0.035] text-cyan-100/54">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-amber-100/22 bg-amber-300/[0.045] text-amber-100/60">
                 <MessageCircle className="h-5 w-5" />
               </div>
               <div className="mt-3 text-sm font-black text-white/62">ยังไม่มีข้อความ</div>
@@ -2454,13 +2454,13 @@ function BattleRoomChatPanel({
       </div>
 
       <form
-        className="border-t border-white/8 bg-black/24 p-2.5"
+        className="border-t border-amber-200/12 bg-black/30 p-2.5"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
-        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/42 p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-100/18 bg-black/48 p-1.5 shadow-[inset_0_0_0_1px_rgba(255,244,214,0.045)]">
           <div ref={emojiRef} className="relative shrink-0">
             {emojiOpen ? (
               <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[90]">
@@ -2479,8 +2479,8 @@ function BattleRoomChatPanel({
               onClick={() => setEmojiOpen((current) => !current)}
               className={`grid h-10 w-10 place-items-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-35 ${
                 emojiOpen
-                  ? "border-cyan-200/45 bg-cyan-300/14 text-cyan-100"
-                  : "border-white/10 bg-white/[0.055] text-white/58 hover:border-cyan-200/35 hover:text-cyan-100"
+                  ? "border-amber-200/50 bg-amber-300/14 text-amber-100"
+                  : "border-white/10 bg-white/[0.055] text-white/58 hover:border-amber-200/38 hover:text-amber-100"
               }`}
               aria-label="เลือกอีโมจิ"
               aria-expanded={emojiOpen}
@@ -2498,7 +2498,7 @@ function BattleRoomChatPanel({
           <button
             type="submit"
             disabled={!draft.trim() || !room?.code}
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-cyan-200" : "bg-cyan-300 hover:bg-cyan-200"}`}
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25 ${sending ? "bg-amber-100" : "bg-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.18)] hover:bg-amber-200"}`}
             aria-label="ส่งข้อความ"
           >
             <SendHorizontal className="h-4 w-4" />
@@ -3188,7 +3188,7 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
-      <div className="pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
+      <div className="triad-opponent-scoreplate pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" currentParticipantId={currentParticipantId} />
         <div className="min-w-0 max-w-[120px] sm:max-w-none">
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/58">คู่แข่ง</div>
