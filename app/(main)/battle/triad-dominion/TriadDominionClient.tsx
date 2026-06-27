@@ -1847,14 +1847,22 @@ function HandCard({
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchMovedRef = useRef(false);
+  const suppressTouchClickRef = useRef(false);
+  const isTouchPreviewMode = () =>
+    typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
   return (
     <button
       type="button"
       onClick={(event) => {
-        const touchPreviewMode =
-          typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-        if (touchPreviewMode) {
+        if (isTouchPreviewMode()) {
           event.preventDefault();
+          if (suppressTouchClickRef.current) {
+            suppressTouchClickRef.current = false;
+            return;
+          }
           if (!used) onPreview(card);
           return;
         }
@@ -1864,9 +1872,20 @@ function HandCard({
       onMouseLeave={onPreviewEnd}
       onFocus={() => !used && onPreview(card)}
       onBlur={onPreviewEnd}
-      onTouchStart={() => {
-        if (disabled || used) return;
-        onPreview(card);
+      onPointerDown={(event) => {
+        if (!isTouchPreviewMode() || disabled || used) return;
+        touchStartRef.current = { x: event.clientX, y: event.clientY };
+        touchMovedRef.current = false;
+        suppressTouchClickRef.current = false;
+      }}
+      onPointerMove={(event) => {
+        if (!touchStartRef.current) return;
+        const deltaX = Math.abs(event.clientX - touchStartRef.current.x);
+        const deltaY = Math.abs(event.clientY - touchStartRef.current.y);
+        if (deltaX > 8 || deltaY > 8) {
+          touchMovedRef.current = true;
+          suppressTouchClickRef.current = true;
+        }
       }}
       draggable={!disabled && !used}
       onDragStart={(event) => {
@@ -1878,7 +1897,12 @@ function HandCard({
         const touchPreviewMode =
           typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
         if (touchPreviewMode) {
+          if (touchMovedRef.current) {
+            touchStartRef.current = null;
+            return;
+          }
           onPreview(card);
+          touchStartRef.current = null;
           return;
         }
         onPreview(card);

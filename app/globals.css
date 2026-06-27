@@ -932,12 +932,12 @@ textarea {
     width: clamp(42px, 9dvw, 58px);
     min-width: clamp(42px, 9dvw, 58px);
     pointer-events: auto !important;
-    touch-action: manipulation !important;
+    touch-action: pan-x !important;
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid button {
     pointer-events: auto !important;
-    touch-action: manipulation !important;
+    touch-action: pan-x !important;
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:first-child {
@@ -1641,12 +1641,12 @@ textarea {
     width: clamp(36px, 8dvw, 50px);
     min-width: clamp(36px, 8dvw, 50px);
     pointer-events: auto !important;
-    touch-action: manipulation !important;
+    touch-action: pan-x !important;
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid button {
     pointer-events: auto !important;
-    touch-action: manipulation !important;
+    touch-action: pan-x !important;
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:first-child {
