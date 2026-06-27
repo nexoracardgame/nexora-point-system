@@ -3406,7 +3406,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     const cachedRoom = readCachedTriadRoom(participant.id);
-    if (!cachedRoom) return;
+    if (!cachedRoom) {
+      setResumeChecking(false);
+      return;
+    }
 
     activeRoomCodeRef.current = cachedRoom.code;
     activeRoomSnapshotRef.current = cachedRoom;
@@ -5284,7 +5287,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ? "ล็อกการ์ดก่อน"
       : "เปิดทั้งสองฝั่ง";
 
-  if (resumeChecking && phase === "lobby") {
+  const shouldShowReconnectSplash =
+    resumeChecking &&
+    phase === "lobby" &&
+    Boolean(activeRoomCode || activeRoomSnapshot || activeRoomCodeRef.current || activeRoomSnapshotRef.current);
+
+  if (shouldShowReconnectSplash) {
     return (
       <main className="triad-lobby-screen grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center overflow-hidden rounded-[24px] border border-amber-200/12 bg-[#050507] px-4 text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
         <div className="w-[min(420px,92vw)] rounded-2xl border border-amber-200/22 bg-black/54 p-5 text-center shadow-[0_0_60px_rgba(251,191,36,0.16)] backdrop-blur-md">
