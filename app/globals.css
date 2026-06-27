@@ -93,6 +93,50 @@ textarea {
   display: none;
 }
 
+.triad-hand-grid.triad-hand-grid-split {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+  gap: clamp(0.28rem, 0.8svh, 0.48rem) !important;
+  width: 100% !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-inline: clamp(0.18rem, 0.5svw, 0.45rem) !important;
+  touch-action: manipulation !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split::before,
+.triad-hand-grid.triad-hand-grid-split::after {
+  content: none !important;
+  display: none !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row {
+  display: grid !important;
+  grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+  gap: clamp(0.18rem, 0.48svw, 0.4rem) !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  align-items: center !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row-label {
+  display: none !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: none !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button .relative.aspect-\[3\/4\] {
+  min-height: clamp(3.8rem, 12.4svh, 6.4rem) !important;
+}
+
 @media (hover: none), (pointer: coarse) {
   html,
   body {

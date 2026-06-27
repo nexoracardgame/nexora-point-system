@@ -1966,6 +1966,7 @@ function PlayerHand({
   onDropToLane: (lane: Lane, cardNo: string) => void;
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
+  const [splitHandLayout, setSplitHandLayout] = useState(false);
   const placedByNo = new Map<string, Lane>();
   (["top", "left", "right"] as Lane[]).forEach((lane) => {
     const cardNo = player[lane];
@@ -1974,6 +1975,16 @@ function PlayerHand({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const syncSplitHandLayout = () => {
+      const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+      const touchDevice = window.navigator.maxTouchPoints > 0;
+      const compactLandscape = window.innerHeight <= 620 && window.innerWidth > window.innerHeight;
+      setSplitHandLayout(coarsePointer || touchDevice || compactLandscape);
+    };
+    syncSplitHandLayout();
+    window.addEventListener("resize", syncSplitHandLayout);
+    window.addEventListener("orientationchange", syncSplitHandLayout);
+
     const preloadHandImages = () => {
       cards.forEach((card) => {
         const img = new window.Image();
@@ -1984,11 +1995,19 @@ function PlayerHand({
 
     if ("requestIdleCallback" in window) {
       const idleId = window.requestIdleCallback(preloadHandImages, { timeout: 700 });
-      return () => window.cancelIdleCallback(idleId);
+      return () => {
+        window.cancelIdleCallback(idleId);
+        window.removeEventListener("resize", syncSplitHandLayout);
+        window.removeEventListener("orientationchange", syncSplitHandLayout);
+      };
     }
 
     const timeoutId = globalThis.setTimeout(preloadHandImages, 180);
-    return () => globalThis.clearTimeout(timeoutId);
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+      window.removeEventListener("resize", syncSplitHandLayout);
+      window.removeEventListener("orientationchange", syncSplitHandLayout);
+    };
   }, [cards]);
 
   const canUsePreviewCard =
@@ -2047,7 +2066,7 @@ function PlayerHand({
           ))}
         </div>
       </div>
-      <div className="triad-hand-grid grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1">
+      <div className={`triad-hand-grid ${splitHandLayout ? "triad-hand-grid-split" : ""} grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1`}>
         <div className="triad-hand-row triad-hand-row-monster">
           <div className="triad-hand-row-label">มอนสเตอร์</div>
           {monsterCards.map(renderHandCard)}
