@@ -1418,46 +1418,25 @@ function BoardCardSlot({
   label: string;
   tone: "player" | "bot" | "neutral";
 }) {
-  const border =
-    tone === "player"
-      ? "border-red-300/55"
-      : tone === "bot"
-        ? "border-cyan-300/55"
-        : "border-amber-300/55";
-  const slotGlow =
-    tone === "player"
-      ? "from-red-400/34 via-rose-200/10 to-transparent"
-      : tone === "bot"
-        ? "from-cyan-300/34 via-sky-200/10 to-transparent"
-        : "from-amber-300/38 via-yellow-100/12 to-transparent";
-  const activeGlow = active ? "shadow-[0_0_34px_rgba(251,191,36,0.34),0_18px_42px_rgba(0,0,0,0.48)]" : "";
+  const activeGlow = active ? "shadow-[0_18px_48px_rgba(0,0,0,0.58)]" : "";
 
   return (
     <div
-      className={`group relative w-[var(--triad-card-size,clamp(48px,7vw,112px))] overflow-visible rounded-[12px] border bg-[#08070b] shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${activeGlow} ${border} ${
+      className={`group relative w-[var(--triad-card-size,clamp(48px,7vw,112px))] overflow-visible rounded-[12px] bg-transparent shadow-[0_18px_42px_rgba(0,0,0,0.42)] ${activeGlow} ${
         aura === "own"
-          ? "ring-4 ring-cyan-300/85 shadow-[0_0_42px_rgba(34,211,238,0.62)]"
+          ? "shadow-[0_20px_54px_rgba(0,0,0,0.58)]"
           : aura === "enemy"
-            ? "ring-4 ring-red-400/85 shadow-[0_0_42px_rgba(248,113,113,0.62)]"
+            ? "shadow-[0_20px_54px_rgba(0,0,0,0.58)]"
             : aura === "pending"
-              ? "ring-4 ring-violet-300/80 shadow-[0_0_42px_rgba(168,85,247,0.55)]"
+              ? "shadow-[0_20px_54px_rgba(0,0,0,0.58)]"
               : ""
       }`}
     >
-      <div className={`pointer-events-none absolute -inset-2 rounded-[18px] bg-gradient-to-br ${slotGlow} opacity-45 blur-xl transition-opacity duration-200 ${active ? "opacity-80" : ""}`} />
-      <div className="pointer-events-none absolute -inset-px rounded-[13px] bg-[linear-gradient(135deg,rgba(255,255,255,0.28),transparent_26%,rgba(255,255,255,0.08)_52%,transparent_72%)] opacity-55" />
+      <div className={`pointer-events-none absolute -inset-2 rounded-[18px] bg-black/45 opacity-25 blur-xl transition-opacity duration-200 ${active || aura ? "opacity-40" : ""}`} />
       {aura ? (
-        <div
-          className={`pointer-events-none absolute inset-0 z-10 animate-pulse rounded-[inherit] ${
-            aura === "own"
-              ? "bg-cyan-300/14"
-              : aura === "enemy"
-                ? "bg-red-500/16"
-                : "bg-violet-400/14"
-          }`}
-        />
+        <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-white/[0.035]" />
       ) : null}
-      <div className="relative overflow-hidden rounded-[10px] border border-white/10 bg-black aspect-[3/4]">
+      <div className="relative overflow-hidden rounded-[10px] bg-black aspect-[3/4]">
         <div className="pointer-events-none absolute inset-0 z-[2] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),transparent_18%,transparent_68%,rgba(0,0,0,0.34))]" />
         <div className="pointer-events-none absolute inset-x-[14%] top-0 z-[3] h-px bg-gradient-to-r from-transparent via-white/55 to-transparent" />
         {card && !hidden ? (
