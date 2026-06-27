@@ -863,9 +863,9 @@ function turnForLane(lane: Lane): TriadTurn {
   return 3;
 }
 
-function roomOpeningSide(room: TriadRoom): RoomPlayerSide | null {
-  if (room.game.activeTurn === 1) return "host";
-  const previousTurn = (room.game.activeTurn - 1) as TriadTurn;
+function roomOpeningSideForTurn(room: TriadRoom, activeTurn: TriadTurn): RoomPlayerSide | null {
+  if (activeTurn === 1) return "host";
+  const previousTurn = (activeTurn - 1) as TriadTurn;
   const previousResult = room.game.turns.find((turn) => turn.turn === previousTurn);
   if (!previousResult) return "host";
   if (previousResult.winner === "draw") {
@@ -880,6 +880,10 @@ function roomOpeningSide(room: TriadRoom): RoomPlayerSide | null {
     return "host";
   }
   return previousResult.winner === "player" ? "host" : "challenger";
+}
+
+function roomOpeningSide(room: TriadRoom): RoomPlayerSide | null {
+  return roomOpeningSideForTurn(room, room.game.activeTurn);
 }
 
 function currentQueuedSkillChoice(room: TriadRoom) {
@@ -1526,6 +1530,10 @@ function RevealSpotlight({
   botName,
   spectatorView = false,
   readyAdvanceSlot,
+  skillOpenerName,
+  skillSecondName,
+  nextSkillOpenerName,
+  nextSkillSecondName,
 }: {
   playerCard?: CardView;
   botCard?: CardView;
@@ -1536,6 +1544,10 @@ function RevealSpotlight({
   botName: string;
   spectatorView?: boolean;
   readyAdvanceSlot?: ReactNode;
+  skillOpenerName?: string;
+  skillSecondName?: string;
+  nextSkillOpenerName?: string;
+  nextSkillSecondName?: string;
 }) {
   if (!showPlayer && !showBot) return null;
 
@@ -1556,8 +1568,13 @@ function RevealSpotlight({
     if (fallback && hasThaiText(fallback)) return fallback;
     return cardNo ? `สกิล No.${cardNo}` : fallback;
   };
-  const priorityName = result?.prioritySide === "opponent" ? botName : playerName;
-  const secondPriorityName = result?.prioritySide === "opponent" ? playerName : botName;
+  const fallbackPriorityName = result?.prioritySide === "opponent" ? botName : playerName;
+  const fallbackSecondPriorityName = result?.prioritySide === "opponent" ? playerName : botName;
+  const priorityName = skillOpenerName || fallbackPriorityName;
+  const secondPriorityName = skillSecondName || fallbackSecondPriorityName;
+  const hasUpcomingSkillOrder = Boolean(nextSkillOpenerName && nextSkillSecondName);
+  const upcomingPriorityName = nextSkillOpenerName || priorityName;
+  const upcomingSecondPriorityName = nextSkillSecondName || secondPriorityName;
   const timeline =
     skillEvents.length > 0
       ? skillEvents
@@ -1629,10 +1646,10 @@ function RevealSpotlight({
               ลำดับเปิดใช้ผลสกิล
             </div>
             <div className="mt-0.5 text-[clamp(0.72rem,1.55cqw,0.9rem)] font-black leading-5 text-white">
-              {priorityName} เปิดใช้ผลสกิลก่อน
+              {hasUpcomingSkillOrder ? `ตาถัดไป ${upcomingPriorityName} เปิดใช้ผลสกิลก่อน` : `${priorityName} เปิดใช้ผลสกิลก่อน`}
             </div>
             <div className="mt-1 text-[clamp(0.58rem,1.2cqw,0.72rem)] font-semibold leading-4 text-amber-50/72">
-              ตามด้วย {secondPriorityName} หากมีสกิลในตานี้
+              {hasUpcomingSkillOrder ? `ตานี้ ${priorityName} → ${secondPriorityName} / ต่อด้วย ${upcomingSecondPriorityName}` : `ตามด้วย ${secondPriorityName} หากมีสกิลในตานี้`}
             </div>
           </div>
           {timeline.map((event, index) => {
@@ -1847,6 +1864,10 @@ function HandCard({
       onMouseLeave={onPreviewEnd}
       onFocus={() => !used && onPreview(card)}
       onBlur={onPreviewEnd}
+      onTouchStart={() => {
+        if (disabled || used) return;
+        onPreview(card);
+      }}
       draggable={!disabled && !used}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", card.cardNo);
@@ -3125,6 +3146,10 @@ function CompactBattleBoard({
   onPlaceCard,
   blessingAuras = null,
   readyAdvanceSlot,
+  skillOpenerName,
+  skillSecondName,
+  nextSkillOpenerName,
+  nextSkillSecondName,
 }: {
   cardsByNo: Map<string, CardView>;
   lockedFight: LockedFight | null;
@@ -3159,6 +3184,10 @@ function CompactBattleBoard({
   onPlaceCard: (lane: Lane, cardNo: string) => void;
   blessingAuras?: { player?: TargetAura; bot?: TargetAura } | null;
   readyAdvanceSlot?: ReactNode;
+  skillOpenerName?: string;
+  skillSecondName?: string;
+  nextSkillOpenerName?: string;
+  nextSkillSecondName?: string;
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
   const playerTriangle = lockedFight?.player || player;
@@ -3238,6 +3267,10 @@ function CompactBattleBoard({
         botName={botName}
         spectatorView={revealAllCards}
         readyAdvanceSlot={readyAdvanceSlot}
+        skillOpenerName={skillOpenerName}
+        skillSecondName={skillSecondName}
+        nextSkillOpenerName={nextSkillOpenerName}
+        nextSkillSecondName={nextSkillSecondName}
       />
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
@@ -3602,6 +3635,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     : opponentSide
       ? currentRoom?.seats[opponentSide] || null
       : null;
+  const displayNameForRoomSide = (side: RoomPlayerSide | null) => {
+    if (!side) return "";
+    if (isSpectator) return side === "host" ? displayPlayerName : displayBotName;
+    if (side === roomPlayerSide) return displayPlayerName;
+    if (side === opponentSide) return displayBotName;
+    return currentRoom?.seats[side]?.name || "";
+  };
+  const oppositeRoomSide = (side: RoomPlayerSide | null): RoomPlayerSide | null =>
+    side === "host" ? "challenger" : side === "challenger" ? "host" : null;
+  const displaySkillOpenerSide = currentRoom ? roomOpeningSideForTurn(currentRoom, displayActiveTurn) : null;
+  const displaySkillSecondSide = oppositeRoomSide(displaySkillOpenerSide);
+  const nextSkillTurn = displayActiveTurn < 3 ? ((displayActiveTurn + 1) as TriadTurn) : null;
+  const displayNextSkillOpenerSide = currentRoom && nextSkillTurn ? roomOpeningSideForTurn(currentRoom, nextSkillTurn) : null;
+  const displayNextSkillSecondSide = oppositeRoomSide(displayNextSkillOpenerSide);
+  const displaySkillOpenerName = displayNameForRoomSide(displaySkillOpenerSide);
+  const displaySkillSecondName = displayNameForRoomSide(displaySkillSecondSide);
+  const displayNextSkillOpenerName = displayNameForRoomSide(displayNextSkillOpenerSide);
+  const displayNextSkillSecondName = displayNameForRoomSide(displayNextSkillSecondSide);
   const displayPlayerDeckCards = spectatorBattleState?.playerDeckCards || playerDeckCards;
   const displayBotDeckCards = spectatorBattleState?.botDeckCards || botDeckCards;
   const displayBattleLog = spectatorBattleState?.battleLog || battleLog;
@@ -6139,6 +6190,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 revealAllCards={isSpectator}
                 randomCard={randomDrawCard}
                 blessingAuras={displayBlessingAuras}
+                skillOpenerName={displaySkillOpenerName}
+                skillSecondName={displaySkillSecondName}
+                nextSkillOpenerName={displayNextSkillOpenerName}
+                nextSkillSecondName={displayNextSkillSecondName}
                 onSelectSkillTarget={(target) =>
                   setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
                 }
@@ -6180,6 +6235,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               revealAllCards={isSpectator}
               randomCard={randomDrawCard}
               blessingAuras={displayBlessingAuras}
+              skillOpenerName={displaySkillOpenerName}
+              skillSecondName={displaySkillSecondName}
+              nextSkillOpenerName={displayNextSkillOpenerName}
+              nextSkillSecondName={displayNextSkillSecondName}
               onSelectSkillTarget={(target) =>
                 setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
               }

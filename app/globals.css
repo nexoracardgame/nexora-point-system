@@ -915,6 +915,15 @@ textarea {
     scroll-padding-inline: max(0.85rem, env(safe-area-inset-left), env(safe-area-inset-right));
   }
 
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid::before,
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid::after {
+    content: "";
+    display: block;
+    flex: 0 0 max(1.15rem, env(safe-area-inset-left), env(safe-area-inset-right));
+    min-width: max(1.15rem, env(safe-area-inset-left), env(safe-area-inset-right));
+    pointer-events: none;
+  }
+
   .nexora-battle-shell .triad-player-hand .triad-hand-grid::-webkit-scrollbar {
     display: none;
   }
@@ -932,11 +941,11 @@ textarea {
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:first-child {
-    margin-left: max(0.25rem, env(safe-area-inset-left)) !important;
+    margin-left: 0 !important;
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:last-child {
-    margin-right: max(0.25rem, env(safe-area-inset-right)) !important;
+    margin-right: 0 !important;
   }
 
   .nexora-battle-shell .triad-board-phase-hud {
@@ -1622,6 +1631,12 @@ textarea {
     scroll-padding-inline: max(0.95rem, env(safe-area-inset-left), env(safe-area-inset-right));
   }
 
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid::before,
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid::after {
+    flex-basis: max(1.45rem, env(safe-area-inset-left), env(safe-area-inset-right));
+    min-width: max(1.45rem, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > * {
     width: clamp(36px, 8dvw, 50px);
     min-width: clamp(36px, 8dvw, 50px);
@@ -1635,11 +1650,11 @@ textarea {
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:first-child {
-    margin-left: max(0.35rem, env(safe-area-inset-left)) !important;
+    margin-left: 0 !important;
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:last-child {
-    margin-right: max(0.35rem, env(safe-area-inset-right)) !important;
+    margin-right: 0 !important;
   }
 
   .nexora-battle-shell .triad-spectator-avatar-rail {
