@@ -2755,7 +2755,7 @@ function SpectatorAvatarRail({
   currentParticipantId?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end">
+    <div className="triad-spectator-avatar-rail flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end">
       {Array.from({ length: SPECTATOR_LIMIT }).map((_, index) => {
         const spectator = spectators[index];
         return spectator ? (

@@ -749,6 +749,43 @@ textarea {
     flex-wrap: nowrap !important;
   }
 
+  .nexora-battle-shell .triad-spectator-avatar-rail {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    gap: 0.18rem !important;
+    max-width: min(34svw, 11.5rem) !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    padding: 0.1rem 0.15rem !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail > div {
+    height: clamp(1.15rem, 4.7svh, 1.5rem) !important;
+    width: clamp(1.15rem, 4.7svh, 1.5rem) !important;
+    min-width: clamp(1.15rem, 4.7svh, 1.5rem) !important;
+    border-width: 1px !important;
+    font-size: clamp(0.46rem, 1.65svh, 0.58rem) !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail button {
+    transform: scale(0.56);
+    transform-origin: center;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail button > span:first-child {
+    inset: -0.15rem !important;
+    opacity: 0.32 !important;
+    filter: blur(4px) !important;
+  }
+
   .nexora-battle-shell .triad-game-layout {
     flex: 0 0 auto;
     min-height: 0;
@@ -869,12 +906,13 @@ textarea {
     gap: 0.25rem !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
-    padding-bottom: 0.1rem !important;
+    padding: 0 0.85rem 0.1rem !important;
     scrollbar-width: none;
     pointer-events: auto !important;
     touch-action: pan-x !important;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
+    scroll-padding-inline: max(0.85rem, env(safe-area-inset-left), env(safe-area-inset-right));
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid::-webkit-scrollbar {
@@ -891,6 +929,14 @@ textarea {
   .nexora-battle-shell .triad-player-hand .triad-hand-grid button {
     pointer-events: auto !important;
     touch-action: manipulation !important;
+  }
+
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:first-child {
+    margin-left: max(0.25rem, env(safe-area-inset-left)) !important;
+  }
+
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:last-child {
+    margin-right: max(0.25rem, env(safe-area-inset-right)) !important;
   }
 
   .nexora-battle-shell .triad-board-phase-hud {
@@ -1569,9 +1615,11 @@ textarea {
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid {
     max-height: 4.05rem;
+    padding-inline: 0.95rem !important;
     pointer-events: auto !important;
     touch-action: pan-x !important;
     -webkit-overflow-scrolling: touch;
+    scroll-padding-inline: max(0.95rem, env(safe-area-inset-left), env(safe-area-inset-right));
   }
 
   .nexora-battle-shell .triad-player-hand .triad-hand-grid > * {
@@ -1584,6 +1632,29 @@ textarea {
   .nexora-battle-shell .triad-player-hand .triad-hand-grid button {
     pointer-events: auto !important;
     touch-action: manipulation !important;
+  }
+
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:first-child {
+    margin-left: max(0.35rem, env(safe-area-inset-left)) !important;
+  }
+
+  .nexora-battle-shell .triad-player-hand .triad-hand-grid > *:last-child {
+    margin-right: max(0.35rem, env(safe-area-inset-right)) !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail {
+    max-width: min(28svw, 8.5rem) !important;
+    gap: 0.12rem !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail > div {
+    height: clamp(0.95rem, 4.15svh, 1.22rem) !important;
+    width: clamp(0.95rem, 4.15svh, 1.22rem) !important;
+    min-width: clamp(0.95rem, 4.15svh, 1.22rem) !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-avatar-rail button {
+    transform: scale(0.44);
   }
 
   .nexora-battle-shell .triad-board-phase-card {
