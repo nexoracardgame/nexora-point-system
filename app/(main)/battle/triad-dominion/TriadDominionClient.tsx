@@ -2410,7 +2410,13 @@ function CardHoverPreview({
         if (event.currentTarget === event.target) onClose?.();
       }}
     >
-      <div className="triad-card-preview-panel relative w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]">
+      <div
+        className="triad-card-preview-panel pointer-events-auto relative w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]"
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
+        onTouchEnd={(event) => event.stopPropagation()}
+      >
         {onClose ? (
           <button
             type="button"
@@ -2447,7 +2453,10 @@ function CardHoverPreview({
             <button
               type="button"
               className="triad-card-preview-use mt-3 hidden w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
+              onPointerDown={(event) => event.stopPropagation()}
+              onTouchStart={(event) => event.stopPropagation()}
               onClick={(event) => {
+                event.preventDefault();
                 event.stopPropagation();
                 onUseCard(card.cardNo);
               }}

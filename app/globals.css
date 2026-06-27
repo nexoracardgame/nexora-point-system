@@ -1664,12 +1664,13 @@ textarea {
   }
 
   .nexora-battle-shell .triad-card-preview-overlay {
-    pointer-events: auto !important;
+    pointer-events: none !important;
     background: rgba(0, 0, 0, 0.58) !important;
     backdrop-filter: blur(4px);
   }
 
   .nexora-battle-shell .triad-card-preview-panel {
+    pointer-events: auto !important;
     display: grid !important;
     width: min(96svw, 760px) !important;
     max-height: calc(100svh - 0.7rem) !important;
@@ -1718,6 +1719,7 @@ textarea {
 
   .nexora-battle-shell .triad-card-preview-use {
     display: flex !important;
+    pointer-events: auto !important;
     min-height: clamp(2.1rem, 6svh, 2.8rem);
     font-size: clamp(0.68rem, 2svh, 0.86rem) !important;
     touch-action: manipulation;
