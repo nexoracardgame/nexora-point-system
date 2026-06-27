@@ -2001,6 +2001,26 @@ function PlayerHand({
     onPlayCard(cardNo);
     setPreviewCard(null);
   };
+  const monsterCards = cards.filter((card) => card.kind !== "skill");
+  const skillCards = cards.filter((card) => card.kind === "skill");
+  const renderHandCard = (card: CardView) => {
+    const placedLane = placedByNo.get(card.cardNo);
+    const unavailable = usedSet.has(card.cardNo) || Boolean(placedLane && placedLane !== activeLane);
+    return (
+      <HandCard
+        key={card.cardNo}
+        card={card}
+        used={unavailable}
+        placedLane={placedLane}
+        disabled={locked}
+        highlighted={highlightCardNo === card.cardNo}
+        onClick={() => onPlayCard(card.cardNo)}
+        onDropToLane={onDropToLane}
+        onPreview={setPreviewCard}
+        onPreviewEnd={() => setPreviewCard(null)}
+      />
+    );
+  };
 
   return (
     <div className="triad-player-hand relative z-[90] rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
@@ -2028,24 +2048,14 @@ function PlayerHand({
         </div>
       </div>
       <div className="triad-hand-grid grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1">
-        {cards.map((card) => {
-          const placedLane = placedByNo.get(card.cardNo);
-          const unavailable = usedSet.has(card.cardNo) || Boolean(placedLane && placedLane !== activeLane);
-          return (
-            <HandCard
-              key={card.cardNo}
-              card={card}
-              used={unavailable}
-              placedLane={placedLane}
-              disabled={locked}
-              highlighted={highlightCardNo === card.cardNo}
-              onClick={() => onPlayCard(card.cardNo)}
-              onDropToLane={onDropToLane}
-              onPreview={setPreviewCard}
-              onPreviewEnd={() => setPreviewCard(null)}
-            />
-          );
-        })}
+        <div className="triad-hand-row triad-hand-row-monster">
+          <div className="triad-hand-row-label">มอนสเตอร์</div>
+          {monsterCards.map(renderHandCard)}
+        </div>
+        <div className="triad-hand-row triad-hand-row-skill">
+          <div className="triad-hand-row-label">สกิล</div>
+          {skillCards.map(renderHandCard)}
+        </div>
       </div>
     </div>
   );
