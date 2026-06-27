@@ -65,15 +65,17 @@ function isStandaloneMode() {
 function isMobileGameDevice() {
   if (typeof window === "undefined") return false;
 
+  const userAgent = window.navigator.userAgent.toLowerCase();
   return (
     window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
-    window.matchMedia("(max-width: 900px)").matches ||
+    /android|iphone|ipad|ipod|mobile/.test(userAgent) ||
     isIosDevice()
   );
 }
 
 export async function requestGameViewport() {
   if (typeof window === "undefined") return;
+  if (!isMobileGameDevice()) return;
 
   try {
     if (!document.fullscreenElement) {

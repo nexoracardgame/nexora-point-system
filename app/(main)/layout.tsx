@@ -1071,7 +1071,7 @@ export default function MainLayout({
 
     const isMobileBattleDevice = () =>
       window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
-      window.matchMedia("(max-width: 900px)").matches;
+      /android|iphone|ipad|ipod|mobile/i.test(window.navigator.userAgent);
 
     if (!isBattleRoute) {
       window.sessionStorage.removeItem("nexora:battle:sticky-viewport");
@@ -1081,7 +1081,10 @@ export default function MainLayout({
       return;
     }
 
-    if (!isMobileBattleDevice()) return;
+    if (!isMobileBattleDevice()) {
+      window.sessionStorage.removeItem("nexora:battle:sticky-viewport");
+      return;
+    }
 
     window.sessionStorage.setItem("nexora:battle:sticky-viewport", "1");
 

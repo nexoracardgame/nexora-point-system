@@ -3323,6 +3323,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   );
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobileBattleDevice =
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+      /android|iphone|ipad|ipod|mobile/i.test(window.navigator.userAgent);
+    if (!isMobileBattleDevice) return;
+
     const orientation = screen.orientation as ScreenOrientation & {
       lock?: (orientation: "landscape" | "portrait" | "any" | "natural") => Promise<void>;
       unlock?: () => void;
