@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
@@ -12,6 +13,7 @@ import {
   Eye,
   Flame,
   Hand,
+  House,
   KeyRound,
   Layers3,
   Lock,
@@ -3316,6 +3318,7 @@ function emptyRevealState(): Record<TriadTurn, TurnReveal> {
 }
 
 export default function TriadDominionClient({ cards, reviewSkills, summary, currentUser }: Props) {
+  const router = useRouter();
   const cardsByNo = useMemo(() => new Map(cards.map((card) => [card.cardNo, card])), [cards]);
   const deckCatalog = useMemo(
     () => uniqueByNo(cards.filter((card) => card.kind === "monster" || card.kind === "skill")),
@@ -5447,6 +5450,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/78 sm:text-base drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
                 สร้างห้อง เข้าห้องด้วยเลข 6 ตัว หรือเลือกนั่งชมก่อนเริ่มสู้ได้เลย
               </p>
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="triad-lobby-home-button mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-amber-100/60 bg-[linear-gradient(135deg,#fde68a,#facc15_42%,#d97706)] px-5 text-sm font-black text-black shadow-[0_0_36px_rgba(251,191,36,0.38),inset_0_0_0_1px_rgba(255,255,255,0.38)] transition hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] sm:w-auto"
+              >
+                <House className="h-4 w-4" />
+                กลับหน้าหลัก
+              </button>
             </div>
             <div className="relative z-20 grid grid-cols-3 gap-2 sm:min-w-[420px]">
               {[
