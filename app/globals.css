@@ -136,6 +136,13 @@ textarea {
   user-select: none !important;
   -webkit-user-select: none !important;
   -webkit-tap-highlight-color: transparent !important;
+  transition-duration: 60ms !important;
+}
+
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button:hover,
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button:focus,
+.triad-hand-grid.triad-hand-grid-split .triad-hand-row > button:active {
+  transform: translateZ(0) !important;
 }
 
 .triad-hand-grid.triad-hand-grid-split .triad-hand-row > button .relative.aspect-\[3\/4\] {

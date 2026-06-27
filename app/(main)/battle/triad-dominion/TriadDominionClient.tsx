@@ -1847,6 +1847,7 @@ function HandCard({
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
+  const touchPreviewHandledRef = useRef(false);
   const isTouchPreviewMode = () =>
     typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
@@ -1856,6 +1857,10 @@ function HandCard({
       onClick={(event) => {
         if (isTouchPreviewMode()) {
           event.preventDefault();
+          if (touchPreviewHandledRef.current) {
+            touchPreviewHandledRef.current = false;
+            return;
+          }
           onPreview(card);
           return;
         }
@@ -1865,17 +1870,34 @@ function HandCard({
         }
         onClick();
       }}
-      onMouseEnter={() => onPreview(card)}
-      onMouseLeave={onPreviewEnd}
-      onFocus={() => onPreview(card)}
-      onBlur={onPreviewEnd}
+      onMouseEnter={() => {
+        if (isTouchPreviewMode()) return;
+        onPreview(card);
+      }}
+      onMouseLeave={() => {
+        if (isTouchPreviewMode()) return;
+        onPreviewEnd();
+      }}
+      onFocus={() => {
+        if (isTouchPreviewMode()) return;
+        onPreview(card);
+      }}
+      onBlur={() => {
+        if (isTouchPreviewMode()) return;
+        onPreviewEnd();
+      }}
       draggable={!disabled && !used}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", card.cardNo);
         event.dataTransfer.effectAllowed = "move";
       }}
       onPointerUp={(event) => {
-        if (isTouchPreviewMode()) return;
+        if (isTouchPreviewMode()) {
+          event.preventDefault();
+          touchPreviewHandledRef.current = true;
+          onPreview(card);
+          return;
+        }
         if (disabled || used) return;
         onPreview(card);
         const target = document
