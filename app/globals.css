@@ -437,6 +437,20 @@ textarea {
   user-select: none;
 }
 
+.nexora-battle-shell,
+.nexora-battle-shell * {
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-drag: none;
+}
+
+.nexora-battle-shell img,
+.nexora-battle-shell picture,
+.nexora-battle-shell [data-nimg] {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
 .nexora-battle-shell main {
   min-height: 100% !important;
   height: 100%;

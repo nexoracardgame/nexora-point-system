@@ -3483,6 +3483,27 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const isBattleTarget = (target: EventTarget | null) =>
+      target instanceof Element && Boolean(target.closest(".nexora-battle-shell"));
+    const blockNativeMobileMenu = (event: Event) => {
+      if (!isBattleTarget(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.addEventListener("contextmenu", blockNativeMobileMenu, true);
+    document.addEventListener("dragstart", blockNativeMobileMenu, true);
+    document.addEventListener("selectstart", blockNativeMobileMenu, true);
+
+    return () => {
+      document.removeEventListener("contextmenu", blockNativeMobileMenu, true);
+      document.removeEventListener("dragstart", blockNativeMobileMenu, true);
+      document.removeEventListener("selectstart", blockNativeMobileMenu, true);
+    };
+  }, []);
+
   const participant = useMemo(() => makeParticipant(currentUser), [currentUser.id, currentUser.image, currentUser.name]);
   const [phase, setPhase] = useState<BattlePhase>("lobby");
   const [resumeChecking, setResumeChecking] = useState(true);
