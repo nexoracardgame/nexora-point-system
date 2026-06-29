@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ensureCardRareRedemptionSchema } from "@/lib/card-rare-redemptions";
 import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
+import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
+import { formatCouponValue } from "@/lib/coupon-utils";
 import { prisma } from "@/lib/prisma";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { formatThaiDateTime } from "@/lib/thai-time";
@@ -77,6 +79,57 @@ type MemberCardRareStats = {
   totalNexValue: number | null;
 };
 
+type MemberCardRareLog = {
+  id: string;
+  code: string;
+  cardNo: string;
+  cardName: string;
+  rewardLabel: string;
+  optionKey: string | null;
+  conditionLabel: string | null;
+  nexValue: number;
+  status: string;
+  createdAt: Date;
+  approvedAt: Date | null;
+};
+
+type MemberCouponHistory = {
+  id: string;
+  code: string;
+  used: boolean;
+  createdAt: Date;
+  usedAt: Date | null;
+  reversedAt: Date | null;
+  reversalReason: string | null;
+  reward: {
+    id: string;
+    name: string;
+    nexCost: number | null;
+    coinCost: number | null;
+  };
+};
+
+function getCouponStatus(coupon: MemberCouponHistory) {
+  if (coupon.reversedAt) {
+    return {
+      label: "ย้อนกลับแล้ว",
+      className: "border-red-300/20 bg-red-300/10 text-red-200",
+    };
+  }
+
+  if (coupon.used) {
+    return {
+      label: "ใช้งานแล้ว",
+      className: "border-emerald-300/20 bg-emerald-300/10 text-emerald-200",
+    };
+  }
+
+  return {
+    label: "พร้อมใช้",
+    className: "border-cyan-300/20 bg-cyan-300/10 text-cyan-200",
+  };
+}
+
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await prisma.user.findUnique({ where: { id } });
@@ -91,10 +144,17 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     take: 20,
   });
 
+  await ensureCouponRollbackSchema();
   await ensureCardSetRedemptionSchema();
   await ensureCardRareRedemptionSchema();
 
-  const [cardSetStatsRows, cardSetLogs, cardRareStatsRows] = await Promise.all([
+  const [
+    cardSetStatsRows,
+    cardSetLogs,
+    cardRareStatsRows,
+    cardRareLogs,
+    coupons,
+  ] = await Promise.all([
     prisma.$queryRawUnsafe<MemberCardSetStats[]>(
       `
         SELECT
@@ -136,6 +196,42 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       `,
       user.id
     ),
+    prisma.$queryRawUnsafe<MemberCardRareLog[]>(
+      `
+        SELECT
+          "id",
+          "code",
+          "cardNo",
+          "cardName",
+          "rewardLabel",
+          "optionKey",
+          "conditionLabel",
+          "nexValue",
+          "status",
+          "createdAt",
+          "approvedAt"
+        FROM "CardRareRedemption"
+        WHERE "userId" = $1
+        ORDER BY "createdAt" DESC
+        LIMIT 30
+      `,
+      user.id
+    ),
+    prisma.coupon.findMany({
+      where: { userId: user.id },
+      include: {
+        reward: {
+          select: {
+            id: true,
+            name: true,
+            nexCost: true,
+            coinCost: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
   ]);
 
   const cardSetStats = cardSetStatsRows[0] || {
@@ -146,6 +242,21 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     approvedCount: 0,
     totalNexValue: 0,
   };
+  const unusedCoupons = coupons.filter(
+    (coupon) => !coupon.used && !coupon.reversedAt
+  ).length;
+  const usedCoupons = coupons.filter(
+    (coupon) => coupon.used && !coupon.reversedAt
+  ).length;
+  const reversedCoupons = coupons.filter((coupon) => coupon.reversedAt).length;
+  const couponNexValue = coupons.reduce((sum, coupon) => {
+    const value = formatCouponValue(coupon.code, coupon.reward);
+    return value.currency === "NEX" ? sum + Number(value.amount || 0) : sum;
+  }, 0);
+  const couponCoinValue = coupons.reduce((sum, coupon) => {
+    const value = formatCouponValue(coupon.code, coupon.reward);
+    return value.currency === "COIN" ? sum + Number(value.amount || 0) : sum;
+  }, 0);
 
   return (
     <div className="space-y-5 text-white">
@@ -203,6 +314,22 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         />
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-6">
+        <Card title="คูปองทั้งหมด" value={`${formatNumber(coupons.length)} ใบ`} />
+        <Card title="คูปองพร้อมใช้" value={`${formatNumber(unusedCoupons)} ใบ`} />
+        <Card title="คูปองใช้แล้ว" value={`${formatNumber(usedCoupons)} ใบ`} />
+        <Card title="คูปองย้อนกลับ" value={`${formatNumber(reversedCoupons)} ใบ`} />
+        <Card
+          title="มูลค่าคูปอง NEX"
+          value={`${formatNumber(couponNexValue)} NEX`}
+          gold
+        />
+        <Card
+          title="มูลค่าคูปอง COIN"
+          value={`${formatNumber(couponCoinValue)} COIN`}
+        />
+      </div>
+
       <div className="flex justify-end">
         <Link
           href={`/admin/card-rare-logs?q=${encodeURIComponent(user.lineId)}`}
@@ -213,6 +340,84 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       </div>
 
       <MemberActions lineId={user.lineId} />
+
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-black sm:text-xl">ประวัติคูปองและการแลกรางวัล</h2>
+          <Link
+            href={`/admin/coupons?q=${encodeURIComponent(user.lineId)}`}
+            className="text-sm font-black text-cyan-200 hover:text-cyan-100"
+          >
+            ดูใน Coupons
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {coupons.length === 0 ? (
+            <div className="rounded-[22px] border border-white/8 bg-black/20 p-5 text-sm text-white/45">
+              ยังไม่มีประวัติคูปองหรือการแลกรางวัล
+            </div>
+          ) : (
+            coupons.map((coupon) => {
+              const status = getCouponStatus(coupon);
+              const value = formatCouponValue(coupon.code, coupon.reward);
+
+              return (
+                <div
+                  key={coupon.id}
+                  className="rounded-[22px] border border-white/8 bg-black/20 p-4"
+                >
+                  <div className="grid gap-3 xl:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto] xl:items-start">
+                    <span
+                      className={`w-fit rounded-full border px-3 py-1 text-xs font-black uppercase ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-black text-white">
+                        {coupon.reward.name}
+                      </div>
+                      <div className="mt-1 break-all text-xs font-bold text-white/42">
+                        {coupon.code}
+                      </div>
+                      {coupon.reversalReason ? (
+                        <div className="mt-2 rounded-full bg-red-300/10 px-3 py-1 text-[11px] font-black text-red-200">
+                          {coupon.reversalReason}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-2 text-xs font-bold text-white/55 sm:grid-cols-3 xl:grid-cols-1">
+                      <div>
+                        <span className="text-white/30">สร้าง: </span>
+                        {formatThaiDateTime(coupon.createdAt)}
+                      </div>
+                      <div>
+                        <span className="text-white/30">ใช้: </span>
+                        {coupon.usedAt ? formatThaiDateTime(coupon.usedAt) : "-"}
+                      </div>
+                      <div>
+                        <span className="text-white/30">ย้อนกลับ: </span>
+                        {coupon.reversedAt ? formatThaiDateTime(coupon.reversedAt) : "-"}
+                      </div>
+                    </div>
+                    <div className="text-left xl:text-right">
+                      <div
+                        className={`text-sm font-black ${
+                          value.currency === "COIN" ? "text-cyan-200" : "text-amber-300"
+                        }`}
+                      >
+                        {value.label}
+                      </div>
+                      <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white/32">
+                        ใช้ {value.currency || "VALUE"} แลก
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
 
       <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -267,6 +472,68 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                   </div>
                 </div>
                 <div className="text-sm font-black text-amber-300">
+                  {formatNumber(Number(log.nexValue || 0))} NEX
+                </div>
+                <div className="text-xs text-white/42 lg:text-right">
+                  {formatThaiDateTime(log.approvedAt || log.createdAt)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-black sm:text-xl">ประวัติการแลก CARD RARE</h2>
+          <Link
+            href={`/admin/card-rare-logs?q=${encodeURIComponent(user.lineId)}`}
+            className="text-sm font-black text-violet-200 hover:text-violet-100"
+          >
+            ดูใน Card Rare Logs
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {cardRareLogs.length === 0 ? (
+            <div className="rounded-[22px] border border-white/8 bg-black/20 p-5 text-sm text-white/45">
+              ยังไม่มีประวัติการแลก CARD RARE
+            </div>
+          ) : (
+            cardRareLogs.map((log) => (
+              <div
+                key={log.id}
+                className="grid gap-3 rounded-[22px] border border-white/8 bg-black/20 p-4 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:items-center"
+              >
+                <span
+                  className={`w-fit rounded-full border px-3 py-1 text-xs font-black uppercase ${
+                    log.status === "approved"
+                      ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
+                      : log.status === "pending"
+                        ? "border-violet-300/20 bg-violet-300/10 text-violet-100"
+                        : "border-red-300/20 bg-red-300/10 text-red-200"
+                  }`}
+                >
+                  {log.status}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-white">
+                    No. {log.cardNo} {log.cardName}
+                  </div>
+                  <div className="mt-1 line-clamp-1 text-xs font-bold text-white/42">
+                    {log.code}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="w-fit rounded-full bg-violet-300/10 px-3 py-1 text-[11px] font-black text-violet-100">
+                      {log.conditionLabel ? "แบบเงื่อนไขพิเศษ" : "แบบมาตรฐาน"}
+                    </span>
+                    {log.conditionLabel ? (
+                      <span className="w-fit rounded-full bg-white/[0.05] px-3 py-1 text-[11px] font-black text-white/52">
+                        {log.conditionLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="text-sm font-black text-violet-200">
                   {formatNumber(Number(log.nexValue || 0))} NEX
                 </div>
                 <div className="text-xs text-white/42 lg:text-right">
