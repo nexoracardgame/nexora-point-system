@@ -389,24 +389,25 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       ) : null}
 
       {active && modalOpen ? (
-        <div className="fixed inset-0 z-[1250] flex items-end justify-center overflow-y-auto bg-black/72 p-3 pb-[calc(12px_+_env(safe-area-inset-bottom))] pt-[calc(12px_+_env(safe-area-inset-top))] backdrop-blur-xl sm:items-center">
+        <div className="fixed inset-0 z-[5000] flex items-end justify-center overflow-y-auto bg-black/78 p-3 pb-[calc(12px_+_env(safe-area-inset-bottom))] pt-[calc(12px_+_env(safe-area-inset-top))] backdrop-blur-xl sm:items-center">
           <div className="relative max-h-[calc(100dvh_-_24px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-xl overflow-y-auto rounded-[32px] border border-white/12 bg-[#101016] p-4 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)] sm:p-5">
-            <button
-              type="button"
-              onClick={() => setModalOpen(false)}
-              className="sticky left-full top-0 z-20 mb-2 grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.08] text-white shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-xl"
-              aria-label="Close QR"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">
-                Card Set Redemption
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">
+                  Card Set Redemption
+                </div>
+                <h2 className="mt-2 break-words text-2xl font-black leading-tight sm:text-3xl">
+                  Set {active.setOrder} {active.setName}
+                </h2>
               </div>
-              <h2 className="mt-2 break-words text-2xl font-black leading-tight sm:text-3xl">
-                Set {active.setOrder} {active.setName}
-              </h2>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-amber-200/30 bg-black/70 text-white shadow-[0_0_30px_rgba(250,204,21,0.18)] ring-1 ring-white/10 backdrop-blur-xl transition active:scale-95"
+                aria-label="Close QR"
+              >
+                <X className="h-6 w-6" />
+              </button>
             </div>
 
             <div
