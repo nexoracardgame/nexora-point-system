@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -28,6 +27,7 @@ type CardSetItem = {
   stars: string;
   totalCards: number;
   coverImage: string;
+  fallbackImage: string;
   priorityImage: boolean;
   nexValue: number;
   bonusOptions: {
@@ -327,15 +327,25 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                   {set.finish === "foil" ? "FOIL" : set.tier}
                 </div>
                 <div className="relative aspect-[1.3]">
-                  <Image
+                  <img
                     src={set.coverImage}
                     alt={set.name}
-                    fill
-                    priority={set.priorityImage}
+                    loading={set.priorityImage ? "eager" : "lazy"}
+                    fetchPriority={set.priorityImage ? "high" : "auto"}
                     decoding="async"
-                    sizes="(min-width: 1280px) 29vw, (min-width: 640px) 45vw, 92vw"
-                    unoptimized
-                    className="object-contain object-center p-5 transition duration-500 group-hover:scale-105"
+                    className="absolute inset-0 h-full w-full object-contain object-center p-5 transition duration-500 group-hover:scale-105"
+                    onError={(event) => {
+                      const image = event.currentTarget;
+                      const usedFallback = image.dataset.fallbackUsed === "true";
+
+                      if (!usedFallback && set.fallbackImage) {
+                        image.dataset.fallbackUsed = "true";
+                        image.src = set.fallbackImage;
+                        return;
+                      }
+
+                      image.src = "/avatar.png";
+                    }}
                   />
                 </div>
               </div>

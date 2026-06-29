@@ -21,20 +21,39 @@ export const revalidate = 0;
 const publicDir = path.join(process.cwd(), "public");
 const cardSetImageExtensions = ["webp", "jpg", "jpeg", "png"];
 
-function resolveCardSetImage(order: number, fallback: string) {
+function publicAssetPath(assetPath: string) {
+  return path.join(publicDir, ...assetPath.split("/").filter(Boolean));
+}
+
+function withAssetVersion(assetPath: string) {
+  try {
+    const stat = fs.statSync(publicAssetPath(assetPath));
+    return `${assetPath}?v=${Math.floor(stat.mtimeMs)}`;
+  } catch {
+    return assetPath;
+  }
+}
+
+function resolveCardSetImages(order: number, fallback: string) {
   const optimizedPath = `/card-sets/optimized/${order}.webp`;
-  if (fs.existsSync(path.join(publicDir, optimizedPath))) {
-    return optimizedPath;
+  const sourceCandidates = cardSetImageExtensions.map(
+    (extension) => `/card-sets/${order}.${extension}`
+  );
+  const existingSource =
+    sourceCandidates.find((imagePath) => fs.existsSync(publicAssetPath(imagePath))) ||
+    fallback;
+
+  if (fs.existsSync(publicAssetPath(optimizedPath))) {
+    return {
+      coverImage: withAssetVersion(optimizedPath),
+      fallbackImage: withAssetVersion(existingSource),
+    };
   }
 
-  for (const extension of cardSetImageExtensions) {
-    const imagePath = `/card-sets/${order}.${extension}`;
-    if (fs.existsSync(path.join(publicDir, imagePath))) {
-      return imagePath;
-    }
-  }
-
-  return fallback;
+  return {
+    coverImage: withAssetVersion(existingSource),
+    fallbackImage: fallback,
+  };
 }
 
 export default async function CardSetPage() {
@@ -52,6 +71,7 @@ export default async function CardSetPage() {
     .sort((a, b) => a.order - b.order)
     .map((set, index) => {
       const fallback = getCardSetCoverImage(set);
+      const images = resolveCardSetImages(set.order, fallback);
       const standardChoice = getCardSetRedemptionChoice(set, "standard");
       const bonusOptions = getCardSetBonusOptions(set);
 
@@ -64,7 +84,8 @@ export default async function CardSetPage() {
         tier: set.tier,
         stars: set.stars,
         totalCards: getCollectionCardIds(set).length,
-        coverImage: resolveCardSetImage(set.order, fallback),
+        coverImage: images.coverImage,
+        fallbackImage: images.fallbackImage,
         priorityImage: index < 6,
         nexValue: standardChoice.nexValue || parseCardSetNexValue(set.reward),
         bonusOptions,
