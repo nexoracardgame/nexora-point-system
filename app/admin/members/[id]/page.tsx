@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
 import { prisma } from "@/lib/prisma";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { formatThaiDateTime } from "@/lib/thai-time";
@@ -51,6 +52,23 @@ function getLogDisplay(log: { type: string; amount: number; point: number }) {
   };
 }
 
+type MemberCardSetLog = {
+  id: string;
+  code: string;
+  setOrder: number;
+  setName: string;
+  rewardLabel: string;
+  nexValue: number;
+  status: string;
+  createdAt: Date;
+  approvedAt: Date | null;
+};
+
+type MemberCardSetStats = {
+  approvedCount: bigint | number;
+  totalNexValue: number | null;
+};
+
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await prisma.user.findUnique({ where: { id } });
@@ -64,6 +82,45 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     orderBy: { createdAt: "desc" },
     take: 20,
   });
+
+  await ensureCardSetRedemptionSchema();
+
+  const [cardSetStatsRows, cardSetLogs] = await Promise.all([
+    prisma.$queryRawUnsafe<MemberCardSetStats[]>(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE "status" = 'approved') AS "approvedCount",
+          COALESCE(SUM("nexValue") FILTER (WHERE "status" = 'approved'), 0) AS "totalNexValue"
+        FROM "CardSetRedemption"
+        WHERE "userId" = $1
+      `,
+      user.id
+    ),
+    prisma.$queryRawUnsafe<MemberCardSetLog[]>(
+      `
+        SELECT
+          "id",
+          "code",
+          "setOrder",
+          "setName",
+          "rewardLabel",
+          "nexValue",
+          "status",
+          "createdAt",
+          "approvedAt"
+        FROM "CardSetRedemption"
+        WHERE "userId" = $1
+        ORDER BY "createdAt" DESC
+        LIMIT 20
+      `,
+      user.id
+    ),
+  ]);
+
+  const cardSetStats = cardSetStatsRows[0] || {
+    approvedCount: 0,
+    totalNexValue: 0,
+  };
 
   return (
     <div className="space-y-5 text-white">
@@ -99,9 +156,71 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <Card title="Line ID" value={user.lineId} />
         <Card title="NEX" value={String(user.nexPoint)} gold />
         <Card title="Coin" value={String(user.coin)} />
+        <Card
+          title="CARD SET แลกสำเร็จ"
+          value={`${formatNumber(Number(cardSetStats.approvedCount || 0))} เซ็ต`}
+          gold
+        />
+        <Card
+          title="CARD SET มูลค่ารวม"
+          value={`${formatNumber(Number(cardSetStats.totalNexValue || 0))} NEX`}
+          gold
+        />
       </div>
 
       <MemberActions lineId={user.lineId} />
+
+      <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-black sm:text-xl">ประวัติการแลก CARD SET</h2>
+          <Link
+            href={`/admin/card-set-logs?q=${encodeURIComponent(user.lineId)}`}
+            className="text-sm font-black text-amber-300 hover:text-amber-200"
+          >
+            ดูใน Card Set Logs
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {cardSetLogs.length === 0 ? (
+            <div className="rounded-[22px] border border-white/8 bg-black/20 p-5 text-sm text-white/45">
+              ยังไม่มีประวัติการแลก CARD SET
+            </div>
+          ) : (
+            cardSetLogs.map((log) => (
+              <div
+                key={log.id}
+                className="grid gap-3 rounded-[22px] border border-white/8 bg-black/20 p-4 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:items-center"
+              >
+                <span
+                  className={`w-fit rounded-full border px-3 py-1 text-xs font-black uppercase ${
+                    log.status === "approved"
+                      ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
+                      : log.status === "pending"
+                        ? "border-amber-300/20 bg-amber-300/10 text-amber-200"
+                        : "border-red-300/20 bg-red-300/10 text-red-200"
+                  }`}
+                >
+                  {log.status}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-white">
+                    Set {log.setOrder} {log.setName}
+                  </div>
+                  <div className="mt-1 line-clamp-1 text-xs font-bold text-white/42">
+                    {log.code}
+                  </div>
+                </div>
+                <div className="text-sm font-black text-amber-300">
+                  {formatNumber(Number(log.nexValue || 0))} NEX
+                </div>
+                <div className="text-xs text-white/42 lg:text-right">
+                  {formatThaiDateTime(log.approvedAt || log.createdAt)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
         <h2 className="text-lg font-black sm:text-xl">ประวัติการเพิ่มแต้ม</h2>

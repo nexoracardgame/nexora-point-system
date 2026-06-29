@@ -1,0 +1,184 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { createLocalNotification } from "@/lib/local-notification-store";
+import { prisma } from "@/lib/prisma";
+import { isStaffRole } from "@/lib/staff-auth";
+import {
+  ensureCardSetRedemptionSchema,
+  expireStaleCardSetRedemptions,
+  serializeCardSetRedemption,
+  type CardSetRedemptionRecord,
+} from "@/lib/card-set-redemptions";
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+};
+
+type RouteProps = {
+  params: Promise<{ code: string }>;
+};
+
+async function findRedemption(code: string) {
+  const rows = await prisma.$queryRawUnsafe<CardSetRedemptionRecord[]>(
+    `
+      SELECT
+        r.*,
+        u."name" AS "userName",
+        u."displayName" AS "userDisplayName",
+        u."image" AS "userImage",
+        u."lineId" AS "userLineId"
+      FROM "CardSetRedemption" r
+      LEFT JOIN "User" u ON u."id" = r."userId"
+      WHERE r."code" = $1
+      LIMIT 1
+    `,
+    code
+  );
+
+  return rows[0] || null;
+}
+
+export async function POST(req: Request, { params }: RouteProps) {
+  try {
+    const session = await getServerSession(authOptions);
+    const actorUserId = String(
+      (session?.user as { id?: string } | undefined)?.id || ""
+    ).trim();
+    const role = String(
+      (session?.user as { role?: string } | undefined)?.role || ""
+    ).trim();
+
+    if (!isStaffRole(role)) {
+      return NextResponse.json(
+        { error: "เฉพาะ staff หรือ admin เท่านั้น" },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { code } = await params;
+    const safeCode = decodeURIComponent(String(code || "").trim());
+    const body = await req.json().catch(() => ({}));
+    const action = String(body?.action || "").trim().toLowerCase();
+
+    if (!safeCode || (action !== "approve" && action !== "cancel")) {
+      return NextResponse.json(
+        { error: "ข้อมูลการยืนยันไม่ถูกต้อง" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    await ensureCardSetRedemptionSchema();
+    await expireStaleCardSetRedemptions();
+
+    const before = await findRedemption(safeCode);
+    if (!before) {
+      return NextResponse.json(
+        { error: "ไม่พบรายการแลกเซ็ตนี้" },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (before.status !== "pending") {
+      return NextResponse.json(
+        {
+          error: "รายการนี้ไม่อยู่ในสถานะรออนุมัติแล้ว",
+          redemption: serializeCardSetRedemption(before),
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (before.expiresAt.getTime() <= Date.now()) {
+      await expireStaleCardSetRedemptions();
+      const expired = await findRedemption(safeCode);
+      return NextResponse.json(
+        {
+          error: "QR CODE นี้หมดเวลาแล้ว",
+          redemption: expired ? serializeCardSetRedemption(expired) : null,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const now = new Date();
+
+    if (action === "approve") {
+      const updated = await prisma.$executeRawUnsafe(
+        `
+          UPDATE "CardSetRedemption"
+          SET "status" = 'approved',
+              "approvedAt" = $1,
+              "approvedById" = $2
+          WHERE "code" = $3
+            AND "status" = 'pending'
+            AND "expiresAt" > $1
+        `,
+        now,
+        actorUserId || null,
+        safeCode
+      );
+
+      if (Number(updated) !== 1) {
+        return NextResponse.json(
+          { error: "อนุมัติไม่สำเร็จ กรุณาโหลดรายการใหม่" },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+    } else {
+      await prisma.$executeRawUnsafe(
+        `
+          UPDATE "CardSetRedemption"
+          SET "status" = 'cancelled',
+              "cancelledAt" = $1,
+              "cancelReason" = $2
+          WHERE "code" = $3
+            AND "status" = 'pending'
+        `,
+        now,
+        String(body?.reason || "staff_cancelled").slice(0, 240),
+        safeCode
+      );
+    }
+
+    const redemption = await findRedemption(safeCode);
+
+    if (redemption) {
+      await createLocalNotification({
+        userId: redemption.userId,
+        type: "wallet",
+        title:
+          action === "approve"
+            ? "การแลก CARD SET เสร็จสมบูรณ์"
+            : "รายการแลก CARD SET ถูกยกเลิก",
+        body:
+          action === "approve"
+            ? `เซ็ต ${redemption.setOrder} ${redemption.setName} ได้รับการอนุมัติแล้ว`
+            : `เซ็ต ${redemption.setOrder} ${redemption.setName} ถูกยกเลิกโดยพนักงาน`,
+        href: "/card-set",
+        image: "/avatar.png",
+        meta: {
+          source: "card-set-redemption",
+          action,
+          code: safeCode,
+          setId: redemption.setId,
+        },
+      }).catch(() => undefined);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        redemption: redemption ? serializeCardSetRedemption(redemption) : null,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    console.error("CARD_SET_ACTION_ERROR", error);
+    return NextResponse.json(
+      { error: "อัปเดตรายการแลกเซ็ตไม่สำเร็จ" },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+

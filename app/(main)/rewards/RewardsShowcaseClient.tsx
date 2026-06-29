@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Coins,
   Gem,
   Gift,
+  Layers3,
   Search,
   ShieldCheck,
   Sparkles,
@@ -215,6 +217,13 @@ export default function RewardsShowcaseClient({
               <h1 className="mt-4 text-4xl font-black tracking-[-0.07em] sm:text-6xl lg:text-7xl">
                 แลกรางวัล
               </h1>
+              <Link
+                href="/card-set"
+                className="mx-auto mt-5 inline-flex min-h-[58px] items-center justify-center gap-3 rounded-full border border-amber-200/40 bg-[linear-gradient(135deg,#fff2a8_0%,#facc15_42%,#d97706_100%)] px-8 text-sm font-black uppercase tracking-[0.22em] text-black shadow-[0_0_40px_rgba(250,204,21,0.34),inset_0_1px_0_rgba(255,255,255,0.66)] transition hover:scale-[1.02] sm:px-10 sm:text-base"
+              >
+                <Layers3 className="h-5 w-5" />
+                CARD SET
+              </Link>
             </div>
 
             <div className="relative mt-7">

@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { CouponViewModel } from "@/components/CouponDetailCard";
+import { extractCardSetCode } from "@/lib/card-set-code";
 import { nexoraConfirm } from "@/lib/nexora-dialog";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
@@ -24,6 +25,23 @@ type StaffCouponScannerProps = {
 
 type LookupOptions = {
   promptUse?: boolean;
+};
+
+type CardSetScanView = {
+  id: string;
+  code: string;
+  userId: string;
+  userName: string;
+  lineId: string;
+  setOrder: number;
+  setName: string;
+  rewardLabel: string;
+  valueLabel: string;
+  status: "pending" | "approved" | "cancelled" | "expired";
+  statusLabel: string;
+  createdAt: string;
+  expiresAt: string;
+  approvedAt: string | null;
 };
 
 function waitForPaint() {
@@ -77,7 +95,11 @@ function extractCouponCode(value?: string | null) {
 
 function normalizeCouponInput(value?: string | null) {
   const raw = String(value || "").trim();
-  return extractCouponCode(raw) || raw;
+  return extractCardSetCode(raw) || extractCouponCode(raw) || raw;
+}
+
+function extractScanCode(value?: string | null) {
+  return extractCardSetCode(value) || extractCouponCode(value);
 }
 
 function getLookupError(status: number) {
@@ -102,6 +124,9 @@ export default function StaffCouponScanner({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<CouponViewModel | null>(null);
+  const [cardSetResult, setCardSetResult] = useState<CardSetScanView | null>(
+    null
+  );
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [cameraAvailable, setCameraAvailable] = useState(false);
@@ -178,6 +203,7 @@ export default function StaffCouponScanner({
 
         setMessage("ยืนยันใช้งานคูปองสำเร็จ");
         setResult(data?.coupon || null);
+        setCardSetResult(null);
         setCode(nextCode);
         inputRef.current?.focus();
       } catch {
@@ -187,6 +213,51 @@ export default function StaffCouponScanner({
       }
     },
     [code, result?.code],
+  );
+
+  const confirmCardSetAction = useCallback(
+    async (action: "approve" | "cancel", targetCode?: string) => {
+      const nextCode = normalizeCouponInput(targetCode || cardSetResult?.code || code);
+      if (!nextCode) return;
+
+      try {
+        setLoading(true);
+        setError("");
+        setMessage("");
+
+        const res = await fetch(
+          `/api/card-set-redemptions/${encodeURIComponent(nextCode)}/action`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action }),
+          }
+        );
+        const data = await res.json();
+
+        if (!res.ok) {
+          setError(String(data?.error || "อัปเดตรายการแลกเซ็ตไม่สำเร็จ"));
+          if (data?.redemption) {
+            setCardSetResult(data.redemption);
+          }
+          return;
+        }
+
+        setCardSetResult(data?.redemption || null);
+        setResult(null);
+        setCode(nextCode);
+        setMessage(
+          action === "approve"
+            ? "อนุมัติการแลก CARD SET สำเร็จ"
+            : "ยกเลิกรายการแลก CARD SET แล้ว"
+        );
+      } catch {
+        setError("เกิดข้อผิดพลาดระหว่างอัปเดตรายการแลกเซ็ต");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cardSetResult?.code, code]
   );
 
   const lookupCoupon = useCallback(
@@ -204,6 +275,30 @@ export default function StaffCouponScanner({
         setError("");
         setMessage("");
 
+        const cardSetCode = extractCardSetCode(nextCode);
+        if (cardSetCode) {
+          const res = await fetch(
+            `/api/card-set-redemptions/${encodeURIComponent(cardSetCode)}`,
+            { cache: "no-store" }
+          );
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(getLookupError(res.status));
+            setResult(null);
+            setCardSetResult(null);
+            return;
+          }
+
+          setCode(cardSetCode);
+          setResult(null);
+          setCardSetResult(data?.redemption || null);
+          if (options.promptUse) {
+            setMessage("สแกน QR CODE CARD SET สำเร็จ");
+          }
+          return;
+        }
+
         const res = await fetch(`/api/coupon/${encodeURIComponent(nextCode)}`, {
           cache: "no-store",
         });
@@ -212,12 +307,14 @@ export default function StaffCouponScanner({
         if (!res.ok) {
           setError(getLookupError(res.status));
           setResult(null);
+          setCardSetResult(null);
           return;
         }
 
         const coupon = (data?.coupon || null) as CouponViewModel | null;
         setCode(nextCode);
         setResult(coupon);
+        setCardSetResult(null);
 
         if (options.promptUse && coupon) {
           if (coupon.isReversed) {
@@ -247,6 +344,7 @@ export default function StaffCouponScanner({
       } catch {
         setError("เกิดข้อผิดพลาดระหว่างโหลดข้อมูลคูปอง");
         setResult(null);
+        setCardSetResult(null);
       } finally {
         setLookupLoading(false);
       }
@@ -274,7 +372,7 @@ export default function StaffCouponScanner({
         const qr = jsQR(imageData.data, width, height, {
           inversionAttempts: "attemptBoth",
         });
-        const detectedCode = extractCouponCode(qr?.data);
+        const detectedCode = extractScanCode(qr?.data);
 
         if (detectedCode && detectedCode !== lastScannedCodeRef.current) {
           lastScannedCodeRef.current = detectedCode;
@@ -557,10 +655,116 @@ export default function StaffCouponScanner({
           <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,16,25,0.96),rgba(9,11,18,0.96))] p-5 shadow-[0_20px_80px_rgba(0,0,0,0.3)]">
             <div className="flex items-center gap-2 text-lg font-black">
               <Sparkles className="h-5 w-5 text-amber-300" />
-              คูปองที่สแกนพบ
+              คูปอง / CARD SET ที่สแกนพบ
             </div>
 
-            {result ? (
+            {cardSetResult ? (
+              <div className="mt-4 grid gap-4">
+                <div className="rounded-[24px] border border-amber-300/20 bg-amber-300/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200/75">
+                    CARD SET
+                  </div>
+                  <div className="mt-2 text-2xl font-black">
+                    Set {cardSetResult.setOrder} {cardSetResult.setName}
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-white/60">
+                    {cardSetResult.valueLabel}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      ผู้แลก
+                    </div>
+                    <div className="mt-2 text-base font-black">
+                      {cardSetResult.userName}
+                    </div>
+                    <div className="mt-1 break-all text-xs font-bold text-white/45">
+                      {cardSetResult.lineId}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      สถานะ
+                    </div>
+                    <div
+                      className={`mt-2 text-base font-black ${
+                        cardSetResult.status === "approved"
+                          ? "text-emerald-300"
+                          : cardSetResult.status === "pending"
+                            ? "text-amber-300"
+                            : "text-red-300"
+                      }`}
+                    >
+                      {cardSetResult.statusLabel}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                    Reward
+                  </div>
+                  <div className="mt-2 text-sm font-bold text-white/75">
+                    {cardSetResult.rewardLabel}
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                    Serial Code
+                  </div>
+                  <div className="mt-2 break-all text-sm font-black text-white/88">
+                    {cardSetResult.code}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      สร้างเมื่อ
+                    </div>
+                    <div className="mt-2 text-sm font-bold text-white/75">
+                      {formatThaiDateTime(cardSetResult.createdAt)}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      หมดเวลา
+                    </div>
+                    <div className="mt-2 text-sm font-bold text-white/75">
+                      {formatThaiDateTime(cardSetResult.expiresAt)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => void confirmCardSetAction("approve")}
+                    disabled={loading || cardSetResult.status !== "pending"}
+                    className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.26)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4" />
+                    )}
+                    อนุมัติ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmCardSetAction("cancel")}
+                    disabled={loading || cardSetResult.status !== "pending"}
+                    className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] border border-red-300/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 transition hover:bg-red-500/16 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    ยกเลิก
+                  </button>
+                </div>
+              </div>
+            ) : result ? (
               <div className="mt-4 grid gap-4">
                 <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                   <div className="text-[10px] uppercase tracking-[0.24em] text-white/38">
