@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { authOptions } from "@/lib/auth";
 import {
-  getCardSetBonusOption,
+  getCardSetBonusOptions,
   getCardSetCoverImage,
   getCardSetRedemptionChoice,
   parseCardSetNexValue,
@@ -53,7 +53,7 @@ export default async function CardSetPage() {
     .map((set, index) => {
       const fallback = getCardSetCoverImage(set);
       const standardChoice = getCardSetRedemptionChoice(set, "standard");
-      const bonusOption = getCardSetBonusOption(set);
+      const bonusOptions = getCardSetBonusOptions(set);
 
       return {
         id: set.id,
@@ -67,7 +67,7 @@ export default async function CardSetPage() {
         coverImage: resolveCardSetImage(set.order, fallback),
         priorityImage: index < 6,
         nexValue: standardChoice.nexValue || parseCardSetNexValue(set.reward),
-        bonusOption,
+        bonusOptions,
         finish: set.finish || "normal",
       };
     });

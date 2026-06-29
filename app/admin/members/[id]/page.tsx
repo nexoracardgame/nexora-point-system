@@ -215,7 +215,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <span className="w-fit rounded-full bg-amber-300/10 px-3 py-1 text-[11px] font-black text-amber-200">
-                      {log.redemptionType === "foil_bonus"
+                      {log.conditionLabel
                         ? "แบบเงื่อนไขเสริม"
                         : "แบบธรรมดา"}
                     </span>

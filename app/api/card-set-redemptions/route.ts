@@ -9,7 +9,7 @@ import {
   ensureCardSetRedemptionSchema,
   expireStaleCardSetRedemptions,
   getCardSetById,
-  getCardSetBonusOption,
+  getCardSetBonusOptions,
   getCardSetRedemptionChoice,
   serializeCardSetRedemption,
   type CardSetRedemptionType,
@@ -119,10 +119,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const redemptionType: CardSetRedemptionType =
-      requestedType === "foil_bonus" && getCardSetBonusOption(set)
-        ? "foil_bonus"
-        : "standard";
+    const bonusOptions = getCardSetBonusOptions(set);
+    const redemptionType = (
+      bonusOptions.some((option) => option.type === requestedType)
+        ? requestedType
+        : "standard"
+    ) as CardSetRedemptionType;
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions(userId);

@@ -18,7 +18,19 @@ export type CardSetRedemptionStatus =
   | "approved"
   | "cancelled"
   | "expired";
-export type CardSetRedemptionType = "standard" | "foil_bonus";
+export type CardSetRedemptionType =
+  | "standard"
+  | "foil_bonus"
+  | "foil_sequence_1"
+  | "foil_sequence_9"
+  | "foil_sequence_18";
+
+export type CardSetRedemptionOption = {
+  type: CardSetRedemptionType;
+  label: string;
+  requiredFoilCount: number;
+  nexValue: number;
+};
 
 export type CardSetRedemptionRecord = {
   id: string;
@@ -68,23 +80,52 @@ function parseNexValues(reward: string) {
     .filter((value) => Number.isFinite(value) && value > 0);
 }
 
-export function getCardSetBonusOption(set: NexoraCollectionSet) {
+export function getCardSetBonusOptions(set: NexoraCollectionSet) {
+  if (set.order === 40) {
+    return [
+      {
+        type: "foil_sequence_1" as const,
+        label: "การ์ดลำดับเลขที่ 1 ครบทั้ง 5 แบบ",
+        requiredFoilCount: 5,
+        nexValue: 100000,
+      },
+      {
+        type: "foil_sequence_9" as const,
+        label: "การ์ดลำดับเลขที่ 9 ครบทั้ง 5 แบบ",
+        requiredFoilCount: 5,
+        nexValue: 100000,
+      },
+      {
+        type: "foil_sequence_18" as const,
+        label: "การ์ดลำดับเลขที่ 18 ครบทั้ง 5 แบบ",
+        requiredFoilCount: 5,
+        nexValue: 50000,
+      },
+    ] satisfies CardSetRedemptionOption[];
+  }
+
   const reward = String(set.reward || "");
   const match = reward.match(
     /(ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม\s*([\d,]+)\s*แบบ\s*รับเพิ่มทั้งหมดเป็น\s*([\d,]+)\s*Nex)/i
   );
 
-  if (!match) return null;
+  if (!match) return [];
 
   const bonusNexValue = Number(String(match[3] || "").replace(/,/g, ""));
-  if (!Number.isFinite(bonusNexValue) || bonusNexValue <= 0) return null;
+  if (!Number.isFinite(bonusNexValue) || bonusNexValue <= 0) return [];
 
-  return {
-    type: "foil_bonus" as const,
-    label: match[1].trim(),
-    requiredFoilCount: Number(String(match[2] || "").replace(/,/g, "")) || 0,
-    nexValue: bonusNexValue,
-  };
+  return [
+    {
+      type: "foil_bonus" as const,
+      label: match[1].trim(),
+      requiredFoilCount: Number(String(match[2] || "").replace(/,/g, "")) || 0,
+      nexValue: bonusNexValue,
+    },
+  ] satisfies CardSetRedemptionOption[];
+}
+
+export function getCardSetBonusOption(set: NexoraCollectionSet) {
+  return getCardSetBonusOptions(set)[0] || null;
 }
 
 export function getCardSetRedemptionChoice(
@@ -93,21 +134,22 @@ export function getCardSetRedemptionChoice(
 ) {
   const values = parseNexValues(set.reward);
   const baseNexValue = values.length ? Math.min(...values) : 0;
-  const bonus = getCardSetBonusOption(set);
+  const options = getCardSetBonusOptions(set);
+  const selected = options.find((option) => option.type === type);
 
-  if (type === "foil_bonus" && bonus) {
+  if (selected) {
     return {
-      redemptionType: "foil_bonus" as const,
-      conditionLabel: bonus.label,
-      rewardLabel: `${set.reward} • เลือกเงื่อนไขเสริม: ${bonus.label}`,
-      nexValue: bonus.nexValue,
+      redemptionType: selected.type,
+      conditionLabel: selected.label,
+      rewardLabel: `${set.reward} • เลือกเงื่อนไขเสริม: ${selected.label}`,
+      nexValue: selected.nexValue,
     };
   }
 
   return {
     redemptionType: "standard" as const,
     conditionLabel: null,
-    rewardLabel: bonus
+    rewardLabel: options.length > 0
       ? String(set.reward || "").split(";")[0]?.trim() || set.reward
       : set.reward,
     nexValue: baseNexValue,

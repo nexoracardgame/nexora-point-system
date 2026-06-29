@@ -170,7 +170,7 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="w-fit rounded-full bg-amber-300/10 px-3 py-1 text-[11px] font-black text-amber-200">
-                        {row.redemptionType === "foil_bonus"
+                        {row.conditionLabel
                           ? "แบบเงื่อนไขเสริม"
                           : "แบบธรรมดา"}
                       </span>

@@ -67,7 +67,7 @@ function activityToneClass(tone: ActivityItem["tone"]) {
 
 function formatCardSetActivitySubtitle(redemption: WalletCardSetRedemption) {
   const typeLabel =
-    redemption.redemptionType === "foil_bonus"
+    redemption.conditionLabel
       ? "แบบเงื่อนไขเสริม"
       : "แบบธรรมดา";
   const condition = redemption.conditionLabel

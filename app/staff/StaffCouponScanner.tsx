@@ -36,7 +36,12 @@ type CardSetScanView = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
-  redemptionType: "standard" | "foil_bonus";
+  redemptionType:
+    | "standard"
+    | "foil_bonus"
+    | "foil_sequence_1"
+    | "foil_sequence_9"
+    | "foil_sequence_18";
   conditionLabel: string | null;
   valueLabel: string;
   status: "pending" | "approved" | "cancelled" | "expired";
@@ -709,7 +714,7 @@ export default function StaffCouponScanner({
                     Reward
                   </div>
                   <div className="mt-2 w-fit rounded-full bg-amber-300/10 px-3 py-1 text-xs font-black text-amber-200">
-                    {cardSetResult.redemptionType === "foil_bonus"
+                    {cardSetResult.conditionLabel
                       ? "แบบเงื่อนไขเสริม"
                       : "แบบธรรมดา"}
                   </div>

@@ -30,14 +30,25 @@ type CardSetItem = {
   coverImage: string;
   priorityImage: boolean;
   nexValue: number;
-  bonusOption: {
-    type: "foil_bonus";
+  bonusOptions: {
+    type:
+      | "foil_bonus"
+      | "foil_sequence_1"
+      | "foil_sequence_9"
+      | "foil_sequence_18";
     label: string;
     requiredFoilCount: number;
     nexValue: number;
-  } | null;
+  }[];
   finish: string;
 };
+
+type CardSetRedemptionType =
+  | "standard"
+  | "foil_bonus"
+  | "foil_sequence_1"
+  | "foil_sequence_9"
+  | "foil_sequence_18";
 
 type Redemption = {
   id: string;
@@ -46,7 +57,7 @@ type Redemption = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
-  redemptionType: "standard" | "foil_bonus";
+  redemptionType: CardSetRedemptionType;
   conditionLabel: string | null;
   nexValue: number;
   status: "pending" | "approved" | "cancelled" | "expired";
@@ -79,7 +90,8 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [loadingSetId, setLoadingSetId] = useState("");
   const [error, setError] = useState("");
-  const [useFoilBonus, setUseFoilBonus] = useState(false);
+  const [selectedRedemptionType, setSelectedRedemptionType] =
+    useState<CardSetRedemptionType>("standard");
   const [now, setNow] = useState(Date.now());
 
   const syncActive = useCallback(async () => {
@@ -198,8 +210,11 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           setId: set.id,
-          redemptionType:
-            useFoilBonus && set.bonusOption ? "foil_bonus" : "standard",
+          redemptionType: set.bonusOptions.some(
+            (option) => option.type === selectedRedemptionType
+          )
+            ? selectedRedemptionType
+            : "standard",
         }),
       });
       const data = await res.json();
@@ -212,7 +227,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       setActive(data?.active || null);
       setModalOpen(Boolean(data?.active));
       setConfirmSet(null);
-      setUseFoilBonus(false);
+      setSelectedRedemptionType("standard");
     } catch {
       setError("เกิดข้อผิดพลาดระหว่างสร้าง QR");
     } finally {
@@ -352,9 +367,9 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                       ? `${formatNumber(set.nexValue)} NEX`
                       : set.reward}
                   </div>
-                  {set.bonusOption ? (
+                  {set.bonusOptions.length > 0 ? (
                     <div className="mt-2 rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-black text-amber-800">
-                      เงื่อนไขเสริม {formatNumber(set.bonusOption.nexValue)} NEX
+                      เงื่อนไขเสริม {set.bonusOptions.length} แบบ
                     </div>
                   ) : null}
                 </div>
@@ -362,7 +377,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setUseFoilBonus(false);
+                    setSelectedRedemptionType("standard");
                     setConfirmSet(set);
                   }}
                   disabled={Boolean(loadingSetId) || Boolean(active && isPending)}
@@ -406,26 +421,66 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
               </div>
             </div>
 
-            {confirmSet.bonusOption ? (
-              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[24px] border border-amber-300/24 bg-amber-300/10 p-4 text-left ring-1 ring-amber-300/10">
-                <input
-                  type="checkbox"
-                  checked={useFoilBonus}
-                  onChange={(event) => setUseFoilBonus(event.target.checked)}
-                  className="mt-1 h-5 w-5 shrink-0 accent-amber-300"
-                />
-                <span className="min-w-0">
-                  <span className="block text-sm font-black text-amber-100">
-                    แลกแบบใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม
+            {confirmSet.bonusOptions.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRedemptionType("standard")}
+                  className={`flex w-full items-start gap-3 rounded-[24px] border p-4 text-left transition ${
+                    selectedRedemptionType === "standard"
+                      ? "border-amber-300/45 bg-amber-300/12 ring-1 ring-amber-300/18"
+                      : "border-white/10 bg-white/[0.04]"
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${
+                      selectedRedemptionType === "standard"
+                        ? "border-amber-300 bg-amber-300 text-black"
+                        : "border-white/30"
+                    }`}
+                  >
+                    {selectedRedemptionType === "standard" ? "✓" : ""}
                   </span>
-                  <span className="mt-1 block text-xs font-bold leading-5 text-white/62">
-                    {confirmSet.bonusOption.label}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white">
+                      แลกแบบธรรมดา
+                    </span>
+                    <span className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-black">
+                      {formatNumber(confirmSet.nexValue)} NEX
+                    </span>
                   </span>
-                  <span className="mt-2 inline-flex rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-black">
-                    รวมเป็น {formatNumber(confirmSet.bonusOption.nexValue)} NEX
-                  </span>
-                </span>
-              </label>
+                </button>
+                {confirmSet.bonusOptions.map((option) => (
+                  <button
+                    key={option.type}
+                    type="button"
+                    onClick={() => setSelectedRedemptionType(option.type)}
+                    className={`flex w-full items-start gap-3 rounded-[24px] border p-4 text-left transition ${
+                      selectedRedemptionType === option.type
+                        ? "border-amber-300/45 bg-amber-300/12 ring-1 ring-amber-300/18"
+                        : "border-white/10 bg-white/[0.04]"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${
+                        selectedRedemptionType === option.type
+                          ? "border-amber-300 bg-amber-300 text-black"
+                          : "border-white/30"
+                      }`}
+                    >
+                      {selectedRedemptionType === option.type ? "✓" : ""}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black text-amber-100">
+                        {option.label}
+                      </span>
+                      <span className="mt-2 inline-flex rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-black">
+                        รวมเป็น {formatNumber(option.nexValue)} NEX
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
             ) : null}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
