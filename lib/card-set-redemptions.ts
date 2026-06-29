@@ -18,6 +18,7 @@ export type CardSetRedemptionStatus =
   | "approved"
   | "cancelled"
   | "expired";
+export type CardSetRedemptionType = "standard" | "foil_bonus";
 
 export type CardSetRedemptionRecord = {
   id: string;
@@ -27,6 +28,8 @@ export type CardSetRedemptionRecord = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
+  redemptionType: CardSetRedemptionType | null;
+  conditionLabel: string | null;
   nexValue: number;
   status: CardSetRedemptionStatus;
   createdAt: Date;
@@ -59,6 +62,58 @@ export function parseCardSetNexValue(reward: string) {
   return matches.length ? Math.max(...matches) : 0;
 }
 
+function parseNexValues(reward: string) {
+  return Array.from(String(reward || "").matchAll(/([\d,]+)\s*Nex/gi))
+    .map((match) => Number(String(match[1] || "").replace(/,/g, "")))
+    .filter((value) => Number.isFinite(value) && value > 0);
+}
+
+export function getCardSetBonusOption(set: NexoraCollectionSet) {
+  const reward = String(set.reward || "");
+  const match = reward.match(
+    /(ใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม\s*([\d,]+)\s*แบบ\s*รับเพิ่มทั้งหมดเป็น\s*([\d,]+)\s*Nex)/i
+  );
+
+  if (!match) return null;
+
+  const bonusNexValue = Number(String(match[3] || "").replace(/,/g, ""));
+  if (!Number.isFinite(bonusNexValue) || bonusNexValue <= 0) return null;
+
+  return {
+    type: "foil_bonus" as const,
+    label: match[1].trim(),
+    requiredFoilCount: Number(String(match[2] || "").replace(/,/g, "")) || 0,
+    nexValue: bonusNexValue,
+  };
+}
+
+export function getCardSetRedemptionChoice(
+  set: NexoraCollectionSet,
+  type: CardSetRedemptionType = "standard"
+) {
+  const values = parseNexValues(set.reward);
+  const baseNexValue = values.length ? Math.min(...values) : 0;
+  const bonus = getCardSetBonusOption(set);
+
+  if (type === "foil_bonus" && bonus) {
+    return {
+      redemptionType: "foil_bonus" as const,
+      conditionLabel: bonus.label,
+      rewardLabel: `${set.reward} • เลือกเงื่อนไขเสริม: ${bonus.label}`,
+      nexValue: bonus.nexValue,
+    };
+  }
+
+  return {
+    redemptionType: "standard" as const,
+    conditionLabel: null,
+    rewardLabel: bonus
+      ? String(set.reward || "").split(";")[0]?.trim() || set.reward
+      : set.reward,
+    nexValue: baseNexValue,
+  };
+}
+
 export function getCardSetCoverImage(set: NexoraCollectionSet) {
   const firstCardId = getCollectionCardIds(set)[0];
   return firstCardId ? `/cards/${firstCardId}.jpg` : "/avatar.png";
@@ -74,6 +129,8 @@ export async function ensureCardSetRedemptionSchema() {
       "setOrder" INTEGER NOT NULL,
       "setName" TEXT NOT NULL,
       "rewardLabel" TEXT NOT NULL,
+      "redemptionType" TEXT NOT NULL DEFAULT 'standard',
+      "conditionLabel" TEXT,
       "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
       "status" TEXT NOT NULL DEFAULT 'pending',
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,6 +147,12 @@ export async function ensureCardSetRedemptionSchema() {
   );
   await prisma.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "CardSetRedemption_createdAt_idx" ON "CardSetRedemption" ("createdAt")'
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardSetRedemption" ADD COLUMN IF NOT EXISTS "redemptionType" TEXT NOT NULL DEFAULT \'standard\''
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardSetRedemption" ADD COLUMN IF NOT EXISTS "conditionLabel" TEXT'
   );
 }
 
@@ -137,6 +200,8 @@ export function serializeCardSetRedemption(row: CardSetRedemptionRecord) {
     setOrder: row.setOrder,
     setName: row.setName,
     rewardLabel: row.rewardLabel,
+    redemptionType: row.redemptionType || "standard",
+    conditionLabel: row.conditionLabel || null,
     nexValue: Number(row.nexValue || 0),
     status,
     createdAt: row.createdAt.toISOString(),

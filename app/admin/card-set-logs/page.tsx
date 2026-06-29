@@ -14,6 +14,8 @@ type CardSetLogRow = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
+  redemptionType: string | null;
+  conditionLabel: string | null;
   nexValue: number;
   status: string;
   createdAt: Date;
@@ -54,6 +56,8 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
         r."setOrder",
         r."setName",
         r."rewardLabel",
+        r."redemptionType",
+        r."conditionLabel",
         r."nexValue",
         r."status",
         r."createdAt",
@@ -164,6 +168,18 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
                     <div className="mt-1 line-clamp-1 text-xs font-bold text-white/46">
                       {row.rewardLabel}
                     </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="w-fit rounded-full bg-amber-300/10 px-3 py-1 text-[11px] font-black text-amber-200">
+                        {row.redemptionType === "foil_bonus"
+                          ? "แบบเงื่อนไขเสริม"
+                          : "แบบธรรมดา"}
+                      </span>
+                      {row.conditionLabel ? (
+                        <span className="w-fit rounded-full bg-white/[0.05] px-3 py-1 text-[11px] font-black text-white/52">
+                          {row.conditionLabel}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <span className={`w-fit rounded-full border px-3 py-1 text-xs font-black uppercase ${getStatusClass(row.status)}`}>
@@ -190,4 +206,3 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
     </div>
   );
 }
-

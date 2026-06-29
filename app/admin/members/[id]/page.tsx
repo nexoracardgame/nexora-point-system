@@ -58,6 +58,8 @@ type MemberCardSetLog = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
+  redemptionType: string | null;
+  conditionLabel: string | null;
   nexValue: number;
   status: string;
   createdAt: Date;
@@ -104,6 +106,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           "setOrder",
           "setName",
           "rewardLabel",
+          "redemptionType",
+          "conditionLabel",
           "nexValue",
           "status",
           "createdAt",
@@ -208,6 +212,18 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                   </div>
                   <div className="mt-1 line-clamp-1 text-xs font-bold text-white/42">
                     {log.code}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="w-fit rounded-full bg-amber-300/10 px-3 py-1 text-[11px] font-black text-amber-200">
+                      {log.redemptionType === "foil_bonus"
+                        ? "แบบเงื่อนไขเสริม"
+                        : "แบบธรรมดา"}
+                    </span>
+                    {log.conditionLabel ? (
+                      <span className="w-fit rounded-full bg-white/[0.05] px-3 py-1 text-[11px] font-black text-white/52">
+                        {log.conditionLabel}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="text-sm font-black text-amber-300">

@@ -9,8 +9,10 @@ import {
   ensureCardSetRedemptionSchema,
   expireStaleCardSetRedemptions,
   getCardSetById,
-  parseCardSetNexValue,
+  getCardSetBonusOption,
+  getCardSetRedemptionChoice,
   serializeCardSetRedemption,
+  type CardSetRedemptionType,
   type CardSetRedemptionRecord,
 } from "@/lib/card-set-redemptions";
 
@@ -107,6 +109,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const setId = String(body?.setId || "").trim();
+    const requestedType = String(body?.redemptionType || "standard").trim();
     const set = getCardSetById(setId);
 
     if (!set) {
@@ -115,6 +118,11 @@ export async function POST(req: Request) {
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    const redemptionType: CardSetRedemptionType =
+      requestedType === "foil_bonus" && getCardSetBonusOption(set)
+        ? "foil_bonus"
+        : "standard";
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions(userId);
@@ -134,16 +142,16 @@ export async function POST(req: Request) {
     const code = buildCardSetCode(set.order);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + CARD_SET_REDEMPTION_TTL_MS);
-    const rewardLabel = set.reward;
-    const nexValue = parseCardSetNexValue(rewardLabel);
+    const choice = getCardSetRedemptionChoice(set, redemptionType);
 
     await prisma.$executeRawUnsafe(
       `
         INSERT INTO "CardSetRedemption" (
           "id", "code", "userId", "setId", "setOrder", "setName",
-          "rewardLabel", "nexValue", "status", "createdAt", "expiresAt"
+          "rewardLabel", "redemptionType", "conditionLabel", "nexValue",
+          "status", "createdAt", "expiresAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12)
       `,
       crypto.randomUUID(),
       code,
@@ -151,8 +159,10 @@ export async function POST(req: Request) {
       set.id,
       set.order,
       set.name,
-      rewardLabel,
-      nexValue,
+      choice.rewardLabel,
+      choice.redemptionType,
+      choice.conditionLabel,
+      choice.nexValue,
       now,
       expiresAt
     );
@@ -171,6 +181,8 @@ export async function POST(req: Request) {
         code,
         setId: set.id,
         setName: set.name,
+        redemptionType: choice.redemptionType,
+        conditionLabel: choice.conditionLabel,
       },
     }).catch(() => undefined);
 
@@ -189,4 +201,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

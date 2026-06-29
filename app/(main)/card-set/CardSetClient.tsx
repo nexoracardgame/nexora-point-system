@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,8 +28,14 @@ type CardSetItem = {
   stars: string;
   totalCards: number;
   coverImage: string;
-  coverImages: string[];
+  priorityImage: boolean;
   nexValue: number;
+  bonusOption: {
+    type: "foil_bonus";
+    label: string;
+    requiredFoilCount: number;
+    nexValue: number;
+  } | null;
   finish: string;
 };
 
@@ -39,6 +46,8 @@ type Redemption = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
+  redemptionType: "standard" | "foil_bonus";
+  conditionLabel: string | null;
   nexValue: number;
   status: "pending" | "approved" | "cancelled" | "expired";
   createdAt: string;
@@ -70,6 +79,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [loadingSetId, setLoadingSetId] = useState("");
   const [error, setError] = useState("");
+  const [useFoilBonus, setUseFoilBonus] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   const syncActive = useCallback(async () => {
@@ -122,6 +132,39 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
     return () => window.clearInterval(interval);
   }, [active, syncRedemption]);
 
+  useEffect(() => {
+    type IdleWindow = Window &
+      typeof globalThis & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      };
+
+    const remainingImages = sets
+      .filter((set) => !set.priorityImage)
+      .map((set) => set.coverImage);
+
+    const preload = () => {
+      remainingImages.forEach((src) => {
+        const image = new window.Image();
+        image.decoding = "async";
+        image.loading = "eager";
+        image.src = src;
+      });
+    };
+
+    const idleWindow = window as IdleWindow;
+    if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
+      const idleId = idleWindow.requestIdleCallback(preload, { timeout: 2400 });
+      return () => idleWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = window.setTimeout(preload, 900);
+    return () => window.clearTimeout(timeoutId);
+  }, [sets]);
+
   const filteredSets = useMemo(() => {
     const keyword = normalize(query);
     if (!keyword) return sets;
@@ -153,7 +196,11 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       const res = await fetch("/api/card-set-redemptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setId: set.id }),
+        body: JSON.stringify({
+          setId: set.id,
+          redemptionType:
+            useFoilBonus && set.bonusOption ? "foil_bonus" : "standard",
+        }),
       });
       const data = await res.json();
 
@@ -165,6 +212,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       setActive(data?.active || null);
       setModalOpen(Boolean(data?.active));
       setConfirmSet(null);
+      setUseFoilBonus(false);
     } catch {
       setError("เกิดข้อผิดพลาดระหว่างสร้าง QR");
     } finally {
@@ -264,27 +312,15 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                   {set.finish === "foil" ? "FOIL" : set.tier}
                 </div>
                 <div className="relative aspect-[1.3]">
-                  <img
-                    src={set.coverImages[0] || set.coverImage}
+                  <Image
+                    src={set.coverImage}
                     alt={set.name}
-                    loading="lazy"
+                    fill
+                    priority={set.priorityImage}
                     decoding="async"
-                    data-image-index="0"
-                    className="absolute inset-0 h-full w-full object-contain object-center p-5 transition duration-500 group-hover:scale-105"
-                    onError={(event) => {
-                      const image = event.currentTarget;
-                      const currentIndex = Number(image.dataset.imageIndex || 0);
-                      const nextIndex = currentIndex + 1;
-                      const nextImage = set.coverImages[nextIndex];
-
-                      if (nextImage) {
-                        image.dataset.imageIndex = String(nextIndex);
-                        image.src = nextImage;
-                        return;
-                      }
-
-                      image.src = "/avatar.png";
-                    }}
+                    sizes="(min-width: 1280px) 29vw, (min-width: 640px) 45vw, 92vw"
+                    unoptimized
+                    className="object-contain object-center p-5 transition duration-500 group-hover:scale-105"
                   />
                 </div>
               </div>
@@ -316,11 +352,19 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                       ? `${formatNumber(set.nexValue)} NEX`
                       : set.reward}
                   </div>
+                  {set.bonusOption ? (
+                    <div className="mt-2 rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-black text-amber-800">
+                      เงื่อนไขเสริม {formatNumber(set.bonusOption.nexValue)} NEX
+                    </div>
+                  ) : null}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setConfirmSet(set)}
+                  onClick={() => {
+                    setUseFoilBonus(false);
+                    setConfirmSet(set);
+                  }}
                   disabled={Boolean(loadingSetId) || Boolean(active && isPending)}
                   className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(250,204,21,0.24)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -361,6 +405,28 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                 {confirmSet.reward}
               </div>
             </div>
+
+            {confirmSet.bonusOption ? (
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[24px] border border-amber-300/24 bg-amber-300/10 p-4 text-left ring-1 ring-amber-300/10">
+                <input
+                  type="checkbox"
+                  checked={useFoilBonus}
+                  onChange={(event) => setUseFoilBonus(event.target.checked)}
+                  className="mt-1 h-5 w-5 shrink-0 accent-amber-300"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-amber-100">
+                    แลกแบบใช้การ์ดฟอยล์ไม่ซ้ำเพิ่ม
+                  </span>
+                  <span className="mt-1 block text-xs font-bold leading-5 text-white/62">
+                    {confirmSet.bonusOption.label}
+                  </span>
+                  <span className="mt-2 inline-flex rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-black">
+                    รวมเป็น {formatNumber(confirmSet.bonusOption.nexValue)} NEX
+                  </span>
+                </span>
+              </label>
+            ) : null}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <button
@@ -465,6 +531,11 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                 <div className="mt-2 text-sm font-black text-white/82">
                   {active.rewardLabel}
                 </div>
+                {active.conditionLabel ? (
+                  <div className="mt-2 rounded-full bg-amber-300/10 px-3 py-1.5 text-xs font-black text-amber-200">
+                    {active.conditionLabel}
+                  </div>
+                ) : null}
               </div>
               <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-4">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-white/35">

@@ -35,6 +35,8 @@ type WalletCardSetRedemption = {
   setOrder: number;
   setName: string;
   rewardLabel: string;
+  redemptionType: string | null;
+  conditionLabel: string | null;
   nexValue: number;
   status: string;
   createdAt: Date;
@@ -61,6 +63,18 @@ function activityToneClass(tone: ActivityItem["tone"]) {
     default:
       return "border-white/10 bg-white/[0.06] text-white/70";
   }
+}
+
+function formatCardSetActivitySubtitle(redemption: WalletCardSetRedemption) {
+  const typeLabel =
+    redemption.redemptionType === "foil_bonus"
+      ? "แบบเงื่อนไขเสริม"
+      : "แบบธรรมดา";
+  const condition = redemption.conditionLabel
+    ? ` • ${redemption.conditionLabel}`
+    : "";
+
+  return `${typeLabel}${condition}`;
 }
 
 function buildPointLogActivity(log: {
@@ -213,6 +227,8 @@ export default async function WalletPage() {
               "setOrder",
               "setName",
               "rewardLabel",
+              "redemptionType",
+              "conditionLabel",
               "nexValue",
               "status",
               "createdAt",
@@ -402,7 +418,7 @@ export default async function WalletPage() {
       id: `card-set-${redemption.id}`,
       title: `แลก CARD SET ${redemption.setOrder}: ${redemption.setName}`,
       subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX • ${
-        redemption.rewardLabel
+        formatCardSetActivitySubtitle(redemption)
       }`,
       createdAt: redemption.approvedAt || redemption.createdAt,
       tone: "amber" as const,

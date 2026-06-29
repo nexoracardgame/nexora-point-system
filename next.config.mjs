@@ -99,6 +99,10 @@ const nextConfig = {
         headers: reusableAssetHeaders,
       },
       {
+        source: "/card-sets/:path*",
+        headers: reusableAssetHeaders,
+      },
+      {
         source: "/model/:path*",
         headers: reusableAssetHeaders,
       },
