@@ -41,7 +41,7 @@ const CARD_SET_SOURCE_EXTENSIONS: Record<number, string> = {
   40: "png",
 };
 
-export const CARD_SET_IMAGE_VERSION = "20260629-card-set";
+export const CARD_SET_IMAGE_VERSION = "20260629080852-card-set";
 
 export function getCardSetImageUrls(order: number) {
   const extension = CARD_SET_SOURCE_EXTENSIONS[order] || "png";

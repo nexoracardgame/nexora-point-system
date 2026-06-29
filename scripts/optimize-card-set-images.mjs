@@ -57,7 +57,10 @@ console.log(
   `Optimized ${optimizedCount} card set images into public/card-sets/optimized. Skipped ${skippedCount}.`
 );
 
-const version = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+const version = new Date()
+  .toISOString()
+  .replace(/[-:TZ.]/g, "")
+  .slice(0, 14);
 const manifest = `const CARD_SET_SOURCE_EXTENSIONS: Record<number, string> = {
 ${Array.from(sourceExtensions.entries())
   .sort(([a], [b]) => a - b)
