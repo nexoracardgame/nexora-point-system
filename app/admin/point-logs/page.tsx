@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getAllLocalProfiles } from "@/lib/local-profile-store";
+import { ensureCriticalBackupSchema } from "@/lib/critical-backup";
+import AutoSubmitSelect from "@/app/admin/AutoSubmitSelect";
 import PointLogsTable from "./PointLogsTable";
 
 type PageProps = {
@@ -18,6 +20,8 @@ type PointLogWithUserRow = {
   displayName: string | null;
   username: string | null;
 };
+
+type BackupCoinLogRow = PointLogWithUserRow;
 
 const LOG_FILTERS = new Set(["all", "nex", "coin"]);
 
@@ -45,8 +49,9 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
   await prisma
     .$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT')
     .catch(() => undefined);
+  await ensureCriticalBackupSchema().catch(() => undefined);
 
-  const [logs, localProfiles] = await Promise.all([
+  const [pointLogs, backupCoinLogs, localProfiles] = await Promise.all([
     prisma.$queryRawUnsafe<PointLogWithUserRow[]>(
       `
         SELECT
@@ -73,6 +78,56 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
       safeType,
       keyword ? 1000 : 200
     ),
+    safeType === "nex"
+      ? Promise.resolve([] as BackupCoinLogRow[])
+      : prisma
+          .$queryRawUnsafe<BackupCoinLogRow[]>(
+            `
+              WITH "coinBackups" AS (
+                SELECT
+                  ('critical:' || c."id") AS "id",
+                  COALESCE(u."lineId", c."afterSnapshot" #>> '{user,lineId}', c."beforeSnapshot" #>> '{user,lineId}', '') AS "lineId",
+                  'admin_coin' AS "type",
+                  CASE
+                    WHEN COALESCE(c."meta"->>'coinAmount', '') ~ '^-?[0-9]+$'
+                      THEN (c."meta"->>'coinAmount')::int
+                    WHEN COALESCE(c."meta"->>'amount', '') ~ '^-?[0-9]+$'
+                      THEN (c."meta"->>'amount')::int
+                    ELSE 0
+                  END AS "amount",
+                  0::double precision AS "point",
+                  c."createdAt",
+                  u."id" AS "userId",
+                  u."name",
+                  u."displayName",
+                  u."username"
+                FROM "CriticalBackupLog" c
+                LEFT JOIN "User" u ON u."id" = c."targetUserId"
+                WHERE c."scope" = 'wallet'
+                  AND c."action" IN ('admin.coin.adjust', 'admin.wallet.adjust')
+                  AND (
+                    c."meta"->>'asset' = 'COIN'
+                    OR NULLIF(c."meta"->>'coinAmount', '') IS NOT NULL
+                  )
+              )
+              SELECT *
+              FROM "coinBackups" b
+              WHERE b."lineId" <> ''
+                AND b."amount" <> 0
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM "PointLog" p
+                  WHERE p."lineId" = b."lineId"
+                    AND LOWER(p."type") LIKE '%coin%'
+                    AND p."amount" = b."amount"
+                    AND ABS(EXTRACT(EPOCH FROM (p."createdAt" - b."createdAt"))) < 10
+                )
+              ORDER BY b."createdAt" DESC
+              LIMIT $1
+            `,
+            keyword ? 1000 : 200
+          )
+          .catch(() => []),
     getAllLocalProfiles().catch(() => []),
   ]);
 
@@ -80,7 +135,9 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
     localProfiles.map((profile) => [profile.userId, profile])
   );
 
-  const mergedLogs = logs.map((log) => {
+  const mergedLogs = [...pointLogs, ...backupCoinLogs]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((log) => {
     const localProfile =
       (log.userId ? localProfileMap.get(log.userId) : null) ||
       localProfileMap.get(log.lineId);
@@ -97,7 +154,7 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
       point: Number(log.point || 0),
       createdAt: log.createdAt.toISOString(),
     };
-  });
+    });
 
   const filteredLogs = keyword
     ? mergedLogs.filter((log) => {
@@ -190,20 +247,19 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
           placeholder="Search name, Line ID, @username"
           className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none placeholder:text-white/35"
         />
-        <select
+        <AutoSubmitSelect
           name="type"
           defaultValue={safeType}
-          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none"
         >
-          <option value="all">All NEX/COIN</option>
-          <option value="nex">NEX only</option>
-          <option value="coin">COIN only</option>
-        </select>
+          <option value="all">ทั้งหมด NEX/COIN</option>
+          <option value="nex">เฉพาะ NEX</option>
+          <option value="coin">เฉพาะ COIN</option>
+        </AutoSubmitSelect>
         <button
           type="submit"
           className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-5 py-3 text-sm font-black text-black"
         >
-          Search
+          ค้นหา
         </button>
       </form>
 

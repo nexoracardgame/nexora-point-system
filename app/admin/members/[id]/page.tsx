@@ -1,8 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ensureCardRareRedemptionSchema } from "@/lib/card-rare-redemptions";
-import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
-import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatCouponValue } from "@/lib/coupon-utils";
 import { prisma } from "@/lib/prisma";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
@@ -134,27 +131,22 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) notFound();
-  const localProfile = await getLocalProfileByUserId(user.id).catch(() => null);
-  const displayName = localProfile?.displayName || user.displayName || user.name || "-";
-  const profileImage = localProfile?.image || user.image;
-
-  const logs = await prisma.pointLog.findMany({
-    where: { lineId: user.lineId },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-  });
-
-  await ensureCouponRollbackSchema();
-  await ensureCardSetRedemptionSchema();
-  await ensureCardRareRedemptionSchema();
 
   const [
+    localProfile,
+    logs,
     cardSetStatsRows,
     cardSetLogs,
     cardRareStatsRows,
     cardRareLogs,
     coupons,
   ] = await Promise.all([
+    getLocalProfileByUserId(user.id).catch(() => null),
+    prisma.pointLog.findMany({
+      where: { lineId: user.lineId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
     prisma.$queryRawUnsafe<MemberCardSetStats[]>(
       `
         SELECT
@@ -164,7 +156,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         WHERE "userId" = $1
       `,
       user.id
-    ),
+    ).catch(() => []),
     prisma.$queryRawUnsafe<MemberCardSetLog[]>(
       `
         SELECT
@@ -185,7 +177,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         LIMIT 20
       `,
       user.id
-    ),
+    ).catch(() => []),
     prisma.$queryRawUnsafe<MemberCardRareStats[]>(
       `
         SELECT
@@ -195,7 +187,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         WHERE "userId" = $1
       `,
       user.id
-    ),
+    ).catch(() => []),
     prisma.$queryRawUnsafe<MemberCardRareLog[]>(
       `
         SELECT
@@ -216,7 +208,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         LIMIT 30
       `,
       user.id
-    ),
+    ).catch(() => []),
     prisma.coupon.findMany({
       where: { userId: user.id },
       include: {
@@ -233,6 +225,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       take: 80,
     }),
   ]);
+
+  const displayName = localProfile?.displayName || user.displayName || user.name || "-";
+  const profileImage = localProfile?.image || user.image;
 
   const cardSetStats = cardSetStatsRows[0] || {
     approvedCount: 0,

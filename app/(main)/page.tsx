@@ -9,6 +9,19 @@ import BattleAppLauncher from "@/components/BattleAppLauncher";
 import GooglePlayButton from "@/components/GooglePlayButton";
 import PrefetchLink from "@/components/PrefetchLink";
 import WindowsDownloadButton from "@/components/WindowsDownloadButton";
+import {
+  Cat,
+  FolderKanban,
+  Gift,
+  Home,
+  Landmark,
+  MessageCircle,
+  PackageOpen,
+  Radio,
+  ShoppingBag,
+  Swords,
+  Trophy,
+} from "lucide-react";
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -18,6 +31,19 @@ const notoSansThai = Noto_Sans_Thai({
 const heroPills = ["สะสม +", "ต่อสู้ +", "แลกเปลี่ยน +", "รับรางวัล +"];
 
 const showDownloadStoreButtons = false;
+const homeMenuItems = [
+  { href: "/", label: "หน้าหลัก", icon: Home },
+  { href: "/market", label: "ตลาด", icon: ShoppingBag },
+  { href: "/box-market", label: "ซอง/กล่องแท้", icon: PackageOpen },
+  { href: "/card-bank", label: "ธนาคารการ์ด", icon: Landmark },
+  { href: "/battle", label: "Battle", icon: Swords },
+  { href: "/rewards", label: "รางวัล", icon: Trophy },
+  { href: "/redeem", label: "คูปอง", icon: Gift },
+  { href: "/collections", label: "คอลเลกชัน", icon: FolderKanban },
+  { href: "/community", label: "คอมมูนิตี้", icon: Cat },
+  { href: "/live", label: "ไลฟ์", icon: Radio },
+  { href: "/dm", label: "แชท", icon: MessageCircle },
+];
 const youtubeArenaEmbedUrl =
   "https://www.youtube.com/embed/eQQeMip8JIQ?autoplay=1&mute=0&controls=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1";
 
@@ -78,6 +104,32 @@ function YouTubeArenaPanel({ mobile = false }: { mobile?: boolean }) {
           <div className="h-7 w-16 rounded-full border border-amber-300/25 bg-[linear-gradient(90deg,rgba(251,191,36,0.16),rgba(255,255,255,0.06))] shadow-[0_0_22px_rgba(251,191,36,0.12)]" />
         </div>
       </div>
+    </div>
+  );
+}
+
+function HomeShortcutMenu() {
+  return (
+    <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      {homeMenuItems.map((item) => {
+        const Icon = item.icon;
+
+        return (
+          <PrefetchLink
+            key={item.href}
+            href={item.href}
+            className="group relative flex min-h-[58px] items-center gap-2 overflow-hidden rounded-[18px] border border-amber-300/18 bg-[#050507]/92 px-3 py-3 text-left shadow-[0_16px_34px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] transition active:scale-[0.98] sm:min-h-[62px] sm:rounded-[20px] sm:px-3.5"
+          >
+            <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/70 to-transparent opacity-70" />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border border-amber-300/18 bg-amber-300/10 text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.12)] transition group-hover:bg-amber-300/16 sm:h-10 sm:w-10">
+              <Icon className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
+            </span>
+            <span className="min-w-0 flex-1 text-[12px] font-black leading-tight tracking-[0.02em] text-amber-100 sm:text-[13px]">
+              {item.label}
+            </span>
+          </PrefetchLink>
+        );
+      })}
     </div>
   );
 }
@@ -164,6 +216,10 @@ export default function NexoraLuxuryHome() {
             </span>
           ))}
         </div>
+
+        <div className="mt-3">
+          <HomeShortcutMenu />
+        </div>
       </div>
 
       <div className="relative z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+112px)] sm:hidden">
@@ -227,6 +283,12 @@ export default function NexoraLuxuryHome() {
             {item}
           </span>
         ))}
+      </div>
+
+      <div className="absolute left-8 right-8 top-[41%] z-30 hidden sm:block">
+        <div className="max-w-[min(980px,calc(100vw-35vw))]">
+          <HomeShortcutMenu />
+        </div>
       </div>
 
       <div className="pointer-events-none absolute inset-x-8 bottom-10 z-40 hidden justify-center gap-3 sm:flex">

@@ -308,15 +308,15 @@ export default function CardRareClient({
                 <div className="absolute right-3 top-3 z-10 rounded-full bg-violet-300/14 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-violet-100 ring-1 ring-violet-300/18">
                   {reward.tier}
                 </div>
-                <div className="relative aspect-[0.72] p-5">
-                  <div className="pointer-events-none absolute inset-5 rounded-[22px] bg-[radial-gradient(circle_at_50%_8%,rgba(255,255,255,0.14),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18))] shadow-[0_18px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10" />
+                <div className="relative aspect-[0.72] p-4 sm:p-5">
+                  <div className="pointer-events-none absolute inset-4 rounded-[28px] bg-[radial-gradient(circle_at_50%_8%,rgba(255,255,255,0.14),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18))] shadow-[0_18px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10 sm:inset-5" />
                   <img
                     src={reward.imageUrl}
                     alt={reward.cardName}
                     loading={reward.priorityImage ? "eager" : "lazy"}
                     fetchPriority={reward.priorityImage ? "high" : "auto"}
                     decoding="async"
-                    className="absolute inset-5 h-[calc(100%-2.5rem)] w-[calc(100%-2.5rem)] rounded-[22px] object-contain object-center drop-shadow-[0_18px_24px_rgba(0,0,0,0.45)] [clip-path:inset(0_round_22px)] transition duration-500 group-hover:scale-[1.035]"
+                    className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] rounded-[28px] bg-black object-cover object-center drop-shadow-[0_18px_24px_rgba(0,0,0,0.45)] [clip-path:inset(1.1%_1.4%_1.1%_1.4%_round_28px)] [mask-image:radial-gradient(white,black)] transition duration-500 group-hover:scale-[1.035] sm:inset-5 sm:h-[calc(100%-2.5rem)] sm:w-[calc(100%-2.5rem)]"
                     onError={(event) => {
                       event.currentTarget.src = "/avatar.png";
                     }}

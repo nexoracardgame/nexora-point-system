@@ -189,7 +189,14 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <AdminUserAvatar src={user.image} name={displayName} size="md" />
               <div className="min-w-0">
-                <Link href={`/admin/members/${user.id}`} className="text-lg font-black text-white hover:text-amber-300">
+                <Link
+                  href={`/admin/members/${user.id}`}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(`/admin/members/${user.id}`)}
+                  onFocus={() => router.prefetch(`/admin/members/${user.id}`)}
+                  onTouchStart={() => router.prefetch(`/admin/members/${user.id}`)}
+                  className="text-lg font-black text-white hover:text-amber-300"
+                >
                   {displayName}
                 </Link>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
