@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
 import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatThaiDateTime, formatThaiTimeAgo } from "@/lib/thai-time";
 
@@ -26,6 +27,18 @@ type ActivityItem = {
   subtitle: string;
   createdAt: Date;
   tone: "emerald" | "amber" | "cyan" | "white";
+};
+
+type WalletCardSetRedemption = {
+  id: string;
+  code: string;
+  setOrder: number;
+  setName: string;
+  rewardLabel: string;
+  nexValue: number;
+  status: string;
+  createdAt: Date;
+  approvedAt: Date | null;
 };
 
 function safeImage(image?: string | null) {
@@ -142,6 +155,7 @@ export default async function WalletPage() {
       coinCost: number | null;
     };
   }> = [];
+  let cardSetRedemptions: WalletCardSetRedemption[] = [];
 
   try {
     user = await prisma.user.findUnique({
@@ -160,8 +174,9 @@ export default async function WalletPage() {
 
     if (user) {
       await ensureCouponRollbackSchema();
+      await ensureCardSetRedemptionSchema();
 
-      [pointLogs, coupons] = await Promise.all([
+      [pointLogs, coupons, cardSetRedemptions] = await Promise.all([
         prisma.pointLog.findMany({
           where: {
             lineId: user.lineId,
@@ -190,6 +205,26 @@ export default async function WalletPage() {
           },
           take: 12,
         }),
+        prisma.$queryRawUnsafe<WalletCardSetRedemption[]>(
+          `
+            SELECT
+              "id",
+              "code",
+              "setOrder",
+              "setName",
+              "rewardLabel",
+              "nexValue",
+              "status",
+              "createdAt",
+              "approvedAt"
+            FROM "CardSetRedemption"
+            WHERE "userId" = $1
+              AND "status" = 'approved'
+            ORDER BY COALESCE("approvedAt", "createdAt") DESC
+            LIMIT 12
+          `,
+          user.id
+        ),
       ]);
     }
   } catch {
@@ -232,6 +267,10 @@ export default async function WalletPage() {
     (sum, coupon) => sum + Number(coupon.reward.nexCost || 0),
     0
   );
+  const approvedCardSetNex = cardSetRedemptions.reduce(
+    (sum, redemption) => sum + Number(redemption.nexValue || 0),
+    0
+  );
   const spentCoinFromCoupons = coupons.reduce(
     (sum, coupon) => sum + Number(coupon.reward.coinCost || 0),
     0
@@ -240,7 +279,7 @@ export default async function WalletPage() {
   const lifetimeNex = Math.max(
     totalEarnedNex,
     nexPoint + spentNexFromCoupons
-  );
+  ) + approvedCardSetNex;
   const lifetimeCoin = coin + spentCoinFromCoupons;
   const walletRank =
     lifetimeNex >= 10_000_000
@@ -358,6 +397,15 @@ export default async function WalletPage() {
             : "คูปองพร้อมใช้งาน",
       createdAt: coupon.createdAt,
       tone: coupon.used ? ("white" as const) : ("amber" as const),
+    })),
+    ...cardSetRedemptions.map((redemption) => ({
+      id: `card-set-${redemption.id}`,
+      title: `แลก CARD SET ${redemption.setOrder}: ${redemption.setName}`,
+      subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX • ${
+        redemption.rewardLabel
+      }`,
+      createdAt: redemption.approvedAt || redemption.createdAt,
+      tone: "amber" as const,
     })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

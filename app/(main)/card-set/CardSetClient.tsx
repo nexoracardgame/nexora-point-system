@@ -27,6 +27,7 @@ type CardSetItem = {
   stars: string;
   totalCards: number;
   coverImage: string;
+  coverImages: string[];
   nexValue: number;
   finish: string;
 };
@@ -264,13 +265,25 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                 </div>
                 <div className="relative aspect-[1.3]">
                   <img
-                    src={set.coverImage}
+                    src={set.coverImages[0] || set.coverImage}
                     alt={set.name}
                     loading="lazy"
                     decoding="async"
-                    className="absolute inset-0 h-full w-full object-contain p-5 transition duration-500 group-hover:scale-105"
+                    data-image-index="0"
+                    className="absolute inset-0 h-full w-full object-contain object-center p-5 transition duration-500 group-hover:scale-105"
                     onError={(event) => {
-                      event.currentTarget.src = "/avatar.png";
+                      const image = event.currentTarget;
+                      const currentIndex = Number(image.dataset.imageIndex || 0);
+                      const nextIndex = currentIndex + 1;
+                      const nextImage = set.coverImages[nextIndex];
+
+                      if (nextImage) {
+                        image.dataset.imageIndex = String(nextIndex);
+                        image.src = nextImage;
+                        return;
+                      }
+
+                      image.src = "/avatar.png";
                     }}
                   />
                 </div>

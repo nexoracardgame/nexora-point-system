@@ -37,10 +37,16 @@ export default async function CardSetPage() {
       stars: set.stars,
       totalCards: getCollectionCardIds(set).length,
       coverImage: getCardSetCoverImage(set),
+      coverImages: [
+        `/card-sets/${set.order}.png`,
+        `/card-sets/${set.order}.jpg`,
+        `/card-sets/${set.order}.jpeg`,
+        `/card-sets/${set.order}.webp`,
+        getCardSetCoverImage(set),
+      ],
       nexValue: parseCardSetNexValue(set.reward),
       finish: set.finish || "normal",
     }));
 
   return <CardSetClient sets={sets} />;
 }
-
