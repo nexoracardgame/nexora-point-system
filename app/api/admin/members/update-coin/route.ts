@@ -53,6 +53,15 @@ export async function POST(req: Request) {
         },
       });
 
+      await tx.pointLog.create({
+        data: {
+          lineId: cleanLineId,
+          type: "admin_coin",
+          amount: nextAmount,
+          point: 0,
+        },
+      });
+
       await writeCriticalBackup(tx, {
         scope: "wallet",
         action: "admin.coin.adjust",

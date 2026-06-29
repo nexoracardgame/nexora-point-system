@@ -308,14 +308,15 @@ export default function CardRareClient({
                 <div className="absolute right-3 top-3 z-10 rounded-full bg-violet-300/14 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-violet-100 ring-1 ring-violet-300/18">
                   {reward.tier}
                 </div>
-                <div className="relative aspect-[0.72]">
+                <div className="relative aspect-[0.72] p-5">
+                  <div className="pointer-events-none absolute inset-5 rounded-[22px] bg-[radial-gradient(circle_at_50%_8%,rgba(255,255,255,0.14),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18))] shadow-[0_18px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10" />
                   <img
                     src={reward.imageUrl}
                     alt={reward.cardName}
                     loading={reward.priorityImage ? "eager" : "lazy"}
                     fetchPriority={reward.priorityImage ? "high" : "auto"}
                     decoding="async"
-                    className="absolute inset-0 h-full w-full object-contain object-center p-4 transition duration-500 group-hover:scale-105"
+                    className="absolute inset-5 h-[calc(100%-2.5rem)] w-[calc(100%-2.5rem)] rounded-[22px] object-contain object-center drop-shadow-[0_18px_24px_rgba(0,0,0,0.45)] [clip-path:inset(0_round_22px)] transition duration-500 group-hover:scale-[1.035]"
                     onError={(event) => {
                       event.currentTarget.src = "/avatar.png";
                     }}
@@ -361,8 +362,8 @@ export default function CardRareClient({
       </div>
 
       {confirmCard ? (
-        <div className="fixed inset-0 z-[1300] flex items-end justify-center overflow-y-auto bg-black/72 p-3 pb-[calc(12px_+_env(safe-area-inset-bottom))] pt-[calc(12px_+_env(safe-area-inset-top))] backdrop-blur-xl sm:items-center">
-          <div className="max-h-[calc(100dvh_-_24px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-lg overflow-y-auto rounded-[30px] border border-white/12 bg-[#101016] p-5 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)]">
+        <div className="fixed inset-0 z-[1300] grid min-h-[100svh] place-items-center overflow-y-auto bg-black/72 px-3 py-[calc(16px_+_env(safe-area-inset-top))] pb-[calc(16px_+_env(safe-area-inset-bottom))] backdrop-blur-xl">
+          <div className="my-auto max-h-[calc(100dvh_-_32px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-lg overflow-y-auto rounded-[30px] border border-white/12 bg-[#101016] p-4 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)] sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.26em] text-violet-200">

@@ -108,16 +108,8 @@ export default function RewardsTable({ rewards }: { rewards: RewardRow[] }) {
         return normalizeRewardRow(reward, currentById.get(id));
       })
       .filter((reward): reward is RewardRow => Boolean(reward));
-    const nextById = new Map(nextRows.map((row) => [row.id, row]));
-    const activeEditingId = editingIdRef.current;
-    const liveReward = activeEditingId ? nextById.get(activeEditingId) : null;
-
     rowsRef.current = nextRows;
     setRows(nextRows);
-
-    if (liveReward) {
-      setStock(String(liveReward.stock));
-    }
   }, []);
 
   const syncRewards = useCallback(async () => {

@@ -20,32 +20,58 @@ function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("th-TH");
 }
 
+function formatSignedNumber(value: number) {
+  return `${value >= 0 ? "+" : ""}${formatNumber(value)}`;
+}
+
 function getLogDisplay(log: PointLogRow) {
   const type = String(log.type || "").trim().toLowerCase();
+  const isCoin = type.includes("coin");
+  const currency = isCoin ? "COIN" : "NEX";
+  const value = isCoin ? Number(log.amount || 0) : Number(log.point || 0);
 
-  if (type === "coupon_rollback_coin") {
+  if (type === "coupon_rollback_coin" || type === "coupon_rollback_nex") {
     return {
-      typeLabel: "rollback coin",
-      amountLabel: `คืน ${formatNumber(log.amount)} COIN`,
-      valueLabel: `+${formatNumber(log.amount)} COIN`,
-      valueClass: "text-sky-300",
+      typeLabel: "COUPON ROLLBACK",
+      amountLabel: `Refund ${formatNumber(Math.abs(value))} ${currency}`,
+      valueLabel: `${formatSignedNumber(value)} ${currency}`,
+      valueClass: isCoin ? "text-sky-300" : "text-amber-300",
+      badgeClass: isCoin
+        ? "border-sky-300/18 bg-sky-300/10 text-sky-300"
+        : "border-amber-300/18 bg-amber-300/10 text-amber-300",
     };
   }
 
-  if (type === "coupon_rollback_nex") {
+  if (type === "admin_coin") {
     return {
-      typeLabel: "rollback nex",
-      amountLabel: "ย้อนกลับคูปอง",
-      valueLabel: `+${formatNumber(log.point)} NEX`,
+      typeLabel: "ADMIN COIN",
+      amountLabel: `${value >= 0 ? "Add" : "Deduct"} ${formatNumber(Math.abs(value))} COIN`,
+      valueLabel: `${formatSignedNumber(value)} COIN`,
+      valueClass: "text-sky-300",
+      badgeClass: "border-sky-300/18 bg-sky-300/10 text-sky-300",
+    };
+  }
+
+  if (type === "admin") {
+    return {
+      typeLabel: "ADMIN NEX",
+      amountLabel: `${value >= 0 ? "Add" : "Deduct"} ${formatNumber(Math.abs(value))} NEX`,
+      valueLabel: `${formatSignedNumber(value)} NEX`,
       valueClass: "text-amber-300",
+      badgeClass: "border-amber-300/18 bg-amber-300/10 text-amber-300",
     };
   }
 
   return {
-    typeLabel: log.type,
-    amountLabel: `จำนวน ${formatNumber(log.amount)}`,
-    valueLabel: `+${formatNumber(log.point)}`,
-    valueClass: "text-amber-300",
+    typeLabel: type ? type.toUpperCase() : "POINT LOG",
+    amountLabel: isCoin
+      ? `${formatNumber(Math.abs(value))} COIN`
+      : `${formatNumber(log.amount)} cards`,
+    valueLabel: `${formatSignedNumber(value)} ${currency}`,
+    valueClass: isCoin ? "text-sky-300" : "text-amber-300",
+    badgeClass: isCoin
+      ? "border-sky-300/18 bg-sky-300/10 text-sky-300"
+      : "border-amber-300/18 bg-amber-300/10 text-amber-300",
   };
 }
 
@@ -54,7 +80,7 @@ export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
     <div className="grid gap-3">
       {logs.length === 0 ? (
         <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-white/45">
-          ไม่พบประวัติการเพิ่มแต้ม
+          No point logs found.
         </div>
       ) : (
         logs.map((log) => {
@@ -96,7 +122,9 @@ export default function PointLogsTable({ logs }: { logs: PointLogRow[] }) {
                   </div>
                 </div>
 
-                <span className="w-fit rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase text-amber-300">
+                <span
+                  className={`w-fit rounded-full border px-3 py-1 text-xs font-black uppercase ${logDisplay.badgeClass}`}
+                >
                   {logDisplay.typeLabel}
                 </span>
                 <div className="text-sm font-bold text-white/78">
