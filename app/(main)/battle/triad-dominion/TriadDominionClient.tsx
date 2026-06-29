@@ -2400,6 +2400,15 @@ function CardHoverPreview({
   onClose?: () => void;
   onUseCard?: (cardNo: string) => void;
 }) {
+  const useCardStampRef = useRef(0);
+  const useCardFromPreview = () => {
+    if (!card || !onUseCard) return;
+    const now = Date.now();
+    if (now - useCardStampRef.current < 180) return;
+    useCardStampRef.current = now;
+    onUseCard(card.cardNo);
+  };
+
   if (!card) return null;
   return (
     <div
@@ -2454,11 +2463,21 @@ function CardHoverPreview({
               type="button"
               className="triad-card-preview-use mt-3 hidden w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
               onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                useCardFromPreview();
+              }}
               onTouchStart={(event) => event.stopPropagation()}
+              onTouchEnd={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                useCardFromPreview();
+              }}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onUseCard(card.cardNo);
+                useCardFromPreview();
               }}
             >
               เลือกใช้การ์ดใบนี้
