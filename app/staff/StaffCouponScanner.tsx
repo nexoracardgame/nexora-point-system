@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { CouponViewModel } from "@/components/CouponDetailCard";
+import { extractCardRareCode } from "@/lib/card-rare-code";
 import { extractCardSetCode } from "@/lib/card-set-code";
 import { nexoraConfirm } from "@/lib/nexora-dialog";
 import { formatThaiDateTime } from "@/lib/thai-time";
@@ -42,6 +43,25 @@ type CardSetScanView = {
     | "foil_sequence_1"
     | "foil_sequence_9"
     | "foil_sequence_18";
+  conditionLabel: string | null;
+  valueLabel: string;
+  status: "pending" | "approved" | "cancelled" | "expired";
+  statusLabel: string;
+  createdAt: string;
+  expiresAt: string;
+  approvedAt: string | null;
+};
+
+type CardRareScanView = {
+  id: string;
+  code: string;
+  userId: string;
+  userName: string;
+  lineId: string;
+  cardNo: string;
+  cardName: string;
+  rewardLabel: string;
+  optionKey: string;
   conditionLabel: string | null;
   valueLabel: string;
   status: "pending" | "approved" | "cancelled" | "expired";
@@ -102,11 +122,11 @@ function extractCouponCode(value?: string | null) {
 
 function normalizeCouponInput(value?: string | null) {
   const raw = String(value || "").trim();
-  return extractCardSetCode(raw) || extractCouponCode(raw) || raw;
+  return extractCardRareCode(raw) || extractCardSetCode(raw) || extractCouponCode(raw) || raw;
 }
 
 function extractScanCode(value?: string | null) {
-  return extractCardSetCode(value) || extractCouponCode(value);
+  return extractCardRareCode(value) || extractCardSetCode(value) || extractCouponCode(value);
 }
 
 function getLookupError(status: number) {
@@ -132,6 +152,9 @@ export default function StaffCouponScanner({
   const [error, setError] = useState("");
   const [result, setResult] = useState<CouponViewModel | null>(null);
   const [cardSetResult, setCardSetResult] = useState<CardSetScanView | null>(
+    null
+  );
+  const [cardRareResult, setCardRareResult] = useState<CardRareScanView | null>(
     null
   );
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -267,6 +290,52 @@ export default function StaffCouponScanner({
     [cardSetResult?.code, code]
   );
 
+  const confirmCardRareAction = useCallback(
+    async (action: "approve" | "cancel", targetCode?: string) => {
+      const nextCode = normalizeCouponInput(targetCode || cardRareResult?.code || code);
+      if (!nextCode) return;
+
+      try {
+        setLoading(true);
+        setError("");
+        setMessage("");
+
+        const res = await fetch(
+          `/api/card-rare-redemptions/${encodeURIComponent(nextCode)}/action`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action }),
+          }
+        );
+        const data = await res.json();
+
+        if (!res.ok) {
+          setError(String(data?.error || "อัปเดตรายการแลก CARD RARE ไม่สำเร็จ"));
+          if (data?.redemption) {
+            setCardRareResult(data.redemption);
+          }
+          return;
+        }
+
+        setCardRareResult(data?.redemption || null);
+        setCardSetResult(null);
+        setResult(null);
+        setCode(nextCode);
+        setMessage(
+          action === "approve"
+            ? "อนุมัติการแลก CARD RARE สำเร็จ"
+            : "ยกเลิกรายการแลก CARD RARE แล้ว"
+        );
+      } catch {
+        setError("เกิดข้อผิดพลาดระหว่างอัปเดตรายการแลก CARD RARE");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cardRareResult?.code, code]
+  );
+
   const lookupCoupon = useCallback(
     async (manualCode?: string, options: LookupOptions = {}) => {
       const nextCode = normalizeCouponInput(manualCode || code);
@@ -281,6 +350,32 @@ export default function StaffCouponScanner({
         setLookupLoading(true);
         setError("");
         setMessage("");
+
+        const cardRareCode = extractCardRareCode(nextCode);
+        if (cardRareCode) {
+          const res = await fetch(
+            `/api/card-rare-redemptions/${encodeURIComponent(cardRareCode)}`,
+            { cache: "no-store" }
+          );
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(getLookupError(res.status));
+            setResult(null);
+            setCardSetResult(null);
+            setCardRareResult(null);
+            return;
+          }
+
+          setCode(cardRareCode);
+          setResult(null);
+          setCardSetResult(null);
+          setCardRareResult(data?.redemption || null);
+          if (options.promptUse) {
+            setMessage("สแกน QR CODE CARD RARE สำเร็จ");
+          }
+          return;
+        }
 
         const cardSetCode = extractCardSetCode(nextCode);
         if (cardSetCode) {
@@ -299,6 +394,7 @@ export default function StaffCouponScanner({
 
           setCode(cardSetCode);
           setResult(null);
+          setCardRareResult(null);
           setCardSetResult(data?.redemption || null);
           if (options.promptUse) {
             setMessage("สแกน QR CODE CARD SET สำเร็จ");
@@ -778,6 +874,120 @@ export default function StaffCouponScanner({
                   >
                     <XCircle className="h-4 w-4" />
                     ยกเลิก
+                  </button>
+                </div>
+              </div>
+            ) : cardRareResult ? (
+              <div className="mt-4 grid gap-4">
+                <div className="rounded-[24px] border border-violet-300/20 bg-violet-300/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-violet-200/75">
+                    CARD RARE
+                  </div>
+                  <div className="mt-2 text-2xl font-black">
+                    No. {cardRareResult.cardNo} {cardRareResult.cardName}
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-white/60">
+                    {cardRareResult.valueLabel}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      เธเธนเนเนเธฅเธ
+                    </div>
+                    <div className="mt-2 text-base font-black">
+                      {cardRareResult.userName}
+                    </div>
+                    <div className="mt-1 break-all text-xs font-bold text-white/45">
+                      {cardRareResult.lineId}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      เธชเธ–เธฒเธเธฐ
+                    </div>
+                    <div
+                      className={`mt-2 text-base font-black ${
+                        cardRareResult.status === "approved"
+                          ? "text-emerald-300"
+                          : cardRareResult.status === "pending"
+                            ? "text-violet-200"
+                            : "text-red-300"
+                      }`}
+                    >
+                      {cardRareResult.statusLabel}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                    Reward
+                  </div>
+                  <div className="mt-2 w-fit rounded-full bg-violet-300/10 px-3 py-1 text-xs font-black text-violet-100">
+                    {cardRareResult.conditionLabel ? "แบบเงื่อนไขพิเศษ" : "แบบมาตรฐาน"}
+                  </div>
+                  <div className="mt-2 text-sm font-bold text-white/75">
+                    {cardRareResult.rewardLabel}
+                  </div>
+                  {cardRareResult.conditionLabel ? (
+                    <div className="mt-2 rounded-full bg-white/[0.05] px-3 py-1.5 text-xs font-black text-white/62">
+                      {cardRareResult.conditionLabel}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                    Serial Code
+                  </div>
+                  <div className="mt-2 break-all text-sm font-black text-white/88">
+                    {cardRareResult.code}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      เธชเธฃเนเธฒเธเน€เธกเธทเนเธญ
+                    </div>
+                    <div className="mt-2 text-sm font-bold text-white/75">
+                      {formatThaiDateTime(cardRareResult.createdAt)}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      เธซเธกเธ”เน€เธงเธฅเธฒ
+                    </div>
+                    <div className="mt-2 text-sm font-bold text-white/75">
+                      {formatThaiDateTime(cardRareResult.expiresAt)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => void confirmCardRareAction("approve")}
+                    disabled={loading || cardRareResult.status !== "pending"}
+                    className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#f5d0fe,#a855f7,#6d28d9)] px-4 py-3 text-sm font-black text-white shadow-[0_0_24px_rgba(168,85,247,0.28)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4" />
+                    )}
+                    เธญเธเธธเธกเธฑเธ•เธด
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmCardRareAction("cancel")}
+                    disabled={loading || cardRareResult.status !== "pending"}
+                    className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] border border-red-300/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 transition hover:bg-red-500/16 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    เธขเธเน€เธฅเธดเธ
                   </button>
                 </div>
               </div>

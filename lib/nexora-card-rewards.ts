@@ -10,10 +10,11 @@ export type NexoraSingleCardNexReward = {
   cardNo: string;
   nexValue: number;
   sourceUrl: string;
+  cardName?: string;
 };
 
 export const NEXORA_SINGLE_CARD_REWARD_SOURCE_URL =
-  "https://www.nexoracardgame.com/jackpot-cards";
+  "https://www.nexoracardgame.com/legend-cards";
 
 export const nexoraCoinRewards: NexoraCoinReward[] = [
   { cardNo: "006", cardName: "KREL IGNIVAR", coinValue: 4000, source: "card-image-ocr", confidence: "high" },
@@ -80,26 +81,13 @@ export const nexoraCoinRewards: NexoraCoinReward[] = [
   { cardNo: "293", cardName: "THE ROOT OF LIFE", coinValue: 8, source: "card-image-ocr", confidence: "medium" },
 ];
 
-export const nexoraSingleCardNexRewards: NexoraSingleCardNexReward[] = [
-  { cardNo: "009", nexValue: 200000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "007", nexValue: 100000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "170", nexValue: 80000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "090", nexValue: 70000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "091", nexValue: 60000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "172", nexValue: 40000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "018", nexValue: 40000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "020", nexValue: 30000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "003", nexValue: 15000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "189", nexValue: 15000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "088", nexValue: 10000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "111", nexValue: 5000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "206", nexValue: 25000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "254", nexValue: 25000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "246", nexValue: 20000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "247", nexValue: 10000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "099", nexValue: 10000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-  { cardNo: "061", nexValue: 10000, sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL },
-];
+export const nexoraSingleCardNexRewards: NexoraSingleCardNexReward[] =
+  cardRareRewards.map((reward) => ({
+    cardNo: reward.cardNo,
+    cardName: reward.cardName,
+    nexValue: Math.max(...reward.options.map((option) => option.nexValue)),
+    sourceUrl: NEXORA_SINGLE_CARD_REWARD_SOURCE_URL,
+  }));
 
 export const nexoraCoinRewardByCardNo = new Map(
   nexoraCoinRewards.map((reward) => [reward.cardNo, reward])
@@ -113,7 +101,7 @@ export function normalizeNexoraCardNo(value: string) {
   const digits = value.replace(/\D/g, "");
   if (!digits) return "";
   const number = Number(digits.slice(-3));
-  if (!Number.isFinite(number) || number < 1 || number > 293) return "";
+  if (!Number.isFinite(number) || number < 1 || number > 316) return "";
   return String(number).padStart(3, "0");
 }
 
@@ -126,3 +114,4 @@ export function getNexoraSingleCardNexReward(cardNo: string) {
   const normalized = normalizeNexoraCardNo(cardNo);
   return normalized ? nexoraSingleCardNexRewardByCardNo.get(normalized) || null : null;
 }
+import { cardRareRewards } from "@/lib/card-rare-rewards";

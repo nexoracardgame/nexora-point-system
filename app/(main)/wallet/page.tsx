@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { ensureCardRareRedemptionSchema } from "@/lib/card-rare-redemptions";
 import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
 import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatThaiDateTime, formatThaiTimeAgo } from "@/lib/thai-time";
@@ -36,6 +37,20 @@ type WalletCardSetRedemption = {
   setName: string;
   rewardLabel: string;
   redemptionType: string | null;
+  conditionLabel: string | null;
+  nexValue: number;
+  status: string;
+  createdAt: Date;
+  approvedAt: Date | null;
+};
+
+type WalletCardRareRedemption = {
+  id: string;
+  code: string;
+  cardNo: string;
+  cardName: string;
+  rewardLabel: string;
+  optionKey: string | null;
   conditionLabel: string | null;
   nexValue: number;
   status: string;
@@ -170,6 +185,7 @@ export default async function WalletPage() {
     };
   }> = [];
   let cardSetRedemptions: WalletCardSetRedemption[] = [];
+  let cardRareRedemptions: WalletCardRareRedemption[] = [];
 
   try {
     user = await prisma.user.findUnique({
@@ -189,8 +205,9 @@ export default async function WalletPage() {
     if (user) {
       await ensureCouponRollbackSchema();
       await ensureCardSetRedemptionSchema();
+      await ensureCardRareRedemptionSchema();
 
-      [pointLogs, coupons, cardSetRedemptions] = await Promise.all([
+      [pointLogs, coupons, cardSetRedemptions, cardRareRedemptions] = await Promise.all([
         prisma.pointLog.findMany({
           where: {
             lineId: user.lineId,
@@ -234,6 +251,28 @@ export default async function WalletPage() {
               "createdAt",
               "approvedAt"
             FROM "CardSetRedemption"
+            WHERE "userId" = $1
+              AND "status" = 'approved'
+            ORDER BY COALESCE("approvedAt", "createdAt") DESC
+            LIMIT 12
+          `,
+          user.id
+        ),
+        prisma.$queryRawUnsafe<WalletCardRareRedemption[]>(
+          `
+            SELECT
+              "id",
+              "code",
+              "cardNo",
+              "cardName",
+              "rewardLabel",
+              "optionKey",
+              "conditionLabel",
+              "nexValue",
+              "status",
+              "createdAt",
+              "approvedAt"
+            FROM "CardRareRedemption"
             WHERE "userId" = $1
               AND "status" = 'approved'
             ORDER BY COALESCE("approvedAt", "createdAt") DESC
@@ -287,6 +326,10 @@ export default async function WalletPage() {
     (sum, redemption) => sum + Number(redemption.nexValue || 0),
     0
   );
+  const approvedCardRareNex = cardRareRedemptions.reduce(
+    (sum, redemption) => sum + Number(redemption.nexValue || 0),
+    0
+  );
   const spentCoinFromCoupons = coupons.reduce(
     (sum, coupon) => sum + Number(coupon.reward.coinCost || 0),
     0
@@ -295,7 +338,7 @@ export default async function WalletPage() {
   const lifetimeNex = Math.max(
     totalEarnedNex,
     nexPoint + spentNexFromCoupons
-  ) + approvedCardSetNex;
+  ) + approvedCardSetNex + approvedCardRareNex;
   const lifetimeCoin = coin + spentCoinFromCoupons;
   const walletRank =
     lifetimeNex >= 10_000_000
@@ -422,6 +465,15 @@ export default async function WalletPage() {
       }`,
       createdAt: redemption.approvedAt || redemption.createdAt,
       tone: "amber" as const,
+    })),
+    ...cardRareRedemptions.map((redemption) => ({
+      id: `card-rare-${redemption.id}`,
+      title: `แลก CARD RARE No. ${redemption.cardNo}: ${redemption.cardName}`,
+      subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX${
+        redemption.conditionLabel ? ` • ${redemption.conditionLabel}` : ""
+      }`,
+      createdAt: redemption.approvedAt || redemption.createdAt,
+      tone: "cyan" as const,
     })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

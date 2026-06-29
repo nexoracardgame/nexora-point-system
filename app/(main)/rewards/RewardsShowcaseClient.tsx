@@ -217,13 +217,22 @@ export default function RewardsShowcaseClient({
               <h1 className="mt-4 text-4xl font-black tracking-[-0.07em] sm:text-6xl lg:text-7xl">
                 แลกรางวัล
               </h1>
-              <Link
-                href="/card-set"
-                className="mx-auto mt-5 inline-flex min-h-[58px] items-center justify-center gap-3 rounded-full border border-amber-200/40 bg-[linear-gradient(135deg,#fff2a8_0%,#facc15_42%,#d97706_100%)] px-8 text-sm font-black uppercase tracking-[0.22em] text-black shadow-[0_0_40px_rgba(250,204,21,0.34),inset_0_1px_0_rgba(255,255,255,0.66)] transition hover:scale-[1.02] sm:px-10 sm:text-base"
-              >
-                <Layers3 className="h-5 w-5" />
-                CARD SET
-              </Link>
+              <div className="mx-auto mt-5 flex max-w-2xl flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/card-set"
+                  className="inline-flex min-h-[58px] w-full items-center justify-center gap-3 rounded-full border border-amber-200/40 bg-[linear-gradient(135deg,#fff2a8_0%,#facc15_42%,#d97706_100%)] px-8 text-sm font-black uppercase tracking-[0.22em] text-black shadow-[0_0_40px_rgba(250,204,21,0.34),inset_0_1px_0_rgba(255,255,255,0.66)] transition hover:scale-[1.02] sm:w-auto sm:px-10 sm:text-base"
+                >
+                  <Layers3 className="h-5 w-5" />
+                  CARD SET
+                </Link>
+                <Link
+                  href="/card-rare"
+                  className="inline-flex min-h-[58px] w-full items-center justify-center gap-3 rounded-full border border-violet-200/45 bg-[linear-gradient(135deg,#f5d0fe_0%,#a855f7_46%,#4c1d95_100%)] px-8 text-sm font-black uppercase tracking-[0.22em] text-white shadow-[0_0_42px_rgba(168,85,247,0.38),inset_0_1px_0_rgba(255,255,255,0.52)] transition hover:scale-[1.02] sm:w-auto sm:px-10 sm:text-base"
+                >
+                  <Sparkles className="h-5 w-5" />
+                  CARD RARE
+                </Link>
+              </div>
             </div>
 
             <div className="relative mt-7">

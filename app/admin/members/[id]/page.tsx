@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ensureCardRareRedemptionSchema } from "@/lib/card-rare-redemptions";
 import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
 import { prisma } from "@/lib/prisma";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
@@ -71,6 +72,11 @@ type MemberCardSetStats = {
   totalNexValue: number | null;
 };
 
+type MemberCardRareStats = {
+  approvedCount: bigint | number;
+  totalNexValue: number | null;
+};
+
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await prisma.user.findUnique({ where: { id } });
@@ -86,8 +92,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   });
 
   await ensureCardSetRedemptionSchema();
+  await ensureCardRareRedemptionSchema();
 
-  const [cardSetStatsRows, cardSetLogs] = await Promise.all([
+  const [cardSetStatsRows, cardSetLogs, cardRareStatsRows] = await Promise.all([
     prisma.$queryRawUnsafe<MemberCardSetStats[]>(
       `
         SELECT
@@ -119,9 +126,23 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       `,
       user.id
     ),
+    prisma.$queryRawUnsafe<MemberCardRareStats[]>(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE "status" = 'approved') AS "approvedCount",
+          COALESCE(SUM("nexValue") FILTER (WHERE "status" = 'approved'), 0) AS "totalNexValue"
+        FROM "CardRareRedemption"
+        WHERE "userId" = $1
+      `,
+      user.id
+    ),
   ]);
 
   const cardSetStats = cardSetStatsRows[0] || {
+    approvedCount: 0,
+    totalNexValue: 0,
+  };
+  const cardRareStats = cardRareStatsRows[0] || {
     approvedCount: 0,
     totalNexValue: 0,
   };
@@ -170,6 +191,25 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           value={`${formatNumber(Number(cardSetStats.totalNexValue || 0))} NEX`}
           gold
         />
+        <Card
+          title="CARD RARE แลกสำเร็จ"
+          value={`${formatNumber(Number(cardRareStats.approvedCount || 0))} ใบ`}
+          gold
+        />
+        <Card
+          title="CARD RARE มูลค่ารวม"
+          value={`${formatNumber(Number(cardRareStats.totalNexValue || 0))} NEX`}
+          gold
+        />
+      </div>
+
+      <div className="flex justify-end">
+        <Link
+          href={`/admin/card-rare-logs?q=${encodeURIComponent(user.lineId)}`}
+          className="rounded-2xl border border-violet-300/20 bg-violet-300/10 px-4 py-3 text-sm font-black text-violet-100"
+        >
+          ดูประวัติ CARD RARE ใน Logs
+        </Link>
       </div>
 
       <MemberActions lineId={user.lineId} />
