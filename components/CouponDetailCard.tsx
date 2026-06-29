@@ -125,6 +125,18 @@ export default function CouponDetailCard({
                   <div className="grid min-h-[190px] w-full place-items-center rounded-[28px] bg-red-50 p-5 text-center text-sm font-black text-red-700 shadow-[0_18px_46px_rgba(20,20,30,0.08)] ring-1 ring-red-100">
                     คูปองนี้ถูกย้อนกลับแล้ว ไม่สามารถนำไปสแกนใช้งานได้
                   </div>
+                ) : coupon.used ? (
+                  <div className="grid min-h-[190px] w-full place-items-center rounded-[28px] bg-emerald-400 p-5 text-center text-black shadow-[0_18px_46px_rgba(16,185,129,0.22)] ring-1 ring-emerald-200">
+                    <div className="grid place-items-center gap-3">
+                      <CheckCircle2 className="h-16 w-16" />
+                      <div className="text-2xl font-black sm:text-3xl">
+                        การแลกเสร็จสมบูรณ์
+                      </div>
+                      <div className="text-sm font-bold opacity-70">
+                        พนักงานยืนยันคูปองนี้แล้ว
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="rounded-[28px] bg-white p-3 shadow-[0_18px_46px_rgba(20,20,30,0.12)] ring-1 ring-black/5">
                     <QRCodeCanvas value={coupon.code} size={qrSize} />

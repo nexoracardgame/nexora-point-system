@@ -72,6 +72,9 @@ export default function RedeemCouponsClient({
     initialOpenCode || cachedRedeemState?.data?.openCode || ""
   );
 
+  const selectedCoupon =
+    coupons.find((coupon) => coupon.code === selectedCode) || null;
+
   useEffect(() => {
     setCoupons((prev) => mergeCoupons(initialCoupons, prev));
   }, [initialCoupons]);
@@ -107,7 +110,7 @@ export default function RedeemCouponsClient({
   }, []);
 
   useEffect(() => {
-    void syncCoupons();
+    const initialSync = window.setTimeout(() => void syncCoupons(), 1200);
 
     const onFocus = () => void syncCoupons();
     const onVisible = () => {
@@ -130,9 +133,10 @@ export default function RedeemCouponsClient({
       if (document.visibilityState === "visible") {
         void syncCoupons();
       }
-    }, 6000);
+    }, 30000);
 
     return () => {
+      window.clearTimeout(initialSync);
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
@@ -141,8 +145,41 @@ export default function RedeemCouponsClient({
     };
   }, [syncCoupons]);
 
-  const selectedCoupon =
-    coupons.find((coupon) => coupon.code === selectedCode) || null;
+  useEffect(() => {
+    if (!selectedCoupon || selectedCoupon.used || selectedCoupon.isReversed) {
+      return;
+    }
+
+    const syncSelectedCoupon = async () => {
+      try {
+        const res = await fetch(
+          `/api/coupon/${encodeURIComponent(selectedCoupon.code)}?ts=${Date.now()}`,
+          { cache: "no-store" }
+        );
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (!data?.coupon) return;
+
+        setCoupons((current) =>
+          current.map((coupon) =>
+            coupon.code === selectedCoupon.code ? data.coupon : coupon
+          )
+        );
+      } catch {
+        return;
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncSelectedCoupon();
+      }
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [selectedCoupon]);
 
   const summary = useMemo(() => {
     const activeCoupons = coupons.filter((coupon) => !coupon.isReversed);

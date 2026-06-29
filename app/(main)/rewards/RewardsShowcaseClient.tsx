@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Coins,
@@ -48,6 +49,7 @@ export default function RewardsShowcaseClient({
   coin: number;
   rewards: RewardItem[];
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [liveRewards, setLiveRewards] = useState(rewards);
   const [balances, setBalances] = useState({
@@ -77,7 +79,11 @@ export default function RewardsShowcaseClient({
   }, []);
 
   useEffect(() => {
-    void syncRewards();
+    router.prefetch("/redeem");
+    router.prefetch("/card-set");
+    router.prefetch("/card-rare");
+
+    const initialSync = window.setTimeout(() => void syncRewards(), 1200);
 
     const onFocus = () => void syncRewards();
     const onVisible = () => {
@@ -100,16 +106,17 @@ export default function RewardsShowcaseClient({
       if (document.visibilityState === "visible") {
         void syncRewards();
       }
-    }, 6000);
+    }, 30000);
 
     return () => {
+      window.clearTimeout(initialSync);
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("nexora:rewards-updated", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [syncRewards]);
+  }, [router, syncRewards]);
 
   useEffect(() => {
     setBalances({
@@ -351,7 +358,7 @@ export default function RewardsShowcaseClient({
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredRewards.map((reward) => (
+              {filteredRewards.map((reward, index) => (
                 <article
                   key={reward.id}
                   className="group overflow-hidden rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.96))] p-3 shadow-[0_18px_70px_rgba(0,0,0,0.36)] transition duration-500 hover:-translate-y-1 hover:border-amber-300/24 sm:p-4"
@@ -370,7 +377,8 @@ export default function RewardsShowcaseClient({
                           "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"
                         }
                         alt={reward.name}
-                        loading="eager"
+                        loading={index < 6 ? "eager" : "lazy"}
+                        fetchPriority={index < 3 ? "high" : "auto"}
                         decoding="async"
                         className="absolute inset-0 h-full w-full object-contain p-5 transition duration-500 group-hover:scale-105"
                         onError={(event) => {

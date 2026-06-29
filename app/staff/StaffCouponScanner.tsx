@@ -15,7 +15,7 @@ import {
 import type { CouponViewModel } from "@/components/CouponDetailCard";
 import { extractCardRareCode } from "@/lib/card-rare-code";
 import { extractCardSetCode } from "@/lib/card-set-code";
-import { nexoraConfirm } from "@/lib/nexora-dialog";
+import { nexoraAlert, nexoraConfirm } from "@/lib/nexora-dialog";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
 const COUPON_CODE_PATTERN = /NXR-(NEX|COIN)-\d+-\d{10,}-[A-Z0-9]{4,16}/i;
@@ -142,6 +142,15 @@ function getUseError(status: number) {
   return "ยืนยันคูปองไม่สำเร็จ";
 }
 
+function showRedeemSuccess(label: string) {
+  void nexoraAlert({
+    title: "การแลกเสร็จสมบูรณ์",
+    message: label,
+    tone: "success",
+    confirmText: "เรียบร้อย",
+  });
+}
+
 export default function StaffCouponScanner({
   embedded = false,
 }: StaffCouponScannerProps = {}) {
@@ -231,10 +240,16 @@ export default function StaffCouponScanner({
           return;
         }
 
-        setMessage("ยืนยันใช้งานคูปองสำเร็จ");
+        setMessage("การแลกเสร็จสมบูรณ์");
         setResult(data?.coupon || null);
         setCardSetResult(null);
+        setCardRareResult(null);
         setCode(nextCode);
+        showRedeemSuccess(
+          data?.coupon?.rewardName
+            ? `ยืนยันใช้คูปอง ${data.coupon.rewardName} สำเร็จ`
+            : "ยืนยันใช้คูปองสำเร็จ"
+        );
         inputRef.current?.focus();
       } catch {
         setError("เกิดข้อผิดพลาดระหว่างยืนยันใช้งานคูปอง");
@@ -276,9 +291,17 @@ export default function StaffCouponScanner({
         setCardSetResult(data?.redemption || null);
         setResult(null);
         setCode(nextCode);
+        if (action === "approve") {
+          setMessage("การแลกเสร็จสมบูรณ์");
+          showRedeemSuccess(
+            `อนุมัติ CARD SET ${data?.redemption?.setOrder || ""} ${
+              data?.redemption?.setName || ""
+            } สำเร็จ`.trim()
+          );
+        }
         setMessage(
           action === "approve"
-            ? "อนุมัติการแลก CARD SET สำเร็จ"
+            ? "การแลกเสร็จสมบูรณ์"
             : "ยกเลิกรายการแลก CARD SET แล้ว"
         );
       } catch {
@@ -322,9 +345,17 @@ export default function StaffCouponScanner({
         setCardSetResult(null);
         setResult(null);
         setCode(nextCode);
+        if (action === "approve") {
+          setMessage("การแลกเสร็จสมบูรณ์");
+          showRedeemSuccess(
+            `อนุมัติ CARD RARE No. ${data?.redemption?.cardNo || ""} ${
+              data?.redemption?.cardName || ""
+            } สำเร็จ`.trim()
+          );
+        }
         setMessage(
           action === "approve"
-            ? "อนุมัติการแลก CARD RARE สำเร็จ"
+            ? "การแลกเสร็จสมบูรณ์"
             : "ยกเลิกรายการแลก CARD RARE แล้ว"
         );
       } catch {
