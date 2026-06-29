@@ -321,8 +321,8 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       </div>
 
       {confirmSet ? (
-        <div className="fixed inset-0 z-[1300] grid place-items-center bg-black/72 p-3 backdrop-blur-xl">
-          <div className="w-full max-w-lg rounded-[30px] border border-white/12 bg-[#101016] p-5 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)]">
+        <div className="fixed inset-0 z-[1300] flex items-end justify-center overflow-y-auto bg-black/72 p-3 pb-[calc(12px_+_env(safe-area-inset-bottom))] pt-[calc(12px_+_env(safe-area-inset-top))] backdrop-blur-xl sm:items-center">
+          <div className="max-h-[calc(100dvh_-_24px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-lg overflow-y-auto rounded-[30px] border border-white/12 bg-[#101016] p-5 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">
@@ -376,22 +376,22 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       ) : null}
 
       {active && modalOpen ? (
-        <div className="fixed inset-0 z-[1250] grid place-items-center bg-black/72 p-3 backdrop-blur-xl">
-          <div className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-white/12 bg-[#101016] p-5 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)]">
+        <div className="fixed inset-0 z-[1250] flex items-end justify-center overflow-y-auto bg-black/72 p-3 pb-[calc(12px_+_env(safe-area-inset-bottom))] pt-[calc(12px_+_env(safe-area-inset-top))] backdrop-blur-xl sm:items-center">
+          <div className="relative max-h-[calc(100dvh_-_24px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-xl overflow-y-auto rounded-[32px] border border-white/12 bg-[#101016] p-4 text-white shadow-[0_30px_120px_rgba(0,0,0,0.62)] sm:p-5">
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04]"
+              className="sticky left-full top-0 z-20 mb-2 grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.08] text-white shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-xl"
               aria-label="Close QR"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="pr-14">
+            <div>
               <div className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">
                 Card Set Redemption
               </div>
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">
+              <h2 className="mt-2 break-words text-2xl font-black leading-tight sm:text-3xl">
                 Set {active.setOrder} {active.setName}
               </h2>
             </div>
@@ -461,10 +461,18 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                 </div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setModalOpen(false)}
+              className="mt-4 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[22px] border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(0,0,0,0.22)] transition active:scale-[0.99] sm:hidden"
+            >
+              <X className="h-4 w-4" />
+              ปิดหน้าต่าง
+            </button>
           </div>
         </div>
       ) : null}
     </div>
   );
 }
-
