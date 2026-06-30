@@ -402,6 +402,8 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const shape: TriadSkillShape =
     card.cardNo === "284"
       ? "swap-control"
+      : card.cardNo === "259"
+        ? "stat"
       : card.cardNo === "227"
         ? "stat"
         : card.cardNo === "236"
@@ -426,6 +428,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const needsReview =
     card.cardNo !== "236" &&
     card.cardNo !== "234" &&
+    card.cardNo !== "259" &&
     card.cardNo !== "227" &&
     (shape === "unparsed" ||
       shape === "element-transform" ||
@@ -436,11 +439,11 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: inferElementCondition(card),
+    elementCondition: card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -866,6 +869,224 @@ function elementConditionLabel(rule: TriadSkillRule) {
   return rule.elementCondition.mode === "include" ? `ต้องเป็นธาตุ${elements}` : `ต้องไม่ใช่ธาตุ${elements}`;
 }
 
+function applyAllFieldStatRule(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
+  blockers: StatGainBlocker[]
+) {
+  const scoreItems = [
+    { score: ownScore, targetSide: side, label: "user" },
+    { score: opponentScore, targetSide: side === "player" ? "opponent" as const : "player" as const, label: "opponent" },
+  ];
+  const events: TriadSkillEvent[] = [];
+
+  for (const effect of rule.effects) {
+    const applied: string[] = [];
+    const blocked: string[] = [];
+
+    for (const item of scoreItems) {
+      if (item.score.metric !== effect.metric) continue;
+      const eligible = item.score.contributions.filter((contribution) => elementConditionMatches(rule, contribution.card));
+      const unblocked = eligible.filter((contribution) => {
+        const blocker = blockers.find((candidate) =>
+          candidate.targetSide === item.targetSide &&
+          statGainBlockerApplies(candidate, effect, contribution)
+        );
+        if (blocker) blocked.push(`${item.label} No.${contribution.card.cardNo} by No.${blocker.rule.cardNo}`);
+        return !blocker;
+      });
+      if (unblocked.length === 0) continue;
+
+      const totalDelta = effect.delta * unblocked.length;
+      item.score.total += totalDelta;
+      item.score.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${effect.metric.toUpperCase()} ${totalDelta.toLocaleString()} (${item.label}, ${unblocked.length})`);
+      applied.push(`${item.label} ${unblocked.length}`);
+    }
+
+    const metricLabel = effect.metric === "attack" ? "ATTACK" : "SUPPORT";
+    if (applied.length === 0) {
+      events.push({
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: blocked.length > 0
+          ? `${metricLabel} change found valid targets, but was blocked (${blocked.join(", ")})`
+          : `No valid ${metricLabel} targets matched this turn`,
+        blocked: true,
+      });
+      continue;
+    }
+
+    const condition = elementConditionLabel(rule);
+    events.push({
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `${metricLabel} ${effect.delta >= 0 ? "+" : ""}${effect.delta.toLocaleString()} applies to all matching monsters on both fields${condition ? ` (${condition})` : ""}: ${applied.join(", ")}${blocked.length > 0 ? `; blocked ${blocked.join(", ")}` : ""}`,
+    });
+  }
+
+  return events;
+}
+
+function applyTidebomb(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  selectedTarget: string,
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
+  blockers: StatGainBlocker[]
+) {
+  const ownTarget = side === "player" ? "player-top" : "bot-top";
+  const opponentTarget = side === "player" ? "bot-top" : "player-top";
+  const normalizedTarget = selectedTarget === ownTarget || selectedTarget === opponentTarget ? selectedTarget : opponentTarget;
+  const targetScore = normalizedTarget === ownTarget ? ownScore : opponentScore;
+  const targetSide = normalizedTarget === "player-top" ? "player" : "opponent";
+  const targetContribution = targetScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = normalizedTarget === ownTarget ? "user main monster" : "opponent main monster";
+
+  if (!targetContribution) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "Tidebomb found no selected main monster target",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (targetContribution.card.attack < 5000 && targetContribution.card.support < 5000) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} does not have ATTACK or SUPPORT 5,000+`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const applied: string[] = [];
+  const blocked: string[] = [];
+  const metrics: TriadMetric[] = ["attack", "support"];
+  for (const metric of metrics) {
+    const originalValue = targetContribution.card[metric];
+    const delta = 3000 - originalValue;
+    if (delta === 0) {
+      applied.push(`${metric.toUpperCase()} 3,000`);
+      continue;
+    }
+    const effect = { metric, delta };
+    const blocker = blockers.find((item) =>
+      item.targetSide === targetSide &&
+      statGainBlockerApplies(item, effect, { lane: "top" })
+    );
+    if (blocker) {
+      blocked.push(`${metric.toUpperCase()} by No.${blocker.rule.cardNo}`);
+      continue;
+    }
+    if (targetScore.metric === metric) {
+      targetScore.total += delta;
+      targetContribution.value = 3000;
+      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${metric.toUpperCase()} ${originalValue.toLocaleString()} -> 3,000`);
+    }
+    applied.push(`${metric.toUpperCase()} ${originalValue.toLocaleString()} -> 3,000`);
+  }
+
+  if (applied.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `${targetLabel} matched Tidebomb, but all stat changes were blocked (${blocked.join(", ")})`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `Tidebomb sets No.${targetContribution.card.cardNo} ${targetLabel} ATTACK and SUPPORT to 3,000 until end of turn (${applied.join(", ")}${blocked.length > 0 ? `; blocked ${blocked.join(", ")}` : ""})`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
+function applyMechanicalTrap(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
+  blockers: StatGainBlocker[]
+) {
+  const effect = rule.effects.find((item) => item.metric === "support" && item.delta < 0) || { metric: "support" as const, delta: -3000 };
+  const scoreItems = [
+    { score: ownScore, targetSide: side, label: "user" },
+    { score: opponentScore, targetSide: side === "player" ? "opponent" as const : "player" as const, label: "opponent" },
+  ];
+  const applied: string[] = [];
+  const blocked: string[] = [];
+
+  for (const item of scoreItems) {
+    if (item.score.metric !== effect.metric) continue;
+    const eligible = item.score.contributions.filter((contribution) => elementConditionMatches(rule, contribution.card));
+    const unblocked = eligible.filter((contribution) => {
+      const blocker = blockers.find((candidate) =>
+        candidate.targetSide === item.targetSide &&
+        statGainBlockerApplies(candidate, effect, contribution)
+      );
+      if (blocker) blocked.push(`${item.label} No.${contribution.card.cardNo} by No.${blocker.rule.cardNo}`);
+      return !blocker;
+    });
+    if (unblocked.length === 0) continue;
+
+    const totalDelta = effect.delta * unblocked.length;
+    item.score.total += totalDelta;
+    item.score.breakdown.push(`No.${rule.cardNo} ${rule.name}: SUP ${totalDelta.toLocaleString()} (${item.label}, ${unblocked.length} non-gold)`);
+    applied.push(`${item.label} ${unblocked.length}`);
+  }
+
+  if (applied.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: blocked.length > 0
+        ? `Mechanical Trap found non-gold targets, but the SUPPORT reduction was blocked (${blocked.join(", ")})`
+        : "Mechanical Trap found no non-gold monster using SUPPORT this turn",
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const blockedText = blocked.length > 0 ? ` Blocked: ${blocked.join(", ")}` : "";
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `Mechanical Trap: every non-gold monster on both fields gets SUPPORT ${effect.delta.toLocaleString()} until end of turn (${applied.join(", ")}).${blockedText}`,
+  } satisfies TriadSkillEvent;
+}
+
 function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
   const blockers: StatUseBlocker[] = [];
   const events: TriadSkillEvent[] = [];
@@ -976,6 +1197,27 @@ function applySkill(
     );
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${result.event.summary}`);
     events.push(result.event);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "259") {
+    const event = applyTidebomb(rule, side, selectedTarget, ownScore, opponentScore, blockers);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${event.summary}`);
+    events.push(event);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "222") {
+    const rockspineEvents = applyAllFieldStatRule(rule, side, ownScore, opponentScore, blockers);
+    events.push(...rockspineEvents);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: applied all-field non-earth ATTACK change`);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "242") {
+    const event = applyMechanicalTrap(rule, side, ownScore, opponentScore, blockers);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${event.summary}`);
+    events.push(event);
     return { unresolved, events };
   }
 

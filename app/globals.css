@@ -1705,6 +1705,10 @@ textarea {
     overflow: hidden !important;
   }
 
+  .nexora-battle-shell .triad-card-preview-panel-passive {
+    pointer-events: none !important;
+  }
+
   .nexora-battle-shell .triad-card-preview-image {
     width: min(58svh, 50svw, 340px) !important;
     max-width: calc(100svw - 13rem) !important;

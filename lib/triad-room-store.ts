@@ -149,6 +149,7 @@ const TRIAD_CHAT_MAX_LENGTH = 240;
 const globalForTriadRooms = globalThis as {
   nexoraTriadRooms?: StoredTriadRoom[];
   nexoraTriadRoomSchemaPromise?: Promise<void>;
+  nexoraTriadRoomMutationLocks?: Map<string, Promise<void>>;
 };
 
 function memoryRooms() {
@@ -607,6 +608,30 @@ async function upsertStoredRoom(room: StoredTriadRoom) {
       return null;
     }
   );
+}
+
+async function withRoomMutationLock<T>(code: string, action: () => Promise<T>): Promise<T> {
+  const lockKey = cleanText(code);
+  if (!globalForTriadRooms.nexoraTriadRoomMutationLocks) {
+    globalForTriadRooms.nexoraTriadRoomMutationLocks = new Map();
+  }
+  const locks = globalForTriadRooms.nexoraTriadRoomMutationLocks;
+  const previous = locks.get(lockKey) || Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.then(() => current, () => current);
+  locks.set(lockKey, queued);
+  await previous.catch(() => null);
+  try {
+    return await action();
+  } finally {
+    release();
+    if (locks.get(lockKey) === queued) {
+      locks.delete(lockKey);
+    }
+  }
 }
 
 async function deleteStoredRoom(code: string) {
@@ -1419,13 +1444,27 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
   return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
 }
 
-export async function advanceTriadRoomTurn(code: string, participantId: string) {
+export async function advanceTriadRoomTurn(
+  code: string,
+  participantId: string,
+  context: { fightNo?: number; turn?: TriadTurn } = {}
+) {
+  return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side = sideForParticipant(room, participantId);
   if (!side && !participantInStoredRoom(room, participantId)) {
     return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   }
+
+  if (
+    context.fightNo &&
+    context.turn &&
+    (room.game.fightNo !== context.fightNo || room.game.activeTurn !== context.turn)
+  ) {
+    return { ok: true as const, room: publicRoom(room), advanced: true as const, stale: true as const };
+  }
+
   const activeResult = room.game.turns.find((turn) => turn.turn === room.game.activeTurn);
   if (!activeResult) {
     return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
@@ -1474,6 +1513,7 @@ export async function advanceTriadRoomTurn(code: string, participantId: string) 
   }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), advanced: true as const };
+  });
 }
 
 export async function timeoutTriadRoomTurn(code: string, participantId: string) {

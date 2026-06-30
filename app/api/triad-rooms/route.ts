@@ -235,7 +235,11 @@ export async function POST(request: Request) {
   }
 
   if (action === "advance-turn") {
-    const result = await advanceTriadRoomTurn(cleanText(body.code), participant.id);
+    const requestedTurn = Number(body.turn || body.activeTurn);
+    const result = await advanceTriadRoomTurn(cleanText(body.code), participant.id, {
+      fightNo: Number(body.fightNo) || undefined,
+      turn: requestedTurn === 1 || requestedTurn === 2 || requestedTurn === 3 ? requestedTurn : undefined,
+    });
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

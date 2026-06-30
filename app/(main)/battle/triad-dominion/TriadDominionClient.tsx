@@ -67,6 +67,8 @@ type CardView = {
   sourceImage: string;
 };
 
+type CardPreviewMode = "hover" | "modal";
+
 type ReviewSkill = {
   cardNo: string;
   name: string;
@@ -774,10 +776,20 @@ function normalizeRoomGame(value: unknown): RoomGame {
   };
 }
 
+function roomProgressValue(room: TriadRoom) {
+  return room.game.fightNo * 10 + room.game.activeTurn;
+}
+
+function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextRoom: TriadRoom) {
+  if (!currentRoom || currentRoom.code !== nextRoom.code) return false;
+  return roomProgressValue(currentRoom) > roomProgressValue(nextRoom);
+}
+
 function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
   if (!room?.code) return rooms;
-  const exists = rooms.some((item) => item.code === room.code);
-  return exists ? rooms.map((item) => (item.code === room.code ? mergeRoomWithStableChat(item, room) : item)) : [room, ...rooms];
+  const existing = rooms.find((item) => item.code === room.code);
+  if (shouldKeepCurrentRoomSnapshot(existing, room)) return rooms;
+  return existing ? rooms.map((item) => (item.code === room.code ? mergeRoomWithStableChat(item, room) : item)) : [room, ...rooms];
 }
 
 function mergeRoomListsWithStableChat(currentRooms: TriadRoom[], nextRooms: TriadRoom[]) {
@@ -1150,6 +1162,10 @@ function monsterHasGravityFieldStat(card?: CardView) {
   return Boolean(card?.kind === "monster" && (card.attack >= 7000 || card.support >= 7000));
 }
 
+function monsterHasTidebombStat(card?: CardView) {
+  return Boolean(card?.kind === "monster" && (card.attack >= 5000 || card.support >= 5000));
+}
+
 function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): SkillTargetId[] {
   return value
     .split(">")
@@ -1193,6 +1209,12 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
     return [
       monsterHasGravityFieldStat(playerTop) ? "player-top" as const : null,
       monsterHasGravityFieldStat(botTop) ? "bot-top" as const : null,
+    ].filter((target): target is SkillTargetId => Boolean(target));
+  }
+  if (card?.cardNo === "259") {
+    return [
+      monsterHasTidebombStat(playerTop) ? "player-top" as const : null,
+      monsterHasTidebombStat(botTop) ? "bot-top" as const : null,
     ].filter((target): target is SkillTargetId => Boolean(target));
   }
   if (rule.target.startsWith("own")) return [ownTarget];
@@ -1744,7 +1766,7 @@ function BoardTriangle({
   onSlotClick?: (lane: Lane) => void;
   onDropCard?: (lane: Lane, cardNo: string) => void;
   selectedLane?: Lane;
-  onPreview?: (card: CardView) => void;
+  onPreview?: (card: CardView, mode?: CardPreviewMode) => void;
   onPreviewEnd?: () => void;
 }) {
   const playerLanes: { lane: Lane; label: string; className: string }[] = [
@@ -1796,15 +1818,15 @@ function BoardTriangle({
               type="button"
               data-triad-lane={lane}
               onClick={() => {
-                if (card && canPreview) onPreview?.(card);
+                if (card && canPreview) onPreview?.(card, "modal");
                 onSlotClick?.(lane);
               }}
               onMouseEnter={() => {
-                if (card && canPreview) onPreview?.(card);
+                if (card && canPreview) onPreview?.(card, "hover");
               }}
               onMouseLeave={onPreviewEnd}
               onFocus={() => {
-                if (card && canPreview) onPreview?.(card);
+                if (card && canPreview) onPreview?.(card, "modal");
               }}
               onBlur={onPreviewEnd}
               onDragOver={(event) => {
@@ -2423,12 +2445,15 @@ function CardHoverPreview({
   card,
   onClose,
   onUseCard,
+  passive = false,
 }: {
   card: CardView | null;
   onClose?: () => void;
   onUseCard?: (cardNo: string) => void;
+  passive?: boolean;
 }) {
   const useCardStampRef = useRef(0);
+  const interactive = Boolean(onUseCard) || !passive;
   const useCardFromPreview = () => {
     if (!card || !onUseCard) return;
     const now = Date.now();
@@ -2448,7 +2473,7 @@ function CardHoverPreview({
       }}
     >
       <div
-        className="triad-card-preview-panel pointer-events-auto relative w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]"
+        className={`triad-card-preview-panel ${interactive ? "pointer-events-auto" : "triad-card-preview-panel-passive pointer-events-none"} relative w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]`}
         onPointerDown={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
@@ -3328,6 +3353,7 @@ function CompactBattleBoard({
   nextSkillSecondName?: string;
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
+  const [previewMode, setPreviewMode] = useState<CardPreviewMode>("hover");
   const playerTriangle = lockedFight?.player || player;
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
@@ -3368,9 +3394,17 @@ function CompactBattleBoard({
   }
   if (blessingAuras?.player) playerAuraByLane.top = blessingAuras.player;
   if (blessingAuras?.bot) botAuraByLane.top = blessingAuras.bot;
+  const showBoardPreview = (card: CardView, mode: CardPreviewMode = "hover") => {
+    setPreviewMode(mode);
+    setPreviewCard(card);
+  };
+  const closeBoardPreview = () => {
+    setPreviewCard(null);
+    setPreviewMode("hover");
+  };
   return (
     <div className="triad-compact-board relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
-      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} />
+      <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
@@ -3459,8 +3493,8 @@ function CompactBattleBoard({
             isVisible={(lane) => botVisible(lane)}
             swapActive={hasSwapResult && showResolvedBoard}
             auraByLane={botAuraByLane}
-            onPreview={setPreviewCard}
-            onPreviewEnd={() => setPreviewCard(null)}
+            onPreview={showBoardPreview}
+            onPreviewEnd={previewMode === "hover" ? closeBoardPreview : undefined}
           />
           <BoardPile label="สุ่ม" sublabel="293 ใบ" tone="gold" rotate />
         </div>
@@ -3480,8 +3514,8 @@ function CompactBattleBoard({
             onSlotClick={canEditPlayerSlots ? (lane) => lane === activeLane && onSelectLane(lane) : undefined}
             onDropCard={canEditPlayerSlots ? (lane, cardNo) => lane === activeLane && onPlaceCard(lane, cardNo) : undefined}
             selectedLane={canEditPlayerSlots ? placementLane : undefined}
-            onPreview={setPreviewCard}
-            onPreviewEnd={() => setPreviewCard(null)}
+            onPreview={showBoardPreview}
+            onPreviewEnd={previewMode === "hover" ? closeBoardPreview : undefined}
           />
           <BoardPile label="ทิ้ง" sublabel={`${playerGraveCards.length}`} tone="red" cards={playerGraveCards} />
         </div>
@@ -3584,6 +3618,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
   const resultAdvanceKeyRef = useRef("");
+  const turnReadyRecoveryKeyRef = useRef("");
   const deckBattleStartKeyRef = useRef("");
   const optimisticRoomLockUntilRef = useRef(0);
   const [lobbyMessage, setLobbyMessage] = useState("");
@@ -4439,6 +4474,38 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setTurnReadySubmittingKey("");
     }
   }, [currentTurnReadyKey, pendingTurnReadyKey, turnReadySubmittingKey]);
+
+  useEffect(() => {
+    const bothReady = Boolean(currentRoom?.game.turnReady.host && currentRoom.game.turnReady.challenger);
+    if (!currentRoom || !roomPlayerSide || !currentResult || !bothReady) {
+      turnReadyRecoveryKeyRef.current = "";
+      return;
+    }
+
+    const recoveryKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}`;
+    if (turnReadyRecoveryKeyRef.current === recoveryKey) return;
+    turnReadyRecoveryKeyRef.current = recoveryKey;
+
+    const timer = window.setTimeout(() => {
+      void postRoomAction({
+        action: "advance-turn",
+        code: currentRoom.code,
+        fightNo: currentRoom.game.fightNo,
+        turn: currentRoom.game.activeTurn,
+      })
+        .then(() => syncRooms({ force: true }))
+        .catch(() => syncRooms({ force: true }).catch(() => null));
+    }, 520);
+    return () => window.clearTimeout(timer);
+  }, [
+    currentResult,
+    currentRoom?.code,
+    currentRoom?.game.activeTurn,
+    currentRoom?.game.fightNo,
+    currentRoom?.game.turnReady.challenger,
+    currentRoom?.game.turnReady.host,
+    roomPlayerSide,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -5406,14 +5473,37 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       },
     }));
 
-    void postRoomAction({ action: "advance-turn", code: currentRoom.code })
+    const actionPayload = {
+      action: "advance-turn",
+      code: currentRoom.code,
+      fightNo: currentRoom.game.fightNo,
+      turn: currentRoom.game.activeTurn,
+    };
+    const scheduleReadySync = (delayMs: number) => {
+      window.setTimeout(() => void syncRooms({ force: true }).catch(() => null), delayMs);
+    };
+
+    void postRoomAction(actionPayload)
       .then((result) => {
         if (!result.ok) {
           setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
+          void syncRooms({ force: true }).catch(() => null);
+          return;
         }
+        const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
+        const advanced =
+          room &&
+          (room.game.fightNo !== currentRoom.game.fightNo || room.game.activeTurn !== currentRoom.game.activeTurn);
+        if (advanced) {
+          setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
+          setTurnReadySubmittingKey((current) => (current === readyKey ? "" : current));
+        }
+        scheduleReadySync(450);
+        scheduleReadySync(1400);
       })
       .catch(() => {
         setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
+        void syncRooms({ force: true }).catch(() => null);
       })
       .finally(() => {
         setTurnReadySubmittingKey((current) => (current === readyKey ? "" : current));
