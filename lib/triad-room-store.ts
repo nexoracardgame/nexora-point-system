@@ -858,6 +858,18 @@ function metalSwordTargets(room: StoredTriadRoom) {
   ].filter((side): side is TriadRoomSlot => Boolean(side));
 }
 
+function monsterHasGravityFieldStat(cardNo: string) {
+  const card = triadCardByNo.get(cleanText(cardNo));
+  return Boolean(card?.kind === "monster" && (card.attack >= 7000 || card.support >= 7000));
+}
+
+function gravityFieldTargets(room: StoredTriadRoom) {
+  return [
+    monsterHasGravityFieldStat(room.game.triangles.host.top) ? ("host" as const) : null,
+    monsterHasGravityFieldStat(room.game.triangles.challenger.top) ? ("challenger" as const) : null,
+  ].filter((side): side is TriadRoomSlot => Boolean(side));
+}
+
 function parseBoardTargetSequence(value = "") {
   return value
     .split(">")
@@ -866,6 +878,7 @@ function parseBoardTargetSequence(value = "") {
 }
 
 function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
+  if (cleanText(cardNo) === "227") return gravityFieldTargets(room).length > 0;
   if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;
   return skillNeedsManualChoice(cardNo);
 }
@@ -1332,7 +1345,12 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
       }
     }
   } else {
-    if (choice.cardNo === "231") {
+    if (choice.cardNo === "227") {
+      const targetSlot = selectedTargetSlot(side, cleanTarget);
+      if (!targetSlot || !gravityFieldTargets(room).includes(targetSlot)) {
+        return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+      }
+    } else if (choice.cardNo === "231") {
       const targetSlot = selectedTargetSlot(side, cleanTarget);
       if (!targetSlot || !metalSwordTargets(room).includes(targetSlot)) {
         return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };

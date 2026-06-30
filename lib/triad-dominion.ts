@@ -370,6 +370,10 @@ function inferElementsFromText(text: string): TriadElement[] {
 }
 
 function inferElementCondition(card: TriadCard): TriadSkillRule["elementCondition"] {
+  if (["001", "002", "003", "004", "005"].includes(card.cardNo) && card.element !== "unknown") {
+    return { mode: "include", elements: [card.element] };
+  }
+
   const text = card.skillText;
   const explicitElements = inferElementsFromText(text);
   const fallbackElements = card.element !== "unknown" ? [card.element] : [];
@@ -398,7 +402,9 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const shape: TriadSkillShape =
     card.cardNo === "284"
       ? "swap-control"
-      : card.cardNo === "236"
+      : card.cardNo === "227"
+        ? "stat"
+        : card.cardNo === "236"
         ? "skill-cancel"
         : card.cardNo === "244" || card.cardNo === "234"
           ? "block-stat-gain"
@@ -420,6 +426,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const needsReview =
     card.cardNo !== "236" &&
     card.cardNo !== "234" &&
+    card.cardNo !== "227" &&
     (shape === "unparsed" ||
       shape === "element-transform" ||
       /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText));
@@ -738,6 +745,108 @@ function applyPowerSeal(
   return events;
 }
 
+function applyGravityField(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  targetId: string | undefined,
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
+  blockers: StatGainBlocker[] = []
+) {
+  const ownTarget = side === "player" ? "player-top" : "bot-top";
+  const opponentTarget = side === "player" ? "bot-top" : "player-top";
+  const normalizedTarget = targetId === ownTarget || targetId === opponentTarget ? targetId : opponentTarget;
+  const targetScore = normalizedTarget === ownTarget ? ownScore : opponentScore;
+  const targetContribution = targetScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = normalizedTarget === ownTarget ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝั่งตรงข้าม";
+
+  if (!targetContribution) {
+    return {
+      event: {
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: "ไม่พบมอนสเตอร์เป้าหมาย สกิลไม่เกิดผลและกลับไปวัดค่าพลังปกติ",
+        targetLabel,
+        blocked: true,
+      } satisfies TriadSkillEvent,
+    };
+  }
+
+  const targetSide = normalizedTarget === ownTarget ? side : side === "player" ? "opponent" : "player";
+  const qualifyingMetrics: TriadMetric[] = [];
+  if (targetContribution.card.attack >= 7000) qualifyingMetrics.push("attack");
+  if (targetContribution.card.support >= 7000) qualifyingMetrics.push("support");
+
+  if (qualifyingMetrics.length === 0) {
+    return {
+      event: {
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} ไม่มี ATK หรือ SUP ตั้งแต่ 7,000 ขึ้นไป สกิลไม่เกิดผล`,
+        targetLabel,
+        blocked: true,
+      } satisfies TriadSkillEvent,
+    };
+  }
+
+  const applied: string[] = [];
+  const blocked: string[] = [];
+
+  for (const metric of qualifyingMetrics) {
+    const originalValue = targetContribution.card[metric];
+    const effect = { metric, delta: -originalValue };
+    const blocker = blockers.find((item) =>
+      item.targetSide === targetSide &&
+      statGainBlockerApplies(item, effect, { lane: "top" })
+    );
+    const label = metric === "attack" ? "ATK" : "SUP";
+    if (blocker) {
+      blocked.push(`${label} ถูกล็อคโดย No.${blocker.rule.cardNo}`);
+      continue;
+    }
+    if (targetScore.metric === metric) {
+      targetScore.total -= originalValue;
+      targetContribution.value = 0;
+      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} ${originalValue.toLocaleString()} -> 0`);
+    }
+    applied.push(`${label} ${originalValue.toLocaleString()} -> 0`);
+  }
+
+  if (applied.length === 0) {
+    return {
+      event: {
+        cardNo: rule.cardNo,
+        name: rule.name,
+        side,
+        type: rule.shape,
+        text: rule.text,
+        summary: `${targetLabel} เข้าเงื่อนไขแต่ค่าที่ลดถูกสกิลป้องกันไว้ (${blocked.join(", ")})`,
+        targetLabel,
+        blocked: true,
+      } satisfies TriadSkillEvent,
+    };
+  }
+
+  const extra = blocked.length > 0 ? ` ส่วนที่ถูกกันไว้: ${blocked.join(", ")}` : "";
+  return {
+    event: {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `เลือก ${targetLabel} No.${targetContribution.card.cardNo} ลดค่าที่เข้าเงื่อนไขเหลือ 0 จนจบตา (${applied.join(", ")})${extra}`,
+      targetLabel,
+    } satisfies TriadSkillEvent,
+  };
+}
+
 type StatUseBlocker = {
   sourceSide: "player" | "opponent";
   targetSide: "player" | "opponent";
@@ -853,6 +962,20 @@ function applySkill(
       text: rule.text,
       summary: "สกิลนี้ยังไม่ทำงานในตานี้",
     });
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "227") {
+    const result = applyGravityField(
+      rule,
+      side,
+      selectedTarget,
+      ownScore,
+      opponentScore,
+      blockers
+    );
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${result.event.summary}`);
+    events.push(result.event);
     return { unresolved, events };
   }
 

@@ -1146,6 +1146,10 @@ function monsterHasUnequalStats(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.attack !== card.support);
 }
 
+function monsterHasGravityFieldStat(card?: CardView) {
+  return Boolean(card?.kind === "monster" && (card.attack >= 7000 || card.support >= 7000));
+}
+
 function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): SkillTargetId[] {
   return value
     .split(">")
@@ -1183,6 +1187,12 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
     return [
       monsterHasUnequalStats(playerTop) ? "player-top" as const : null,
       monsterHasUnequalStats(botTop) ? "bot-top" as const : null,
+    ].filter((target): target is SkillTargetId => Boolean(target));
+  }
+  if (card?.cardNo === "227") {
+    return [
+      monsterHasGravityFieldStat(playerTop) ? "player-top" as const : null,
+      monsterHasGravityFieldStat(botTop) ? "bot-top" as const : null,
     ].filter((target): target is SkillTargetId => Boolean(target));
   }
   if (rule.target.startsWith("own")) return [ownTarget];
