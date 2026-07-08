@@ -97,11 +97,13 @@ function buildPointLogActivity(log: {
   point: number | null;
   amount: number | null;
   type: string | null;
+  note?: string | null;
   createdAt: Date;
 }): ActivityItem {
   const type = String(log.type || "").trim().toLowerCase();
   const amount = Number(log.amount || 0);
   const point = Number(log.point || 0);
+  const note = String(log.note || "").trim();
 
   if (type === "coupon_rollback_coin") {
     return {
@@ -123,14 +125,25 @@ function buildPointLogActivity(log: {
     };
   }
 
+  const isAdminCoin = type === "admin_coin";
+  const isAdminNex = type === "admin";
+
   return {
     id: `point-${log.id}`,
-    title: `ได้รับ ${formatNumber(point)} NEX`,
-    subtitle: `สแกนการ์ด ${String(log.type || "").toUpperCase()} จำนวน ${formatNumber(
-      amount
-    )} ใบ`,
+    title: isAdminCoin
+      ? `${amount >= 0 ? "ได้รับ" : "ถูกหัก"} ${formatNumber(Math.abs(amount))} COIN`
+      : isAdminNex
+        ? `${point >= 0 ? "ได้รับ" : "ถูกหัก"} ${formatNumber(Math.abs(point))} NEX`
+        : `ได้รับ ${formatNumber(point)} NEX`,
+    subtitle:
+      note ||
+      (isAdminCoin || isAdminNex
+        ? "ปรับยอดโดยแอดมิน"
+        : `สแกนการ์ด ${String(log.type || "").toUpperCase()} จำนวน ${formatNumber(
+            amount
+          )} ใบ`),
     createdAt: log.createdAt,
-    tone: "emerald",
+    tone: isAdminCoin ? "cyan" : "emerald",
   };
 }
 
@@ -170,6 +183,7 @@ export default async function WalletPage() {
     point: number | null;
     amount: number | null;
     type: string | null;
+    note: string | null;
     createdAt: Date;
   }> = [];
   let coupons: Array<{
@@ -204,19 +218,31 @@ export default async function WalletPage() {
 
     if (user) {
       await ensureCouponRollbackSchema();
+      await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT').catch(() => undefined);
+      await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "evidenceJson" TEXT').catch(() => undefined);
       await ensureCardSetRedemptionSchema();
       await ensureCardRareRedemptionSchema();
 
       [pointLogs, coupons, cardSetRedemptions, cardRareRedemptions] = await Promise.all([
-        prisma.pointLog.findMany({
-          where: {
-            lineId: user.lineId,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 12,
-        }),
+        prisma.$queryRawUnsafe<
+          Array<{
+            id: string;
+            point: number | null;
+            amount: number | null;
+            type: string | null;
+            note: string | null;
+            createdAt: Date;
+          }>
+        >(
+          `
+            SELECT "id", "point", "amount", "type", "note", "createdAt"
+            FROM "PointLog"
+            WHERE "lineId" = $1
+            ORDER BY "createdAt" DESC
+            LIMIT 12
+          `,
+          user.lineId
+        ),
         prisma.coupon.findMany({
           where: {
             userId: user.id,
@@ -734,7 +760,7 @@ export default async function WalletPage() {
                       <div className="truncate font-bold text-white">
                         {"title" in item ? item.title : item.label}
                       </div>
-                      <div className="mt-1 truncate text-sm text-white/42">{item.subtitle}</div>
+                      <div className="mt-1 line-clamp-2 text-sm leading-5 text-white/42">{item.subtitle}</div>
                     </div>
                     <div className="text-right text-sm font-black text-white/78">
                       {"createdAt" in item ? formatThaiTimeAgo(item.createdAt) : index === 0 ? "Live" : "Ready"}

@@ -4,6 +4,22 @@ import { requireAdminActor } from "@/lib/admin-auth";
 import { writeCriticalBackup } from "@/lib/critical-backup";
 import { createWalletReceivedNotification } from "@/lib/wallet-notification";
 
+type EvidenceImage = {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+};
+
+async function ensurePointLogEvidenceSchema() {
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT'
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "evidenceJson" TEXT'
+  );
+}
+
 function parseOptionalAmount(value: unknown, integerOnly = false) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -26,14 +42,30 @@ export async function POST(req: Request) {
     const { actor, error } = await requireAdminActor();
     if (error) return error;
 
-    const { lineId, nexAmount, coinAmount } = await req.json();
+    const { lineId, nexAmount, coinAmount, note, evidenceImages } = await req.json();
     const cleanLineId = String(lineId || "").trim();
     const nextNexAmount = parseOptionalAmount(nexAmount);
     const nextCoinAmount = parseOptionalAmount(coinAmount, true);
+    const cleanNote = String(note || "").trim().slice(0, 2000);
+    const safeEvidenceImages: EvidenceImage[] = Array.isArray(evidenceImages)
+      ? evidenceImages
+          .map((image) => ({
+            name: String(image?.name || "evidence").slice(0, 180),
+            type: String(image?.type || "image/*").slice(0, 80),
+            size: Math.max(0, Number(image?.size || 0)),
+            dataUrl: String(image?.dataUrl || ""),
+          }))
+          .filter((image) => image.dataUrl.startsWith("data:image/"))
+      : [];
+    const evidenceJson = safeEvidenceImages.length
+      ? JSON.stringify(safeEvidenceImages)
+      : null;
 
     if (!cleanLineId || (nextNexAmount === null && nextCoinAmount === null)) {
       return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
+
+    await ensurePointLogEvidenceSchema();
 
     const result = await prisma.$transaction(async (tx) => {
       const beforeUser = await tx.user.findUnique({
@@ -85,25 +117,32 @@ export async function POST(req: Request) {
       });
 
       if (nextNexAmount !== null) {
-        await tx.pointLog.create({
-          data: {
-            lineId: cleanLineId,
-            type: "admin",
-            amount: Math.trunc(nextNexAmount),
-            point: nextNexAmount,
-          },
-        });
+        await tx.$executeRawUnsafe(
+          `
+            INSERT INTO "PointLog" ("id", "lineId", "type", "amount", "point", "note", "evidenceJson", "createdAt")
+            VALUES ($1, $2, 'admin', $3, $4, $5, $6, CURRENT_TIMESTAMP)
+          `,
+          crypto.randomUUID(),
+          cleanLineId,
+          Math.trunc(nextNexAmount),
+          nextNexAmount,
+          cleanNote || null,
+          evidenceJson
+        );
       }
 
       if (nextCoinAmount !== null) {
-        await tx.pointLog.create({
-          data: {
-            lineId: cleanLineId,
-            type: "admin_coin",
-            amount: nextCoinAmount,
-            point: 0,
-          },
-        });
+        await tx.$executeRawUnsafe(
+          `
+            INSERT INTO "PointLog" ("id", "lineId", "type", "amount", "point", "note", "evidenceJson", "createdAt")
+            VALUES ($1, $2, 'admin_coin', $3, 0, $4, $5, CURRENT_TIMESTAMP)
+          `,
+          crypto.randomUUID(),
+          cleanLineId,
+          nextCoinAmount,
+          cleanNote || null,
+          evidenceJson
+        );
       }
 
       await writeCriticalBackup(tx, {
@@ -128,6 +167,8 @@ export async function POST(req: Request) {
         meta: {
           nexAmount: nextNexAmount,
           coinAmount: nextCoinAmount,
+          note: cleanNote || null,
+          evidenceImages: safeEvidenceImages,
           source: "admin-members-adjust-wallet",
         },
       });

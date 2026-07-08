@@ -14,6 +14,8 @@ type PointLogWithUserRow = {
   type: string;
   amount: number | null;
   point: number | null;
+  note: string | null;
+  evidenceJson: string | null;
   createdAt: Date;
   userId: string | null;
   name: string | null;
@@ -49,6 +51,12 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
   await prisma
     .$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "username" TEXT')
     .catch(() => undefined);
+  await prisma
+    .$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT')
+    .catch(() => undefined);
+  await prisma
+    .$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "evidenceJson" TEXT')
+    .catch(() => undefined);
   await ensureCriticalBackupSchema().catch(() => undefined);
 
   const [pointLogs, backupCoinLogs, localProfiles] = await Promise.all([
@@ -60,6 +68,8 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
           p."type",
           p."amount",
           p."point",
+          p."note",
+          p."evidenceJson",
           p."createdAt",
           u."id" AS "userId",
           u."name",
@@ -96,6 +106,11 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
                     ELSE 0
                   END AS "amount",
                   0::double precision AS "point",
+                  c."meta"->>'note' AS "note",
+                  CASE
+                    WHEN c."meta" ? 'evidenceImages' THEN (c."meta"->'evidenceImages')::text
+                    ELSE NULL
+                  END AS "evidenceJson",
                   c."createdAt",
                   u."id" AS "userId",
                   u."name",
@@ -152,6 +167,8 @@ export default async function PointLogsPage({ searchParams }: PageProps) {
       type: log.type,
       amount: Number(log.amount || 0),
       point: Number(log.point || 0),
+      note: log.note || null,
+      evidenceJson: log.evidenceJson || null,
       createdAt: log.createdAt.toISOString(),
     };
     });
