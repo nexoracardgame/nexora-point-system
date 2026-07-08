@@ -68,7 +68,11 @@ export async function GET(_req: Request, { params }: RouteProps) {
       );
     }
 
-    if (redemption.userId !== userId && !isStaffRole(role)) {
+    if (
+      redemption.userId !== userId &&
+      !isStaffRole(role) &&
+      !redemption.createdByAdminMode
+    ) {
       return NextResponse.json(
         { error: "You do not have permission to view this redemption" },
         { status: 403, headers: NO_STORE_HEADERS }

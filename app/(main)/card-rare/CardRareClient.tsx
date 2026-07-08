@@ -12,6 +12,7 @@ import {
   Layers3,
   Loader2,
   QrCode,
+  ScanLine,
   Search,
   ShieldCheck,
   Sparkles,
@@ -61,6 +62,7 @@ type Redemption = {
   items: RedemptionItem[];
   itemCount: number;
   totalQuantity: number;
+  createdByAdminMode?: boolean;
   status: "pending" | "approved" | "cancelled" | "expired";
   createdAt: string;
   expiresAt: string;
@@ -104,11 +106,14 @@ function formatRemaining(ms: number) {
 
 export default function CardRareClient({
   rewards,
+  canUseAdminMode = false,
 }: {
   rewards: CardRareItem[];
+  canUseAdminMode?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [multiMode, setMultiMode] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
   const [selected, setSelected] = useState<Record<string, SelectedCard>>({});
   const [confirmCard, setConfirmCard] = useState<CardRareItem | null>(null);
   const [selectedOptionKey, setSelectedOptionKey] = useState("standard");
@@ -270,7 +275,20 @@ export default function CardRareClient({
   function toggleMultiMode() {
     setMultiMode((current) => {
       const next = !current;
-      if (!next) setSelected({});
+      if (!next) {
+        setSelected({});
+        setAdminMode(false);
+      }
+      setError("");
+      return next;
+    });
+  }
+
+  function toggleAdminMode() {
+    if (!canUseAdminMode || isPending) return;
+    setAdminMode((current) => {
+      const next = !current;
+      if (next) setMultiMode(true);
       setError("");
       return next;
     });
@@ -328,6 +346,7 @@ export default function CardRareClient({
       () => {
         setSelected({});
         setMultiMode(false);
+        setAdminMode(false);
       }
     );
   }
@@ -343,7 +362,7 @@ export default function CardRareClient({
       const res = await fetch("/api/card-rare-redemptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, adminMode }),
       });
       const data = await res.json();
 
@@ -390,6 +409,21 @@ export default function CardRareClient({
                 <Layers3 className="h-4 w-4" />
                 เลือกหลายใบ
               </button>
+              {canUseAdminMode ? (
+                <button
+                  type="button"
+                  onClick={toggleAdminMode}
+                  disabled={Boolean(isPending)}
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    adminMode
+                      ? "bg-cyan-300 text-black shadow-[0_0_24px_rgba(34,211,238,0.26)]"
+                      : "border border-cyan-200/22 bg-cyan-200/10 text-cyan-100"
+                  }`}
+                >
+                  <ScanLine className="h-4 w-4" />
+                  โหมดแอดมิน
+                </button>
+              ) : null}
               <div className="rounded-full border border-violet-300/22 bg-violet-300/10 px-4 py-2 text-xs font-black text-violet-100">
                 {formatNumber(rewards.length)} CARD RARE
               </div>
@@ -763,7 +797,7 @@ export default function CardRareClient({
                 <>
                   <div className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-[10px] font-black uppercase text-white">
                     <QrCode className="h-3.5 w-3.5 text-violet-300" />
-                    Staff Scan Only
+                    {active.createdByAdminMode ? "Customer Scan" : "Staff Scan Only"}
                   </div>
                   <div className="mt-4 flex justify-center">
                     <div className="rounded-[24px] bg-white p-3 shadow-[0_16px_44px_rgba(0,0,0,0.14)] ring-1 ring-black/8">

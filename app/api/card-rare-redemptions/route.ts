@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createLocalNotification } from "@/lib/local-notification-store";
 import { prisma } from "@/lib/prisma";
+import { isStaffRole } from "@/lib/staff-auth";
 import { getCardRareRewardChoice } from "@/lib/card-rare-rewards";
 import {
   CARD_RARE_REDEMPTION_TTL_MS,
@@ -159,6 +160,18 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
+    const role = String(
+      (session?.user as { role?: string } | undefined)?.role || ""
+    ).trim();
+    const adminMode = Boolean(body?.adminMode);
+
+    if (adminMode && !isStaffRole(role)) {
+      return NextResponse.json(
+        { error: "เฉพาะเจ้าหน้าที่เท่านั้น" },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const requestedItems: CardRareRedemptionRequestItem[] = Array.isArray(
       body?.items
     )
@@ -229,9 +242,9 @@ export async function POST(req: Request) {
         INSERT INTO "CardRareRedemption" (
           "id", "code", "userId", "cardNo", "cardName",
           "rewardLabel", "optionKey", "conditionLabel", "nexValue", "imageUrl", "itemsJson",
-          "status", "createdAt", "expiresAt"
+          "createdByAdminMode", "adminCreatorId", "status", "createdAt", "expiresAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'pending', $14, $15)
       `,
       redemptionId,
       code,
@@ -244,6 +257,8 @@ export async function POST(req: Request) {
       totalNex,
       firstItem.imageUrl,
       JSON.stringify(items),
+      adminMode,
+      adminMode ? userId : null,
       now,
       expiresAt
     );
@@ -267,7 +282,7 @@ export async function POST(req: Request) {
       href: "/card-rare",
       image: firstItem.imageUrl,
       meta: {
-        source: "card-rare-redemption",
+        source: adminMode ? "card-rare-admin-mode-redemption" : "card-rare-redemption",
         code,
         cardNo: firstItem.cardNo,
         cardName: firstItem.cardName,

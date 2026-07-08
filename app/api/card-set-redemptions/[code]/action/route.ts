@@ -49,10 +49,10 @@ export async function POST(req: Request, { params }: RouteProps) {
       (session?.user as { role?: string } | undefined)?.role || ""
     ).trim();
 
-    if (!isStaffRole(role)) {
+    if (!actorUserId) {
       return NextResponse.json(
-        { error: "เฉพาะ staff หรือ admin เท่านั้น" },
-        { status: 403, headers: NO_STORE_HEADERS }
+        { error: "กรุณาเข้าสู่ระบบก่อน" },
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -74,15 +74,25 @@ export async function POST(req: Request, { params }: RouteProps) {
     const before = await findRedemption(safeCode);
     if (!before) {
       return NextResponse.json(
-        { error: "ไม่พบรายการแลกเซ็ตนี้" },
+        { error: "ไม่พบรายการแลก CARD SET นี้" },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const staffActor = isStaffRole(role);
+    const adminModeClaim = Boolean(before.createdByAdminMode);
+
+    if (!staffActor && !adminModeClaim) {
+      return NextResponse.json(
+        { error: "คุณไม่มีสิทในการใช้งานฟังชั่นนี้ เฉพาะเจ้าหน้าที่เท่านั้น" },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
     if (before.status !== "pending") {
       return NextResponse.json(
         {
-          error: "รายการนี้ไม่อยู่ในสถานะรออนุมัติแล้ว",
+          error: "รายการนี้ไม่ได้อยู่ในสถานะรออนุมัติแล้ว",
           redemption: serializeCardSetRedemption(before),
         },
         { status: 409, headers: NO_STORE_HEADERS }
@@ -107,7 +117,8 @@ export async function POST(req: Request, { params }: RouteProps) {
       const updated = await prisma.$executeRawUnsafe(
         `
           UPDATE "CardSetRedemption"
-          SET "status" = 'approved',
+          SET "userId" = CASE WHEN "createdByAdminMode" = true AND $4 = true THEN $2 ELSE "userId" END,
+              "status" = 'approved',
               "approvedAt" = $1,
               "approvedById" = $2
           WHERE "code" = $3
@@ -115,8 +126,9 @@ export async function POST(req: Request, { params }: RouteProps) {
             AND "expiresAt" > $1
         `,
         now,
-        actorUserId || null,
-        safeCode
+        actorUserId,
+        safeCode,
+        adminModeClaim
       );
 
       if (Number(updated) !== 1) {
@@ -129,17 +141,24 @@ export async function POST(req: Request, { params }: RouteProps) {
       await prisma.$executeRawUnsafe(
         `
           UPDATE "CardSetRedemptionLog"
-          SET "status" = 'approved',
+          SET "userId" = CASE WHEN $4 = true THEN $2 ELSE "userId" END,
+              "status" = 'approved',
               "approvedAt" = $1,
               "approvedById" = $2
           WHERE "redemptionId" = $3
             AND "status" = 'pending'
         `,
         now,
-        actorUserId || null,
-        before.id
+        actorUserId,
+        before.id,
+        adminModeClaim
       );
     } else {
+      const cancelReason = String(
+        body?.reason ||
+          (adminModeClaim ? "customer_cancelled" : "staff_cancelled")
+      ).slice(0, 240);
+
       await prisma.$executeRawUnsafe(
         `
           UPDATE "CardSetRedemption"
@@ -150,7 +169,7 @@ export async function POST(req: Request, { params }: RouteProps) {
             AND "status" = 'pending'
         `,
         now,
-        String(body?.reason || "staff_cancelled").slice(0, 240),
+        cancelReason,
         safeCode
       );
       await prisma.$executeRawUnsafe(
@@ -163,7 +182,7 @@ export async function POST(req: Request, { params }: RouteProps) {
             AND "status" = 'pending'
         `,
         now,
-        String(body?.reason || "staff_cancelled").slice(0, 240),
+        cancelReason,
         before.id
       );
     }
@@ -180,12 +199,14 @@ export async function POST(req: Request, { params }: RouteProps) {
             : "รายการแลก CARD SET ถูกยกเลิก",
         body:
           action === "approve"
-            ? `เซ็ต ${redemption.setOrder} ${redemption.setName} ได้รับการอนุมัติแล้ว`
-            : `เซ็ต ${redemption.setOrder} ${redemption.setName} ถูกยกเลิกโดยพนักงาน`,
+            ? `Set ${redemption.setOrder} ${redemption.setName} ได้รับการยืนยันแล้ว`
+            : `Set ${redemption.setOrder} ${redemption.setName} ถูกยกเลิก`,
         href: "/card-set",
         image: "/avatar.png",
         meta: {
-          source: "card-set-redemption",
+          source: redemption.createdByAdminMode
+            ? "card-set-admin-mode-redemption"
+            : "card-set-redemption",
           action,
           code: safeCode,
           setId: redemption.setId,
@@ -203,7 +224,7 @@ export async function POST(req: Request, { params }: RouteProps) {
   } catch (error) {
     console.error("CARD_SET_ACTION_ERROR", error);
     return NextResponse.json(
-      { error: "อัปเดตรายการแลกเซ็ตไม่สำเร็จ" },
+      { error: "อัปเดตรายการแลก CARD SET ไม่สำเร็จ" },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

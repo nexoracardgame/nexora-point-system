@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createLocalNotification } from "@/lib/local-notification-store";
 import { prisma } from "@/lib/prisma";
+import { isStaffRole } from "@/lib/staff-auth";
 import {
   CARD_SET_REDEMPTION_TTL_MS,
   buildCardSetCode,
@@ -191,6 +192,18 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
+    const role = String(
+      (session?.user as { role?: string } | undefined)?.role || ""
+    ).trim();
+    const adminMode = Boolean(body?.adminMode);
+
+    if (adminMode && !isStaffRole(role)) {
+      return NextResponse.json(
+        { error: "เฉพาะเจ้าหน้าที่เท่านั้น" },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const requestedItems: CardSetRedemptionRequestItem[] = Array.isArray(
       body?.items
     )
@@ -248,9 +261,9 @@ export async function POST(req: Request) {
         INSERT INTO "CardSetRedemption" (
           "id", "code", "userId", "setId", "setOrder", "setName",
           "rewardLabel", "redemptionType", "conditionLabel", "nexValue", "itemsJson",
-          "status", "createdAt", "expiresAt"
+          "createdByAdminMode", "adminCreatorId", "status", "createdAt", "expiresAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'pending', $14, $15)
       `,
       redemptionId,
       code,
@@ -263,6 +276,8 @@ export async function POST(req: Request) {
       firstItem.conditionLabel,
       totalNex,
       JSON.stringify(items),
+      adminMode,
+      adminMode ? userId : null,
       now,
       expiresAt
     );
@@ -286,7 +301,7 @@ export async function POST(req: Request) {
       href: "/card-set",
       image: "/avatar.png",
       meta: {
-        source: "card-set-redemption",
+        source: adminMode ? "card-set-admin-mode-redemption" : "card-set-redemption",
         code,
         setId: firstItem.setId,
         setName: firstItem.setName,

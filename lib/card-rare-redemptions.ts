@@ -26,6 +26,8 @@ export type CardRareRedemptionRecord = {
   nexValue: number;
   imageUrl: string | null;
   itemsJson: string | null;
+  createdByAdminMode: boolean | null;
+  adminCreatorId: string | null;
   status: CardRareRedemptionStatus;
   createdAt: Date;
   expiresAt: Date;
@@ -65,6 +67,8 @@ export async function ensureCardRareRedemptionSchema() {
       "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
       "imageUrl" TEXT,
       "itemsJson" TEXT,
+      "createdByAdminMode" BOOLEAN NOT NULL DEFAULT false,
+      "adminCreatorId" TEXT,
       "status" TEXT NOT NULL DEFAULT 'pending',
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "expiresAt" TIMESTAMP(3) NOT NULL,
@@ -92,6 +96,12 @@ export async function ensureCardRareRedemptionSchema() {
   );
   await prisma.$executeRawUnsafe(
     'ALTER TABLE "CardRareRedemption" ADD COLUMN IF NOT EXISTS "itemsJson" TEXT'
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardRareRedemption" ADD COLUMN IF NOT EXISTS "createdByAdminMode" BOOLEAN NOT NULL DEFAULT false'
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardRareRedemption" ADD COLUMN IF NOT EXISTS "adminCreatorId" TEXT'
   );
 
   await prisma.$executeRawUnsafe(`
@@ -256,6 +266,8 @@ export function serializeCardRareRedemption(row: CardRareRedemptionRecord) {
     items,
     itemCount: items.length,
     totalQuantity,
+    createdByAdminMode: Boolean(row.createdByAdminMode),
+    adminCreatorId: row.adminCreatorId,
     status,
     createdAt: row.createdAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),

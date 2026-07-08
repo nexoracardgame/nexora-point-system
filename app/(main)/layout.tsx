@@ -47,6 +47,7 @@ import {
   ShieldCheck,
   Swords,
   Landmark,
+  ScanLine,
 } from "lucide-react";
 import { isAdminRole } from "@/lib/staff-auth";
 
@@ -1210,6 +1211,7 @@ export default function MainLayout({
       "/market/deals",
       "/rewards",
       "/redeem",
+      "/reward-scan",
       "/collections",
       "/community",
       "/live",
@@ -1405,6 +1407,12 @@ export default function MainLayout({
         active: pathname.startsWith("/redeem"),
       },
       {
+        href: "/reward-scan",
+        label: "สแกนรางวัล",
+        icon: ScanLine,
+        active: pathname.startsWith("/reward-scan"),
+      },
+      {
         href: "/collections",
         label: t("layout.nav.collections"),
         icon: FolderKanban,
@@ -1458,6 +1466,12 @@ export default function MainLayout({
         label: "Battle",
         icon: Swords,
         active: pathname.startsWith("/battle"),
+      },
+      {
+        href: "/reward-scan",
+        label: "สแกน",
+        icon: ScanLine,
+        active: pathname.startsWith("/reward-scan"),
       },
       {
         href: "/dm",
@@ -1964,7 +1978,7 @@ export default function MainLayout({
       {!hideMobileBottomNav && (
         <nav className="fixed inset-x-0 bottom-0 z-[1100] min-h-[var(--app-mobile-nav-height)] overflow-hidden rounded-t-[22px] border-x-0 border-b-0 border-t border-white/10 bg-[#030406]/96 px-1.5 pb-[calc(var(--app-safe-bottom)+7px)] pt-1.5 shadow-[0_-18px_52px_rgba(0,0,0,0.72)] backdrop-blur-3xl xl:hidden">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.01)_34%,rgba(0,0,0,0)_100%)]" />
-          <div className="relative mx-auto grid w-full max-w-[760px] grid-cols-7 gap-0.5 sm:gap-1.5">
+          <div className="relative mx-auto grid w-full max-w-[760px] grid-cols-8 gap-0.5 sm:gap-1.5">
             {mobileBottomItems.map((item) => {
               const Icon = item.icon;
 

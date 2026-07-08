@@ -22,6 +22,7 @@ const COUPON_CODE_PATTERN = /NXR-(NEX|COIN)-\d+-\d{10,}-[A-Z0-9]{4,16}/i;
 
 type StaffCouponScannerProps = {
   embedded?: boolean;
+  mode?: "staff" | "customer-admin-redemption";
 };
 
 type LookupOptions = {
@@ -190,7 +191,9 @@ function showRedeemSuccess(label: string) {
 
 export default function StaffCouponScanner({
   embedded = false,
+  mode = "staff",
 }: StaffCouponScannerProps = {}) {
+  const customerAdminMode = mode === "customer-admin-redemption";
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -206,6 +209,7 @@ export default function StaffCouponScanner({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [cameraAvailable, setCameraAvailable] = useState(false);
+  const [forbiddenOpen, setForbiddenOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -227,6 +231,15 @@ export default function StaffCouponScanner({
     if (message) return "success";
     return "idle";
   }, [error, message]);
+
+  const showForbiddenAccess = useCallback(() => {
+    setForbiddenOpen(true);
+    setError("");
+    setMessage("");
+    setResult(null);
+    setCardSetResult(null);
+    setCardRareResult(null);
+  }, []);
 
   const stopCamera = useCallback(async () => {
     if (scanFrameRef.current != null) {
@@ -254,6 +267,11 @@ export default function StaffCouponScanner({
 
   const confirmCouponUse = useCallback(
     async (targetCode?: string) => {
+      if (customerAdminMode) {
+        showForbiddenAccess();
+        return;
+      }
+
       const nextCode = normalizeCouponInput(targetCode || result?.code || code);
       if (!nextCode) return;
 
@@ -294,7 +312,7 @@ export default function StaffCouponScanner({
         setLoading(false);
       }
     },
-    [code, result?.code],
+    [code, customerAdminMode, result?.code, showForbiddenAccess],
   );
 
   const confirmCardSetAction = useCallback(
@@ -436,6 +454,10 @@ export default function StaffCouponScanner({
           const data = await res.json();
 
           if (!res.ok) {
+            if (customerAdminMode && res.status === 403) {
+              showForbiddenAccess();
+              return;
+            }
             setError(getLookupError(res.status));
             setResult(null);
             setCardSetResult(null);
@@ -444,6 +466,10 @@ export default function StaffCouponScanner({
           }
 
           setCode(cardRareCode);
+          if (customerAdminMode && !data?.redemption?.createdByAdminMode) {
+            showForbiddenAccess();
+            return;
+          }
           setResult(null);
           setCardSetResult(null);
           setCardRareResult(data?.redemption || null);
@@ -462,6 +488,10 @@ export default function StaffCouponScanner({
           const data = await res.json();
 
           if (!res.ok) {
+            if (customerAdminMode && res.status === 403) {
+              showForbiddenAccess();
+              return;
+            }
             setError(getLookupError(res.status));
             setResult(null);
             setCardSetResult(null);
@@ -469,12 +499,21 @@ export default function StaffCouponScanner({
           }
 
           setCode(cardSetCode);
+          if (customerAdminMode && !data?.redemption?.createdByAdminMode) {
+            showForbiddenAccess();
+            return;
+          }
           setResult(null);
           setCardRareResult(null);
           setCardSetResult(data?.redemption || null);
           if (options.promptUse) {
             setMessage("สแกน QR CODE CARD SET สำเร็จ");
           }
+          return;
+        }
+
+        if (customerAdminMode) {
+          showForbiddenAccess();
           return;
         }
 
@@ -528,7 +567,7 @@ export default function StaffCouponScanner({
         setLookupLoading(false);
       }
     },
-    [code, confirmCouponUse],
+    [code, confirmCouponUse, customerAdminMode, showForbiddenAccess],
   );
 
   const scanFrame = useCallback(() => {
@@ -684,7 +723,7 @@ export default function StaffCouponScanner({
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-amber-200 sm:text-xs">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                STAFF COUPON SCAN
+                {customerAdminMode ? "CUSTOMER REWARD SCAN" : "STAFF COUPON SCAN"}
               </div>
 
               <h1 className="mt-4 text-3xl font-black sm:text-4xl xl:text-5xl">
@@ -1264,6 +1303,29 @@ export default function StaffCouponScanner({
           </div>
         </section>
       </div>
+
+      {forbiddenOpen ? (
+        <div className="fixed inset-0 z-[6000] grid place-items-center bg-black/82 px-4 backdrop-blur-xl">
+          <div className="w-full max-w-sm rounded-[32px] border border-red-300/30 bg-[radial-gradient(circle_at_top,#5b0b12,#160408_58%,#070305_100%)] p-6 text-center text-white shadow-[0_32px_120px_rgba(239,68,68,0.38)]">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-red-200/30 bg-red-500/20 text-red-100 shadow-[0_0_48px_rgba(239,68,68,0.5)]">
+              <XCircle className="h-9 w-9" />
+            </div>
+            <h2 className="mt-5 text-2xl font-black text-red-100">
+              คุณไม่มีสิทในการใช้งานฟังชั่นนี้
+            </h2>
+            <p className="mt-3 text-sm font-bold leading-6 text-red-100/76">
+              เฉพาะเจ้าหน้าที่เท่านั้น หรือสแกนได้เฉพาะ QR ที่แอดมินสร้างจากโหมดแอดมินให้ลูกค้าใช้งาน
+            </p>
+            <button
+              type="button"
+              onClick={() => setForbiddenOpen(false)}
+              className="mt-6 inline-flex min-h-[52px] w-full items-center justify-center rounded-[20px] bg-red-100 px-5 text-sm font-black text-red-950 shadow-[0_0_28px_rgba(254,202,202,0.22)]"
+            >
+              รับทราบ
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

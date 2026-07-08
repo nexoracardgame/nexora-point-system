@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { cardRareRewards } from "@/lib/card-rare-rewards";
+import { isStaffRole } from "@/lib/staff-auth";
 import CardRareClient from "./CardRareClient";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,10 @@ export default async function CardRarePage() {
   if (!userId) {
     redirect("/login");
   }
+
+  const role = String(
+    (session?.user as { role?: string } | undefined)?.role || ""
+  );
 
   const rewards = cardRareRewards
     .slice()
@@ -32,5 +37,10 @@ export default async function CardRarePage() {
       priorityImage: index < 10,
     }));
 
-  return <CardRareClient rewards={rewards} />;
+  return (
+    <CardRareClient
+      rewards={rewards}
+      canUseAdminMode={isStaffRole(role)}
+    />
+  );
 }

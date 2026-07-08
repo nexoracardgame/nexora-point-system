@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { isStaffRole } from "@/lib/staff-auth";
 import {
   getCardSetBonusOptions,
   getCardSetRedemptionChoice,
@@ -25,6 +26,10 @@ export default async function CardSetPage() {
   if (!userId) {
     redirect("/login");
   }
+
+  const role = String(
+    (session?.user as { role?: string } | undefined)?.role || ""
+  );
 
   const sets = nexoraCollectionSets
     .slice()
@@ -52,5 +57,10 @@ export default async function CardSetPage() {
       };
     });
 
-  return <CardSetClient sets={sets} />;
+  return (
+    <CardSetClient
+      sets={sets}
+      canUseAdminMode={isStaffRole(role)}
+    />
+  );
 }

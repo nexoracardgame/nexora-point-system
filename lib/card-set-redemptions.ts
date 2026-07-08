@@ -44,6 +44,8 @@ export type CardSetRedemptionRecord = {
   conditionLabel: string | null;
   nexValue: number;
   itemsJson: string | null;
+  createdByAdminMode: boolean | null;
+  adminCreatorId: string | null;
   status: CardSetRedemptionStatus;
   createdAt: Date;
   expiresAt: Date;
@@ -188,6 +190,8 @@ export async function ensureCardSetRedemptionSchema() {
       "conditionLabel" TEXT,
       "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
       "itemsJson" TEXT,
+      "createdByAdminMode" BOOLEAN NOT NULL DEFAULT false,
+      "adminCreatorId" TEXT,
       "status" TEXT NOT NULL DEFAULT 'pending',
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "expiresAt" TIMESTAMP(3) NOT NULL,
@@ -212,6 +216,12 @@ export async function ensureCardSetRedemptionSchema() {
   );
   await prisma.$executeRawUnsafe(
     'ALTER TABLE "CardSetRedemption" ADD COLUMN IF NOT EXISTS "itemsJson" TEXT'
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardSetRedemption" ADD COLUMN IF NOT EXISTS "createdByAdminMode" BOOLEAN NOT NULL DEFAULT false'
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardSetRedemption" ADD COLUMN IF NOT EXISTS "adminCreatorId" TEXT'
   );
 
   await prisma.$executeRawUnsafe(`
@@ -379,6 +389,8 @@ export function serializeCardSetRedemption(row: CardSetRedemptionRecord) {
     items,
     itemCount: items.length,
     totalQuantity,
+    createdByAdminMode: Boolean(row.createdByAdminMode),
+    adminCreatorId: row.adminCreatorId,
     status,
     createdAt: row.createdAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
