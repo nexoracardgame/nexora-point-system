@@ -11,3 +11,4 @@ node_modules/
 .venv-ai/
 .venv-ai/
 .vercel
+apps-script/commission-system/*.xlsx

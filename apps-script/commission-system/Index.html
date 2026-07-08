@@ -1,0 +1,3836 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NECSHORA 63 CO., LTD. Commission</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f5fb;
+        --panel: rgba(255, 255, 255, 0.96);
+        --panel-2: #eef2fa;
+        --line: rgba(9, 9, 11, 0.08);
+        --text: #09090b;
+        --muted: rgba(9, 9, 11, 0.48);
+        --gold: #f5b623;
+        --gold-2: #ffe486;
+        --gold-3: #c98a17;
+        --cyan: #111827;
+        --green: #43e58f;
+        --red: #ff5f70;
+        --shadow: 0 24px 70px rgba(20, 20, 30, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 20% 8%, rgba(255, 255, 255, 0.96), transparent 24rem),
+          radial-gradient(circle at 82% 0%, rgba(255, 228, 134, 0.24), transparent 22rem),
+          linear-gradient(180deg, #f8f9fd 0%, #eef1f8 48%, #e7ebf4 100%);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(9, 9, 11, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(9, 9, 11, 0.026) 1px, transparent 1px);
+        background-size: 52px 52px;
+        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 82%);
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        min-height: 42px;
+        border: 0;
+        border-radius: 8px;
+        background: #09090b;
+        color: #ffffff;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 18px 36px rgba(20, 20, 30, 0.16);
+      }
+
+      button.secondary {
+        background: #ffffff;
+        color: #09090b;
+        border: 1px solid var(--line);
+        box-shadow: 0 12px 28px rgba(20, 20, 30, 0.08);
+      }
+
+      button.detail-close {
+        min-height: 34px;
+        padding: 0 12px;
+        box-shadow: none;
+      }
+
+      button.danger {
+        background: linear-gradient(180deg, #ef4444, #b91c1c);
+        color: #ffffff;
+        border: 1px solid rgba(127, 29, 29, 0.28);
+        box-shadow: 0 16px 34px rgba(185, 28, 28, 0.24);
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.58;
+      }
+
+      input,
+      select {
+        width: 100%;
+        min-height: 42px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        color: var(--text);
+        padding: 0 12px;
+        outline: none;
+      }
+
+      select option {
+        background: #ffffff;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .shell {
+        width: min(1180px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: #09090b;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow: 0 16px 40px rgba(15, 15, 20, 0.18);
+        color: var(--gold-2);
+        font-weight: 900;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(24px, 4vw, 38px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      h3 {
+        font-size: 16px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        padding: 6px;
+        border: 1px solid rgba(9, 9, 11, 0.08);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 14px 34px rgba(20, 20, 30, 0.08);
+      }
+
+      .tabs button {
+        min-height: 36px;
+        padding: 0 14px;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .tabs button.active {
+        background: #09090b;
+        color: #ffffff;
+      }
+
+      .tabs button.report-tab.active,
+      .tabs button.report-tab:hover {
+        color: var(--gold-2);
+      }
+
+      .panel {
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 245, 251, 0.96)),
+          var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .hero-main,
+      .hero-side,
+      .section {
+        padding: 22px;
+      }
+
+      .hero-main {
+        background:
+          radial-gradient(circle at 20% 0%, rgba(255, 228, 134, 0.18), transparent 18rem),
+          #09090b;
+        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .hero-main .muted,
+      .hero-main label {
+        color: rgba(255, 255, 255, 0.58);
+      }
+
+      .hero-main input,
+      .hero-main select {
+        background: rgba(255, 255, 255, 0.96);
+        color: #09090b;
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+
+      .hero-main button {
+        background: #ffffff;
+        color: #09090b;
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+      }
+
+      .hero-main .pill {
+        background: #ffffff;
+        color: #09090b;
+      }
+
+      .hero-main .notice {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.68);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .hero-side {
+        position: relative;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .hero-side > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero-side::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(135deg, rgba(5, 6, 10, 0.32), rgba(5, 6, 10, 0.88)),
+          var(--member-bg, none);
+        background-size: cover;
+        background-position: center;
+        opacity: 0;
+        transform: scale(1.04);
+        transition: opacity 260ms ease, transform 520ms ease;
+      }
+
+      .hero-side.has-member-bg::before {
+        opacity: 0.42;
+        transform: scale(1);
+      }
+
+      .hero-main {
+        display: grid;
+        gap: 20px;
+      }
+
+      .report-board {
+        display: grid;
+        gap: 18px;
+      }
+
+      .report-hero {
+        padding: 24px;
+        background:
+          radial-gradient(circle at 100% 0%, rgba(255, 228, 134, 0.22), transparent 22rem),
+          linear-gradient(180deg, #111113, #050506);
+        color: #ffffff;
+      }
+
+      .report-hero .muted {
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      .report-inventory-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .report-inventory-stats .stat {
+        min-height: 112px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+          #050506;
+        border: 1px solid rgba(245, 182, 35, 0.16);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 38px rgba(0, 0, 0, 0.18);
+      }
+
+      .report-inventory-stats .stat strong {
+        color: var(--gold-2);
+      }
+
+      .report-stock-detail {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .report-stock-card {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(245, 182, 35, 0.16);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)),
+          rgba(255, 255, 255, 0.02);
+      }
+
+      .report-stock-card h3 {
+        color: #ffffff;
+        font-size: 15px;
+      }
+
+      .report-stock-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .report-stock-metric {
+        display: grid;
+        gap: 4px;
+        min-height: 62px;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .report-stock-metric span {
+        color: rgba(255, 255, 255, 0.52);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .report-stock-metric strong {
+        color: var(--gold-2);
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      .report-stock-lots {
+        display: grid;
+        gap: 6px;
+      }
+
+      .report-stock-lot {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 38px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .report-stock-lot strong {
+        color: #ffffff;
+        font-size: 13px;
+      }
+
+      .branch-picker {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .branch-choice {
+        min-height: 92px;
+        padding: 18px;
+        text-align: left;
+        background: #09090b;
+        color: var(--gold-2);
+        border: 1px solid rgba(245, 182, 35, 0.36);
+      }
+
+      .branch-choice.is-dim {
+        opacity: 0.32;
+      }
+
+      .branch-choice.is-selected {
+        transform: translateY(-2px);
+        box-shadow: 0 24px 50px rgba(9, 9, 11, 0.22), 0 0 0 2px rgba(245, 182, 35, 0.24);
+      }
+
+      .report-table th,
+      .report-table td {
+        white-space: nowrap;
+        vertical-align: middle;
+      }
+
+      .report-table {
+        width: 100%;
+        min-width: 920px;
+        table-layout: fixed;
+      }
+
+      .report-table th {
+        padding: 12px 10px;
+        font-size: 12px;
+        line-height: 1;
+        text-transform: uppercase;
+        text-align: center !important;
+        letter-spacing: 0;
+      }
+
+      .report-table td {
+        padding: 10px;
+        text-align: center;
+      }
+
+      .report-index-col {
+        width: 56px;
+      }
+
+      .report-sale-col {
+        width: 76px;
+      }
+
+      .report-code-col {
+        width: 112px;
+      }
+
+      .report-box-col {
+        width: 116px;
+      }
+
+      .report-money-col {
+        width: 104px;
+      }
+
+      .report-note-col {
+        width: 140px;
+      }
+
+      .report-code,
+      .report-sale,
+      .row-sale,
+      .row-commission {
+        white-space: nowrap;
+      }
+
+      .report-index,
+      .report-sale,
+      .report-code,
+      .row-sale,
+      .row-commission,
+      .report-box-cell,
+      .report-note-cell {
+        text-align: center;
+      }
+
+      .report-table input {
+        width: 100%;
+        max-width: 92px;
+        min-height: 38px;
+        margin: 0 auto;
+        padding: 0 8px;
+        text-align: center;
+        font-weight: 900;
+      }
+
+      .report-note {
+        max-width: 126px !important;
+      }
+
+      .report-total-row td {
+        background: rgba(255, 228, 134, 0.22);
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .report-total-label {
+        text-align: left !important;
+        padding-left: 14px !important;
+      }
+
+      .report-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .report-actions button {
+        color: var(--gold-2);
+        border: 1px solid rgba(245, 182, 35, 0.34);
+      }
+
+      .report-actions button.secondary {
+        color: #09090b;
+        background: #ffffff;
+      }
+
+      .report-actions button.report-waiting,
+      .report-actions button.report-waiting:disabled {
+        opacity: 1;
+        cursor: not-allowed;
+        color: #ffffff;
+        background: #16a34a;
+        border-color: rgba(22, 163, 74, 0.34);
+        box-shadow: 0 18px 34px rgba(22, 163, 74, 0.18);
+      }
+
+      .report-months {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .report-months button {
+        min-height: 36px;
+        padding: 0 12px;
+        color: var(--gold-2);
+        border: 1px solid rgba(245, 182, 35, 0.28);
+        box-shadow: none;
+      }
+
+      .report-months button.submitted {
+        background: #ffffff;
+        color: #09090b;
+      }
+
+      .report-months button.active {
+        background: var(--gold);
+        color: #09090b;
+      }
+
+      .report-table input:disabled {
+        cursor: default;
+        opacity: 1;
+        background: #eef2fa;
+        color: #09090b;
+      }
+
+      .admin-report-alert {
+        display: grid;
+        gap: 8px;
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 95, 112, 0.42);
+        background: rgba(255, 95, 112, 0.12);
+        color: #7f1d1d;
+        cursor: pointer;
+      }
+
+      .admin-report-alert.live-pop {
+        animation: reportPulse 1.05s ease both;
+      }
+
+      .admin-report-alert strong {
+        color: #09090b;
+      }
+
+      @keyframes reportPulse {
+        0% {
+          transform: translateY(-6px) scale(0.985);
+          box-shadow: 0 0 0 rgba(255, 95, 112, 0);
+        }
+        42% {
+          transform: translateY(0) scale(1.012);
+          box-shadow: 0 18px 44px rgba(255, 95, 112, 0.24);
+        }
+        100% {
+          transform: translateY(0) scale(1);
+          box-shadow: 0 0 0 rgba(255, 95, 112, 0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .admin-report-alert.live-pop {
+          animation: none;
+        }
+      }
+
+      .stock-over-modal {
+        border: 1px solid rgba(255, 95, 112, 0.38);
+        box-shadow: 0 28px 86px rgba(127, 29, 29, 0.22);
+      }
+
+      .stock-over-modal .pill {
+        background: rgba(255, 95, 112, 0.14);
+        color: #be123c;
+      }
+
+      .stock-over-message {
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 95, 112, 0.22);
+        background: rgba(255, 95, 112, 0.08);
+        color: #991b1b;
+        font-weight: 900;
+        line-height: 1.55;
+      }
+
+      .lookup-grid,
+      .admin-grid,
+      .mapping-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .lookup-grid {
+        grid-template-columns: 1fr 180px 120px;
+        align-items: end;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 10px;
+      }
+
+      .profile-grid,
+      .product-grid,
+      .branch-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .profile-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
+      .product-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
+      .branch-grid {
+        grid-template-columns: repeat(5, minmax(160px, 1fr));
+      }
+
+      .stat {
+        min-height: 96px;
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #09090b;
+        color: #ffffff;
+        min-width: 0;
+      }
+
+      .mini-card,
+      .branch-card {
+        min-height: 74px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #eef2fa;
+        min-width: 0;
+      }
+
+      .branch-card {
+        text-align: left;
+        color: #ffffff;
+        background: #09090b;
+        box-shadow: 0 20px 50px rgba(15, 15, 20, 0.18);
+      }
+
+      .mini-card strong,
+      .branch-card strong {
+        display: block;
+        margin-top: 6px;
+        color: currentColor;
+        font-size: 18px;
+        line-height: 1.34;
+        overflow-wrap: anywhere;
+      }
+
+      .branch-card .branch-total {
+        color: var(--gold);
+        font-size: 20px;
+      }
+
+      .stat .muted,
+      .branch-card .muted {
+        color: rgba(255, 255, 255, 0.48);
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 10px;
+        font-size: clamp(26px, 3.1vw, 34px);
+        line-height: 1.08;
+        color: var(--gold-2);
+        overflow-wrap: anywhere;
+      }
+
+      .table-wrap {
+        width: 100%;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .sales-detail-wrap {
+        overflow: visible;
+      }
+
+      .upload-history-wrap {
+        overflow: visible;
+      }
+
+      table {
+        width: 100%;
+        min-width: 780px;
+        border-collapse: collapse;
+      }
+
+      .upload-history-table {
+        min-width: 0;
+        table-layout: fixed;
+      }
+
+      .sales-detail-table {
+        min-width: 0;
+        table-layout: fixed;
+      }
+
+      th,
+      td {
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .sales-detail-table th,
+      .sales-detail-table td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        vertical-align: top;
+      }
+
+      .upload-history-table th,
+      .upload-history-table td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        vertical-align: middle;
+      }
+
+      .upload-history-table th:nth-child(1) {
+        width: 18%;
+      }
+
+      .upload-history-table th:nth-child(2) {
+        width: 29%;
+      }
+
+      .upload-history-table th:nth-child(3) {
+        width: 9%;
+      }
+
+      .upload-history-table th:nth-child(4),
+      .upload-history-table th:nth-child(5) {
+        width: 16%;
+      }
+
+      .upload-history-table th:nth-child(6) {
+        width: 12%;
+      }
+
+      button.delete-upload {
+        min-height: 34px;
+        width: 100%;
+        padding: 0 10px;
+        background: #e11d48;
+        color: #ffffff;
+        box-shadow: 0 12px 24px rgba(225, 29, 72, 0.22);
+      }
+
+      .inventory-action {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+
+      button.inventory-open,
+      button.stock-open {
+        min-height: 44px;
+        padding: 0 18px;
+        background: #09090b;
+        color: var(--gold-2);
+        border: 1px solid rgba(245, 182, 35, 0.42);
+        box-shadow: 0 18px 38px rgba(9, 9, 11, 0.18);
+      }
+
+      .inventory-modal {
+        width: min(920px, 100%);
+        max-height: min(86vh, 760px);
+        overflow: auto;
+        padding: 24px;
+        border-radius: 8px;
+        background:
+          radial-gradient(circle at 100% 0%, rgba(255, 228, 134, 0.18), transparent 18rem),
+          linear-gradient(180deg, #ffffff 0%, #f4f6fb 100%);
+        color: #09090b;
+        box-shadow: 0 36px 110px rgba(0, 0, 0, 0.34);
+      }
+
+      #inventoryModal {
+        place-items: center;
+        overflow: auto;
+      }
+
+      #inventoryModal .inventory-modal {
+        width: min(1180px, 100%);
+        max-height: none;
+        overflow: visible;
+      }
+
+      .inventory-modal-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: flex-start;
+        padding-bottom: 4px;
+      }
+
+      .inventory-modal-header h2 {
+        margin-bottom: 4px;
+      }
+
+      .inventory-close {
+        min-width: 74px;
+        min-height: 44px;
+      }
+
+      .inventory-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .inventory-table {
+        min-width: 0;
+        table-layout: fixed;
+      }
+
+      .inventory-table th,
+      .inventory-table td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .manual-clear-input {
+        width: 100%;
+        min-height: 42px;
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      .inventory-cycle-picker {
+        max-width: 280px;
+        color: var(--muted);
+        font-weight: 900;
+      }
+
+      .branch-month-picker {
+        max-width: 320px;
+        color: var(--muted);
+        font-weight: 900;
+      }
+
+      .inventory-cycle-picker select {
+        min-height: 46px;
+        font-weight: 900;
+        background: #ffffff;
+      }
+
+      .branch-month-picker select {
+        min-height: 46px;
+        font-weight: 900;
+        background: #ffffff;
+      }
+
+      .manual-clear-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      button.manual-clear,
+      button.modal-stock-open {
+        min-height: 42px;
+        padding: 0 18px;
+        background: #09090b;
+        color: var(--gold-2);
+        border: 1px solid rgba(245, 182, 35, 0.42);
+        box-shadow: 0 14px 30px rgba(9, 9, 11, 0.16);
+      }
+
+      button.cancel-lot {
+        min-height: 34px;
+        width: 100%;
+        padding: 0 10px;
+        background: rgba(225, 29, 72, 0.12);
+        color: #be123c;
+        border: 1px solid rgba(225, 29, 72, 0.28);
+        box-shadow: none;
+      }
+
+      .stock-credit-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .stock-credit-row {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+        min-height: 260px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 243, 250, 0.96));
+        box-shadow: 0 16px 38px rgba(20, 20, 30, 0.08);
+      }
+
+      .stock-credit-title {
+        display: grid;
+        gap: 8px;
+        min-height: 72px;
+      }
+
+      .stock-credit-title span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .stock-credit-title strong {
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .stock-credit-row label {
+        gap: 7px;
+      }
+
+      .stock-credit-row input {
+        min-height: 52px;
+        font-size: 18px;
+        font-weight: 900;
+        background: #ffffff;
+      }
+
+      .stock-date-label {
+        min-height: 20px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .sales-detail-table th:nth-child(1) {
+        width: 19%;
+      }
+
+      .sales-detail-table th:nth-child(2) {
+        width: 13%;
+      }
+
+      .sales-detail-table th:nth-child(3),
+      .sales-detail-table th:nth-child(4) {
+        width: 18%;
+      }
+
+      .sales-detail-table th:nth-child(5),
+      .sales-detail-table th:nth-child(6),
+      .sales-detail-table th:nth-child(7) {
+        width: 10%;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        background: #f0f3fa;
+      }
+
+      .click-row {
+        cursor: pointer;
+        transition: background 160ms ease, color 160ms ease;
+      }
+
+      .click-row:hover {
+        background: rgba(245, 182, 35, 0.12);
+      }
+
+      .click-row.active {
+        background: rgba(245, 182, 35, 0.18);
+        box-shadow: inset 4px 0 0 var(--gold);
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .admin-grid {
+        grid-template-columns: 0.82fr 1.18fr;
+      }
+
+      .mapping-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .inline {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .check {
+        grid-template-columns: 20px 1fr;
+        align-items: center;
+        color: var(--text);
+      }
+
+      .check input {
+        min-height: auto;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: #09090b;
+        color: #ffffff;
+        border: 1px solid rgba(9, 9, 11, 0.08);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .notice {
+        min-height: 40px;
+        padding: 11px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #f0f3fa;
+        color: var(--muted);
+      }
+
+      .dropzone {
+        min-height: 170px;
+        padding: 22px;
+        border: 1.5px dashed rgba(9, 9, 11, 0.22);
+        border-radius: 8px;
+        background:
+          radial-gradient(circle at 18% 0%, rgba(255, 228, 134, 0.24), transparent 16rem),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 243, 250, 0.94));
+        display: grid;
+        place-items: center;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+      }
+
+      .dropzone:hover,
+      .dropzone.dragging {
+        border-color: var(--gold-3);
+        background:
+          radial-gradient(circle at 18% 0%, rgba(255, 228, 134, 0.38), transparent 16rem),
+          #ffffff;
+        box-shadow: 0 18px 44px rgba(20, 20, 30, 0.12);
+        transform: translateY(-1px);
+      }
+
+      .dropzone input {
+        display: none;
+      }
+
+      .dropzone-title {
+        display: block;
+        color: var(--text);
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1.22;
+      }
+
+      .dropzone-subtitle {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .dropzone-file {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 100%;
+        min-height: 34px;
+        margin-top: 14px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: #09090b;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 900;
+        overflow-wrap: anywhere;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, 0.64);
+        backdrop-filter: blur(18px);
+      }
+
+      #cancelStockCreditModal {
+        z-index: 60;
+      }
+
+      .admin-modal {
+        width: min(460px, 100%);
+        padding: 22px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          radial-gradient(circle at top, rgba(255, 228, 134, 0.16), transparent 18rem),
+          #09090b;
+        color: #ffffff;
+        box-shadow: 0 36px 110px rgba(0, 0, 0, 0.72), 0 0 80px rgba(247, 198, 91, 0.12);
+      }
+
+      .admin-modal .muted,
+      .admin-modal label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .admin-modal input {
+        background: #ffffff;
+        color: #09090b;
+      }
+
+      .admin-modal button:not(.secondary) {
+        background: #ffffff;
+        color: #09090b;
+      }
+
+      .admin-modal button.secondary {
+        background: rgba(255, 255, 255, 0.08);
+        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.14);
+      }
+
+      .modal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .notice.error {
+        color: #ffd6dc;
+        border-color: rgba(255, 95, 112, 0.42);
+        background: rgba(255, 95, 112, 0.12);
+      }
+
+      .notice.success {
+        color: #d8ffe9;
+        border-color: rgba(67, 229, 143, 0.34);
+        background: rgba(67, 229, 143, 0.11);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 1080px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-side {
+          min-height: auto;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .topbar,
+        .lookup-grid,
+        .admin-grid,
+        .mapping-grid,
+        .branch-grid,
+        .branch-picker,
+        .modal-actions {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          display: grid;
+        }
+
+        .tabs {
+          width: 100%;
+        }
+
+        .tabs button {
+          flex: 1;
+        }
+
+        .hero-main,
+        .hero-side,
+        .section {
+          padding: 16px;
+        }
+
+        table {
+          min-width: 720px;
+        }
+
+        .upload-history-table {
+          min-width: 0;
+        }
+
+        .stock-credit-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .report-inventory-stats {
+          grid-template-columns: 1fr;
+        }
+
+        .report-stock-detail {
+          grid-template-columns: 1fr;
+        }
+
+        .stock-credit-row {
+          min-height: auto;
+        }
+      }
+
+      @media (max-width: 720px) {
+        body {
+          background:
+            radial-gradient(circle at 50% -8%, rgba(255, 228, 134, 0.24), transparent 18rem),
+            linear-gradient(180deg, #f7f8fc 0%, #edf1f8 100%);
+        }
+
+        body::before {
+          background-size: 34px 34px;
+          opacity: 0.5;
+        }
+
+        button,
+        input,
+        select {
+          min-height: 48px;
+          font-size: 16px;
+        }
+
+        .shell {
+          width: 100%;
+          padding: 10px 10px 26px;
+        }
+
+        .topbar {
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .brand {
+          align-items: flex-start;
+        }
+
+        .mark {
+          width: 38px;
+          height: 38px;
+          flex: 0 0 auto;
+        }
+
+        h1 {
+          font-size: 22px;
+          line-height: 1.12;
+        }
+
+        h2 {
+          font-size: 18px;
+          line-height: 1.22;
+        }
+
+        p {
+          line-height: 1.48;
+        }
+
+        .tabs {
+          position: sticky;
+          top: 8px;
+          z-index: 10;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .tabs button {
+          min-width: max-content;
+          min-height: 42px;
+          scroll-snap-align: start;
+        }
+
+        .hero,
+        .report-board,
+        #adminView {
+          gap: 10px;
+        }
+
+        .panel {
+          border-radius: 8px;
+          box-shadow: 0 12px 34px rgba(20, 20, 30, 0.1);
+        }
+
+        .hero-main,
+        .hero-side,
+        .section,
+        .report-hero {
+          padding: 16px;
+        }
+
+        .hero-main {
+          min-height: calc(100svh - 92px);
+          align-content: space-between;
+        }
+
+        .lookup-grid {
+          gap: 10px;
+        }
+
+        .stats,
+        .profile-grid,
+        .product-grid,
+        .inventory-stats,
+        .report-inventory-stats,
+        .report-stock-detail,
+        .branch-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .stat,
+        .mini-card,
+        .branch-card {
+          min-height: 82px;
+          padding: 14px;
+        }
+
+        .stat strong {
+          font-size: 30px;
+          line-height: 1.05;
+        }
+
+        .branch-card .branch-total {
+          font-size: 24px;
+        }
+
+        .inline {
+          flex-wrap: wrap;
+          align-items: stretch;
+        }
+
+        .inline > * {
+          min-width: 0;
+        }
+
+        .branch-month-picker,
+        .inventory-cycle-picker,
+        .inline label {
+          max-width: none !important;
+          width: 100%;
+        }
+
+        .inventory-action {
+          justify-content: stretch;
+        }
+
+        .inventory-action button,
+        .report-actions button,
+        .manual-clear-actions button,
+        .modal-actions button {
+          width: 100%;
+        }
+
+        .modal-backdrop {
+          align-items: end;
+          place-items: end center;
+          padding: 10px;
+        }
+
+        .admin-modal,
+        .inventory-modal,
+        #inventoryModal .inventory-modal {
+          width: 100%;
+          max-height: calc(100svh - 20px);
+          overflow: auto;
+          padding: 16px;
+          border-radius: 8px;
+        }
+
+        .inventory-modal-header {
+          display: grid;
+          gap: 10px;
+        }
+
+        .inventory-close {
+          width: 100%;
+        }
+
+        .table-wrap {
+          overflow: visible;
+          border: 0;
+          background: transparent;
+        }
+
+        .report-table,
+        .upload-history-table,
+        .inventory-table,
+        .branch-employees-table,
+        .sales-detail-table,
+        #branchEmployeesBody {
+          display: block;
+          width: 100%;
+          min-width: 0;
+        }
+
+        .report-table colgroup {
+          display: none;
+        }
+
+        #branchEmployeesBody,
+        #branchEmployeesBody tr,
+        #branchEmployeesBody td,
+        #uploadsBody,
+        #uploadsBody tr,
+        #uploadsBody td,
+        #pendingReportsBody,
+        #pendingReportsBody tr,
+        #pendingReportsBody td,
+        #inventoryBody,
+        #inventoryBody tr,
+        #inventoryBody td,
+        #reportRows,
+        #reportRows tr,
+        #reportRows td,
+        .sales-detail-table tbody,
+        .sales-detail-table tr,
+        .sales-detail-table td {
+          display: block;
+          width: 100%;
+        }
+
+        .report-table thead,
+        .upload-history-table thead,
+        .inventory-table thead,
+        .branch-employees-table thead,
+        .sales-detail-table thead {
+          display: none;
+        }
+
+        #branchEmployeesBody tr,
+        #uploadsBody tr,
+        #pendingReportsBody tr,
+        #inventoryBody tr,
+        #reportRows tr,
+        .sales-detail-table tr {
+          margin-bottom: 10px;
+          padding: 12px;
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.9);
+          box-shadow: 0 10px 26px rgba(20, 20, 30, 0.07);
+        }
+
+        #reportRows tr {
+          background: #09090b;
+          border-color: rgba(245, 182, 35, 0.18);
+          color: #ffffff;
+        }
+
+        #branchEmployeesBody td,
+        #uploadsBody td,
+        #pendingReportsBody td,
+        #inventoryBody td,
+        #reportRows td,
+        .sales-detail-table td {
+          display: grid;
+          grid-template-columns: minmax(98px, 36%) minmax(0, 1fr);
+          gap: 10px;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 1px solid rgba(9, 9, 11, 0.06);
+          white-space: normal;
+          overflow-wrap: anywhere;
+          text-align: right;
+        }
+
+        #reportRows td {
+          border-bottom-color: rgba(255, 255, 255, 0.08);
+        }
+
+        #branchEmployeesBody td:last-child,
+        #uploadsBody td:last-child,
+        #pendingReportsBody td:last-child,
+        #inventoryBody td:last-child,
+        #reportRows td:last-child,
+        .sales-detail-table td:last-child {
+          border-bottom: 0;
+        }
+
+        #branchEmployeesBody td::before,
+        #uploadsBody td::before,
+        #pendingReportsBody td::before,
+        #inventoryBody td::before,
+        #reportRows td::before,
+        .sales-detail-table td::before {
+          content: attr(data-label);
+          color: var(--muted);
+          font-size: 12px;
+          font-weight: 900;
+          text-align: left;
+        }
+
+        #reportRows td::before {
+          color: rgba(255, 255, 255, 0.56);
+        }
+
+        #branchEmployeesBody td[colspan],
+        #uploadsBody td[colspan],
+        #pendingReportsBody td[colspan],
+        #inventoryBody td[colspan],
+        #reportRows td[colspan],
+        .sales-detail-table td[colspan] {
+          display: block;
+          text-align: left;
+        }
+
+        #branchEmployeesBody td[colspan]::before,
+        #uploadsBody td[colspan]::before,
+        #pendingReportsBody td[colspan]::before,
+        #inventoryBody td[colspan]::before,
+        #reportRows td[colspan]::before,
+        .sales-detail-table td[colspan]::before {
+          content: "";
+          display: none;
+        }
+
+        .report-index {
+          color: var(--gold-2);
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .report-box-cell input,
+        .report-note-cell input,
+        .manual-clear-input {
+          max-width: none !important;
+          min-height: 46px;
+          text-align: right;
+        }
+
+        .report-total-row td {
+          background: transparent;
+        }
+
+        .report-total-label {
+          padding-left: 0 !important;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .shell {
+          width: 100%;
+          padding-top: 14px;
+        }
+
+        .stats,
+        .profile-grid,
+        .product-grid,
+        .inventory-stats {
+          grid-template-columns: 1fr;
+        }
+
+        .inventory-modal-header {
+          display: grid;
+        }
+
+        .inventory-modal {
+          padding: 18px;
+        }
+
+        .manual-clear-actions {
+          grid-template-columns: 1fr;
+        }
+
+        .stock-credit-title {
+          min-height: auto;
+        }
+
+        .stock-credit-row input {
+          min-height: 48px;
+        }
+
+        .stat {
+          min-height: 88px;
+          padding: 14px;
+        }
+
+        .stat strong {
+          font-size: clamp(24px, 9vw, 32px);
+        }
+
+        .mini-card strong {
+          font-size: 17px;
+        }
+
+        .dropzone {
+          min-height: 145px;
+          padding: 18px;
+        }
+
+        .dropzone-title {
+          font-size: 18px;
+        }
+
+        .brand p {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">NX</div>
+          <div>
+            <h1>NECSHORA 63 CO., LTD. Commission</h1>
+            <p class="muted">ระบบตรวจยอดขายและค่าคอมพนักงาน</p>
+          </div>
+        </div>
+        <nav class="tabs">
+          <button id="tabPublic" class="active" type="button" onclick="setMode('public')">ทั่วไป</button>
+          <button id="tabReport" class="report-tab" type="button" onclick="setMode('report')">ส่งรายงาน</button>
+          <button id="tabAdmin" type="button" onclick="setMode('admin')">แอดมิน</button>
+        </nav>
+      </header>
+
+      <section id="publicView" class="hero">
+        <div class="panel hero-main">
+          <div class="stack">
+            <span class="pill">Employee Portal</span>
+            <h2>ดูยอดขายและค่าคอมด้วยรหัสสมาชิก</h2>
+            <p class="muted">กรอกรหัสประจำตัวเพื่อดูสรุปยอดรวม ค่าคอม และรายการขายละเอียดที่บันทึกจากไฟล์ Excel รายเดือน</p>
+          </div>
+
+          <div class="lookup-grid">
+            <label>
+              รหัสสมาชิก / รหัสพนักงาน
+              <input id="employeeCode" placeholder="เช่น NX001" onkeydown="handleLookupKey(event)">
+            </label>
+            <label>
+              เดือน
+              <select id="employeeMonth" onkeydown="handleLookupKey(event)">
+                <option value="">ทุกเดือน</option>
+              </select>
+            </label>
+            <button type="button" onclick="lookupEmployee()">ค้นหา</button>
+          </div>
+
+          <div id="publicNotice" class="notice">พร้อมค้นหาข้อมูล</div>
+        </div>
+
+        <aside id="memberHero" class="panel hero-side stack">
+          <h2 id="employeeName">ยังไม่ได้เลือกพนักงาน</h2>
+          <p class="muted" id="employeeMeta">ข้อมูลจะปรากฏหลังจากกรอกรหัสสมาชิก</p>
+          <div class="stats">
+            <div class="stat">
+              <span class="muted">ยอดขายรวม</span>
+              <strong id="totalSales">฿0</strong>
+            </div>
+            <div class="stat">
+              <span class="muted">ค่าคอมรวม</span>
+              <strong id="totalCommission">฿0</strong>
+            </div>
+            <div class="stat">
+              <span class="muted">จำนวนรายการ</span>
+              <strong id="totalRows">0</strong>
+            </div>
+            <div id="memberOnlySalesCard" class="stat hidden">
+              <span class="muted">ยอดขายเฉพาะรหัส</span>
+              <strong id="memberOnlySales">฿0</strong>
+            </div>
+            <div id="specialTgInventoryCard" class="stat hidden">
+              <span class="muted">สถานะคลังรวม TG</span>
+              <strong id="specialTgInventorySales">฿0</strong>
+            </div>
+          </div>
+          <div class="profile-grid">
+            <div class="mini-card"><span class="muted">รหัสสมาชิก</span><strong id="profileCode">-</strong></div>
+            <div class="mini-card"><span class="muted">ชื่อจริง</span><strong id="profileRealName">-</strong></div>
+            <div class="mini-card"><span class="muted">ชื่อเล่น</span><strong id="profileNickname">-</strong></div>
+            <div class="mini-card"><span class="muted">สาขา</span><strong id="profileBranch">-</strong></div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="reportView" class="hidden report-board">
+        <div class="panel report-hero stack">
+          <span class="pill">Branch Report</span>
+          <h2 id="reportTitle">ส่งรายการยอดขายประจำเดือน</h2>
+          <p id="reportCycleText" class="muted">เลือกสาขาและปลดล็อกเพื่อกรอกยอดขายตามรอบค่าคอม 25 ถึง 25</p>
+          <div id="reportMonthChoices" class="report-months"></div>
+          <div class="stats">
+            <div class="stat">
+              <span class="muted">สาขา</span>
+              <strong id="reportBranchName">ยังไม่ได้เลือก</strong>
+            </div>
+            <div class="stat">
+              <span class="muted">เรทค่าคอม</span>
+              <strong id="reportRate">-</strong>
+            </div>
+            <div class="stat">
+              <span class="muted">ยอดรวม</span>
+              <strong id="reportGrandTotal">฿0</strong>
+            </div>
+          </div>
+          <div class="report-inventory-stats">
+            <div class="stat">
+              <span class="muted">ยอดโอนเข้าบริษัท NEXORA 63</span>
+              <strong id="reportInventorySales">฿0</strong>
+            </div>
+            <div class="stat">
+              <span class="muted" id="reportInventoryCommissionLabel">NEXORA 63 ต้องโอนคืน 10%</span>
+              <strong id="reportInventoryCommission">฿0</strong>
+            </div>
+            <div class="stat">
+              <span class="muted">กล่องขายแล้วรวม</span>
+              <strong id="reportInventorySold">0</strong>
+            </div>
+          </div>
+          <div id="reportStockDetail" class="report-stock-detail"></div>
+        </div>
+
+        <div class="panel section stack">
+          <div class="inline" style="justify-content: space-between; flex-wrap: wrap;">
+            <div>
+              <h2>ตารางกรอกยอดขายกล่อง</h2>
+              <p class="muted">กรอกเฉพาะจำนวนกล่อง Bronze / Silver / Gold ระบบจะคำนวณยอดขายรวมและค่าคอมให้อัตโนมัติ</p>
+            </div>
+            <span class="pill" id="reportEmployeeCount">0 คน</span>
+          </div>
+          <div id="reportNotice" class="notice">กรุณาเลือกสาขาก่อนเริ่มส่งรายงาน</div>
+          <div class="table-wrap">
+            <table class="report-table">
+              <colgroup>
+                <col class="report-index-col">
+                <col class="report-sale-col">
+                <col class="report-code-col">
+                <col class="report-box-col">
+                <col class="report-box-col">
+                <col class="report-box-col">
+                <col class="report-money-col">
+                <col class="report-money-col">
+                <col class="report-note-col">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ลำดับ</th>
+                  <th>Sale</th>
+                  <th>รหัสสมาชิก</th>
+                  <th>Bronze</th>
+                  <th>Silver</th>
+                  <th>Gold</th>
+                  <th>ยอดขายรวม</th>
+                  <th>ค่าคอม</th>
+                  <th>หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody id="reportRows">
+                <tr><td colspan="9" class="muted">ยังไม่ได้ปลดล็อกสาขา</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="report-actions">
+            <button id="reportSubmitButton" type="button" onclick="openReportSubmitModal()">ส่งข้อมูล</button>
+            <button type="button" class="secondary" onclick="exitReportMode()">ออก</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="employeeDetails" class="panel section stack" style="margin-top: 18px;">
+        <div class="inline" style="justify-content: space-between; flex-wrap: wrap;">
+          <h2>ยอดแยกสินค้า</h2>
+          <div class="inline" style="justify-content: flex-end;">
+            <span class="pill">สรุปรายคน</span>
+            <button id="adminDetailClose" class="secondary detail-close hidden" type="button" onclick="closeAdminEmployeeDetail()">ปิดรายละเอียด</button>
+          </div>
+        </div>
+        <div id="productSummary" class="product-grid"></div>
+        <div class="inline" style="justify-content: space-between;">
+          <h2>รายการขายละเอียด</h2>
+          <div class="inline" style="flex-wrap: wrap; justify-content: flex-end;">
+            <label style="min-width: 190px;">
+              เลือกเดือน
+              <select id="detailMonth" onchange="renderSalesDetails()">
+                <option value="">รวมทั้งหมด</option>
+              </select>
+            </label>
+            <span class="pill" id="detailCount">0 รายการ</span>
+          </div>
+        </div>
+        <div class="table-wrap sales-detail-wrap">
+          <table class="sales-detail-table">
+            <thead>
+              <tr>
+                <th>วันที่ขาย</th>
+                <th>เลขบิล</th>
+                <th>สินค้า</th>
+                <th>สมาชิก</th>
+                <th>ยอดขาย</th>
+                <th>เรท</th>
+                <th>ค่าคอม</th>
+              </tr>
+            </thead>
+            <tbody id="salesBody">
+              <tr><td colspan="7" class="muted">ยังไม่มีข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="adminView" class="hidden stack">
+        <div class="panel section stack">
+          <div class="inline" style="justify-content: space-between; flex-wrap: wrap;">
+            <div>
+              <h2>Admin Mode</h2>
+              <p class="muted">อัปโหลดไฟล์ยอดขายรายเดือน และดูประวัติการนำเข้า</p>
+            </div>
+          </div>
+          <div class="admin-grid">
+            <div class="stack">
+              <div class="notice success" id="adminNotice">ปลดล็อกแอดมินแล้ว พร้อมจัดการข้อมูล</div>
+              <button type="button" class="secondary" onclick="lockAdmin()">ออกจากโหมดแอดมิน</button>
+            </div>
+            <div class="stack">
+              <div class="notice success">ค่าคอมระบบถูกล็อกตามกฎ NEXORA: ปกติ 10%, สาขา TG 15%, และรายชื่อพิเศษแยกเข้าสาขา TG อัตโนมัติ</div>
+            </div>
+          </div>
+          <button id="adminReportAlert" class="admin-report-alert hidden" type="button" onclick="openPendingReportsModal()">
+            <strong id="adminReportAlertTitle">มีรายงานรออนุมัติ</strong>
+            <span id="adminReportAlertMeta">กดเพื่อเปิดตรวจสอบยอดขายจากสาขา</span>
+          </button>
+        </div>
+
+        <div class="panel section stack">
+          <div class="inline" style="justify-content: space-between; flex-wrap: wrap;">
+            <div>
+              <h2>สรุปตามสาขา</h2>
+              <p class="muted">กดการ์ดสาขาเพื่อดูรายชื่อพนักงานและยอดรวมในกลุ่มนั้น</p>
+            </div>
+            <span id="selectedBranchPill" class="pill">ทุกสาขา</span>
+          </div>
+          <label class="branch-month-picker">
+            เลือกเดือนสรุปสาขา
+            <select id="branchMonthSelect" onchange="changeBranchMonth(this.value)"></select>
+          </label>
+          <div id="branchCards" class="branch-grid"></div>
+          <div class="table-wrap">
+            <table class="branch-employees-table">
+              <thead>
+                <tr>
+                  <th>รหัส</th>
+                  <th>ชื่อ</th>
+                  <th>รายการ</th>
+                  <th>ยอดขาย</th>
+                  <th>ค่าคอม</th>
+                </tr>
+              </thead>
+              <tbody id="branchEmployeesBody">
+                <tr><td colspan="5" class="muted">ยังไม่มีข้อมูล</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="branchInventoryAction" class="inventory-action hidden">
+            <button class="inventory-open" type="button" onclick="openBranchInventory()">ดูสถานะคลังรวม</button>
+          </div>
+          <div id="adminDetailMount"></div>
+        </div>
+
+        <div class="panel section stack">
+          <h2>อัปโหลด Excel รายเดือน</h2>
+          <div class="admin-grid">
+            <div class="stack">
+              <label>
+                เดือนของยอดขาย
+                <input id="uploadMonth" type="month">
+              </label>
+              <label>
+                สาขาเริ่มต้นของไฟล์นี้
+                <select id="uploadBranch">
+                  <option value="NEX">NEX</option>
+                  <option value="TG">TG</option>
+                  <option value="CG">CG</option>
+                  <option value="NNT">NNT</option>
+                  <option value="GENERAL">เครือข่ายทั่วไป</option>
+                </select>
+              </label>
+              <label>
+                ไฟล์ยอดขาย
+                <div id="uploadDropzone" class="dropzone" role="button" tabindex="0" onclick="openFilePicker()" onkeydown="handleDropzoneKey(event)">
+                  <input id="excelFile" type="file" onchange="handleFilePicked(event)" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                  <span>
+                    <span class="dropzone-title">ลากไฟล์มาวางตรงนี้ หรือกดเพื่อเลือกไฟล์</span>
+                    <span class="dropzone-subtitle">รองรับ Excel, PDF และ Word</span>
+                    <span id="uploadFileName" class="dropzone-file">ยังไม่ได้เลือกไฟล์</span>
+                  </span>
+                </div>
+              </label>
+              <button id="importButton" type="button" onclick="importUpload()">นำเข้าและสรุปอัตโนมัติ</button>
+            </div>
+            <div class="stack">
+              <h3>POS Auto Import</h3>
+              <div class="notice success">โยนไฟล์ POS ของสาขานี้เข้ามา ระบบจะอ่านหัวบิล รายการสินค้า ยอดขาย และสรุปค่าคอมให้อัตโนมัติ</div>
+              <div class="notice">ไม่ต้องจับคู่คอลัมน์ ไม่ต้องตั้งค่าเพิ่ม ใช้ไฟล์ report_by_document จาก POS ได้เลย</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel section stack">
+          <div class="inline" style="justify-content: space-between;">
+            <h2>ประวัติการอัปโหลด</h2>
+            <span class="pill" id="uploadCount">0 ครั้ง</span>
+          </div>
+          <div class="table-wrap upload-history-wrap">
+            <table class="upload-history-table">
+              <thead>
+                <tr>
+                  <th>วันเวลา</th>
+                  <th>ไฟล์</th>
+                  <th>แถว</th>
+                  <th>ยอดขาย</th>
+                  <th>ค่าคอม</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="uploadsBody">
+                <tr><td colspan="6" class="muted">ยังไม่มีประวัติ</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="reportBranchModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="reportBranchModalTitle">
+      <div class="admin-modal stack" style="width: min(720px, 100%);">
+        <div class="stack">
+          <span class="pill">Branch Gate</span>
+          <h2 id="reportBranchModalTitle">เลือกสาขาที่ต้องการส่งรายงาน</h2>
+          <p class="muted">ต้องเลือกสาขาก่อน จึงจะเข้าสู่หน้าส่งรายการยอดขายประจำเดือนได้</p>
+        </div>
+        <div id="reportBranchChoices" class="branch-picker">
+          <button type="button" class="branch-choice" onclick="selectReportBranch('TG')"><strong>TG</strong><br><span class="muted">Team Gold</span></button>
+          <button type="button" class="branch-choice" onclick="selectReportBranch('CG')"><strong>CG</strong><br><span class="muted">Card Guild</span></button>
+          <button type="button" class="branch-choice" onclick="selectReportBranch('NNT')"><strong>NNT</strong><br><span class="muted">NNT Branch</span></button>
+        </div>
+        <div id="reportBranchNotice" class="notice">กรุณาเลือกสาขา</div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="cancelReportBranchSelect()">ยกเลิก</button>
+          <button type="button" onclick="confirmReportBranchSelect()">ยืนยัน</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="reportPinModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="reportPinModalTitle">
+      <div class="admin-modal stack">
+        <div class="stack">
+          <span class="pill">Branch PIN</span>
+          <h2 id="reportPinModalTitle">ใส่รหัสสาขา</h2>
+          <p id="reportPinMeta" class="muted">ปลดล็อกหน้าส่งรายงานยอดขาย</p>
+        </div>
+        <label>
+          รหัสสาขา
+          <input id="reportPin" type="password" autocomplete="off" onkeydown="handleReportPinKey(event)">
+        </label>
+        <div id="reportPinNotice" class="notice">กรอกรหัสเพื่อเข้าใช้งาน</div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="cancelReportPin()">ยกเลิก</button>
+          <button type="button" onclick="unlockReportBranch()">เข้าสู่ระบบ</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="reportSubmitModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="reportSubmitModalTitle">
+      <div class="admin-modal stack">
+        <div class="stack">
+          <span class="pill">Submit Report</span>
+          <h2 id="reportSubmitModalTitle">ยืนยันส่งข้อมูล</h2>
+          <p id="reportSubmitText" class="muted">ใส่รหัสสาขาอีกครั้งเพื่อยืนยันการส่งรายงาน</p>
+        </div>
+        <label>
+          รหัสสาขา
+          <input id="reportSubmitPin" type="password" autocomplete="off" onkeydown="handleReportSubmitPinKey(event)">
+        </label>
+        <div id="reportSubmitNotice" class="notice">ข้อมูลรอบเดิมของสาขานี้จะถูกแทนที่ด้วยชุดล่าสุด</div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeReportSubmitModal()">ยกเลิก</button>
+          <button type="button" onclick="submitBranchReport()">ยืนยันส่งข้อมูล</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="pendingReportsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pendingReportsTitle">
+      <div class="inventory-modal stack">
+        <div class="inventory-modal-header">
+          <div>
+            <span class="pill">Branch Reports</span>
+            <h2 id="pendingReportsTitle">รายงานรออนุมัติ</h2>
+            <p id="pendingReportsMeta" class="muted">ตรวจยอดขายสาขาก่อนอนุมัติตัดสต๊อก</p>
+          </div>
+          <button type="button" class="secondary inventory-close" onclick="closePendingReportsModal()">ปิด</button>
+        </div>
+        <div class="table-wrap upload-history-wrap">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>สาขา</th>
+                <th>เดือน</th>
+                <th>สมาชิก</th>
+                <th>Bronze</th>
+                <th>Silver</th>
+                <th>Gold</th>
+                <th>ยอดขาย</th>
+              </tr>
+            </thead>
+            <tbody id="pendingReportsBody"></tbody>
+          </table>
+        </div>
+        <div class="manual-clear-actions">
+          <button class="manual-clear" type="button" onclick="approveSelectedReport()">อนุมัติ</button>
+          <button class="danger" type="button" onclick="rejectSelectedReport()">ไม่อนุมัติ</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="stockOverModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="stockOverTitle">
+      <div class="admin-modal stack stock-over-modal">
+        <div class="stack">
+          <span class="pill">Stock Warning</span>
+          <h2 id="stockOverTitle">ส่งข้อมูลไม่ได้</h2>
+          <p id="stockOverText" class="stock-over-message">ข้อมูลที่ส่งจำนวนสินค้าเกินกว่าเครดิตสต๊อกที่ทางสาขารับไป</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" onclick="closeStockOverModal()">เข้าใจแล้ว</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
+      <div class="admin-modal stack">
+        <div class="stack">
+          <span class="pill">Admin Gate</span>
+          <h2 id="adminModalTitle">ปลดล็อกหลังบ้าน NEXORA</h2>
+          <p class="muted">ใส่รหัสแอดมินเพื่อเข้าโหมดจัดการยอดขาย ค่าคอม และไฟล์ Excel รายเดือน</p>
+        </div>
+        <label>
+          รหัสแอดมิน
+          <input id="adminPin" type="password" autocomplete="off" onkeydown="handleAdminPinKey(event)">
+        </label>
+        <div id="adminModalNotice" class="notice">ระบบหลังบ้านถูกล็อกไว้</div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeAdminModal()">ยกเลิก</button>
+          <button type="button" onclick="unlockAdmin()">เข้าสู่ระบบ</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="stockCreditModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="stockCreditModalTitle">
+      <div class="inventory-modal stack">
+        <div class="inventory-modal-header">
+          <div>
+            <span class="pill">Stock Credit</span>
+            <h2 id="stockCreditModalTitle">เติมสต๊อกเครดิต</h2>
+            <p id="stockCreditMeta" class="muted">บันทึกล็อตกล่องที่สาขารับไปขายเพิ่ม</p>
+          </div>
+          <button type="button" class="secondary inventory-close" onclick="closeStockCreditModal()">ปิด</button>
+        </div>
+        <div id="stockCreditRows" class="stock-credit-grid"></div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeStockCreditModal()">ยกเลิก</button>
+          <button type="button" onclick="submitStockCredit()">บันทึกเติมสต๊อก</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="cancelStockCreditModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cancelStockCreditTitle">
+      <div class="admin-modal stack">
+        <div class="stack">
+          <span class="pill">Cancel Credit Lot</span>
+          <h2 id="cancelStockCreditTitle">ยืนยันยกเลิกรายการเติมสต๊อก</h2>
+          <p id="cancelStockCreditText" class="muted">รายการนี้จะถูกลบออกจากระบบสต๊อกถาวร</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeCancelStockCreditModal()">ยกเลิก</button>
+          <button type="button" class="danger" onclick="confirmCancelStockCredit()">ยืนยัน</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="inventoryModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="inventoryModalTitle">
+      <div class="inventory-modal stack">
+        <div class="inventory-modal-header">
+          <div>
+            <span class="pill">Branch Stock</span>
+            <h2 id="inventoryModalTitle">สถานะคลังรวม</h2>
+            <p id="inventoryMeta" class="muted">สรุปจากไฟล์ยอดขายที่นำเข้าแล้ว</p>
+          </div>
+          <button type="button" class="secondary inventory-close" onclick="closeBranchInventory()">ปิด</button>
+        </div>
+        <label class="inventory-cycle-picker">
+          เลือกรอบค่าคอม
+          <select id="inventoryCycleSelect" onchange="changeInventoryCycle(this.value)"></select>
+        </label>
+        <div id="inventoryStats" class="inventory-stats"></div>
+        <div class="table-wrap upload-history-wrap">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>รายการ</th>
+                <th>เครดิตล็อตนี้</th>
+                <th>ขายแล้ว</th>
+                <th>คงค้างในคลัง</th>
+                <th>เคลียร์แมนนวล</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryBody"></tbody>
+          </table>
+        </div>
+        <div class="manual-clear-actions">
+          <button class="modal-stock-open" type="button" onclick="openStockCreditModal()">เติมสต๊อกเครดิต</button>
+          <button class="manual-clear" type="button" onclick="submitManualClear()">เคลียร์ยอด</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        mode: "public",
+        adminReady: false,
+        branchSummary: [],
+        selectedBranch: "",
+        selectedBranchMonth: "",
+        selectedInventoryMonth: "",
+        currentEmployee: null,
+        detailMonth: "",
+        uploadFile: null,
+        adminDetailOpen: false,
+        returnToInventoryAfterStock: false,
+        returnToInventoryAfterCancel: false,
+        pendingCancelStockCredit: null,
+        pendingReports: [],
+        selectedPendingReportId: "",
+        adminPollTimer: 0,
+        adminPollBusy: false,
+        lastPendingReportCount: 0,
+        reportBranch: "",
+        reportPendingBranch: "",
+        reportMonth: "",
+        reportPinValue: "",
+        reportReady: false,
+        reportData: null,
+        reportCache: {},
+      };
+      const INVENTORY_BRANCHES = ["TG", "CG", "NNT"];
+      const STOCK_ITEMS = [
+        { key: "boxBronze", label: "กล่อง Bronze" },
+        { key: "boxSilver", label: "กล่อง Silver" },
+        { key: "boxGold", label: "กล่อง Gold" },
+      ];
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const now = new Date();
+        state.adminReady = false;
+        document.getElementById("adminPin").value = "";
+        document.getElementById("uploadMonth").value = now.toISOString().slice(0, 7);
+        setupUploadDropzone();
+        google.script.run
+          .withSuccessHandler(renderPublicState)
+          .withFailureHandler((error) => showNotice("publicNotice", error.message, true))
+          .getPublicState();
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) refreshAdminRealtimeReports();
+        });
+      });
+
+      function setMode(mode) {
+        if (mode === "admin" && !state.adminReady) {
+          openAdminModal();
+          return;
+        }
+        if (mode === "report" && !state.reportReady) {
+          stopAdminRealtimeReports();
+          state.mode = "report";
+          document.getElementById("publicView").classList.add("hidden");
+          document.getElementById("adminView").classList.add("hidden");
+          document.getElementById("reportView").classList.remove("hidden");
+          document.getElementById("employeeDetails").classList.add("hidden");
+          document.getElementById("tabPublic").classList.remove("active");
+          document.getElementById("tabReport").classList.add("active");
+          document.getElementById("tabAdmin").classList.remove("active");
+          openReportBranchModal();
+          return;
+        }
+        state.mode = mode;
+        document.getElementById("publicView").classList.toggle("hidden", mode !== "public");
+        if (mode === "public") {
+          moveEmployeeDetailsToPublic();
+          document.getElementById("employeeDetails").classList.remove("hidden");
+          document.getElementById("adminDetailClose").classList.add("hidden");
+        } else if (mode === "admin") {
+          document.getElementById("employeeDetails").classList.toggle("hidden", !state.adminDetailOpen);
+          document.getElementById("adminDetailClose").classList.toggle("hidden", !state.adminDetailOpen);
+        } else {
+          document.getElementById("employeeDetails").classList.add("hidden");
+          document.getElementById("adminDetailClose").classList.add("hidden");
+        }
+        document.getElementById("adminView").classList.toggle("hidden", mode !== "admin");
+        document.getElementById("reportView").classList.toggle("hidden", mode !== "report");
+        document.getElementById("tabPublic").classList.toggle("active", mode === "public");
+        document.getElementById("tabReport").classList.toggle("active", mode === "report");
+        document.getElementById("tabAdmin").classList.toggle("active", mode === "admin");
+        if (mode === "admin" && state.adminReady) {
+          startAdminRealtimeReports();
+        } else {
+          stopAdminRealtimeReports();
+        }
+      }
+
+      function openAdminModal() {
+        document.getElementById("adminModal").classList.remove("hidden");
+        document.getElementById("tabPublic").classList.toggle("active", state.mode !== "admin");
+        document.getElementById("tabReport").classList.toggle("active", state.mode === "report");
+        document.getElementById("tabAdmin").classList.remove("active");
+        setTimeout(() => document.getElementById("adminPin").focus(), 40);
+      }
+
+      function closeAdminModal() {
+        document.getElementById("adminModal").classList.add("hidden");
+        document.getElementById("adminModalNotice").textContent = "ระบบหลังบ้านถูกล็อกไว้";
+        document.getElementById("adminModalNotice").classList.remove("error", "success");
+      }
+
+      function lockAdmin() {
+        stopAdminRealtimeReports();
+        state.adminReady = false;
+        state.adminDetailOpen = false;
+        state.pendingReports = [];
+        state.lastPendingReportCount = 0;
+        document.getElementById("adminPin").value = "";
+        document.getElementById("adminDetailClose").classList.add("hidden");
+        setMode("public");
+      }
+
+      function handleAdminPinKey(event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          unlockAdmin();
+        }
+        if (event.key === "Escape") {
+          closeAdminModal();
+        }
+      }
+
+      function openReportBranchModal() {
+        state.reportPendingBranch = state.reportBranch || "";
+        renderReportBranchChoices();
+        document.getElementById("reportBranchModal").classList.remove("hidden");
+        showNotice("reportBranchNotice", "กรุณาเลือกสาขา", false);
+      }
+
+      function selectReportBranch(branch) {
+        state.reportPendingBranch = branch;
+        renderReportBranchChoices();
+      }
+
+      function renderReportBranchChoices() {
+        Array.from(document.querySelectorAll("#reportBranchChoices .branch-choice")).forEach((button) => {
+          const selected = Boolean(state.reportPendingBranch) && button.textContent.indexOf(state.reportPendingBranch) >= 0;
+          button.classList.toggle("is-selected", selected);
+          button.classList.toggle("is-dim", Boolean(state.reportPendingBranch) && !selected);
+        });
+      }
+
+      function confirmReportBranchSelect() {
+        if (!state.reportPendingBranch) {
+          showNotice("reportBranchNotice", "กรุณาเลือกสาขาก่อน", true);
+          return;
+        }
+        state.reportBranch = state.reportPendingBranch;
+        document.getElementById("reportBranchModal").classList.add("hidden");
+        openReportPinModal();
+      }
+
+      function cancelReportBranchSelect() {
+        state.reportPendingBranch = "";
+        document.getElementById("reportBranchModal").classList.add("hidden");
+        setMode("public");
+      }
+
+      function openReportPinModal() {
+        document.getElementById("reportPin").value = "";
+        document.getElementById("reportPinMeta").textContent = `ปลดล็อกสาขา ${state.reportBranch}`;
+        showNotice("reportPinNotice", "กรอกรหัสเพื่อเข้าใช้งาน", false);
+        document.getElementById("reportPinModal").classList.remove("hidden");
+        setTimeout(() => document.getElementById("reportPin").focus(), 40);
+      }
+
+      function cancelReportPin() {
+        document.getElementById("reportPinModal").classList.add("hidden");
+        state.reportReady = false;
+        setMode("public");
+      }
+
+      function handleReportPinKey(event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          unlockReportBranch();
+        }
+        if (event.key === "Escape") {
+          cancelReportPin();
+        }
+      }
+
+      function unlockReportBranch() {
+        const pin = document.getElementById("reportPin").value.trim();
+        if (!state.reportBranch || !pin) {
+          showNotice("reportPinNotice", "กรุณาใส่รหัสสาขา", true);
+          return;
+        }
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((data) => {
+            setBusy(false);
+            state.reportReady = true;
+            state.reportPinValue = pin;
+            state.reportMonth = data.selectedMonth || "";
+            state.reportData = data;
+            cacheReportState(data);
+            document.getElementById("reportPinModal").classList.add("hidden");
+            setMode("report");
+            renderReportTable(data);
+            showNotice("reportNotice", "ปลดล็อกสาขาสำเร็จ พร้อมกรอกยอดขาย", false, true);
+          })
+          .withFailureHandler(() => {
+            setBusy(false);
+            showNotice("reportPinNotice", "รหัสสาขาไม่ถูกต้อง", true);
+          })
+          .getBranchReportState(state.reportBranch, pin, state.reportMonth);
+      }
+
+      function renderReportTable(data) {
+        let employees = data.employees || [];
+        const savedByCode = {};
+        (data.savedEntries || []).forEach((entry) => {
+          savedByCode[entry.employeeCode] = entry;
+        });
+        const employeeCodes = employees.reduce((acc, employee) => {
+          acc[employee.employeeCode] = true;
+          return acc;
+        }, {});
+        (data.savedEntries || []).forEach((entry) => {
+          if (entry.employeeCode && !employeeCodes[entry.employeeCode]) {
+            employees = employees.concat([{
+              employeeCode: entry.employeeCode,
+              employeeName: entry.employeeName || entry.employeeCode,
+              nickname: entry.employeeName || entry.employeeCode,
+            }]);
+          }
+        });
+        const cycle = data.cycle || {};
+        const rate = Number(data.rate || 10);
+        const reportStatus = String(data.reportStatus || "").toUpperCase();
+        const isPending = reportStatus === "PENDING";
+        const isApproved = reportStatus === "APPROVED";
+        const isSubmitted = Boolean(data.submitted);
+        state.reportMonth = data.selectedMonth || "";
+        const isAllReport = reportStatus === "ALL" || !state.reportMonth;
+        document.getElementById("reportBranchName").textContent = data.branchName || data.branch || "-";
+        document.getElementById("reportRate").textContent = `${number(rate)}%`;
+        document.getElementById("reportEmployeeCount").textContent = `${number(employees.length)} คน`;
+        renderReportInventoryStats(data.inventorySummary || {}, rate, state.reportMonth);
+        document.getElementById("reportCycleText").textContent = isAllReport
+          ? "รวมรายละเอียดรายงานจากทุกเดือน"
+          : cycle.start && cycle.end
+            ? `รอบค่าคอม ${formatDateTimeLabel(cycle.start, true)} ถึง ${formatDateTimeLabel(cycle.end, true)}`
+            : "รอบค่าคอมวันที่ 25 ถึงวันที่ 25 เดือนถัดไป";
+        renderReportMonthChoices(data.reportMonths || [], data.selectedMonth || "");
+        document.getElementById("reportRows").innerHTML = employees.length ? employees.map((employee, index) => `
+          ${(() => {
+            const saved = savedByCode[employee.employeeCode] || {};
+            return `
+          <tr class="report-entry" data-code="${escapeHtml(employee.employeeCode || "")}" data-name="${escapeHtml(employee.employeeName || "")}">
+            <td class="report-index" data-label="ลำดับ">${index + 1}</td>
+            <td class="report-sale" data-label="Sale">${escapeHtml(employee.nickname || "-")}</td>
+            <td class="report-code" data-label="รหัสสมาชิก">${escapeHtml(employee.employeeCode || "")}</td>
+            <td class="report-box-cell" data-label="Bronze"><input class="report-box" data-key="boxBronze" type="number" min="0" step="1" inputmode="numeric" placeholder="0" value="${escapeHtml(saved.boxBronze || "")}" ${isSubmitted || isAllReport ? "disabled" : ""} oninput="updateReportTotals()"></td>
+            <td class="report-box-cell" data-label="Silver"><input class="report-box" data-key="boxSilver" type="number" min="0" step="1" inputmode="numeric" placeholder="0" value="${escapeHtml(saved.boxSilver || "")}" ${isSubmitted || isAllReport ? "disabled" : ""} oninput="updateReportTotals()"></td>
+            <td class="report-box-cell" data-label="Gold"><input class="report-box" data-key="boxGold" type="number" min="0" step="1" inputmode="numeric" placeholder="0" value="${escapeHtml(saved.boxGold || "")}" ${isSubmitted || isAllReport ? "disabled" : ""} oninput="updateReportTotals()"></td>
+            <td class="row-sale" data-label="ยอดขายรวม">฿0</td>
+            <td class="row-commission" data-label="ค่าคอม">฿0</td>
+            <td class="report-note-cell" data-label="หมายเหตุ"><input class="report-note" placeholder="-" value="${escapeHtml(saved.notes || "")}" ${isSubmitted || isAllReport ? "disabled" : ""}></td>
+          </tr>
+            `;
+          })()}
+        `).join("") + `
+          <tr class="report-total-row">
+            <td class="report-total-label" colspan="3">รวมทั้งสิ้น</td>
+            <td id="reportBronzeTotal" class="report-box-cell" data-label="Bronze">0</td>
+            <td id="reportSilverTotal" class="report-box-cell" data-label="Silver">0</td>
+            <td id="reportGoldTotal" class="report-box-cell" data-label="Gold">0</td>
+            <td id="reportSalesTotal" class="row-sale" data-label="ยอดขายรวม">฿0</td>
+            <td id="reportCommissionTotal" class="row-commission" data-label="ค่าคอม">฿0</td>
+            <td class="report-note-cell"></td>
+          </tr>
+        ` : '<tr><td colspan="9" class="muted">ยังไม่มีรายชื่อพนักงานในสาขานี้</td></tr>';
+        const submitButton = document.getElementById("reportSubmitButton");
+        submitButton.disabled = isSubmitted || isAllReport;
+        submitButton.classList.toggle("report-waiting", isPending);
+        submitButton.textContent = isAllReport ? "เลือกเดือนเพื่อส่งข้อมูล" : isPending ? "โปรดรอการอนุมัติ" : isApproved ? "ส่งแล้ว ดูประวัติเท่านั้น" : "ส่งข้อมูล";
+        const reportMessage = isAllReport
+          ? "โหมดรวมทั้งหมดเป็นประวัติรวม เลือกเดือนก่อนหากต้องการส่งรายงาน"
+          : isPending
+            ? "ส่งข้อมูลแล้ว กำลังรอแอดมินสูงสุดตรวจและอนุมัติ"
+            : isApproved
+              ? "เดือนนี้อนุมัติแล้ว ระบบล็อกเป็นประวัติและแก้ไขไม่ได้"
+              : "เดือนนี้ยังไม่เคยส่งข้อมูล สามารถกรอกและส่งได้ 1 ครั้ง";
+        showNotice("reportNotice", reportMessage, false, true);
+        updateReportTotals();
+      }
+
+      function renderReportInventoryStats(inventory, rate, selectedMonth) {
+        const cycleOptions = getInventoryCycleOptions(inventory || {});
+        const selectedCycle = selectedMonth
+          ? (cycleOptions || []).find((row) => row.month === selectedMonth) || {}
+          : buildAllInventoryCycle(inventory || {}, cycleOptions);
+        const sold = selectedCycle.soldTotal || {};
+        const soldBoxes = Number(sold.boxBronze || 0) + Number(sold.boxSilver || 0) + Number(sold.boxGold || 0);
+        document.getElementById("reportInventorySales").textContent = money(selectedCycle.totalSales || 0);
+        document.getElementById("reportInventoryCommissionLabel").textContent = `NEXORA 63 ต้องโอนคืน ${number(rate || 10)}%`;
+        document.getElementById("reportInventoryCommission").textContent = money(selectedCycle.totalCommission || 0);
+        document.getElementById("reportInventorySold").textContent = number(soldBoxes);
+        renderReportStockDetail(inventory, selectedMonth, selectedCycle);
+      }
+
+      function renderReportStockDetail(inventory, selectedMonth, selectedCycle) {
+        const lots = inventory.lots || [];
+        const remaining = inventory.remainingTotal || {};
+        const cycleStart = String(selectedCycle && selectedCycle.cycleStart || "");
+        const cycleEnd = String(selectedCycle && selectedCycle.cycleEnd || "");
+        document.getElementById("reportStockDetail").innerHTML = STOCK_ITEMS.map((item) => {
+          const currentLots = lots.filter((lot) => {
+            const date = String(lot.creditDate || "");
+            return lot.itemKey === item.key && (!selectedMonth || !cycleStart || !cycleEnd || (date >= cycleStart && date < cycleEnd));
+          });
+          const currentIssued = currentLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0);
+          const currentSold = selectedMonth
+            ? Number(selectedCycle && selectedCycle.soldTotal && selectedCycle.soldTotal[item.key] || 0)
+            : currentLots.reduce((sum, lot) => sum + Number(lot.sold || 0), 0);
+          const currentRemaining = selectedMonth
+            ? Math.max(currentIssued - currentSold, 0)
+            : currentLots.reduce((sum, lot) => sum + Math.max(Number(lot.remaining || 0), 0), 0);
+          const lotRows = currentLots.length ? currentLots.map((lot) => `
+            <div class="report-stock-lot">
+              <span>${escapeHtml(formatDateTimeLabel(lot.creditDate || "", true) || "ไม่ระบุวันที่")}</span>
+              <strong>${number(lot.remaining)} เหลือ | ${number(lot.sold)} ขายแล้ว</strong>
+            </div>
+          `).join("") : '<div class="report-stock-lot"><span>เครดิตล็อตนี้</span><strong>ยังไม่มีล็อต</strong></div>';
+          return `
+            <div class="report-stock-card">
+              <h3>${escapeHtml(item.label)}</h3>
+              <div class="report-stock-grid">
+                <div class="report-stock-metric"><span>คงค้างในคลัง</span><strong>${number(remaining[item.key] || 0)}</strong></div>
+                <div class="report-stock-metric"><span>เครดิตล็อตนี้</span><strong>${number(currentIssued)}</strong></div>
+                <div class="report-stock-metric"><span>ขายแล้วล็อตนี้</span><strong>${number(currentSold)}</strong></div>
+                <div class="report-stock-metric"><span>เหลือล็อตนี้</span><strong>${number(currentRemaining)}</strong></div>
+              </div>
+              <div class="report-stock-lots">${lotRows}</div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      function renderReportMonthChoices(months, selectedMonth) {
+        const allButton = `
+          <button type="button" class="${!selectedMonth ? "active" : ""}" onclick="selectReportMonth('')">
+            รวมทั้งหมด
+          </button>
+        `;
+        document.getElementById("reportMonthChoices").innerHTML = allButton + (months || []).map((month) => `
+          <button type="button" class="${month.key === selectedMonth ? "active" : ""} ${month.submitted ? "submitted" : ""}" onclick="selectReportMonth('${escapeHtml(month.key)}')">
+            ${escapeHtml(formatMonthLabel(month.key))}
+          </button>
+        `).join("");
+      }
+
+      function selectReportMonth(monthKey) {
+        if (!state.reportReady || !state.reportBranch || !state.reportPinValue) return;
+        state.reportMonth = monthKey;
+        const cached = getCachedReportState(monthKey);
+        if (cached) {
+          state.reportData = cached;
+          renderReportTable(cached);
+          return;
+        }
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((data) => {
+            setBusy(false);
+            state.reportData = data;
+            cacheReportState(data);
+            renderReportTable(data);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            showNotice("reportNotice", error.message || "โหลดเดือนนี้ไม่สำเร็จ", true);
+          })
+          .getBranchReportState(state.reportBranch, state.reportPinValue, monthKey);
+      }
+
+      function reportCacheKey(monthKey) {
+        return `${state.reportBranch || ""}::${monthKey || ""}`;
+      }
+
+      function cacheReportState(data) {
+        if (!data || !state.reportBranch) return;
+        state.reportCache[reportCacheKey(data.selectedMonth || "")] = data;
+      }
+
+      function getCachedReportState(monthKey) {
+        return state.reportCache[reportCacheKey(monthKey)];
+      }
+
+      function getReportPrices() {
+        const prices = state.reportData && state.reportData.prices || {};
+        return {
+          boxBronze: Number(prices.boxBronze || 650),
+          boxSilver: Number(prices.boxSilver || 1100),
+          boxGold: Number(prices.boxGold || 1650),
+        };
+      }
+
+      function updateReportTotals() {
+        const prices = getReportPrices();
+        const rate = Number(state.reportData && state.reportData.rate || 10);
+        const totals = { boxBronze: 0, boxSilver: 0, boxGold: 0, sales: 0, commission: 0 };
+        Array.from(document.querySelectorAll(".report-entry")).forEach((row) => {
+          const bronze = Number(row.querySelector('[data-key="boxBronze"]').value || 0);
+          const silver = Number(row.querySelector('[data-key="boxSilver"]').value || 0);
+          const gold = Number(row.querySelector('[data-key="boxGold"]').value || 0);
+          const sale = bronze * prices.boxBronze + silver * prices.boxSilver + gold * prices.boxGold;
+          const commission = sale * rate / 100;
+          totals.boxBronze += bronze;
+          totals.boxSilver += silver;
+          totals.boxGold += gold;
+          totals.sales += sale;
+          totals.commission += commission;
+          row.querySelector(".row-sale").textContent = money(sale);
+          row.querySelector(".row-commission").textContent = money(commission);
+        });
+        const setText = (id, value) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        };
+        setText("reportBronzeTotal", number(totals.boxBronze));
+        setText("reportSilverTotal", number(totals.boxSilver));
+        setText("reportGoldTotal", number(totals.boxGold));
+        setText("reportSalesTotal", money(totals.sales));
+        setText("reportCommissionTotal", money(totals.commission));
+        document.getElementById("reportGrandTotal").textContent = money(totals.sales);
+      }
+
+      function getReportEntries() {
+        return Array.from(document.querySelectorAll(".report-entry")).map((row) => ({
+          employeeCode: row.dataset.code || "",
+          employeeName: row.dataset.name || "",
+          boxBronze: row.querySelector('[data-key="boxBronze"]').value || 0,
+          boxSilver: row.querySelector('[data-key="boxSilver"]').value || 0,
+          boxGold: row.querySelector('[data-key="boxGold"]').value || 0,
+          notes: row.querySelector(".report-note").value || "",
+        }));
+      }
+
+      function openReportSubmitModal() {
+        if (!state.reportReady || !state.reportBranch) {
+          openReportBranchModal();
+          return;
+        }
+        if (state.reportData && state.reportData.submitted) {
+          showNotice("reportNotice", "เดือนนี้ส่งข้อมูลแล้ว แก้ไขหรือส่งซ้ำไม่ได้", true);
+          return;
+        }
+        if (!state.reportMonth) {
+          showNotice("reportNotice", "กรุณาเลือกเดือนก่อนส่งข้อมูล โหมดรวมทั้งหมดใช้ดูประวัติเท่านั้น", true);
+          return;
+        }
+        const hasSale = getReportEntries().some((entry) => {
+          return Number(entry.boxBronze || 0) + Number(entry.boxSilver || 0) + Number(entry.boxGold || 0) > 0;
+        });
+        if (!hasSale) {
+          showNotice("reportNotice", "กรุณากรอกยอดขายอย่างน้อย 1 รายการ", true);
+          return;
+        }
+        document.getElementById("reportSubmitPin").value = "";
+        document.getElementById("reportSubmitText").textContent = `ยืนยันส่งรายงานสาขา ${state.reportBranch} รอบปัจจุบัน`;
+        showNotice("reportSubmitNotice", "ข้อมูลรอบเดิมของสาขานี้จะถูกแทนที่ด้วยชุดล่าสุด", false);
+        document.getElementById("reportSubmitModal").classList.remove("hidden");
+        setTimeout(() => document.getElementById("reportSubmitPin").focus(), 40);
+      }
+
+      function closeReportSubmitModal() {
+        document.getElementById("reportSubmitModal").classList.add("hidden");
+      }
+
+      function handleReportSubmitPinKey(event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          submitBranchReport();
+        }
+        if (event.key === "Escape") {
+          closeReportSubmitModal();
+        }
+      }
+
+      function submitBranchReport() {
+        const pin = document.getElementById("reportSubmitPin").value.trim();
+        if (!state.reportMonth) {
+          showNotice("reportSubmitNotice", "กรุณาเลือกเดือนก่อนส่งข้อมูล", true);
+          return;
+        }
+        if (!pin) {
+          showNotice("reportSubmitNotice", "กรุณาใส่รหัสสาขาเพื่อยืนยัน", true);
+          return;
+        }
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((result) => {
+            setBusy(false);
+            closeReportSubmitModal();
+            state.reportData = result.state || state.reportData;
+            state.reportCache = {};
+            cacheReportState(state.reportData);
+            renderReportTable(state.reportData);
+            showNotice("reportNotice", `ส่งข้อมูลสำเร็จ ${number(result.rowsSaved || 0)} รายการ ยอดรวม ${money(result.totalSales || 0)}`, false, true);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            const message = error.message || "";
+            if (message.indexOf("STOCK_OVER_LIMIT:") === 0) {
+              closeReportSubmitModal();
+              openStockOverModal(message.split(":")[1] || state.reportBranch);
+              return;
+            }
+            showNotice("reportSubmitNotice", error.message || "ส่งข้อมูลไม่สำเร็จ", true);
+          })
+          .submitBranchSalesReport(state.reportBranch, pin, state.reportMonth, getReportEntries());
+      }
+
+      function openStockOverModal(branch) {
+        const branchLabel = branch || state.reportBranch || "-";
+        document.getElementById("stockOverText").textContent = `ข้อมูลที่ส่งจำนวนสินค้าเกินกว่าเครดิตสต๊อกที่ทางสาขา ${branchLabel} รับไป โปรดติดต่อทีมงาน NECSHORA 63 โดยตรงด่วน`;
+        document.getElementById("stockOverModal").classList.remove("hidden");
+      }
+
+      function closeStockOverModal() {
+        document.getElementById("stockOverModal").classList.add("hidden");
+      }
+
+      function exitReportMode() {
+        state.reportReady = false;
+        state.reportData = null;
+        state.reportPinValue = "";
+        state.reportBranch = "";
+        state.reportPendingBranch = "";
+        state.reportCache = {};
+        document.getElementById("reportPin").value = "";
+        document.getElementById("reportSubmitPin").value = "";
+        setMode("public");
+      }
+
+      function handleLookupKey(event) {
+        if (event.isComposing) return;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          lookupEmployee();
+        }
+      }
+
+      function renderPublicState(data) {
+        fillMonthSelect("employeeMonth", data.months || []);
+      }
+
+      function fillMonthSelect(id, months) {
+        const select = document.getElementById(id);
+        const current = select.value;
+        select.innerHTML = '<option value="">ทุกเดือน</option>' + months.map((month) => {
+          return `<option value="${escapeHtml(formatMonthKey(month))}">${escapeHtml(formatMonthLabel(month))}</option>`;
+        }).join("");
+        select.value = current;
+      }
+
+      function lookupEmployee() {
+        const code = document.getElementById("employeeCode").value.trim();
+        const month = document.getElementById("employeeMonth").value;
+        if (!code) {
+          showNotice("publicNotice", "กรุณากรอกรหัสสมาชิก", true);
+          return;
+        }
+        state.detailMonth = month;
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((data) => {
+            setBusy(false);
+            renderEmployee(data);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            showNotice("publicNotice", error.message, true);
+          })
+          .getEmployeeSummary(code, "");
+      }
+
+      function renderEmployee(data) {
+        state.currentEmployee = data;
+        if (state.detailMonth && !(data.months || []).some((row) => row.month === state.detailMonth)) {
+          state.detailMonth = "";
+        }
+        document.getElementById("employeeName").textContent = data.employeeName || data.employeeCode;
+        document.getElementById("employeeMeta").textContent = `รหัส ${data.employeeCode} | พบ ${data.totals.count} รายการ`;
+        document.getElementById("totalSales").textContent = money(data.totals.totalSales);
+          document.getElementById("totalCommission").textContent = money(data.totals.totalCommission);
+          document.getElementById("totalRows").textContent = number(data.totals.count);
+          renderSpecialTgInventorySummary(data);
+          const profile = data.profile || {};
+          document.getElementById("profileCode").textContent = data.employeeCode || "-";
+          document.getElementById("profileRealName").textContent = profile.realName || data.employeeName || "-";
+          document.getElementById("profileNickname").textContent = profile.nickname || "-";
+          document.getElementById("profileBranch").textContent = branchName(profile.branch) || "-";
+          renderMemberBackground(profile.bgImage);
+          renderProductSummary(data.productTotals || {});
+          fillMonthSelect("employeeMonth", data.availableMonths || []);
+          fillDetailMonthSelect(data.months || []);
+        const lookupMessage = data.totals.count
+          ? "โหลดข้อมูลสำเร็จ"
+          : data.memberFound
+            ? "พบสมาชิกแล้ว แต่ยังไม่มียอดขายในเดือนที่เลือก"
+            : "ไม่พบรหัสนี้ในฐานสมาชิก";
+        showNotice("publicNotice", lookupMessage, !data.totals.count && !data.memberFound, data.totals.count || data.memberFound);
+
+        renderSalesDetails();
+        }
+
+        function fillDetailMonthSelect(monthRows) {
+          const select = document.getElementById("detailMonth");
+          const months = (monthRows || []).map((row) => row.month).filter(Boolean);
+          select.innerHTML = '<option value="">รวมทั้งหมด</option>' + months.map((month) => {
+            return `<option value="${escapeHtml(formatMonthKey(month))}">${escapeHtml(formatMonthLabel(month))}</option>`;
+          }).join("");
+          select.value = state.detailMonth || "";
+        }
+
+        function renderSalesDetails() {
+          const data = state.currentEmployee || {};
+          const selectedMonth = document.getElementById("detailMonth").value;
+          state.detailMonth = selectedMonth;
+          const rows = (data.allSales || data.sales || []).filter((row) => {
+            return !selectedMonth || formatMonthKey(row.Month || "") === selectedMonth;
+          });
+          document.getElementById("detailCount").textContent = `${number(rows.length)} รายการ`;
+          document.getElementById("salesBody").innerHTML = rows.length ? rows.map((row) => `
+            <tr>
+              <td data-label="วันที่ขาย">${escapeHtml(formatSaleDateLabel(row))}</td>
+              <td data-label="เลขบิล">${escapeHtml(row["Invoice No"] || "")}</td>
+              <td data-label="สินค้า">${escapeHtml(row.Item || "")}</td>
+              <td data-label="สมาชิก">${escapeHtml(row.Customer || "")}</td>
+              <td data-label="ยอดขาย">${money(row["Sale Amount"])}</td>
+              <td data-label="เรท">${number(row["Commission Rate"])}%</td>
+            <td data-label="ค่าคอม">${money(row["Commission Amount"])}</td>
+          </tr>
+          `).join("") : '<tr><td colspan="7" class="muted">ยังไม่มีข้อมูลในเดือนที่เลือก</td></tr>';
+        }
+
+        function renderMemberBackground(imageUrl) {
+          const hero = document.getElementById("memberHero");
+          if (!imageUrl) {
+            hero.classList.remove("has-member-bg");
+            hero.style.removeProperty("--member-bg");
+            return;
+          }
+          hero.style.setProperty("--member-bg", `url("${String(imageUrl).replace(/"/g, "%22")}")`);
+          hero.classList.add("has-member-bg");
+        }
+
+        function renderProductSummary(totals) {
+          const items = [
+            ["กล่อง Bronze", totals.boxBronze],
+            ["กล่อง Silver", totals.boxSilver],
+            ["กล่อง Gold", totals.boxGold],
+            ["ซอง Bronze", totals.packBronze],
+            ["ซอง Silver", totals.packSilver],
+            ["ซอง Gold", totals.packGold],
+            ["ไข่เงิน", totals.silverEgg],
+            ["ไข่ทอง", totals.goldEgg],
+            ["อื่นๆ", totals.otherQty],
+          ];
+          document.getElementById("productSummary").innerHTML = items.map(([label, value]) => `
+            <div class="mini-card">
+              <span class="muted">${escapeHtml(label)}</span>
+              <strong>${number(value)}</strong>
+            </div>
+          `).join("");
+        }
+
+        function renderSpecialTgInventorySummary(data) {
+          const special = data.specialTgInventorySummary || {};
+          const memberTotals = data.memberTotals || {};
+          const showSpecial = Boolean(special.isSpecial);
+          document.getElementById("memberOnlySalesCard").classList.toggle("hidden", !showSpecial);
+          document.getElementById("specialTgInventoryCard").classList.toggle("hidden", !showSpecial);
+          if (!showSpecial) return;
+          document.getElementById("memberOnlySales").textContent = money(memberTotals.totalSales || 0);
+          document.getElementById("specialTgInventorySales").textContent = money(special.totalSales || 0);
+        }
+
+      function unlockAdmin() {
+        const pin = getPin();
+        if (!pin) {
+          showNotice("adminModalNotice", "กรุณาใส่รหัสแอดมิน", true);
+          return;
+        }
+        setBusy(true);
+        google.script.run
+          .withSuccessHandler((data) => {
+            setBusy(false);
+            state.adminReady = true;
+            renderAdmin(data);
+            closeAdminModal();
+            setMode("admin");
+            showNotice("adminNotice", "ปลดล็อกสำเร็จ", false, true);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            showNotice("adminModalNotice", "รหัสไม่ถูกต้อง", true);
+          })
+          .getAdminState(pin);
+      }
+
+        function renderAdmin(data) {
+          state.branchSummary = data.branchSummary || [];
+          state.pendingReports = data.pendingReports || [];
+          renderPendingReportAlert();
+          renderBranchCards();
+          document.getElementById("uploadCount").textContent = `${number((data.uploads || []).length)} ครั้ง`;
+          document.getElementById("uploadsBody").innerHTML = (data.uploads || []).length ? data.uploads.map((row) => `
+          <tr>
+            <td data-label="วันเวลา">${escapeHtml(formatUploadDateTimeLabel(row))}</td>
+            <td data-label="ไฟล์">${escapeHtml(row["File Name"] || "")}</td>
+            <td data-label="แถว">${number(row["Rows Imported"])}</td>
+            <td data-label="ยอดขาย">${money(row["Total Sales"])}</td>
+            <td data-label="ค่าคอม">${money(row["Total Commission"])}</td>
+            <td data-label="จัดการ"><button class="delete-upload" type="button" onclick="deleteUploadFile('${encodeURIComponent(row["Upload ID"] || "")}', '${encodeURIComponent(row["File Name"] || "")}')">ลบไฟล์</button></td>
+          </tr>
+          `).join("") : '<tr><td colspan="6" class="muted">ยังไม่มีประวัติ</td></tr>';
+        }
+
+        function startAdminRealtimeReports() {
+          if (state.adminPollTimer) return;
+          state.adminPollTimer = window.setInterval(refreshAdminRealtimeReports, 4000);
+        }
+
+        function stopAdminRealtimeReports() {
+          if (state.adminPollTimer) {
+            window.clearInterval(state.adminPollTimer);
+            state.adminPollTimer = 0;
+          }
+          state.adminPollBusy = false;
+        }
+
+        function refreshAdminRealtimeReports() {
+          if (!state.adminReady || state.mode !== "admin" || state.adminPollBusy || document.hidden) return;
+          const pin = getPin();
+          if (!pin) return;
+          state.adminPollBusy = true;
+          const previousCount = (state.pendingReports || []).length;
+          google.script.run
+            .withSuccessHandler((data) => {
+              state.adminPollBusy = false;
+              const nextReports = data.pendingReports || [];
+              const nextCount = nextReports.length;
+              state.pendingReports = nextReports;
+              if (Array.isArray(data.branchSummary)) {
+                state.branchSummary = data.branchSummary;
+              }
+              renderPendingReportAlert(previousCount);
+              if (!document.getElementById("pendingReportsModal").classList.contains("hidden")) {
+                if (!nextReports.some((report) => report.submissionId === state.selectedPendingReportId)) {
+                  state.selectedPendingReportId = nextReports[0] ? nextReports[0].submissionId || "" : "";
+                }
+                renderPendingReportsModal();
+              }
+              if (nextCount > previousCount) {
+                showNotice("adminNotice", `มีรายงานรออนุมัติใหม่ ${number(nextCount)} รายการ`, false, true);
+              }
+            })
+            .withFailureHandler(() => {
+              state.adminPollBusy = false;
+            })
+            .getAdminState(pin);
+        }
+
+        function renderPendingReportAlert(previousCount) {
+          const alert = document.getElementById("adminReportAlert");
+          const count = (state.pendingReports || []).length;
+          popPendingReportAlertIfNeeded(count, previousCount);
+          alert.classList.toggle("hidden", count <= 0);
+          document.getElementById("adminReportAlertTitle").textContent = count ? `มีรายงานรออนุมัติ ${number(count)} รายการ` : "ไม่มีรายงานรออนุมัติ";
+          document.getElementById("adminReportAlertMeta").textContent = count
+            ? "กดเพื่อตรวจสอบยอดขายจากสาขา ก่อนตัดสต๊อกเข้าระบบจริง"
+            : "";
+        }
+
+        function popPendingReportAlertIfNeeded(count, previousCount) {
+          const alert = document.getElementById("adminReportAlert");
+          if (count > (previousCount || state.lastPendingReportCount || 0)) {
+            alert.classList.remove("live-pop");
+            void alert.offsetWidth;
+            alert.classList.add("live-pop");
+          }
+          state.lastPendingReportCount = count;
+        }
+
+        function openPendingReportsModal() {
+          const reports = state.pendingReports || [];
+          if (!reports.length) return;
+          state.selectedPendingReportId = reports[0].submissionId || "";
+          renderPendingReportsModal();
+          document.getElementById("pendingReportsModal").classList.remove("hidden");
+        }
+
+        function closePendingReportsModal() {
+          document.getElementById("pendingReportsModal").classList.add("hidden");
+        }
+
+        function selectPendingReport(id) {
+          state.selectedPendingReportId = id;
+          renderPendingReportsModal();
+        }
+
+        function renderPendingReportsModal() {
+          const reports = state.pendingReports || [];
+          const selected = reports.find((report) => report.submissionId === state.selectedPendingReportId) || reports[0] || {};
+          state.selectedPendingReportId = selected.submissionId || "";
+          document.getElementById("pendingReportsMeta").textContent = selected.submissionId
+            ? `สาขา ${selected.branch || "-"} | ${formatMonthLabel(selected.month || "")} | ส่งเมื่อ ${formatDateTimeLabel(selected.submittedAt || "")}`
+            : "ยังไม่มีรายงานรออนุมัติ";
+          const rows = reports.flatMap((report) => {
+            const lines = report.lines && report.lines.length ? report.lines : [{ employeeName: "-", employeeCode: "", boxBronze: 0, boxSilver: 0, boxGold: 0 }];
+            return lines.map((line) => {
+              const active = report.submissionId === state.selectedPendingReportId ? " active" : "";
+              return `
+            <tr class="click-row${active}" onclick="selectPendingReport('${escapeHtml(report.submissionId || "")}')">
+              <td data-label="สาขา">${escapeHtml(report.branch || "")}</td>
+              <td data-label="เดือน">${escapeHtml(formatMonthLabel(report.month || ""))}</td>
+              <td data-label="สมาชิก">${escapeHtml(line.nickname || line.saleName || line.employeeCode || line.employeeName || "")}</td>
+              <td data-label="Bronze">${number(line.boxBronze)}</td>
+              <td data-label="Silver">${number(line.boxSilver)}</td>
+              <td data-label="Gold">${number(line.boxGold)}</td>
+              <td data-label="ยอดขาย">${money((line.boxBronze || 0) * 650 + (line.boxSilver || 0) * 1100 + (line.boxGold || 0) * 1650)}</td>
+            </tr>
+              `;
+            });
+          });
+          document.getElementById("pendingReportsBody").innerHTML = rows.length ? rows.join("") : '<tr><td colspan="7" class="muted">ยังไม่มีรายงานรออนุมัติ</td></tr>';
+        }
+
+        function approveSelectedReport() {
+          if (!state.selectedPendingReportId) return;
+          setBusy(true);
+          showNotice("adminNotice", "กำลังอนุมัติรายงานและตัดสต๊อก...", false);
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              closePendingReportsModal();
+              renderAdmin(data);
+              showNotice("adminNotice", "อนุมัติรายงานสำเร็จ สต๊อกถูกอัปเดตแล้ว", false, true);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message || "อนุมัติไม่สำเร็จ", true);
+            })
+            .approveBranchReport(getPin(), state.selectedPendingReportId);
+        }
+
+        function rejectSelectedReport() {
+          if (!state.selectedPendingReportId) return;
+          setBusy(true);
+          showNotice("adminNotice", "กำลังไม่อนุมัติรายงาน...", false);
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              closePendingReportsModal();
+              renderAdmin(data);
+              showNotice("adminNotice", "ไม่อนุมัติรายงานแล้ว สาขาสามารถส่งใหม่ได้", false, true);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message || "ไม่อนุมัติไม่สำเร็จ", true);
+            })
+            .rejectBranchReport(getPin(), state.selectedPendingReportId);
+        }
+
+        function deleteUploadFile(encodedUploadId, encodedFileName) {
+          const uploadId = decodeURIComponent(encodedUploadId || "");
+          const fileName = decodeURIComponent(encodedFileName || "");
+          if (!uploadId) {
+            showNotice("adminNotice", "ไม่พบรหัสไฟล์อัปโหลด", true);
+            return;
+          }
+          const label = fileName || uploadId;
+          if (!confirm(`ลบไฟล์นี้ออกจากระบบ?\n\n${label}\n\nยอดขายและค่าคอมทุกแถวที่มาจากไฟล์นี้จะถูกลบออกทันที`)) {
+            return;
+          }
+
+          setBusy(true);
+          showNotice("adminNotice", "กำลังลบไฟล์และยอดที่เกี่ยวข้อง...", false);
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              renderAdmin(data);
+              state.adminDetailOpen = false;
+              document.getElementById("employeeDetails").classList.add("hidden");
+              document.getElementById("adminDetailClose").classList.add("hidden");
+              google.script.run.withSuccessHandler(renderPublicState).getPublicState();
+              const deleted = data.deletedUpload || {};
+              showNotice("adminNotice", `ลบไฟล์สำเร็จ: ลบยอดขาย ${number(deleted.salesRows || 0)} แถว`, false, true);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message, true);
+            })
+            .deleteUpload(getPin(), uploadId);
+        }
+
+        function renderBranchCards() {
+          const monthOptions = getBranchMonthOptions();
+          const selectedMonth = getSelectedBranchMonth(monthOptions);
+          renderBranchMonthSelect(monthOptions, selectedMonth);
+          document.getElementById("branchCards").innerHTML = state.branchSummary.map((branch) => `
+            <button class="branch-card" type="button" onclick="selectBranch('${escapeHtml(branch.code)}')">
+              <span class="muted">${escapeHtml(branch.name)}</span>
+              <strong class="branch-total">${money(getBranchMonthTotals(branch, selectedMonth).totalSales)}</strong>
+              <span class="muted">${number(branch.employeeCount)} คน | ${number(getBranchMonthTotals(branch, selectedMonth).rowCount)} รายการ</span>
+            </button>
+          `).join("");
+          const selected = state.branchSummary.find((branch) => branch.code === state.selectedBranch) || state.branchSummary[0];
+          if (selected) selectBranch(selected.code);
+        }
+
+        function getBranchMonthOptions() {
+          const months = {};
+          state.branchSummary.forEach((branch) => {
+            getCycleRows(branch.cycleHistory).forEach((row) => {
+              if (row.month) months[row.month] = row;
+            });
+            getCycleRows(branch.inventorySummary && branch.inventorySummary.cycleHistory).forEach((row) => {
+              if (row.month) months[row.month] = row;
+            });
+          });
+          return Object.values(months).sort((a, b) => String(b.month || "").localeCompare(String(a.month || "")));
+        }
+
+        function getSelectedBranchMonth(monthOptions) {
+          const options = monthOptions || [];
+          if (!state.selectedBranchMonth) return "";
+          const selected = options.find((row) => row.month === state.selectedBranchMonth);
+          if (!selected) state.selectedBranchMonth = "";
+          return state.selectedBranchMonth || "";
+        }
+
+        function renderBranchMonthSelect(monthOptions, selectedMonth) {
+          const select = document.getElementById("branchMonthSelect");
+          if (!select) return;
+          if (!(monthOptions || []).length) {
+            select.innerHTML = '<option value="">ยังไม่มีเดือนให้เลือก</option>';
+            select.disabled = true;
+            return;
+          }
+          select.disabled = false;
+          const monthRows = (monthOptions || []).map((row) => {
+            const start = formatDateTimeLabel(row.cycleStart || "", true);
+            const end = formatDateTimeLabel(row.cycleEnd || "", true);
+            const label = `${formatMonthLabel(row.month || "")}${start && end ? ` (รอบ ${start} - ${end})` : ""}`;
+            return `<option value="${escapeHtml(row.month || "")}">${escapeHtml(label)}</option>`;
+          }).join("");
+          select.innerHTML = '<option value="">รวมทั้งหมด</option>' + monthRows;
+          select.value = selectedMonth || "";
+        }
+
+        function changeBranchMonth(month) {
+          state.selectedBranchMonth = month || "";
+          renderBranchCards();
+        }
+
+        function getCycleRows(value) {
+          if (Array.isArray(value)) return value;
+          if (value && typeof value === "object") return Object.values(value);
+          return [];
+        }
+
+        function getBranchMonthTotals(branch, selectedMonth) {
+          if (!selectedMonth) {
+            return {
+              rowCount: Number(branch.rowCount || 0),
+              totalSales: Number(branch.totalSales || 0),
+              totalCommission: Number(branch.totalCommission || 0),
+            };
+          }
+          const row = getCycleRows(branch.cycleHistory).find((item) => item.month === selectedMonth) || {};
+          return {
+            rowCount: Number(row.rowCount || 0),
+            totalSales: Number(row.totalSales || 0),
+            totalCommission: Number(row.totalCommission || 0),
+          };
+        }
+
+        function getEmployeeMonthTotals(employee, selectedMonth) {
+          if (!selectedMonth) {
+            return {
+              rowCount: Number(employee.rowCount || 0),
+              totalSales: Number(employee.totalSales || 0),
+              totalCommission: Number(employee.totalCommission || 0),
+            };
+          }
+          const row = getCycleRows(employee.cycleHistory).find((item) => item.month === selectedMonth) || {};
+          return {
+            rowCount: Number(row.rowCount || 0),
+            totalSales: Number(row.totalSales || 0),
+            totalCommission: Number(row.totalCommission || 0),
+          };
+        }
+
+        function selectBranch(code) {
+          state.selectedBranch = code;
+          state.selectedInventoryMonth = "";
+          const branch = state.branchSummary.find((item) => item.code === code);
+          if (!branch) return;
+          document.getElementById("selectedBranchPill").textContent = branch.name;
+          document.getElementById("branchInventoryAction").classList.toggle("hidden", !INVENTORY_BRANCHES.includes(branch.code));
+          const selectedMonth = state.selectedBranchMonth || "";
+          const employees = (branch.employees || []).slice().sort((a, b) => {
+            const aTotals = getEmployeeMonthTotals(a, selectedMonth);
+            const bTotals = getEmployeeMonthTotals(b, selectedMonth);
+            return bTotals.totalSales - aTotals.totalSales;
+          });
+          document.getElementById("branchEmployeesBody").innerHTML = employees.length ? employees.map((employee) => {
+            const totals = getEmployeeMonthTotals(employee, selectedMonth);
+            return `
+            <tr class="click-row" onclick="openAdminEmployeeDetail('${encodeURIComponent(employee.employeeCode)}')">
+              <td data-label="รหัส">${escapeHtml(employee.employeeCode)}</td>
+              <td data-label="ชื่อ">${escapeHtml(employee.nickname || employee.employeeName || "-")}</td>
+              <td data-label="รายการ">${number(totals.rowCount)}</td>
+              <td data-label="ยอดขาย">${money(totals.totalSales)}</td>
+              <td data-label="ค่าคอม">${money(totals.totalCommission)}</td>
+            </tr>
+          `;
+          }).join("") : '<tr><td colspan="5" class="muted">ยังไม่มีข้อมูลในสาขานี้</td></tr>';
+        }
+
+        function openBranchInventory() {
+          const branch = state.branchSummary.find((item) => item.code === state.selectedBranch);
+          if (!branch || !INVENTORY_BRANCHES.includes(branch.code)) return;
+
+          const inventory = branch.inventorySummary || {};
+          const cycleOptions = getInventoryCycleOptions(inventory);
+          const selectedCycle = getSelectedInventoryCycle(inventory, cycleOptions);
+          const isAllInventory = !selectedCycle.month;
+          const credits = isAllInventory
+            ? inventory.creditsAllTotal || inventory.creditsTotal || {}
+            : selectedCycle.creditsTotal || {};
+          const sold = selectedCycle.soldTotal || inventory.allocationSoldTotal || inventory.soldTotal || {};
+          const remaining = isAllInventory ? inventory.remainingTotal || {} : {};
+          const oversold = isAllInventory ? inventory.oversoldTotal || {} : {};
+          const items = STOCK_ITEMS.map((item) => ({
+            key: item.key,
+            label: item.label,
+            issued: Number(credits[item.key] || 0),
+            sold: Number(sold[item.key] || 0),
+            remaining: isAllInventory
+              ? Number(remaining[item.key] || 0)
+              : Math.max(Number(credits[item.key] || 0) - Number(sold[item.key] || 0), 0),
+            oversold: isAllInventory
+              ? Number(oversold[item.key] || 0)
+              : Math.max(Number(sold[item.key] || 0) - Number(credits[item.key] || 0), 0),
+          }));
+
+          document.getElementById("inventoryModalTitle").textContent = `สถานะคลังรวม ${branch.name}`;
+          const cycleStart = formatDateTimeLabel(selectedCycle.cycleStart || inventory.cycleStart || "", true);
+          const cycleEnd = formatDateTimeLabel(selectedCycle.cycleEnd || inventory.cycleEnd || "", true);
+          document.getElementById("inventoryMeta").textContent = isAllInventory
+            ? "รวมสถานะคลังจากทุกเดือน"
+            : cycleStart && cycleEnd
+              ? `รอบค่าคอม ${cycleStart} ถึง ${cycleEnd}`
+              : "รอบค่าคอมวันที่ 25 ถึงวันที่ 25 เดือนถัดไป";
+          renderInventoryCycleSelect(cycleOptions, selectedCycle.month || "");
+          const branchRate = branch.code === "TG" ? 15 : 10;
+          inventory.totalSales = selectedCycle.totalSales || 0;
+          inventory.totalCommission = selectedCycle.totalCommission || 0;
+          document.getElementById("inventoryStats").innerHTML = [
+            ["ยอดโอนเข้าบริษัท NEXORA 63", money(inventory.totalSales || 0)],
+            [`NEXORA 63 ต้องโอนคืน ${branchRate}%`, money(inventory.totalCommission || 0)],
+            ["กล่องขายแล้วรวม", number(items.reduce((sum, item) => sum + item.sold, 0))],
+          ].map(([label, value]) => `
+            <div class="mini-card">
+              <span class="muted">${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+            </div>
+          `).join("");
+          const summaryRows = items.map((item) => `
+            <tr>
+              <td data-label="สินค้า">${escapeHtml(item.label)}</td>
+              <td data-label="เครดิตเข้า">${number(item.issued)}</td>
+              <td data-label="ขายแล้ว">${number(item.sold)}</td>
+              <td data-label="คงค้างในคลัง">${item.oversold ? `-${number(item.oversold)}` : number(item.remaining)}</td>
+              <td data-label="เคลียร์แมนนวล"><input class="manual-clear-input" data-item-key="${escapeHtml(item.key)}" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></td>
+            </tr>
+          `).join("");
+          const lotRows = (inventory.lots || []).length ? `
+            <tr><td colspan="5"><strong>ประวัติล็อตเครดิต</strong></td></tr>
+            ${(inventory.lots || []).map((lot) => `
+              <tr>
+                <td data-label="ล็อต">${escapeHtml(lot.item || "")}<br><span class="muted">${escapeHtml(formatDateTimeLabel(lot.creditDate || "", true) || "ไม่ระบุวันที่")}</span></td>
+                <td data-label="เครดิตเข้า">${number(lot.quantity)}</td>
+                <td data-label="ขายแล้ว">${number(lot.sold)}</td>
+                <td data-label="คงเหลือ">${lot.remaining < 0 ? `-${number(Math.abs(lot.remaining))}` : `${number(lot.remaining)} · ${escapeHtml(lot.status || "")}`}</td>
+                <td data-label="จัดการ"><button class="cancel-lot" type="button" onclick="openCancelStockCreditModal('${encodeURIComponent(lot.creditId || "")}', '${encodeURIComponent(lot.item || "")}', '${encodeURIComponent(lot.creditDate || "")}')">ยกเลิก</button></td>
+              </tr>
+            `).join("")}
+          ` : '<tr><td colspan="5" class="muted">ยังไม่มีประวัติเติมเครดิตล็อต</td></tr>';
+          document.getElementById("inventoryBody").innerHTML = summaryRows + lotRows;
+          document.getElementById("inventoryModal").classList.remove("hidden");
+        }
+
+        function getInventoryCycleOptions(inventory) {
+          const rows = (inventory.cycleHistory || []).slice();
+          return rows.sort((a, b) => String(b.month || "").localeCompare(String(a.month || "")));
+        }
+
+        function getSelectedInventoryCycle(inventory, cycleOptions) {
+          if (!state.selectedInventoryMonth) return buildAllInventoryCycle(inventory, cycleOptions);
+          const selected = (cycleOptions || []).find((row) => row.month === state.selectedInventoryMonth);
+          if (!selected) {
+            state.selectedInventoryMonth = "";
+            return buildAllInventoryCycle(inventory, cycleOptions);
+          }
+          return selected;
+        }
+
+        function buildAllInventoryCycle(inventory, cycleOptions) {
+          const rows = cycleOptions || [];
+          const soldTotal = inventory.allocationSoldTotal || rows.reduce((totals, row) => {
+            STOCK_ITEMS.forEach((item) => {
+              totals[item.key] = Number(totals[item.key] || 0) + Number(row.soldTotal && row.soldTotal[item.key] || 0);
+            });
+            return totals;
+          }, {});
+          return {
+            month: "",
+            totalSales: rows.reduce((sum, row) => sum + Number(row.totalSales || 0), 0),
+            totalCommission: rows.reduce((sum, row) => sum + Number(row.totalCommission || 0), 0),
+            creditsTotal: inventory.creditsAllTotal || inventory.creditsTotal || {},
+            soldTotal,
+          };
+        }
+
+        function renderInventoryCycleSelect(cycleOptions, selectedMonth) {
+          const select = document.getElementById("inventoryCycleSelect");
+          if (!select) return;
+          const monthRows = (cycleOptions || []).map((row) => {
+            const start = formatDateTimeLabel(row.cycleStart || "", true);
+            const end = formatDateTimeLabel(row.cycleEnd || "", true);
+            const label = `${formatMonthLabel(row.month || "")}${start && end ? ` (รอบ ${start} - ${end})` : ""}`;
+            return `<option value="${escapeHtml(row.month || "")}">${escapeHtml(label)}</option>`;
+          }).join("");
+          select.innerHTML = '<option value="">รวมทั้งหมด</option>' + monthRows;
+          select.value = selectedMonth || "";
+        }
+
+        function changeInventoryCycle(month) {
+          state.selectedInventoryMonth = month || "";
+          openBranchInventory();
+        }
+
+        function closeBranchInventory() {
+          document.getElementById("inventoryModal").classList.add("hidden");
+          state.returnToInventoryAfterStock = false;
+          state.returnToInventoryAfterCancel = false;
+        }
+
+        function openCancelStockCreditModal(encodedCreditId, encodedItem, encodedDate) {
+          const creditId = decodeURIComponent(encodedCreditId || "");
+          if (!creditId || creditId.indexOf("OVER-") === 0) return;
+          const item = decodeURIComponent(encodedItem || "");
+          const date = decodeURIComponent(encodedDate || "");
+          state.pendingCancelStockCredit = { creditId, item, date };
+          state.returnToInventoryAfterCancel = !document.getElementById("inventoryModal").classList.contains("hidden");
+          document.getElementById("inventoryModal").classList.add("hidden");
+          document.getElementById("cancelStockCreditText").textContent = [
+            item || "รายการเติมสต๊อก",
+            formatDateTimeLabel(date, true) || "",
+            "ถ้ากดยืนยัน ตัวเลขจากล็อตนี้จะถูกลบออกและคำนวณคลังใหม่ทันที",
+          ].filter(Boolean).join(" · ");
+          document.getElementById("cancelStockCreditModal").classList.remove("hidden");
+        }
+
+        function closeCancelStockCreditModal(skipReturn) {
+          state.pendingCancelStockCredit = null;
+          document.getElementById("cancelStockCreditModal").classList.add("hidden");
+          if (!skipReturn && state.returnToInventoryAfterCancel) {
+            state.returnToInventoryAfterCancel = false;
+            openBranchInventory();
+          }
+        }
+
+        function confirmCancelStockCredit() {
+          const pending = state.pendingCancelStockCredit;
+          if (!pending || !pending.creditId) return;
+          setBusy(true);
+          showNotice("adminNotice", "กำลังยกเลิกรายการเติมสต๊อก...", false);
+          google.script.run
+            .withSuccessHandler((data) => {
+              const shouldReturn = state.returnToInventoryAfterCancel;
+              setBusy(false);
+              closeCancelStockCreditModal(true);
+              renderAdmin(data);
+              if (shouldReturn) {
+                state.returnToInventoryAfterCancel = false;
+                openBranchInventory();
+              }
+              showNotice("adminNotice", "ยกเลิกรายการเติมสต๊อกสำเร็จ", false, true);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message, true);
+            })
+            .deleteStockCredit(getPin(), pending.creditId);
+        }
+
+        function submitManualClear() {
+          const branch = state.branchSummary.find((item) => item.code === state.selectedBranch);
+          if (!branch || !INVENTORY_BRANCHES.includes(branch.code)) return;
+          const sales = Array.from(document.querySelectorAll(".manual-clear-input")).map((input) => ({
+            itemKey: input.dataset.itemKey,
+            quantity: input.value,
+          }));
+          if (!sales.some((item) => Number(item.quantity || 0) > 0)) {
+            showNotice("adminNotice", "กรุณากรอกจำนวนกล่องที่ต้องการเคลียร์อย่างน้อย 1 รายการ", true);
+            return;
+          }
+
+          setBusy(true);
+          showNotice("adminNotice", "กำลังเคลียร์ยอดขายแมนนวล...", false);
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              renderAdmin(data);
+              const refreshed = state.branchSummary.find((item) => item.code === branch.code);
+              if (refreshed) {
+                state.selectedBranch = refreshed.code;
+                openBranchInventory();
+              }
+              showNotice("adminNotice", "เคลียร์ยอดแมนนวลสำเร็จ", false, true);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message, true);
+            })
+            .addManualSales(getPin(), branch.code, sales);
+        }
+
+        function openStockCreditModal() {
+          const branch = state.branchSummary.find((item) => item.code === state.selectedBranch);
+          if (!branch || !INVENTORY_BRANCHES.includes(branch.code)) return;
+          state.returnToInventoryAfterStock = !document.getElementById("inventoryModal").classList.contains("hidden");
+          document.getElementById("inventoryModal").classList.add("hidden");
+          const today = new Date().toISOString().slice(0, 10);
+          document.getElementById("stockCreditModalTitle").textContent = `เติมสต๊อกเครดิต ${branch.name}`;
+          document.getElementById("stockCreditMeta").textContent = "กรอกจำนวนกล่องที่สาขารับไปขายเพิ่ม พร้อมวันที่ของล็อต";
+          document.getElementById("stockCreditRows").innerHTML = STOCK_ITEMS.map((item) => `
+            <div class="stock-credit-row" data-item-key="${escapeHtml(item.key)}">
+              <div class="stock-credit-title">
+                <span>Credit Lot</span>
+                <strong>${escapeHtml(item.label)}</strong>
+              </div>
+              <label>
+                จำนวนกล่อง
+                <input class="stock-qty" type="number" min="0" step="1" inputmode="numeric" placeholder="0">
+              </label>
+              <label>
+                วันที่เติมล็อต
+                <input class="stock-date" type="date" value="${today}" onchange="updateStockDateLabels()">
+                <span class="stock-date-label">${escapeHtml(formatDateTimeLabel(today, true))}</span>
+              </label>
+            </div>
+          `).join("");
+          document.getElementById("stockCreditModal").classList.remove("hidden");
+        }
+
+        function updateStockDateLabels() {
+          Array.from(document.querySelectorAll(".stock-credit-row")).forEach((row) => {
+            const date = row.querySelector(".stock-date").value;
+            row.querySelector(".stock-date-label").textContent = formatDateTimeLabel(date, true) || "";
+          });
+        }
+
+        function closeStockCreditModal(skipReturn) {
+          document.getElementById("stockCreditModal").classList.add("hidden");
+          if (!skipReturn && state.returnToInventoryAfterStock) {
+            state.returnToInventoryAfterStock = false;
+            openBranchInventory();
+          }
+        }
+
+        function submitStockCredit() {
+          const branch = state.branchSummary.find((item) => item.code === state.selectedBranch);
+          if (!branch || !INVENTORY_BRANCHES.includes(branch.code)) return;
+          const credits = Array.from(document.querySelectorAll(".stock-credit-row")).map((row) => ({
+            itemKey: row.dataset.itemKey,
+            quantity: row.querySelector(".stock-qty").value,
+            date: row.querySelector(".stock-date").value,
+          }));
+          if (!credits.some((item) => Number(item.quantity || 0) > 0)) {
+            showNotice("adminNotice", "กรุณากรอกจำนวนกล่องที่ต้องการเติมอย่างน้อย 1 รายการ", true);
+            return;
+          }
+
+          setBusy(true);
+          showNotice("adminNotice", "กำลังบันทึกสต๊อกเครดิต...", false);
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              renderAdmin(data);
+              closeStockCreditModal(true);
+              if (state.returnToInventoryAfterStock) {
+                state.returnToInventoryAfterStock = false;
+                openBranchInventory();
+              }
+              showNotice("adminNotice", "บันทึกสต๊อกเครดิตสำเร็จ", false, true);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message, true);
+            })
+            .addStockCredit(getPin(), branch.code, credits);
+        }
+
+        function openAdminEmployeeDetail(encodedCode) {
+          const code = decodeURIComponent(encodedCode || "");
+          if (!code) return;
+          state.adminDetailOpen = true;
+          state.detailMonth = "";
+          moveEmployeeDetailsToAdmin();
+          document.getElementById("employeeDetails").classList.remove("hidden");
+          document.getElementById("adminDetailClose").classList.remove("hidden");
+          showNotice("adminNotice", "กำลังโหลดรายละเอียดพนักงาน...", false);
+          setBusy(true);
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              renderEmployee(data);
+              showNotice("adminNotice", "โหลดรายละเอียดพนักงานสำเร็จ", false, true);
+              document.getElementById("employeeDetails").scrollIntoView({ behavior: "smooth", block: "start" });
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message, true);
+            })
+            .getEmployeeSummary(code, "");
+        }
+
+        function closeAdminEmployeeDetail() {
+          state.adminDetailOpen = false;
+          state.currentEmployee = null;
+          state.detailMonth = "";
+          document.getElementById("employeeDetails").classList.add("hidden");
+          document.getElementById("adminDetailClose").classList.add("hidden");
+          showNotice("adminNotice", "ปิดรายละเอียดพนักงานแล้ว", false);
+        }
+
+        function moveEmployeeDetailsToAdmin() {
+          const details = document.getElementById("employeeDetails");
+          const mount = document.getElementById("adminDetailMount");
+          if (details.parentNode !== mount) {
+            mount.appendChild(details);
+          }
+        }
+
+        function moveEmployeeDetailsToPublic() {
+          const details = document.getElementById("employeeDetails");
+          const adminView = document.getElementById("adminView");
+          document.getElementById("adminDetailClose").classList.add("hidden");
+          if (details.parentNode !== adminView.parentNode || details.nextElementSibling !== adminView) {
+            adminView.parentNode.insertBefore(details, adminView);
+          }
+        }
+
+      function importUpload() {
+        const file = state.uploadFile || document.getElementById("excelFile").files[0];
+        if (!file) {
+          showNotice("adminNotice", "กรุณาเลือกไฟล์ Excel, PDF หรือ Word ก่อน", true);
+          return;
+        }
+        setBusy(true);
+        showNotice("adminNotice", "กำลังอ่านไฟล์และสรุปข้อมูลอัตโนมัติ...", false);
+        fileToPayload(file).then((payload) => {
+          google.script.run
+            .withSuccessHandler((data) => {
+              setBusy(false);
+              renderAdmin(data);
+              clearSelectedUploadFile();
+              showNotice("adminNotice", "นำเข้าและสรุปข้อมูลสำเร็จ", false, true);
+              google.script.run.withSuccessHandler(renderPublicState).getPublicState();
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              showNotice("adminNotice", error.message, true);
+            })
+            .importExcelUpload(getPin(), payload, {
+              month: document.getElementById("uploadMonth").value,
+              branch: document.getElementById("uploadBranch").value,
+            });
+        });
+      }
+
+      function setupUploadDropzone() {
+        const dropzone = document.getElementById("uploadDropzone");
+        ["dragenter", "dragover"].forEach((eventName) => {
+          dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            dropzone.classList.add("dragging");
+          });
+        });
+        ["dragleave", "drop"].forEach((eventName) => {
+          dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            dropzone.classList.remove("dragging");
+          });
+        });
+        dropzone.addEventListener("drop", (event) => {
+          const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+          if (file) setSelectedUploadFile(file);
+        });
+      }
+
+      function openFilePicker() {
+        document.getElementById("excelFile").click();
+      }
+
+      function handleDropzoneKey(event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openFilePicker();
+        }
+      }
+
+      function handleFilePicked(event) {
+        const file = event.target.files && event.target.files[0];
+        if (file) setSelectedUploadFile(file);
+      }
+
+      function setSelectedUploadFile(file) {
+        state.uploadFile = file;
+        document.getElementById("uploadFileName").textContent = file.name;
+        const inferredMonth = inferMonthFromFileName(file.name);
+        if (inferredMonth) {
+          document.getElementById("uploadMonth").value = inferredMonth;
+        }
+      }
+
+      function clearSelectedUploadFile() {
+        state.uploadFile = null;
+        document.getElementById("excelFile").value = "";
+        document.getElementById("uploadFileName").textContent = "ยังไม่ได้เลือกไฟล์";
+      }
+
+      function formatMonthKey(value) {
+        const text = String(value || "").trim();
+        const direct = text.match(/^(\d{4})-(\d{2})/);
+        if (direct) return `${direct[1]}-${direct[2]}`;
+        const date = new Date(text);
+        if (!Number.isNaN(date.getTime())) {
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        }
+        return text;
+      }
+
+      function formatMonthLabel(value) {
+        const key = formatMonthKey(value);
+        const match = key.match(/^(\d{4})-(\d{2})$/);
+        if (!match) return String(value || "");
+        const monthNames = [
+          "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+          "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+        ];
+        return `${monthNames[Number(match[2]) - 1]} ${match[1]}`;
+      }
+
+      function inferMonthFromFileName(name) {
+        const text = String(name || "").toLowerCase();
+        const iso = text.match(/(20\d{2})[-_.\s](0?[1-9]|1[0-2])/);
+        if (iso) return `${iso[1]}-${String(Number(iso[2])).padStart(2, "0")}`;
+        const dmy = text.match(/\b\d{1,2}[-_.\s](0?[1-9]|1[0-2])[-_.\s](20\d{2}|25\d{2})\b/);
+        if (dmy) {
+          let year = Number(dmy[2]);
+          if (year > 2400) year -= 543;
+          return `${year}-${String(Number(dmy[1])).padStart(2, "0")}`;
+        }
+        const monthMap = {
+          "มกราคม": 1, "ม.ค.": 1, "jan": 1,
+          "กุมภาพันธ์": 2, "ก.พ.": 2, "feb": 2,
+          "มีนาคม": 3, "มี.ค.": 3, "mar": 3,
+          "เมษายน": 4, "เม.ย.": 4, "apr": 4,
+          "พฤษภาคม": 5, "พ.ค.": 5, "may": 5,
+          "มิถุนายน": 6, "มิ.ย.": 6, "jun": 6,
+          "กรกฎาคม": 7, "ก.ค.": 7, "jul": 7,
+          "สิงหาคม": 8, "ส.ค.": 8, "aug": 8,
+          "กันยายน": 9, "ก.ย.": 9, "sep": 9,
+          "ตุลาคม": 10, "ต.ค.": 10, "oct": 10,
+          "พฤศจิกายน": 11, "พ.ย.": 11, "nov": 11,
+          "ธันวาคม": 12, "ธ.ค.": 12, "dec": 12,
+        };
+        const yearMatch = text.match(/\b(20\d{2}|25\d{2})\b/);
+        if (!yearMatch) return "";
+        let year = Number(yearMatch[1]);
+        if (year > 2400) year -= 543;
+        const found = Object.keys(monthMap).find((monthName) => text.indexOf(monthName) >= 0);
+        return found ? `${year}-${String(monthMap[found]).padStart(2, "0")}` : "";
+      }
+
+      function formatDateTimeLabel(value, hideSheetDefaultTime) {
+        const text = String(value || "").trim();
+        if (!text) return "";
+        const parts = parseDateTimeParts(text);
+        if (!parts) return text;
+        const monthNames = [
+          "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+          "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+        ];
+        const dateLabel = `${parts.day} ${monthNames[parts.month - 1]} ${parts.year}`;
+        const time = parts.time || "";
+        if (!time) return dateLabel;
+        if (hideSheetDefaultTime && (time === "07:00" || time === "07:00:00")) return dateLabel;
+        return `${dateLabel} ${time.slice(0, 5)}`;
+      }
+
+      function formatUploadDateTimeLabel(row) {
+        const uploadedAt = formatDateTimeLabel(row && row["Uploaded At"] || "", false);
+        if (uploadedAt) return uploadedAt;
+        return formatMonthLabel(row && row.Month || "");
+      }
+
+      function formatSaleDateLabel(row) {
+        const dateParts = parseDateTimeParts(row && row["Sale Date"] || "");
+        const monthKey = formatMonthKey(row && row.Month || "");
+        const monthMatch = monthKey.match(/^(\d{4})-(\d{2})$/);
+        if (!dateParts) return formatMonthLabel(monthKey || row.Month || "");
+        if (monthMatch) {
+          dateParts.year = Number(monthMatch[1]);
+          dateParts.month = Number(monthMatch[2]);
+        }
+        const monthNames = [
+          "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+          "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+        ];
+        const label = `${dateParts.day} ${monthNames[dateParts.month - 1]} ${dateParts.year}`;
+        const time = dateParts.time || "";
+        if (!time || time === "07:00" || time === "07:00:00") return label;
+        return `${label} ${time.slice(0, 5)}`;
+      }
+
+      function parseDateTimeParts(value) {
+        const text = String(value || "").trim();
+        let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T-]+(\d{1,2}:\d{2}(?::\d{2})?))?/);
+        if (match) {
+          return {
+            year: Number(match[1]),
+            month: Number(match[2]),
+            day: Number(match[3]),
+            time: match[4] || "",
+          };
+        }
+        match = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?:\s*[- ]\s*(\d{1,2}:\d{2}(?::\d{2})?))?/);
+        if (match) {
+          let year = Number(match[3]);
+          if (year < 100) year += 2000;
+          if (year > 2400) year -= 543;
+          return {
+            year,
+            month: Number(match[2]),
+            day: Number(match[1]),
+            time: match[4] || "",
+          };
+        }
+        const date = new Date(text);
+        if (Number.isNaN(date.getTime())) return null;
+        return {
+          year: date.getFullYear(),
+          month: date.getMonth() + 1,
+          day: date.getDate(),
+          time: `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`,
+        };
+      }
+
+      function fileToPayload(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve({
+            name: file.name,
+            mimeType: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            data: reader.result,
+          });
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function getPin() {
+        return document.getElementById("adminPin").value.trim();
+      }
+
+      function setBusy(isBusy) {
+        Array.from(document.querySelectorAll("button")).forEach((button) => {
+          button.disabled = isBusy;
+        });
+      }
+
+      function showNotice(id, message, isError, isSuccess) {
+        const element = document.getElementById(id);
+        element.textContent = message;
+        element.classList.toggle("error", Boolean(isError));
+        element.classList.toggle("success", Boolean(isSuccess));
+      }
+
+      function money(value) {
+        return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(Number(value) || 0);
+      }
+
+      function number(value) {
+        return new Intl.NumberFormat("th-TH").format(Number(value) || 0);
+      }
+
+      function branchName(code) {
+        return ({
+          NEX: "NEX",
+          TG: "TG",
+          CG: "CG",
+          NNT: "NNT",
+          GENERAL: "เครือข่ายทั่วไป",
+        })[String(code || "").toUpperCase()] || code;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#039;",
+        })[char]);
+      }
+    </script>
+  </body>
+</html>

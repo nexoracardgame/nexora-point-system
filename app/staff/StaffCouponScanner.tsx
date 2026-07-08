@@ -63,6 +63,20 @@ type CardRareScanView = {
   rewardLabel: string;
   optionKey: string;
   conditionLabel: string | null;
+  nexValue: number;
+  items?: Array<{
+    cardNo: string;
+    cardName: string;
+    rewardLabel: string;
+    optionKey: string;
+    conditionLabel: string | null;
+    nexValue: number;
+    imageUrl: string;
+    quantity: number;
+    lineTotalNex: number;
+  }>;
+  itemCount?: number;
+  totalQuantity?: number;
   valueLabel: string;
   status: "pending" | "approved" | "cancelled" | "expired";
   statusLabel: string;
@@ -70,6 +84,10 @@ type CardRareScanView = {
   expiresAt: string;
   approvedAt: string | null;
 };
+
+function formatNumber(value: number) {
+  return Number(value || 0).toLocaleString("th-TH");
+}
 
 function waitForPaint() {
   return new Promise<void>((resolve) => {
@@ -348,9 +366,13 @@ export default function StaffCouponScanner({
         if (action === "approve") {
           setMessage("การแลกเสร็จสมบูรณ์");
           showRedeemSuccess(
-            `อนุมัติ CARD RARE No. ${data?.redemption?.cardNo || ""} ${
-              data?.redemption?.cardName || ""
-            } สำเร็จ`.trim()
+            Number(data?.redemption?.itemCount || 1) > 1
+              ? `อนุมัติ CARD RARE ${data.redemption.itemCount} แบบ / ${
+                  data.redemption.totalQuantity || 1
+                } ใบ รวม ${data.redemption.valueLabel} สำเร็จ`
+              : `อนุมัติ CARD RARE No. ${data?.redemption?.cardNo || ""} ${
+                  data?.redemption?.cardName || ""
+                } สำเร็จ`.trim()
           );
         }
         setMessage(
@@ -915,10 +937,14 @@ export default function StaffCouponScanner({
                     CARD RARE
                   </div>
                   <div className="mt-2 text-2xl font-black">
-                    No. {cardRareResult.cardNo} {cardRareResult.cardName}
+                    {Number(cardRareResult.itemCount || 1) > 1
+                      ? `CARD RARE ${cardRareResult.itemCount} แบบ / ${
+                          cardRareResult.totalQuantity || 1
+                        } ใบ`
+                      : `No. ${cardRareResult.cardNo} ${cardRareResult.cardName}`}
                   </div>
                   <div className="mt-1 text-sm font-bold text-white/60">
-                    {cardRareResult.valueLabel}
+                    รวมทั้งหมด {cardRareResult.valueLabel}
                   </div>
                 </div>
 
@@ -951,6 +977,59 @@ export default function StaffCouponScanner({
                     </div>
                   </div>
                 </div>
+
+                {cardRareResult.items?.length ? (
+                  <div className="rounded-[22px] border border-amber-200/18 bg-amber-200/8 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.22em] text-amber-100/65">
+                          รายการการ์ดทั้งหมด
+                        </div>
+                        <div className="mt-1 text-sm font-black text-white/82">
+                          {cardRareResult.items.length} แบบ /{" "}
+                          {cardRareResult.totalQuantity || 1} ใบ
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-black">
+                        {cardRareResult.valueLabel}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {cardRareResult.items.map((item) => (
+                        <div
+                          key={`${item.cardNo}-${item.optionKey}`}
+                          className="flex gap-3 rounded-[18px] border border-white/8 bg-black/25 p-3"
+                        >
+                          <img
+                            src={item.imageUrl}
+                            alt={item.cardName}
+                            className="h-16 w-12 shrink-0 rounded-xl object-cover"
+                            onError={(event) => {
+                              event.currentTarget.src = "/avatar.png";
+                            }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-black text-white">
+                              No. {item.cardNo} {item.cardName}
+                            </div>
+                            <div className="mt-1 text-xs font-bold text-white/55">
+                              {formatNumber(item.nexValue)} NEX x{" "}
+                              {item.quantity} ใบ
+                            </div>
+                            {item.conditionLabel ? (
+                              <div className="mt-1 text-xs font-bold text-violet-100/70">
+                                {item.conditionLabel}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="text-right text-sm font-black text-amber-100">
+                            {formatNumber(item.lineTotalNex)} NEX
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                   <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">

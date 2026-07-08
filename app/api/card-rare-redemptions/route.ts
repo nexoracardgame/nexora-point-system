@@ -10,12 +10,25 @@ import {
   ensureCardRareRedemptionSchema,
   expireStaleCardRareRedemptions,
   serializeCardRareRedemption,
+  type CardRareRedemptionItem,
   type CardRareRedemptionRecord,
 } from "@/lib/card-rare-redemptions";
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
 };
+
+type CardRareRedemptionRequestItem = {
+  cardNo?: unknown;
+  optionKey?: unknown;
+  quantity?: unknown;
+};
+
+function normalizeQuantity(value: unknown) {
+  const quantity = Math.floor(Number(value || 1));
+  if (!Number.isFinite(quantity)) return 1;
+  return Math.min(99, Math.max(1, quantity));
+}
 
 async function getRedemptionByCode(code: string) {
   const rows = await prisma.$queryRawUnsafe<CardRareRedemptionRecord[]>(
@@ -105,13 +118,39 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const cardNo = String(body?.cardNo || "").trim();
-    const optionKey = String(body?.optionKey || "standard").trim();
-    const choice = getCardRareRewardChoice(cardNo, optionKey);
+    const requestedItems: CardRareRedemptionRequestItem[] = Array.isArray(
+      body?.items
+    )
+      ? body.items
+      : [{ cardNo: body?.cardNo, optionKey: body?.optionKey, quantity: 1 }];
 
-    if (!choice) {
+    const items = requestedItems
+      .slice(0, 120)
+      .map((item) => {
+        const choice = getCardRareRewardChoice(
+          String(item?.cardNo || "").trim(),
+          String(item?.optionKey || "standard").trim()
+        );
+        if (!choice) return null;
+
+        const quantity = normalizeQuantity(item?.quantity);
+        return {
+          cardNo: choice.reward.cardNo,
+          cardName: choice.reward.cardName,
+          rewardLabel: choice.rewardLabel,
+          optionKey: choice.option.key,
+          conditionLabel: choice.conditionLabel,
+          nexValue: choice.nexValue,
+          imageUrl: choice.reward.imageUrl,
+          quantity,
+          lineTotalNex: choice.nexValue * quantity,
+        } satisfies CardRareRedemptionItem;
+      })
+      .filter((item): item is CardRareRedemptionItem => Boolean(item));
+
+    if (!items.length) {
       return NextResponse.json(
-        { error: "ไม่พบการ์ดแรร์ใบนี้ในระบบ" },
+        { error: "ไม่พบการ์ดแรร์ในระบบ" },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
@@ -131,7 +170,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const code = buildCardRareCode(choice.reward.cardNo);
+    const firstItem = items[0];
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalNex = items.reduce((sum, item) => sum + item.lineTotalNex, 0);
+    const rewardLabel =
+      items.length === 1 && totalQuantity === 1
+        ? firstItem.rewardLabel
+        : `CARD RARE ${items.length} แบบ / ${totalQuantity} ใบ`;
+    const code = buildCardRareCode(firstItem.cardNo);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + CARD_RARE_REDEMPTION_TTL_MS);
 
@@ -139,21 +185,22 @@ export async function POST(req: Request) {
       `
         INSERT INTO "CardRareRedemption" (
           "id", "code", "userId", "cardNo", "cardName",
-          "rewardLabel", "optionKey", "conditionLabel", "nexValue", "imageUrl",
+          "rewardLabel", "optionKey", "conditionLabel", "nexValue", "imageUrl", "itemsJson",
           "status", "createdAt", "expiresAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)
       `,
       crypto.randomUUID(),
       code,
       userId,
-      choice.reward.cardNo,
-      choice.reward.cardName,
-      choice.rewardLabel,
-      choice.option.key,
-      choice.conditionLabel,
-      choice.nexValue,
-      choice.reward.imageUrl,
+      firstItem.cardNo,
+      items.length === 1 ? firstItem.cardName : `CARD RARE ${totalQuantity} ใบ`,
+      rewardLabel,
+      firstItem.optionKey,
+      firstItem.conditionLabel,
+      totalNex,
+      firstItem.imageUrl,
+      JSON.stringify(items),
       now,
       expiresAt
     );
@@ -164,16 +211,18 @@ export async function POST(req: Request) {
       userId,
       type: "wallet",
       title: "สร้าง QR แลก CARD RARE แล้ว",
-      body: `Card #${choice.reward.cardNo} ${choice.reward.cardName} ต้องให้พนักงานสแกนภายใน 1 ชั่วโมง`,
+      body: `${rewardLabel} รวม ${totalNex.toLocaleString("th-TH")} NEX ต้องให้พนักงานสแกนภายใน 1 ชั่วโมง`,
       href: "/card-rare",
-      image: choice.reward.imageUrl,
+      image: firstItem.imageUrl,
       meta: {
         source: "card-rare-redemption",
         code,
-        cardNo: choice.reward.cardNo,
-        cardName: choice.reward.cardName,
-        optionKey: choice.option.key,
-        conditionLabel: choice.conditionLabel,
+        cardNo: firstItem.cardNo,
+        cardName: firstItem.cardName,
+        optionKey: firstItem.optionKey,
+        conditionLabel: firstItem.conditionLabel,
+        totalQuantity,
+        totalNex,
       },
     }).catch(() => undefined);
 

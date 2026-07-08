@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PU Foam Deposit Calculator</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f5f8;
+        --ink: #09090b;
+        --muted: rgba(9, 9, 11, 0.52);
+        --line: rgba(9, 9, 11, 0.1);
+        --gold: #f3bd38;
+        --gold-soft: #ffe8a3;
+        --panel: rgba(255, 255, 255, 0.92);
+        --shadow: 0 28px 90px rgba(9, 9, 11, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 16% 10%, rgba(255, 255, 255, 0.96), transparent 22rem),
+          radial-gradient(circle at 90% 0%, rgba(243, 189, 56, 0.22), transparent 22rem),
+          linear-gradient(180deg, #fbfbfd 0%, #eef1f6 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(9, 9, 11, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(9, 9, 11, 0.026) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent 82%);
+      }
+
+      main {
+        position: relative;
+        z-index: 1;
+        width: min(1380px, calc(100% - 28px));
+        min-height: 100vh;
+        margin: 0 auto;
+        display: grid;
+        place-items: center;
+        padding: 32px 0;
+      }
+
+      .calculator {
+        width: 100%;
+        display: grid;
+        gap: 18px;
+        padding: clamp(18px, 4vw, 34px);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 247, 251, 0.92)),
+          var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(360px, 0.82fr) minmax(560px, 1.18fr);
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .estimate-column {
+        display: grid;
+        gap: 18px;
+        align-content: start;
+      }
+
+      .intro,
+      .input-card {
+        border-radius: 10px;
+        padding: clamp(18px, 3vw, 28px);
+      }
+
+      .intro {
+        display: grid;
+        gap: 18px;
+        align-content: center;
+        color: #ffffff;
+        background:
+          radial-gradient(circle at 100% 0%, rgba(255, 232, 163, 0.22), transparent 18rem),
+          linear-gradient(145deg, #111113, #050506);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .input-card {
+        display: grid;
+        gap: 14px;
+        background: #ffffff;
+        border: 1px solid var(--line);
+      }
+
+      .pill {
+        width: max-content;
+        min-height: 30px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 11px;
+        border-radius: 999px;
+        background: #09090b;
+        color: var(--gold-soft);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(30px, 5vw, 58px);
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: clamp(20px, 3vw, 30px);
+        line-height: 1.15;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .intro .muted {
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      label {
+        display: grid;
+        gap: 10px;
+        font-weight: 900;
+        color: var(--muted);
+      }
+
+      input {
+        width: 100%;
+        min-height: 78px;
+        border: 1px solid rgba(9, 9, 11, 0.1);
+        border-radius: 10px;
+        padding: 0 18px;
+        outline: none;
+        background: #f7f8fb;
+        color: var(--ink);
+        font: inherit;
+        font-size: clamp(28px, 6vw, 52px);
+        font-weight: 950;
+        letter-spacing: 0;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      }
+
+      input:focus {
+        border-color: rgba(243, 189, 56, 0.75);
+        box-shadow: 0 0 0 4px rgba(243, 189, 56, 0.16);
+      }
+
+      button {
+        min-height: 56px;
+        border: 0;
+        border-radius: 10px;
+        background: #09090b;
+        color: var(--gold-soft);
+        font: inherit;
+        font-weight: 950;
+        cursor: pointer;
+        box-shadow: 0 18px 42px rgba(9, 9, 11, 0.16);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.62;
+      }
+
+      .results {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .estimate-column .results {
+        grid-template-columns: 1fr;
+      }
+
+      .result {
+        min-height: 150px;
+        display: grid;
+        align-content: space-between;
+        gap: 16px;
+        padding: 18px;
+        border-radius: 10px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+          #09090b;
+        color: #ffffff;
+        border: 1px solid rgba(243, 189, 56, 0.24);
+        box-shadow: 0 20px 48px rgba(9, 9, 11, 0.18);
+      }
+
+      .estimate-column .result {
+        min-height: 108px;
+      }
+
+      .result span {
+        color: rgba(255, 255, 255, 0.58);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .result strong {
+        color: var(--gold-soft);
+        font-size: clamp(26px, 4vw, 42px);
+        line-height: 1;
+        overflow-wrap: anywhere;
+      }
+
+      .price-board {
+        display: grid;
+        gap: 14px;
+        padding: clamp(16px, 2.2vw, 22px);
+        border-radius: 10px;
+        background:
+          radial-gradient(circle at 100% 0%, rgba(243, 189, 56, 0.16), transparent 18rem),
+          linear-gradient(180deg, #111113, #050506);
+        color: #ffffff;
+        border: 1px solid rgba(243, 189, 56, 0.22);
+        box-shadow: 0 22px 60px rgba(9, 9, 11, 0.18);
+      }
+
+      .hero .price-board {
+        min-height: 100%;
+      }
+
+      .price-board .muted {
+        color: rgba(255, 255, 255, 0.58);
+      }
+
+      .price-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: end;
+        flex-wrap: wrap;
+      }
+
+      .price-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .price-group {
+        display: grid;
+        gap: 6px;
+        padding: 12px;
+        border-radius: 10px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.038));
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .price-group h3 {
+        color: var(--gold-soft);
+        font-size: clamp(14px, 1.15vw, 16px);
+        line-height: 1.2;
+      }
+
+      .price-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
+        gap: 9px;
+        align-items: center;
+        padding: 7px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .price-row:first-of-type {
+        border-top: 0;
+      }
+
+      .price-row span {
+        color: rgba(255, 255, 255, 0.76);
+        font-size: clamp(12px, 0.95vw, 14px);
+        font-weight: 900;
+        line-height: 1.34;
+      }
+
+      .price-row em {
+        display: block;
+        margin-top: 3px;
+        color: rgba(255, 255, 255, 0.56);
+        font-style: normal;
+        font-size: clamp(10px, 0.82vw, 11px);
+        font-weight: 800;
+        line-height: 1.25;
+      }
+
+      .price-row strong {
+        color: var(--gold-soft);
+        font-size: clamp(13px, 1.05vw, 16px);
+        text-align: right;
+        white-space: nowrap;
+        line-height: 1.1;
+      }
+
+      .price-sub {
+        margin-top: -2px;
+        color: rgba(255, 255, 255, 0.48);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .status {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #eef1f6;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      .status.ready {
+        color: #166534;
+        background: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.22);
+      }
+
+      .formula {
+        display: grid;
+        gap: 8px;
+        padding: 16px;
+        border-radius: 10px;
+        background: #f7f8fb;
+        border: 1px solid var(--line);
+        font-weight: 900;
+      }
+
+      .formula-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .percent-control {
+        display: inline-grid;
+        grid-template-columns: minmax(64px, 86px) auto;
+        align-items: center;
+        gap: 6px;
+        color: var(--ink);
+        font-weight: 950;
+      }
+
+      .percent-control input {
+        min-height: 38px;
+        padding: 0 10px;
+        border-radius: 8px;
+        background: #ffffff;
+        text-align: right;
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .standard-note {
+        display: grid;
+        gap: 10px;
+        margin-top: 8px;
+        padding: 14px;
+        border-radius: 10px;
+        background: rgba(243, 189, 56, 0.12);
+        border: 1px solid rgba(243, 189, 56, 0.28);
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 850;
+        line-height: 1.55;
+      }
+
+      .standard-note strong {
+        color: #7c5200;
+      }
+
+      .standard-reset {
+        width: max-content;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid rgba(9, 9, 11, 0.08);
+        background: #ffffff;
+        color: var(--ink);
+        box-shadow: none;
+        font-size: 12px;
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--line);
+      }
+
+      .travel-panel {
+        display: grid;
+        gap: 16px;
+        padding: clamp(18px, 3vw, 28px);
+        border-radius: 10px;
+        background:
+          radial-gradient(circle at 100% 0%, rgba(243, 189, 56, 0.14), transparent 18rem),
+          #ffffff;
+        border: 1px solid var(--line);
+      }
+
+      .travel-head {
+        display: grid;
+        gap: 8px;
+      }
+
+      .travel-grid {
+        display: grid;
+        grid-template-columns: 1fr 180px 160px;
+        gap: 12px;
+        align-items: end;
+      }
+
+      .travel-panel input {
+        min-height: 56px;
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      .travel-rate input {
+        text-align: center;
+      }
+
+      .travel-results {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .travel-result {
+        min-height: 116px;
+        display: grid;
+        align-content: space-between;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 10px;
+        background: #09090b;
+        color: #ffffff;
+        border: 1px solid rgba(243, 189, 56, 0.2);
+      }
+
+      .travel-result span {
+        color: rgba(255, 255, 255, 0.56);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .travel-result strong {
+        color: var(--gold-soft);
+        font-size: clamp(24px, 4vw, 38px);
+        line-height: 1;
+        overflow-wrap: anywhere;
+      }
+
+      .travel-address {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .address-card {
+        display: grid;
+        gap: 8px;
+        min-height: 86px;
+        padding: 16px;
+        border-radius: 10px;
+        background: #f7f8fb;
+        border: 1px solid var(--line);
+      }
+
+      .address-card span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .address-card strong {
+        color: var(--ink);
+        font-size: clamp(18px, 3vw, 26px);
+        line-height: 1.1;
+        overflow-wrap: anywhere;
+      }
+
+      .tank-delivery {
+        display: grid;
+        gap: 12px;
+        padding: clamp(16px, 2.4vw, 22px);
+        border-radius: 10px;
+        background: #09090b;
+        color: #ffffff;
+        border: 1px solid rgba(243, 189, 56, 0.24);
+      }
+
+      .tank-delivery-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .tank-delivery h3 {
+        color: #ffffff;
+        font-size: clamp(20px, 2.8vw, 30px);
+        line-height: 1.15;
+      }
+
+      .tank-delivery .muted {
+        color: rgba(255, 255, 255, 0.58);
+      }
+
+      .tank-rates {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .tank-rate {
+        display: grid;
+        gap: 8px;
+        min-height: 118px;
+        padding: 14px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.065);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .tank-rate span {
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .tank-rate strong {
+        color: var(--gold-soft);
+        font-size: clamp(20px, 2.5vw, 30px);
+        line-height: 1;
+      }
+
+      .tank-rate small {
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 13px;
+        font-weight: 850;
+        line-height: 1.35;
+      }
+
+      @media (max-width: 1180px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .tank-rates {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 820px) {
+        main {
+          width: min(100% - 18px, 1380px);
+          padding: 18px 0;
+          place-items: start center;
+        }
+
+        .results,
+        .price-grid,
+        .travel-grid,
+        .travel-results,
+        .travel-address,
+        .tank-rates {
+          grid-template-columns: 1fr;
+        }
+
+        .price-head {
+          display: grid;
+          align-items: start;
+        }
+
+        .result {
+          min-height: 116px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .price-row {
+          grid-template-columns: 1fr;
+          gap: 6px;
+          padding: 13px 0;
+        }
+
+        .price-row strong {
+          text-align: left;
+          font-size: 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="calculator" aria-label="PU Foam deposit calculator">
+        <div class="hero">
+          <div class="estimate-column">
+          <div class="intro">
+            <span class="pill">PU Foam Business</span>
+            <h1>คำนวณราคามัดจำงานพ่นโฟม</h1>
+            <p class="muted">กรอกยอดเงินรวมของงานพ่นโฟม ระบบจะแยกยอดโอน 3 งวดให้ทันทีแบบทศนิยมครบถ้วน</p>
+          </div>
+
+          <div class="input-card">
+            <label>
+              ยอดเงินรวมของงาน
+              <input id="totalAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" oninput="handleInput()" autofocus>
+            </label>
+            <div class="formula">
+              <div class="formula-row">
+                <span class="muted">งวดที่ 1</span>
+                <span class="percent-control"><input id="rateFirst" type="number" min="0" step="0.01" inputmode="decimal" value="50" oninput="handleRateInput()"><strong>%</strong></span>
+              </div>
+              <div class="formula-row">
+                <span class="muted">งวดที่ 2</span>
+                <span class="percent-control"><input id="rateSecond" type="number" min="0" step="0.01" inputmode="decimal" value="30" oninput="handleRateInput()"><strong>%</strong></span>
+              </div>
+              <div class="formula-row">
+                <span class="muted">งวดที่ 3</span>
+                <span class="percent-control"><input id="rateFinal" type="number" min="0" step="0.01" inputmode="decimal" value="20" oninput="handleRateInput()"><strong>%</strong></span>
+              </div>
+              <div class="standard-note">
+                <strong id="standardTitle">มาตรฐานเริ่มต้น</strong>
+                <span id="standardText">ยอดไม่ถึง 50,000 บาท ใช้ 50% / 50% จบ 2 งวด และยอดเกิน 50,000 บาท ใช้ 20% / 50% / 30%</span>
+                <button class="standard-reset" type="button" onclick="resetStandardRates()">ใช้มาตรฐานอัตโนมัติ</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="results">
+          <article class="result">
+            <span id="firstPaymentLabel">โอนงวดที่ 1 · 50%</span>
+            <strong id="firstPayment">฿0.00</strong>
+          </article>
+          <article class="result">
+            <span id="secondPaymentLabel">โอนงวดที่ 2 · 30%</span>
+            <strong id="secondPayment">฿0.00</strong>
+          </article>
+          <article class="result">
+            <span id="finalPaymentLabel">โอนงวดที่ 3 · 20%</span>
+            <strong id="finalPayment">฿0.00</strong>
+          </article>
+          </div>
+
+          <div id="status" class="status">พร้อมคำนวณ</div>
+        </div>
+
+        <section class="price-board" aria-label="Foam price table">
+          <div class="price-head">
+            <div>
+              <span class="pill">Foam Price List</span>
+              <h2>ตารางราคางานโฟม</h2>
+              <p class="muted">ราคางานโฟมอัปเดต เริ่ม 25/5/69 - 31/12/69</p>
+            </div>
+            <p class="muted">ใช้เป็นราคาอ้างอิงเบื้องต้นสำหรับประเมินงาน</p>
+          </div>
+
+          <div class="price-grid">
+            <div class="price-group">
+              <h3>งานฉีดโฟม</h3>
+              <div class="price-row"><span>ฉีดโฟมธรรมดา</span><strong>4,200/คิว</strong></div>
+              <div class="price-row"><span>ฉีดโฟมกันลามไฟ</span><strong>4,600/คิว</strong></div>
+              <div class="price-row"><span>ฉีดโฟมเรือประมง</span><strong>110/กิโล</strong></div>
+              <p class="price-sub">คิว = ลูกบาศก์เมตร</p>
+            </div>
+
+            <div class="price-group">
+              <h3>งานพ่นโฟม</h3>
+              <div class="price-row"><span>พ่นโฟม ความหนา 1 นิ้ว<em>หากไม่ถึง 100 ตร.ม. จะคิดเป็นราคาเหมา</em></span><strong>220/ตร.ม.</strong></div>
+              <div class="price-row"><span>พื้นที่ 500 - 1,000 ตร.ม. ความหนา 1 นิ้ว</span><strong>200/ตร.ม.</strong></div>
+            </div>
+
+            <div class="price-group">
+              <h3>เรือและใต้พื้นบ้าน</h3>
+              <div class="price-row"><span>ฉีดเรือยาง</span><strong>6,000/เมตร</strong></div>
+              <div class="price-row"><span>ฉีดใต้พื้นบ้าน<em>หากไม่เกิน 20 เมตรจะคิดเป็นราคาเหมา</em></span><strong>800/เมตร</strong></div>
+              <div class="price-row"><span>ฉีดเรือคายัค</span><strong>2,900/ลำ</strong></div>
+            </div>
+
+            <div class="price-group">
+              <h3>ถังพลาสติกและงานอัดโฟม</h3>
+              <div class="price-row"><span>ถังพลาสติก 200 ลิตรอัดโฟม ชนิด 1 ขอบ</span><strong>1,600</strong></div>
+              <div class="price-row"><span>ถังพลาสติก 200 ลิตรอัดโฟม ชนิด 2 ขอบ</span><strong>1,650</strong></div>
+              <div class="price-row"><span>ฉีดโฟมใส่ถังลูกค้าเอง 1 - 49 ใบ</span><strong>1,250/200 ลิตร</strong></div>
+              <div class="price-row"><span>ฉีดโฟมใส่ถังลูกค้าเอง 50 - 100 ใบ</span><strong>1,200/200 ลิตร</strong></div>
+              <div class="price-row"><span>ฉีดโฟมใส่ถังลูกค้าเอง 100 ใบขึ้นไป</span><strong>1,150/200 ลิตร</strong></div>
+              <div class="price-row"><span>ถัง 100 ลิตร พร้อมอัดโฟม</span><strong>1,250/ถัง</strong></div>
+              <div class="price-row"><span>ถัง 120 ลิตร พร้อมอัดโฟม</span><strong>1,300/ถัง</strong></div>
+              <div class="price-row"><span>ฉีดโฟมถัง 100 ลิตร ถังลูกค้าเอง</span><strong>700</strong></div>
+              <div class="price-row"><span>ฉีดโฟมถัง 120 ลิตร ถังลูกค้าเอง</span><strong>850</strong></div>
+            </div>
+          </div>
+        </section>
+        </div>
+
+        <div class="divider"></div>
+
+        <section class="travel-panel" aria-label="Travel estimate calculator">
+          <div class="travel-head">
+            <span class="pill">Travel Estimate</span>
+            <h2>คำนวณค่าเดินทางเบื้องต้น</h2>
+            <p class="muted">วางลิงก์โลเคชั่นหน้างานจาก Google Maps แล้วกด Enter ระบบจะคำนวณระยะทางจากจุดเริ่มต้นหลักและประเมินค่าเดินทางให้ทันที</p>
+          </div>
+
+          <div class="travel-grid">
+            <label>
+              ลิงก์โลเคชั่นหน้างาน
+              <input id="travelLocation" type="text" inputmode="url" autocomplete="off" placeholder="วางลิงก์ Google Maps ที่นี่" onkeydown="handleTravelKey(event)">
+            </label>
+            <label class="travel-rate">
+              บาท / กิโลเมตร
+              <input id="travelRate" type="number" min="1" step="1" inputmode="decimal" value="15" onkeydown="handleTravelKey(event)">
+            </label>
+            <button id="travelButton" type="button" onclick="estimateTravel()">คำนวณ</button>
+          </div>
+
+          <div class="travel-results">
+            <article class="travel-result">
+              <span>ระยะทางโดยประมาณ</span>
+              <strong id="travelDistance">0.0 กม.</strong>
+            </article>
+            <article class="travel-result">
+              <span>ค่าเดินทางประเมิน</span>
+              <strong id="travelCost">฿0.00</strong>
+            </article>
+            <article class="travel-result">
+              <span>เวลาเดินทางคร่าว ๆ</span>
+              <strong id="travelDuration">-</strong>
+            </article>
+          </div>
+
+          <div class="travel-address">
+            <div class="address-card">
+              <span>ตำบล / แขวง</span>
+              <strong id="travelSubdistrict">-</strong>
+            </div>
+            <div class="address-card">
+              <span>อำเภอ / เขต</span>
+              <strong id="travelDistrict">-</strong>
+            </div>
+            <div class="address-card">
+              <span>จังหวัด</span>
+              <strong id="travelProvince">-</strong>
+            </div>
+          </div>
+
+          <div id="travelStatus" class="status">พร้อมคำนวณค่าเดินทาง</div>
+
+          <section class="tank-delivery" aria-label="Tank delivery price">
+            <div class="tank-delivery-head">
+              <div>
+                <span class="pill">Tank Delivery</span>
+                <h3>ราคาค่าส่งถัง</h3>
+              </div>
+              <p class="muted">ใช้ประกอบการประเมินค่าขนส่งถังเบื้องต้น</p>
+            </div>
+            <div class="tank-rates">
+              <article class="tank-rate">
+                <span>ไม่เกิน 20 ใบ</span>
+                <strong>15 บาท/กม.</strong>
+                <small>กระบะ</small>
+              </article>
+              <article class="tank-rate">
+                <span>20 - 45 ใบ</span>
+                <strong>20 บาท/กม.</strong>
+                <small>จัมโบ้</small>
+              </article>
+              <article class="tank-rate">
+                <span>45 - 100 ใบ</span>
+                <strong>25 บาท/กม.</strong>
+                <small>สิบล้อ</small>
+              </article>
+              <article class="tank-rate">
+                <span>ส่งถังเอกชน</span>
+                <strong>400/ใบ</strong>
+                <small>คิดตามจำนวนถัง</small>
+              </article>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const state = {
+        lastSavedTotal: "",
+        saveTimer: 0,
+        travelBusy: false,
+        ratesManual: false,
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        applyStandardRates(0);
+        render(0);
+        google.script.run
+          .withSuccessHandler(() => setStatus("พร้อมคำนวณ", false))
+          .withFailureHandler(() => setStatus("โหลดระบบสำเร็จ แต่ยังไม่ได้บันทึกลงชีต", false))
+          .getInitialState();
+      });
+
+      function handleInput() {
+        const input = document.getElementById("totalAmount");
+        const total = parseAmount(input.value);
+        if (!state.ratesManual) {
+          applyStandardRates(total);
+        }
+        render(total);
+        scheduleSave(total);
+      }
+
+      function handleRateInput() {
+        state.ratesManual = true;
+        const total = parseAmount(document.getElementById("totalAmount").value);
+        render(total);
+        scheduleSave(total);
+      }
+
+      function render(total) {
+        const rates = getDepositRates();
+        renderStandardText(total, getStandardRates(total));
+        const first = total * rates.first / 100;
+        const second = total * rates.second / 100;
+        const finalPayment = total * rates.final / 100;
+        document.getElementById("firstPaymentLabel").textContent = `โอนงวดที่ 1 · ${formatPercent(rates.first)}%`;
+        document.getElementById("secondPaymentLabel").textContent = `โอนงวดที่ 2 · ${formatPercent(rates.second)}%`;
+        document.getElementById("finalPaymentLabel").textContent = `โอนงวดที่ 3 · ${formatPercent(rates.final)}%`;
+        document.getElementById("firstPayment").textContent = money(first);
+        document.getElementById("secondPayment").textContent = money(second);
+        document.getElementById("finalPayment").textContent = money(finalPayment);
+        setStatus(total > 0 ? "คำนวณเรียบร้อย ตัวเลขพร้อมใช้งาน" : "พร้อมคำนวณ", total > 0);
+      }
+
+      function scheduleSave(total) {
+        window.clearTimeout(state.saveTimer);
+        const rates = getDepositRates();
+        const saveKey = [total.toFixed(2), rates.first, rates.second, rates.final].join("|");
+        if (total <= 0 || saveKey === state.lastSavedTotal) return;
+        state.saveTimer = window.setTimeout(() => {
+          state.lastSavedTotal = saveKey;
+          google.script.run
+            .withSuccessHandler(() => setStatus("คำนวณเรียบร้อย และบันทึกประวัติไว้แล้ว", true))
+            .withFailureHandler(() => setStatus("คำนวณเรียบร้อย แต่บันทึกประวัติลงชีตไม่สำเร็จ", false))
+            .saveCalculation({
+              total,
+              rates,
+              userAgent: navigator.userAgent || ""
+            });
+        }, 1200);
+      }
+
+      function getDepositRates() {
+        return {
+          first: parseAmount(document.getElementById("rateFirst").value),
+          second: parseAmount(document.getElementById("rateSecond").value),
+          final: parseAmount(document.getElementById("rateFinal").value)
+        };
+      }
+
+      function applyStandardRates(total) {
+        const standard = getStandardRates(total);
+        document.getElementById("rateFirst").value = standard.first;
+        document.getElementById("rateSecond").value = standard.second;
+        document.getElementById("rateFinal").value = standard.final;
+        renderStandardText(total, standard);
+      }
+
+      function resetStandardRates() {
+        state.ratesManual = false;
+        const total = parseAmount(document.getElementById("totalAmount").value);
+        applyStandardRates(total);
+        render(total);
+        scheduleSave(total);
+      }
+
+      function getStandardRates(total) {
+        return total > 50000
+          ? { first: 20, second: 50, final: 30, label: "ยอดเกิน 50,000 บาท" }
+          : { first: 50, second: 50, final: 0, label: "ยอดไม่ถึง 50,000 บาท" };
+      }
+
+      function renderStandardText(total, standard) {
+        const title = state.ratesManual ? "กำลังใช้เปอร์เซ็นต์ที่ปรับเอง" : `มาตรฐานเริ่มต้น · ${standard.label}`;
+        const text = total > 50000
+          ? "ยอดเกิน 50,000 บาท: งวดแรก 20%, งวดสอง 50%, งวดสาม 30%"
+          : "ยอดไม่ถึง 50,000 บาท: งวดแรก 50%, งวดสอง 50%, จบ 2 งวด งวดสามเป็น 0%";
+        document.getElementById("standardTitle").textContent = title;
+        document.getElementById("standardText").textContent = state.ratesManual
+          ? "ระบบจะคำนวณตามเปอร์เซ็นต์ที่พิมพ์เอง หากต้องการกลับไปใช้สูตรมาตรฐาน ให้กดปุ่มด้านล่าง"
+          : text;
+      }
+
+      function formatPercent(value) {
+        const numberValue = Number(value) || 0;
+        return new Intl.NumberFormat("th-TH", {
+          minimumFractionDigits: Number.isInteger(numberValue) ? 0 : 2,
+          maximumFractionDigits: 2
+        }).format(numberValue);
+      }
+
+      function parseAmount(value) {
+        const cleaned = String(value || "").replace(/[,\s฿]/g, "").replace(/[^\d.]/g, "");
+        const parts = cleaned.split(".");
+        const normalized = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("")}` : cleaned;
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+
+      function money(value) {
+        return new Intl.NumberFormat("th-TH", {
+          style: "currency",
+          currency: "THB",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(Number(value) || 0);
+      }
+
+      function setStatus(message, ready) {
+        const el = document.getElementById("status");
+        el.textContent = message;
+        el.classList.toggle("ready", Boolean(ready));
+      }
+
+      function handleTravelKey(event) {
+        if (event.isComposing) return;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          estimateTravel();
+        }
+      }
+
+      function estimateTravel() {
+        if (state.travelBusy) return;
+        const location = document.getElementById("travelLocation").value.trim();
+        const rate = Number(document.getElementById("travelRate").value || 15);
+        if (!location) {
+          setTravelStatus("กรุณาวางลิงก์โลเคชั่นหน้างานก่อน", false);
+          return;
+        }
+        state.travelBusy = true;
+        document.getElementById("travelButton").disabled = true;
+        setTravelStatus("กำลังอ่านลิงก์ Google Maps และคำนวณเส้นทาง...", false);
+        google.script.run
+          .withSuccessHandler((result) => {
+            state.travelBusy = false;
+            document.getElementById("travelButton").disabled = false;
+            document.getElementById("travelDistance").textContent = `${number(result.distanceKm || 0)} กม.`;
+            document.getElementById("travelCost").textContent = wholeMoney(result.estimatedCost || 0);
+            document.getElementById("travelDuration").textContent = result.durationText || "-";
+            renderTravelAddress(result.address || {});
+            setTravelStatus(`คำนวณสำเร็จ เรท ${number(result.rate || rate)} บาท/กม.`, true);
+          })
+          .withFailureHandler((error) => {
+            state.travelBusy = false;
+            document.getElementById("travelButton").disabled = false;
+            setTravelStatus(error.message || "คำนวณค่าเดินทางไม่สำเร็จ", false);
+          })
+          .estimateTravel({
+            location,
+            rate,
+            userAgent: navigator.userAgent || ""
+          });
+      }
+
+      function setTravelStatus(message, ready) {
+        const el = document.getElementById("travelStatus");
+        el.textContent = message;
+        el.classList.toggle("ready", Boolean(ready));
+      }
+
+      function renderTravelAddress(address) {
+        document.getElementById("travelSubdistrict").textContent = address.subdistrict || "-";
+        document.getElementById("travelDistrict").textContent = address.district || "-";
+        document.getElementById("travelProvince").textContent = address.province || "-";
+      }
+
+      function number(value) {
+        return new Intl.NumberFormat("th-TH", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1
+        }).format(Number(value) || 0);
+      }
+
+      function wholeMoney(value) {
+        return new Intl.NumberFormat("th-TH", {
+          style: "currency",
+          currency: "THB",
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(Number(value) || 0);
+      }
+    </script>
+  </body>
+</html>

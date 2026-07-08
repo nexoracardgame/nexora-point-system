@@ -28,7 +28,7 @@ export default async function CardRarePage() {
     })
     .map((reward, index) => ({
       ...reward,
-      maxNexValue: reward.options[0]?.nexValue || 0,
+      maxNexValue: Math.max(...reward.options.map((option) => option.nexValue)),
       priorityImage: index < 10,
     }));
 

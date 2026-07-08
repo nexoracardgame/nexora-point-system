@@ -25,6 +25,7 @@ export type CardRareRedemptionRecord = {
   conditionLabel: string | null;
   nexValue: number;
   imageUrl: string | null;
+  itemsJson: string | null;
   status: CardRareRedemptionStatus;
   createdAt: Date;
   expiresAt: Date;
@@ -36,6 +37,18 @@ export type CardRareRedemptionRecord = {
   userDisplayName: string | null;
   userImage: string | null;
   userLineId: string | null;
+};
+
+export type CardRareRedemptionItem = {
+  cardNo: string;
+  cardName: string;
+  rewardLabel: string;
+  optionKey: string;
+  conditionLabel: string | null;
+  nexValue: number;
+  imageUrl: string;
+  quantity: number;
+  lineTotalNex: number;
 };
 
 export async function ensureCardRareRedemptionSchema() {
@@ -51,6 +64,7 @@ export async function ensureCardRareRedemptionSchema() {
       "conditionLabel" TEXT,
       "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
       "imageUrl" TEXT,
+      "itemsJson" TEXT,
       "status" TEXT NOT NULL DEFAULT 'pending',
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "expiresAt" TIMESTAMP(3) NOT NULL,
@@ -76,6 +90,60 @@ export async function ensureCardRareRedemptionSchema() {
   await prisma.$executeRawUnsafe(
     'ALTER TABLE "CardRareRedemption" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT'
   );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "CardRareRedemption" ADD COLUMN IF NOT EXISTS "itemsJson" TEXT'
+  );
+}
+
+function parseRedemptionItems(row: CardRareRedemptionRecord): CardRareRedemptionItem[] {
+  if (row.itemsJson) {
+    try {
+      const parsed = JSON.parse(row.itemsJson);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => {
+            const quantity = Math.max(1, Math.floor(Number(item?.quantity || 1)));
+            const nexValue = Number(item?.nexValue || 0);
+            const cardNo = String(item?.cardNo || "").trim();
+            const cardName = String(item?.cardName || "").trim();
+            if (!cardNo || !cardName || !Number.isFinite(nexValue)) return null;
+
+            return {
+              cardNo,
+              cardName,
+              rewardLabel: String(item?.rewardLabel || `${cardName} #${cardNo}`),
+              optionKey: String(item?.optionKey || "standard"),
+              conditionLabel: item?.conditionLabel
+                ? String(item.conditionLabel)
+                : null,
+              nexValue,
+              imageUrl: String(item?.imageUrl || `/cards/${cardNo}.jpg`),
+              quantity,
+              lineTotalNex: Number(item?.lineTotalNex || nexValue * quantity),
+            };
+          })
+          .filter((item): item is CardRareRedemptionItem => Boolean(item));
+      }
+    } catch {
+      // Fall back to the legacy single-card columns below.
+    }
+  }
+
+  const quantity = 1;
+  const nexValue = Number(row.nexValue || 0);
+  return [
+    {
+      cardNo: row.cardNo,
+      cardName: row.cardName,
+      rewardLabel: row.rewardLabel,
+      optionKey: row.optionKey || "standard",
+      conditionLabel: row.conditionLabel || null,
+      nexValue,
+      imageUrl: row.imageUrl || `/cards/${row.cardNo}.jpg`,
+      quantity,
+      lineTotalNex: nexValue,
+    },
+  ];
 }
 
 export async function expireStaleCardRareRedemptions(userId?: string) {
@@ -114,6 +182,10 @@ export function serializeCardRareRedemption(row: CardRareRedemptionRecord) {
       ? "expired"
       : row.status;
 
+  const items = parseRedemptionItems(row);
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalNex = items.reduce((sum, item) => sum + item.lineTotalNex, 0);
+
   return {
     id: row.id,
     code: row.code,
@@ -123,8 +195,11 @@ export function serializeCardRareRedemption(row: CardRareRedemptionRecord) {
     rewardLabel: row.rewardLabel,
     optionKey: row.optionKey || "standard",
     conditionLabel: row.conditionLabel || null,
-    nexValue: Number(row.nexValue || 0),
+    nexValue: totalNex || Number(row.nexValue || 0),
     imageUrl: row.imageUrl || `/cards/${row.cardNo}.jpg`,
+    items,
+    itemCount: items.length,
+    totalQuantity,
     status,
     createdAt: row.createdAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
@@ -137,7 +212,7 @@ export function serializeCardRareRedemption(row: CardRareRedemptionRecord) {
       "NEXORA User",
     userImage: row.userImage || "/avatar.png",
     lineId: row.userLineId || "",
-    valueLabel: `${Number(row.nexValue || 0).toLocaleString("th-TH")} NEX`,
+    valueLabel: `${Number(totalNex || row.nexValue || 0).toLocaleString("th-TH")} NEX`,
     statusLabel:
       status === "approved"
         ? "การแลกเสร็จสมบูรณ์"

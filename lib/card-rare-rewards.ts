@@ -65,6 +65,7 @@ export const cardRareRewards: CardRareReward[] = [
   { cardNo: "068", cardName: "Digger Mole", tier: "Bronze", imageUrl: localCardImage("068"), options: [standard(2000, true)] },
   { cardNo: "085", cardName: "Goldshade", tier: "Gold", imageUrl: localCardImage("085"), options: [standard(10000)] },
   { cardNo: "088", cardName: "Magic Forge", tier: "Silver", imageUrl: localCardImage("088"), options: [standard(30000)] },
+  { cardNo: "089", cardName: "Rust Spirit", tier: "Silver", imageUrl: localCardImage("089"), options: [standard(200, true)] },
   { cardNo: "090", cardName: "Emperor of Gold", tier: "Gold", imageUrl: localCardImage("090"), options: [standard(60000)] },
   { cardNo: "091", cardName: "Crystal Dragon", tier: "Gold", imageUrl: localCardImage("091"), options: [standard(40000)] },
   { cardNo: "097", cardName: "Golden Sage", tier: "Gold", imageUrl: localCardImage("097"), options: [standard(5000)] },
