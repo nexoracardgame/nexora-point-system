@@ -12,13 +12,26 @@ import {
   getCardSetBonusOptions,
   getCardSetRedemptionChoice,
   serializeCardSetRedemption,
-  type CardSetRedemptionType,
+  type CardSetRedemptionItem,
   type CardSetRedemptionRecord,
+  type CardSetRedemptionType,
 } from "@/lib/card-set-redemptions";
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
 };
+
+type CardSetRedemptionRequestItem = {
+  setId?: unknown;
+  redemptionType?: unknown;
+  quantity?: unknown;
+};
+
+function normalizeQuantity(value: unknown) {
+  const quantity = Math.floor(Number(value || 1));
+  if (!Number.isFinite(quantity)) return 1;
+  return Math.min(99, Math.max(1, quantity));
+}
 
 async function getRedemptionByCode(code: string) {
   const rows = await prisma.$queryRawUnsafe<CardSetRedemptionRecord[]>(
@@ -61,6 +74,35 @@ async function getActiveRedemption(userId: string) {
   );
 
   return rows[0] || null;
+}
+
+function buildRedemptionItem(
+  input: CardSetRedemptionRequestItem
+): CardSetRedemptionItem | null {
+  const set = getCardSetById(String(input?.setId || "").trim());
+  if (!set) return null;
+
+  const requestedType = String(input?.redemptionType || "standard").trim();
+  const bonusOptions = getCardSetBonusOptions(set);
+  const redemptionType = (
+    bonusOptions.some((option) => option.type === requestedType)
+      ? requestedType
+      : "standard"
+  ) as CardSetRedemptionType;
+  const choice = getCardSetRedemptionChoice(set, redemptionType);
+  const quantity = normalizeQuantity(input?.quantity);
+
+  return {
+    setId: set.id,
+    setOrder: set.order,
+    setName: set.name,
+    rewardLabel: choice.rewardLabel,
+    redemptionType: choice.redemptionType,
+    conditionLabel: choice.conditionLabel,
+    nexValue: choice.nexValue,
+    quantity,
+    lineTotalNex: choice.nexValue * quantity,
+  };
 }
 
 export async function GET() {
@@ -108,23 +150,29 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const setId = String(body?.setId || "").trim();
-    const requestedType = String(body?.redemptionType || "standard").trim();
-    const set = getCardSetById(setId);
+    const requestedItems: CardSetRedemptionRequestItem[] = Array.isArray(
+      body?.items
+    )
+      ? body.items
+      : [
+          {
+            setId: body?.setId,
+            redemptionType: body?.redemptionType,
+            quantity: 1,
+          },
+        ];
 
-    if (!set) {
+    const items = requestedItems
+      .slice(0, 80)
+      .map(buildRedemptionItem)
+      .filter((item): item is CardSetRedemptionItem => Boolean(item));
+
+    if (!items.length) {
       return NextResponse.json(
         { error: "ไม่พบเซ็ตการ์ดนี้" },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
-
-    const bonusOptions = getCardSetBonusOptions(set);
-    const redemptionType = (
-      bonusOptions.some((option) => option.type === requestedType)
-        ? requestedType
-        : "standard"
-    ) as CardSetRedemptionType;
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions(userId);
@@ -141,30 +189,37 @@ export async function POST(req: Request) {
       );
     }
 
-    const code = buildCardSetCode(set.order);
+    const firstItem = items[0];
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalNex = items.reduce((sum, item) => sum + item.lineTotalNex, 0);
+    const rewardLabel =
+      items.length === 1 && totalQuantity === 1
+        ? firstItem.rewardLabel
+        : `CARD SET ${items.length} เซ็ต / ${totalQuantity} ชุด`;
+    const code = buildCardSetCode(firstItem.setOrder);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + CARD_SET_REDEMPTION_TTL_MS);
-    const choice = getCardSetRedemptionChoice(set, redemptionType);
 
     await prisma.$executeRawUnsafe(
       `
         INSERT INTO "CardSetRedemption" (
           "id", "code", "userId", "setId", "setOrder", "setName",
-          "rewardLabel", "redemptionType", "conditionLabel", "nexValue",
+          "rewardLabel", "redemptionType", "conditionLabel", "nexValue", "itemsJson",
           "status", "createdAt", "expiresAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)
       `,
       crypto.randomUUID(),
       code,
       userId,
-      set.id,
-      set.order,
-      set.name,
-      choice.rewardLabel,
-      choice.redemptionType,
-      choice.conditionLabel,
-      choice.nexValue,
+      firstItem.setId,
+      firstItem.setOrder,
+      items.length === 1 ? firstItem.setName : `CARD SET ${totalQuantity} ชุด`,
+      rewardLabel,
+      firstItem.redemptionType,
+      firstItem.conditionLabel,
+      totalNex,
+      JSON.stringify(items),
       now,
       expiresAt
     );
@@ -175,16 +230,18 @@ export async function POST(req: Request) {
       userId,
       type: "wallet",
       title: "สร้าง QR แลก CARD SET แล้ว",
-      body: `เซ็ต ${set.order} ${set.name} ต้องให้พนักงานสแกนภายใน 1 ชั่วโมง`,
+      body: `${rewardLabel} รวม ${totalNex.toLocaleString("th-TH")} NEX ต้องให้พนักงานสแกนภายใน 1 ชั่วโมง`,
       href: "/card-set",
       image: "/avatar.png",
       meta: {
         source: "card-set-redemption",
         code,
-        setId: set.id,
-        setName: set.name,
-        redemptionType: choice.redemptionType,
-        conditionLabel: choice.conditionLabel,
+        setId: firstItem.setId,
+        setName: firstItem.setName,
+        redemptionType: firstItem.redemptionType,
+        conditionLabel: firstItem.conditionLabel,
+        totalQuantity,
+        totalNex,
       },
     }).catch(() => undefined);
 

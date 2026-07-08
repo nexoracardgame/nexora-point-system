@@ -44,6 +44,25 @@ type CardSetScanView = {
     | "foil_sequence_9"
     | "foil_sequence_18";
   conditionLabel: string | null;
+  nexValue: number;
+  items?: Array<{
+    setId: string;
+    setOrder: number;
+    setName: string;
+    rewardLabel: string;
+    redemptionType:
+      | "standard"
+      | "foil_bonus"
+      | "foil_sequence_1"
+      | "foil_sequence_9"
+      | "foil_sequence_18";
+    conditionLabel: string | null;
+    nexValue: number;
+    quantity: number;
+    lineTotalNex: number;
+  }>;
+  itemCount?: number;
+  totalQuantity?: number;
   valueLabel: string;
   status: "pending" | "approved" | "cancelled" | "expired";
   statusLabel: string;
@@ -312,9 +331,13 @@ export default function StaffCouponScanner({
         if (action === "approve") {
           setMessage("การแลกเสร็จสมบูรณ์");
           showRedeemSuccess(
-            `อนุมัติ CARD SET ${data?.redemption?.setOrder || ""} ${
-              data?.redemption?.setName || ""
-            } สำเร็จ`.trim()
+            Number(data?.redemption?.itemCount || 1) > 1
+              ? `อนุมัติ CARD SET ${data.redemption.itemCount} เซ็ต / ${
+                  data.redemption.totalQuantity || 1
+                } ชุด รวม ${data.redemption.valueLabel} สำเร็จ`
+              : `อนุมัติ CARD SET ${data?.redemption?.setOrder || ""} ${
+                  data?.redemption?.setName || ""
+                } สำเร็จ`.trim()
           );
         }
         setMessage(
@@ -821,10 +844,14 @@ export default function StaffCouponScanner({
                     CARD SET
                   </div>
                   <div className="mt-2 text-2xl font-black">
-                    Set {cardSetResult.setOrder} {cardSetResult.setName}
+                    {Number(cardSetResult.itemCount || 1) > 1
+                      ? `CARD SET ${cardSetResult.itemCount} เซ็ต / ${
+                          cardSetResult.totalQuantity || 1
+                        } ชุด`
+                      : `Set ${cardSetResult.setOrder} ${cardSetResult.setName}`}
                   </div>
                   <div className="mt-1 text-sm font-bold text-white/60">
-                    {cardSetResult.valueLabel}
+                    รวมทั้งหมด {cardSetResult.valueLabel}
                   </div>
                 </div>
 
@@ -857,6 +884,53 @@ export default function StaffCouponScanner({
                     </div>
                   </div>
                 </div>
+
+                {cardSetResult.items?.length ? (
+                  <div className="rounded-[22px] border border-amber-200/18 bg-amber-200/8 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.22em] text-amber-100/65">
+                          รายการเซ็ตทั้งหมด
+                        </div>
+                        <div className="mt-1 text-sm font-black text-white/82">
+                          {cardSetResult.items.length} เซ็ต /{" "}
+                          {cardSetResult.totalQuantity || 1} ชุด
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-black">
+                        {cardSetResult.valueLabel}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {cardSetResult.items.map((item) => (
+                        <div
+                          key={`${item.setId}-${item.redemptionType}`}
+                          className="rounded-[18px] border border-white/8 bg-black/25 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-black text-white">
+                                Set {item.setOrder} {item.setName}
+                              </div>
+                              <div className="mt-1 text-xs font-bold text-white/55">
+                                {formatNumber(item.nexValue)} NEX x{" "}
+                                {item.quantity} ชุด
+                              </div>
+                              {item.conditionLabel ? (
+                                <div className="mt-1 text-xs font-bold text-amber-100/70">
+                                  {item.conditionLabel}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="text-right text-sm font-black text-amber-100">
+                              {formatNumber(item.lineTotalNex)} NEX
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                   <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
