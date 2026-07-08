@@ -148,8 +148,8 @@ export default function AdminSidebar() {
         <AdminNav navItems={navItems} onPrefetch={prefetchAdminRoute} onClose={() => setOpen(false)} />
       </aside>
 
-      <div className="sticky top-0 z-50 w-full border-b border-white/8 bg-[#090b11]/95 px-3 py-3 backdrop-blur-2xl sm:px-4 xl:hidden">
-        <div className="flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-50 w-full border-b border-white/8 bg-[#090b11]/95 px-3 pb-3 pt-[calc(var(--app-safe-top)+12px)] backdrop-blur-2xl sm:px-4 xl:hidden">
+        <div className="flex min-h-[56px] items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <HomeLink compact onPrefetch={prefetchAdminRoute} onClose={() => setOpen(false)} />
             <div className="min-w-0">
@@ -177,7 +177,7 @@ export default function AdminSidebar() {
             onClick={() => setOpen(false)}
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
           />
-          <div className="absolute right-0 top-0 h-full w-[88%] max-w-[360px] overflow-y-auto border-l border-white/10 bg-[#090b11] p-4 shadow-[0_30px_100px_rgba(0,0,0,0.6)]">
+          <div className="absolute right-0 top-0 h-full w-[88%] max-w-[360px] overflow-y-auto border-l border-white/10 bg-[#090b11] px-4 pb-4 pt-[calc(var(--app-safe-top)+16px)] shadow-[0_30px_100px_rgba(0,0,0,0.6)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">
