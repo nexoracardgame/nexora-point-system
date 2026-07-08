@@ -40,7 +40,7 @@ const homeMenuItems = [
   { href: "/battle", label: "Battle", icon: Swords },
   { href: "/rewards", label: "รางวัล", icon: Trophy },
   { href: "/redeem", label: "คูปอง", icon: Gift },
-  { href: "/reward-scan", label: "CUSTOMER REWARD SCAN", icon: ScanLine },
+  { href: "/reward-scan", label: "สแกน", icon: ScanLine },
   { href: "/collections", label: "คอลเลกชัน", icon: FolderKanban },
   { href: "/community", label: "คอมมูนิตี้", icon: Cat },
   { href: "/live", label: "ไลฟ์", icon: Radio },
