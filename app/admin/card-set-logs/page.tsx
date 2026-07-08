@@ -50,26 +50,42 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
   const rows = await prisma.$queryRawUnsafe<CardSetLogRow[]>(
     `
       SELECT
-        r."id",
-        r."code",
-        r."userId",
-        r."setOrder",
-        r."setName",
-        r."rewardLabel",
-        r."redemptionType",
-        r."conditionLabel",
-        r."nexValue",
-        r."status",
-        r."createdAt",
-        r."approvedAt",
-        r."expiresAt",
+        l."id",
+        l."code",
+        l."userId",
+        l."setOrder",
+        l."setName",
+        l."rewardLabel",
+        l."redemptionType",
+        l."conditionLabel",
+        l."nexValue",
+        l."status",
+        l."createdAt",
+        l."approvedAt",
+        l."expiresAt",
         u."name",
         u."displayName",
         u."lineId"
-      FROM "CardSetRedemption" r
-      LEFT JOIN "User" u ON u."id" = r."userId"
-      WHERE ($1::text = 'all' OR r."status" = $1::text)
-      ORDER BY r."createdAt" DESC
+      FROM (
+        SELECT
+          "id", "code", "userId", "setOrder", "setName", "rewardLabel",
+          "redemptionType", "conditionLabel", "nexValue", "status",
+          "createdAt", "approvedAt", "expiresAt"
+        FROM "CardSetRedemptionLog"
+        UNION ALL
+        SELECT
+          r."id", r."code", r."userId", r."setOrder", r."setName", r."rewardLabel",
+          r."redemptionType", r."conditionLabel", r."nexValue", r."status",
+          r."createdAt", r."approvedAt", r."expiresAt"
+        FROM "CardSetRedemption" r
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "CardSetRedemptionLog" l
+          WHERE l."redemptionId" = r."id"
+        )
+      ) l
+      LEFT JOIN "User" u ON u."id" = l."userId"
+      WHERE ($1::text = 'all' OR l."status" = $1::text)
+      ORDER BY l."createdAt" DESC
       LIMIT $2
     `,
     safeStatus,

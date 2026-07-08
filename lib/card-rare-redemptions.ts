@@ -93,6 +93,42 @@ export async function ensureCardRareRedemptionSchema() {
   await prisma.$executeRawUnsafe(
     'ALTER TABLE "CardRareRedemption" ADD COLUMN IF NOT EXISTS "itemsJson" TEXT'
   );
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CardRareRedemptionLog" (
+      "id" TEXT PRIMARY KEY,
+      "redemptionId" TEXT NOT NULL,
+      "code" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "itemIndex" INTEGER NOT NULL,
+      "cardNo" TEXT NOT NULL,
+      "cardName" TEXT NOT NULL,
+      "rewardLabel" TEXT NOT NULL,
+      "optionKey" TEXT NOT NULL DEFAULT 'standard',
+      "conditionLabel" TEXT,
+      "nexValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "imageUrl" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'pending',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "expiresAt" TIMESTAMP(3) NOT NULL,
+      "approvedAt" TIMESTAMP(3),
+      "approvedById" TEXT,
+      "cancelledAt" TIMESTAMP(3),
+      "cancelReason" TEXT
+    )
+  `);
+  await prisma.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "CardRareRedemptionLog_redemptionId_idx" ON "CardRareRedemptionLog" ("redemptionId")'
+  );
+  await prisma.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "CardRareRedemptionLog_code_idx" ON "CardRareRedemptionLog" ("code")'
+  );
+  await prisma.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "CardRareRedemptionLog_userId_status_idx" ON "CardRareRedemptionLog" ("userId", "status")'
+  );
+  await prisma.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "CardRareRedemptionLog_createdAt_idx" ON "CardRareRedemptionLog" ("createdAt")'
+  );
 }
 
 function parseRedemptionItems(row: CardRareRedemptionRecord): CardRareRedemptionItem[] {
@@ -162,12 +198,32 @@ export async function expireStaleCardRareRedemptions(userId?: string) {
       now,
       userId
     );
+    await prisma.$executeRawUnsafe(
+      `
+        UPDATE "CardRareRedemptionLog"
+        SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+        WHERE "status" = 'pending'
+          AND "expiresAt" <= $1
+          AND "userId" = $2
+      `,
+      now,
+      userId
+    );
     return;
   }
 
   await prisma.$executeRawUnsafe(
     `
       UPDATE "CardRareRedemption"
+      SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+      WHERE "status" = 'pending'
+        AND "expiresAt" <= $1
+    `,
+    now
+  );
+  await prisma.$executeRawUnsafe(
+    `
+      UPDATE "CardRareRedemptionLog"
       SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
       WHERE "status" = 'pending'
         AND "expiresAt" <= $1

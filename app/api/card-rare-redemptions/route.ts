@@ -50,6 +50,47 @@ async function getRedemptionByCode(code: string) {
   return rows[0] || null;
 }
 
+async function insertCardRareDetailLogs(input: {
+  redemptionId: string;
+  code: string;
+  userId: string;
+  items: CardRareRedemptionItem[];
+  createdAt: Date;
+  expiresAt: Date;
+}) {
+  let itemIndex = 0;
+
+  for (const item of input.items) {
+    for (let copy = 0; copy < item.quantity; copy += 1) {
+      itemIndex += 1;
+      await prisma.$executeRawUnsafe(
+        `
+          INSERT INTO "CardRareRedemptionLog" (
+            "id", "redemptionId", "code", "userId", "itemIndex",
+            "cardNo", "cardName", "rewardLabel", "optionKey", "conditionLabel",
+            "nexValue", "imageUrl", "status", "createdAt", "expiresAt"
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', $13, $14)
+        `,
+        crypto.randomUUID(),
+        input.redemptionId,
+        input.code,
+        input.userId,
+        itemIndex,
+        item.cardNo,
+        item.cardName,
+        item.rewardLabel,
+        item.optionKey,
+        item.conditionLabel,
+        item.nexValue,
+        item.imageUrl,
+        input.createdAt,
+        input.expiresAt
+      );
+    }
+  }
+}
+
 async function getActiveRedemption(userId: string) {
   const rows = await prisma.$queryRawUnsafe<CardRareRedemptionRecord[]>(
     `
@@ -181,6 +222,8 @@ export async function POST(req: Request) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + CARD_RARE_REDEMPTION_TTL_MS);
 
+    const redemptionId = crypto.randomUUID();
+
     await prisma.$executeRawUnsafe(
       `
         INSERT INTO "CardRareRedemption" (
@@ -190,7 +233,7 @@ export async function POST(req: Request) {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)
       `,
-      crypto.randomUUID(),
+      redemptionId,
       code,
       userId,
       firstItem.cardNo,
@@ -204,6 +247,15 @@ export async function POST(req: Request) {
       now,
       expiresAt
     );
+
+    await insertCardRareDetailLogs({
+      redemptionId,
+      code,
+      userId,
+      items,
+      createdAt: now,
+      expiresAt,
+    });
 
     const redemption = await getRedemptionByCode(code);
 

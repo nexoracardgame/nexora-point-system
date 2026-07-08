@@ -125,6 +125,20 @@ export async function POST(req: Request, { params }: RouteProps) {
           { status: 409, headers: NO_STORE_HEADERS }
         );
       }
+
+      await prisma.$executeRawUnsafe(
+        `
+          UPDATE "CardRareRedemptionLog"
+          SET "status" = 'approved',
+              "approvedAt" = $1,
+              "approvedById" = $2
+          WHERE "redemptionId" = $3
+            AND "status" = 'pending'
+        `,
+        now,
+        actorUserId || null,
+        before.id
+      );
     } else {
       await prisma.$executeRawUnsafe(
         `
@@ -138,6 +152,19 @@ export async function POST(req: Request, { params }: RouteProps) {
         now,
         String(body?.reason || "staff_cancelled").slice(0, 240),
         safeCode
+      );
+      await prisma.$executeRawUnsafe(
+        `
+          UPDATE "CardRareRedemptionLog"
+          SET "status" = 'cancelled',
+              "cancelledAt" = $1,
+              "cancelReason" = $2
+          WHERE "redemptionId" = $3
+            AND "status" = 'pending'
+        `,
+        now,
+        String(body?.reason || "staff_cancelled").slice(0, 240),
+        before.id
       );
     }
 
