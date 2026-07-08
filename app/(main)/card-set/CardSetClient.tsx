@@ -349,7 +349,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#050507] pb-48 text-white">
+    <div className="min-h-screen overflow-hidden bg-[#050507] pb-[calc(var(--app-mobile-nav-height)_+_170px)] text-white xl:pb-28">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(251,191,36,0.16),transparent_26%),linear-gradient(180deg,#0b0b10_0%,#050507_100%)]" />
 
       <div className="relative mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
@@ -577,7 +577,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       </div>
 
       {multiMode ? (
-        <div className="fixed inset-x-0 bottom-[calc(22px_+_env(safe-area-inset-bottom))] z-[1200] px-3">
+        <div className="fixed inset-x-0 bottom-[calc(var(--app-mobile-nav-height)_+_18px)] z-[1260] px-3 xl:bottom-6">
           <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-[24px] border border-amber-200/24 bg-[#111014]/95 p-3 shadow-[0_-18px_70px_rgba(0,0,0,0.52)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs font-black uppercase text-amber-100/70">
