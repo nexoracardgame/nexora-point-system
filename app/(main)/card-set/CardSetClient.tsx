@@ -97,8 +97,9 @@ function parseSelectedQuantity(value: string | number | undefined) {
 }
 
 function normalizeQuantityInput(value: string) {
-  if (value === "") return "";
-  const quantity = Math.floor(Number(value));
+  const digits = value.replace(/\D/g, "");
+  if (digits === "") return "";
+  const quantity = Math.floor(Number(digits));
   return Number.isFinite(quantity)
     ? String(Math.min(99, Math.max(1, quantity)))
     : "";
@@ -161,7 +162,7 @@ export default function CardSetClient({
             set: CardSetItem;
             quantity: number;
             lineTotalNex: number;
-          } => Boolean(item)
+          } => item !== null && item.quantity > 0
         ),
     [selected, setById]
   );
@@ -566,6 +567,9 @@ export default function CardSetClient({
                     <div
                       className="mt-3 rounded-[20px] border border-amber-200/18 bg-amber-200/8 p-3"
                       onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onTouchStart={(event) => event.stopPropagation()}
                     >
                       <label className="text-[10px] font-black uppercase text-amber-100/70">
                         จำนวนเซ็ตนี้
