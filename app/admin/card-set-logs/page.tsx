@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
 type PageProps = {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string }>;
 };
 
 type CardSetLogRow = {
@@ -41,9 +41,8 @@ function getStatusClass(status: string) {
 }
 
 export default async function CardSetLogsPage({ searchParams }: PageProps) {
-  const { q = "", status = "all" } = await searchParams;
+  const { q = "" } = await searchParams;
   const keyword = normalize(q);
-  const safeStatus = String(status || "all").trim().toLowerCase();
 
   await ensureCardSetRedemptionSchema();
 
@@ -84,11 +83,10 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
         )
       ) l
       LEFT JOIN "User" u ON u."id" = l."userId"
-      WHERE ($1::text = 'all' OR l."status" = $1::text)
+      WHERE l."status" = 'approved'
       ORDER BY l."createdAt" DESC
-      LIMIT $2
+      LIMIT $1
     `,
-    safeStatus,
     keyword ? 1000 : 250
   );
 
@@ -117,7 +115,7 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
         <h1 className="mt-2 text-3xl font-black sm:text-4xl">Card Set Logs</h1>
       </div>
 
-      <form method="GET" className="grid gap-3 sm:grid-cols-[1fr_200px_auto]">
+      <form method="GET" className="grid gap-3 sm:grid-cols-[1fr_190px_auto]">
         <input
           type="text"
           name="q"
@@ -127,8 +125,9 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
         />
         <select
           name="status"
-          defaultValue={safeStatus}
-          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none"
+          defaultValue="approved"
+          disabled
+          className="rounded-2xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition hover:border-amber-300/35 hover:bg-white/[0.06]"
         >
           <option value="all">ทั้งหมด</option>
           <option value="pending">pending</option>
@@ -138,7 +137,7 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
         </select>
         <button
           type="submit"
-          className="rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-5 py-3 text-sm font-black text-black"
+          className="rounded-2xl border border-white/10 bg-black px-5 py-3 text-sm font-black text-white transition hover:border-amber-300/35 hover:bg-white/[0.06]"
         >
           ค้นหา
         </button>
