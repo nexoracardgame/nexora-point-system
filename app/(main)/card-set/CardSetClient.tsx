@@ -82,11 +82,24 @@ type Redemption = {
 
 type SelectedSet = {
   setId: string;
-  quantity: number;
+  quantity: string;
 };
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("th-TH");
+}
+
+function parseSelectedQuantity(value: string | number | undefined) {
+  const quantity = Math.floor(Number(value));
+  return Number.isFinite(quantity) ? Math.min(99, Math.max(0, quantity)) : 0;
+}
+
+function normalizeQuantityInput(value: string) {
+  if (value === "") return "";
+  const quantity = Math.floor(Number(value));
+  return Number.isFinite(quantity)
+    ? String(Math.min(99, Math.max(1, quantity)))
+    : "";
 }
 
 function normalize(value: string) {
@@ -125,7 +138,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
         .map((item) => {
           const set = setById.get(item.setId);
           if (!set) return null;
-          const quantity = Math.min(99, Math.max(1, item.quantity));
+          const quantity = parseSelectedQuantity(item.quantity);
           return {
             set,
             quantity,
@@ -269,14 +282,14 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
       if (next[set.id]) {
         delete next[set.id];
       } else {
-        next[set.id] = { setId: set.id, quantity: 1 };
+        next[set.id] = { setId: set.id, quantity: "1" };
       }
       return next;
     });
   }
 
   function updateQuantity(setId: string, value: string) {
-    const quantity = Math.min(99, Math.max(1, Math.floor(Number(value || 1))));
+    const quantity = normalizeQuantityInput(value);
     setSelected((current) =>
       current[setId] ? { ...current, [setId]: { setId, quantity } } : current
     );
@@ -296,13 +309,15 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
   }
 
   async function createMultiRedemption() {
-    if (!selectedItems.length) {
+    const validItems = selectedItems.filter((item) => item.quantity > 0);
+
+    if (!validItems.length) {
       setError("เลือกเซ็ตอย่างน้อย 1 เซ็ตก่อนสร้าง QR");
       return;
     }
 
     await createQr(
-      selectedItems.map(({ set, quantity }) => ({
+      validItems.map(({ set, quantity }) => ({
         setId: set.id,
         redemptionType: "standard" as const,
         quantity,
@@ -522,7 +537,7 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                         min={1}
                         max={99}
                         inputMode="numeric"
-                        value={selectedSet?.quantity || 1}
+                        value={selectedSet?.quantity ?? ""}
                         disabled={!selectedSet}
                         onChange={(event) =>
                           updateQuantity(set.id, event.target.value)
@@ -545,7 +560,10 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
                     {multiMode ? (
                       <div className="mt-1 text-xs font-bold text-black/48">
                         รวมตามจำนวน:{" "}
-                        {formatNumber(set.nexValue * (selectedSet?.quantity || 1))}{" "}
+                        {formatNumber(
+                          set.nexValue *
+                            parseSelectedQuantity(selectedSet?.quantity)
+                        )}{" "}
                         NEX
                       </div>
                     ) : set.bonusOptions.length > 0 ? (
@@ -601,7 +619,9 @@ export default function CardSetClient({ sets }: { sets: CardSetItem[] }) {
               <button
                 type="button"
                 onClick={() => void createMultiRedemption()}
-                disabled={!selectedItems.length || loading || Boolean(isPending)}
+                disabled={
+                  selectedQuantity < 1 || loading || Boolean(isPending)
+                }
                 className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-2xl bg-[linear-gradient(135deg,#fff7ad,#fbbf24,#a16207)] px-3 text-xs font-black text-black shadow-[0_0_26px_rgba(251,191,36,0.28)] disabled:cursor-not-allowed disabled:opacity-50 sm:gap-2 sm:px-5 sm:text-sm"
               >
                 {loading ? (
