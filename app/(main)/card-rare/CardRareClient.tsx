@@ -348,7 +348,7 @@ export default function CardRareClient({
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#050507] pb-28 text-white">
+    <div className="min-h-screen overflow-hidden bg-[#050507] pb-48 text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(168,85,247,0.22),transparent_28%),linear-gradient(180deg,#0b0b10_0%,#050507_100%)]" />
 
       <div className="relative mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6 xl:px-6">
@@ -560,8 +560,8 @@ export default function CardRareClient({
       </div>
 
       {multiMode ? (
-        <div className="fixed inset-x-0 bottom-0 z-[1200] px-3 pb-[calc(12px_+_env(safe-area-inset-bottom))]">
-          <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-[26px] border border-amber-200/24 bg-[#111014]/95 p-3 shadow-[0_-18px_70px_rgba(0,0,0,0.52)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+        <div className="fixed inset-x-0 bottom-[calc(22px_+_env(safe-area-inset-bottom))] z-[1200] px-3">
+          <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-[24px] border border-amber-200/24 bg-[#111014]/95 p-3 shadow-[0_-18px_70px_rgba(0,0,0,0.52)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs font-black uppercase text-amber-100/70">
                 เลือกแล้ว
@@ -573,11 +573,11 @@ export default function CardRareClient({
                 รวม {formatNumber(selectedTotalNex)} NEX
               </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setSelected({})}
-                className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-black text-white"
+                className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-xs font-black text-white sm:px-4 sm:text-sm"
               >
                 ล้างที่เลือก
               </button>
@@ -585,7 +585,7 @@ export default function CardRareClient({
                 type="button"
                 onClick={() => void createMultiRedemption()}
                 disabled={!selectedItems.length || loading || Boolean(isPending)}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#fff7ad,#fbbf24,#a16207)] px-5 text-sm font-black text-black shadow-[0_0_26px_rgba(251,191,36,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-2xl bg-[linear-gradient(135deg,#fff7ad,#fbbf24,#a16207)] px-3 text-xs font-black text-black shadow-[0_0_26px_rgba(251,191,36,0.28)] disabled:cursor-not-allowed disabled:opacity-50 sm:gap-2 sm:px-5 sm:text-sm"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
