@@ -11,6 +11,10 @@ type EvidenceImage = {
   dataUrl: string;
 };
 
+const MAX_EVIDENCE_IMAGES = 30;
+const MAX_EVIDENCE_DATA_URL_LENGTH = 550_000;
+const MAX_EVIDENCE_TOTAL_LENGTH = 8_000_000;
+
 async function ensurePointLogEvidenceSchema() {
   await prisma.$executeRawUnsafe(
     'ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT'
@@ -37,26 +41,63 @@ function parseOptionalAmount(value: unknown, integerOnly = false) {
   return amount;
 }
 
+function sanitizeEvidenceImages(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  let totalLength = 0;
+  const images: EvidenceImage[] = [];
+
+  for (const image of value) {
+    if (images.length >= MAX_EVIDENCE_IMAGES) break;
+
+    const dataUrl = String(image?.dataUrl || "");
+    if (!dataUrl.startsWith("data:image/") || dataUrl.length > MAX_EVIDENCE_DATA_URL_LENGTH) {
+      continue;
+    }
+
+    totalLength += dataUrl.length;
+    if (totalLength > MAX_EVIDENCE_TOTAL_LENGTH) {
+      break;
+    }
+
+    images.push({
+      name: String(image?.name || "evidence").slice(0, 180),
+      type: String(image?.type || "image/jpeg").slice(0, 80),
+      size: Math.max(0, Number(image?.size || 0)),
+      dataUrl,
+    });
+  }
+
+  return images;
+}
+
 export async function POST(req: Request) {
   try {
     const { actor, error } = await requireAdminActor();
     if (error) return error;
 
-    const { lineId, nexAmount, coinAmount, note, evidenceImages } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "ข้อมูลที่ส่งมาไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง" },
+        { status: 400 }
+      );
+    }
+
+    const { lineId, nexAmount, coinAmount, note, evidenceImages } = body as {
+      lineId?: unknown;
+      nexAmount?: unknown;
+      coinAmount?: unknown;
+      note?: unknown;
+      evidenceImages?: unknown;
+    };
     const cleanLineId = String(lineId || "").trim();
     const nextNexAmount = parseOptionalAmount(nexAmount);
     const nextCoinAmount = parseOptionalAmount(coinAmount, true);
     const cleanNote = String(note || "").trim().slice(0, 2000);
-    const safeEvidenceImages: EvidenceImage[] = Array.isArray(evidenceImages)
-      ? evidenceImages
-          .map((image) => ({
-            name: String(image?.name || "evidence").slice(0, 180),
-            type: String(image?.type || "image/*").slice(0, 80),
-            size: Math.max(0, Number(image?.size || 0)),
-            dataUrl: String(image?.dataUrl || ""),
-          }))
-          .filter((image) => image.dataUrl.startsWith("data:image/"))
-      : [];
+    const safeEvidenceImages = sanitizeEvidenceImages(evidenceImages);
     const evidenceJson = safeEvidenceImages.length
       ? JSON.stringify(safeEvidenceImages)
       : null;
@@ -168,7 +209,12 @@ export async function POST(req: Request) {
           nexAmount: nextNexAmount,
           coinAmount: nextCoinAmount,
           note: cleanNote || null,
-          evidenceImages: safeEvidenceImages,
+          evidenceImages: safeEvidenceImages.map((image) => ({
+            name: image.name,
+            type: image.type,
+            size: image.size,
+          })),
+          evidenceImageCount: safeEvidenceImages.length,
           source: "admin-members-adjust-wallet",
         },
       });
@@ -233,6 +279,13 @@ export async function POST(req: Request) {
         return NextResponse.json(
           { error: "COIN ต้องเป็นจำนวนเต็ม เช่น 100 หรือ -100" },
           { status: 400 }
+        );
+      }
+
+      if (error.message === "user_not_found") {
+        return NextResponse.json(
+          { error: "ไม่พบสมาชิกนี้ กรุณารีเฟรชหน้าแล้วลองใหม่" },
+          { status: 404 }
         );
       }
     }

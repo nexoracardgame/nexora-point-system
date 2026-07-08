@@ -27,6 +27,10 @@ type EvidenceImage = {
   dataUrl: string;
 };
 
+const MAX_EVIDENCE_IMAGES = 30;
+const MAX_EVIDENCE_EDGE = 960;
+const EVIDENCE_IMAGE_QUALITY = 0.68;
+
 function normalizeSearch(value: string) {
   return value.toLowerCase().trim().replace(/^@+/, "");
 }
@@ -67,6 +71,49 @@ function getAdjustmentDialogMeta(nexAmount: number | null, coinAmount: number | 
           ? "อัปเดตแต้มสำเร็จ"
           : "สำเร็จ",
     tone: hasDecrease ? ("warning" as const) : ("success" as const),
+  };
+}
+
+function loadImageFromFile(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("อ่านไฟล์รูปไม่สำเร็จ"));
+    };
+    image.src = url;
+  });
+}
+
+async function resizeEvidenceImage(file: File): Promise<EvidenceImage> {
+  const source = await loadImageFromFile(file);
+  const scale = Math.min(1, MAX_EVIDENCE_EDGE / Math.max(source.naturalWidth, source.naturalHeight));
+  const width = Math.max(1, Math.round(source.naturalWidth * scale));
+  const height = Math.max(1, Math.round(source.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("ย่อรูปไม่สำเร็จ");
+  }
+
+  context.drawImage(source, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL("image/jpeg", EVIDENCE_IMAGE_QUALITY);
+  const safeName = file.name.replace(/\.[^.]+$/, "") || "evidence";
+
+  return {
+    name: `${safeName}.jpg`,
+    type: "image/jpeg",
+    size: Math.round((dataUrl.length * 3) / 4),
+    dataUrl,
   };
 }
 
@@ -114,25 +161,25 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
   const readEvidenceFiles = async (lineId: string, files: FileList | null) => {
     if (!files?.length) return;
 
-    const images = await Promise.all(
-      Array.from(files)
-        .filter((file) => file.type.startsWith("image/"))
-        .map(
-          (file) =>
-            new Promise<EvidenceImage>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () =>
-                resolve({
-                  name: file.name,
-                  type: file.type,
-                  size: file.size,
-                  dataUrl: String(reader.result || ""),
-                });
-              reader.onerror = () => reject(new Error("อ่านไฟล์รูปไม่สำเร็จ"));
-              reader.readAsDataURL(file);
-            })
-        )
-    );
+    const currentImages = evidenceInputs[lineId] || [];
+    const remainingSlots = MAX_EVIDENCE_IMAGES - currentImages.length;
+
+    if (remainingSlots <= 0) {
+      await nexoraAlert({
+        title: "แนบรูปครบแล้ว",
+        message: `แนบรูปได้สูงสุด ${MAX_EVIDENCE_IMAGES} รูปต่อรายการ`,
+        tone: "warning",
+      });
+      return;
+    }
+
+    const imageFiles = Array.from(files)
+      .filter((file) => file.type.startsWith("image/"))
+      .slice(0, remainingSlots);
+
+    if (!imageFiles.length) return;
+
+    const images = await Promise.all(imageFiles.map((file) => resizeEvidenceImage(file)));
 
     setEvidenceInputs((prev) => ({
       ...prev,
@@ -312,7 +359,13 @@ export default function MembersTable({ users }: { users: UserRow[] }) {
                   multiple
                   className="hidden"
                   onChange={(event) => {
-                    void readEvidenceFiles(user.lineId, event.target.files);
+                    void readEvidenceFiles(user.lineId, event.target.files).catch((error) => {
+                      void nexoraAlert({
+                        title: "แนบรูปไม่สำเร็จ",
+                        message: error instanceof Error ? error.message : "ลองเลือกรูปใหม่อีกครั้ง",
+                        tone: "danger",
+                      });
+                    });
                     event.currentTarget.value = "";
                   }}
                 />
