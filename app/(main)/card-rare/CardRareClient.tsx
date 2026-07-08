@@ -81,16 +81,11 @@ function formatNumber(value: number) {
 
 function parseSelectedQuantity(value: string | number | undefined) {
   const quantity = Math.floor(Number(value));
-  return Number.isFinite(quantity) ? Math.min(99, Math.max(0, quantity)) : 0;
+  return Number.isFinite(quantity) ? Math.max(0, quantity) : 0;
 }
 
 function normalizeQuantityInput(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits === "") return "";
-  const quantity = Math.floor(Number(digits));
-  return Number.isFinite(quantity)
-    ? String(Math.min(99, Math.max(1, quantity)))
-    : "";
+  return value.replace(/\D/g, "");
 }
 
 function normalize(value: string) {
@@ -556,10 +551,9 @@ export default function CardRareClient({
                         จำนวนการ์ดใบนี้
                       </label>
                       <input
-                        type="number"
-                        min={1}
-                        max={99}
+                        type="text"
                         inputMode="numeric"
+                        pattern="[0-9]*"
                         value={selectedCard?.quantity ?? ""}
                         disabled={!selectedCard}
                         onChange={(event) =>

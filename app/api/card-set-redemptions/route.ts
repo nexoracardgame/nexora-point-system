@@ -31,7 +31,7 @@ type CardSetRedemptionRequestItem = {
 function normalizeQuantity(value: unknown) {
   const quantity = Math.floor(Number(value || 1));
   if (!Number.isFinite(quantity)) return 1;
-  return Math.min(99, Math.max(1, quantity));
+  return Math.max(1, quantity);
 }
 
 async function getRedemptionByCode(code: string) {
