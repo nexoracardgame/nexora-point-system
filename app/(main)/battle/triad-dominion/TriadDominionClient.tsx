@@ -6675,7 +6675,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </div>
       ) : null}
-      {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} onClose={() => setSpectatorPreviewCard(null)} /> : null}
+      {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} onClose={() => setSpectatorPreviewCard(null)} passive /> : null}
       <section className="triad-game-roombar relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(230px,0.85fr)_minmax(260px,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-2">

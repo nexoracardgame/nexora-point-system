@@ -1023,7 +1023,7 @@ function applyTidebomb(
   const targetScore = normalizedTarget === ownTarget ? ownScore : opponentScore;
   const targetSide = normalizedTarget === "player-top" ? "player" : "opponent";
   const targetContribution = targetScore.contributions.find((item) => item.lane === "top");
-  const targetLabel = normalizedTarget === ownTarget ? "user main monster" : "opponent main monster";
+  const targetLabel = normalizedTarget === ownTarget ? "มอนสเตอร์หลักฝ่ายผู้ใช้สกิล" : "มอนสเตอร์หลักฝ่ายตรงข้าม";
 
   if (!targetContribution) {
     return {
@@ -1032,7 +1032,7 @@ function applyTidebomb(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: "Tidebomb found no selected main monster target",
+      summary: "ใบ 259 ไม่ทำงาน เพราะไม่พบมอนสเตอร์หลักที่ถูกเลือกเป็นเป้าหมาย",
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
@@ -1045,7 +1045,7 @@ function applyTidebomb(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} does not have ATTACK or SUPPORT 5,000+`,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} ไม่เข้าเงื่อนไข เพราะไม่มีค่า ATK หรือ SUP ตั้งแต่ 5,000 ขึ้นไป`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
@@ -1055,10 +1055,11 @@ function applyTidebomb(
   const blocked: string[] = [];
   const metrics: TriadMetric[] = ["attack", "support"];
   for (const metric of metrics) {
+    const metricLabel = metric === "attack" ? "ATK" : "SUP";
     const originalValue = targetContribution.card[metric];
     const delta = 3000 - originalValue;
     if (delta === 0) {
-      applied.push(`${metric.toUpperCase()} 3,000`);
+      applied.push(`${metricLabel} คงไว้ที่ 3,000`);
       continue;
     }
     const effect = { metric, delta };
@@ -1067,15 +1068,15 @@ function applyTidebomb(
       statGainBlockerApplies(item, effect, { lane: "top" })
     );
     if (blocker) {
-      blocked.push(`${metric.toUpperCase()} by No.${blocker.rule.cardNo}`);
+      blocked.push(`${metricLabel} ถูกบล็อกโดย No.${blocker.rule.cardNo}`);
       continue;
     }
     if (targetScore.metric === metric) {
       targetScore.total += delta;
       targetContribution.value = 3000;
-      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${metric.toUpperCase()} ${originalValue.toLocaleString()} -> 3,000`);
+      targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${metricLabel} ${originalValue.toLocaleString()} -> 3,000`);
     }
-    applied.push(`${metric.toUpperCase()} ${originalValue.toLocaleString()} -> 3,000`);
+    applied.push(`${metricLabel} ${originalValue.toLocaleString()} -> 3,000`);
   }
 
   if (applied.length === 0) {
@@ -1085,7 +1086,7 @@ function applyTidebomb(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: `${targetLabel} matched Tidebomb, but all stat changes were blocked (${blocked.join(", ")})`,
+      summary: `${targetLabel} เข้าเงื่อนไขใบ 259 แล้ว แต่การเปลี่ยนค่าสเตตัสทั้งหมดถูกบล็อก (${blocked.join(", ")})`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
@@ -1097,7 +1098,7 @@ function applyTidebomb(
     side,
     type: rule.shape,
     text: rule.text,
-    summary: `Tidebomb sets No.${targetContribution.card.cardNo} ${targetLabel} ATTACK and SUPPORT to 3,000 until end of turn (${applied.join(", ")}${blocked.length > 0 ? `; blocked ${blocked.join(", ")}` : ""})`,
+    summary: `ใบ 259 ปรับ No.${targetContribution.card.cardNo} ${targetLabel} ให้ ATK และ SUP เป็น 3,000 จนจบเทิร์น (${applied.join(", ")}${blocked.length > 0 ? `; ถูกบล็อก ${blocked.join(", ")}` : ""})`,
     targetLabel,
   } satisfies TriadSkillEvent;
 }
@@ -1702,6 +1703,10 @@ function applySkill(
       targetLabel,
     });
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: locked ${metricLabel} changes on ${targetSide}${targetLane ? ` ${targetLane}` : ""}`);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "245") {
     return { unresolved, events };
   }
 
