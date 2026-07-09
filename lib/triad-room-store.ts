@@ -1947,6 +1947,47 @@ export async function chooseTriadRoomOpeningTieBreak(
   return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
 }
 
+export async function resetTriadRoomOpeningTieBreak(code: string, participant: string | TriadRoomParticipant) {
+  return withRoomMutationLock(code, async () => {
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    const side =
+      typeof participant === "string"
+        ? sideForParticipant(room, participant)
+        : reconnectParticipantSeat(room, participant);
+    if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+    if (isTriadBotParticipant(room.seats[side])) {
+      return { ok: false as const, reason: "bot_seat" as const, room: publicRoom(room) };
+    }
+    const firstTurnResult = room.game.turns.find((turn) => turn.turn === 1);
+    if (room.status !== "playing" || firstTurnResult?.winner !== "draw") {
+      return { ok: false as const, reason: "not_available" as const, room: publicRoom(room) };
+    }
+
+    const previousTieBreak = room.game.openerTieBreak;
+    room.game.activeTurn = 1;
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.turnStartedAt = Date.now();
+    room.game.openerTieBreak = {
+      fightNo: room.game.fightNo,
+      turn: 1,
+      round: Math.max(1, (previousTieBreak.round || 1) + 1),
+      status: "waiting",
+      reason: "first_turn_score_draw",
+      choices: {},
+      revealChoices: undefined,
+      winner: "",
+      source: "manual",
+      message: "RPS was reset. Choose again.",
+    };
+
+    runBotBrain(room);
+    healTriadRoomState(room);
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room) };
+  });
+}
+
 export async function advanceTriadRoomTurn(
   code: string,
   participantId: string,

@@ -14,6 +14,7 @@ import {
   lockTriadRoomCard,
   moveTriadParticipantToSpectator,
   resetTriadRoomBattle,
+  resetTriadRoomOpeningTieBreak,
   readyTriadRoomDeck,
   setTriadRoomDeck,
   setTriadRoomBotOpponent,
@@ -247,6 +248,15 @@ export async function POST(request: Request) {
       participant,
       body.choice === "rock" || body.choice === "scissors" || body.choice === "paper" ? body.choice : "unknown"
     );
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      "room" in result ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "reset-opening-tiebreak") {
+    const result = await resetTriadRoomOpeningTieBreak(cleanText(body.code), participant);
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

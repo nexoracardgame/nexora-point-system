@@ -2440,6 +2440,8 @@ function OpeningTieBreakOverlay({
   isSpectator,
   pendingChoice,
   onChoose,
+  onReset,
+  resetDisabled,
   onExit,
 }: {
   tieBreak?: OpeningTieBreak | null;
@@ -2449,6 +2451,8 @@ function OpeningTieBreakOverlay({
   isSpectator: boolean;
   pendingChoice: TriadRpsChoice | null;
   onChoose: (choice: TriadRpsChoice) => void;
+  onReset?: () => void;
+  resetDisabled?: boolean;
   onExit?: () => void;
 }) {
   if (!tieBreak || (tieBreak.status !== "waiting" && tieBreak.status !== "resolved")) return null;
@@ -2533,6 +2537,17 @@ function OpeningTieBreakOverlay({
             )}
           </div>
         )}
+        {!isSpectator && ownSide && onReset ? (
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={resetDisabled}
+            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-200/24 bg-red-500/10 text-xs font-black uppercase tracking-[0.12em] text-red-100 transition hover:border-red-100/55 hover:bg-red-500/18 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {resetDisabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            Reset RPS
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -3774,6 +3789,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
   const [openingTieBreakResultVisible, setOpeningTieBreakResultVisible] = useState(false);
   const [openingTieBreakResultKey, setOpeningTieBreakResultKey] = useState("");
+  const [openingTieBreakResetting, setOpeningTieBreakResetting] = useState(false);
   const [pendingTurnReadyKey, setPendingTurnReadyKey] = useState("");
   const [turnReadySubmittingKey, setTurnReadySubmittingKey] = useState("");
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
@@ -4335,6 +4351,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         void syncRooms({ force: true }).catch(() => null);
         setBattleLog((current) => ["เลือกเป่ายิงฉุบไม่สำเร็จ ระบบจะซิงก์สถานะล่าสุดอีกครั้ง", ...current]);
       }
+    });
+  };
+
+  const resetOpeningTieBreak = () => {
+    if (!currentRoom || !roomPlayerSide || isSpectator || openingTieBreakResetting) return;
+    const firstTurnDraw = currentRoom.game.turns.find((turn) => turn.turn === 1)?.winner === "draw";
+    if (!firstTurnDraw) return;
+    openingTieBreakPendingChoiceRef.current = null;
+    openingTieBreakPendingKeyRef.current = "";
+    setOpeningTieBreakPendingChoice(null);
+    setOpeningTieBreakResultVisible(false);
+    setOpeningTieBreakResetting(true);
+    void postRoomAction({
+      action: "reset-opening-tiebreak",
+      code: currentRoom.code,
+    }).then((result) => {
+      if (!result.ok) {
+        setBattleLog((current) => ["Reset RPS failed. Syncing latest room state.", ...current]);
+      }
+      void syncRooms({ force: true }).catch(() => null);
+    }).finally(() => {
+      setOpeningTieBreakResetting(false);
     });
   };
 
@@ -6600,6 +6638,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         isSpectator={isSpectator}
         pendingChoice={visibleOpeningTieBreakPendingChoice}
         onChoose={chooseOpeningTieBreak}
+        onReset={resetOpeningTieBreak}
+        resetDisabled={openingTieBreakResetting}
         onExit={leaveRoom}
       />
       <OpeningTieBreakResultOverlay
