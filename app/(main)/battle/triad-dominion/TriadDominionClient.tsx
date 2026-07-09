@@ -3813,7 +3813,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return shuffledCardsBySeed(deckCatalog, `${currentRoom.code}:all:${roomPlayerSide}`);
   }, [cardsByNo, currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
-  const pvpTurnTimedOut = Boolean(isPvpRoom && currentRoom && currentRoom.status === "playing" && roomTurnSecondsLeft(currentRoom) <= 0);
+  const pvpTurnTimedOut = Boolean(
+    isPvpRoom &&
+      currentRoom &&
+      currentRoom.status === "playing" &&
+      (timeLeft <= 0 || roomTurnSecondsLeft(currentRoom) <= 0)
+  );
   const pvpPlacementClosed = Boolean(isPvpRoom && (roomTurnResolved || currentResult || pvpTurnTimedOut));
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
@@ -5084,11 +5089,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       }).then((result) => {
         if (!result.ok) {
           optimisticRoomLockUntilRef.current = 0;
-          setTurnLocked(result.payload?.resolved || result.payload?.reason === "already_resolved" ? true : false);
+          const serverClosedTurn =
+            result.payload?.resolved ||
+            result.payload?.reason === "already_resolved" ||
+            result.payload?.reason === "turn_expired";
+          setTurnLocked(serverClosedTurn ? true : false);
           if (previousRoom) patchCurrentRoom(() => previousRoom);
           void syncRooms({ force: true }).catch(() => null);
           const lockError =
-            result.payload?.resolved || result.payload?.reason === "already_resolved"
+            serverClosedTurn
               ? "ตานี้ถูกตัดสินแล้วจากการหมดเวลา วางการ์ดเพิ่มไม่ได้ กดพร้อมเพื่อไปต่อ"
               : "ล็อกการ์ดในห้อง PvP ไม่ได้";
           setBattleLog((current) => [lockError, ...current]);
@@ -5379,7 +5388,21 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (currentRoom && roomPlayerSide && opponentSide) {
       void postRoomAction({ action: "timeout-turn", code: currentRoom.code }).then((result) => {
         if (result.ok) {
-          setBattleLog((current) => [`ตาที่ ${activeTurn}: หมดเวลา ระบบตัดสินผลให้แล้ว`, ...current]);
+          const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
+          const timeoutResult = room?.game.turns.find((turn) => turn.turn === activeTurn);
+          const ownIsHost = roomPlayerSide === "host";
+          const ownWon =
+            timeoutResult?.winner === (ownIsHost ? "player" : "opponent");
+          const opponentWon =
+            timeoutResult?.winner === (ownIsHost ? "opponent" : "player");
+          const timeoutMessage = timeoutResult
+            ? ownWon
+              ? `ตาที่ ${activeTurn}: คู่แข่งไม่วางการ์ดจนหมดเวลา คุณชนะตานี้ทันที`
+              : opponentWon
+                ? `ตาที่ ${activeTurn}: คุณไม่วางการ์ดจนหมดเวลา แพ้ตานี้ทันที`
+                : `ตาที่ ${activeTurn}: ทั้งสองฝั่งไม่วางการ์ดทันเวลา ตานี้เสมอ`
+            : `ตาที่ ${activeTurn}: หมดเวลา ระบบตัดสินผลให้แล้ว`;
+          setBattleLog((current) => [timeoutMessage, ...current]);
         }
       });
       return;
@@ -5663,10 +5686,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const activeTurnScored = Boolean(revealState?.scored);
   const canRevealTurn = Boolean(displayCurrentResult) && (displayTurnLocked || Boolean(isPvpRoom && roomTurnResolved));
   const showReadyAdvanceButton = Boolean(
-    !isSpectator &&
+      !isSpectator &&
       isPvpRoom &&
       roomPlayerSide &&
-      displayTurnLocked &&
+      (displayTurnLocked || roomTurnResolved) &&
       displayLockedFight &&
       activeTurnScored &&
       !matchDone &&

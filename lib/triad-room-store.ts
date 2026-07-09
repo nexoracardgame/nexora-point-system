@@ -1612,6 +1612,12 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   const lane = laneForTurn(room.game.activeTurn);
   const existingCard = room.game.triangles[side][lane];
   const turnResolved = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
+  if (!turnResolved && Date.now() - room.game.turnStartedAt >= TURN_TIMEOUT_MS) {
+    resolveTimeout(room);
+    runBotBrain(room);
+    await upsertStoredRoom(room);
+    return { ok: false as const, reason: "turn_expired" as const, room: publicRoom(room), resolved: true };
+  }
   if (existingCard) {
     const sameCard = existingCard === cleanText(cardNo);
     return {
