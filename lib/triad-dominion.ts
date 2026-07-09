@@ -450,7 +450,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
@@ -1184,6 +1184,76 @@ function applyHydroburst255(
     type: rule.shape,
     text: rule.text,
     summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} แต้มไม่เกิน 5,000 ได้รับบัฟ ${applied.join(", ")}${blocked.length > 0 ? `; ${blocked.join(", ")}` : ""}`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
+function applyEarthRebirth225Strict(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: TriadScoreState,
+  blockers: StatGainBlocker[] = []
+) {
+  const targetContribution = ownScore.contributions.find((item) => item.card.kind === "monster" && item.card.attack <= 5000);
+  const targetLabel = "มอนสเตอร์ฝั่งผู้ใช้สกิลที่ ATK ไม่เกิน 5,000";
+  if (!targetContribution) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ไม่พบมอนสเตอร์ฝั่งผู้ใช้สกิลที่มี ATK 5,000 หรือต่ำกว่า ใบ 225 จึงไม่ทำงาน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const effects: TriadSkillEffect[] = [
+    { metric: "attack", delta: 2500 },
+    { metric: "support", delta: 2500 },
+  ];
+  const applied: string[] = [];
+  const blocked: string[] = [];
+  for (const effect of effects) {
+    if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) continue;
+    const label = effect.metric === "attack" ? "ATK" : "SUP";
+    const blocker = blockers.find((item) =>
+      item.targetSide === side &&
+      statGainBlockerApplies(item, effect, targetContribution)
+    );
+    if (blocker) {
+      blocked.push(`${label} ถูกบล็อกโดย No.${blocker.rule.cardNo}`);
+      continue;
+    }
+    ownScore.total += effect.delta;
+    targetContribution.value += effect.delta;
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: No.${targetContribution.card.cardNo} ${label} +${effect.delta.toLocaleString()}`);
+    applied.push(`${label} +${effect.delta.toLocaleString()}`);
+  }
+
+  if (applied.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: blocked.length > 0
+        ? `No.${targetContribution.card.cardNo} เข้าเงื่อนไข ATK ไม่เกิน 5,000 แต่บัฟถูกบล็อก (${blocked.join(", ")})`
+        : "เข้าเงื่อนไข ATK ไม่เกิน 5,000 แต่ตานี้ไม่มีค่าสเตตัสที่ใบ 225 ใช้บัฟได้",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี ATK ${targetContribution.card.attack.toLocaleString()} ไม่เกิน 5,000 ใบ 225 บัฟ ${applied.join(", ")}${blocked.length > 0 ? `; ${blocked.join(", ")}` : ""}`,
     targetLabel,
   } satisfies TriadSkillEvent;
 }
@@ -1991,6 +2061,11 @@ function applySkill(
 
   if (rule.cardNo === "255") {
     events.push(applyHydroburst255(rule, side, ownScore, blockers));
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "225") {
+    events.push(applyEarthRebirth225Strict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 
