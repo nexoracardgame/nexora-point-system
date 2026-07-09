@@ -21,6 +21,7 @@ type TriadBlessingChoice = "draw-skill" | "reroll-own" | "reroll-opponent";
 export type TriadOpeningTieBreak = {
   fightNo: number;
   turn: TriadTurn;
+  round?: number;
   status: "idle" | "waiting" | "resolved";
   reason: "first_turn_score_draw" | "";
   choices: Partial<Record<TriadRoomSlot, TriadRpsChoice>>;
@@ -225,6 +226,7 @@ function emptyOpeningTieBreak(): TriadOpeningTieBreak {
   return {
     fightNo: 1,
     turn: 1,
+    round: 1,
     status: "idle",
     reason: "",
     choices: {},
@@ -361,6 +363,7 @@ function normalizeOpeningTieBreak(value: unknown): TriadOpeningTieBreak {
   return {
     fightNo: Number(raw.fightNo || 1),
     turn: raw.turn === 2 || raw.turn === 3 ? raw.turn : 1,
+    round: Math.max(1, Number(raw.round || 1)),
     status,
     reason: raw.reason === "first_turn_score_draw" ? "first_turn_score_draw" : "",
     choices: {
@@ -1072,17 +1075,13 @@ function botChooseOpeningTieBreak(room: StoredTriadRoom) {
   if (!isTriadBotParticipant(room.seats.challenger)) return false;
   const tieBreak = room.game.openerTieBreak;
   if (tieBreak.status !== "waiting" || (tieBreak.choices.challenger || "unknown") !== "unknown") return false;
-  const hostChoice = tieBreak.choices.host || "unknown";
-  const choice: TriadRpsChoice =
-    hostChoice === "rock" ? "paper" :
-    hostChoice === "paper" ? "scissors" :
-    hostChoice === "scissors" ? "rock" :
-    (["rock", "paper", "scissors"] as TriadRpsChoice[])[Math.floor(Math.random() * 3)];
+  const choice = (["rock", "paper", "scissors"] as TriadRpsChoice[])[Math.floor(Math.random() * 3)];
   const nextChoices = { ...tieBreak.choices, challenger: choice };
   const winner = rpsWinner(nextChoices.host || "unknown", nextChoices.challenger || "unknown");
   room.game.openerTieBreak = {
     ...tieBreak,
     choices: nextChoices,
+    round: winner === "draw" ? (tieBreak.round || 1) + 1 : tieBreak.round || 1,
     status: winner === "host" || winner === "challenger" ? "resolved" : "waiting",
     winner: winner === "host" || winner === "challenger" ? winner : "",
     source: "manual",
@@ -1432,6 +1431,7 @@ function updateOpeningTieBreakAfterResult(room: StoredTriadRoom, result: TriadTu
   const base = {
     fightNo: room.game.fightNo,
     turn: 1 as TriadTurn,
+    round: 1,
     reason: "first_turn_score_draw" as const,
     choices: { host: hostChoice, challenger: challengerChoice },
   };
@@ -1778,6 +1778,7 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
   room.game.openerTieBreak = {
     ...tieBreak,
     choices: nextChoices,
+    round: winner === "draw" ? (tieBreak.round || 1) + 1 : tieBreak.round || 1,
     status: winner === "host" || winner === "challenger" ? "resolved" : "waiting",
     winner: winner === "host" || winner === "challenger" ? winner : "",
     source: "manual",

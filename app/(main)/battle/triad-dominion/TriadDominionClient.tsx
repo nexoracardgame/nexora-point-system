@@ -171,6 +171,7 @@ type RoomGame = {
 type OpeningTieBreak = {
   fightNo: number;
   turn: TriadTurn;
+  round?: number;
   status: "idle" | "waiting" | "resolved";
   reason: "first_turn_score_draw" | "";
   choices: Partial<Record<RoomPlayerSide, TriadRpsChoice>>;
@@ -699,8 +700,9 @@ function normalizeRoomGame(value: unknown): RoomGame {
         ? (rawTieBreak.revealChoices as Record<string, unknown>)
         : null;
     return {
-      fightNo: Number(rawTieBreak.fightNo || 1),
-      turn: rawTieBreak.turn === 2 || rawTieBreak.turn === 3 ? rawTieBreak.turn : 1,
+    fightNo: Number(rawTieBreak.fightNo || 1),
+    turn: rawTieBreak.turn === 2 || rawTieBreak.turn === 3 ? rawTieBreak.turn : 1,
+    round: Math.max(1, Number(rawTieBreak.round || 1)),
       status: rawTieBreak.status === "waiting" || rawTieBreak.status === "resolved" ? rawTieBreak.status : "idle",
       reason: rawTieBreak.reason === "first_turn_score_draw" ? "first_turn_score_draw" : "",
       choices: {
@@ -2398,6 +2400,7 @@ function OpeningTieBreakOverlay({
   const winnerName = tieBreak.winner === "host" ? hostName : tieBreak.winner === "challenger" ? challengerName : "";
   const resolved = tieBreak.status === "resolved" && Boolean(tieBreak.winner);
   const canChoose = tieBreak.status === "waiting" && !isSpectator && ownSide && ownChoice === "unknown";
+  const previousRoundDraw = tieBreak.status === "waiting" && hostChoice !== "unknown" && challengerChoice !== "unknown";
 
   return (
     <div className="fixed inset-0 z-[90] grid place-items-center bg-black/72 px-4 backdrop-blur-md">
@@ -2407,7 +2410,8 @@ function OpeningTieBreakOverlay({
             <Swords className="h-6 w-6" />
           </div>
           <div className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/62">ตัดสินฝ่ายเปิดสกิลตาถัดไป</div>
-          <div className="mt-1 text-2xl font-black">{resolved ? "ตัดสินเป่ายิงฉุบแล้ว" : "ตาแรกคะแนนเสมอแล้ว"}</div>
+          <div className="mt-1 text-2xl font-black">{resolved ? "ตัดสินเป่ายิงฉุบแล้ว" : previousRoundDraw ? "เป่ายิงฉุบเสมอ เลือกใหม่" : "ตาแรกคะแนนเสมอแล้ว"}</div>
+          <div className="mt-2 text-xs font-black uppercase tracking-[0.18em] text-amber-100/48">รอบเป่ายิงฉุบที่ {tieBreak.round || 1}</div>
           <p className="mt-3 text-sm font-semibold leading-6 text-white/68">
             {resolved && winnerName
               ? `${winnerName} ชนะจากการตัดสินเป่ายิงฉุบ และจะเป็นฝ่ายเปิดการ์ด/ใช้สกิลก่อนในตาถัดไป`
@@ -2435,9 +2439,9 @@ function OpeningTieBreakOverlay({
           </div>
         ) : (
           <div className="mt-5 space-y-3">
-            {tieBreak.reason === "first_turn_score_draw" && revealedChoices.host !== "unknown" && revealedChoices.challenger !== "unknown" ? (
+            {previousRoundDraw ? (
               <div className="rounded-xl border border-amber-200/24 bg-amber-300/10 p-3 text-center text-sm font-black text-amber-100">
-                เสมออีกครั้ง เลือกใหม่จนกว่าจะมีผู้ชนะ ฝ่ายที่ชนะจะได้เปิดสกิลก่อนในตาถัดไป
+                เสมออีกครั้ง เลือกใหม่ได้ทันที จนกว่าจะมีผู้ชนะเพื่อเปิดสกิลก่อน
               </div>
             ) : null}
             {canChoose ? (
@@ -4236,6 +4240,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setOpeningTieBreakPendingChoice(null);
   }, [
     currentRoom?.game.openerTieBreak.fightNo,
+    currentRoom?.game.openerTieBreak.round,
     currentRoom?.game.openerTieBreak.status,
     currentRoom?.game.openerTieBreak.choices.host,
     currentRoom?.game.openerTieBreak.choices.challenger,
@@ -4595,7 +4600,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     const hostChoice = tieBreak.revealChoices?.host || tieBreak.choices.host || "unknown";
     const challengerChoice = tieBreak.revealChoices?.challenger || tieBreak.choices.challenger || "unknown";
-    const resultKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${tieBreak.winner}:${hostChoice}:${challengerChoice}`;
+    const resultKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${tieBreak.round || 1}:${tieBreak.winner}:${hostChoice}:${challengerChoice}`;
     if (openerTieBreakResultKeyRef.current === resultKey) return;
 
     openerTieBreakResultKeyRef.current = resultKey;
@@ -4610,6 +4615,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     currentRoom?.code,
     currentRoom?.game.activeTurn,
     currentRoom?.game.fightNo,
+    currentRoom?.game.openerTieBreak.round,
     currentRoom?.game.openerTieBreak.status,
     currentRoom?.game.openerTieBreak.winner,
     currentRoom?.game.openerTieBreak.choices.host,
