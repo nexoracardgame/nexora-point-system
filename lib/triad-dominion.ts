@@ -411,7 +411,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const shape: TriadSkillShape =
     card.cardNo === "245" || card.cardNo === "284"
       ? "swap-control"
-      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238"
+      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239"
         ? "stat"
       : card.cardNo === "227"
         ? "stat"
@@ -449,7 +449,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
@@ -1342,6 +1342,90 @@ function applyMetalShield238Strict(
   } satisfies TriadSkillEvent;
 }
 
+function applyIronWings239Strict(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: TriadScoreState,
+  blockers: StatGainBlocker[] = []
+) {
+  const targetContribution = ownScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = "มอนสเตอร์หลักฝ่ายผู้ใช้สกิล";
+  if (!targetContribution) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ไม่พบมอนสเตอร์หลักฝั่งตัวเอง ใบ 239 จึงไม่ทำงาน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (targetContribution.card.support > 1000) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี SUP ${targetContribution.card.support.toLocaleString()} เกิน 1,000 จึงไม่เข้าเงื่อนไขใบ 239`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const effects: TriadSkillEffect[] = [
+    { metric: "attack", delta: 7000 },
+    { metric: "support", delta: 3000 },
+  ];
+  const applied: string[] = [];
+  const blocked: string[] = [];
+
+  for (const effect of effects) {
+    const label = effect.metric === "attack" ? "ATK" : "SUP";
+    if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) continue;
+    const blocker = blockers.find((item) =>
+      item.targetSide === side &&
+      statGainBlockerApplies(item, effect, { lane: "top" })
+    );
+    if (blocker) {
+      blocked.push(`${label} ถูกบล็อกโดย No.${blocker.rule.cardNo}`);
+      continue;
+    }
+    ownScore.total += effect.delta;
+    targetContribution.value += effect.delta;
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} +${effect.delta.toLocaleString()}`);
+    applied.push(`${label} +${effect.delta.toLocaleString()}`);
+  }
+
+  if (applied.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: blocked.length > 0
+        ? `เข้าเงื่อนไขแล้วแต่บัฟถูกบล็อก (${blocked.join(", ")})`
+        : "เข้าเงื่อนไขแล้ว แต่ตานี้ไม่มีค่าสเตตัสที่ใบ 239 ใช้บัฟได้",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี SUP ไม่เกิน 1,000 ใบ 239 บัฟ ${applied.join(", ")}${blocked.length > 0 ? `; ${blocked.join(", ")}` : ""}`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
 function applyPitfall223(
   rule: TriadSkillRule,
   side: "player" | "opponent",
@@ -1730,6 +1814,11 @@ function applySkill(
 
   if (rule.cardNo === "238") {
     events.push(applyMetalShield238Strict(rule, side, ownScore, blockers));
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "239") {
+    events.push(applyIronWings239Strict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 

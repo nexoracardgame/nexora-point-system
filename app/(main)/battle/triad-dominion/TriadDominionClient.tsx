@@ -1238,6 +1238,10 @@ function monsterHasMetalShield238Stat(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.support <= 2000);
 }
 
+function monsterHasIronWings239Stat(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.support <= 1000);
+}
+
 function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): SkillTargetId[] {
   return value
     .split(">")
@@ -1300,6 +1304,10 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   if (card?.cardNo === "238") {
     const ownCard = side === "player" ? playerTop : botTop;
     return monsterHasMetalShield238Stat(ownCard) ? [ownTarget] : [];
+  }
+  if (card?.cardNo === "239") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasIronWings239Stat(ownCard) ? [ownTarget] : [];
   }
   if (rule.target.startsWith("own")) return [ownTarget];
   if (rule.target.startsWith("opponent")) return [opponentTarget];
@@ -1909,6 +1917,13 @@ function BoardTriangle({
                 if (card && canPreview) onPreview?.(card, "hover");
               }}
               onMouseLeave={onPreviewEnd}
+              onPointerEnter={() => {
+                if (card && canPreview) onPreview?.(card, "hover");
+              }}
+              onPointerMove={() => {
+                if (card && canPreview) onPreview?.(card, "hover");
+              }}
+              onPointerLeave={onPreviewEnd}
               onFocus={() => {
                 if (card && canPreview) onPreview?.(card, "modal");
               }}
@@ -3792,6 +3807,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [openingTieBreakResetting, setOpeningTieBreakResetting] = useState(false);
   const [pendingTurnReadyKey, setPendingTurnReadyKey] = useState("");
   const [turnReadySubmittingKey, setTurnReadySubmittingKey] = useState("");
+  const [deckReadySubmitting, setDeckReadySubmitting] = useState(false);
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const openingTieBreakPendingKeyRef = useRef("");
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
@@ -4030,6 +4046,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
   const bothDecksReady = roomBattleReady;
+  useEffect(() => {
+    if (!deckReadySubmitting) return;
+    if (!currentRoom || currentRoom.status !== "playing" || phase !== "deck" || ownDeckReady || bothDecksReady) {
+      setDeckReadySubmitting(false);
+    }
+  }, [bothDecksReady, currentRoom, deckReadySubmitting, ownDeckReady, phase]);
   const deckSelectionActive = Boolean(currentRoom && currentRoom.status === "playing" && !bothDecksReady);
   const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
   const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
@@ -5005,7 +5027,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const enterBattle = async () => {
-    if (ownDeckReady) return;
+    if (ownDeckReady || deckReadySubmitting) return;
     const monsterCount = playerDeckCards.filter((card) => card.kind === "monster").length;
     if (!currentRoom && monsterCount < 3) {
       setBattleLog(["เด็คต้องมีมอนสเตอร์อย่างน้อย 3 ใบ เพื่อใช้เป็นการ์ดหลักของแต่ละรอบ"]);
@@ -5013,17 +5035,25 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
+      if (!deckValidation.valid) return;
+      setDeckReadySubmitting(true);
+      optimisticRoomLockUntilRef.current = Date.now() + 3200;
       const optimisticRoom = patchCurrentRoom((room) => ({
         ...room,
         game: {
           ...room.game,
+          decks: {
+            ...room.game.decks,
+            [roomPlayerSide]: playerDeck,
+          },
           deckReady: {
             ...room.game.deckReady,
-            [roomPlayerSide]: room.game.deckReady[roomPlayerSide],
+            [roomPlayerSide]: true,
           },
         },
       }));
       if (roomDecksReadyForBattle(optimisticRoom)) {
+        setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
         setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
@@ -5034,15 +5064,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         deck: playerDeck,
       });
       if (!result.ok) {
+        setDeckReadySubmitting(false);
+        optimisticRoomLockUntilRef.current = 0;
         setBattleLog(["กดพร้อมเด็คเข้าห้อง PvP ไม่ได้"]);
         return;
       }
+      setDeckReadySubmitting(false);
       const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || currentRoom;
       const ownDeck = room.game.decks[roomPlayerSide];
       const enemyDeck = room.game.decks[opponentSide];
       setBotDeck(enemyDeck);
       setPlayerDeck(ownDeck);
       if (roomDecksReadyForBattle(room)) {
+        setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
         setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
@@ -5064,12 +5098,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const timer = window.setInterval(() => {
       const nextLeft = roomDeckSecondsLeft(currentRoom);
       setDeckTimeLeft(nextLeft);
-      if (phase === "deck" && nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && deckValidation.valid) {
+      if (phase === "deck" && nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && !deckReadySubmitting && deckValidation.valid) {
+        setDeckReadySubmitting(true);
         void postRoomAction({
           action: "ready-deck",
           code: currentRoom.code,
           deck: playerDeck,
         }).then((result) => {
+          setDeckReadySubmitting(false);
           if (result.ok) {
             const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
             if (roomDecksReadyForBattle(room)) {
