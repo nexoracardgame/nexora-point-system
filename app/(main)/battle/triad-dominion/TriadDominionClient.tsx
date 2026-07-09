@@ -1156,6 +1156,7 @@ function validateDeckForMode(cards: CardView[], mode: DeckMode) {
 }
 
 function skillNeedsChoice(card?: CardView) {
+  if (card?.cardNo === "245") return false;
   return Boolean(card?.kind === "skill" && (card.cardNo === "254" || card.cardNo === "231" || /เลือก|choose|target/i.test(card.skillText)));
 }
 
@@ -3812,6 +3813,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return shuffledCardsBySeed(deckCatalog, `${currentRoom.code}:all:${roomPlayerSide}`);
   }, [cardsByNo, currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
+  const pvpTurnTimedOut = Boolean(isPvpRoom && currentRoom && currentRoom.status === "playing" && roomTurnSecondsLeft(currentRoom) <= 0);
+  const pvpPlacementClosed = Boolean(isPvpRoom && (roomTurnResolved || currentResult || pvpTurnTimedOut));
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
     : "เรา";
@@ -3833,6 +3836,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const displayFightScore = spectatorBattleState?.fightScore || fightScore;
   const displayTimeLeft = spectatorBattleState?.timeLeft ?? timeLeft;
   const displayTurnLocked = spectatorBattleState?.turnLocked ?? turnLocked;
+  const placementLocked = Boolean(displayTurnLocked || matchDone || pvpPlacementClosed);
   const displayPlayerName = spectatorBattleState?.playerName || playerLabel;
   const displayBotName = spectatorBattleState?.botName || opponentLabel;
   const displayPlayerImage = spectatorBattleState?.playerImage || playerImage;
@@ -4672,11 +4676,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setBotDeck(enemyDeck);
     const serverPlayerTriangle = previewTriangles[roomPlayerSide];
     const activeLane = laneForTurn(currentRoom.game.activeTurn);
+    const turnResolved = currentRoom.game.turns.some((turn) => turn.turn === currentRoom.game.activeTurn);
     setTurnLocked(Boolean(serverPlayerTriangle[activeLane]));
     setTimeLeft(roomTurnSecondsLeft(currentRoom));
     setPlayer((current) => {
       const next = { ...serverPlayerTriangle };
-      if (!serverPlayerTriangle[activeLane] && current[activeLane]) {
+      if (!turnResolved && !serverPlayerTriangle[activeLane] && current[activeLane]) {
         next[activeLane] = current[activeLane];
       }
       return next;
@@ -4935,6 +4940,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
+    if (pvpPlacementClosed) {
+      setBattleLog((current) => ["หมดเวลาหรือตานี้ถูกตัดสินแล้ว ไม่สามารถวางการ์ดเพิ่มได้ กดพร้อมเพื่อไปต่อเท่านั้น", ...current]);
+      return false;
+    }
     if (turnLocked || matchDone || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return false;
     const alreadyPlayedLane = (["top", "left", "right"] as Lane[]).find((item) => item !== lane && player[item] === cardNo);
     if (alreadyPlayedLane) return false;
@@ -5005,6 +5014,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const lockFight = (cardNoOverride = "", laneOverride?: Lane) => {
+    if (pvpPlacementClosed) {
+      setBattleLog((current) => ["หมดเวลาหรือตานี้ถูกตัดสินแล้ว ไม่สามารถล็อกการ์ดเพิ่มได้ กดพร้อมเพื่อไปต่อเท่านั้น", ...current]);
+      void syncRooms({ force: true }).catch(() => null);
+      return;
+    }
     const lane = laneOverride || laneForTurn(activeTurn);
     const playerForLock = cardNoOverride ? { ...player, [lane]: cardNoOverride } : player;
     if (!playerForLock[lane]) {
@@ -5070,10 +5084,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       }).then((result) => {
         if (!result.ok) {
           optimisticRoomLockUntilRef.current = 0;
-          setTurnLocked(false);
+          setTurnLocked(result.payload?.resolved || result.payload?.reason === "already_resolved" ? true : false);
           if (previousRoom) patchCurrentRoom(() => previousRoom);
           void syncRooms({ force: true }).catch(() => null);
-          setBattleLog((current) => ["ล็อกการ์ดในห้อง PvP ไม่ได้", ...current]);
+          const lockError =
+            result.payload?.resolved || result.payload?.reason === "already_resolved"
+              ? "ตานี้ถูกตัดสินแล้วจากการหมดเวลา วางการ์ดเพิ่มไม่ได้ กดพร้อมเพื่อไปต่อ"
+              : "ล็อกการ์ดในห้อง PvP ไม่ได้";
+          setBattleLog((current) => [lockError, ...current]);
           return;
         }
         setBattleLog((current) => [
@@ -5419,7 +5437,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         if (current <= 1) {
           window.clearInterval(timer);
           setTimeout(timeoutTurn, 0);
-          return TURN_SECONDS;
+          return isPvpRoom ? 0 : TURN_SECONDS;
         }
         return current - 1;
       });
@@ -6544,7 +6562,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 currentParticipantId={participant.id}
                 placementLane={placementLane}
                 timeLeft={displayTimeLeft}
-                turnLocked={displayTurnLocked}
+                turnLocked={placementLocked}
                 pendingSkillChoice={pendingSkillChoice}
                 waitingSkillChoice={waitingSkillChoice}
                 revealAllCards={isSpectator}
@@ -6589,7 +6607,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               currentParticipantId={participant.id}
               placementLane={placementLane}
               timeLeft={displayTimeLeft}
-              turnLocked={displayTurnLocked}
+              turnLocked={placementLocked}
               pendingSkillChoice={pendingSkillChoice}
               waitingSkillChoice={waitingSkillChoice}
               revealAllCards={isSpectator}
@@ -6620,7 +6638,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               player={player}
               placementLane={placementLane}
               activeLane={laneForTurn(activeTurn)}
-              locked={turnLocked || matchDone}
+              locked={placementLocked}
               highlightCardNo={displayRandomDrawCardNo}
               onSelectLane={setPlacementLane}
               onPlayCard={placeCardFromHand}

@@ -369,15 +369,24 @@ function inferElementsFromText(text: string): TriadElement[] {
   return uniqueElements(elements);
 }
 
+function hasExplicitElementCondition(text: string) {
+  const explicitElementMarker =
+    /(?:\u0e18\u0e32\u0e15\u0e38|Element|Symbol|icon|\u{1F534}|\u{1F535}|\u{1F7E2}|\u2660|coin|triangle)/iu;
+  const explicitExclusion =
+    /(?:\u0e44\u0e21\u0e48\u0e43\u0e0a\u0e48|\u0e22\u0e01\u0e40\u0e27\u0e49\u0e19|except|non[-\s]?)[\s\S]{0,36}(?:\u0e18\u0e32\u0e15\u0e38|Element|Symbol|icon|Fire|Water|Wood|Gold|Earth|\u{1F534}|\u{1F535}|\u{1F7E2}|\u2660|coin|triangle)/iu;
+  return explicitElementMarker.test(text) || explicitExclusion.test(text);
+}
+
 function inferElementCondition(card: TriadCard): TriadSkillRule["elementCondition"] {
   if (["001", "002", "003", "004", "005"].includes(card.cardNo) && card.element !== "unknown") {
     return { mode: "include", elements: [card.element] };
   }
 
   const text = card.skillText;
+  if (!hasExplicitElementCondition(text)) return undefined;
+
   const explicitElements = inferElementsFromText(text);
-  const fallbackElements = card.element !== "unknown" ? [card.element] : [];
-  const elements = explicitElements.length > 0 ? explicitElements : fallbackElements;
+  const elements = explicitElements;
   if (elements.length === 0) return undefined;
 
   if (/ไม่ใช่|ยกเว้น|except|non[-\s]?/i.test(text)) {
@@ -400,7 +409,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const effects = statEffects(card.skillText);
   const inferredShape = inferSkillShape(card.skillText, effects);
   const shape: TriadSkillShape =
-    card.cardNo === "284"
+    card.cardNo === "245" || card.cardNo === "284"
       ? "swap-control"
       : card.cardNo === "259"
         ? "stat"
@@ -430,6 +439,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     card.cardNo !== "234" &&
     card.cardNo !== "259" &&
     card.cardNo !== "227" &&
+    card.cardNo !== "245" &&
     (shape === "unparsed" ||
       shape === "element-transform" ||
       /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText));
@@ -1135,14 +1145,15 @@ function applySkill(
   skippedSkillCardNos: Set<string> = new Set(),
   cancelledSkillCardNos: Set<string> = new Set(),
   canCancelOpponentSkill = false,
-  selectedTarget = ""
+  selectedTarget = "",
+  overrideRule?: TriadSkillRule
 ) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   const unresolved: TriadSkillRule[] = [];
   const events: TriadSkillEvent[] = [];
-  if (!laneCard || laneCard.kind !== "skill") return { unresolved, events };
+  if ((!laneCard || laneCard.kind !== "skill") && !overrideRule) return { unresolved, events };
 
-  const rule = triadSkillRuleByNo.get(laneCard.cardNo);
+  const rule = overrideRule || (laneCard ? triadSkillRuleByNo.get(laneCard.cardNo) : undefined);
   if (!rule) return { unresolved, events };
 
   if (cancelledSkillCardNos.has(rule.cardNo)) {
@@ -1413,6 +1424,85 @@ function applySkill(
   return { unresolved, events };
 }
 
+function getEnergyReversalRule(triangle: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
+  const rule = getLaneSkillRule(triangle, turn, skippedSkillCardNos);
+  return rule?.cardNo === "245" && rule.allowedTurns.includes(turn) ? rule : undefined;
+}
+
+function getOpposingSkillRuleForEnergyReversal(
+  triangle: TriadTriangle,
+  turn: TriadTurn,
+  skippedSkillCardNos: Set<string> = new Set()
+) {
+  const rule = getLaneSkillRule(triangle, turn, skippedSkillCardNos);
+  if (!rule || rule.cardNo === "245") return undefined;
+  return rule;
+}
+
+function applyEnergyReversal(
+  side: "player" | "opponent",
+  ownTriangle: TriadTriangle,
+  opposingTriangle: TriadTriangle,
+  ownScore: ReturnType<typeof baseScore>,
+  opponentScore: ReturnType<typeof baseScore>,
+  turn: TriadTurn,
+  blockers: StatGainBlocker[],
+  skippedSkillCardNos: Set<string>,
+  cancelledSkillCardNos: Set<string>,
+  selectedTarget = ""
+) {
+  const unresolved: TriadSkillRule[] = [];
+  const events: TriadSkillEvent[] = [];
+  const reversalRule = getEnergyReversalRule(ownTriangle, turn, skippedSkillCardNos);
+  if (!reversalRule) return { unresolved, events };
+  if (cancelledSkillCardNos.has(reversalRule.cardNo)) return { unresolved, events };
+
+  const copiedRule = getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn);
+  if (!copiedRule) {
+    events.push({
+      cardNo: reversalRule.cardNo,
+      name: reversalRule.name,
+      side,
+      type: reversalRule.shape,
+      text: reversalRule.text,
+      summary: "Energy Reversal found no opposing skill to copy this turn.",
+      blocked: true,
+    });
+    ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: no opposing skill to copy`);
+    return { unresolved, events };
+  }
+
+  events.push({
+    cardNo: reversalRule.cardNo,
+    name: reversalRule.name,
+    side,
+    type: reversalRule.shape,
+    text: reversalRule.text,
+    summary: `Energy Reversal copies No.${copiedRule.cardNo} ${copiedRule.name} and uses it for this side.`,
+    targetLabel: `No.${copiedRule.cardNo}`,
+  });
+  ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: copied No.${copiedRule.cardNo} ${copiedRule.name}`);
+
+  const copied = applySkill(
+    opposingTriangle,
+    ownScore,
+    opponentScore,
+    turn,
+    side,
+    blockers,
+    new Set(),
+    new Set(),
+    false,
+    selectedTarget,
+    copiedRule
+  );
+
+  return {
+    unresolved: [...unresolved, ...copied.unresolved],
+    events: [...events, ...copied.events],
+  };
+}
+
 function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
   const laneCard = getCard(triangle[selectedLane(turn)]);
   if (!laneCard || laneCard.kind !== "skill") return undefined;
@@ -1508,7 +1598,7 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
     { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn, skippedSkillCardNos) },
   ].filter(
     (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
-      item.rule?.shape === "swap-control" && item.rule.allowedTurns.includes(turn)
+      item.rule?.shape === "swap-control" && item.rule.cardNo !== "245" && item.rule.allowedTurns.includes(turn)
   );
 
   if (swapSkills.length > 0) {
@@ -1531,11 +1621,36 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
   return { player: effectivePlayer, opponent: effectiveOpponent, events };
 }
 
+function collectEnergyReversalLocks(
+  player: TriadTriangle,
+  opponent: TriadTriangle,
+  turn: TriadTurn,
+  prioritySide: "player" | "opponent",
+  skippedSkillCardNos: Set<string> = new Set()
+) {
+  const lockedSkillCardNos = new Set<string>();
+  const priorityTriangle = prioritySide === "player" ? player : opponent;
+  const opposingTriangle = prioritySide === "player" ? opponent : player;
+  const reversalRule = getEnergyReversalRule(priorityTriangle, turn, skippedSkillCardNos);
+  const copiedRule = reversalRule ? getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn) : undefined;
+  if (copiedRule) lockedSkillCardNos.add(copiedRule.cardNo);
+  return { lockedSkillCardNos };
+}
+
 export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const prioritySide = input.prioritySide || "player";
   const skippedSkillCardNos = new Set((input.skippedSkillCardNos || []).map((cardNo) => normalizeCardNo(cardNo)));
   const skillCancels = collectSkillCancels(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos);
-  const blockedSkillCardNos = new Set([...skippedSkillCardNos, ...skillCancels.cancelledSkillCardNos]);
+  const energyReversalLocks = collectEnergyReversalLocks(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos);
+  const cancelledOrLockedSkillCardNos = new Set([
+    ...skillCancels.cancelledSkillCardNos,
+    ...energyReversalLocks.lockedSkillCardNos,
+  ]);
+  const blockedSkillCardNos = new Set([
+    ...skippedSkillCardNos,
+    ...cancelledOrLockedSkillCardNos,
+    ...energyReversalLocks.lockedSkillCardNos,
+  ]);
   const statUseBlocks = collectStatUseBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos);
   const statGainBlockers: StatGainBlocker[] = [];
@@ -1559,7 +1674,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
           "player",
           statGainBlockers,
           skippedSkillCardNos,
-          skillCancels.cancelledSkillCardNos,
+          cancelledOrLockedSkillCardNos,
           prioritySide === "player",
           input.skillTargets?.player?.[getCard(input.player[selectedLane(input.turn)])?.cardNo || ""]
         )
@@ -1571,14 +1686,38 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
           "opponent",
           statGainBlockers,
           skippedSkillCardNos,
-          skillCancels.cancelledSkillCardNos,
+          cancelledOrLockedSkillCardNos,
           prioritySide === "opponent",
           input.skillTargets?.opponent?.[getCard(input.opponent[selectedLane(input.turn)])?.cardNo || ""]
         );
+  const applySideWithEnergyReversal = (side: "player" | "opponent") => {
+    const base = applySide(side);
+    const ownTriangle = side === "player" ? input.player : input.opponent;
+    const opposingTriangle = side === "player" ? input.opponent : input.player;
+    const ownScore = side === "player" ? playerScore : opponentScore;
+    const opposingScore = side === "player" ? opponentScore : playerScore;
+    const selectedTarget = input.skillTargets?.[side]?.[getCard(ownTriangle[selectedLane(input.turn)])?.cardNo || ""];
+    const copied = applyEnergyReversal(
+      side,
+      ownTriangle,
+      opposingTriangle,
+      ownScore,
+      opposingScore,
+      input.turn,
+      statGainBlockers,
+      skippedSkillCardNos,
+      cancelledOrLockedSkillCardNos,
+      selectedTarget
+    );
+    return {
+      unresolved: [...base.unresolved, ...copied.unresolved],
+      events: [...base.events, ...copied.events],
+    };
+  };
   const orderedApplied =
     prioritySide === "player"
-      ? [applySide("player"), applySide("opponent")]
-      : [applySide("opponent"), applySide("player")];
+      ? [applySideWithEnergyReversal("player"), applySideWithEnergyReversal("opponent")]
+      : [applySideWithEnergyReversal("opponent"), applySideWithEnergyReversal("player")];
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
 
