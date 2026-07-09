@@ -640,7 +640,7 @@ function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhas
   const spectator = room.spectators.some((viewer) => viewer.id === participantId);
   const fieldPlayer = room.seats.host?.id === participantId || room.seats.challenger?.id === participantId;
   if (!spectator && !fieldPlayer) return null;
-  if (spectator) return roomDecksReadyForBattle(room) ? "battle" : "room";
+  if (spectator) return "battle";
   return roomDecksReadyForBattle(room) ? "battle" : "deck";
 }
 
@@ -2206,7 +2206,7 @@ function PlayerHand({
 
   return (
     <div className="triad-player-hand relative z-[90] rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
-      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} onUseCard={canUsePreviewCard ? usePreviewCard : undefined} />
+      <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} onUseCard={canUsePreviewCard ? usePreviewCard : undefined} passive />
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
           การ์ดในมือ
@@ -2565,7 +2565,7 @@ function CardHoverPreview({
   passive?: boolean;
 }) {
   const useCardStampRef = useRef(0);
-  const interactive = Boolean(onUseCard) || !passive;
+  const interactive = !passive && (Boolean(onUseCard) || Boolean(onClose));
   const useCardFromPreview = () => {
     if (!card || !onUseCard) return;
     const now = Date.now();
@@ -2586,7 +2586,7 @@ function CardHoverPreview({
   if (!card) return null;
   return (
     <div
-      className={`triad-card-preview-overlay fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${onClose ? "pointer-events-auto" : "pointer-events-none"}`}
+      className={`triad-card-preview-overlay fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
       role="dialog"
       aria-modal="true"
       onClick={(event) => {
@@ -2600,7 +2600,7 @@ function CardHoverPreview({
         onTouchStart={(event) => event.stopPropagation()}
         onTouchEnd={(event) => event.stopPropagation()}
       >
-        {onClose ? (
+        {onClose && !passive ? (
           <button
             type="button"
             aria-label="ปิดหน้าต่างการ์ด"
@@ -2632,7 +2632,7 @@ function CardHoverPreview({
           <div className="triad-card-preview-text mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
             {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
           </div>
-          {onUseCard ? (
+          {onUseCard && !passive ? (
             <button
               type="button"
               className="triad-card-preview-use mt-3 hidden w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
@@ -2657,7 +2657,7 @@ function CardHoverPreview({
               เลือกใช้การ์ดใบนี้
             </button>
           ) : null}
-          {onClose ? (
+          {onClose && !passive ? (
             <button
               type="button"
               onClick={onClose}
@@ -6450,6 +6450,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   ไปนั่งชม
                 </button>
               ) : null}
+            </div>
+            <div className="md:col-span-2">
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
             </div>
           </div>
 
