@@ -1423,6 +1423,7 @@ function parseBoardTargetSequence(value = "") {
 }
 
 function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
+  if (cleanText(cardNo) === "265") return false;
   if (cleanText(cardNo) === "254") return true;
   if (cleanText(cardNo) === "227") return gravityFieldTargets(room).length > 0;
   if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;

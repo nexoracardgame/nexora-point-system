@@ -1255,6 +1255,7 @@ function validateDeckForMode(cards: CardView[], mode: DeckMode) {
 
 function skillNeedsChoice(card?: CardView) {
   if (card?.cardNo === "245") return false;
+  if (card?.cardNo === "265") return false;
   return Boolean(card?.kind === "skill" && (card.cardNo === "254" || card.cardNo === "231" || /เลือก|choose|target/i.test(card.skillText)));
 }
 

@@ -449,7 +449,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "005" ? "own-all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
@@ -1184,6 +1184,83 @@ function applyHydroburst255(
   } satisfies TriadSkillEvent;
 }
 
+function applyWaterCrystal005Strict(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: TriadScoreState,
+  blockers: StatGainBlocker[] = []
+) {
+  const effect: TriadSkillEffect = { metric: "attack", delta: 3000 };
+  const targetLabel = "มอนสเตอร์ธาตุน้ำฝั่งผู้ใช้สกิล";
+
+  if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ใบ 005 เป็นบัฟ ATK จึงทำงานเฉพาะตาที่ใช้ค่า ATK คิดคะแนน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const waterContributions = ownScore.contributions.filter((item) => item.card.element === "water");
+  if (waterContributions.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ใบ 005 ไม่พบมอนสเตอร์ธาตุน้ำฝั่งผู้ใช้สกิล จึงไม่เกิดผล",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const applied: string[] = [];
+  const blocked: string[] = [];
+  for (const contribution of waterContributions) {
+    const blocker = blockers.find((item) =>
+      item.targetSide === side &&
+      statGainBlockerApplies(item, effect, contribution)
+    );
+    if (blocker) {
+      blocked.push(`No.${contribution.card.cardNo} ถูกบล็อกโดย No.${blocker.rule.cardNo}`);
+      continue;
+    }
+    ownScore.total += effect.delta;
+    contribution.value += effect.delta;
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: No.${contribution.card.cardNo} water ATK +${effect.delta.toLocaleString()}`);
+    applied.push(`No.${contribution.card.cardNo} +${effect.delta.toLocaleString()}`);
+  }
+
+  if (applied.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `ใบ 005 เจอมอนสเตอร์ธาตุน้ำแล้ว แต่บัฟถูกบล็อกทั้งหมด (${blocked.join(", ")})`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `ใบ 005 บัฟ ATK +3,000 ให้มอนสเตอร์ธาตุน้ำฝั่งผู้ใช้สกิลครบตามเงื่อนไข: ${applied.join(", ")}${blocked.length > 0 ? `; ถูกบล็อก ${blocked.join(", ")}` : ""}`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
 function applyPitfall223Strict(
   rule: TriadSkillRule,
   side: "player" | "opponent",
@@ -1744,6 +1821,10 @@ function applySkill(
     return { unresolved, events };
   }
 
+  if (rule.cardNo === "265") {
+    return { unresolved, events };
+  }
+
   if (rule.cardNo === "227") {
     const result = applyGravityField(
       rule,
@@ -1870,6 +1951,11 @@ function applySkill(
   }
 
   if (rule.cardNo === "245") {
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "005") {
+    events.push(applyWaterCrystal005Strict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 
@@ -2131,6 +2217,22 @@ function statGainBlockerApplies(blocker: StatGainBlocker, effect: TriadSkillEffe
   return effect.delta > 0;
 }
 
+function deterministicHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function pickFlashZoomMonster(seed: string, excludedCardNos: string[]) {
+  const excluded = new Set(excludedCardNos.map((cardNo) => normalizeCardNo(cardNo)).filter(Boolean));
+  const pool = triadCards.filter((card) => card.kind === "monster" && !excluded.has(card.cardNo));
+  if (pool.length === 0) return null;
+  return pool[deterministicHash(seed) % pool.length] || null;
+}
+
 function collectSkillCancels(
   player: TriadTriangle,
   opponent: TriadTriangle,
@@ -2174,6 +2276,54 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
   const effectivePlayer = { ...player };
   const effectiveOpponent = { ...opponent };
   const events: TriadSkillEvent[] = [];
+  const flashZoomSkills = [
+    { side: "player" as const, triangle: player, target: effectiveOpponent, targetLabel: "มอนสเตอร์หลักฝ่ายตรงข้าม" },
+    { side: "opponent" as const, triangle: opponent, target: effectivePlayer, targetLabel: "มอนสเตอร์หลักฝ่ายตรงข้าม" },
+  ]
+    .map((item) => ({
+      ...item,
+      rule: getLaneSkillRule(item.triangle, turn, skippedSkillCardNos),
+    }))
+    .filter(
+      (item): item is {
+        side: "player" | "opponent";
+        triangle: TriadTriangle;
+        target: TriadTriangle;
+        targetLabel: string;
+        rule: TriadSkillRule;
+      } => item.rule?.cardNo === "265" && item.rule.allowedTurns.includes(turn)
+    );
+
+  for (const item of flashZoomSkills) {
+    const originalTop = item.target.top;
+    const replacement = pickFlashZoomMonster(
+      `flash-zoom:${turn}:${item.side}:${player.top}:${player.left}:${player.right}:${opponent.top}:${opponent.left}:${opponent.right}`,
+      [player.top, player.left || "", player.right || "", opponent.top, opponent.left || "", opponent.right || ""]
+    );
+    if (!originalTop || !replacement) {
+      events.push({
+        cardNo: item.rule.cardNo,
+        name: item.rule.name,
+        side: item.side,
+        type: item.rule.shape,
+        text: item.rule.text,
+        summary: "ไม่พบมอนสเตอร์หลักฝ่ายตรงข้ามหรือไม่มีมอนสเตอร์ใหม่ให้สุ่ม ใบ 265 จึงไม่เปลี่ยนสนามในตานี้",
+        targetLabel: item.targetLabel,
+        blocked: true,
+      });
+      continue;
+    }
+    item.target.top = replacement.cardNo;
+    events.push({
+      cardNo: item.rule.cardNo,
+      name: item.rule.name,
+      side: item.side,
+      type: item.rule.shape,
+      text: item.rule.text,
+      summary: `ทำลายมอนสเตอร์หลักฝ่ายตรงข้าม No.${originalTop} ชั่วคราว แล้วสุ่ม No.${replacement.cardNo} ${replacement.name} ขึ้นมาแทนเฉพาะตานี้ จบตาแล้วมอนสเตอร์เดิมกลับมา`,
+      targetLabel: item.targetLabel,
+    });
+  }
   return { player: effectivePlayer, opponent: effectiveOpponent, events };
 
   const swapSkills = [
