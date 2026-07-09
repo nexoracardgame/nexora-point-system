@@ -979,6 +979,28 @@ function botTargetToken(side: TriadRoomSlot, targetSide: TriadRoomSlot) {
 function chooseBotSkillTarget(room: StoredTriadRoom, choice: TriadRoomSkillChoice) {
   const opponentSide: TriadRoomSlot = choice.side === "host" ? "challenger" : "host";
   const ownSide = choice.side;
+  const rule = triadSkillRuleByNo.get(choice.cardNo);
+  const topCardMatchesRule = (side: TriadRoomSlot) => {
+    const card = triadCardByNo.get(room.game.triangles[side].top);
+    if (!card) return false;
+    if (!rule?.elementCondition) return true;
+    const listed = rule.elementCondition.elements.includes(card.element);
+    return rule.elementCondition.mode === "include" ? listed : !listed;
+  };
+  const preferredElementTarget = (() => {
+    if (!rule) return "";
+    const hasBuff = rule.effects.some((effect) => effect.delta > 0);
+    const hasDebuff = rule.effects.some((effect) => effect.delta < 0);
+    if (rule.target.startsWith("opponent")) return topCardMatchesRule(opponentSide) ? opponentSide : "";
+    if (rule.target.startsWith("own")) return topCardMatchesRule(ownSide) ? ownSide : "";
+    if (rule.target === "any-one") {
+      if (hasDebuff && topCardMatchesRule(opponentSide)) return opponentSide;
+      if (hasBuff && topCardMatchesRule(ownSide)) return ownSide;
+      if (topCardMatchesRule(opponentSide)) return opponentSide;
+      if (topCardMatchesRule(ownSide)) return ownSide;
+    }
+    return "";
+  })();
   if (choice.cardNo === "254") {
     const ownTop = triadCardByNo.get(room.game.triangles[ownSide].top);
     const opponentTop = triadCardByNo.get(room.game.triangles[opponentSide].top);
@@ -1000,6 +1022,7 @@ function chooseBotSkillTarget(room: StoredTriadRoom, choice: TriadRoomSkillChoic
       ? `${botTargetToken(choice.side, opponentSide)}>${botTargetToken(choice.side, ownSide)}`
       : "";
   }
+  if (preferredElementTarget) return botTargetToken(choice.side, preferredElementTarget);
   if (room.game.triangles[opponentSide].top) return botTargetToken(choice.side, opponentSide);
   if (room.game.triangles[ownSide].top) return botTargetToken(choice.side, ownSide);
   return "";
@@ -1038,6 +1061,63 @@ function applyBotSkillChoice(room: StoredTriadRoom) {
   return true;
 }
 
+function botSkillElementScore(room: StoredTriadRoom, side: TriadRoomSlot, cardNo: string) {
+  const rule = triadSkillRuleByNo.get(cleanText(cardNo));
+  const card = triadCardByNo.get(cleanText(cardNo));
+  if (!rule || card?.kind !== "skill") return 0;
+
+  if (!rule.allowedTurns.includes(room.game.activeTurn)) return -180_000;
+  if (!rule.elementCondition) return 2_500;
+
+  const opponentSide: TriadRoomSlot = side === "host" ? "challenger" : "host";
+  const topMatches = (targetSide: TriadRoomSlot) => {
+    const topCard = triadCardByNo.get(room.game.triangles[targetSide].top);
+    if (!topCard || !rule.elementCondition) return false;
+    const listed = rule.elementCondition.elements.includes(topCard.element);
+    return rule.elementCondition.mode === "include" ? listed : !listed;
+  };
+  const countMatches = (slots: TriadRoomSlot[]) => slots.filter(topMatches).length;
+  const hasBuff = rule.effects.some((effect) => effect.delta > 0);
+  const hasDebuff = rule.effects.some((effect) => effect.delta < 0);
+
+  let intendedSlots: TriadRoomSlot[] = [];
+  if (rule.target.startsWith("own")) intendedSlots = [side];
+  else if (rule.target.startsWith("opponent")) intendedSlots = [opponentSide];
+  else if (rule.target === "all") intendedSlots = ["host", "challenger"];
+  else if (rule.target === "any-one") {
+    intendedSlots = hasDebuff ? [opponentSide] : hasBuff ? [side] : [opponentSide, side];
+  } else {
+    intendedSlots = [opponentSide, side];
+  }
+
+  const intendedMatches = countMatches(intendedSlots);
+  if (intendedMatches > 0) return 35_000 + intendedMatches * 14_000;
+
+  const fallbackSlots = (["host", "challenger"] as TriadRoomSlot[]).filter((slot) => !intendedSlots.includes(slot));
+  const fallbackMatches = countMatches(fallbackSlots);
+  if (fallbackMatches > 0 && rule.target === "any-one") return 8_000;
+
+  return -260_000;
+}
+
+function simulatedRoomWithBotSkillChoice(room: StoredTriadRoom, candidateTriangles: StoredTriadRoom["game"]["triangles"]) {
+  const simulatedRoom: StoredTriadRoom = {
+    ...room,
+    game: {
+      ...room.game,
+      triangles: candidateTriangles,
+      skillChoices: room.game.skillChoices.map((choice) => ({ ...choice })),
+    },
+  };
+  ensureSkillChoices(simulatedRoom);
+  for (const choice of currentTurnChoices(simulatedRoom)) {
+    if (choice.side !== "challenger" || choice.selectedTarget || choice.skipped) continue;
+    const selectedTarget = chooseBotSkillTarget(simulatedRoom, choice);
+    if (selectedTarget) choice.selectedTarget = selectedTarget;
+  }
+  return simulatedRoom;
+}
+
 function botCardScore(room: StoredTriadRoom, cardNo: string) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
@@ -1055,23 +1135,29 @@ function botCardScore(room: StoredTriadRoom, cardNo: string) {
       triangles: candidateTriangles,
     },
   });
+  const elementScore = botSkillElementScore(
+    { ...room, game: { ...room.game, triangles: candidateTriangles } },
+    "challenger",
+    cardNo
+  );
   if (room.game.triangles.host[lane] && opener) {
+    const simulatedRoom = simulatedRoomWithBotSkillChoice(room, candidateTriangles);
     const rawResult = resolveTriadTurn({
       turn,
       player: opener === "host" ? candidateTriangles.host : candidateTriangles.challenger,
       opponent: opener === "host" ? candidateTriangles.challenger : candidateTriangles.host,
       prioritySide: "player",
-      skillTargets: selectedSkillTargets({ ...room, game: { ...room.game, triangles: candidateTriangles } }, opener),
+      skillTargets: selectedSkillTargets(simulatedRoom, opener),
     });
     const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
     const pointScore = result.winner === "opponent" ? 100_000 : result.winner === "draw" ? 25_000 : -100_000;
-    return pointScore + result.opponentTotal - result.playerTotal;
+    return pointScore + result.opponentTotal - result.playerTotal + elementScore;
   }
   const card = triadCardByNo.get(cardNo);
   if (!card) return 0;
   if (turn === 1) return card.attack + card.support;
-  if (turn === 2) return card.kind === "monster" ? card.attack : botDeckScore(cardNo);
-  return card.kind === "monster" ? card.support : botDeckScore(cardNo);
+  if (turn === 2) return card.kind === "monster" ? card.attack : botDeckScore(cardNo) + elementScore;
+  return card.kind === "monster" ? card.support : botDeckScore(cardNo) + elementScore;
 }
 
 function chooseBotCardForTurn(room: StoredTriadRoom) {
@@ -1304,6 +1390,7 @@ function parseBoardTargetSequence(value = "") {
 }
 
 function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
+  if (cleanText(cardNo) === "254") return true;
   if (cleanText(cardNo) === "227") return gravityFieldTargets(room).length > 0;
   if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;
   return skillNeedsManualChoice(cardNo);

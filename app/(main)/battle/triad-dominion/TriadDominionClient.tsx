@@ -40,6 +40,7 @@ import {
   resolveTriadTurn,
   triadCardByNo,
   triadSkillRuleByNo,
+  type TriadCard,
   type TriadCardKind,
   type TriadElement,
   type TriadRpsChoice,
@@ -1115,6 +1116,40 @@ function chooseBotTriangle(player: TriadTriangle, botDeckCards: CardView[]): Tri
   );
 }
 
+function localBotSkillElementScore(turn: TriadTurn, player: TriadTriangle, bot: TriadTriangle, card: CardView) {
+  const rule = triadSkillRuleByNo.get(card.cardNo);
+  if (card.kind !== "skill" || !rule) return 0;
+  if (!rule.allowedTurns.includes(turn)) return -180_000;
+  if (!rule.elementCondition) return 2_500;
+
+  const playerTop = player.top ? triadCardByNo.get(player.top) : undefined;
+  const botTop = bot.top ? triadCardByNo.get(bot.top) : undefined;
+  const matches = (target?: CardView | TriadCard | null) => {
+    if (!target) return false;
+    const listed = rule.elementCondition?.elements.includes(target.element) || false;
+    return rule.elementCondition?.mode === "include" ? listed : !listed;
+  };
+  const hasBuff = rule.effects.some((effect) => effect.delta > 0);
+  const hasDebuff = rule.effects.some((effect) => effect.delta < 0);
+  const intendedTargets =
+    rule.target.startsWith("own")
+      ? [botTop]
+      : rule.target.startsWith("opponent")
+        ? [playerTop]
+        : rule.target === "all"
+          ? [playerTop, botTop]
+          : rule.target === "any-one"
+            ? hasDebuff
+              ? [playerTop]
+              : hasBuff
+                ? [botTop]
+                : [playerTop, botTop]
+            : [playerTop, botTop];
+  const intendedMatches = intendedTargets.filter(matches).length;
+  if (intendedMatches > 0) return 35_000 + intendedMatches * 14_000;
+  return -260_000;
+}
+
 function chooseBotCardForTurn({
   turn,
   player,
@@ -1142,7 +1177,7 @@ function chooseBotCardForTurn({
   for (const card of playableCards) {
     const candidateBot = { ...bot, [lane]: card.cardNo };
     const result = resolveTriadTurn({ turn, player, opponent: candidateBot });
-    const margin = result.opponentTotal - result.playerTotal;
+    const margin = result.opponentTotal - result.playerTotal + localBotSkillElementScore(turn, player, candidateBot, card);
     if (!best || margin > best.margin || (margin === best.margin && result.opponentTotal > best.total)) {
       best = { cardNo: card.cardNo, margin, total: result.opponentTotal };
     }
@@ -1267,6 +1302,7 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
 
+  if (card?.cardNo === "254") return [];
   if (!rule) return [ownTarget];
   if (card?.cardNo === "234") return [ownTarget];
   if (card?.cardNo === "232") {
@@ -2908,11 +2944,13 @@ function SpectatorDeckStrip({
   cards,
   tone,
   onPreview,
+  onPreviewEnd,
 }: {
   title: string;
   cards: CardView[];
   tone: "top" | "bottom";
   onPreview?: (card: CardView | null) => void;
+  onPreviewEnd?: () => void;
 }) {
   const accent =
     tone === "top"
@@ -2934,9 +2972,12 @@ function SpectatorDeckStrip({
             key={card.cardNo}
             type="button"
             onMouseEnter={() => onPreview?.(card)}
-            onMouseLeave={() => onPreview?.(null)}
+            onMouseLeave={onPreviewEnd}
+            onPointerEnter={() => onPreview?.(card)}
+            onPointerMove={() => onPreview?.(card)}
+            onPointerLeave={onPreviewEnd}
             onFocus={() => onPreview?.(card)}
-            onBlur={() => onPreview?.(null)}
+            onBlur={onPreviewEnd}
             onClick={() => onPreview?.(card)}
             className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-md border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/55 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
           >
@@ -3948,9 +3989,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       })
     : "";
   useEffect(() => {
-    if (!isSpectator || !spectatorPreviewCard) return;
+    if (isSpectator) return;
     setSpectatorPreviewCard(null);
-  }, [isSpectator, spectatorRoomStateKey]);
+  }, [isSpectator]);
   const selectableDeckCatalog = useMemo(() => {
     if (!currentRoom || !roomPlayerSide) return deckCatalog;
     const pool = currentRoom.game.selectionPools[roomPlayerSide] || [];
@@ -4941,6 +4982,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   useEffect(() => {
     if (!ownPendingRoomSkillChoice || !roomPlayerSide) {
       if (isPvpRoom) setPendingSkillChoice(null);
+      if (isPvpRoom) setPendingBlessingChoice(null);
       if (!waitingPendingRoomSkillChoice) return;
       const tick = () => {
         setTimeLeft(Math.max(0, Math.ceil((waitingPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000)));
@@ -4950,6 +4992,33 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return () => window.clearInterval(timer);
     }
 
+    if (ownPendingRoomSkillChoice.cardNo === "254") {
+      setPendingSkillChoice(null);
+      if (currentRoom && opponentSide) {
+        const previewTriangles = applyRoomBlessingPreview(
+          currentRoom,
+          currentRoom.game.triangles[roomPlayerSide],
+          currentRoom.game.triangles[opponentSide]
+        );
+        setPendingBlessingChoice({
+          side: "player",
+          lane: ownPendingRoomSkillChoice.lane,
+          player: previewTriangles[roomPlayerSide],
+          bot: previewTriangles[opponentSide],
+          choice: ownPendingRoomSkillChoice.blessingChoice,
+          drawnCardNo: ownPendingRoomSkillChoice.blessingDrawCardNo,
+          previewTopCardNo: ownPendingRoomSkillChoice.blessingPreviewTopNo,
+        });
+      }
+      const tick = () => {
+        setTimeLeft(Math.max(0, Math.ceil((ownPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000)));
+      };
+      tick();
+      const timer = window.setInterval(tick, 250);
+      return () => window.clearInterval(timer);
+    }
+
+    setPendingBlessingChoice(null);
     setPendingSkillChoice((current) => ({
       side: "player",
       lane: ownPendingRoomSkillChoice.lane,
@@ -4966,7 +5035,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     tick();
     const timer = window.setInterval(tick, 250);
     return () => window.clearInterval(timer);
-  }, [isPvpRoom, ownPendingRoomSkillChoice, roomPlayerSide, waitingPendingRoomSkillChoice]);
+  }, [currentRoom, isPvpRoom, opponentSide, ownPendingRoomSkillChoice, roomPlayerSide, waitingPendingRoomSkillChoice]);
 
   const toggleDeckCard = (cardNo: string) => {
     if (ownDeckReady) return;
@@ -5282,8 +5351,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const previewOpponentTop = opponentSide ? cardsByNo.get(currentRoom.game.triangles[opponentSide].top) : undefined;
       const needsSkillChoice = Boolean(
         playerCard &&
-          skillNeedsChoice(playerCard) &&
-          getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(playerForLock.top), previewOpponentTop).length > 0
+          (playerCard.cardNo === "254" ||
+            (skillNeedsChoice(playerCard) &&
+              getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(playerForLock.top), previewOpponentTop).length > 0))
       );
       const previousRoom = currentRoom;
       optimisticRoomLockUntilRef.current = Date.now() + 3200;
@@ -6697,7 +6767,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ออกห้อง
         </button>
       ) : null}
-      {deckSelectionActive ? (
+      {false && deckSelectionActive ? (
         <div className="px-2 pt-16 sm:px-3">
           <div className="ml-auto w-full sm:w-[min(390px,100%)]">
             <DeckSelectionStatusBanner
@@ -6813,7 +6883,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
           {isSpectator ? (
             <div className="grid gap-2 sm:gap-3">
-              <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" onPreview={setSpectatorPreviewCard} />
+              <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
               <CompactBattleBoard
                 cardsByNo={cardsByNo}
                 lockedFight={displayLockedFight}
@@ -6856,7 +6926,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 onSelectLane={setPlacementLane}
                 onPlaceCard={placeAndLockCard}
               />
-              <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" onPreview={setSpectatorPreviewCard} />
+              <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
             </div>
           ) : (
             <CompactBattleBoard
@@ -6903,7 +6973,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               readyAdvanceSlot={showReadyAdvanceButton ? renderReadyAdvanceButton() : null}
             />
           )}
-          <BlessingChoiceOverlay card={pendingBlessingChoice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
+          <BlessingChoiceOverlay card={pendingBlessingChoice && !pendingBlessingChoice.choice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
 
           {!isSpectator ? (
             <PlayerHand
@@ -7063,6 +7133,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           {currentRoom ? (
             <div className="triad-room-actions-mobile space-y-2 2xl:hidden">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              {deckSelectionActive ? (
+                <DeckSelectionStatusBanner
+                  title="กำลังเลือกเด็ค"
+                  leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+                  rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+                  timerText={deckTimerText}
+                  message="รอทั้งสองฝั่งกดพร้อมครบก่อนเริ่มสนามจริง"
+                  compact
+                />
+              ) : null}
               {renderRoomBattleActions()}
             </div>
           ) : null}
@@ -7072,6 +7152,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           {currentRoom ? (
             <div className="space-y-2">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              {deckSelectionActive ? (
+                <DeckSelectionStatusBanner
+                  title="กำลังเลือกเด็ค"
+                  leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
+                  rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
+                  timerText={deckTimerText}
+                  message="รอทั้งสองฝั่งกดพร้อมครบก่อนเริ่มสนามจริง"
+                  compact
+                />
+              ) : null}
               {renderRoomBattleActions()}
             </div>
           ) : null}
