@@ -1221,6 +1221,19 @@ function monsterHasTidebombStat(card?: CardView) {
   return Boolean(card?.kind === "monster" && (card.attack >= 5000 || card.support >= 5000));
 }
 
+function monsterHasHydroburst255Stat(card?: CardView) {
+  if (card?.kind !== "monster") return false;
+  return card.attack <= 5000 || card.support <= 5000;
+}
+
+function monsterHasPitfall223Stat(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.attack <= 2000);
+}
+
+function monsterHasMetalShield238Stat(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.support <= 2000);
+}
+
 function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): SkillTargetId[] {
   return value
     .split(">")
@@ -1271,6 +1284,18 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
       monsterHasTidebombStat(playerTop) ? "player-top" as const : null,
       monsterHasTidebombStat(botTop) ? "bot-top" as const : null,
     ].filter((target): target is SkillTargetId => Boolean(target));
+  }
+  if (card?.cardNo === "255") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasHydroburst255Stat(ownCard) ? [ownTarget] : [];
+  }
+  if (card?.cardNo === "223") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasPitfall223Stat(ownCard) ? [ownTarget] : [];
+  }
+  if (card?.cardNo === "238") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasMetalShield238Stat(ownCard) ? [ownTarget] : [];
   }
   if (rule.target.startsWith("own")) return [ownTarget];
   if (rule.target.startsWith("opponent")) return [opponentTarget];
@@ -2530,10 +2555,19 @@ function CardHoverPreview({
     onUseCard(card.cardNo);
   };
 
+  useEffect(() => {
+    if (!card || !onClose) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [card, onClose]);
+
   if (!card) return null;
   return (
     <div
-      className="triad-card-preview-overlay pointer-events-none fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px]"
+      className={`triad-card-preview-overlay fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${onClose ? "pointer-events-auto" : "pointer-events-none"}`}
       role="dialog"
       aria-modal="true"
       onClick={(event) => {
@@ -2552,7 +2586,7 @@ function CardHoverPreview({
             type="button"
             aria-label="ปิดหน้าต่างการ์ด"
             onClick={onClose}
-            className="triad-card-preview-close absolute right-2 top-2 z-20 hidden h-9 w-9 place-items-center rounded-full border border-white/16 bg-black/72 text-white shadow-[0_10px_28px_rgba(0,0,0,0.36)]"
+            className="triad-card-preview-close absolute right-2 top-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-white/16 bg-black/72 text-white shadow-[0_10px_28px_rgba(0,0,0,0.36)] transition hover:border-amber-100/55 hover:text-amber-100"
           >
             <X className="h-4 w-4" />
           </button>
@@ -2602,6 +2636,15 @@ function CardHoverPreview({
               }}
             >
               เลือกใช้การ์ดใบนี้
+            </button>
+          ) : null}
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/12 bg-white/8 text-sm font-black text-white transition hover:border-amber-100/45 hover:bg-amber-200/12 hover:text-amber-100"
+            >
+              ปิด
             </button>
           ) : null}
         </div>
@@ -3846,6 +3889,31 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ),
     };
   }, [cardsByNo, currentRoom, isSpectator]);
+  const spectatorRoomStateKey = currentRoom
+    ? JSON.stringify({
+        code: currentRoom.code,
+        updatedAt: currentRoom.updatedAt,
+        fightNo: currentRoom.game.fightNo,
+        activeTurn: currentRoom.game.activeTurn,
+        triangles: currentRoom.game.triangles,
+        turns: currentRoom.game.turns.map((turn) => [turn.turn, turn.winner, turn.playerTotal, turn.opponentTotal]),
+        choices: currentRoom.game.skillChoices.map((choice) => [
+          choice.fightNo,
+          choice.turn,
+          choice.side,
+          choice.cardNo,
+          choice.selectedTarget,
+          choice.skipped,
+        ]),
+        ready: currentRoom.game.turnReady,
+        tieBreak: currentRoom.game.openerTieBreak,
+        matchEndedAt: currentRoom.game.matchEndedAt,
+      })
+    : "";
+  useEffect(() => {
+    if (!isSpectator || !spectatorPreviewCard) return;
+    setSpectatorPreviewCard(null);
+  }, [isSpectator, spectatorRoomStateKey]);
   const selectableDeckCatalog = useMemo(() => {
     if (!currentRoom || !roomPlayerSide) return deckCatalog;
     const pool = currentRoom.game.selectionPools[roomPlayerSide] || [];
@@ -4620,7 +4688,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const firstTurnResult = currentRoom?.game.turns.find((turn) => turn.turn === 1);
     if (
       !currentRoom ||
-      currentRoom.game.activeTurn !== 1 ||
       firstTurnResult?.winner !== "draw" ||
       tieBreak?.status !== "resolved" ||
       !tieBreak.winner
@@ -6515,7 +6582,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       />
       <OpeningTieBreakResultOverlay
         key={openingTieBreakResultKey}
-        tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
+        tieBreak={currentRoom?.game.openerTieBreak}
         hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
         challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
         visible={openingTieBreakResultVisible}
