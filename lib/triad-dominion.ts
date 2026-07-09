@@ -411,7 +411,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const shape: TriadSkillShape =
     card.cardNo === "245" || card.cardNo === "284"
       ? "swap-control"
-      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223"
+      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238"
         ? "stat"
       : card.cardNo === "227"
         ? "stat"
@@ -449,7 +449,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
@@ -1262,6 +1262,85 @@ function applyPitfall223Strict(
   } satisfies TriadSkillEvent;
 }
 
+function applyMetalShield238Strict(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: TriadScoreState,
+  blockers: StatGainBlocker[] = []
+) {
+  const targetContribution = ownScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = "own main monster";
+  if (!targetContribution) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "No own main monster found. No.238 does not activate.",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (targetContribution.card.support > 2000) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} SUP ${targetContribution.card.support.toLocaleString()} is over 2,000, so No.238 cannot buff it.`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const effect: TriadSkillEffect = { metric: "support", delta: 5000 };
+  if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "No.238 condition passed, but this turn is not using SUP for scoring.",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const blocker = blockers.find((item) =>
+    item.targetSide === side &&
+    statGainBlockerApplies(item, effect, { lane: "top" })
+  );
+  if (blocker) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.238 condition passed, but SUP +5,000 was blocked by No.${blocker.rule.cardNo} ${blocker.rule.name}.`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  ownScore.total += effect.delta;
+  targetContribution.value += effect.delta;
+  ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} SUP +${effect.delta.toLocaleString()}`);
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} has SUP ${targetContribution.card.support.toLocaleString()} or lower, so No.238 gives SUP +5,000.`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
 function applyPitfall223(
   rule: TriadSkillRule,
   side: "player" | "opponent",
@@ -1641,6 +1720,11 @@ function applySkill(
 
   if (rule.cardNo === "223") {
     events.push(applyPitfall223Strict(rule, side, ownScore, blockers));
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "238") {
+    events.push(applyMetalShield238Strict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 
