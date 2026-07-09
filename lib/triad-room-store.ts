@@ -145,6 +145,9 @@ const WAITING_ROOM_TTL_MS = 15 * 60_000;
 const PLAYING_ROOM_TTL_MS = 30 * 60_000;
 const TRIAD_CHAT_LIMIT = 80;
 const TRIAD_CHAT_MAX_LENGTH = 240;
+const TRIAD_BOT_ID = "triad-bot-level-99";
+const TRIAD_BOT_NAME = "BOT Level.99";
+const TRIAD_BOT_IMAGE = "/avatar.png";
 
 const globalForTriadRooms = globalThis as {
   nexoraTriadRooms?: StoredTriadRoom[];
@@ -161,6 +164,19 @@ function memoryRooms() {
 
 function cleanText(value: unknown) {
   return String(value || "").trim();
+}
+
+function triadBotParticipant(): TriadRoomParticipant {
+  return {
+    id: TRIAD_BOT_ID,
+    name: TRIAD_BOT_NAME,
+    image: TRIAD_BOT_IMAGE,
+    joinedAt: Date.now(),
+  };
+}
+
+function isTriadBotParticipant(participant?: TriadRoomParticipant | null) {
+  return participant?.id === TRIAD_BOT_ID;
 }
 
 function normalizeAccess(value: unknown): TriadRoomAccess {
@@ -692,28 +708,38 @@ export async function createTriadRoom(input: {
   password?: string;
   participant: TriadRoomParticipant;
   deckMode?: TriadDeckMode;
+  playWithBot?: boolean;
 }) {
   const existingRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const code = roomCode(existingRooms);
   const deckMode = normalizeDeckMode(input.deckMode);
+  const selectionPools = buildSelectionPools(deckMode, code);
   const room: StoredTriadRoom = {
     code,
     access: input.access,
     password: input.access === "private" ? cleanText(input.password) : "",
-    status: "waiting",
+    status: input.playWithBot ? "playing" : "waiting",
     hostId: input.participant.id,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     seats: {
       host: input.participant,
-      challenger: null,
+      challenger: input.playWithBot ? triadBotParticipant() : null,
     },
     spectators: [],
     game: normalizeGame({
       deckMode,
-      selectionPools: buildSelectionPools(deckMode, code),
+      selectionPools,
     }),
   };
+  if (input.playWithBot) {
+    room.game = {
+      ...freshGame(),
+      deckMode,
+      selectionPools,
+    };
+    ensureBotDeckReady(room);
+  }
 
   await upsertStoredRoom(room);
   return publicRoom(room);
@@ -837,6 +863,295 @@ function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["
     host: [...monsters.host, ...randomSkillPool(`${seed}:host`)],
     challenger: [...monsters.challenger, ...randomSkillPool(`${seed}:challenger`)],
   };
+}
+
+function botDeckScore(cardNo: string) {
+  const card = triadCardByNo.get(cleanText(cardNo));
+  if (!card) return 0;
+  if (card.kind === "monster") return card.attack + card.support + Math.max(card.attack, card.support) * 0.35;
+  const rule = triadSkillRuleByNo.get(card.cardNo);
+  if (!rule) return card.kind === "skill" ? 2500 : 0;
+  const effectScore = rule.effects.reduce((sum, effect) => sum + Math.abs(effect.delta), 0);
+  const shapeBonus: Record<string, number> = {
+    "skill-cancel": 7200,
+    "swap-control": 6800,
+    "block-stat-gain": 5600,
+    "element-transform": 3800,
+    stat: 3600,
+    unparsed: 2400,
+  };
+  return (shapeBonus[rule.shape] || 2200) + effectScore;
+}
+
+function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[]) {
+  const uniquePool = Array.from(new Set(pool.map(cleanText).filter(Boolean)));
+  const monsters = uniquePool
+    .filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster")
+    .sort((a, b) => botDeckScore(b) - botDeckScore(a));
+  const skills = uniquePool
+    .filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "skill")
+    .sort((a, b) => botDeckScore(b) - botDeckScore(a));
+
+  if (mode === "monster") return monsters.slice(0, TRIAD_MONSTER_DECK_SIZE);
+  if (mode === "skill") {
+    return [
+      ...monsters.slice(0, TRIAD_SKILL_MODE_MONSTERS),
+      ...skills.slice(0, TRIAD_SKILL_MODE_SKILLS),
+    ].slice(0, TRIAD_DECK_SIZE);
+  }
+
+  const deck = [...monsters.slice(0, 8), ...skills.slice(0, 12)];
+  if (deck.length < TRIAD_DECK_SIZE) {
+    deck.push(...uniquePool.filter((cardNo) => !deck.includes(cardNo)).sort((a, b) => botDeckScore(b) - botDeckScore(a)));
+  }
+  return deck.slice(0, TRIAD_DECK_SIZE);
+}
+
+function ensureBotDeckReady(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  const mode = room.game.deckMode || "all";
+  const botDeck = chooseBotDeckForMode(mode, room.game.selectionPools.challenger || []);
+  const validation = validateDeckForMode(mode, botDeck);
+  if (!validation.ok) return false;
+  const currentDeck = room.game.decks.challenger || [];
+  const changed = !room.game.deckReady.challenger || currentDeck.join("|") !== botDeck.join("|");
+  room.game.decks.challenger = botDeck;
+  room.game.deckReady.challenger = true;
+  return changed;
+}
+
+function botTargetToken(side: TriadRoomSlot, targetSide: TriadRoomSlot) {
+  if (side === "host") return targetSide === "host" ? "player-top" : "bot-top";
+  return targetSide === "challenger" ? "player-top" : "bot-top";
+}
+
+function chooseBotSkillTarget(room: StoredTriadRoom, choice: TriadRoomSkillChoice) {
+  const opponentSide: TriadRoomSlot = choice.side === "host" ? "challenger" : "host";
+  const ownSide = choice.side;
+  if (choice.cardNo === "254") {
+    const ownTop = triadCardByNo.get(room.game.triangles[ownSide].top);
+    const opponentTop = triadCardByNo.get(room.game.triangles[opponentSide].top);
+    if ((opponentTop?.attack || 0) + (opponentTop?.support || 0) > (ownTop?.attack || 0) + (ownTop?.support || 0)) {
+      return "reroll-opponent";
+    }
+    return "draw-skill";
+  }
+  if (choice.cardNo === "227") {
+    const target = gravityFieldTargets(room).find((side) => side === opponentSide) || gravityFieldTargets(room)[0];
+    return target ? botTargetToken(choice.side, target) : "";
+  }
+  if (choice.cardNo === "231") {
+    const target = metalSwordTargets(room).find((side) => side === opponentSide) || metalSwordTargets(room)[0];
+    return target ? botTargetToken(choice.side, target) : "";
+  }
+  if (choice.cardNo === "232") {
+    return room.game.triangles[opponentSide].top && room.game.triangles[ownSide].top
+      ? `${botTargetToken(choice.side, opponentSide)}>${botTargetToken(choice.side, ownSide)}`
+      : "";
+  }
+  if (room.game.triangles[opponentSide].top) return botTargetToken(choice.side, opponentSide);
+  if (room.game.triangles[ownSide].top) return botTargetToken(choice.side, ownSide);
+  return "";
+}
+
+function applyBotSkillChoice(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  ensureSkillChoices(room);
+  const choice = currentTurnChoices(room).find(
+    (item) => item.side === "challenger" && !item.selectedTarget && !item.skipped
+  );
+  if (!choice) return false;
+  const selectedTarget = chooseBotSkillTarget(room, choice);
+  if (!selectedTarget) {
+    choice.skipped = true;
+    resolveIfBothLocked(room);
+    return true;
+  }
+  if (choice.cardNo === "254") {
+    choice.selectedTarget = selectedTarget;
+    choice.blessingChoice = selectedTarget as TriadBlessingChoice;
+    if (selectedTarget === "draw-skill") {
+      const drawn = randomCardNoByKind("skill", blessingRandomExcludedCards(room, ["254"]));
+      if (drawn) {
+        choice.blessingDrawCardNo = drawn;
+        room.game.usedCards.challenger = Array.from(new Set([...(room.game.usedCards.challenger || []), drawn]));
+      }
+    } else {
+      const drawn = randomCardNoByKind("monster", blessingRandomExcludedCards(room));
+      if (drawn) choice.blessingPreviewTopNo = drawn;
+    }
+  } else {
+    choice.selectedTarget = selectedTarget;
+  }
+  resolveIfBothLocked(room);
+  return true;
+}
+
+function botCardScore(room: StoredTriadRoom, cardNo: string) {
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  const candidateTriangles = {
+    ...room.game.triangles,
+    challenger: {
+      ...room.game.triangles.challenger,
+      [lane]: cardNo,
+    },
+  };
+  const opener = getOpeningSide({
+    ...room,
+    game: {
+      ...room.game,
+      triangles: candidateTriangles,
+    },
+  });
+  if (room.game.triangles.host[lane] && opener) {
+    const rawResult = resolveTriadTurn({
+      turn,
+      player: opener === "host" ? candidateTriangles.host : candidateTriangles.challenger,
+      opponent: opener === "host" ? candidateTriangles.challenger : candidateTriangles.host,
+      prioritySide: "player",
+      skillTargets: selectedSkillTargets({ ...room, game: { ...room.game, triangles: candidateTriangles } }, opener),
+    });
+    const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
+    const pointScore = result.winner === "opponent" ? 100_000 : result.winner === "draw" ? 25_000 : -100_000;
+    return pointScore + result.opponentTotal - result.playerTotal;
+  }
+  const card = triadCardByNo.get(cardNo);
+  if (!card) return 0;
+  if (turn === 1) return card.attack + card.support;
+  if (turn === 2) return card.kind === "monster" ? card.attack : botDeckScore(cardNo);
+  return card.kind === "monster" ? card.support : botDeckScore(cardNo);
+}
+
+function chooseBotCardForTurn(room: StoredTriadRoom) {
+  const turn = room.game.activeTurn;
+  const lane = laneForTurn(turn);
+  const alreadyPlaced = new Set([
+    room.game.triangles.challenger.top,
+    room.game.triangles.challenger.left,
+    room.game.triangles.challenger.right,
+    ...(room.game.usedCards.challenger || []),
+  ].filter(Boolean));
+  const mode = room.game.deckMode || "all";
+  const requiredKind: "monster" | "skill" | "any" =
+    lane === "top" ? "monster" : mode === "monster" ? "monster" : mode === "skill" ? "skill" : "any";
+  const playable = (room.game.decks.challenger || []).filter((cardNo) => {
+    if (alreadyPlaced.has(cardNo)) return false;
+    const kind = triadCardByNo.get(cardNo)?.kind;
+    if (requiredKind === "any") return kind === "monster" || kind === "skill";
+    return kind === requiredKind;
+  });
+  return playable
+    .map((cardNo) => ({ cardNo, score: botCardScore(room, cardNo) }))
+    .sort((a, b) => b.score - a.score)[0]?.cardNo || "";
+}
+
+function lockBotCard(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  const lane = laneForTurn(room.game.activeTurn);
+  if (room.game.triangles.challenger[lane]) return false;
+  if (!room.game.triangles.host[lane]) return false;
+  const cardNo = chooseBotCardForTurn(room);
+  if (!cardNo) return false;
+  room.game.triangles.challenger[lane] = cardNo;
+  room.game.usedCards.challenger = Array.from(new Set([...(room.game.usedCards.challenger || []), cardNo]));
+  resolveIfBothLocked(room);
+  return true;
+}
+
+function botChooseOpeningTieBreak(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  const tieBreak = room.game.openerTieBreak;
+  if (tieBreak.status !== "waiting" || (tieBreak.choices.challenger || "unknown") !== "unknown") return false;
+  const hostChoice = tieBreak.choices.host || "unknown";
+  const choice: TriadRpsChoice =
+    hostChoice === "rock" ? "paper" :
+    hostChoice === "paper" ? "scissors" :
+    hostChoice === "scissors" ? "rock" :
+    (["rock", "paper", "scissors"] as TriadRpsChoice[])[Math.floor(Math.random() * 3)];
+  const nextChoices = { ...tieBreak.choices, challenger: choice };
+  const winner = rpsWinner(nextChoices.host || "unknown", nextChoices.challenger || "unknown");
+  room.game.openerTieBreak = {
+    ...tieBreak,
+    choices: nextChoices,
+    status: winner === "host" || winner === "challenger" ? "resolved" : "waiting",
+    winner: winner === "host" || winner === "challenger" ? winner : "",
+    source: "manual",
+    revealChoices: winner === "draw" ? nextChoices : undefined,
+  };
+  if (winner === "draw") room.game.openerTieBreak.choices = {};
+  if (winner === "host" || winner === "challenger") {
+    room.game.activeTurn = 2;
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.turnStartedAt = Date.now();
+  }
+  resolveIfBothLocked(room);
+  return true;
+}
+
+function readyBotForAdvance(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  if (!room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) return false;
+  if (room.game.activeTurn === 1 && room.game.turns.find((turn) => turn.turn === 1)?.winner === "draw" && room.game.openerTieBreak.status !== "resolved") {
+    return false;
+  }
+  if (room.game.turnReady.challenger) return false;
+  room.game.turnReady = { ...room.game.turnReady, challenger: true };
+  if (!room.game.turnReady.host) return true;
+  if (room.game.activeTurn < 3) {
+    room.game.activeTurn = (room.game.activeTurn + 1) as TriadTurn;
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.turnStartedAt = Date.now();
+  } else {
+    room.game.fightNo = Math.min(4, room.game.fightNo + 1);
+    room.game.activeTurn = 1;
+    room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
+    room.game.turns = [];
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.openerTieBreak = emptyOpeningTieBreak();
+    room.game.turnStartedAt = Date.now();
+  }
+  return true;
+}
+
+function runBotBrain(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  let changed = false;
+  if (room.status === "playing") {
+    changed = ensureBotDeckReady(room) || changed;
+    if (room.game.deckReady.host && room.game.deckReady.challenger) {
+      const wasReady = battleDecksReady(room);
+      finalizeDeckSelection(room);
+      changed = !wasReady || changed;
+      for (let index = 0; index < 4; index += 1) {
+        const before = JSON.stringify({
+          triangles: room.game.triangles,
+          choices: room.game.skillChoices,
+          turns: room.game.turns,
+          ready: room.game.turnReady,
+          activeTurn: room.game.activeTurn,
+          fightNo: room.game.fightNo,
+          tie: room.game.openerTieBreak,
+        });
+        changed = botChooseOpeningTieBreak(room) || changed;
+        changed = applyBotSkillChoice(room) || changed;
+        changed = lockBotCard(room) || changed;
+        changed = applyBotSkillChoice(room) || changed;
+        changed = readyBotForAdvance(room) || changed;
+        const after = JSON.stringify({
+          triangles: room.game.triangles,
+          choices: room.game.skillChoices,
+          turns: room.game.turns,
+          ready: room.game.turnReady,
+          activeTurn: room.game.activeTurn,
+          fightNo: room.game.fightNo,
+          tie: room.game.openerTieBreak,
+        });
+        if (before === after) break;
+      }
+    }
+  }
+  return changed;
 }
 
 function freshGame(): TriadRoomGame {
@@ -1615,6 +1930,49 @@ export async function takeTriadRoomSlot(code: string, slot: TriadRoomSlot, parti
   return { ok: true as const, room: publicRoom(cleanRoom) };
 }
 
+export async function setTriadRoomBotOpponent(code: string, participantId: string, enabled: boolean) {
+  return withRoomMutationLock(code, async () => {
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    if (!canControlStoredRoom(room, participantId)) {
+      return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+    }
+    if (room.status === "playing" && !room.game.matchWinner) {
+      return { ok: false as const, reason: "already_playing" as const, room: publicRoom(room) };
+    }
+
+    if (enabled) {
+      if (room.seats.challenger && !isTriadBotParticipant(room.seats.challenger)) {
+        return { ok: false as const, reason: "slot_taken" as const, room: publicRoom(room) };
+      }
+      room.seats.challenger = triadBotParticipant();
+      room.spectators = room.spectators.filter((viewer) => viewer.id !== TRIAD_BOT_ID);
+      room.status = "waiting";
+      room.game = {
+        ...freshGame(),
+        deckMode: room.game.deckMode || "all",
+        selectionPools: buildSelectionPools(room.game.deckMode || "all", `${room.code}:bot:${Date.now()}`),
+        chat: room.game.chat,
+      };
+    } else {
+      if (!isTriadBotParticipant(room.seats.challenger)) {
+        return { ok: true as const, room: publicRoom(room), enabled: false as const };
+      }
+      room.seats.challenger = null;
+      room.status = "waiting";
+      room.game = {
+        ...freshGame(),
+        deckMode: room.game.deckMode || "all",
+        selectionPools: buildSelectionPools(room.game.deckMode || "all", `${room.code}:human:${Date.now()}`),
+        chat: room.game.chat,
+      };
+    }
+
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), enabled };
+  });
+}
+
 export async function startTriadRoom(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
@@ -1630,8 +1988,27 @@ export async function startTriadRoom(code: string, participantId: string) {
     deckMode,
     selectionPools: buildSelectionPools(deckMode, `${room.code}:${Date.now()}`),
   };
+  if (isTriadBotParticipant(room.seats.challenger)) {
+    ensureBotDeckReady(room);
+  }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
+}
+
+export async function runTriadRoomBot(code: string, participantId: string) {
+  return withRoomMutationLock(code, async () => {
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    if (!participantInStoredRoom(room, participantId) && !canControlStoredRoom(room, participantId)) {
+      return { ok: false as const, reason: "not_in_room" as const, room: publicRoom(room) };
+    }
+    if (!isTriadBotParticipant(room.seats.challenger)) {
+      return { ok: false as const, reason: "no_bot" as const, room: publicRoom(room) };
+    }
+    const changed = runBotBrain(room);
+    if (changed) await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), changed };
+  });
 }
 
 export async function resetTriadRoomBattle(code: string, participantId: string) {
@@ -1697,6 +2074,10 @@ export async function leaveTriadRoom(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: true as const };
   const cleanRoom = removeParticipant(room, participantId);
+  if (room.hostId === participantId && isTriadBotParticipant(cleanRoom.seats.challenger)) {
+    await deleteStoredRoom(room.code);
+    return { ok: true as const };
+  }
   if (!cleanRoom.seats.host && !cleanRoom.seats.challenger && cleanRoom.spectators.length === 0) {
     await deleteStoredRoom(room.code);
     return { ok: true as const };

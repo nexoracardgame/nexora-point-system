@@ -1,0 +1,9 @@
+
+> nexora-tcg@0.1.1 dev
+> next dev --webpack
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.117:3000
+- Environments: .env
+✓ Ready in 537ms

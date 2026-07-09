@@ -219,6 +219,7 @@ const ACTIVE_ROOM_SYNC_MS = 1000;
 const HIDDEN_SYNC_MS = 4000;
 const MIN_SYNC_GAP_MS = 140;
 const TRIAD_RESUME_ROOM_CACHE_KEY = "nexora:triad:active-room";
+const TRIAD_BOT_ID = "triad-bot-level-99";
 const rankFrames = [
   { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
   { name: "เหล็กดำ", aura: "from-slate-300/30 via-slate-800/20 to-black/20", ring: "border-slate-300/55 shadow-[0_0_24px_rgba(148,163,184,0.22)]", badge: "bg-slate-200 text-black" },
@@ -370,6 +371,10 @@ function participantInRoom(room: TriadRoom | undefined, participantId: string) {
     room.seats.challenger?.id === participantId ||
     room.spectators.some((viewer) => viewer.id === participantId)
   );
+}
+
+function isBotParticipant(participant?: RoomParticipant | null) {
+  return participant?.id === TRIAD_BOT_ID;
 }
 
 function readCachedTriadRoom(participantId: string) {
@@ -2834,6 +2839,7 @@ function RoomSeatCard({
     tone === "host"
       ? "border-amber-300/45 from-amber-300/18 via-[#120806]/82 to-black"
       : "border-amber-200/28 from-[#2a1112]/82 via-[#120608]/88 to-black";
+  const botSeat = isBotParticipant(participant);
   return (
     <div className={`relative min-h-[320px] overflow-hidden rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.1),transparent)] opacity-30" />
@@ -2844,11 +2850,17 @@ function RoomSeatCard({
       </div>
       {participant ? (
         <div className="relative flex min-h-[248px] flex-col items-center justify-center text-center">
+          {botSeat ? (
+            <div className="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-cyan-100/45 bg-cyan-200/14 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.24)]">
+              <Bot className="h-3.5 w-3.5" />
+              AI COMBAT CORE
+            </div>
+          ) : null}
           <RankAvatar participant={participant} size="xl" crown={isLeader} />
           <div className="mt-5 w-full border-y border-white/10 bg-black/34 px-3 py-3">
             <div className="truncate text-2xl font-black uppercase tracking-normal text-white">{participant.name}</div>
             <div className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-amber-100/62">
-              {rankFrames[rankIndexForParticipant(participant)].name}
+              {botSeat ? "LEVEL 99 AI DUELIST" : rankFrames[rankIndexForParticipant(participant)].name}
             </div>
           </div>
           <div className="mt-3 rounded-full border border-emerald-200/25 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
@@ -3603,6 +3615,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [roomPassword, setRoomPassword] = useState("");
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
   const [createRoomMode, setCreateRoomMode] = useState<DeckMode>("all");
+  const [createRoomWithBot, setCreateRoomWithBot] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
@@ -3614,6 +3627,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const openerTieBreakAdvanceTimerRef = useRef<number | null>(null);
   const openerTieBreakResultKeyRef = useRef("");
   const openerTieBreakResultTimerRef = useRef<number | null>(null);
+  const botRunKeyRef = useRef("");
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
@@ -3706,6 +3720,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const isRoomController = Boolean(
     currentRoom && (currentRoom.hostId === participant.id || currentRoom.seats.host?.id === participant.id)
   );
+  const hasBotOpponent = Boolean(currentRoom && isBotParticipant(currentRoom.seats.challenger));
   const isFieldPlayer = Boolean(
     currentRoom?.seats.host?.id === participant.id || currentRoom?.seats.challenger?.id === participant.id
   );
@@ -4209,6 +4224,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       access,
       password,
       deckMode,
+      playWithBot: createRoomWithBot,
     });
 
     const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
@@ -4221,7 +4237,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     activeRoomCodeRef.current = room.code;
     setActiveRoomCode(room.code);
     setLobbyMessage("");
-    setPhase("room");
+    setPhase(room.status === "playing" ? phaseForPlayingRoom(room, participant.id) || "deck" : "room");
   };
 
   const enterRoom = async (codeInput = joinCode, forceSpectator = false, passwordInput = joinPassword) => {
@@ -4280,6 +4296,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (!currentRoom || currentRoom.status === "playing" || currentRoom.seats[slot]) return;
     const result = await postRoomAction({ action: "take-slot", code: currentRoom.code, slot });
     if (!result.ok) setLobbyMessage("ลงช่องนี้ไม่ได้");
+  };
+
+  const toggleBotOpponent = async () => {
+    if (!currentRoom || !isRoomController) return;
+    const result = await postRoomAction({
+      action: "set-bot",
+      code: currentRoom.code,
+      enabled: !hasBotOpponent,
+    });
+    if (!result.ok) {
+      setLobbyMessage(hasBotOpponent ? "เอาบอทออกจากห้องไม่สำเร็จ" : "เพิ่มบอทไม่ได้ ช่องผู้ท้าชิงอาจไม่ว่าง");
+      return;
+    }
+    setLobbyMessage(!hasBotOpponent ? "BOT Level.99 ลงฝั่งผู้ท้าชิงแล้ว" : "เอา BOT Level.99 ออกจากห้องแล้ว");
   };
 
   const startRoomGame = async () => {
@@ -4850,6 +4880,34 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPhase("battle");
     setBattleLog((current) => (current.length ? current : ["ทั้งสองฝั่งล็อคเด็คแล้ว เริ่มสู้กันได้เลย"]));
   }, [currentRoom, phase]);
+
+  useEffect(() => {
+    if (!currentRoom || !hasBotOpponent || !participantInRoom(currentRoom, participant.id)) {
+      botRunKeyRef.current = "";
+      return;
+    }
+    const botKey = JSON.stringify({
+      code: currentRoom.code,
+      status: currentRoom.status,
+      deckReady: currentRoom.game.deckReady,
+      fightNo: currentRoom.game.fightNo,
+      activeTurn: currentRoom.game.activeTurn,
+      triangles: currentRoom.game.triangles,
+      choices: currentRoom.game.skillChoices,
+      turns: currentRoom.game.turns.map((turn) => [turn.turn, turn.winner, turn.playerTotal, turn.opponentTotal]),
+      turnReady: currentRoom.game.turnReady,
+      tieBreak: currentRoom.game.openerTieBreak,
+      matchWinner: currentRoom.game.matchWinner,
+    });
+    if (botRunKeyRef.current === botKey) return;
+    botRunKeyRef.current = botKey;
+    const timer = window.setTimeout(() => {
+      void postRoomAction({ action: "run-bot", code: currentRoom.code }).then((result) => {
+        if (!result.ok) botRunKeyRef.current = "";
+      });
+    }, 420);
+    return () => window.clearTimeout(timer);
+  }, [currentRoom, hasBotOpponent, participant.id]);
 
   function resetBattle() {
     setPhase("deck");
@@ -5778,6 +5836,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               </div>
               <button
                 type="button"
+                onClick={() => setCreateRoomWithBot((value) => !value)}
+                className={`mt-4 flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                  createRoomWithBot
+                    ? "border-cyan-200/55 bg-cyan-300/14 shadow-[0_0_30px_rgba(34,211,238,0.16)]"
+                    : "border-white/12 bg-black/34 hover:border-cyan-200/32"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${createRoomWithBot ? "border-cyan-100/70 bg-cyan-200 text-black" : "border-white/14 bg-white/6 text-cyan-100"}`}>
+                    <Bot className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white">สู้กับบอททันที</span>
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-white/55">สร้างแล้วเข้าสู่หน้าเลือกการ์ดเลย บอทจะลงฝั่งผู้ท้าชิงเป็น BOT Level.99</span>
+                  </span>
+                </span>
+                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-black ${createRoomWithBot ? "border-cyan-100 bg-cyan-200 text-black" : "border-white/18 bg-black/40 text-white/24"}`}>
+                  {createRoomWithBot ? <Check className="h-4 w-4" /> : null}
+                </span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setCreateModeDialogOpen(false);
                   void createRoom(createRoomMode);
@@ -6049,6 +6129,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-white/14 bg-black/45 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/78 transition hover:border-white/30 hover:bg-black/55"
               >
                 ออกห้อง
+              </button>
+              <button
+                type="button"
+                onClick={toggleBotOpponent}
+                disabled={!isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)}
+                className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/8 disabled:text-white/28 ${
+                  hasBotOpponent
+                    ? "border-cyan-100/55 bg-cyan-200 text-black shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:bg-cyan-100"
+                    : "border-cyan-200/28 bg-cyan-300/10 text-cyan-50 hover:border-cyan-100/60 hover:bg-cyan-300/16"
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                {hasBotOpponent ? "เอาบอทออก" : "สู้กับบอท"}
               </button>
               <button
                 type="button"

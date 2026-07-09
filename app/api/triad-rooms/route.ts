@@ -16,9 +16,11 @@ import {
   resetTriadRoomBattle,
   readyTriadRoomDeck,
   setTriadRoomDeck,
+  setTriadRoomBotOpponent,
   sendTriadRoomChatMessage,
   startTriadRoom,
   surrenderTriadRoom,
+  runTriadRoomBot,
   takeTriadRoomSlot,
   timeoutTriadRoomTurn,
   type TriadRoomAccess,
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
       return noStoreJson({ error: "password_too_short" }, { status: 400 });
     }
     const deckMode = body.deckMode === "monster" || body.deckMode === "skill" ? body.deckMode : "all";
-    const room = await createTriadRoom({ access, password, participant, deckMode });
+    const room = await createTriadRoom({ access, password, participant, deckMode, playWithBot: Boolean(body.playWithBot) });
     return roomActionJson({ room }, undefined, { action, code: room.code, room });
   }
 
@@ -176,6 +178,24 @@ export async function POST(request: Request) {
 
   if (action === "start") {
     const result = await startTriadRoom(cleanText(body.code), participant.id);
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "set-bot") {
+    const result = await setTriadRoomBotOpponent(cleanText(body.code), participant.id, Boolean(body.enabled));
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "run-bot") {
+    const result = await runTriadRoomBot(cleanText(body.code), participant.id);
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },
