@@ -172,6 +172,7 @@ const TRIAD_DECK_SIZE = 20;
 const TRIAD_MONSTER_DECK_SIZE = 20;
 const TRIAD_SKILL_MODE_MONSTERS = 10;
 const TRIAD_SKILL_MODE_SKILLS = 10;
+const TRIAD_SELECTION_POOL_SIZE = 293;
 const TURN_TIMEOUT_MS = 120_000;
 const SKILL_CHOICE_TIMEOUT_MS = 30_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
@@ -318,6 +319,11 @@ function emptyOpeningTieBreak(): TriadOpeningTieBreak {
 
 function normalizeDeck(value: unknown) {
   return Array.isArray(value) ? value.map((item) => cleanText(item)).filter(Boolean).slice(0, 40) : [];
+}
+
+function normalizeSelectionPool(value: unknown) {
+  const limit = Math.max(TRIAD_SELECTION_POOL_SIZE, triadCards.length);
+  return Array.isArray(value) ? value.map((item) => cleanText(item)).filter(Boolean).slice(0, limit) : [];
 }
 
 function normalizeDeckMode(value: unknown): TriadDeckMode {
@@ -512,8 +518,8 @@ function normalizeGame(value: unknown): TriadRoomGame {
     },
     deckMode: normalizeDeckMode(raw.deckMode),
     selectionPools: {
-      host: normalizeDeck((raw.selectionPools as Record<string, unknown> | undefined)?.host),
-      challenger: normalizeDeck((raw.selectionPools as Record<string, unknown> | undefined)?.challenger),
+      host: normalizeSelectionPool((raw.selectionPools as Record<string, unknown> | undefined)?.host),
+      challenger: normalizeSelectionPool((raw.selectionPools as Record<string, unknown> | undefined)?.challenger),
     },
     deckStartedAt: Number(raw.deckStartedAt || Date.now()),
     triangles: {
@@ -972,6 +978,7 @@ export async function listTriadRooms() {
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
   for (const room of aliveRooms) {
+    const selectionPoolsChanged = repairSelectionPools(room);
     const deckGateChanged = enforceDeckGate(room);
     const choicesExpired = markExpiredSkillChoices(room);
     const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
@@ -979,7 +986,7 @@ export async function listTriadRooms() {
     const botChanged = runBotBrain(room);
     const stateHealed = healTriadRoomState(room);
     const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    if (deckGateChanged || choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
+    if (selectionPoolsChanged || deckGateChanged || choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
       await upsertStoredRoom(room);
     }
   }
@@ -1183,6 +1190,26 @@ function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["
     host: [...monsters.host, ...randomSkillPool(`${seed}:host`)],
     challenger: [...monsters.challenger, ...randomSkillPool(`${seed}:challenger`)],
   };
+}
+
+function expectedSelectionPoolSize(mode: TriadDeckMode) {
+  if (mode === "all") return triadCards.filter((card) => card.kind !== "unknown").length;
+  if (mode === "skill") return TRIAD_MONSTER_DECK_SIZE + 20;
+  return TRIAD_MONSTER_DECK_SIZE;
+}
+
+function repairSelectionPools(room: StoredTriadRoom) {
+  if (room.status !== "playing") return false;
+  const mode = room.game.deckMode || "all";
+  const expectedSize = expectedSelectionPoolSize(mode);
+  if (
+    (room.game.selectionPools.host || []).length >= expectedSize &&
+    (room.game.selectionPools.challenger || []).length >= expectedSize
+  ) {
+    return false;
+  }
+  room.game.selectionPools = buildSelectionPools(mode, `${room.code}:selection:${room.game.deckStartedAt || room.createdAt}`);
+  return true;
 }
 
 function botDeckScore(cardNo: string) {
@@ -2121,6 +2148,7 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
 export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  repairSelectionPools(room);
   enforceDeckGate(room);
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
@@ -2135,6 +2163,7 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
 export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[]) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  repairSelectionPools(room);
   enforceDeckGate(room);
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };

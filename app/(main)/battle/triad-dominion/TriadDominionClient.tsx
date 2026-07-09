@@ -243,6 +243,7 @@ type TurnReveal = {
 };
 
 const DECK_SIZE = 20;
+const TRIAD_SELECTION_POOL_SIZE = 293;
 const SKILL_MODE_MONSTER_LIMIT = 10;
 const SKILL_MODE_SKILL_LIMIT = 10;
 const TURN_SECONDS = 120;
@@ -891,7 +892,7 @@ function normalizeRoomGame(value: unknown): RoomGame {
   const turnReady = raw.turnReady && typeof raw.turnReady === "object" ? (raw.turnReady as Record<string, unknown>) : {};
   const activeTurn = Number(raw.activeTurn || 1);
   const cleanDeck = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, DECK_SIZE) : [];
-  const cleanPool = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, 40) : [];
+  const cleanPool = (deck: unknown) => Array.isArray(deck) ? deck.map((item) => safeText(item)).filter(Boolean).slice(0, TRIAD_SELECTION_POOL_SIZE) : [];
   const cleanChat = (messages: unknown): RoomChatMessage[] => Array.isArray(messages)
     ? messages
         .map((message) => {
@@ -1442,7 +1443,7 @@ function deckModeCardKind(mode: DeckMode, lane: Lane): TriadCardKind | "any" {
 function deckAllowsCard(mode: DeckMode, lane: Lane, card?: CardView | null) {
   if (!card) return false;
   const requiredKind = deckModeCardKind(mode, lane);
-  if (requiredKind === "any") return card.kind === "monster" || card.kind === "skill";
+  if (requiredKind === "any") return card.kind !== "unknown";
   return card.kind === requiredKind;
 }
 
@@ -4033,7 +4034,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const router = useRouter();
   const cardsByNo = useMemo(() => new Map(cards.map((card) => [card.cardNo, card])), [cards]);
   const deckCatalog = useMemo(
-    () => uniqueByNo(cards.filter((card) => card.kind === "monster" || card.kind === "skill")),
+    () => uniqueByNo(cards.filter((card) => card.kind !== "unknown")),
     [cards]
   );
 
