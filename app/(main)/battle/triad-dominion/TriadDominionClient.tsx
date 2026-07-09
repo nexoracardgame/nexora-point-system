@@ -1150,6 +1150,21 @@ function localBotSkillElementScore(turn: TriadTurn, player: TriadTriangle, bot: 
   return -260_000;
 }
 
+function localBotResolvedSkillPenalty(result: TriadTurnResult, card: CardView) {
+  const rule = triadSkillRuleByNo.get(card.cardNo);
+  if (card.kind !== "skill" || !rule?.elementCondition) return 0;
+  const botEvents = result.skillEvents.filter((event) => event.side === "opponent" && event.cardNo === card.cardNo);
+  if (botEvents.length === 0) return -260_000;
+  if (botEvents.some((event) => event.blocked)) return -320_000;
+  return 80_000;
+}
+
+function localBotCanUseElementSkill(turn: TriadTurn, player: TriadTriangle, bot: TriadTriangle, card: CardView) {
+  const rule = triadSkillRuleByNo.get(card.cardNo);
+  if (card.kind !== "skill" || !rule?.elementCondition) return true;
+  return localBotSkillElementScore(turn, player, bot, card) > 0;
+}
+
 function chooseBotCardForTurn({
   turn,
   player,
@@ -1172,18 +1187,27 @@ function chooseBotCardForTurn({
     if (requiredKind === "any") return card.kind === "monster" || card.kind === "skill";
     return card.kind === requiredKind;
   });
+  const smartPlayableCards = playableCards.filter((card) => {
+    const candidateBot = { ...bot, [lane]: card.cardNo };
+    return localBotCanUseElementSkill(turn, player, candidateBot, card);
+  });
+  const scoringCards = smartPlayableCards.length > 0 ? smartPlayableCards : playableCards;
   let best: { cardNo: string; margin: number; total: number } | null = null;
 
-  for (const card of playableCards) {
+  for (const card of scoringCards) {
     const candidateBot = { ...bot, [lane]: card.cardNo };
     const result = resolveTriadTurn({ turn, player, opponent: candidateBot });
-    const margin = result.opponentTotal - result.playerTotal + localBotSkillElementScore(turn, player, candidateBot, card);
+    const margin =
+      result.opponentTotal -
+      result.playerTotal +
+      localBotSkillElementScore(turn, player, candidateBot, card) +
+      localBotResolvedSkillPenalty(result, card);
     if (!best || margin > best.margin || (margin === best.margin && result.opponentTotal > best.total)) {
       best = { cardNo: card.cardNo, margin, total: result.opponentTotal };
     }
   }
 
-  return best?.cardNo || playableCards[0]?.cardNo || "";
+  return best?.cardNo || scoringCards[0]?.cardNo || "";
 }
 
 function deckModeCardKind(mode: DeckMode, lane: Lane): TriadCardKind | "any" {
@@ -1265,6 +1289,10 @@ function monsterHasHydroburst255Stat(card?: CardView) {
   return card.attack <= 5000 || card.support <= 5000;
 }
 
+function monsterHasVerdant019Element(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.element === "wood");
+}
+
 function monsterHasPitfall223Stat(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.attack <= 2000);
 }
@@ -1275,6 +1303,10 @@ function monsterHasMetalShield238Stat(card?: CardView) {
 
 function monsterHasIronWings239Stat(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.support <= 1000);
+}
+
+function monsterHasCounterBlade243Stat(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.support <= 3000);
 }
 
 function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): SkillTargetId[] {
@@ -1333,6 +1365,10 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
     const ownCard = side === "player" ? playerTop : botTop;
     return monsterHasHydroburst255Stat(ownCard) ? [ownTarget] : [];
   }
+  if (card?.cardNo === "019") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasVerdant019Element(ownCard) ? [ownTarget] : [];
+  }
   if (card?.cardNo === "223") {
     const ownCard = side === "player" ? playerTop : botTop;
     return monsterHasPitfall223Stat(ownCard) ? [ownTarget] : [];
@@ -1344,6 +1380,10 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   if (card?.cardNo === "239") {
     const ownCard = side === "player" ? playerTop : botTop;
     return monsterHasIronWings239Stat(ownCard) ? [ownTarget] : [];
+  }
+  if (card?.cardNo === "243") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasCounterBlade243Stat(ownCard) ? [ownTarget] : [];
   }
   if (rule.target.startsWith("own")) return [ownTarget];
   if (rule.target.startsWith("opponent")) return [opponentTarget];

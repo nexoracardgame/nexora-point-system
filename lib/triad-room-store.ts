@@ -1023,6 +1023,7 @@ function chooseBotSkillTarget(room: StoredTriadRoom, choice: TriadRoomSkillChoic
       : "";
   }
   if (preferredElementTarget) return botTargetToken(choice.side, preferredElementTarget);
+  if (rule?.elementCondition) return "";
   if (room.game.triangles[opponentSide].top) return botTargetToken(choice.side, opponentSide);
   if (room.game.triangles[ownSide].top) return botTargetToken(choice.side, ownSide);
   return "";
@@ -1118,6 +1119,21 @@ function simulatedRoomWithBotSkillChoice(room: StoredTriadRoom, candidateTriangl
   return simulatedRoom;
 }
 
+function botResolvedSkillPenalty(result: TriadTurnResult, cardNo: string) {
+  const rule = triadSkillRuleByNo.get(cleanText(cardNo));
+  if (!rule?.elementCondition) return 0;
+  const botEvents = result.skillEvents.filter((event) => event.side === "opponent" && event.cardNo === cleanText(cardNo));
+  if (botEvents.length === 0) return -260_000;
+  if (botEvents.some((event) => event.blocked)) return -320_000;
+  return 80_000;
+}
+
+function botCanUseElementSkill(room: StoredTriadRoom, side: TriadRoomSlot, cardNo: string) {
+  const rule = triadSkillRuleByNo.get(cleanText(cardNo));
+  if (!rule?.elementCondition) return true;
+  return botSkillElementScore(room, side, cardNo) > 0;
+}
+
 function botCardScore(room: StoredTriadRoom, cardNo: string) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
@@ -1151,7 +1167,7 @@ function botCardScore(room: StoredTriadRoom, cardNo: string) {
     });
     const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
     const pointScore = result.winner === "opponent" ? 100_000 : result.winner === "draw" ? 25_000 : -100_000;
-    return pointScore + result.opponentTotal - result.playerTotal + elementScore;
+    return pointScore + result.opponentTotal - result.playerTotal + elementScore + botResolvedSkillPenalty(result, cardNo);
   }
   const card = triadCardByNo.get(cardNo);
   if (!card) return 0;
@@ -1178,7 +1194,24 @@ function chooseBotCardForTurn(room: StoredTriadRoom) {
     if (requiredKind === "any") return kind === "monster" || kind === "skill";
     return kind === requiredKind;
   });
-  return playable
+  const smartPlayable = playable.filter((cardNo) => {
+    const candidateRoom: StoredTriadRoom = {
+      ...room,
+      game: {
+        ...room.game,
+        triangles: {
+          ...room.game.triangles,
+          challenger: {
+            ...room.game.triangles.challenger,
+            [lane]: cardNo,
+          },
+        },
+      },
+    };
+    return botCanUseElementSkill(candidateRoom, "challenger", cardNo);
+  });
+  const scoringCards = smartPlayable.length > 0 ? smartPlayable : playable;
+  return scoringCards
     .map((cardNo) => ({ cardNo, score: botCardScore(room, cardNo) }))
     .sort((a, b) => b.score - a.score)[0]?.cardNo || "";
 }

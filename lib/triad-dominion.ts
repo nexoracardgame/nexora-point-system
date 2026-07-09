@@ -411,7 +411,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const shape: TriadSkillShape =
     card.cardNo === "245" || card.cardNo === "284"
       ? "swap-control"
-      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239"
+      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243"
         ? "stat"
       : card.cardNo === "227"
         ? "stat"
@@ -449,11 +449,11 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "019" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -1426,6 +1426,85 @@ function applyIronWings239Strict(
   } satisfies TriadSkillEvent;
 }
 
+function applyCounterBlade243Strict(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: TriadScoreState,
+  blockers: StatGainBlocker[] = []
+) {
+  const targetContribution = ownScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = "มอนสเตอร์หลักฝ่ายผู้ใช้สกิล";
+  if (!targetContribution) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ไม่พบมอนสเตอร์หลักฝ่ายตัวเอง ใบ 243 จึงไม่ทำงาน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (targetContribution.card.support > 3000) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี SUP ${targetContribution.card.support.toLocaleString()} เกิน 3,000 จึงไม่เข้าเงื่อนไขใบ 243`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const effect: TriadSkillEffect = { metric: "support", delta: 4000 };
+  if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ใบ 243 เข้าเงื่อนไขแล้ว แต่ตานี้ไม่ได้ใช้ค่า SUP ในการคิดคะแนน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const blocker = blockers.find((item) =>
+    item.targetSide === side &&
+    statGainBlockerApplies(item, effect, { lane: "top" })
+  );
+  if (blocker) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `ใบ 243 เข้าเงื่อนไขแล้ว แต่ SUP +4,000 ถูกบล็อกโดย No.${blocker.rule.cardNo} ${blocker.rule.name}`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  ownScore.total += effect.delta;
+  targetContribution.value += effect.delta;
+  ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} SUP +${effect.delta.toLocaleString()}`);
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี SUP ไม่เกิน 3,000 ใบ 243 บัฟ SUP +4,000`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
 function applyPitfall223(
   rule: TriadSkillRule,
   side: "player" | "opponent",
@@ -1819,6 +1898,11 @@ function applySkill(
 
   if (rule.cardNo === "239") {
     events.push(applyIronWings239Strict(rule, side, ownScore, blockers));
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "243") {
+    events.push(applyCounterBlade243Strict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 
