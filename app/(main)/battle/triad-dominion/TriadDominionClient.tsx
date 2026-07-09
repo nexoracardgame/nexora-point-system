@@ -318,6 +318,10 @@ function shuffledCardsBySeed(cards: CardView[], seed: string) {
   return next;
 }
 
+function sortCardsByNo(cards: CardView[]) {
+  return [...cards].sort((a, b) => a.cardNo.localeCompare(b.cardNo, "en", { numeric: true }));
+}
+
 function uniqueByNo(cards: CardView[]) {
   const seen = new Set<string>();
   return cards.filter((card) => {
@@ -1404,7 +1408,7 @@ function chooseBotCardForTurn({
   const lane = laneForTurn(turn);
   const alreadyPlaced = new Set([bot.top, bot.left, bot.right].filter(Boolean));
   const requiredKind: TriadCardKind | "any" =
-    lane === "top" ? "monster" : deckMode === "monster" ? "monster" : deckMode === "skill" ? "skill" : "any";
+    lane === "top" ? "monster" : deckMode === "monster" ? "monster" : deckMode === "skill" || deckMode === "all" ? "skill" : "any";
   const playableCards = botDeckCards.filter((card) => {
     if (alreadyPlaced.has(card.cardNo)) return false;
     if (requiredKind === "any") return card.kind === "monster" || card.kind === "skill";
@@ -1436,7 +1440,7 @@ function chooseBotCardForTurn({
 function deckModeCardKind(mode: DeckMode, lane: Lane): TriadCardKind | "any" {
   if (lane === "top") return "monster";
   if (mode === "monster") return "monster";
-  if (mode === "skill") return "skill";
+  if (mode === "skill" || mode === "all") return "skill";
   return "any";
 }
 
@@ -4298,7 +4302,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (currentDeckMode === "skill") {
         return orderedCards.filter((card) => card.kind === "monster" || card.kind === "skill");
       }
-      return orderedCards;
+      return sortCardsByNo(orderedCards);
     }
     if (currentDeckMode === "monster") {
       return shuffledCardsBySeed(deckCatalog.filter((card) => card.kind === "monster"), `${currentRoom.code}:monster:${roomPlayerSide}`);
@@ -4309,7 +4313,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         `${currentRoom.code}:skill:${roomPlayerSide}`
       );
     }
-    return shuffledCardsBySeed(deckCatalog, `${currentRoom.code}:all:${roomPlayerSide}`);
+    return sortCardsByNo(deckCatalog);
   }, [cardsByNo, currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
   const roomBattleReady = roomDecksReadyForBattle(currentRoom);
@@ -5588,7 +5592,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setBattleLog((current) => ["โหมด MONSTER ใช้การ์ดมอนสเตอร์เท่านั้น", ...current]);
       return false;
     }
-    if (currentDeckMode === "skill" && lane !== "top" && card?.kind !== "skill") {
+    if ((currentDeckMode === "skill" || currentDeckMode === "all") && lane !== "top" && card?.kind !== "skill") {
       setBattleLog((current) => ["โหมด SKILL ใช้การ์ดสกิลในตานี้เท่านั้น", ...current]);
       return false;
     }

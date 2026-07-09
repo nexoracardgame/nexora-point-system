@@ -1092,6 +1092,21 @@ function laneForTurn(turn: TriadTurn): keyof TriadTriangle {
   return "right";
 }
 
+function requiredCardKindForTurn(mode: TriadDeckMode, turn: TriadTurn): "monster" | "skill" | "any" {
+  if (turn === 1) return "monster";
+  if (mode === "monster") return "monster";
+  if (mode === "skill" || mode === "all") return "skill";
+  return "any";
+}
+
+function cardAllowedForTurn(mode: TriadDeckMode, turn: TriadTurn, cardNo: string) {
+  const card = triadCardByNo.get(cleanText(cardNo));
+  if (!card) return false;
+  const requiredKind = requiredCardKindForTurn(mode, turn);
+  if (requiredKind === "any") return card.kind !== "unknown";
+  return card.kind === requiredKind;
+}
+
 function metricForTurn(turn: TriadTurn): TriadTurnResult["metric"] {
   if (turn === 1) return "total";
   if (turn === 2) return "attack";
@@ -1169,14 +1184,14 @@ function blessingRandomExcludedCards(room: StoredTriadRoom, extra: string[] = []
 }
 
 function buildSelectionPools(mode: TriadDeckMode, seed: string): TriadRoomGame["selectionPools"] {
-  const allCards = shuffled(
-    triadCards.filter((card) => card.kind !== "unknown").map((card) => card.cardNo),
-    `${seed}:all`
-  );
+  const allCards = triadCards
+    .filter((card) => card.kind !== "unknown")
+    .map((card) => card.cardNo)
+    .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
   if (mode === "all") {
     return {
-      host: shuffled(allCards, `${seed}:host:all`),
-      challenger: shuffled(allCards, `${seed}:challenger:all`),
+      host: allCards,
+      challenger: allCards,
     };
   }
   const monsters = pairedMonsterPools(seed);
@@ -1482,8 +1497,7 @@ function chooseBotCardForTurn(room: StoredTriadRoom) {
     ...(room.game.usedCards.challenger || []),
   ].filter(Boolean));
   const mode = room.game.deckMode || "all";
-  const requiredKind: "monster" | "skill" | "any" =
-    lane === "top" ? "monster" : mode === "monster" ? "monster" : mode === "skill" ? "skill" : "any";
+  const requiredKind = requiredCardKindForTurn(mode, turn);
   const playable = (room.game.decks.challenger || []).filter((cardNo) => {
     if (alreadyPlaced.has(cardNo)) return false;
     const kind = triadCardByNo.get(cardNo)?.kind;
@@ -2229,6 +2243,9 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   );
   if (alreadyPlayed) {
     return { ok: false as const, reason: "already_played" as const, room: publicRoom(room), resolved: turnResolved };
+  }
+  if (!cardAllowedForTurn(room.game.deckMode || "all", room.game.activeTurn, cleanedCardNo)) {
+    return { ok: false as const, reason: "invalid_card_kind" as const, room: publicRoom(room), resolved: turnResolved };
   }
   room.game.triangles[side][lane] = cleanedCardNo;
   room.game.usedCards = {
