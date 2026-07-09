@@ -158,6 +158,7 @@ type RoomGame = {
   openerTieBreak: OpeningTieBreak;
   turns: TriadTurnResult[];
   turnReady: Record<RoomPlayerSide, boolean>;
+  matchScore: Record<RoomPlayerSide, number>;
   activeTurn: TriadTurn;
   fightNo: number;
   turnStartedAt: number;
@@ -771,6 +772,10 @@ function normalizeRoomGame(value: unknown): RoomGame {
       host: Boolean(turnReady.host),
       challenger: Boolean(turnReady.challenger),
     },
+    matchScore: {
+      host: Math.max(0, Number((raw.matchScore as Record<string, unknown> | undefined)?.host || 0)),
+      challenger: Math.max(0, Number((raw.matchScore as Record<string, unknown> | undefined)?.challenger || 0)),
+    },
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
     turnStartedAt: Number(raw.turnStartedAt || Date.now()),
@@ -1158,6 +1163,20 @@ function validateDeckForMode(cards: CardView[], mode: DeckMode) {
 function skillNeedsChoice(card?: CardView) {
   if (card?.cardNo === "245") return false;
   return Boolean(card?.kind === "skill" && (card.cardNo === "254" || card.cardNo === "231" || /เลือก|choose|target/i.test(card.skillText)));
+}
+
+function roomMatchScoreForView(room: TriadRoom | null | undefined, roomPlayerSide: RoomPlayerSide | null, isSpectator = false) {
+  if (!room) return null;
+  const score = room.game.matchScore || { host: 0, challenger: 0 };
+  if (isSpectator || !roomPlayerSide) {
+    return { player: score.host || 0, bot: score.challenger || 0 };
+  }
+  const opponentSide = roomPlayerSide === "host" ? "challenger" : "host";
+  return { player: score[roomPlayerSide] || 0, bot: score[opponentSide] || 0 };
+}
+
+function absoluteRoomTurn(fightNo: number, turn: TriadTurn) {
+  return (Math.max(1, fightNo) - 1) * 3 + turn;
 }
 
 function monsterHasUnequalStats(card?: CardView) {
@@ -3018,10 +3037,12 @@ function MatchFinalOverlay({
   winner,
   surrendered,
   score,
+  isDraw,
 }: {
   winner: string;
   surrendered?: string;
   score: { player: number; bot: number };
+  isDraw?: boolean;
 }) {
   return (
     <div className="triad-match-final-overlay pointer-events-none fixed inset-0 z-[95] grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(251,191,36,0.22),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.9)_100%)] p-4 backdrop-blur-sm">
@@ -3033,7 +3054,7 @@ function MatchFinalOverlay({
             <Trophy className="h-8 w-8" />
           </div>
           <div className="triad-match-final-title mt-5 text-[clamp(2.1rem,6vw,4.8rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.65)]">
-            ชนะที่แท้จริง
+            {isDraw ? "เสมออย่างสมศักดิ์ศรี" : "ชนะที่แท้จริง"}
           </div>
           <div className="triad-match-final-winner mt-4 text-[clamp(1.25rem,3.2vw,2.15rem)] font-black text-amber-100">{winner}</div>
           {surrendered ? (
@@ -3716,7 +3737,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const forcedWinnerSide = currentRoom?.game.matchWinner || "";
   const surrenderedSide = currentRoom?.game.surrenderedBy || "";
-  const matchDone = fightNo > 3 || Boolean(forcedWinnerSide);
+  const matchDone = Boolean(currentRoom?.game.matchEndedAt) || fightNo > 3 || Boolean(forcedWinnerSide);
   const isRoomHost = Boolean(currentRoom && currentRoom.hostId === participant.id);
   const isRoomController = Boolean(
     currentRoom && (currentRoom.hostId === participant.id || currentRoom.seats.host?.id === participant.id)
@@ -3772,7 +3793,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       activeTurn: currentRoom.game.activeTurn,
       fightNo: currentRoom.game.fightNo,
       fightScore: getFightScore(currentRoom.game.turns, revealState),
-      matchScore: getFightScore(currentRoom.game.turns, revealState),
+      matchScore: roomMatchScoreForView(currentRoom, null, true) || getFightScore(currentRoom.game.turns, revealState),
       turnLocked: Boolean(hostTriangle[activeLane] || challengerTriangle[activeLane]),
       timeLeft: roomTurnSecondsLeft(currentRoom),
       playerDeckCards: currentRoom.game.decks.host.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[],
@@ -3837,7 +3858,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const displayRevealed = spectatorBattleState?.revealed || revealed;
   const displayActiveTurn = spectatorBattleState?.activeTurn || activeTurn;
   const displayFightNo = spectatorBattleState?.fightNo || fightNo;
-  const displayMatchScore = spectatorBattleState?.matchScore || matchScore;
+  const roomDisplayMatchScore = roomMatchScoreForView(currentRoom, roomPlayerSide, isSpectator);
+  const displayMatchScore = spectatorBattleState?.matchScore || roomDisplayMatchScore || matchScore;
   const displayFightScore = spectatorBattleState?.fightScore || fightScore;
   const displayTimeLeft = spectatorBattleState?.timeLeft ?? timeLeft;
   const displayTurnLocked = spectatorBattleState?.turnLocked ?? turnLocked;
@@ -3961,19 +3983,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const winnerText =
     forcedWinnerLabel
       ? `${forcedWinnerLabel} ชนะ`
-      : matchScore.player === matchScore.bot
+      : displayMatchScore.player === displayMatchScore.bot
       ? "เสมอกัน"
-      : matchScore.player > matchScore.bot
+      : displayMatchScore.player > displayMatchScore.bot
         ? `${playerLabel} ชนะ`
         : `${opponentLabel} ชนะ`;
 
   const finalMatchScore = forcedWinnerSide
     ? forcedWinnerSide === roomPlayerSide
-      ? { player: Math.max(matchScore.player, matchScore.bot + 1), bot: matchScore.bot }
+      ? { player: Math.max(displayMatchScore.player, displayMatchScore.bot + 1), bot: displayMatchScore.bot }
       : forcedWinnerSide === opponentSide
-        ? { player: matchScore.player, bot: Math.max(matchScore.bot, matchScore.player + 1) }
-        : matchScore
-    : matchScore;
+        ? { player: displayMatchScore.player, bot: Math.max(displayMatchScore.bot, displayMatchScore.player + 1) }
+        : displayMatchScore
+    : displayMatchScore;
 
   const keepPendingOpeningTieBreakChoice = (room: TriadRoom) => {
     const pendingChoice = openingTieBreakPendingChoiceRef.current;
@@ -4648,13 +4670,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, participant.id, phase]);
 
   useEffect(() => {
-    if (!currentRoom?.game.matchWinner || !currentRoom.game.matchEndedAt || !isRoomController) return;
+    if (!currentRoom?.game.matchEndedAt || !isRoomController) return;
     const delay = Math.max(0, 6500 - (Date.now() - currentRoom.game.matchEndedAt));
     const timer = window.setTimeout(() => {
       void postRoomAction({ action: "continue", code: currentRoom.code });
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, isRoomController]);
+  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, isRoomController]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -6418,8 +6440,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ยอมแพ้
         </button>
       ) : null}
-      {matchDone && forcedWinnerLabel ? (
-        <MatchFinalOverlay winner={forcedWinnerLabel} surrendered={surrenderedLabel} score={finalMatchScore} />
+      {matchDone ? (
+        <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} />
       ) : null}
       <OpeningTieBreakOverlay
         tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}

@@ -108,6 +108,10 @@ export type TriadRoomGame = {
     host: boolean;
     challenger: boolean;
   };
+  matchScore: {
+    host: number;
+    challenger: number;
+  };
   activeTurn: TriadTurn;
   fightNo: number;
   turnStartedAt: number;
@@ -414,6 +418,10 @@ function normalizeGame(value: unknown): TriadRoomGame {
     turnReady: {
       host: Boolean(turnReady.host),
       challenger: Boolean(turnReady.challenger),
+    },
+    matchScore: {
+      host: Math.max(0, Number((raw.matchScore as Record<string, unknown> | undefined)?.host || 0)),
+      challenger: Math.max(0, Number((raw.matchScore as Record<string, unknown> | undefined)?.challenger || 0)),
     },
     activeTurn: activeTurn === 2 || activeTurn === 3 ? activeTurn : 1,
     fightNo: Math.max(1, Math.min(4, Number(raw.fightNo || 1))),
@@ -1092,6 +1100,7 @@ function botChooseOpeningTieBreak(room: StoredTriadRoom) {
 
 function readyBotForAdvance(room: StoredTriadRoom) {
   if (!isTriadBotParticipant(room.seats.challenger)) return false;
+  if (room.game.matchEndedAt) return false;
   if (!room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) return false;
   if (room.game.activeTurn === 1 && room.game.turns.find((turn) => turn.turn === 1)?.winner === "draw" && room.game.openerTieBreak.status !== "resolved") {
     return false;
@@ -1104,6 +1113,7 @@ function readyBotForAdvance(room: StoredTriadRoom) {
     room.game.turnReady = { host: false, challenger: false };
     room.game.turnStartedAt = Date.now();
   } else {
+    if (finalizeNineTurnMatchIfNeeded(room, room.game.activeTurn)) return true;
     room.game.fightNo = Math.min(4, room.game.fightNo + 1);
     room.game.activeTurn = 1;
     room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
@@ -1171,6 +1181,7 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
   room.game.turns = [];
   room.game.turnReady = { host: false, challenger: false };
+  room.game.matchScore = { host: 0, challenger: 0 };
   room.game.openerTieBreak = emptyOpeningTieBreak();
   room.game.activeTurn = 1;
   room.game.fightNo = 1;
@@ -1480,6 +1491,7 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
   }));
   const nextResult = { ...result, skillEvents: [...blessingEvents, ...result.skillEvents] };
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), nextResult].sort((a, b) => a.turn - b.turn);
+  recordResolvedTurnScore(room, nextResult);
   updateOpeningTieBreakAfterResult(room, nextResult);
 }
 
@@ -1520,6 +1532,28 @@ function resolveTimeout(room: StoredTriadRoom) {
     skillEvents: [],
   };
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), result].sort((a, b) => a.turn - b.turn);
+  recordResolvedTurnScore(room, result);
+}
+
+function absoluteTurnNo(room: StoredTriadRoom, turn = room.game.activeTurn) {
+  return (Math.max(1, room.game.fightNo) - 1) * 3 + turn;
+}
+
+function recordResolvedTurnScore(room: StoredTriadRoom, result: TriadTurnResult) {
+  room.game.matchScore = room.game.matchScore || { host: 0, challenger: 0 };
+  if (result.winner === "player") room.game.matchScore.host += 1;
+  if (result.winner === "opponent") room.game.matchScore.challenger += 1;
+  finalizeNineTurnMatchIfNeeded(room, result.turn);
+}
+
+function finalizeNineTurnMatchIfNeeded(room: StoredTriadRoom, turn = room.game.activeTurn) {
+  if (room.game.matchEndedAt || absoluteTurnNo(room, turn) < 9) return false;
+  const hostScore = room.game.matchScore?.host || 0;
+  const challengerScore = room.game.matchScore?.challenger || 0;
+  room.game.matchWinner = hostScore > challengerScore ? "host" : challengerScore > hostScore ? "challenger" : "";
+  room.game.matchEndedAt = Date.now();
+  room.game.turnReady = { host: false, challenger: false };
+  return true;
 }
 
 function getOpeningSide(room: StoredTriadRoom): "host" | "challenger" | null {
@@ -1795,6 +1829,9 @@ export async function advanceTriadRoomTurn(
   if (!activeResult) {
     return { ok: false as const, reason: "turn_not_resolved" as const, room: publicRoom(room) };
   }
+  if (room.game.matchEndedAt) {
+    return { ok: true as const, room: publicRoom(room), matchEnded: true as const };
+  }
   if (
     room.game.activeTurn === 1 &&
     activeResult.winner === "draw" &&
@@ -1831,6 +1868,11 @@ export async function advanceTriadRoomTurn(
     room.game.turnReady = { host: false, challenger: false };
     room.game.turnStartedAt = Date.now();
   } else {
+    if (finalizeNineTurnMatchIfNeeded(room, room.game.activeTurn)) {
+      runBotBrain(room);
+      await upsertStoredRoom(room);
+      return { ok: true as const, room: publicRoom(room), matchEnded: true as const };
+    }
     room.game.fightNo = Math.min(4, room.game.fightNo + 1);
     room.game.activeTurn = 1;
     room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
