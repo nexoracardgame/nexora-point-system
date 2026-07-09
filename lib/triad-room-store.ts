@@ -703,13 +703,14 @@ export async function listTriadRooms() {
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
   for (const room of aliveRooms) {
+    const deckGateChanged = enforceDeckGate(room);
     const choicesExpired = markExpiredSkillChoices(room);
     const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
     resolveIfBothLocked(room);
     const botChanged = runBotBrain(room);
     const stateHealed = healTriadRoomState(room);
     const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    if (choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
+    if (deckGateChanged || choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
       await upsertStoredRoom(room);
     }
   }
@@ -1167,7 +1168,7 @@ function runBotBrain(room: StoredTriadRoom) {
   let changed = false;
   if (room.status === "playing") {
     changed = ensureBotDeckReady(room) || changed;
-    if (room.game.deckReady.host && room.game.deckReady.challenger) {
+    if (battleDecksReady(room)) {
       const wasReady = battleDecksReady(room);
       finalizeDeckSelection(room);
       changed = !wasReady || changed;
@@ -1208,11 +1209,18 @@ function freshGame(): TriadRoomGame {
 }
 
 function battleDecksReady(room: StoredTriadRoom) {
-  return Boolean(room.game.deckReady.host && room.game.deckReady.challenger);
+  const deckMode = room.game.deckMode || "all";
+  return Boolean(
+    room.game.deckReady.host &&
+      room.game.deckReady.challenger &&
+      validateDeckForMode(deckMode, room.game.decks.host).ok &&
+      validateDeckForMode(deckMode, room.game.decks.challenger).ok
+  );
 }
 
 function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
-  if (battleDecksReady(room) && !force) return false;
+  if (!battleDecksReady(room)) return false;
+  if (!force) return false;
   room.game.deckReady = { host: true, challenger: true };
   room.game.usedCards = { host: [], challenger: [] };
   room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
@@ -1222,6 +1230,35 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   room.game.openerTieBreak = emptyOpeningTieBreak();
   room.game.activeTurn = 1;
   room.game.fightNo = 1;
+  room.game.matchWinner = "";
+  room.game.surrenderedBy = "";
+  room.game.matchEndedAt = 0;
+  room.game.turnStartedAt = Date.now();
+  return true;
+}
+
+function enforceDeckGate(room: StoredTriadRoom) {
+  if (room.status !== "playing") return false;
+  const deckMode = room.game.deckMode || "all";
+  const hostValid = validateDeckForMode(deckMode, room.game.decks.host).ok;
+  const challengerValid = validateDeckForMode(deckMode, room.game.decks.challenger).ok;
+  const nextReady = {
+    host: Boolean(room.game.deckReady.host && hostValid),
+    challenger: Boolean(room.game.deckReady.challenger && challengerValid),
+  };
+  const changedReady =
+    nextReady.host !== room.game.deckReady.host ||
+    nextReady.challenger !== room.game.deckReady.challenger;
+  if (!changedReady && nextReady.host && nextReady.challenger) return false;
+
+  room.game.deckReady = nextReady;
+  room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
+  room.game.turns = [];
+  room.game.turnReady = { host: false, challenger: false };
+  room.game.openerTieBreak = emptyOpeningTieBreak();
+  room.game.activeTurn = 1;
+  room.game.fightNo = 1;
+  room.game.matchScore = { host: 0, challenger: 0 };
   room.game.matchWinner = "";
   room.game.surrenderedBy = "";
   room.game.matchEndedAt = 0;
@@ -1690,6 +1727,7 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
 export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  enforceDeckGate(room);
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   if (room.game.deckReady[side]) {
@@ -1703,6 +1741,7 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
 export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[]) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  enforceDeckGate(room);
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   const wasBattleReady = battleDecksReady(room);
@@ -1730,8 +1769,13 @@ export async function readyTriadRoomDeck(code: string, participantId: string, de
 export async function lockTriadRoomCard(code: string, participantId: string, cardNo: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  enforceDeckGate(room);
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+  if (!battleDecksReady(room)) {
+    await upsertStoredRoom(room);
+    return { ok: false as const, reason: "deck_not_ready" as const, room: publicRoom(room), resolved: false };
+  }
   const lane = laneForTurn(room.game.activeTurn);
   const existingCard = room.game.triangles[side][lane];
   const turnResolved = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
@@ -1989,10 +2033,12 @@ export async function advanceTriadRoomTurn(
 export async function timeoutTriadRoomTurn(code: string, participantId: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  enforceDeckGate(room);
   if (!participantId || !participantInStoredRoom(room, participantId)) {
     return { ok: false as const, reason: "not_in_room" as const, room: publicRoom(room) };
   }
-  if (room.status !== "playing" || room.game.decks.host.length < TRIAD_DECK_SIZE || room.game.decks.challenger.length < TRIAD_DECK_SIZE) {
+  if (room.status !== "playing" || !battleDecksReady(room)) {
+    await upsertStoredRoom(room);
     return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
   }
   if (room.game.turns.some((turn) => turn.turn === room.game.activeTurn)) {

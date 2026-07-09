@@ -636,8 +636,17 @@ function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhas
   const spectator = room.spectators.some((viewer) => viewer.id === participantId);
   const fieldPlayer = room.seats.host?.id === participantId || room.seats.challenger?.id === participantId;
   if (!spectator && !fieldPlayer) return null;
-  if (spectator) return "battle";
-  return room.game.deckReady.host && room.game.deckReady.challenger ? "battle" : "deck";
+  if (spectator) return roomDecksReadyForBattle(room) ? "battle" : "room";
+  return roomDecksReadyForBattle(room) ? "battle" : "deck";
+}
+
+function roomDecksReadyForBattle(room: TriadRoom | null | undefined) {
+  return Boolean(
+    room?.game.deckReady.host &&
+      room.game.deckReady.challenger &&
+      room.game.decks.host.length >= DECK_SIZE &&
+      room.game.decks.challenger.length >= DECK_SIZE
+  );
 }
 
 function removeParticipant(room: TriadRoom, participantId: string): TriadRoom {
@@ -3862,8 +3871,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return shuffledCardsBySeed(deckCatalog, `${currentRoom.code}:all:${roomPlayerSide}`);
   }, [cardsByNo, currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
+  const roomBattleReady = roomDecksReadyForBattle(currentRoom);
   const pvpTurnTimedOut = Boolean(
     isPvpRoom &&
+      roomBattleReady &&
       currentRoom &&
       currentRoom.status === "playing" &&
       (timeLeft <= 0 || roomTurnSecondsLeft(currentRoom) <= 0)
@@ -3929,7 +3940,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const displayBattleLog = spectatorBattleState?.battleLog || battleLog;
   const ownDeckReady = Boolean(roomPlayerSide && currentRoom?.game.deckReady[roomPlayerSide]);
   const opponentDeckReady = Boolean(opponentSide && currentRoom?.game.deckReady[opponentSide]);
-  const bothDecksReady = Boolean(currentRoom?.game.deckReady.host && currentRoom?.game.deckReady.challenger);
+  const bothDecksReady = roomBattleReady;
   const deckSelectionActive = Boolean(currentRoom && currentRoom.status === "playing" && !bothDecksReady);
   const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
   const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
@@ -4710,6 +4721,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
+    const decksReadyForBattle = roomDecksReadyForBattle(currentRoom);
+    if (!decksReadyForBattle) {
+      const ownDeck = currentRoom.game.decks[roomPlayerSide];
+      const enemyDeck = currentRoom.game.decks[opponentSide];
+      if (ownDeckReady || phase !== "deck") setPlayerDeck(ownDeck);
+      setBotDeck(enemyDeck);
+      setTurnLocked(false);
+      setPendingSkillChoice(null);
+      setPendingBlessingChoice(null);
+      setLockedFight(null);
+      setPlayer({ top: "", left: "", right: "" });
+      setActiveTurn(1);
+      setFightNo(1);
+      setPlacementLane("top");
+      setTimeLeft(TURN_SECONDS);
+      setDeckTimeLeft(roomDeckSecondsLeft(currentRoom));
+      return;
+    }
     const turnKey = `${currentRoom.code}:${currentRoom.game.fightNo}:${currentRoom.game.activeTurn}`;
     if (pvpTurnKeyRef.current && pvpTurnKeyRef.current !== turnKey) {
       setTurnLocked(false);
@@ -4755,7 +4784,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       turns: mappedTurns,
     });
     setDeckTimeLeft(roomDeckSecondsLeft(currentRoom));
-    if ((phase === "deck" || deckSelectionActive) && currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger) {
+    if ((phase === "deck" || deckSelectionActive) && roomDecksReadyForBattle(currentRoom)) {
       setBattleLog((current) => current.length ? current : ["ทั้งสองฝั่งล็อกเด็คแล้ว เริ่มสู้กันได้เลย"]);
     }
   }, [currentRoom, deckSelectionActive, opponentSide, ownDeckReady, phase, roomPlayerSide]);
@@ -4867,7 +4896,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           },
         },
       }));
-      if (optimisticRoom?.game.deckReady.host && optimisticRoom?.game.deckReady.challenger) {
+      if (roomDecksReadyForBattle(optimisticRoom)) {
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
         setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
@@ -4886,7 +4915,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const enemyDeck = room.game.decks[opponentSide];
       setBotDeck(enemyDeck);
       setPlayerDeck(ownDeck);
-      if (room.game.deckReady.host && room.game.deckReady.challenger) {
+      if (roomDecksReadyForBattle(room)) {
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
         setBattleLog(["กดพร้อมแล้ว เด็คถูกล็อก รออีกฝ่ายกดพร้อม"]);
@@ -4916,7 +4945,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         }).then((result) => {
           if (result.ok) {
             const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
-            if (room?.game.deckReady.host && room.game.deckReady.challenger) {
+            if (roomDecksReadyForBattle(room)) {
               setBattleLog(["หมดเวลาเลือกเด็ค ระบบล็อกเด็คเท่าที่เลือกไว้แล้ว"]);
             }
           }
@@ -4928,7 +4957,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     if (!currentRoom || currentRoom.status !== "playing") return;
-    const decksReady = Boolean(currentRoom.game.deckReady.host && currentRoom.game.deckReady.challenger);
+    const decksReady = roomDecksReadyForBattle(currentRoom);
     if (!decksReady) {
       deckBattleStartKeyRef.current = "";
       return;
@@ -5434,6 +5463,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const timeoutTurn = () => {
+    if (currentRoom && !roomDecksReadyForBattle(currentRoom)) return;
     if (matchDone || (!isPvpRoom && turnLocked && !pendingSkillChoice)) return;
     const lane = laneForTurn(activeTurn);
 
@@ -5505,7 +5535,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     const pvpTurnResolved = Boolean(isPvpRoom && currentResult && roomTurnResolved);
-    if (phase !== "battle" || matchDone || pvpTurnResolved || (!isPvpRoom && turnLocked && !pendingSkillChoice)) return;
+    if (phase !== "battle" || !bothDecksReady || matchDone || pvpTurnResolved || (!isPvpRoom && turnLocked && !pendingSkillChoice)) return;
 
     const timer = window.setInterval(() => {
       setTimeLeft((current) => {
@@ -5519,7 +5549,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [phase, matchDone, turnLocked, pendingSkillChoice, activeTurn, player, lockedFight, isPvpRoom, currentResult, roomTurnResolved, currentRoom?.code, roomPlayerSide, opponentSide]);
+  }, [phase, bothDecksReady, matchDone, turnLocked, pendingSkillChoice, activeTurn, player, lockedFight, isPvpRoom, currentResult, roomTurnResolved, currentRoom?.code, roomPlayerSide, opponentSide]);
 
   const scoreTurnIfReady = (
     turn: TriadTurn,
