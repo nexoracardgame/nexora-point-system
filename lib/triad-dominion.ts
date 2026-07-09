@@ -139,6 +139,7 @@ export type TriadSkillEvent = {
 const sourceCards = ((bundledCardSkillDbJson as { cards?: SourceCard[] }).cards || []).filter(
   Boolean
 );
+const ELEMENT_CRYSTAL_CARD_NOS = new Set(["001", "002", "003", "004", "005"]);
 
 function normalizeCardNo(value: string | number) {
   return String(value).replace(/\D/g, "").padStart(3, "0").slice(-3);
@@ -378,7 +379,7 @@ function hasExplicitElementCondition(text: string) {
 }
 
 function inferElementCondition(card: TriadCard): TriadSkillRule["elementCondition"] {
-  if (["001", "002", "003", "004", "005"].includes(card.cardNo) && card.element !== "unknown") {
+  if (ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) && card.element !== "unknown") {
     return { mode: "include", elements: [card.element] };
   }
 
@@ -449,7 +450,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : card.cardNo === "005" ? "own-all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
@@ -1184,14 +1185,16 @@ function applyHydroburst255(
   } satisfies TriadSkillEvent;
 }
 
-function applyWaterCrystal005Strict(
+function applyElementCrystalStrict(
   rule: TriadSkillRule,
   side: "player" | "opponent",
   ownScore: TriadScoreState,
   blockers: StatGainBlocker[] = []
 ) {
   const effect: TriadSkillEffect = { metric: "attack", delta: 3000 };
-  const targetLabel = "มอนสเตอร์ธาตุน้ำฝั่งผู้ใช้สกิล";
+  const crystalElement = rule.elementHint;
+  const elementLabel = formatElementName(crystalElement);
+  const targetLabel = `มอนสเตอร์ธาตุ${elementLabel}ฝั่งผู้ใช้สกิล`;
 
   if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) {
     return {
@@ -1200,21 +1203,34 @@ function applyWaterCrystal005Strict(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: "ใบ 005 เป็นบัฟ ATK จึงทำงานเฉพาะตาที่ใช้ค่า ATK คิดคะแนน",
+      summary: `ใบ ${rule.cardNo} เป็นบัฟ ATK จึงทำงานเฉพาะตาที่ใช้ค่า ATK คิดคะแนน`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
   }
 
-  const waterContributions = ownScore.contributions.filter((item) => item.card.element === "water");
-  if (waterContributions.length === 0) {
+  if (crystalElement === "unknown") {
     return {
       cardNo: rule.cardNo,
       name: rule.name,
       side,
       type: rule.shape,
       text: rule.text,
-      summary: "ใบ 005 ไม่พบมอนสเตอร์ธาตุน้ำฝั่งผู้ใช้สกิล จึงไม่เกิดผล",
+      summary: `ใบ ${rule.cardNo} ไม่พบธาตุประจำ Crystal จึงไม่เกิดผล`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const matchingContributions = ownScore.contributions.filter((item) => item.card.element === crystalElement);
+  if (matchingContributions.length === 0) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `ใบ ${rule.cardNo} ไม่พบมอนสเตอร์ธาตุ${elementLabel}ฝั่งผู้ใช้สกิล จึงไม่เกิดผล`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
@@ -1222,7 +1238,7 @@ function applyWaterCrystal005Strict(
 
   const applied: string[] = [];
   const blocked: string[] = [];
-  for (const contribution of waterContributions) {
+  for (const contribution of matchingContributions) {
     const blocker = blockers.find((item) =>
       item.targetSide === side &&
       statGainBlockerApplies(item, effect, contribution)
@@ -1233,7 +1249,7 @@ function applyWaterCrystal005Strict(
     }
     ownScore.total += effect.delta;
     contribution.value += effect.delta;
-    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: No.${contribution.card.cardNo} water ATK +${effect.delta.toLocaleString()}`);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: No.${contribution.card.cardNo} ${crystalElement} ATK +${effect.delta.toLocaleString()}`);
     applied.push(`No.${contribution.card.cardNo} +${effect.delta.toLocaleString()}`);
   }
 
@@ -1244,7 +1260,7 @@ function applyWaterCrystal005Strict(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: `ใบ 005 เจอมอนสเตอร์ธาตุน้ำแล้ว แต่บัฟถูกบล็อกทั้งหมด (${blocked.join(", ")})`,
+      summary: `ใบ ${rule.cardNo} เจอมอนสเตอร์ธาตุ${elementLabel}แล้ว แต่บัฟถูกบล็อกทั้งหมด (${blocked.join(", ")})`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
@@ -1256,7 +1272,7 @@ function applyWaterCrystal005Strict(
     side,
     type: rule.shape,
     text: rule.text,
-    summary: `ใบ 005 บัฟ ATK +3,000 ให้มอนสเตอร์ธาตุน้ำฝั่งผู้ใช้สกิลครบตามเงื่อนไข: ${applied.join(", ")}${blocked.length > 0 ? `; ถูกบล็อก ${blocked.join(", ")}` : ""}`,
+    summary: `ใบ ${rule.cardNo} บัฟ ATK +3,000 ให้มอนสเตอร์ธาตุ${elementLabel}ฝั่งผู้ใช้สกิลครบตามเงื่อนไข: ${applied.join(", ")}${blocked.length > 0 ? `; ถูกบล็อก ${blocked.join(", ")}` : ""}`,
     targetLabel,
   } satisfies TriadSkillEvent;
 }
@@ -1954,8 +1970,8 @@ function applySkill(
     return { unresolved, events };
   }
 
-  if (rule.cardNo === "005") {
-    events.push(applyWaterCrystal005Strict(rule, side, ownScore, blockers));
+  if (ELEMENT_CRYSTAL_CARD_NOS.has(rule.cardNo)) {
+    events.push(applyElementCrystalStrict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 

@@ -5389,13 +5389,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const turnPrioritySide = lastTurnWinner === "bot" ? "opponent" : "player";
 
     if (currentRoom && roomPlayerSide && opponentSide) {
-      const previewOpponentTop = opponentSide ? cardsByNo.get(currentRoom.game.triangles[opponentSide].top) : undefined;
-      const needsSkillChoice = Boolean(
-        playerCard &&
-          (playerCard.cardNo === "254" ||
-            (skillNeedsChoice(playerCard) &&
-              getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(playerForLock.top), previewOpponentTop).length > 0))
-      );
       const previousRoom = currentRoom;
       optimisticRoomLockUntilRef.current = Date.now() + 3200;
       patchCurrentRoom((room) => ({
@@ -5413,27 +5406,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             ...room.game.usedCards,
             [roomPlayerSide]: Array.from(new Set([...(room.game.usedCards[roomPlayerSide] || []), playerForLock[lane]].filter(Boolean))),
           },
-          skillChoices: needsSkillChoice
-            ? [
-                ...room.game.skillChoices.filter(
-                  (choice) =>
-                    choice.fightNo !== room.game.fightNo ||
-                    choice.turn !== room.game.activeTurn ||
-                    choice.side !== roomPlayerSide
-                ),
-                {
-                  fightNo: room.game.fightNo,
-                  turn: room.game.activeTurn,
-                  side: roomPlayerSide,
-                  lane,
-                  cardNo: playerCard?.cardNo || "",
-                  startedAt: Date.now(),
-                  deadlineAt: Date.now() + 30_000,
-                  selectedTarget: "",
-                  skipped: false,
-                },
-              ]
-            : room.game.skillChoices,
         },
       }));
       setTurnLocked(true);
