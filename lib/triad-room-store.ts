@@ -707,8 +707,9 @@ export async function listTriadRooms() {
     const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
     resolveIfBothLocked(room);
     const botChanged = runBotBrain(room);
+    const stateHealed = healTriadRoomState(room);
     const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    if (choicesExpired || resolvedAfterChoiceTimeout || botChanged) {
+    if (choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
       await upsertStoredRoom(room);
     }
   }
@@ -1419,6 +1420,57 @@ function rpsWinner(hostChoice: TriadRpsChoice, challengerChoice: TriadRpsChoice)
   return "challenger";
 }
 
+function settleOpeningTieBreak(room: StoredTriadRoom) {
+  if (room.game.activeTurn !== 1) return false;
+  const firstTurnResult = room.game.turns.find((turn) => turn.turn === 1);
+  if (firstTurnResult?.winner !== "draw") return false;
+  const tieBreak = room.game.openerTieBreak;
+  if (tieBreak.status !== "waiting") return false;
+  if (tieBreak.fightNo !== room.game.fightNo || tieBreak.turn !== 1) return false;
+
+  const hostChoice = tieBreak.choices.host || "unknown";
+  const challengerChoice = tieBreak.choices.challenger || "unknown";
+  const winner = rpsWinner(hostChoice, challengerChoice);
+  if (!winner) return false;
+
+  if (winner === "draw") {
+    room.game.openerTieBreak = {
+      ...tieBreak,
+      choices: {},
+      revealChoices: { host: hostChoice, challenger: challengerChoice },
+      round: (tieBreak.round || 1) + 1,
+      winner: "",
+      status: "waiting",
+      source: "manual",
+      message:
+        "เป่ายิงฉุบเสมออีกครั้ง เลือกใหม่ได้ทันทีจนกว่าจะมีผู้ชนะ ผู้ชนะจะได้เปิดสกิลก่อนในตาถัดไปเท่านั้น",
+    };
+    return true;
+  }
+
+  room.game.openerTieBreak = {
+    ...tieBreak,
+    choices: { host: hostChoice, challenger: challengerChoice },
+    revealChoices: { host: hostChoice, challenger: challengerChoice },
+    round: tieBreak.round || 1,
+    status: "resolved",
+    winner,
+    source: "manual",
+  };
+  room.game.activeTurn = 2;
+  room.game.turnReady = { host: false, challenger: false };
+  room.game.turnStartedAt = Date.now();
+  return true;
+}
+
+function healTriadRoomState(room: StoredTriadRoom) {
+  let changed = false;
+  changed = settleOpeningTieBreak(room) || changed;
+  resolveIfBothLocked(room);
+  changed = settleOpeningTieBreak(room) || changed;
+  return changed;
+}
+
 function updateOpeningTieBreakAfterResult(room: StoredTriadRoom, result: TriadTurnResult) {
   if (room.game.activeTurn !== 1 || result.winner !== "draw") {
     room.game.openerTieBreak = emptyOpeningTieBreak();
@@ -1753,6 +1805,7 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
   }
   resolveIfBothLocked(room);
   runBotBrain(room);
+  healTriadRoomState(room);
   await upsertStoredRoom(room);
   return {
     ok: true as const,
@@ -1801,6 +1854,7 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
 
   resolveIfBothLocked(room);
   runBotBrain(room);
+  healTriadRoomState(room);
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
 }
