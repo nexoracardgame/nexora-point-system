@@ -375,6 +375,25 @@ function participantInRoom(room: TriadRoom | undefined, participantId: string) {
   );
 }
 
+function participantsLookSame(a?: RoomParticipant | null, b?: RoomParticipant | null) {
+  if (!a || !b || isBotParticipant(a) || isBotParticipant(b)) return false;
+  const aName = safeText(a.name).toLowerCase();
+  const bName = safeText(b.name).toLowerCase();
+  if (!aName || aName !== bName) return false;
+  const aImage = safeText(a.image);
+  const bImage = safeText(b.image);
+  return !aImage || !bImage || aImage === bImage;
+}
+
+function participantRoomSide(room: TriadRoom | null | undefined, participant: RoomParticipant): RoomPlayerSide | null {
+  if (!room) return null;
+  if (room.seats.host?.id === participant.id) return "host";
+  if (room.seats.challenger?.id === participant.id) return "challenger";
+  if (participantsLookSame(room.seats.host, participant)) return "host";
+  if (participantsLookSame(room.seats.challenger, participant)) return "challenger";
+  return null;
+}
+
 function isBotParticipant(participant?: RoomParticipant | null) {
   return participant?.id === TRIAD_BOT_ID;
 }
@@ -2383,6 +2402,7 @@ function OpeningTieBreakOverlay({
   isSpectator,
   pendingChoice,
   onChoose,
+  onExit,
 }: {
   tieBreak?: OpeningTieBreak | null;
   hostName: string;
@@ -2391,6 +2411,7 @@ function OpeningTieBreakOverlay({
   isSpectator: boolean;
   pendingChoice: TriadRpsChoice | null;
   onChoose: (choice: TriadRpsChoice) => void;
+  onExit?: () => void;
 }) {
   if (!tieBreak || (tieBreak.status !== "waiting" && tieBreak.status !== "resolved")) return null;
   const revealedChoices = tieBreak.revealChoices || tieBreak.choices;
@@ -2459,8 +2480,17 @@ function OpeningTieBreakOverlay({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-white/10 bg-black/28 p-4 text-center text-sm font-semibold text-white/58">
-                {isSpectator ? "ผู้ชมกำลังรอดูผลการล็อกของทั้งสองฝ่าย" : "ล็อกคำตอบแล้ว รออีกฝ่าย"}
+              <div className="space-y-3 rounded-xl border border-white/10 bg-black/28 p-4 text-center text-sm font-semibold text-white/58">
+                <div>{isSpectator ? "ผู้ชมกำลังรอดูผลการล็อกของทั้งสองฝ่าย" : "ล็อกคำตอบแล้ว รออีกฝ่าย"}</div>
+                {isSpectator && onExit ? (
+                  <button
+                    type="button"
+                    onClick={onExit}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/12 bg-white/8 px-4 text-xs font-black text-white transition hover:border-amber-100/45 hover:bg-amber-200/12 hover:text-amber-100"
+                  >
+                    ออกจากห้องนี้
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
@@ -3747,15 +3777,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     currentRoom && (currentRoom.hostId === participant.id || currentRoom.seats.host?.id === participant.id)
   );
   const hasBotOpponent = Boolean(currentRoom && isBotParticipant(currentRoom.seats.challenger));
-  const isFieldPlayer = Boolean(
-    currentRoom?.seats.host?.id === participant.id || currentRoom?.seats.challenger?.id === participant.id
-  );
+  const roomPlayerSide: RoomPlayerSide | null = participantRoomSide(currentRoom, participant);
+  const isFieldPlayer = Boolean(roomPlayerSide);
   const isSpectator = Boolean(currentRoom && !isFieldPlayer && currentRoom.spectators.some((viewer) => viewer.id === participant.id));
-  const roomPlayerSide: RoomPlayerSide | null = currentRoom?.seats.host?.id === participant.id
-    ? "host"
-    : currentRoom?.seats.challenger?.id === participant.id
-      ? "challenger"
-      : null;
   const opponentSide: RoomPlayerSide | null = roomPlayerSide === "host" ? "challenger" : roomPlayerSide === "challenger" ? "host" : null;
   const displayUsedPlayerSet = new Set([
     ...usedPlayerSet,
@@ -6457,6 +6481,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         isSpectator={isSpectator}
         pendingChoice={openingTieBreakPendingChoice}
         onChoose={chooseOpeningTieBreak}
+        onExit={leaveRoom}
       />
       <OpeningTieBreakResultOverlay
         key={openingTieBreakResultKey}

@@ -244,7 +244,7 @@ export async function POST(request: Request) {
   if (action === "choose-opening-tiebreak") {
     const result = await chooseTriadRoomOpeningTieBreak(
       cleanText(body.code),
-      participant.id,
+      participant,
       body.choice === "rock" || body.choice === "scissors" || body.choice === "paper" ? body.choice : "unknown"
     );
     return roomActionJson(

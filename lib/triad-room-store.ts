@@ -764,6 +764,43 @@ function sideForParticipant(room: StoredTriadRoom, participantId: string): "host
   return null;
 }
 
+function normalizedParticipantName(participant?: Pick<TriadRoomParticipant, "name"> | null) {
+  return cleanText(participant?.name || "").toLowerCase();
+}
+
+function participantsLookSame(
+  seat: TriadRoomParticipant | null | undefined,
+  participant: TriadRoomParticipant
+) {
+  if (!seat || isTriadBotParticipant(seat) || isTriadBotParticipant(participant)) return false;
+  const seatName = normalizedParticipantName(seat);
+  const participantName = normalizedParticipantName(participant);
+  if (!seatName || seatName !== participantName) return false;
+  const seatImage = cleanText(seat.image);
+  const participantImage = cleanText(participant.image);
+  return !seatImage || !participantImage || seatImage === participantImage;
+}
+
+function reconnectParticipantSeat(room: StoredTriadRoom, participant: TriadRoomParticipant) {
+  const exactSide = sideForParticipant(room, participant.id);
+  if (exactSide) return exactSide;
+  const matchedSide = participantsLookSame(room.seats.host, participant)
+    ? "host"
+    : participantsLookSame(room.seats.challenger, participant)
+      ? "challenger"
+      : null;
+  if (!matchedSide) return null;
+
+  room.seats[matchedSide] = {
+    ...room.seats[matchedSide],
+    ...participant,
+    joinedAt: room.seats[matchedSide]?.joinedAt || participant.joinedAt,
+  };
+  room.spectators = room.spectators.filter((viewer) => viewer.id !== participant.id);
+  if (matchedSide === "host") room.hostId = participant.id;
+  return matchedSide;
+}
+
 function participantInStoredRoom(room: StoredTriadRoom, participantId: string) {
   return Boolean(sideForParticipant(room, participantId) || room.spectators.some((viewer) => viewer.id === participantId));
 }
@@ -1814,10 +1851,17 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
   };
 }
 
-export async function chooseTriadRoomOpeningTieBreak(code: string, participantId: string, choice: TriadRpsChoice) {
+export async function chooseTriadRoomOpeningTieBreak(
+  code: string,
+  participant: string | TriadRoomParticipant,
+  choice: TriadRpsChoice
+) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
-  const side = sideForParticipant(room, participantId);
+  const side =
+    typeof participant === "string"
+      ? sideForParticipant(room, participant)
+      : reconnectParticipantSeat(room, participant);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   const cleanChoice = normalizeRpsChoice(choice);
   if (cleanChoice === "unknown") return { ok: false as const, reason: "invalid_choice" as const, room: publicRoom(room) };
