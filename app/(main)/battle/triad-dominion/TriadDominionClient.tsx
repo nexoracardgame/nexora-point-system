@@ -1040,6 +1040,15 @@ function roomProgressValue(room: TriadRoom) {
 
 function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextRoom: TriadRoom) {
   if (!currentRoom || currentRoom.code !== nextRoom.code) return false;
+  if (
+    currentRoom.status === "playing" &&
+    nextRoom.status === "playing" &&
+    roomDecksReadyForBattle(currentRoom) &&
+    !roomDecksReadyForBattle(nextRoom) &&
+    Number(nextRoom.game.deckStartedAt || 0) <= Number(currentRoom.game.deckStartedAt || 0)
+  ) {
+    return true;
+  }
   return roomProgressValue(currentRoom) > roomProgressValue(nextRoom);
 }
 
@@ -4555,10 +4564,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const reconnectRoom = !activeCode ? nextRooms.find((room) => participantInRoom(room, participant.id)) : null;
     if (reconnectRoom) {
       activeRoomCodeRef.current = reconnectRoom.code;
-      activeRoomSnapshotRef.current = reconnectRoom;
       setActiveRoomCode(reconnectRoom.code);
-      setActiveRoomSnapshot(reconnectRoom);
-      writeCachedTriadRoom(participant.id, reconnectRoom);
+      setStableActiveRoomSnapshot(reconnectRoom);
       setPhase(reconnectRoom.status === "playing" ? phaseForPlayingRoom(reconnectRoom, participant.id) || "battle" : "room");
       setLobbyMessage("");
     }
@@ -4596,6 +4603,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return nextRoom;
   };
 
+  const setStableActiveRoomSnapshot = (room: TriadRoom) => {
+    const currentSnapshot = activeRoomSnapshotRef.current || undefined;
+    const stableRoom = currentSnapshot && shouldKeepCurrentRoomSnapshot(currentSnapshot, room) ? currentSnapshot : room;
+    activeRoomSnapshotRef.current = stableRoom;
+    setActiveRoomSnapshot(stableRoom);
+    writeCachedTriadRoom(participant.id, stableRoom);
+    return stableRoom;
+  };
+
   const postRoomAction = async (body: Record<string, unknown>) => {
     const response = await fetch(ROOM_API_PATH, {
       method: "POST",
@@ -4617,11 +4633,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     );
     if (actionRoom) {
       const stableActionRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom));
-      activeRoomSnapshotRef.current = stableActionRoom;
-      setActiveRoomSnapshot(stableActionRoom);
-      writeCachedTriadRoom(participant.id, stableActionRoom);
-      if (participantInRoom(stableActionRoom, participant.id) && stableActionRoom.status === "playing") {
-        const nextPhase = phaseForPlayingRoom(stableActionRoom, participant.id);
+      const activeStableRoom = setStableActiveRoomSnapshot(stableActionRoom);
+      if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
+        const nextPhase = phaseForPlayingRoom(activeStableRoom, participant.id);
         if (nextPhase) setPhase(nextPhase);
       }
     } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
@@ -5013,9 +5027,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
       const roomIncludesMe = participantInRoom(room, participant.id);
       if (activeRoomCodeRef.current === room.code || roomIncludesMe) {
-        activeRoomSnapshotRef.current = stableRoom;
-        setActiveRoomSnapshot(stableRoom);
-        writeCachedTriadRoom(participant.id, stableRoom);
+        setStableActiveRoomSnapshot(stableRoom);
       }
 
       if (!activeRoomCodeRef.current && roomIncludesMe) {
