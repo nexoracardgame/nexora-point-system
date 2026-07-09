@@ -63,6 +63,32 @@ export type TriadRoomParticipant = {
   joinedAt: number;
 };
 
+export type TriadRankKey = "bronze" | "silver" | "gold" | "platinum" | "diamond" | "master" | "god-of-legends";
+
+export type TriadRankProfile = {
+  userId: string;
+  name: string;
+  image: string;
+  wins: number;
+  losses: number;
+  rankKey: TriadRankKey;
+  rankName: string;
+  rankIndex: number;
+  nextRankWins: number | null;
+  updatedAt: number;
+};
+
+export type TriadRankUpEvent = {
+  userId: string;
+  name: string;
+  image: string;
+  previousRank: TriadRankKey;
+  nextRank: TriadRankKey;
+  rankName: string;
+  wins: number;
+  at: number;
+};
+
 export type StoredTriadRoom = {
   code: string;
   access: TriadRoomAccess;
@@ -119,6 +145,8 @@ export type TriadRoomGame = {
   matchWinner: TriadRoomSlot | "";
   surrenderedBy: TriadRoomSlot | "";
   matchEndedAt: number;
+  rankedRecordedAt: number;
+  rankUpEvents: TriadRankUpEvent[];
   chat: TriadRoomChatMessage[];
 };
 
@@ -156,6 +184,7 @@ const TRIAD_BOT_IMAGE = "/avatar.png";
 
 const globalForTriadRooms = globalThis as {
   nexoraTriadRooms?: StoredTriadRoom[];
+  nexoraTriadRankProfiles?: TriadRankProfile[];
   nexoraTriadRoomSchemaPromise?: Promise<void>;
   nexoraTriadRoomMutationLocks?: Map<string, Promise<void>>;
 };
@@ -182,6 +211,57 @@ function triadBotParticipant(): TriadRoomParticipant {
 
 function isTriadBotParticipant(participant?: TriadRoomParticipant | null) {
   return participant?.id === TRIAD_BOT_ID;
+}
+
+const TRIAD_RANKS: Array<{ key: TriadRankKey; name: string; wins: number }> = [
+  { key: "bronze", name: "Bronze", wins: 0 },
+  { key: "silver", name: "Silver", wins: 100 },
+  { key: "gold", name: "Gold", wins: 500 },
+  { key: "platinum", name: "Platinum", wins: 1000 },
+  { key: "diamond", name: "Diamond", wins: 3000 },
+  { key: "master", name: "Master", wins: 5000 },
+  { key: "god-of-legends", name: "God Of Legends", wins: 10000 },
+];
+
+function rankForWins(wins: number) {
+  const safeWins = Math.max(0, Math.floor(Number(wins) || 0));
+  let rankIndex = 0;
+  for (let index = 0; index < TRIAD_RANKS.length; index += 1) {
+    if (safeWins >= TRIAD_RANKS[index].wins) rankIndex = index;
+  }
+  const rank = TRIAD_RANKS[rankIndex] || TRIAD_RANKS[0];
+  const nextRank = TRIAD_RANKS[rankIndex + 1] || null;
+  return {
+    rankKey: rank.key,
+    rankName: rank.name,
+    rankIndex,
+    nextRankWins: nextRank ? nextRank.wins : null,
+  };
+}
+
+function normalizeRankProfile(value: unknown): TriadRankProfile | null {
+  const raw = value && typeof value === "object" ? (value as Partial<TriadRankProfile>) : {};
+  const userId = cleanText(raw.userId);
+  if (!userId || userId === TRIAD_BOT_ID) return null;
+  const wins = Math.max(0, Math.floor(Number(raw.wins) || 0));
+  const losses = Math.max(0, Math.floor(Number(raw.losses) || 0));
+  const rank = rankForWins(wins);
+  return {
+    userId,
+    name: cleanText(raw.name) || "PLAYER",
+    image: cleanText(raw.image) || "/avatar.png",
+    wins,
+    losses,
+    ...rank,
+    updatedAt: Number(raw.updatedAt || Date.now()),
+  };
+}
+
+function memoryRankProfiles() {
+  if (!globalForTriadRooms.nexoraTriadRankProfiles) {
+    globalForTriadRooms.nexoraTriadRankProfiles = [];
+  }
+  return globalForTriadRooms.nexoraTriadRankProfiles;
 }
 
 function normalizeAccess(value: unknown): TriadRoomAccess {
@@ -348,6 +428,31 @@ function normalizeChatMessages(value: unknown, roomCode = ""): TriadRoomChatMess
     .slice(-TRIAD_CHAT_LIMIT);
 }
 
+function normalizeRankUpEvents(value: unknown): TriadRankUpEvent[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((event) => {
+      const raw = event && typeof event === "object" ? (event as Record<string, unknown>) : {};
+      const userId = cleanText(raw.userId);
+      const nextRank = cleanText(raw.nextRank) as TriadRankKey;
+      const rank = TRIAD_RANKS.find((item) => item.key === nextRank);
+      if (!userId || !rank) return null;
+      const previousRank = cleanText(raw.previousRank) as TriadRankKey;
+      return {
+        userId,
+        name: cleanText(raw.name) || "PLAYER",
+        image: cleanText(raw.image) || "/avatar.png",
+        previousRank: TRIAD_RANKS.some((item) => item.key === previousRank) ? previousRank : "bronze",
+        nextRank,
+        rankName: rank.name,
+        wins: Math.max(0, Math.floor(Number(raw.wins) || 0)),
+        at: Number(raw.at || Date.now()),
+      } satisfies TriadRankUpEvent;
+    })
+    .filter((event): event is TriadRankUpEvent => Boolean(event))
+    .slice(-4);
+}
+
 function normalizeRpsChoice(value: unknown): TriadRpsChoice {
   return value === "rock" || value === "scissors" || value === "paper" ? value : "unknown";
 }
@@ -432,6 +537,8 @@ function normalizeGame(value: unknown): TriadRoomGame {
     matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
     surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
     matchEndedAt: Number(raw.matchEndedAt || 0),
+    rankedRecordedAt: Number(raw.rankedRecordedAt || 0),
+    rankUpEvents: normalizeRankUpEvents(raw.rankUpEvents),
     chat: normalizeChatMessages(raw.chat),
   };
 }
@@ -490,6 +597,17 @@ async function ensureTriadRoomSchema() {
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_status_idx" ON "TriadRoom" ("status")`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRoom_createdAt_idx" ON "TriadRoom" ("createdAt" DESC)`);
       await prisma.$executeRawUnsafe(`ALTER TABLE "TriadRoom" ADD COLUMN IF NOT EXISTS "game" JSONB NOT NULL DEFAULT '{"decks":{"host":[],"challenger":[]},"deckReady":{"host":false,"challenger":false},"deckStartedAt":0,"triangles":{"host":{"top":"","left":"","right":""},"challenger":{"top":"","left":"","right":""}},"turns":[],"activeTurn":1,"fightNo":1,"turnStartedAt":0,"matchWinner":"","surrenderedBy":"","matchEndedAt":0}'::jsonb`);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "TriadRankProfile" (
+          "userId" TEXT PRIMARY KEY,
+          "name" TEXT NOT NULL DEFAULT 'PLAYER',
+          "image" TEXT NOT NULL DEFAULT '/avatar.png',
+          "wins" INTEGER NOT NULL DEFAULT 0,
+          "losses" INTEGER NOT NULL DEFAULT 0,
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRankProfile_leaderboard_idx" ON "TriadRankProfile" ("wins" DESC, "losses" ASC, "updatedAt" ASC)`);
     })().catch((error) => {
       globalForTriadRooms.nexoraTriadRoomSchemaPromise = undefined;
       throw error;
@@ -577,6 +695,122 @@ async function dbDeleteRoom(code: string) {
   await prisma.$executeRawUnsafe(`DELETE FROM "TriadRoom" WHERE "code" = $1`, cleanText(code));
 }
 
+type RankProfileRow = {
+  userId: string;
+  name: string;
+  image: string;
+  wins: number;
+  losses: number;
+  updatedAt: Date | string;
+};
+
+function rowToRankProfile(row: RankProfileRow): TriadRankProfile {
+  return normalizeRankProfile({
+    userId: row.userId,
+    name: row.name,
+    image: row.image,
+    wins: row.wins,
+    losses: row.losses,
+    updatedAt: new Date(row.updatedAt).getTime(),
+  })!;
+}
+
+async function dbGetRankProfile(userId: string) {
+  await ensureTriadRoomSchema();
+  const rows = await prisma.$queryRawUnsafe<RankProfileRow[]>(
+    `
+      SELECT "userId", "name", "image", "wins", "losses", "updatedAt"
+      FROM "TriadRankProfile"
+      WHERE "userId" = $1
+      LIMIT 1
+    `,
+    cleanText(userId)
+  );
+  return rows[0] ? rowToRankProfile(rows[0]) : null;
+}
+
+async function dbAddRankResult(participant: TriadRoomParticipant, result: "win" | "loss") {
+  await ensureTriadRoomSchema();
+  await prisma.$executeRawUnsafe(
+    `
+      INSERT INTO "TriadRankProfile" ("userId", "name", "image", "wins", "losses", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      ON CONFLICT ("userId") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "image" = EXCLUDED."image",
+        "wins" = "TriadRankProfile"."wins" + EXCLUDED."wins",
+        "losses" = "TriadRankProfile"."losses" + EXCLUDED."losses",
+        "updatedAt" = NOW()
+    `,
+    participant.id,
+    participant.name,
+    participant.image || "/avatar.png",
+    result === "win" ? 1 : 0,
+    result === "loss" ? 1 : 0
+  );
+  return dbGetRankProfile(participant.id);
+}
+
+async function dbListRankProfiles() {
+  await ensureTriadRoomSchema();
+  const rows = await prisma.$queryRawUnsafe<RankProfileRow[]>(`
+    SELECT "userId", "name", "image", "wins", "losses", "updatedAt"
+    FROM "TriadRankProfile"
+    ORDER BY "wins" DESC, "losses" ASC, "updatedAt" ASC
+    LIMIT 500
+  `);
+  return rows.map(rowToRankProfile);
+}
+
+function memoryAddRankResult(participant: TriadRoomParticipant, result: "win" | "loss") {
+  const profiles = memoryRankProfiles();
+  const index = profiles.findIndex((profile) => profile.userId === participant.id);
+  const current = profiles[index] || normalizeRankProfile({
+    userId: participant.id,
+    name: participant.name,
+    image: participant.image,
+    wins: 0,
+    losses: 0,
+  })!;
+  const next = normalizeRankProfile({
+    ...current,
+    name: participant.name,
+    image: participant.image || current.image,
+    wins: current.wins + (result === "win" ? 1 : 0),
+    losses: current.losses + (result === "loss" ? 1 : 0),
+    updatedAt: Date.now(),
+  })!;
+  if (index >= 0) profiles[index] = next;
+  else profiles.push(next);
+  return next;
+}
+
+async function addRankResult(participant: TriadRoomParticipant, result: "win" | "loss") {
+  if (!participant.id || isTriadBotParticipant(participant)) return null;
+  try {
+    const before = await dbGetRankProfile(participant.id);
+    const after = await dbAddRankResult(participant, result);
+    return { before, after };
+  } catch (error) {
+    console.error("TRIAD RANK DB FALLBACK:", error);
+    const before = memoryRankProfiles().find((profile) => profile.userId === participant.id) || null;
+    const after = memoryAddRankResult(participant, result);
+    return { before, after };
+  }
+}
+
+export async function listTriadRankProfiles() {
+  try {
+    return await dbListRankProfiles();
+  } catch (error) {
+    console.error("TRIAD RANK LIST DB FALLBACK:", error);
+    return memoryRankProfiles()
+      .slice()
+      .sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.updatedAt - b.updatedAt)
+      .slice(0, 500);
+  }
+}
+
 function roomCode(existing: StoredTriadRoom[]) {
   const used = new Set(existing.map((room) => room.code));
   for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -622,7 +856,42 @@ async function getStoredRoom(code: string) {
   );
 }
 
+async function persistRankedMatchIfNeeded(room: StoredTriadRoom) {
+  if (!room.game.matchEndedAt || room.game.rankedRecordedAt) return;
+  room.game.rankedRecordedAt = Date.now();
+  room.game.rankUpEvents = [];
+
+  const host = room.seats.host;
+  const challenger = room.seats.challenger;
+  const humanPvp = Boolean(host && challenger && !isTriadBotParticipant(host) && !isTriadBotParticipant(challenger));
+  if (!humanPvp || !room.game.matchWinner) return;
+
+  const winner = room.game.matchWinner === "host" ? host : challenger;
+  const loser = room.game.matchWinner === "host" ? challenger : host;
+  if (!winner || !loser) return;
+
+  const winnerResult = await addRankResult(winner, "win");
+  await addRankResult(loser, "loss");
+  const beforeRank = winnerResult?.before?.rankKey || "bronze";
+  const afterProfile = winnerResult?.after || null;
+  if (afterProfile && beforeRank !== afterProfile.rankKey) {
+    room.game.rankUpEvents = [
+      {
+        userId: afterProfile.userId,
+        name: afterProfile.name,
+        image: afterProfile.image,
+        previousRank: beforeRank,
+        nextRank: afterProfile.rankKey,
+        rankName: afterProfile.rankName,
+        wins: afterProfile.wins,
+        at: Date.now(),
+      },
+    ];
+  }
+}
+
 async function upsertStoredRoom(room: StoredTriadRoom) {
+  await persistRankedMatchIfNeeded(room);
   room.updatedAt = Date.now();
   await withRoomStore(
     "write",
@@ -1352,6 +1621,8 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   room.game.matchWinner = "";
   room.game.surrenderedBy = "";
   room.game.matchEndedAt = 0;
+  room.game.rankedRecordedAt = 0;
+  room.game.rankUpEvents = [];
   room.game.turnStartedAt = Date.now();
   return true;
 }
@@ -1381,6 +1652,8 @@ function enforceDeckGate(room: StoredTriadRoom) {
   room.game.matchWinner = "";
   room.game.surrenderedBy = "";
   room.game.matchEndedAt = 0;
+  room.game.rankedRecordedAt = 0;
+  room.game.rankUpEvents = [];
   room.game.turnStartedAt = Date.now();
   return true;
 }

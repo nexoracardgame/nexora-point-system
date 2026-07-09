@@ -9,6 +9,7 @@ import {
   chooseTriadRoomSkillTarget,
   disbandTriadRoom,
   joinTriadRoom,
+  listTriadRankProfiles,
   leaveTriadRoom,
   listTriadRooms,
   lockTriadRoomCard,
@@ -109,7 +110,12 @@ export async function GET() {
   const actor = await getApiActor();
   if (!actor) return noStoreJson({ error: "unauthorized" }, { status: 401 });
 
-  return noStoreJson({ rooms: await listTriadRooms() });
+  const [rooms, rankProfiles] = await Promise.all([listTriadRooms(), listTriadRankProfiles()]);
+  return noStoreJson({
+    rooms,
+    rankProfiles,
+    leaderboard: rankProfiles.filter((profile) => profile.wins > 0),
+  });
 }
 
 export async function POST(request: Request) {

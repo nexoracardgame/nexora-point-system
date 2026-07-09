@@ -112,6 +112,32 @@ type RoomParticipant = {
   joinedAt: number;
 };
 
+type TriadRankKey = "bronze" | "silver" | "gold" | "platinum" | "diamond" | "master" | "god-of-legends";
+
+type TriadRankProfile = {
+  userId: string;
+  name: string;
+  image: string;
+  wins: number;
+  losses: number;
+  rankKey: TriadRankKey;
+  rankName: string;
+  rankIndex: number;
+  nextRankWins: number | null;
+  updatedAt: number;
+};
+
+type TriadRankUpEvent = {
+  userId: string;
+  name: string;
+  image: string;
+  previousRank: TriadRankKey;
+  nextRank: TriadRankKey;
+  rankName: string;
+  wins: number;
+  at: number;
+};
+
 type FriendRelationStatus = "self" | "none" | "outgoing" | "incoming" | "friends";
 
 type FriendRelationResponse = {
@@ -166,6 +192,8 @@ type RoomGame = {
   matchWinner: RoomPlayerSide | "";
   surrenderedBy: RoomPlayerSide | "";
   matchEndedAt: number;
+  rankedRecordedAt: number;
+  rankUpEvents: TriadRankUpEvent[];
   chat: RoomChatMessage[];
 };
 
@@ -228,15 +256,13 @@ const MIN_SYNC_GAP_MS = 140;
 const TRIAD_RESUME_ROOM_CACHE_KEY = "nexora:triad:active-room";
 const TRIAD_BOT_ID = "triad-bot-level-99";
 const rankFrames = [
-  { name: "ไม้ฝึกหัด", aura: "from-zinc-500/30 via-white/8 to-zinc-900/20", ring: "border-zinc-400/45 shadow-[0_0_22px_rgba(161,161,170,0.18)]", badge: "bg-zinc-300 text-black" },
-  { name: "เหล็กดำ", aura: "from-slate-300/30 via-slate-800/20 to-black/20", ring: "border-slate-300/55 shadow-[0_0_24px_rgba(148,163,184,0.22)]", badge: "bg-slate-200 text-black" },
-  { name: "ทองแดง", aura: "from-orange-300/38 via-amber-900/22 to-black/20", ring: "border-orange-300/60 shadow-[0_0_28px_rgba(251,146,60,0.26)]", badge: "bg-orange-300 text-black" },
-  { name: "เงิน", aura: "from-white/42 via-cyan-200/18 to-black/20", ring: "border-white/70 shadow-[0_0_30px_rgba(226,232,240,0.3)]", badge: "bg-white text-black" },
-  { name: "ทอง", aura: "from-amber-200/55 via-yellow-500/24 to-black/20", ring: "border-amber-200/80 shadow-[0_0_34px_rgba(251,191,36,0.38)]", badge: "bg-amber-200 text-black" },
-  { name: "เพลิงแดง", aura: "from-red-300/58 via-rose-600/30 to-black/24", ring: "border-red-300/85 shadow-[0_0_38px_rgba(248,113,113,0.42)]", badge: "bg-red-400 text-white" },
-  { name: "มรกต", aura: "from-emerald-200/58 via-emerald-500/26 to-black/24", ring: "border-emerald-200/85 shadow-[0_0_40px_rgba(52,211,153,0.38)]", badge: "bg-emerald-300 text-black" },
-  { name: "เพชรฟ้า", aura: "from-cyan-100/65 via-sky-400/32 to-black/24", ring: "border-cyan-100/90 shadow-[0_0_44px_rgba(125,211,252,0.45)]", badge: "bg-cyan-200 text-black" },
-  { name: "ราชันออร่า", aura: "from-yellow-100/75 via-rose-400/34 to-violet-500/24", ring: "border-yellow-100 shadow-[0_0_58px_rgba(250,204,21,0.58)]", badge: "bg-gradient-to-r from-yellow-200 to-rose-300 text-black" },
+  { key: "bronze", name: "???????????", aura: "from-orange-700/40 via-amber-900/18 to-black/20", ring: "border-orange-400/58 shadow-[0_0_26px_rgba(251,146,60,0.24)]", badge: "bg-orange-400 text-black" },
+  { key: "silver", name: "?????????????", aura: "from-white/46 via-slate-300/18 to-black/18", ring: "border-slate-100/75 shadow-[0_0_34px_rgba(226,232,240,0.3)]", badge: "bg-slate-100 text-black" },
+  { key: "gold", name: "??????????", aura: "from-yellow-100/62 via-amber-400/28 to-black/18", ring: "border-yellow-200/90 shadow-[0_0_42px_rgba(250,204,21,0.44)]", badge: "bg-yellow-200 text-black" },
+  { key: "platinum", name: "???????????????", aura: "from-cyan-100/58 via-teal-300/24 to-black/20", ring: "border-cyan-100/85 shadow-[0_0_46px_rgba(125,211,252,0.42)]", badge: "bg-cyan-100 text-black" },
+  { key: "diamond", name: "????????????", aura: "from-sky-100/70 via-blue-400/32 to-violet-400/16", ring: "border-sky-100 shadow-[0_0_56px_rgba(96,165,250,0.54)]", badge: "bg-sky-200 text-black" },
+  { key: "master", name: "?????????????", aura: "from-fuchsia-200/64 via-rose-500/28 to-violet-700/24", ring: "border-fuchsia-100 shadow-[0_0_64px_rgba(217,70,239,0.55)]", badge: "bg-fuchsia-200 text-black" },
+  { key: "god-of-legends", name: "????? God Of Legends", aura: "from-yellow-100/80 via-rose-300/42 to-violet-400/32", ring: "border-yellow-100 shadow-[0_0_82px_rgba(250,204,21,0.72)]", badge: "bg-gradient-to-r from-yellow-100 via-rose-200 to-violet-200 text-black" },
 ] as const;
 
 type SkillTargetId = "player-top" | "bot-top";
@@ -325,15 +351,66 @@ function makeParticipant(user: Props["currentUser"]): RoomParticipant {
   };
 }
 
-function rankIndexForParticipant(participant?: Pick<RoomParticipant, "id"> | null) {
-  const seed = participant?.id || "empty";
-  return seed.split("").reduce((total, letter) => total + letter.charCodeAt(0), 0) % rankFrames.length;
+function rankForWins(wins: number) {
+  const safeWins = Math.max(0, Math.floor(Number(wins) || 0));
+  if (safeWins >= 10000) return 6;
+  if (safeWins >= 5000) return 5;
+  if (safeWins >= 3000) return 4;
+  if (safeWins >= 1000) return 3;
+  if (safeWins >= 500) return 2;
+  if (safeWins >= 100) return 1;
+  return 0;
+}
+
+function normalizeRankProfile(value: unknown): TriadRankProfile | null {
+  const raw = value && typeof value === "object" ? (value as Partial<TriadRankProfile>) : {};
+  const userId = safeText(raw.userId);
+  if (!userId || userId === TRIAD_BOT_ID) return null;
+  const wins = Math.max(0, Math.floor(Number(raw.wins) || 0));
+  const losses = Math.max(0, Math.floor(Number(raw.losses) || 0));
+  const rankIndex = Math.min(rankFrames.length - 1, Math.max(0, Number.isFinite(Number(raw.rankIndex)) ? Number(raw.rankIndex) : rankForWins(wins)));
+  const frame = rankFrames[rankIndex] || rankFrames[0];
+  return {
+    userId,
+    name: safeText(raw.name) || "PLAYER",
+    image: safeText(raw.image) || "/avatar.png",
+    wins,
+    losses,
+    rankKey: (raw.rankKey || frame.key) as TriadRankKey,
+    rankName: safeText(raw.rankName) || frame.name,
+    rankIndex,
+    nextRankWins: raw.nextRankWins === null ? null : Number(raw.nextRankWins || 0) || null,
+    updatedAt: safeTimeMs(raw.updatedAt, Date.now()),
+  };
+}
+
+function profileForParticipant(participant: Pick<RoomParticipant, "id" | "name" | "image"> | null | undefined, profiles: Record<string, TriadRankProfile>) {
+  if (!participant || participant.id === TRIAD_BOT_ID) return null;
+  return profiles[participant.id] || {
+    userId: participant.id,
+    name: participant.name,
+    image: participant.image,
+    wins: 0,
+    losses: 0,
+    rankKey: "bronze" as const,
+    rankName: rankFrames[0].name,
+    rankIndex: 0,
+    nextRankWins: 100,
+    updatedAt: Date.now(),
+  };
+}
+
+function rankIndexForParticipant(participant?: Pick<RoomParticipant, "id"> | null, profile?: TriadRankProfile | null) {
+  if (profile) return profile.rankIndex;
+  if (participant?.id === TRIAD_BOT_ID) return rankFrames.length - 1;
+  return 0;
 }
 
 function RankAvatar({
   participant,
   name,
   image,
+  profile,
   rankIndex,
   size = "md",
   crown,
@@ -341,11 +418,12 @@ function RankAvatar({
   participant?: RoomParticipant | null;
   name?: string;
   image?: string;
+  profile?: TriadRankProfile | null;
   rankIndex?: number;
   size?: "sm" | "md" | "lg" | "xl";
   crown?: boolean;
 }) {
-  const frame = rankFrames[rankIndex ?? rankIndexForParticipant(participant)];
+  const frame = rankFrames[rankIndex ?? rankIndexForParticipant(participant, profile)] || rankFrames[0];
   const sizeClass = {
     sm: "h-10 w-10 p-[3px]",
     md: "h-14 w-14 p-1",
@@ -581,6 +659,7 @@ function MiniProfileHover({
   participant,
   name,
   image,
+  profile,
   label,
   align = "left",
   placement = "bottom",
@@ -590,16 +669,21 @@ function MiniProfileHover({
   participant?: RoomParticipant | null;
   name?: string;
   image?: string;
+  profile?: TriadRankProfile | null;
   label?: string;
   align?: "left" | "right";
   placement?: "top" | "bottom";
   size?: "sm" | "md";
   currentParticipantId?: string;
 }) {
-  const profileName = name || participant?.name || "ผู้เล่น";
+  const profileName = name || participant?.name || "???????";
   const profileImage = image || participant?.image || "/avatar.png";
-  const frame = rankFrames[rankIndexForParticipant(participant || { id: profileName })];
+  const frame = rankFrames[rankIndexForParticipant(participant || { id: profileName }, profile)] || rankFrames[0];
   const avatarSize = size === "md" ? "h-11 w-11" : "h-9 w-9";
+  const wins = profile?.wins || 0;
+  const losses = profile?.losses || 0;
+  const totalMatches = wins + losses;
+  const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
 
   return (
     <div className="group relative z-50 inline-flex shrink-0 items-center">
@@ -613,26 +697,133 @@ function MiniProfileHover({
         </span>
       </button>
       <div
-        className={`pointer-events-auto invisible absolute z-[160] w-60 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
+        className={`pointer-events-auto invisible absolute z-[160] w-72 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
           placement === "top" ? "bottom-[calc(100%+0.55rem)]" : "top-[calc(100%+0.55rem)]"
-        } ${
-          align === "right" ? "right-0" : "left-0"
-        }`}
+        } ${align === "right" ? "right-0" : "left-0"}`}
       >
         <div className="flex items-center gap-3">
-          <RankAvatar participant={participant || undefined} name={profileName} image={profileImage} size="md" />
+          <RankAvatar participant={participant || undefined} name={profileName} image={profileImage} profile={profile} size="md" />
           <div className="min-w-0">
             <div className="truncate text-sm font-black text-white">{profileName}</div>
             <div className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.16em] text-amber-100/56">
-              {label || frame.name}
+              {label || profile?.rankName || frame.name}
             </div>
           </div>
         </div>
-        <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.045] px-3 py-2 text-xs font-semibold leading-5 text-white/62">
-          กำลังอยู่ในสนาม Triad Dominion
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-xl border border-emerald-200/16 bg-emerald-300/10 px-2 py-2 text-center">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100/60">???</div>
+            <div className="mt-1 text-lg font-black text-emerald-100">{wins.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl border border-rose-200/16 bg-rose-300/10 px-2 py-2 text-center">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-rose-100/60">???</div>
+            <div className="mt-1 text-lg font-black text-rose-100">{losses.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl border border-amber-200/16 bg-amber-300/10 px-2 py-2 text-center">
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/60">???%</div>
+            <div className="mt-1 text-lg font-black text-amber-100">{winRate}%</div>
+          </div>
+        </div>
+        <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-black leading-5 ${frame.badge}`}>
+          {profile?.rankName || frame.name}
+          {profile?.nextRankWins ? <span className="ml-2 opacity-70">??? {Math.max(0, profile.nextRankWins - wins).toLocaleString()} ???????????????</span> : <span className="ml-2 opacity-80">??????????</span>}
         </div>
         <BattleMiniFriendButton targetUserId={participant?.id} currentUserId={currentParticipantId} />
       </div>
+    </div>
+  );
+}
+
+function RankLeaderboardPanel({
+  leaderboard,
+  currentParticipantId,
+}: {
+  leaderboard: TriadRankProfile[];
+  currentParticipantId: string;
+}) {
+  const rankedPlayers = leaderboard
+    .filter((profile) => profile.wins > 0)
+    .slice()
+    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name, "th"))
+    .slice(0, 100);
+
+  return (
+    <div className="relative overflow-hidden rounded-[18px] border border-amber-200/20 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_34%),linear-gradient(180deg,rgba(12,10,8,0.92),rgba(3,4,8,0.9))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/80 to-transparent" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="grid h-10 w-10 place-items-center rounded-xl border border-amber-100/35 bg-amber-300/16 text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.18)]">
+            <Trophy className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="text-sm font-black text-white">ถ้วยอันดับแรงค์</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-100/52">PvP leaderboard</div>
+          </div>
+        </div>
+        <div className="rounded-full border border-white/10 bg-black/36 px-3 py-1 text-xs font-black text-white/58">
+          {rankedPlayers.length.toLocaleString()} ผู้เล่น
+        </div>
+      </div>
+
+      {rankedPlayers.length > 0 ? (
+        <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+          {rankedPlayers.map((profile, index) => {
+            const participantProfile: RoomParticipant = {
+              id: profile.userId,
+              name: profile.name,
+              image: profile.image,
+              joinedAt: profile.updatedAt,
+            };
+            const frame = rankFrames[profile.rankIndex] || rankFrames[0];
+            const podium =
+              index === 0
+                ? "border-amber-100/50 bg-amber-300/12"
+                : index === 1
+                  ? "border-slate-100/35 bg-white/[0.055]"
+                  : index === 2
+                    ? "border-orange-200/35 bg-orange-300/8"
+                    : "border-white/8 bg-white/[0.035]";
+
+            return (
+              <div key={profile.userId} className={`group relative grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-2xl border ${podium} px-3 py-2 transition hover:-translate-y-0.5 hover:border-amber-100/45 hover:bg-amber-200/10`}>
+                <div className="text-center">
+                  <div className={`mx-auto grid h-9 w-9 place-items-center rounded-xl border text-sm font-black ${index < 3 ? "border-amber-100/45 bg-amber-300/18 text-amber-100" : "border-white/10 bg-black/38 text-white/54"}`}>
+                    {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
+                  </div>
+                </div>
+                <div className="flex min-w-0 items-center gap-3">
+                  <MiniProfileHover
+                    participant={participantProfile}
+                    profile={profile}
+                    label={profile.rankName}
+                    currentParticipantId={currentParticipantId}
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-white">{profile.name}</div>
+                    <div className={`mt-1 inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${frame.badge}`}>
+                      <span className="truncate">{profile.rankName}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid min-w-[96px] grid-cols-2 gap-1 text-center">
+                  <div className="rounded-lg border border-emerald-200/14 bg-emerald-300/10 px-2 py-1">
+                    <div className="text-[9px] font-black text-emerald-100/56">ชนะ</div>
+                    <div className="text-sm font-black text-emerald-100">{profile.wins.toLocaleString()}</div>
+                  </div>
+                  <div className="rounded-lg border border-rose-200/14 bg-rose-300/10 px-2 py-1">
+                    <div className="text-[9px] font-black text-rose-100/56">แพ้</div>
+                    <div className="text-sm font-black text-rose-100">{profile.losses.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-white/12 bg-black/28 p-6 text-center text-sm font-semibold text-white/46">
+          ยังไม่มีผู้เล่นที่ชนะ PvP อย่างน้อย 1 เกม
+        </div>
+      )}
     </div>
   );
 }
@@ -777,6 +968,26 @@ function normalizeRoomGame(value: unknown): RoomGame {
         })
         .filter((choice) => choice.cardNo)
     : [];
+  const cleanRankUpEvents = (events: unknown): TriadRankUpEvent[] => Array.isArray(events)
+    ? events
+        .map((event) => {
+          const rawEvent = event && typeof event === "object" ? (event as Record<string, unknown>) : {};
+          const userId = safeText(rawEvent.userId);
+          const rankIndex = rankFrames.findIndex((frame) => frame.key === rawEvent.nextRank);
+          if (!userId || rankIndex < 0) return null;
+          return {
+            userId,
+            name: safeText(rawEvent.name) || "PLAYER",
+            image: safeText(rawEvent.image) || "/avatar.png",
+            previousRank: (safeText(rawEvent.previousRank) || "bronze") as TriadRankKey,
+            nextRank: rankFrames[rankIndex].key as TriadRankKey,
+            rankName: safeText(rawEvent.rankName) || rankFrames[rankIndex].name,
+            wins: Math.max(0, Number(rawEvent.wins || 0)),
+            at: safeTimeMs(rawEvent.at, Date.now()),
+          } satisfies TriadRankUpEvent;
+        })
+        .filter((event): event is TriadRankUpEvent => Boolean(event))
+    : [];
   return {
     decks: {
       host: cleanDeck(decks.host),
@@ -817,6 +1028,8 @@ function normalizeRoomGame(value: unknown): RoomGame {
     matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
     surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
     matchEndedAt: Number(raw.matchEndedAt || 0),
+    rankedRecordedAt: Number(raw.rankedRecordedAt || 0),
+    rankUpEvents: cleanRankUpEvents(raw.rankUpEvents),
     chat: cleanChat(raw.chat),
   };
 }
@@ -3043,6 +3256,7 @@ function SpectatorDeckStrip({
 function RoomSeatCard({
   label,
   participant,
+  profile,
   isLeader,
   tone,
   emptyText,
@@ -3051,6 +3265,7 @@ function RoomSeatCard({
 }: {
   label: string;
   participant: RoomParticipant | null;
+  profile?: TriadRankProfile | null;
   isLeader?: boolean;
   tone: "host" | "challenger";
   emptyText: string;
@@ -3078,11 +3293,11 @@ function RoomSeatCard({
               AI COMBAT CORE
             </div>
           ) : null}
-          <RankAvatar participant={participant} size="xl" crown={isLeader} />
+          <RankAvatar participant={participant} profile={profile} size="xl" crown={isLeader} />
           <div className="mt-5 w-full border-y border-white/10 bg-black/34 px-3 py-3">
             <div className="truncate text-2xl font-black uppercase tracking-normal text-white">{participant.name}</div>
             <div className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-amber-100/62">
-              {botSeat ? "LEVEL 99 AI DUELIST" : rankFrames[rankIndexForParticipant(participant)].name}
+              {botSeat ? "LEVEL 99 AI DUELIST" : profile?.rankName || rankFrames[rankIndexForParticipant(participant, profile)].name}
             </div>
           </div>
           <div className="mt-3 rounded-full border border-emerald-200/25 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
@@ -3117,11 +3332,13 @@ function RoomSeatCard({
 function SpectatorPanel({
   spectators,
   currentId,
+  rankProfiles,
   canWatch,
   onWatch,
 }: {
   spectators: RoomParticipant[];
   currentId: string;
+  rankProfiles: Record<string, TriadRankProfile>;
   canWatch: boolean;
   onWatch: () => void;
 }) {
@@ -3148,7 +3365,7 @@ function SpectatorPanel({
           return (
             <div key={spectator?.id || index} className="flex min-h-14 items-center gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3">
               {spectator ? (
-                <RankAvatar participant={spectator} size="sm" />
+                <RankAvatar participant={spectator} profile={profileForParticipant(spectator, rankProfiles)} size="sm" />
               ) : (
                 <div className="grid h-10 w-10 place-items-center rounded-full border border-dashed border-white/12 bg-black/35 text-[10px] font-black text-white/24">
                   {index + 1}
@@ -3167,9 +3384,11 @@ function SpectatorPanel({
 
 function SpectatorAvatarRail({
   spectators,
+  rankProfiles,
   currentParticipantId,
 }: {
   spectators: RoomParticipant[];
+  rankProfiles: Record<string, TriadRankProfile>;
   currentParticipantId?: string;
 }) {
   return (
@@ -3180,6 +3399,7 @@ function SpectatorAvatarRail({
           <MiniProfileHover
             key={spectator.id}
             participant={spectator}
+            profile={profileForParticipant(spectator, rankProfiles)}
             label={`ผู้ชม ${index + 1}`}
             align={index > 5 ? "right" : "left"}
             currentParticipantId={currentParticipantId}
@@ -3240,11 +3460,13 @@ function MatchFinalOverlay({
   surrendered,
   score,
   isDraw,
+  rankUpEvents = [],
 }: {
   winner: string;
   surrendered?: string;
   score: { player: number; bot: number };
   isDraw?: boolean;
+  rankUpEvents?: TriadRankUpEvent[];
 }) {
   return (
     <div className="triad-match-final-overlay pointer-events-none fixed inset-0 z-[95] grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(251,191,36,0.22),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.9)_100%)] p-4 backdrop-blur-sm">
@@ -3265,6 +3487,24 @@ function MatchFinalOverlay({
           <div className="triad-match-final-score mx-auto mt-5 w-fit rounded-full border border-red-200/35 bg-red-500/16 px-5 py-2 text-xl font-black text-white">
             คะแนนรวม {score.player}-{score.bot}
           </div>
+          {rankUpEvents.length > 0 ? (
+            <div className="mx-auto mt-4 grid w-[min(520px,100%)] gap-2">
+              {rankUpEvents.map((event) => {
+                const frame = rankFrames.find((rankFrame) => rankFrame.key === event.nextRank) || rankFrames[0];
+                return (
+                  <div key={`${event.userId}-${event.nextRank}-${event.at}`} className={`rounded-2xl border px-4 py-3 text-left shadow-[0_0_38px_rgba(251,191,36,0.14)] ${frame.badge}`}>
+                    <div className="flex items-center gap-2 text-sm font-black">
+                      <Sparkles className="h-4 w-4" />
+                      เลื่อนแรงค์!
+                    </div>
+                    <div className="mt-1 text-xs font-bold opacity-90">
+                      {event.name} ขึ้นสู่ {event.rankName} ด้วยชัยชนะ {event.wins.toLocaleString()} เกม
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="triad-match-final-note mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/42">
             กำลังพาทุกคนกลับห้องรอ
           </div>
@@ -3530,6 +3770,7 @@ function CompactBattleBoard({
   botImage,
   playerParticipant,
   botParticipant,
+  rankProfiles,
   currentParticipantId,
   placementLane,
   timeLeft,
@@ -3568,6 +3809,7 @@ function CompactBattleBoard({
   botImage: string;
   playerParticipant?: RoomParticipant | null;
   botParticipant?: RoomParticipant | null;
+  rankProfiles?: Record<string, TriadRankProfile>;
   currentParticipantId?: string;
   placementLane: Lane;
   timeLeft: number;
@@ -3646,7 +3888,7 @@ function CompactBattleBoard({
       <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
       <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
       <div className="triad-opponent-scoreplate pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
-        <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} label="คู่แข่ง" currentParticipantId={currentParticipantId} />
+        <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />
         <div className="min-w-0 max-w-[120px] sm:max-w-none">
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/58">คู่แข่ง</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{botName}</div>
@@ -3663,7 +3905,7 @@ function CompactBattleBoard({
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-red-100/58">เรา</div>
           <div className="truncate text-xs font-black text-white sm:text-base">{playerName}</div>
         </div>
-        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />
+        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />
       </div>
       <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
@@ -3834,6 +4076,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [phase, setPhase] = useState<BattlePhase>("lobby");
   const [resumeChecking, setResumeChecking] = useState(true);
   const [rooms, setRooms] = useState<TriadRoom[]>([]);
+  const [rankProfiles, setRankProfiles] = useState<Record<string, TriadRankProfile>>({});
+  const [leaderboard, setLeaderboard] = useState<TriadRankProfile[]>([]);
   const [activeRoomCode, setActiveRoomCode] = useState("");
   const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
   const [roomPassword, setRoomPassword] = useState("");
@@ -4293,6 +4537,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const payload = await response.json().catch(() => ({}));
       if (!Array.isArray(payload.rooms)) return [];
     const nextRooms = normalizeApiRooms(payload.rooms);
+    const nextProfiles: TriadRankProfile[] = Array.isArray(payload.rankProfiles)
+      ? payload.rankProfiles.map(normalizeRankProfile).filter((profile: TriadRankProfile | null): profile is TriadRankProfile => Boolean(profile))
+      : [];
+    const nextLeaderboard: TriadRankProfile[] = Array.isArray(payload.leaderboard)
+      ? payload.leaderboard.map(normalizeRankProfile).filter((profile: TriadRankProfile | null): profile is TriadRankProfile => Boolean(profile))
+      : nextProfiles.filter((profile: TriadRankProfile) => profile.wins > 0);
+    if (nextProfiles.length > 0 || Array.isArray(payload.rankProfiles)) {
+      setRankProfiles(Object.fromEntries(nextProfiles.map((profile) => [profile.userId, profile])));
+    }
+    if (nextLeaderboard.length > 0 || Array.isArray(payload.leaderboard)) {
+      setLeaderboard(nextLeaderboard);
+    }
     const activeCode = activeRoomCodeRef.current;
     const snapshotCode = activeRoomSnapshotRef.current?.code || "";
     const knownActiveCode = activeCode || snapshotCode;
@@ -6370,6 +6626,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             ) : null}
           </div>
 
+          <div className="space-y-4">
+          <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />
           <div className="rounded-[18px] border border-amber-200/16 bg-black/36 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-black text-white">
@@ -6384,7 +6642,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-200/70 to-transparent" />
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <RankAvatar participant={room.seats.host} size="md" />
+                      <RankAvatar participant={room.seats.host} profile={profileForParticipant(room.seats.host, rankProfiles)} size="md" />
                       <div className="min-w-0">
                       <div className="font-mono text-2xl font-black tracking-[0.18em] text-white">{room.code}</div>
                       <div className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/38">
@@ -6418,6 +6676,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 </div>
               )}
             </div>
+          </div>
           </div>
         </section>
       </main>
@@ -6536,6 +6795,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <RoomSeatCard
               label="ฝั่งเจ้าของห้อง"
               participant={currentRoom.seats.host}
+              profile={profileForParticipant(currentRoom.seats.host, rankProfiles)}
               isLeader={currentRoom.seats.host?.id === currentRoom.hostId}
               tone="host"
               emptyText="ช่องเจ้าของห้องว่าง"
@@ -6545,6 +6805,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <RoomSeatCard
               label="ฝั่งผู้ท้าชิง"
               participant={currentRoom.seats.challenger}
+              profile={profileForParticipant(currentRoom.seats.challenger, rankProfiles)}
               isLeader={currentRoom.seats.challenger?.id === currentRoom.hostId}
               tone="challenger"
               emptyText="รอผู้ท้าชิง"
@@ -6579,6 +6840,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <SpectatorPanel
               spectators={currentRoom.spectators}
               currentId={participant.id}
+              rankProfiles={rankProfiles}
               canWatch={!currentIsSpectator && currentRoom.status === "waiting"}
               onWatch={moveToSpectator}
             />
@@ -6750,7 +7012,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </button>
       ) : null}
       {matchDone ? (
-        <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} />
+        <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} />
       ) : null}
       <OpeningTieBreakOverlay
         tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
@@ -6822,7 +7084,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <div className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/38 lg:text-right">
               ผู้ชม {currentRoom?.spectators.length || 0}/{SPECTATOR_LIMIT}
             </div>
-            <SpectatorAvatarRail spectators={currentRoom?.spectators || []} currentParticipantId={participant.id} />
+            <SpectatorAvatarRail spectators={currentRoom?.spectators || []} rankProfiles={rankProfiles} currentParticipantId={participant.id} />
           </div>
           {currentRoom ? (
             <button
@@ -6916,6 +7178,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 botImage={displayBotImage}
                 playerParticipant={displayPlayerParticipant}
                 botParticipant={displayBotParticipant}
+                rankProfiles={rankProfiles}
                 currentParticipantId={participant.id}
                 placementLane={placementLane}
                 timeLeft={displayTimeLeft}
@@ -6961,6 +7224,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               botImage={displayBotImage}
               playerParticipant={displayPlayerParticipant}
               botParticipant={displayBotParticipant}
+              rankProfiles={rankProfiles}
               currentParticipantId={participant.id}
               placementLane={placementLane}
               timeLeft={displayTimeLeft}

@@ -454,7 +454,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "019" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -976,6 +976,9 @@ function applyAllFieldStatRule(
 
       const totalDelta = effect.delta * unblocked.length;
       item.score.total += totalDelta;
+      unblocked.forEach((contribution) => {
+        contribution.value += effect.delta;
+      });
       item.score.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${effect.metric.toUpperCase()} ${totalDelta.toLocaleString()} (${item.label}, ${unblocked.length})`);
       applied.push(`${item.label} ${unblocked.length}`);
     }
@@ -1707,6 +1710,9 @@ function applyMechanicalTrap(
 
     const totalDelta = effect.delta * unblocked.length;
     item.score.total += totalDelta;
+    unblocked.forEach((contribution) => {
+      contribution.value += effect.delta;
+    });
     item.score.breakdown.push(`No.${rule.cardNo} ${rule.name}: SUP ${totalDelta.toLocaleString()} (${item.label}, ${unblocked.length} non-gold)`);
     applied.push(`${item.label} ${unblocked.length}`);
   }
@@ -2076,6 +2082,10 @@ function applySkill(
       if (unblockedCount === 0) continue;
       const totalDelta = effect.delta * unblockedCount;
       targetScore.total += totalDelta;
+      intendedContributions.forEach((contribution) => {
+        const isBlocked = blockedContributions.some((blocked) => blocked.contribution === contribution);
+        if (!isBlocked) contribution.value += effect.delta;
+      });
       const label = effect.metric === "attack" ? "ATK" : "SUP";
       targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${label} ${totalDelta >= 0 ? "+" : ""}${totalDelta}`);
       const metricLabel = effect.metric === "attack" ? "โจมตี" : "ช่วยเหลือ";
