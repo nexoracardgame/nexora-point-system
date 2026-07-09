@@ -89,6 +89,17 @@ export type TriadRankUpEvent = {
   at: number;
 };
 
+type TriadBotMemoryEntry = {
+  key: string;
+  cardNo: string;
+  context: string;
+  plays: number;
+  wins: number;
+  losses: number;
+  score: number;
+  updatedAt: number;
+};
+
 export type StoredTriadRoom = {
   code: string;
   access: TriadRoomAccess;
@@ -182,10 +193,14 @@ const TRIAD_CHAT_MAX_LENGTH = 240;
 const TRIAD_BOT_ID = "triad-bot-level-99";
 const TRIAD_BOT_NAME = "BOT Level.99";
 const TRIAD_BOT_IMAGE = "/avatar.png";
+const TRIAD_BOT_MEMORY_LIMIT = 1500;
+type TriadBotStrategy = "killer" | "control" | "element" | "comeback" | "surprise";
 
 const globalForTriadRooms = globalThis as {
   nexoraTriadRooms?: StoredTriadRoom[];
   nexoraTriadRankProfiles?: TriadRankProfile[];
+  nexoraTriadBotMemory?: Map<string, TriadBotMemoryEntry>;
+  nexoraTriadBotMemoryHydrated?: boolean;
   nexoraTriadRoomSchemaPromise?: Promise<void>;
   nexoraTriadRoomMutationLocks?: Map<string, Promise<void>>;
 };
@@ -197,8 +212,21 @@ function memoryRooms() {
   return globalForTriadRooms.nexoraTriadRooms;
 }
 
+function memoryBotMemory() {
+  if (!globalForTriadRooms.nexoraTriadBotMemory) {
+    globalForTriadRooms.nexoraTriadBotMemory = new Map();
+  }
+  return globalForTriadRooms.nexoraTriadBotMemory;
+}
+
 function cleanText(value: unknown) {
   return String(value || "").trim();
+}
+
+function cleanCardNo(value: unknown) {
+  const raw = cleanText(value);
+  const digits = raw.replace(/\D/g, "");
+  return digits ? digits.padStart(3, "0").slice(-3) : raw;
 }
 
 function triadBotParticipant(): TriadRoomParticipant {
@@ -256,6 +284,45 @@ function normalizeRankProfile(value: unknown): TriadRankProfile | null {
     ...rank,
     updatedAt: Number(raw.updatedAt || Date.now()),
   };
+}
+
+function normalizeBotMemoryEntry(value: Partial<TriadBotMemoryEntry> & { key?: string; cardNo?: string; context?: string }): TriadBotMemoryEntry | null {
+  const cardNo = cleanCardNo(value.cardNo);
+  const context = cleanText(value.context);
+  if (!cardNo || !context) return null;
+  const key = cleanText(value.key) || `${context}:${cardNo}`;
+  return {
+    key,
+    cardNo,
+    context,
+    plays: Math.max(0, Math.floor(Number(value.plays || 0))),
+    wins: Math.max(0, Math.floor(Number(value.wins || 0))),
+    losses: Math.max(0, Math.floor(Number(value.losses || 0))),
+    score: Math.max(-500, Math.min(500, Number(value.score || 0))),
+    updatedAt: Number(value.updatedAt || Date.now()),
+  };
+}
+
+function botMemoryKey(context: string, cardNo: string) {
+  return `${cleanText(context)}:${cleanCardNo(cardNo)}`;
+}
+
+function pruneBotMemory() {
+  const memory = memoryBotMemory();
+  if (memory.size <= TRIAD_BOT_MEMORY_LIMIT) return [];
+  const entries = [...memory.values()].sort((a, b) => {
+    const aValue = Math.abs(a.score) + a.plays * 0.35;
+    const bValue = Math.abs(b.score) + b.plays * 0.35;
+    return bValue - aValue || b.updatedAt - a.updatedAt;
+  });
+  const keep = new Set(entries.slice(0, TRIAD_BOT_MEMORY_LIMIT).map((entry) => entry.key));
+  const removed: string[] = [];
+  for (const key of memory.keys()) {
+    if (keep.has(key)) continue;
+    memory.delete(key);
+    removed.push(key);
+  }
+  return removed;
 }
 
 function memoryRankProfiles() {
@@ -614,6 +681,20 @@ async function ensureTriadRoomSchema() {
         )
       `);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadRankProfile_leaderboard_idx" ON "TriadRankProfile" ("wins" DESC, "losses" ASC, "updatedAt" ASC)`);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "TriadBotMemory" (
+          "key" TEXT PRIMARY KEY,
+          "cardNo" TEXT NOT NULL,
+          "context" TEXT NOT NULL,
+          "plays" INTEGER NOT NULL DEFAULT 0,
+          "wins" INTEGER NOT NULL DEFAULT 0,
+          "losses" INTEGER NOT NULL DEFAULT 0,
+          "score" DOUBLE PRECISION NOT NULL DEFAULT 0,
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadBotMemory_card_context_idx" ON "TriadBotMemory" ("cardNo", "context")`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TriadBotMemory_score_idx" ON "TriadBotMemory" ("score" DESC, "updatedAt" DESC)`);
     })().catch((error) => {
       globalForTriadRooms.nexoraTriadRoomSchemaPromise = undefined;
       throw error;
@@ -710,6 +791,17 @@ type RankProfileRow = {
   updatedAt: Date | string;
 };
 
+type BotMemoryRow = {
+  key: string;
+  cardNo: string;
+  context: string;
+  plays: number;
+  wins: number;
+  losses: number;
+  score: number;
+  updatedAt: Date | string;
+};
+
 function rowToRankProfile(row: RankProfileRow): TriadRankProfile {
   return normalizeRankProfile({
     userId: row.userId,
@@ -719,6 +811,19 @@ function rowToRankProfile(row: RankProfileRow): TriadRankProfile {
     losses: row.losses,
     updatedAt: new Date(row.updatedAt).getTime(),
   })!;
+}
+
+function rowToBotMemoryEntry(row: BotMemoryRow): TriadBotMemoryEntry | null {
+  return normalizeBotMemoryEntry({
+    key: row.key,
+    cardNo: row.cardNo,
+    context: row.context,
+    plays: row.plays,
+    wins: row.wins,
+    losses: row.losses,
+    score: row.score,
+    updatedAt: new Date(row.updatedAt).getTime(),
+  });
 }
 
 async function dbGetRankProfile(userId: string) {
@@ -766,6 +871,68 @@ async function dbListRankProfiles() {
     LIMIT 500
   `);
   return rows.map(rowToRankProfile);
+}
+
+async function hydrateBotMemoryFromDb() {
+  if (globalForTriadRooms.nexoraTriadBotMemoryHydrated) return;
+  await ensureTriadRoomSchema();
+  const rows = await prisma.$queryRawUnsafe<BotMemoryRow[]>(`
+    SELECT "key", "cardNo", "context", "plays", "wins", "losses", "score", "updatedAt"
+    FROM "TriadBotMemory"
+    ORDER BY "updatedAt" DESC
+    LIMIT 1500
+  `);
+  const memory = memoryBotMemory();
+  for (const row of rows) {
+    const entry = rowToBotMemoryEntry(row);
+    if (entry) memory.set(entry.key, entry);
+  }
+  globalForTriadRooms.nexoraTriadBotMemoryHydrated = true;
+}
+
+async function dbUpsertBotMemoryEntry(entry: TriadBotMemoryEntry) {
+  await ensureTriadRoomSchema();
+  await prisma.$executeRawUnsafe(
+    `
+      INSERT INTO "TriadBotMemory" ("key", "cardNo", "context", "plays", "wins", "losses", "score", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0))
+      ON CONFLICT ("key") DO UPDATE SET
+        "cardNo" = EXCLUDED."cardNo",
+        "context" = EXCLUDED."context",
+        "plays" = EXCLUDED."plays",
+        "wins" = EXCLUDED."wins",
+        "losses" = EXCLUDED."losses",
+        "score" = EXCLUDED."score",
+        "updatedAt" = EXCLUDED."updatedAt"
+    `,
+    entry.key,
+    entry.cardNo,
+    entry.context,
+    entry.plays,
+    entry.wins,
+    entry.losses,
+    entry.score,
+    entry.updatedAt
+  );
+}
+
+async function dbDeleteBotMemoryEntries(keys: string[]) {
+  if (keys.length === 0) return;
+  await ensureTriadRoomSchema();
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "TriadBotMemory" WHERE "key" = ANY($1::text[])`,
+    keys
+  );
+}
+
+async function warmBotMemory() {
+  if (globalForTriadRooms.nexoraTriadBotMemoryHydrated) return;
+  try {
+    await hydrateBotMemoryFromDb();
+  } catch (error) {
+    console.error("TRIAD BOT MEMORY LOAD FALLBACK:", error);
+    globalForTriadRooms.nexoraTriadBotMemoryHydrated = true;
+  }
 }
 
 function memoryAddRankResult(participant: TriadRoomParticipant, result: "win" | "loss") {
@@ -864,6 +1031,7 @@ async function getStoredRoom(code: string) {
 
 async function persistRankedMatchIfNeeded(room: StoredTriadRoom) {
   if (!room.game.matchEndedAt || room.game.rankedRecordedAt) return;
+  learnFromBotMatch(room);
   room.game.rankedRecordedAt = Date.now();
   room.game.rankUpEvents = [];
 
@@ -975,6 +1143,7 @@ async function pruneExpiredRooms(rooms: StoredTriadRoom[]) {
 }
 
 export async function listTriadRooms() {
+  await warmBotMemory();
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
   for (const room of aliveRooms) {
@@ -1000,6 +1169,7 @@ export async function createTriadRoom(input: {
   deckMode?: TriadDeckMode;
   playWithBot?: boolean;
 }) {
+  await warmBotMemory();
   const existingRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const code = roomCode(existingRooms);
   const deckMode = normalizeDeckMode(input.deckMode);
@@ -1227,6 +1397,161 @@ function repairSelectionPools(room: StoredTriadRoom) {
   return true;
 }
 
+function botLearningContexts(room: StoredTriadRoom, cardNo: string, turn = room.game.activeTurn) {
+  const mode = room.game.deckMode || "all";
+  const lane = laneForTurn(turn);
+  const ownTop = triadCardByNo.get(room.game.triangles.challenger.top);
+  const opponentTop = triadCardByNo.get(room.game.triangles.host.top);
+  const card = triadCardByNo.get(cleanCardNo(cardNo));
+  return [
+    `global:${cleanCardNo(cardNo)}`,
+    `deck:${mode}`,
+    `turn:${turn}`,
+    `mode:${mode}:turn:${turn}`,
+    `mode:${mode}:lane:${lane}`,
+    ownTop?.element ? `own-element:${ownTop.element}:turn:${turn}` : "",
+    opponentTop?.element ? `opp-element:${opponentTop.element}:turn:${turn}` : "",
+    card?.kind ? `kind:${card.kind}:turn:${turn}` : "",
+  ].filter(Boolean);
+}
+
+function botMemoryScore(cardNo: string, contexts: string[]) {
+  const memory = memoryBotMemory();
+  const normalizedCardNo = cleanCardNo(cardNo);
+  return contexts.reduce((sum, context) => {
+    const entry = memory.get(botMemoryKey(context, normalizedCardNo));
+    if (!entry) return sum;
+    const confidence = Math.min(1.8, Math.log2(entry.plays + 1) / 3);
+    return sum + entry.score * confidence;
+  }, 0);
+}
+
+function hashSeed(value: string) {
+  return value.split("").reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261);
+}
+
+function botStrategyForRoom(room: StoredTriadRoom): TriadBotStrategy {
+  const scoreDelta = (room.game.matchScore?.challenger || 0) - (room.game.matchScore?.host || 0);
+  if (scoreDelta < 0) return "comeback";
+  const seed = hashSeed([
+    room.code,
+    room.game.deckMode,
+    room.game.fightNo,
+    room.game.activeTurn,
+    room.game.triangles.host.top,
+    room.game.triangles.host.left,
+    room.game.triangles.challenger.top,
+    room.game.turns.map((turn) => turn.winner).join("-"),
+  ].join(":"));
+  const strategies: TriadBotStrategy[] = scoreDelta > 1
+    ? ["control", "surprise", "element", "killer", "control"]
+    : ["killer", "control", "element", "surprise", "killer"];
+  return strategies[seed % strategies.length];
+}
+
+function botStrategyScore(room: StoredTriadRoom, cardNo: string, strategy: TriadBotStrategy) {
+  const card = triadCardByNo.get(cleanCardNo(cardNo));
+  const rule = triadSkillRuleByNo.get(cleanCardNo(cardNo));
+  const turn = room.game.activeTurn;
+  if (!card) return 0;
+  if (strategy === "killer") {
+    return card.kind === "monster"
+      ? Math.max(card.attack, card.support) * 0.08
+      : (rule?.effects || []).reduce((sum, effect) => sum + Math.max(0, effect.delta), 0) * 0.35;
+  }
+  if (strategy === "control") {
+    if (!rule) return 0;
+    const controlShape = rule.shape === "skill-cancel" || rule.shape === "block-stat-gain" || rule.shape === "swap-control";
+    const debuff = rule.effects.reduce((sum, effect) => sum + Math.abs(Math.min(0, effect.delta)), 0);
+    return (controlShape ? 9000 : 0) + debuff * 0.45;
+  }
+  if (strategy === "element") {
+    return botSkillElementScore(room, "challenger", cardNo) * 1.15;
+  }
+  if (strategy === "comeback") {
+    const pressure = Math.max(1, (room.game.matchScore?.host || 0) - (room.game.matchScore?.challenger || 0));
+    const swing = rule?.effects.reduce((sum, effect) => sum + Math.abs(effect.delta), 0) || Math.max(card.attack, card.support);
+    return pressure * Math.min(12000, swing * 0.5);
+  }
+  if (strategy === "surprise") {
+    const contexts = botLearningContexts(room, cardNo, turn);
+    const learned = botMemoryScore(cardNo, contexts);
+    const playedPenalty = Math.min(8000, (room.game.usedCards.challenger || []).filter((usedNo) => usedNo === cleanCardNo(cardNo)).length * 2500);
+    const rareShapeBonus = rule && (rule.shape === "swap-control" || rule.shape === "element-transform" || rule.shape === "unparsed") ? 7000 : 0;
+    return learned * 0.8 + rareShapeBonus - playedPenalty;
+  }
+  return 0;
+}
+
+function pickBotCardFromRanked(room: StoredTriadRoom, ranked: Array<{ cardNo: string; score: number }>) {
+  if (ranked.length === 0) return "";
+  const strategy = botStrategyForRoom(room);
+  if (strategy !== "surprise" && strategy !== "control" && strategy !== "element") return ranked[0].cardNo;
+  const topScore = ranked[0].score;
+  const windowSize = strategy === "surprise" ? 5 : 3;
+  const candidates = ranked
+    .slice(0, windowSize)
+    .filter((item) => item.score >= topScore - (strategy === "surprise" ? 18000 : 9000));
+  if (candidates.length <= 1) return ranked[0].cardNo;
+  const seed = hashSeed(`${room.code}:${room.game.fightNo}:${room.game.activeTurn}:${strategy}:${room.game.triangles.host[laneForTurn(room.game.activeTurn)]}:${room.game.turns.length}`);
+  const totalWeight = candidates.reduce((sum, item) => sum + Math.max(1, item.score - candidates[candidates.length - 1].score + 1), 0);
+  let roll = seed % Math.max(1, Math.floor(totalWeight));
+  for (const item of candidates) {
+    roll -= Math.max(1, item.score - candidates[candidates.length - 1].score + 1);
+    if (roll <= 0) return item.cardNo;
+  }
+  return candidates[0].cardNo;
+}
+
+function applyBotLearning(cardNo: string, contexts: string[], outcome: number, weight = 1) {
+  const normalizedCardNo = cleanCardNo(cardNo);
+  if (!normalizedCardNo) return;
+  const memory = memoryBotMemory();
+  const now = Date.now();
+  for (const context of contexts) {
+    const cleanContext = cleanText(context);
+    if (!cleanContext) continue;
+    const key = botMemoryKey(cleanContext, normalizedCardNo);
+    const current = memory.get(key) || normalizeBotMemoryEntry({ key, cardNo: normalizedCardNo, context: cleanContext });
+    if (!current) continue;
+    const delta = Math.max(-18, Math.min(18, outcome * weight));
+    const next = {
+      ...current,
+      plays: current.plays + 1,
+      wins: current.wins + (outcome > 0 ? 1 : 0),
+      losses: current.losses + (outcome < 0 ? 1 : 0),
+      score: Math.max(-500, Math.min(500, current.score * 0.985 + delta)),
+      updatedAt: now,
+    };
+    memory.set(key, next);
+    void dbUpsertBotMemoryEntry(next).catch((error) => console.error("TRIAD BOT MEMORY DB FALLBACK:", error));
+  }
+  const removed = pruneBotMemory();
+  if (removed.length > 0) {
+    void dbDeleteBotMemoryEntries(removed).catch((error) => console.error("TRIAD BOT MEMORY PRUNE FALLBACK:", error));
+  }
+}
+
+function learnFromBotTurn(room: StoredTriadRoom, result: TriadTurnResult) {
+  if (!isTriadBotParticipant(room.seats.challenger)) return;
+  const lane = laneForTurn(result.turn);
+  const botCardNo = room.game.triangles.challenger[lane];
+  if (!botCardNo) return;
+  const margin = result.opponentTotal - result.playerTotal;
+  const outcome = result.winner === "opponent" ? 1 : result.winner === "player" ? -1 : 0.15;
+  const weight = 3 + Math.min(8, Math.abs(margin) / 1500);
+  applyBotLearning(botCardNo, botLearningContexts(room, botCardNo, result.turn), outcome, weight);
+}
+
+function learnFromBotMatch(room: StoredTriadRoom) {
+  if (!isTriadBotParticipant(room.seats.challenger) || !room.game.matchEndedAt) return;
+  const outcome = room.game.matchWinner === "challenger" ? 1 : room.game.matchWinner === "host" ? -1 : 0.1;
+  const weight = room.game.matchWinner ? 7 : 2;
+  for (const cardNo of room.game.decks.challenger || []) {
+    applyBotLearning(cardNo, [`match:${room.game.deckMode || "all"}`, `deck:${room.game.deckMode || "all"}`], outcome, weight);
+  }
+}
+
 function botDeckScore(cardNo: string) {
   const card = triadCardByNo.get(cleanText(cardNo));
   if (!card) return 0;
@@ -1245,14 +1570,24 @@ function botDeckScore(cardNo: string) {
   return (shapeBonus[rule.shape] || 2200) + effectScore;
 }
 
-function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[]) {
+function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[], seed = "") {
   const uniquePool = Array.from(new Set(pool.map(cleanText).filter(Boolean)));
+  const strategySeed = hashSeed(`${mode}:${seed}:${uniquePool.join("|").slice(0, 80)}`);
+  const strategy: TriadBotStrategy = (["killer", "control", "element", "surprise"][strategySeed % 4] || "killer") as TriadBotStrategy;
+  const deckContextScore = (cardNo: string) => {
+    const rule = triadSkillRuleByNo.get(cleanCardNo(cardNo));
+    const memory = botMemoryScore(cardNo, [`deck:${mode}`, `match:${mode}`]);
+    const controlBonus = strategy === "control" && rule && (rule.shape === "skill-cancel" || rule.shape === "block-stat-gain" || rule.shape === "swap-control") ? 9000 : 0;
+    const elementBonus = strategy === "element" && rule?.elementCondition ? 6500 : 0;
+    const surpriseBonus = strategy === "surprise" && rule && (rule.shape === "swap-control" || rule.shape === "element-transform" || rule.shape === "unparsed") ? 5500 : 0;
+    return botDeckScore(cardNo) + memory + controlBonus + elementBonus + surpriseBonus;
+  };
   const monsters = uniquePool
     .filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster")
-    .sort((a, b) => botDeckScore(b) - botDeckScore(a));
+    .sort((a, b) => deckContextScore(b) - deckContextScore(a));
   const skills = uniquePool
     .filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "skill")
-    .sort((a, b) => botDeckScore(b) - botDeckScore(a));
+    .sort((a, b) => deckContextScore(b) - deckContextScore(a));
 
   if (mode === "monster") return monsters.slice(0, TRIAD_MONSTER_DECK_SIZE);
   if (mode === "skill") {
@@ -1264,7 +1599,7 @@ function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[]) {
 
   const deck = [...monsters.slice(0, 8), ...skills.slice(0, 12)];
   if (deck.length < TRIAD_DECK_SIZE) {
-    deck.push(...uniquePool.filter((cardNo) => !deck.includes(cardNo)).sort((a, b) => botDeckScore(b) - botDeckScore(a)));
+    deck.push(...uniquePool.filter((cardNo) => !deck.includes(cardNo)).sort((a, b) => deckContextScore(b) - deckContextScore(a)));
   }
   return deck.slice(0, TRIAD_DECK_SIZE);
 }
@@ -1272,7 +1607,7 @@ function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[]) {
 function ensureBotDeckReady(room: StoredTriadRoom) {
   if (!isTriadBotParticipant(room.seats.challenger)) return false;
   const mode = room.game.deckMode || "all";
-  const botDeck = chooseBotDeckForMode(mode, room.game.selectionPools.challenger || []);
+  const botDeck = chooseBotDeckForMode(mode, room.game.selectionPools.challenger || [], `${room.code}:${room.game.deckStartedAt}:${room.game.fightNo}`);
   const validation = validateDeckForMode(mode, botDeck);
   if (!validation.ok) return false;
   const currentDeck = room.game.decks.challenger || [];
@@ -1448,6 +1783,9 @@ function botCanUseElementSkill(room: StoredTriadRoom, side: TriadRoomSlot, cardN
 function botCardScore(room: StoredTriadRoom, cardNo: string) {
   const turn = room.game.activeTurn;
   const lane = laneForTurn(turn);
+  const learnedScore = botMemoryScore(cardNo, botLearningContexts(room, cardNo, turn));
+  const strategy = botStrategyForRoom(room);
+  const strategyScore = botStrategyScore(room, cardNo, strategy);
   const candidateTriangles = {
     ...room.game.triangles,
     challenger: {
@@ -1478,13 +1816,13 @@ function botCardScore(room: StoredTriadRoom, cardNo: string) {
     });
     const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
     const pointScore = result.winner === "opponent" ? 100_000 : result.winner === "draw" ? 25_000 : -100_000;
-    return pointScore + result.opponentTotal - result.playerTotal + elementScore + botResolvedSkillPenalty(result, cardNo);
+    return pointScore + result.opponentTotal - result.playerTotal + elementScore + botResolvedSkillPenalty(result, cardNo) + learnedScore + strategyScore;
   }
   const card = triadCardByNo.get(cardNo);
   if (!card) return 0;
-  if (turn === 1) return card.attack + card.support;
-  if (turn === 2) return card.kind === "monster" ? card.attack : botDeckScore(cardNo) + elementScore;
-  return card.kind === "monster" ? card.support : botDeckScore(cardNo) + elementScore;
+  if (turn === 1) return card.attack + card.support + learnedScore + strategyScore;
+  if (turn === 2) return (card.kind === "monster" ? card.attack : botDeckScore(cardNo) + elementScore) + learnedScore + strategyScore;
+  return (card.kind === "monster" ? card.support : botDeckScore(cardNo) + elementScore) + learnedScore + strategyScore;
 }
 
 function chooseBotCardForTurn(room: StoredTriadRoom) {
@@ -1521,9 +1859,10 @@ function chooseBotCardForTurn(room: StoredTriadRoom) {
     return botCanUseElementSkill(candidateRoom, "challenger", cardNo);
   });
   const scoringCards = smartPlayable.length > 0 ? smartPlayable : playable;
-  return scoringCards
+  const ranked = scoringCards
     .map((cardNo) => ({ cardNo, score: botCardScore(room, cardNo) }))
-    .sort((a, b) => b.score - a.score)[0]?.cardNo || "";
+    .sort((a, b) => b.score - a.score);
+  return pickBotCardFromRanked(room, ranked);
 }
 
 function lockBotCard(room: StoredTriadRoom) {
@@ -2101,6 +2440,7 @@ function absoluteTurnNo(room: StoredTriadRoom, turn = room.game.activeTurn) {
 }
 
 function recordResolvedTurnScore(room: StoredTriadRoom, result: TriadTurnResult) {
+  learnFromBotTurn(room, result);
   room.game.matchScore = room.game.matchScore || { host: 0, challenger: 0 };
   if (result.winner === "player") room.game.matchScore.host += 1;
   if (result.winner === "opponent") room.game.matchScore.challenger += 1;
@@ -2160,6 +2500,7 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
 }
 
 export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
+  await warmBotMemory();
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   repairSelectionPools(room);
@@ -2175,6 +2516,7 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
 }
 
 export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[]) {
+  await warmBotMemory();
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   repairSelectionPools(room);
@@ -2613,6 +2955,7 @@ export async function takeTriadRoomSlot(code: string, slot: TriadRoomSlot, parti
 }
 
 export async function setTriadRoomBotOpponent(code: string, participantId: string, enabled: boolean) {
+  await warmBotMemory();
   return withRoomMutationLock(code, async () => {
     const room = await getStoredRoom(code);
     if (!room) return { ok: false as const, reason: "not_found" as const };
@@ -2656,6 +2999,7 @@ export async function setTriadRoomBotOpponent(code: string, participantId: strin
 }
 
 export async function startTriadRoom(code: string, participantId: string) {
+  await warmBotMemory();
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
@@ -2678,6 +3022,7 @@ export async function startTriadRoom(code: string, participantId: string) {
 }
 
 export async function runTriadRoomBot(code: string, participantId: string) {
+  await warmBotMemory();
   return withRoomMutationLock(code, async () => {
     const room = await getStoredRoom(code);
     if (!room) return { ok: false as const, reason: "not_found" as const };
