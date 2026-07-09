@@ -695,8 +695,9 @@ export async function listTriadRooms() {
     const choicesExpired = markExpiredSkillChoices(room);
     const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
     resolveIfBothLocked(room);
+    const botChanged = runBotBrain(room);
     const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    if (choicesExpired || resolvedAfterChoiceTimeout) {
+    if (choicesExpired || resolvedAfterChoiceTimeout || botChanged) {
       await upsertStoredRoom(room);
     }
   }
@@ -1598,6 +1599,7 @@ export async function readyTriadRoomDeck(code: string, participantId: string, de
   if (!wasBattleReady && battleDecksReady(room)) {
     finalizeDeckSelection(room, true);
   }
+  runBotBrain(room);
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
 }
@@ -1638,6 +1640,7 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
     [side]: Array.from(new Set([...(room.game.usedCards?.[side] || []), cleanedCardNo])),
   };
   resolveIfBothLocked(room);
+  runBotBrain(room);
   await upsertStoredRoom(room);
   return {
     ok: true as const,
@@ -1709,6 +1712,7 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     choice.selectedTarget = cleanTarget || "selected";
   }
   resolveIfBothLocked(room);
+  runBotBrain(room);
   await upsertStoredRoom(room);
   return {
     ok: true as const,
@@ -1755,6 +1759,7 @@ export async function chooseTriadRoomOpeningTieBreak(code: string, participantId
   }
 
   resolveIfBothLocked(room);
+  runBotBrain(room);
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
 }
@@ -1800,6 +1805,7 @@ export async function advanceTriadRoomTurn(
     room.game.activeTurn = 2;
     room.game.turnReady = { host: false, challenger: false };
     room.game.turnStartedAt = Date.now();
+    runBotBrain(room);
     await upsertStoredRoom(room);
     return { ok: true as const, room: publicRoom(room), advanced: true as const };
   }
@@ -1810,6 +1816,7 @@ export async function advanceTriadRoomTurn(
     [side]: true,
   };
   if (!room.game.turnReady.host || !room.game.turnReady.challenger) {
+    runBotBrain(room);
     await upsertStoredRoom(room);
     return { ok: true as const, room: publicRoom(room), waitingReady: true as const };
   }
@@ -1826,6 +1833,7 @@ export async function advanceTriadRoomTurn(
     room.game.openerTieBreak = emptyOpeningTieBreak();
     room.game.turnStartedAt = Date.now();
   }
+  runBotBrain(room);
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), advanced: true as const };
   });
