@@ -2945,6 +2945,109 @@ textarea {
   }
 }
 
+@media (max-width: 950px), (hover: none) and (pointer: coarse) {
+  .nexora-battle-shell .triad-effect-timeline {
+    left: clamp(0.6rem, 5.8dvw, 7.2rem) !important;
+    right: clamp(0.6rem, 5.8dvw, 7.2rem) !important;
+    top: calc(var(--triad-mobile-stage-h, 100dvh) - clamp(9.8rem, 36dvh, 12.4rem)) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: clamp(3.9rem, 17dvh, 5.6rem) !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: clamp(0.3rem, 1.4dvw, 0.62rem) !important;
+    overflow: visible !important;
+    z-index: 155 !important;
+    pointer-events: none !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline > div {
+    min-width: 0 !important;
+    min-height: clamp(3.5rem, 15dvh, 5rem) !important;
+    max-height: clamp(3.9rem, 17dvh, 5.6rem) !important;
+    overflow: hidden !important;
+    border-radius: clamp(0.45rem, 1.8dvh, 0.82rem) !important;
+    padding: clamp(0.34rem, 1.25dvh, 0.58rem) clamp(0.42rem, 1.25dvw, 0.7rem) !important;
+    pointer-events: auto !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline > div:nth-child(n + 4) {
+    display: none !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .text-\[8px\] {
+    font-size: clamp(0.42rem, 1.45dvh, 0.58rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .mt-0\.5 {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden !important;
+    font-size: clamp(0.58rem, 2.25dvh, 0.86rem) !important;
+    line-height: 1.12 !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .mt-1,
+  .nexora-battle-shell .triad-effect-timeline .mt-1.whitespace-normal {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden !important;
+    font-size: clamp(0.5rem, 1.8dvh, 0.68rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .flex.items-start {
+    gap: 0.28rem !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .shrink-0.rounded-full {
+    padding: 0.12rem 0.36rem !important;
+    font-size: clamp(0.46rem, 1.6dvh, 0.62rem) !important;
+  }
+
+  .nexora-battle-shell .triad-ready-advance-spotlight {
+    width: min(38dvw, 18rem) !important;
+    margin-top: clamp(0.2rem, 0.8dvh, 0.4rem) !important;
+  }
+
+  .nexora-battle-shell .triad-ready-advance-spotlight button {
+    min-height: clamp(2.05rem, 8dvh, 2.75rem) !important;
+    border-radius: clamp(0.55rem, 2dvh, 0.9rem) !important;
+    padding: 0.22rem 0.55rem !important;
+  }
+}
+
+@media (max-width: 950px) and (max-height: 430px), (hover: none) and (pointer: coarse) and (max-height: 430px) {
+  .nexora-battle-shell .triad-effect-timeline {
+    left: clamp(0.35rem, 5dvw, 5.8rem) !important;
+    right: clamp(0.35rem, 5dvw, 5.8rem) !important;
+    top: calc(var(--triad-mobile-stage-h, 100dvh) - clamp(7.25rem, 31dvh, 9rem)) !important;
+    max-height: clamp(3.05rem, 15dvh, 4.05rem) !important;
+    gap: clamp(0.2rem, 1dvw, 0.42rem) !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline > div {
+    min-height: clamp(2.95rem, 14dvh, 3.85rem) !important;
+    max-height: clamp(3.05rem, 15dvh, 4.05rem) !important;
+    padding: 0.25rem 0.36rem !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .mt-0\.5 {
+    font-size: clamp(0.52rem, 2dvh, 0.72rem) !important;
+  }
+
+  .nexora-battle-shell .triad-effect-timeline .mt-1,
+  .nexora-battle-shell .triad-effect-timeline .mt-1.whitespace-normal {
+    -webkit-line-clamp: 1;
+    font-size: clamp(0.46rem, 1.65dvh, 0.58rem) !important;
+  }
+}
+
 @keyframes nexora-route-progress {
   0% {
     transform: translateX(-70%) scaleX(0.32);
