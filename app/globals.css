@@ -442,6 +442,8 @@ textarea {
   -webkit-touch-callout: none !important;
   -webkit-tap-highlight-color: transparent;
   -webkit-user-drag: none;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 .nexora-battle-shell img,
@@ -2643,6 +2645,29 @@ textarea {
   z-index: 2147483000 !important;
   isolation: isolate;
   transform: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.nexora-battle-preview-portal *,
+.nexora-battle-target-portal * {
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-user-drag: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.nexora-battle-preview-portal img,
+.nexora-battle-preview-portal picture,
+.nexora-battle-preview-portal [data-nimg],
+.nexora-battle-target-portal img,
+.nexora-battle-target-portal picture,
+.nexora-battle-target-portal [data-nimg] {
+  pointer-events: none !important;
+  -webkit-user-drag: none !important;
 }
 
 .nexora-battle-preview-portal .triad-card-preview-panel {
@@ -2827,6 +2852,10 @@ textarea {
   backdrop-filter: blur(10px) brightness(0.72) !important;
   isolation: isolate;
   pointer-events: auto !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 .nexora-battle-target-portal .triad-skill-target-panel {

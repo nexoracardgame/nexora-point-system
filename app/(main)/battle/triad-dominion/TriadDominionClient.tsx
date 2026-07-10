@@ -4137,11 +4137,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   useEffect(() => {
     if (typeof document === "undefined") return;
     const isBattleTarget = (target: EventTarget | null) =>
-      target instanceof Element && Boolean(target.closest(".nexora-battle-shell"));
+      target instanceof Element &&
+      Boolean(target.closest(".nexora-battle-shell, .nexora-battle-preview-portal, .nexora-battle-target-portal"));
     const blockNativeMobileMenu = (event: Event) => {
       if (!isBattleTarget(event.target)) return;
       event.preventDefault();
       event.stopPropagation();
+      const selection = window.getSelection?.();
+      if (selection && !selection.isCollapsed) selection.removeAllRanges();
     };
 
     document.addEventListener("contextmenu", blockNativeMobileMenu, true);
