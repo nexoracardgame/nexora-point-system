@@ -2359,7 +2359,6 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          closeHoldPreview();
           return;
         }
         if (disabled || used) return;
@@ -2374,7 +2373,6 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          closeHoldPreview();
           return;
         }
       }}
@@ -2905,7 +2903,7 @@ function CardHoverPreview({
   if (!card) return null;
   return (
     <div
-      className={`triad-card-preview-overlay fixed inset-0 z-[80] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
+      className={`triad-card-preview-overlay fixed inset-0 z-[5000] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
       role="dialog"
       aria-modal="true"
       onClick={(event) => {
