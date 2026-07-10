@@ -1621,6 +1621,19 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   return [ownTarget];
 }
 
+function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView): SkillTargetId[] {
+  const selectable = getSelectableSkillTargetIds(card, side, playerTop, botTop);
+  if (selectable.length > 0 || card?.cardNo === "254") return selectable;
+  const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
+  const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
+  const ownCard = side === "player" ? playerTop : botTop;
+  const opponentCard = side === "player" ? botTop : playerTop;
+  return [
+    ownCard?.kind === "monster" ? ownTarget : null,
+    opponentCard?.kind === "monster" ? opponentTarget : null,
+  ].filter((target): target is SkillTargetId => Boolean(target));
+}
+
 function hiddenCard() {
   return (
     <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-cyan-200/20 bg-black shadow-[0_22px_60px_rgba(0,0,0,0.38)]">
@@ -3571,11 +3584,16 @@ function SkillTargetOverlay({
   onSelect: (target: SkillTargetSelection) => void;
   onConfirm: () => void;
 }) {
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
   if (!card) return null;
 
   const requiresTwoTargets = isTwoStepTargetSkill(card);
   const selectedTargets = parseSkillTargetSelection(selectedTarget);
-  const selectableTargetIds = new Set(getSelectableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop));
+  const selectableTargetIds = new Set(getPlayableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop));
   const targets = [
     { id: "player-top" as const, label: "การ์ดหลักเรา", card: playerTop, tone: "border-red-300/60" },
     { id: "bot-top" as const, label: "การ์ดหลักคู่แข่ง", card: botTop, tone: "border-cyan-300/60" },
@@ -3584,8 +3602,9 @@ function SkillTargetOverlay({
     ? selectedTargets.length === 2 ? selectedTarget : ""
     : selectedTarget || (targets.length === 1 ? targets[0].id : "");
 
-  return (
-    <div className="triad-skill-target-overlay absolute bottom-4 right-4 top-16 z-[90] flex w-[min(430px,calc(100%-2rem))] items-center">
+  if (!portalReady || typeof document === "undefined") return null;
+  const overlay = (
+    <div className="triad-skill-target-overlay nexora-battle-target-portal fixed inset-0 z-[5000] grid place-items-center p-3">
       <div className="triad-skill-target-panel max-h-full w-full overflow-auto rounded-2xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] backdrop-blur-md sm:p-5">
         <div className="triad-skill-target-header text-center">
           <div className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-200/70">เลือกเป้าหมายสกิล</div>
@@ -3607,7 +3626,7 @@ function SkillTargetOverlay({
         </div>
 
         <div className="triad-skill-target-list mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          {targets.map((target) => (
+          {targets.length > 0 ? targets.map((target) => (
             <button
               key={target.id}
               type="button"
@@ -3626,7 +3645,11 @@ function SkillTargetOverlay({
                 <BoardCardSlot card={target.card} label={target.label} tone={target.id === "player-top" ? "player" : "bot"} />
               </div>
             </button>
-          ))}
+          )) : (
+            <div className="triad-skill-target-empty rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-center text-sm font-bold text-white/58">
+              ยังไม่พบมอนสเตอร์หลักที่เลือกได้ในตานี้
+            </div>
+          )}
         </div>
 
         <button
@@ -3643,6 +3666,7 @@ function SkillTargetOverlay({
       </div>
     </div>
   );
+  return createPortal(overlay, document.body);
 }
 
 function BlessingChoiceOverlay({
@@ -3882,7 +3906,7 @@ function CompactBattleBoard({
   const skillChoiceForAura = pendingSkillChoice || waitingSkillChoice || null;
   const pendingSkillCard = pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined;
   const pendingFallbackTargets = pendingSkillChoice
-    ? getSelectableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top))
+    ? getPlayableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top))
     : [];
   const pendingTarget = pendingSkillChoice?.selectedTarget || (pendingFallbackTargets.length === 1 ? pendingFallbackTargets[0] : "");
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
@@ -3968,7 +3992,7 @@ function CompactBattleBoard({
         onSelect={(target) => {
           if (!pendingSkillChoice) return;
           const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-          const selectable = new Set(getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined));
+          const selectable = new Set(getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined));
           if (!parseSkillTargetSelection(target).every((item) => selectable.has(item))) return;
           onSelectSkillTarget(target);
         }}
@@ -5777,7 +5801,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (playerCard && skillNeedsChoice(playerCard)) {
-      const targets = getSelectableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top));
+      const targets = getPlayableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top));
       if (targets.length === 0) {
         const result = resolveTriadTurn({
           turn: activeTurn,
@@ -5857,7 +5881,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const confirmSkillTarget = () => {
     if (!pendingSkillChoice || !lockedFight) return;
     const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-    const fallbackTargets = getSelectableSkillTargetIds(
+    const fallbackTargets = getPlayableSkillTargetIds(
       skillCard,
       pendingSkillChoice.side,
       cardsByNo.get(lockedFight.player.top),
@@ -5866,7 +5890,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const selectedTarget = pendingSkillChoice.selectedTarget || (fallbackTargets.length === 1 ? fallbackTargets[0] : "");
     if (!selectedTarget) return;
     const selectableTargetIds = new Set(
-      getSelectableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top))
+      getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top))
     );
     const selectedTargets = parseSkillTargetSelection(selectedTarget);
     const validTargetSelection = isTwoStepTargetSkill(skillCard)
