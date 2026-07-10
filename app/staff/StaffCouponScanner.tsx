@@ -1064,7 +1064,7 @@ export default function StaffCouponScanner({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
-                      เธเธนเนเนเธฅเธ
+                      ผู้แลก
                     </div>
                     <div className="mt-2 text-base font-black">
                       {cardRareResult.userName}
@@ -1075,7 +1075,7 @@ export default function StaffCouponScanner({
                   </div>
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
-                      เธชเธ–เธฒเธเธฐ
+                      สถานะ
                     </div>
                     <div
                       className={`mt-2 text-base font-black ${
@@ -1173,7 +1173,7 @@ export default function StaffCouponScanner({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
-                      เธชเธฃเนเธฒเธเน€เธกเธทเนเธญ
+                      สร้างเมื่อ
                     </div>
                     <div className="mt-2 text-sm font-bold text-white/75">
                       {formatThaiDateTime(cardRareResult.createdAt)}
@@ -1181,7 +1181,7 @@ export default function StaffCouponScanner({
                   </div>
                   <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">
-                      เธซเธกเธ”เน€เธงเธฅเธฒ
+                      หมดเวลา
                     </div>
                     <div className="mt-2 text-sm font-bold text-white/75">
                       {formatThaiDateTime(cardRareResult.expiresAt)}
@@ -1201,7 +1201,7 @@ export default function StaffCouponScanner({
                     ) : (
                       <ShieldCheck className="h-4 w-4" />
                     )}
-                    เธญเธเธธเธกเธฑเธ•เธด
+                    อนุมัติ
                   </button>
                   <button
                     type="button"
@@ -1210,7 +1210,7 @@ export default function StaffCouponScanner({
                     className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] border border-red-300/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 transition hover:bg-red-500/16 disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <XCircle className="h-4 w-4" />
-                    เธขเธเน€เธฅเธดเธ
+                    ยกเลิก
                   </button>
                 </div>
               </div>
