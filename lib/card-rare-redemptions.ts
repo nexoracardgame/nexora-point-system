@@ -199,8 +199,23 @@ export async function expireStaleCardRareRedemptions(userId?: string) {
   if (userId) {
     await prisma.$executeRawUnsafe(
       `
-        UPDATE "CardRareRedemption"
-        SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+        DELETE FROM "CardRareRedemptionLog"
+        WHERE "status" = 'expired'
+          AND "userId" = $1
+      `,
+      userId
+    );
+    await prisma.$executeRawUnsafe(
+      `
+        DELETE FROM "CardRareRedemption"
+        WHERE "status" = 'expired'
+          AND "userId" = $1
+      `,
+      userId
+    );
+    await prisma.$executeRawUnsafe(
+      `
+        DELETE FROM "CardRareRedemptionLog"
         WHERE "status" = 'pending'
           AND "expiresAt" <= $1
           AND "userId" = $2
@@ -210,8 +225,7 @@ export async function expireStaleCardRareRedemptions(userId?: string) {
     );
     await prisma.$executeRawUnsafe(
       `
-        UPDATE "CardRareRedemptionLog"
-        SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+        DELETE FROM "CardRareRedemption"
         WHERE "status" = 'pending'
           AND "expiresAt" <= $1
           AND "userId" = $2
@@ -224,8 +238,19 @@ export async function expireStaleCardRareRedemptions(userId?: string) {
 
   await prisma.$executeRawUnsafe(
     `
-      UPDATE "CardRareRedemption"
-      SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+      DELETE FROM "CardRareRedemptionLog"
+      WHERE "status" = 'expired'
+    `
+  );
+  await prisma.$executeRawUnsafe(
+    `
+      DELETE FROM "CardRareRedemption"
+      WHERE "status" = 'expired'
+    `
+  );
+  await prisma.$executeRawUnsafe(
+    `
+      DELETE FROM "CardRareRedemptionLog"
       WHERE "status" = 'pending'
         AND "expiresAt" <= $1
     `,
@@ -233,8 +258,7 @@ export async function expireStaleCardRareRedemptions(userId?: string) {
   );
   await prisma.$executeRawUnsafe(
     `
-      UPDATE "CardRareRedemptionLog"
-      SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+      DELETE FROM "CardRareRedemption"
       WHERE "status" = 'pending'
         AND "expiresAt" <= $1
     `,

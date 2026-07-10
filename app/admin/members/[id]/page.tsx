@@ -4,6 +4,8 @@ import { formatCouponValue } from "@/lib/coupon-utils";
 import { prisma } from "@/lib/prisma";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { formatThaiDateTime } from "@/lib/thai-time";
+import { expireStaleCardRareRedemptions } from "@/lib/card-rare-redemptions";
+import { expireStaleCardSetRedemptions } from "@/lib/card-set-redemptions";
 import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
 import PointLogEvidenceImages from "@/app/admin/point-logs/PointLogEvidenceImages";
 import MemberActions from "./MemberActions";
@@ -177,6 +179,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT').catch(() => undefined);
   await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "evidenceJson" TEXT').catch(() => undefined);
+  await Promise.all([
+    expireStaleCardSetRedemptions(user.id).catch(() => undefined),
+    expireStaleCardRareRedemptions(user.id).catch(() => undefined),
+  ]);
 
   const [
     localProfile,
@@ -209,10 +215,11 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     prisma.$queryRawUnsafe<MemberCardSetStats[]>(
       `
         SELECT
-          COUNT(*) FILTER (WHERE "status" = 'approved') AS "approvedCount",
-          COALESCE(SUM("nexValue") FILTER (WHERE "status" = 'approved'), 0) AS "totalNexValue"
-        FROM "CardSetRedemption"
+          COUNT(*) AS "approvedCount",
+          COALESCE(SUM("nexValue"), 0) AS "totalNexValue"
+        FROM "CardSetRedemptionLog"
         WHERE "userId" = $1
+          AND "status" = 'approved'
       `,
       user.id
     ).catch(() => []),
@@ -230,20 +237,22 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           "status",
           "createdAt",
           "approvedAt"
-        FROM "CardSetRedemption"
+        FROM "CardSetRedemptionLog"
         WHERE "userId" = $1
-        ORDER BY "createdAt" DESC
-        LIMIT 20
+          AND "status" = 'approved'
+        ORDER BY COALESCE("approvedAt", "createdAt") DESC
+        LIMIT 100
       `,
       user.id
     ).catch(() => []),
     prisma.$queryRawUnsafe<MemberCardRareStats[]>(
       `
         SELECT
-          COUNT(*) FILTER (WHERE "status" = 'approved') AS "approvedCount",
-          COALESCE(SUM("nexValue") FILTER (WHERE "status" = 'approved'), 0) AS "totalNexValue"
-        FROM "CardRareRedemption"
+          COUNT(*) AS "approvedCount",
+          COALESCE(SUM("nexValue"), 0) AS "totalNexValue"
+        FROM "CardRareRedemptionLog"
         WHERE "userId" = $1
+          AND "status" = 'approved'
       `,
       user.id
     ).catch(() => []),
@@ -261,10 +270,11 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           "status",
           "createdAt",
           "approvedAt"
-        FROM "CardRareRedemption"
+        FROM "CardRareRedemptionLog"
         WHERE "userId" = $1
-        ORDER BY "createdAt" DESC
-        LIMIT 30
+          AND "status" = 'approved'
+        ORDER BY COALESCE("approvedAt", "createdAt") DESC
+        LIMIT 100
       `,
       user.id
     ).catch(() => []),

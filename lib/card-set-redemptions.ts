@@ -322,8 +322,23 @@ export async function expireStaleCardSetRedemptions(userId?: string) {
   if (userId) {
     await prisma.$executeRawUnsafe(
       `
-        UPDATE "CardSetRedemption"
-        SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+        DELETE FROM "CardSetRedemptionLog"
+        WHERE "status" = 'expired'
+          AND "userId" = $1
+      `,
+      userId
+    );
+    await prisma.$executeRawUnsafe(
+      `
+        DELETE FROM "CardSetRedemption"
+        WHERE "status" = 'expired'
+          AND "userId" = $1
+      `,
+      userId
+    );
+    await prisma.$executeRawUnsafe(
+      `
+        DELETE FROM "CardSetRedemptionLog"
         WHERE "status" = 'pending'
           AND "expiresAt" <= $1
           AND "userId" = $2
@@ -333,8 +348,7 @@ export async function expireStaleCardSetRedemptions(userId?: string) {
     );
     await prisma.$executeRawUnsafe(
       `
-        UPDATE "CardSetRedemptionLog"
-        SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+        DELETE FROM "CardSetRedemption"
         WHERE "status" = 'pending'
           AND "expiresAt" <= $1
           AND "userId" = $2
@@ -347,8 +361,19 @@ export async function expireStaleCardSetRedemptions(userId?: string) {
 
   await prisma.$executeRawUnsafe(
     `
-      UPDATE "CardSetRedemption"
-      SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+      DELETE FROM "CardSetRedemptionLog"
+      WHERE "status" = 'expired'
+    `
+  );
+  await prisma.$executeRawUnsafe(
+    `
+      DELETE FROM "CardSetRedemption"
+      WHERE "status" = 'expired'
+    `
+  );
+  await prisma.$executeRawUnsafe(
+    `
+      DELETE FROM "CardSetRedemptionLog"
       WHERE "status" = 'pending'
         AND "expiresAt" <= $1
     `,
@@ -356,8 +381,7 @@ export async function expireStaleCardSetRedemptions(userId?: string) {
   );
   await prisma.$executeRawUnsafe(
     `
-      UPDATE "CardSetRedemptionLog"
-      SET "status" = 'expired', "cancelledAt" = $1, "cancelReason" = 'expired'
+      DELETE FROM "CardSetRedemption"
       WHERE "status" = 'pending'
         AND "expiresAt" <= $1
     `,
