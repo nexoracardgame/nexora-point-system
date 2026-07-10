@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bot,
   Check,
@@ -2227,6 +2228,14 @@ function BoardTriangle({
               onPointerMove={() => {
                 if (card && canPreview) onPreview?.(card, "hover");
               }}
+              onPointerDown={(event) => {
+                if (!card || !canPreview) return;
+                if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+                onPreview?.(card, "modal");
+              }}
+              onTouchStart={() => {
+                if (card && canPreview) onPreview?.(card, "modal");
+              }}
               onPointerLeave={onPreviewEnd}
               onFocus={() => {
                 if (card && canPreview) onPreview?.(card, "modal");
@@ -2882,6 +2891,7 @@ function CardHoverPreview({
   passive?: boolean;
 }) {
   const useCardStampRef = useRef(0);
+  const [portalReady, setPortalReady] = useState(false);
   const interactive = !passive && (Boolean(onUseCard) || Boolean(onClose));
   const useCardFromPreview = () => {
     if (!card || !onUseCard) return;
@@ -2892,6 +2902,10 @@ function CardHoverPreview({
   };
 
   useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
     if (!card || !onClose) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -2900,10 +2914,10 @@ function CardHoverPreview({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [card, onClose]);
 
-  if (!card) return null;
-  return (
+  if (!card || !portalReady || typeof document === "undefined") return null;
+  const preview = (
     <div
-      className={`triad-card-preview-overlay fixed inset-0 z-[5000] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
+      className={`triad-card-preview-overlay nexora-battle-preview-portal fixed inset-0 z-[5000] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
       role="dialog"
       aria-modal="true"
       onClick={(event) => {
@@ -2987,6 +3001,7 @@ function CardHoverPreview({
       </div>
     </div>
   );
+  return createPortal(preview, document.body);
 }
 
 function BattleRoomChatPanel({
