@@ -3258,7 +3258,7 @@ function SpectatorDeckStrip({
       ? "border-cyan-200/24 bg-cyan-500/10 text-cyan-100"
       : "border-rose-200/24 bg-rose-500/10 text-rose-100";
   return (
-    <div className={`rounded-2xl border bg-black/42 px-3 py-2 shadow-[0_18px_52px_rgba(0,0,0,0.3)] backdrop-blur-sm ${tone === "top" ? "border-cyan-200/18" : "border-rose-200/18"}`}>
+    <div className={`triad-spectator-deck-strip rounded-2xl border bg-black/42 px-3 py-2 shadow-[0_18px_52px_rgba(0,0,0,0.3)] backdrop-blur-sm ${tone === "top" ? "border-cyan-200/18" : "border-rose-200/18"}`}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className={`text-[10px] font-black uppercase tracking-[0.18em] ${tone === "top" ? "text-cyan-100/72" : "text-rose-100/72"}`}>
           {title}
@@ -3267,7 +3267,7 @@ function SpectatorDeckStrip({
           {cards.length} ใบ
         </div>
       </div>
-      <div className="grid grid-cols-10 gap-1 md:grid-cols-[repeat(20,minmax(0,1fr))]">
+      <div className="triad-spectator-deck-cards grid grid-cols-10 gap-1 md:grid-cols-[repeat(20,minmax(0,1fr))]">
         {cards.map((card) => (
           <button
             key={card.cardNo}
@@ -3946,7 +3946,7 @@ function CompactBattleBoard({
     setPreviewMode("hover");
   };
   return (
-    <div className="triad-compact-board relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0">
+    <div className={`triad-compact-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0`}>
       <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
       <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
@@ -7096,7 +7096,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main className="triad-dominion-game relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]">
+    <main className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
           type="button"
@@ -7253,7 +7253,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ) : null}
 
           {isSpectator ? (
-            <div className="grid gap-2 sm:gap-3">
+            <div className="triad-spectator-live-stack grid gap-2 sm:gap-3">
               <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
               <CompactBattleBoard
                 cardsByNo={cardsByNo}
