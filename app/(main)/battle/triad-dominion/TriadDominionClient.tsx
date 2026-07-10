@@ -4044,6 +4044,31 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const root = document.documentElement;
+    const syncBattleViewport = () => {
+      const viewport = window.visualViewport;
+      const width = Math.max(1, Math.floor(viewport?.width || window.innerWidth));
+      const height = Math.max(1, Math.floor(viewport?.height || window.innerHeight));
+      root.style.setProperty("--triad-battle-vw", `${width}px`);
+      root.style.setProperty("--triad-battle-vh", `${height}px`);
+    };
+    syncBattleViewport();
+    window.addEventListener("resize", syncBattleViewport);
+    window.addEventListener("orientationchange", syncBattleViewport);
+    window.visualViewport?.addEventListener("resize", syncBattleViewport);
+    window.visualViewport?.addEventListener("scroll", syncBattleViewport);
+    return () => {
+      window.removeEventListener("resize", syncBattleViewport);
+      window.removeEventListener("orientationchange", syncBattleViewport);
+      window.visualViewport?.removeEventListener("resize", syncBattleViewport);
+      window.visualViewport?.removeEventListener("scroll", syncBattleViewport);
+      root.style.removeProperty("--triad-battle-vw");
+      root.style.removeProperty("--triad-battle-vh");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     const isMobileBattleDevice =
       window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
       /android|iphone|ipad|ipod|mobile/i.test(window.navigator.userAgent);
