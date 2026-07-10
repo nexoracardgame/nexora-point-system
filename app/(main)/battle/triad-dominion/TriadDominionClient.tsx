@@ -3676,6 +3676,11 @@ function BlessingChoiceOverlay({
   card?: CardView;
   onChoose: (choice: BlessingChoice) => void;
 }) {
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
   if (!card) return null;
   const choices: { id: BlessingChoice; title: string; detail: string }[] = [
     {
@@ -3695,21 +3700,22 @@ function BlessingChoiceOverlay({
     },
   ];
 
-  return (
-    <div className="absolute inset-0 z-50 grid place-items-center bg-black/72 p-4 backdrop-blur-md">
-      <div className="w-[min(720px,94vw)] overflow-hidden rounded-2xl border border-cyan-100/30 bg-[#05070d] shadow-[0_0_70px_rgba(34,211,238,0.25)]">
-        <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.16),rgba(251,191,36,0.08))] p-4 text-center">
+  if (!portalReady || typeof document === "undefined") return null;
+  const overlay = (
+    <div className="triad-blessing-overlay nexora-battle-blessing-portal fixed inset-0 z-[5000] grid place-items-center bg-black/72 p-4 backdrop-blur-md">
+      <div className="triad-blessing-panel w-[min(720px,94vw)] overflow-hidden rounded-2xl border border-cyan-100/30 bg-[#05070d] shadow-[0_0_70px_rgba(34,211,238,0.25)]">
+        <div className="triad-blessing-header border-b border-white/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.16),rgba(251,191,36,0.08))] p-4 text-center">
           <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100/70">No.254 สกิลพิเศษ</div>
           <div className="mt-1 text-2xl font-black text-white">{card.name}</div>
           <div className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-white/58">{card.skillText}</div>
         </div>
-        <div className="grid gap-3 p-4 sm:grid-cols-3">
+        <div className="triad-blessing-choice-grid grid gap-3 p-4 sm:grid-cols-3">
           {choices.map((choice) => (
             <button
               key={choice.id}
               type="button"
               onClick={() => onChoose(choice.id)}
-              className="min-h-32 rounded-xl border border-cyan-100/18 bg-white/[0.045] p-4 text-left transition hover:-translate-y-1 hover:border-amber-200/55 hover:bg-amber-200/10"
+              className="triad-blessing-choice min-h-32 rounded-xl border border-cyan-100/18 bg-white/[0.045] p-4 text-left transition hover:-translate-y-1 hover:border-amber-200/55 hover:bg-amber-200/10"
             >
               <div className="text-lg font-black text-white">{choice.title}</div>
               <div className="mt-2 text-sm font-semibold leading-5 text-white/55">{choice.detail}</div>
@@ -3719,6 +3725,7 @@ function BlessingChoiceOverlay({
       </div>
     </div>
   );
+  return createPortal(overlay, document.body);
 }
 
 function ReadyAdvanceButton({
@@ -4138,7 +4145,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (typeof document === "undefined") return;
     const isBattleTarget = (target: EventTarget | null) =>
       target instanceof Element &&
-      Boolean(target.closest(".nexora-battle-shell, .nexora-battle-preview-portal, .nexora-battle-target-portal"));
+      Boolean(target.closest(".nexora-battle-shell, .nexora-battle-preview-portal, .nexora-battle-target-portal, .nexora-battle-blessing-portal"));
     const blockNativeMobileMenu = (event: Event) => {
       if (!isBattleTarget(event.target)) return;
       event.preventDefault();
