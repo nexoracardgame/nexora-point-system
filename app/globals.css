@@ -2797,6 +2797,30 @@ textarea {
   }
 }
 
+@media (max-width: 950px), (hover: none) and (pointer: coarse) {
+  .nexora-battle-shell .triad-board-phase-hud {
+    bottom: clamp(0.12rem, 0.85dvh, 0.36rem) !important;
+  }
+
+  .nexora-battle-shell .triad-board-phase-card {
+    width: min(34dvw, 280px) !important;
+    max-width: calc(100dvw - 10rem) !important;
+    transform: scale(0.66) !important;
+    transform-origin: bottom center !important;
+  }
+}
+
+@media (max-width: 950px) and (max-height: 420px), (hover: none) and (pointer: coarse) and (max-height: 420px) {
+  .nexora-battle-shell .triad-board-phase-hud {
+    bottom: clamp(0.04rem, 0.45dvh, 0.18rem) !important;
+  }
+
+  .nexora-battle-shell .triad-board-phase-card {
+    width: min(31dvw, 245px) !important;
+    transform: scale(0.58) !important;
+  }
+}
+
 @keyframes nexora-route-progress {
   0% {
     transform: translateX(-70%) scaleX(0.32);

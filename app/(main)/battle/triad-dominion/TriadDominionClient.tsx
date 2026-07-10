@@ -2892,7 +2892,9 @@ function CardHoverPreview({
 }) {
   const useCardStampRef = useRef(0);
   const [portalReady, setPortalReady] = useState(false);
-  const interactive = !passive && (Boolean(onUseCard) || Boolean(onClose));
+  const [coarsePreviewInput, setCoarsePreviewInput] = useState(false);
+  const allowMobileUse = passive && Boolean(onUseCard) && coarsePreviewInput;
+  const interactive = (!passive || allowMobileUse) && (Boolean(onUseCard) || Boolean(onClose));
   const useCardFromPreview = () => {
     if (!card || !onUseCard) return;
     const now = Date.now();
@@ -2903,6 +2905,11 @@ function CardHoverPreview({
 
   useEffect(() => {
     setPortalReady(true);
+    const mediaQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+    const syncInputMode = () => setCoarsePreviewInput(mediaQuery.matches || window.navigator.maxTouchPoints > 0);
+    syncInputMode();
+    mediaQuery.addEventListener("change", syncInputMode);
+    return () => mediaQuery.removeEventListener("change", syncInputMode);
   }, []);
 
   useEffect(() => {
@@ -2963,10 +2970,10 @@ function CardHoverPreview({
           <div className="triad-card-preview-text mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
             {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
           </div>
-          {onUseCard && !passive ? (
+          {onUseCard && (!passive || allowMobileUse) ? (
             <button
               type="button"
-              className="triad-card-preview-use mt-3 hidden w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
+              className="triad-card-preview-use mt-3 flex w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
               onPointerDown={(event) => event.stopPropagation()}
               onPointerUp={(event) => {
                 event.preventDefault();
@@ -2985,7 +2992,7 @@ function CardHoverPreview({
                 useCardFromPreview();
               }}
             >
-              เลือกใช้การ์ดใบนี้
+              เลือกการ์ดใบนี้ลงสนาม
             </button>
           ) : null}
           {onClose && !passive ? (
