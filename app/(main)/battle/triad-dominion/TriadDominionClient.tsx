@@ -1158,6 +1158,7 @@ function roomBattleStartKey(room: TriadRoom) {
 
 function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextRoom: TriadRoom) {
   if (!currentRoom || currentRoom.code !== nextRoom.code) return false;
+  if (Number(nextRoom.updatedAt || 0) > Number(currentRoom.updatedAt || 0)) return false;
   if (currentRoom.status === "playing" && nextRoom.status === "waiting") {
     return true;
   }
@@ -4851,6 +4852,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     : opponentSide
       ? currentRoom?.seats[opponentSide] || null
       : null;
+
+  useEffect(() => {
+    if (!currentRoom || !isFieldPlayer || phase !== "battle" || !handPlacementLocked || matchDone) return;
+    const timer = window.setInterval(() => {
+      void syncRooms({ force: true }).catch(() => null);
+    }, 1600);
+    return () => window.clearInterval(timer);
+  }, [currentRoom?.code, currentRoom?.game.activeTurn, currentRoom?.game.fightNo, handPlacementLocked, isFieldPlayer, matchDone, phase]);
   const displayNameForRoomSide = (side: RoomPlayerSide | null) => {
     if (!side) return "";
     if (isSpectator) return side === "host" ? displayPlayerName : displayBotName;
