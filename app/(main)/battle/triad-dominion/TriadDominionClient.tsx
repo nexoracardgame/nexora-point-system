@@ -3661,12 +3661,14 @@ function MatchFinalOverlay({
   score,
   isDraw,
   rankUpEvents = [],
+  onExitLobby,
 }: {
   winner: string;
   surrendered?: string;
   score: { player: number; bot: number };
   isDraw?: boolean;
   rankUpEvents?: TriadRankUpEvent[];
+  onExitLobby?: () => void;
 }) {
   return (
     <div className="triad-match-final-overlay pointer-events-none fixed inset-0 z-[95] grid place-items-center bg-[radial-gradient(circle_at_50%_45%,rgba(251,191,36,0.22),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.9)_100%)] p-4 backdrop-blur-sm">
@@ -3708,6 +3710,15 @@ function MatchFinalOverlay({
           <div className="triad-match-final-note mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/42">
             กำลังพาทุกคนกลับห้องรอ
           </div>
+          {onExitLobby ? (
+            <button
+              type="button"
+              onClick={onExitLobby}
+              className="pointer-events-auto mx-auto mt-4 inline-flex h-11 items-center justify-center rounded-xl border border-white/18 bg-white/10 px-5 text-xs font-black uppercase tracking-[0.14em] text-white/82 shadow-[0_0_28px_rgba(255,255,255,0.08)] transition hover:border-amber-100/55 hover:bg-amber-300 hover:text-black"
+            >
+              ออกห้อง
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -7465,7 +7476,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </button>
       ) : null}
       {matchFinalVisible ? (
-        <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} />
+        <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} onExitLobby={leaveRoom} />
       ) : null}
       <OpeningTieBreakOverlay
         tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
