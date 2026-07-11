@@ -2946,11 +2946,13 @@ function CardHoverPreview({
   onClose,
   onUseCard,
   passive = false,
+  variant = "battle",
 }: {
   card: CardView | null;
   onClose?: () => void;
   onUseCard?: (cardNo: string) => void;
   passive?: boolean;
+  variant?: "battle" | "deck";
 }) {
   const useCardStampRef = useRef(0);
   const [portalReady, setPortalReady] = useState(false);
@@ -2984,9 +2986,10 @@ function CardHoverPreview({
   }, [card, onClose]);
 
   if (!card || !portalReady || typeof document === "undefined") return null;
+  const isDeckPreview = variant === "deck";
   const preview = (
     <div
-      className={`triad-card-preview-overlay nexora-battle-preview-portal fixed inset-0 z-[5000] grid place-items-center bg-black/18 p-4 backdrop-blur-[2px] ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
+      className={`triad-card-preview-overlay nexora-battle-preview-portal fixed inset-0 z-[5000] grid place-items-center p-4 backdrop-blur-[2px] ${isDeckPreview ? "bg-black/8" : "bg-black/18"} ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
       role="dialog"
       aria-modal="true"
       onClick={(event) => {
@@ -2994,7 +2997,9 @@ function CardHoverPreview({
       }}
     >
       <div
-        className={`triad-card-preview-panel ${interactive ? "pointer-events-auto" : "triad-card-preview-panel-passive pointer-events-none"} relative w-[min(430px,82vw)] rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)]`}
+        className={`triad-card-preview-panel ${interactive ? "pointer-events-auto" : "triad-card-preview-panel-passive pointer-events-none"} relative rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)] ${
+          isDeckPreview ? "grid w-[min(760px,92vw)] gap-4 md:grid-cols-[minmax(210px,310px)_1fr]" : "w-[min(430px,82vw)]"
+        }`}
         onPointerDown={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
@@ -3010,7 +3015,11 @@ function CardHoverPreview({
             <X className="h-4 w-4" />
           </button>
         ) : null}
-        <div className="triad-card-preview-image relative mx-auto aspect-[3/4] w-[min(330px,70vw)] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)]">
+        <div
+          className={`triad-card-preview-image relative mx-auto aspect-[3/4] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)] ${
+            isDeckPreview ? "w-[min(300px,62vw)] md:w-full" : "w-[min(330px,70vw)]"
+          }`}
+        >
           <Image
             src={card.sourceImage}
             alt={card.name}
@@ -3022,14 +3031,21 @@ function CardHoverPreview({
             unoptimized
           />
         </div>
-        <div className="triad-card-preview-info mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+        <div className={`triad-card-preview-info rounded-2xl border border-white/10 bg-white/[0.045] p-3 ${isDeckPreview ? "mt-0 flex min-h-0 flex-col md:p-4" : "mt-3"}`}>
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/58">No.{card.cardNo}</div>
-          <div className="mt-1 line-clamp-2 text-xl font-black leading-tight text-white">{card.name}</div>
-          <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-black text-black">
+          <div className={`${isDeckPreview ? "text-2xl" : "text-xl"} mt-1 line-clamp-2 font-black leading-tight text-white`}>{card.name}</div>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black text-black">
             <span className="rounded-md bg-amber-200 px-2 py-1">ATK {card.attack.toLocaleString()}</span>
             <span className="rounded-md bg-cyan-200 px-2 py-1">SUP {card.support.toLocaleString()}</span>
+            <span className={`rounded-md px-2 py-1 ${card.kind === "skill" ? "bg-violet-200" : "bg-emerald-200"}`}>
+              {card.kind === "skill" ? "สกิล" : elementLabel[card.element]}
+            </span>
           </div>
-          <div className="triad-card-preview-text mt-2 max-h-28 overflow-hidden text-sm font-semibold leading-6 text-white/72">
+          <div
+            className={`triad-card-preview-text mt-3 text-sm font-semibold leading-6 text-white/76 ${
+              isDeckPreview ? "max-h-[min(280px,34vh)] flex-1 overflow-y-auto pr-1" : "max-h-28 overflow-hidden"
+            }`}
+          >
             {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
           </div>
           {onUseCard && (!passive || allowMobileUse) ? (
@@ -4357,6 +4373,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         : "โหมดรวม";
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const roomTurnResolved = Boolean(currentRoom?.game.turns.some((turn) => turn.turn === activeTurn));
+  const roomActiveTurnResolved = Boolean(
+    currentRoom?.game.turns.some((turn) => turn.turn === currentRoom.game.activeTurn)
+  );
+  const roomActiveTurnScored = Boolean(currentRoom && revealed[currentRoom.game.activeTurn]?.scored);
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
   const playerGraveCards = gravePlayerCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -5311,7 +5331,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     const bothReady = Boolean(currentRoom?.game.turnReady.host && currentRoom.game.turnReady.challenger);
-    if (!currentRoom || !roomPlayerSide || !currentResult || !bothReady) {
+    if (!currentRoom || !roomPlayerSide || !roomActiveTurnResolved || !bothReady || !roomActiveTurnScored) {
       turnReadyRecoveryKeyRef.current = "";
       return;
     }
@@ -5332,12 +5352,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }, 520);
     return () => window.clearTimeout(timer);
   }, [
-    currentResult,
     currentRoom?.code,
     currentRoom?.game.activeTurn,
     currentRoom?.game.fightNo,
     currentRoom?.game.turnReady.challenger,
     currentRoom?.game.turnReady.host,
+    roomActiveTurnResolved,
+    roomActiveTurnScored,
     roomPlayerSide,
   ]);
 
@@ -6382,6 +6403,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const markRoomTurnReady = () => {
     if (!currentRoom || !roomPlayerSide || !currentTurnReadyKey) return false;
+    if (!revealed[currentRoom.game.activeTurn]?.scored) return false;
     if (
       pendingTurnReadyKey === currentTurnReadyKey ||
       turnReadySubmittingKey === currentTurnReadyKey ||
@@ -7257,7 +7279,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </button>
           </div>
         ) : null}
-        <CardHoverPreview card={deckPreviewCard} onClose={() => setDeckPreviewCard(null)} passive />
+        <CardHoverPreview card={deckPreviewCard} onClose={() => setDeckPreviewCard(null)} passive variant="deck" />
       </main>
     );
   }
