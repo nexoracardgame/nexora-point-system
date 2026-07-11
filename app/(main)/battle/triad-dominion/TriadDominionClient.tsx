@@ -4654,7 +4654,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const forcedWinnerSide = currentRoom?.game.matchWinner || "";
   const surrenderedSide = currentRoom?.game.surrenderedBy || "";
-  const matchDone = Boolean(currentRoom?.game.matchEndedAt) || fightNo > 3 || Boolean(forcedWinnerSide);
+  const serverMatchDone = Boolean(currentRoom?.game.matchEndedAt || forcedWinnerSide);
+  const matchDone = currentRoom ? serverMatchDone : fightNo > 3;
   const isRoomHost = Boolean(currentRoom && currentRoom.hostId === participant.id);
   const isRoomController = Boolean(
     currentRoom && (currentRoom.hostId === participant.id || currentRoom.seats.host?.id === participant.id)
