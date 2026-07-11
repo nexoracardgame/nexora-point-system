@@ -2052,6 +2052,9 @@ function applySkill(
   }
 
   if (rule.shape === "swap-control") {
+    if (!overrideRule) {
+      return { unresolved, events };
+    }
     if (boardState) {
       events.push(applyScoreStateTopSwap(rule, side, side === "player" ? ownScore : opponentScore, side === "player" ? opponentScore : ownScore, boardState));
       return { unresolved, events };
@@ -2233,10 +2236,10 @@ function applyEnergyReversal(
       side,
       type: reversalRule.shape,
       text: reversalRule.text,
-      summary: "Energy Reversal found no opposing skill to copy this turn.",
+      summary: "กลยุทธ์ทวนพลังไม่พบสกิลฝ่ายตรงข้ามให้คัดลอกในเทิร์นนี้",
       blocked: true,
     });
-    ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: no opposing skill to copy`);
+    ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: ไม่พบสกิลฝ่ายตรงข้ามให้คัดลอก`);
     return { unresolved, events };
   }
 
@@ -2246,10 +2249,10 @@ function applyEnergyReversal(
     side,
     type: reversalRule.shape,
     text: reversalRule.text,
-    summary: `Energy Reversal copies No.${copiedRule.cardNo} ${copiedRule.name} and uses it for this side.`,
+    summary: `กลยุทธ์ทวนพลังคัดลอก No.${copiedRule.cardNo} ${copiedRule.name} แล้วใช้ให้ฝ่ายนี้`,
     targetLabel: `No.${copiedRule.cardNo}`,
   });
-  ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: copied No.${copiedRule.cardNo} ${copiedRule.name}`);
+  ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: คัดลอก No.${copiedRule.cardNo} ${copiedRule.name}`);
 
   const copied = applySkill(
     opposingTriangle,
