@@ -921,7 +921,7 @@ function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhas
   const fieldPlayer = room.seats.host?.id === participantId || room.seats.challenger?.id === participantId;
   if (!spectator && !fieldPlayer) return null;
   if (room.status !== "playing") return "room";
-  if (spectator) return roomDecksReadyForBattle(room) ? "battle" : "room";
+  if (spectator) return "battle";
   return roomDecksReadyForBattle(room) ? "battle" : "deck";
 }
 
@@ -4718,8 +4718,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       matchScore: roomMatchScoreForView(currentRoom, null, true) || getFightScore(currentRoom.game.turns, revealState),
       turnLocked: Boolean(hostTriangle[activeLane] || challengerTriangle[activeLane]),
       timeLeft: roomTurnSecondsLeft(currentRoom),
-      playerDeckCards: currentRoom.game.decks.host.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[],
-      botDeckCards: currentRoom.game.decks.challenger.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[],
+      playerDeckCards: currentRoom.game.deckReady.host
+        ? (currentRoom.game.decks.host.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[])
+        : [],
+      botDeckCards: currentRoom.game.deckReady.challenger
+        ? (currentRoom.game.decks.challenger.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[])
+        : [],
       playerName: currentRoom.seats.host?.name || "ฝั่งบน",
       botName: currentRoom.seats.challenger?.name || "ฝั่งล่าง",
       playerImage: currentRoom.seats.host?.image || "/avatar.png",
@@ -5140,6 +5144,38 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return stableRoom;
   };
 
+  const resetLocalDeckSelectionState = (room: TriadRoom) => {
+    startedBattleRoomKeysRef.current.delete(roomBattleStartKey(room));
+    deckBattleStartKeyRef.current = "";
+    pvpTurnKeyRef.current = "";
+    turnReadyRecoveryKeyRef.current = "";
+    resultAdvanceKeyRef.current = "";
+    setDeckReadySubmitting(false);
+    setPendingTurnReadyKey("");
+    setTurnReadySubmittingKey("");
+    setPlayerDeck([]);
+    setBotDeck([]);
+    setUsedPlayerCards([]);
+    setUsedBotCards([]);
+    setGravePlayerCards([]);
+    setGraveBotCards([]);
+    setPlayer({ top: "", left: "", right: "" });
+    setLockedFight(null);
+    setTurnLocked(false);
+    setPendingSkillChoice(null);
+    setPendingBlessingChoice(null);
+    setRandomDrawCardNo("");
+    setActiveTurn(1);
+    setFightNo(1);
+    setPlacementLane("top");
+    setRevealed(emptyRevealState());
+    setLastTurnWinner(null);
+    setMatchScore({ player: 0, bot: 0 });
+    setTimeLeft(TURN_SECONDS);
+    setResultTimeLeft(RESULT_SECONDS);
+    setDeckTimeLeft(roomDeckSecondsLeft(room));
+  };
+
   const postRoomAction = async (body: Record<string, unknown>) => {
     const response = await fetch(ROOM_API_PATH, {
       method: "POST",
@@ -5174,6 +5210,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         : setStableActiveRoomSnapshot(
             keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom))
           );
+      if (body.action === "gm-reset-decks") {
+        resetLocalDeckSelectionState(activeStableRoom);
+      }
       if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
         if (payload.battleReady || roomDecksReadyForBattle(activeStableRoom)) markBattleStartedForRoom(activeStableRoom);
         const nextPhase = payload.battleReady ? "battle" : phaseForRoomWithBattleLock(activeStableRoom);
@@ -5694,7 +5733,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           return;
         }
         if (room) {
-          forceApplyServerRoom(room);
+          const stableRoom = forceApplyServerRoom(room);
+          if (event.action === "gm-reset-decks") {
+            resetLocalDeckSelectionState(stableRoom);
+          }
         }
         void syncRooms({ force: true }).catch(() => null);
         return;
@@ -7876,7 +7918,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ออกห้อง
         </button>
       ) : null}
-      {false && deckSelectionActive ? (
+      {deckSelectionActive ? (
         <div className="px-2 pt-16 sm:px-3">
           <div className="ml-auto w-full sm:w-[min(390px,100%)]">
             <DeckSelectionStatusBanner
@@ -7968,7 +8010,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
       <section className={`triad-game-layout grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(300px,18vw,340px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
         <section className="triad-game-playarea grid min-h-0 max-w-full grid-rows-[minmax(330px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(420px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(470px,calc(100vh-390px))_auto_auto]">
-          {false && deckSelectionActive ? (
+          {deckSelectionActive ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
