@@ -2495,6 +2495,12 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
+          if (disabled || used) {
+            onPreview(card);
+            return;
+          }
+          closeHoldPreview();
+          onClick();
           return;
         }
         if (disabled || used) return;
