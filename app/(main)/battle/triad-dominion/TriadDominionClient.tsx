@@ -5762,7 +5762,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const timer = window.setInterval(() => {
       const nextLeft = roomDeckSecondsLeft(currentRoom);
       setDeckTimeLeft(nextLeft);
-      if (phase === "deck" && nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && !deckReadySubmitting && deckValidation.valid) {
+      if (phase === "deck" && nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && !deckReadySubmitting) {
         setDeckReadySubmitting(true);
         void postRoomAction({
           action: "ready-deck",
@@ -5782,7 +5782,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [currentRoom, deckSelectionActive, deckValidation.valid, ownDeckReady, opponentSide, phase, playerDeck, roomPlayerSide]);
+  }, [currentRoom, deckSelectionActive, ownDeckReady, opponentSide, phase, playerDeck, roomPlayerSide]);
 
   useEffect(() => {
     if (!currentRoom || currentRoom.status !== "playing") return;

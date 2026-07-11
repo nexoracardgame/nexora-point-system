@@ -184,6 +184,7 @@ const TRIAD_MONSTER_DECK_SIZE = 20;
 const TRIAD_SKILL_MODE_MONSTERS = 10;
 const TRIAD_SKILL_MODE_SKILLS = 10;
 const TRIAD_SELECTION_POOL_SIZE = 293;
+const DECK_SELECTION_TIMEOUT_MS = 5 * 60_000;
 const TURN_TIMEOUT_MS = 120_000;
 const SKILL_CHOICE_TIMEOUT_MS = 30_000;
 const WAITING_ROOM_TTL_MS = 15 * 60_000;
@@ -1604,6 +1605,56 @@ function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[], seed = "") {
   return deck.slice(0, TRIAD_DECK_SIZE);
 }
 
+function autoCompleteDeckForMode(mode: TriadDeckMode, currentDeck: string[], pool: string[], seed = "") {
+  const selected = Array.from(new Set(normalizeDeckForMode(mode, currentDeck)));
+  const selectedSet = new Set(selected);
+  const rankedPool = chooseBotDeckForMode(mode, pool, seed).filter((cardNo) => !selectedSet.has(cardNo));
+  const fallbackPool = Array.from(new Set(pool.map(cleanText).filter(Boolean))).filter((cardNo) => !selectedSet.has(cardNo));
+  const append = [...rankedPool, ...fallbackPool];
+
+  if (mode === "monster") {
+    return [
+      ...selected.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster"),
+      ...append.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster"),
+    ].slice(0, TRIAD_MONSTER_DECK_SIZE);
+  }
+
+  if (mode === "skill") {
+    const selectedMonsters = selected.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster").slice(0, TRIAD_SKILL_MODE_MONSTERS);
+    const selectedSkills = selected.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "skill").slice(0, TRIAD_SKILL_MODE_SKILLS);
+    const monsterAppend = append.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster" && !selectedMonsters.includes(cardNo));
+    const skillAppend = append.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "skill" && !selectedSkills.includes(cardNo));
+    return [
+      ...selectedMonsters,
+      ...monsterAppend.slice(0, Math.max(0, TRIAD_SKILL_MODE_MONSTERS - selectedMonsters.length)),
+      ...selectedSkills,
+      ...skillAppend.slice(0, Math.max(0, TRIAD_SKILL_MODE_SKILLS - selectedSkills.length)),
+    ].slice(0, TRIAD_DECK_SIZE);
+  }
+
+  const deck = selected.slice(0, TRIAD_DECK_SIZE);
+  for (const monsterCardNo of append.filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster")) {
+    if (deckCardCounts(deck).monsters >= 3) break;
+    if (deck.includes(monsterCardNo)) continue;
+    if (deck.length >= TRIAD_DECK_SIZE) {
+      let removableIndex = -1;
+      for (let index = deck.length - 1; index >= 0; index -= 1) {
+        if (triadCardByNo.get(deck[index])?.kind !== "monster") {
+          removableIndex = index;
+          break;
+        }
+      }
+      if (removableIndex >= 0) deck.splice(removableIndex, 1);
+    }
+    deck.push(monsterCardNo);
+  }
+  for (const cardNo of append) {
+    if (deck.length >= TRIAD_DECK_SIZE) break;
+    if (!deck.includes(cardNo)) deck.push(cardNo);
+  }
+  return deck.slice(0, TRIAD_DECK_SIZE);
+}
+
 function ensureBotDeckReady(room: StoredTriadRoom) {
   if (!isTriadBotParticipant(room.seats.challenger)) return false;
   const mode = room.game.deckMode || "all";
@@ -2003,13 +2054,30 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   room.game.matchEndedAt = 0;
   room.game.rankedRecordedAt = 0;
   room.game.rankUpEvents = [];
-  room.game.turnStartedAt = Date.now();
+  room.game.turnStartedAt = Math.max(Date.now(), Number(room.game.deckStartedAt || 0) + 1);
   return true;
 }
 
 function enforceDeckGate(room: StoredTriadRoom) {
   if (room.status !== "playing") return false;
   const deckMode = room.game.deckMode || "all";
+  const deckSelectionFinalized = Number(room.game.turnStartedAt || 0) > Number(room.game.deckStartedAt || 0);
+  const deckSelectionExpired = Date.now() - Number(room.game.deckStartedAt || Date.now()) >= DECK_SELECTION_TIMEOUT_MS;
+  if (!deckSelectionFinalized && deckSelectionExpired) {
+    (["host", "challenger"] as TriadRoomSlot[]).forEach((side) => {
+      const autoDeck = autoCompleteDeckForMode(
+        deckMode,
+        room.game.decks[side],
+        room.game.selectionPools[side] || [],
+        `${room.code}:${room.game.deckStartedAt}:${side}:timeout`
+      );
+      if (validateDeckForMode(deckMode, autoDeck).ok) {
+        room.game.decks[side] = autoDeck;
+        room.game.deckReady[side] = true;
+      }
+    });
+    if (battleDecksReady(room)) return finalizeDeckSelection(room, true);
+  }
   const hostValid = validateDeckForMode(deckMode, room.game.decks.host).ok;
   const challengerValid = validateDeckForMode(deckMode, room.game.decks.challenger).ok;
   const nextReady = {
@@ -2019,6 +2087,10 @@ function enforceDeckGate(room: StoredTriadRoom) {
   const changedReady =
     nextReady.host !== room.game.deckReady.host ||
     nextReady.challenger !== room.game.deckReady.challenger;
+  if (!deckSelectionFinalized && nextReady.host && nextReady.challenger) {
+    room.game.deckReady = nextReady;
+    return finalizeDeckSelection(room, true) || changedReady;
+  }
   if (!changedReady && nextReady.host && nextReady.challenger) return false;
 
   room.game.deckReady = nextReady;
