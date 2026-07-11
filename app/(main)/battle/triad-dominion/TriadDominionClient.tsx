@@ -1177,6 +1177,13 @@ function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
   return existing ? rooms.map((item) => (item.code === room.code ? mergeRoomWithStableChat(item, room) : item)) : [room, ...rooms];
 }
 
+function forceReplaceRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
+  if (!room?.code) return rooms;
+  const existing = rooms.find((item) => item.code === room.code);
+  const stableRoom = mergeRoomWithStableChat(existing, room);
+  return existing ? rooms.map((item) => (item.code === room.code ? stableRoom : item)) : [stableRoom, ...rooms];
+}
+
 function mergeRoomListsWithStableChat(currentRooms: TriadRoom[], nextRooms: TriadRoom[]) {
   return nextRooms.map((room) => mergeRoomWithStableChat(currentRooms.find((item) => item.code === room.code), room));
 }
@@ -5111,6 +5118,23 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return stableRoom;
   };
 
+  const forceApplyServerRoom = (room: TriadRoom) => {
+    optimisticRoomLockUntilRef.current = 0;
+    const stableRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, room));
+    activeRoomSnapshotRef.current = stableRoom;
+    setActiveRoomSnapshot(stableRoom);
+    setRooms((current) => forceReplaceRoomByCode(current, stableRoom));
+    writeCachedTriadRoom(participant.id, stableRoom);
+    if (activeRoomCodeRef.current === stableRoom.code || participantInRoom(stableRoom, participant.id)) {
+      activeRoomCodeRef.current = stableRoom.code;
+      setActiveRoomCode(stableRoom.code);
+      if (roomDecksReadyForBattle(stableRoom)) markBattleStartedForRoom(stableRoom);
+      const nextPhase = stableRoom.status === "playing" ? phaseForRoomWithBattleLock(stableRoom, "battle") || "battle" : "room";
+      setPhase(nextPhase);
+    }
+    return stableRoom;
+  };
+
   const postRoomAction = async (body: Record<string, unknown>) => {
     const response = await fetch(ROOM_API_PATH, {
       method: "POST",
@@ -5120,6 +5144,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
     const payload = await response.json().catch(() => ({}));
     const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
+    const isGmRescueAction =
+      body.action === "gm-reset-decks" || body.action === "gm-refresh-app" || body.action === "gm-restart-turn";
     if (actionRoom) {
       optimisticRoomLockUntilRef.current =
         body.action === "lock-card" && !payload.resolved
@@ -5132,12 +5158,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     setRooms((current) =>
       actionRoom
-        ? mergeIncomingRoom(mergeIncomingRooms(current, nextRooms), actionRoom)
+        ? isGmRescueAction
+          ? forceReplaceRoomByCode(mergeIncomingRooms(current, nextRooms), actionRoom)
+          : mergeIncomingRoom(mergeIncomingRooms(current, nextRooms), actionRoom)
         : mergeIncomingRooms(current, nextRooms)
     );
     if (actionRoom) {
-      const stableActionRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom));
-      const activeStableRoom = setStableActiveRoomSnapshot(stableActionRoom);
+      const activeStableRoom = isGmRescueAction
+        ? forceApplyServerRoom(actionRoom)
+        : setStableActiveRoomSnapshot(
+            keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom))
+          );
       if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
         if (payload.battleReady || roomDecksReadyForBattle(activeStableRoom)) markBattleStartedForRoom(activeStableRoom);
         const nextPhase = payload.battleReady ? "battle" : phaseForRoomWithBattleLock(activeStableRoom);
