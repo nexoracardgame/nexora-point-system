@@ -671,6 +671,7 @@ function MiniProfileHover({
   placement = "bottom",
   size = "sm",
   currentParticipantId,
+  crown = false,
 }: {
   participant?: RoomParticipant | null;
   name?: string;
@@ -679,13 +680,14 @@ function MiniProfileHover({
   label?: string;
   align?: "left" | "right";
   placement?: "top" | "bottom";
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "xl";
   currentParticipantId?: string;
+  crown?: boolean;
 }) {
   const profileName = name || participant?.name || "ผู้เล่น";
   const profileImage = image || participant?.image || "/avatar.png";
   const frame = rankFrames[rankIndexForParticipant(participant || { id: profileName }, profile)] || rankFrames[0];
-  const avatarSize = size === "md" ? "h-11 w-11" : "h-9 w-9";
+  const avatarSize = size === "xl" ? "h-24 w-24" : size === "md" ? "h-11 w-11" : "h-9 w-9";
   const wins = profile?.wins || 0;
   const losses = profile?.losses || 0;
   const totalMatches = wins + losses;
@@ -701,6 +703,11 @@ function MiniProfileHover({
         <span className="relative h-full w-full overflow-hidden rounded-full border border-black/70 bg-black">
           <Image src={profileImage} alt={profileName} width={48} height={48} className="h-full w-full object-cover" />
         </span>
+        {crown ? (
+          <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full border border-amber-100/70 bg-amber-300 text-black shadow-[0_0_22px_rgba(251,191,36,0.5)]">
+            <Crown className="h-3.5 w-3.5" />
+          </span>
+        ) : null}
       </button>
       <div
         className={`pointer-events-auto invisible absolute z-[160] w-72 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
@@ -860,6 +867,31 @@ function removeParticipant(room: TriadRoom, participantId: string): TriadRoom {
       challenger: room.seats.challenger?.id === participantId ? null : room.seats.challenger,
     },
     spectators: room.spectators.filter((viewer) => viewer.id !== participantId),
+  };
+}
+
+function roomWithOptimisticJoin(room: TriadRoom, participant: RoomParticipant, forceSpectator: boolean): TriadRoom {
+  if (participantInRoom(room, participant.id)) return room;
+  const mustSpectate = Boolean(forceSpectator || room.status === "playing" || (room.seats.host && room.seats.challenger));
+  if (!mustSpectate && !room.seats.host) {
+    return {
+      ...room,
+      seats: { ...room.seats, host: participant },
+      hostId: participant.id,
+      updatedAt: Date.now(),
+    };
+  }
+  if (!mustSpectate) {
+    return {
+      ...room,
+      seats: { ...room.seats, challenger: participant },
+      updatedAt: Date.now(),
+    };
+  }
+  return {
+    ...room,
+    spectators: [participant, ...room.spectators].slice(0, SPECTATOR_LIMIT),
+    updatedAt: Date.now(),
   };
 }
 
@@ -1678,20 +1710,36 @@ function DeckCard({
   disabled,
   disabledReason,
   onClick,
+  onPreview,
+  onPreviewEnd,
 }: {
   card: CardView;
   selected: boolean;
   disabled: boolean;
   disabledReason?: string;
   onClick: () => void;
+  onPreview?: (card: CardView) => void;
+  onPreviewEnd?: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={disabled && !selected}
+      onClick={() => {
+        if (disabled && !selected) return;
+        onClick();
+      }}
+      onMouseEnter={() => onPreview?.(card)}
+      onMouseLeave={onPreviewEnd}
+      onPointerEnter={() => onPreview?.(card)}
+      onPointerMove={() => onPreview?.(card)}
+      onPointerLeave={onPreviewEnd}
+      onFocus={() => onPreview?.(card)}
+      onBlur={onPreviewEnd}
+      aria-disabled={disabled && !selected}
       title={disabled && !selected ? disabledReason : selected ? "คลิกอีกครั้งเพื่อลบการ์ดใบนี้" : undefined}
-      className={`group relative min-w-0 overflow-hidden rounded-xl border bg-black/52 text-left shadow-[0_18px_48px_rgba(0,0,0,0.32)] transition hover:-translate-y-1 hover:border-amber-300/60 disabled:cursor-not-allowed disabled:opacity-35 ${
+      className={`group relative min-w-0 overflow-hidden rounded-xl border bg-black/52 text-left shadow-[0_18px_48px_rgba(0,0,0,0.32)] transition hover:-translate-y-1 hover:border-amber-300/60 ${
+        disabled && !selected ? "cursor-not-allowed opacity-45" : ""
+      } ${
         selected ? "border-amber-300 ring-2 ring-amber-300/30" : "border-white/10"
       }`}
     >
@@ -3028,10 +3076,12 @@ function CardHoverPreview({
 function BattleRoomChatPanel({
   room,
   currentUserId,
+  rankProfiles,
   onSend,
 }: {
   room: TriadRoom | null | undefined;
   currentUserId: string;
+  rankProfiles: Record<string, TriadRankProfile>;
   onSend: (text: string) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState("");
@@ -3074,7 +3124,7 @@ function BattleRoomChatPanel({
   };
 
   return (
-    <section className="triad-battle-chat-panel flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-amber-200/24 bg-[radial-gradient(circle_at_18%_0%,rgba(251,191,36,0.16),transparent_34%),linear-gradient(180deg,rgba(18,13,5,0.94),rgba(4,4,7,0.98))] shadow-[0_24px_70px_rgba(0,0,0,0.42),0_0_42px_rgba(251,191,36,0.08),inset_0_0_0_1px_rgba(255,244,214,0.055)] 2xl:h-[min(560px,calc(100vh-300px))] 2xl:min-h-[380px]">
+    <section className="triad-battle-chat-panel flex min-h-[300px] flex-col rounded-2xl border border-amber-200/24 bg-[radial-gradient(circle_at_18%_0%,rgba(251,191,36,0.16),transparent_34%),linear-gradient(180deg,rgba(18,13,5,0.94),rgba(4,4,7,0.98))] shadow-[0_24px_70px_rgba(0,0,0,0.42),0_0_42px_rgba(251,191,36,0.08),inset_0_0_0_1px_rgba(255,244,214,0.055)] 2xl:h-[min(560px,calc(100vh-300px))] 2xl:min-h-[380px]">
       <div className="border-b border-amber-200/14 bg-[linear-gradient(135deg,rgba(251,191,36,0.22),rgba(180,83,9,0.12),transparent)] px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -3098,15 +3148,20 @@ function BattleRoomChatPanel({
         {messages.length > 0 ? (
           messages.map((message) => {
             const mine = message.senderId === currentUserId;
+            const messageParticipant: RoomParticipant = {
+              id: message.senderId,
+              name: message.senderName,
+              image: message.senderImage || "/avatar.png",
+              joinedAt: message.createdAt,
+            };
             return (
               <div key={message.id} className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
                 {!mine ? (
-                  <Image
-                    src={message.senderImage || "/avatar.png"}
-                    alt={message.senderName}
-                    width={34}
-                    height={34}
-                    className="mt-1 h-8 w-8 shrink-0 rounded-lg border border-white/10 object-cover"
+                  <MiniProfileHover
+                    participant={messageParticipant}
+                    profile={profileForParticipant(messageParticipant, rankProfiles)}
+                    label="แชทสนาม"
+                    currentParticipantId={currentUserId}
                   />
                 ) : null}
                 <div className={`max-w-[88%] ${mine ? "text-right" : "text-left"}`}>
@@ -3310,6 +3365,7 @@ function RoomSeatCard({
   emptyText,
   canTake,
   onTake,
+  currentParticipantId,
 }: {
   label: string;
   participant: RoomParticipant | null;
@@ -3319,6 +3375,7 @@ function RoomSeatCard({
   emptyText: string;
   canTake: boolean;
   onTake: () => void;
+  currentParticipantId?: string;
 }) {
   const toneClass =
     tone === "host"
@@ -3326,7 +3383,7 @@ function RoomSeatCard({
       : "border-amber-200/28 from-[#2a1112]/82 via-[#120608]/88 to-black";
   const botSeat = isBotParticipant(participant);
   return (
-    <div className={`relative min-h-[320px] overflow-hidden rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
+    <div className={`relative min-h-[320px] rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.1),transparent)] opacity-30" />
       <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/60 to-transparent" />
       <div className="relative mb-4 flex items-center justify-between gap-3">
@@ -3341,7 +3398,15 @@ function RoomSeatCard({
               AI COMBAT CORE
             </div>
           ) : null}
-          <RankAvatar participant={participant} profile={profile} size="xl" crown={isLeader} />
+          <MiniProfileHover
+            participant={participant}
+            profile={profile}
+            label={botSeat ? "AI COMBAT CORE" : profile?.rankName || rankFrames[rankIndexForParticipant(participant, profile)].name}
+            size="xl"
+            align="right"
+            crown={isLeader}
+            currentParticipantId={currentParticipantId}
+          />
           <div className="mt-5 w-full border-y border-white/10 bg-black/34 px-3 py-3">
             <div className="truncate text-2xl font-black uppercase tracking-normal text-white">{participant.name}</div>
             <div className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-amber-100/62">
@@ -3413,7 +3478,13 @@ function SpectatorPanel({
           return (
             <div key={spectator?.id || index} className="flex min-h-14 items-center gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3">
               {spectator ? (
-                <RankAvatar participant={spectator} profile={profileForParticipant(spectator, rankProfiles)} size="sm" />
+                <MiniProfileHover
+                  participant={spectator}
+                  profile={profileForParticipant(spectator, rankProfiles)}
+                  label={`ผู้ชม ${index + 1}`}
+                  align="right"
+                  currentParticipantId={currentId}
+                />
               ) : (
                 <div className="grid h-10 w-10 place-items-center rounded-full border border-dashed border-white/12 bg-black/35 text-[10px] font-black text-white/24">
                   {index + 1}
@@ -4180,6 +4251,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [createRoomWithBot, setCreateRoomWithBot] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
+  const [joiningRoomCode, setJoiningRoomCode] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
   const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
   const activeRoomCodeRef = useRef("");
@@ -4221,6 +4293,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [matchScore, setMatchScore] = useState({ player: 0, bot: 0 });
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [spectatorPreviewCard, setSpectatorPreviewCard] = useState<CardView | null>(null);
+  const [deckPreviewCard, setDeckPreviewCard] = useState<CardView | null>(null);
   const [openingTieBreakPendingChoice, setOpeningTieBreakPendingChoice] = useState<TriadRpsChoice | null>(null);
   const [openingTieBreakResultVisible, setOpeningTieBreakResultVisible] = useState(false);
   const [openingTieBreakResultKey, setOpeningTieBreakResultKey] = useState("");
@@ -4607,7 +4680,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (
         optimisticRoom &&
         optimisticRoom.code === room.code &&
-        Date.now() < optimisticRoomLockUntilRef.current
+        Date.now() < optimisticRoomLockUntilRef.current &&
+        !roomDecksReadyForBattle(room)
       ) {
         return keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(room, optimisticRoom));
       }
@@ -4619,7 +4693,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const stableRoom =
       optimisticRoom &&
       optimisticRoom.code === room.code &&
-      Date.now() < optimisticRoomLockUntilRef.current
+      Date.now() < optimisticRoomLockUntilRef.current &&
+      !roomDecksReadyForBattle(room)
         ? mergeRoomWithStableChat(room, optimisticRoom)
         : room;
     return mergeRoomByCode(current, keepPendingOpeningTieBreakChoice(stableRoom));
@@ -4729,7 +4804,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const stableActionRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom));
       const activeStableRoom = setStableActiveRoomSnapshot(stableActionRoom);
       if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
-        const nextPhase = phaseForPlayingRoom(activeStableRoom, participant.id);
+        const nextPhase = payload.battleReady ? "battle" : phaseForPlayingRoom(activeStableRoom, participant.id);
         if (nextPhase) setPhase(nextPhase);
       }
     } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
@@ -4914,41 +4989,78 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setLobbyMessage("ไม่พบห้องนี้");
       return;
     }
+    if (joiningRoomCode === code) return;
     if (room?.access === "private" && !passwordInput.trim() && room.hostId !== participant.id) {
       setPasswordRoom(room);
       setLobbyMessage("");
       return;
     }
 
+    const shouldEnterAsSpectator = forceSpectator || room?.status === "playing";
+    const canOptimisticallyEnter = Boolean(room && (room.access !== "private" || room.hostId === participant.id));
+    const optimisticRoom = room ? roomWithOptimisticJoin(room, participant, shouldEnterAsSpectator) : null;
+    const previousRoomCode = activeRoomCodeRef.current;
+    const previousRoomSnapshot = activeRoomSnapshotRef.current;
+    const previousPhase = phase;
+    let usedOptimisticRoom = false;
+
+    setJoiningRoomCode(code);
+    setLobbyMessage("");
+    if (canOptimisticallyEnter && optimisticRoom) {
+      usedOptimisticRoom = true;
+      activeRoomCodeRef.current = optimisticRoom.code;
+      setActiveRoomCode(optimisticRoom.code);
+      setStableActiveRoomSnapshot(optimisticRoom);
+      setRooms((current) => mergeIncomingRoom(current, optimisticRoom));
+      setPhase(optimisticRoom.status === "playing" ? phaseForPlayingRoom(optimisticRoom, participant.id) || "battle" : "room");
+    } else {
+      setLobbyMessage("กำลังเข้าห้อง...");
+    }
+
+    const restoreBeforeOptimisticJoin = () => {
+      if (!usedOptimisticRoom) return;
+      activeRoomCodeRef.current = previousRoomCode;
+      activeRoomSnapshotRef.current = previousRoomSnapshot;
+      setActiveRoomCode(previousRoomCode);
+      setActiveRoomSnapshot(previousRoomSnapshot);
+      writeCachedTriadRoom(participant.id, previousRoomSnapshot);
+      setPhase(previousPhase);
+    };
+
     const result = await postRoomAction({
       action: "join",
       code,
       password: passwordInput.trim(),
-      forceSpectator,
-    });
+      forceSpectator: shouldEnterAsSpectator,
+    }).catch(() => null);
 
-    if (!result.ok) {
-      const lockedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || null;
-      if (result.payload?.reason === "wrong_password" && lockedRoom && !passwordInput.trim()) {
+    if (!result?.ok) {
+      const lockedRoom = normalizeApiRooms(result?.payload?.room ? [result.payload.room] : [])[0] || null;
+      restoreBeforeOptimisticJoin();
+      setJoiningRoomCode("");
+      if (result?.payload?.reason === "wrong_password" && lockedRoom && !passwordInput.trim()) {
         setPasswordRoom(lockedRoom);
         setLobbyMessage("");
         return;
       }
-      setLobbyMessage(result.payload?.reason === "wrong_password" ? "รหัสห้องไม่ถูกต้อง" : "เข้าห้องนี้ไม่ได้");
+      setLobbyMessage(result?.payload?.reason === "wrong_password" ? "รหัสห้องไม่ถูกต้อง" : "เข้าห้องนี้ไม่ได้");
       return;
     }
 
     setPasswordRoom(null);
     setJoinPassword("");
-    const joinedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || room;
+    const joinedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || optimisticRoom || room;
     if (!joinedRoom?.code) {
+      restoreBeforeOptimisticJoin();
+      setJoiningRoomCode("");
       setLobbyMessage("ไม่พบห้องนี้");
       return;
     }
-    setActiveRoomSnapshot(joinedRoom);
     activeRoomSnapshotRef.current = joinedRoom;
     activeRoomCodeRef.current = joinedRoom.code;
     setActiveRoomCode(joinedRoom.code);
+    setStableActiveRoomSnapshot(joinedRoom);
+    setJoiningRoomCode("");
     setLobbyMessage(result.payload?.joinedAs === "spectator" ? "เข้ามาเป็นผู้ชมแล้ว" : "");
     setPhase(joinedRoom.status === "playing" ? phaseForPlayingRoom(joinedRoom, participant.id) || "battle" : "room");
   };
@@ -5546,7 +5658,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const enemyDeck = room.game.decks[opponentSide];
       setBotDeck(enemyDeck);
       setPlayerDeck(ownDeck);
-      if (roomDecksReadyForBattle(room)) {
+      if (result.payload?.battleReady || roomDecksReadyForBattle(room)) {
         setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
@@ -5579,7 +5691,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           setDeckReadySubmitting(false);
           if (result.ok) {
             const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
-            if (roomDecksReadyForBattle(room)) {
+            if (result.payload?.battleReady || roomDecksReadyForBattle(room)) {
+              setPhase("battle");
               setBattleLog(["หมดเวลาเลือกเด็ค ระบบล็อกเด็คเท่าที่เลือกไว้แล้ว"]);
             }
           }
@@ -6473,6 +6586,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 8);
     const searchedRoom = joinCode.length === 6 ? rooms.find((room) => room.code === joinCode) : null;
+    const isJoiningSearchedRoom = Boolean(joinCode.length === 6 && joiningRoomCode === joinCode);
 
     return (
       <main className="triad-lobby-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
@@ -6508,10 +6622,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 </button>
                 <button
                   type="button"
-                  onClick={() => enterRoom(passwordRoom.code, false, joinPassword)}
-                  className="h-11 rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200"
+                  onClick={() => enterRoom(passwordRoom.code, passwordRoom.status === "playing", joinPassword)}
+                  disabled={joiningRoomCode === passwordRoom.code}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-300 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-70"
                 >
-                  ยืนยัน
+                  {joiningRoomCode === passwordRoom.code ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {joiningRoomCode === passwordRoom.code ? "กำลังเข้า..." : "ยืนยัน"}
                 </button>
               </div>
             </div>
@@ -6716,12 +6832,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               />
               <button
                 type="button"
-                onClick={() => enterRoom()}
-                disabled={joinCode.length !== 6}
+                onClick={() => enterRoom(joinCode, searchedRoom?.status === "playing")}
+                disabled={joinCode.length !== 6 || isJoiningSearchedRoom}
                 className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.26)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
               >
-                <KeyRound className="h-4 w-4" />
-                {searchedRoom?.status === "playing" ? "เข้าชม" : "เข้าห้อง"}
+                {isJoiningSearchedRoom ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                {isJoiningSearchedRoom ? "กำลังเข้า..." : searchedRoom?.status === "playing" ? "เข้าชม" : "เข้าห้อง"}
               </button>
             </div>
             {lobbyMessage ? (
@@ -6769,10 +6885,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   </div>
                   <button
                     type="button"
-                    onClick={() => (room.access === "private" && room.hostId !== participant.id ? setPasswordRoom(room) : enterRoom(room.code))}
-                    className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-red-500 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_28px_rgba(239,68,68,0.26)] transition hover:bg-red-400"
+                    onClick={() => (room.access === "private" && room.hostId !== participant.id ? setPasswordRoom(room) : enterRoom(room.code, room.status === "playing"))}
+                    disabled={joiningRoomCode === room.code}
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_28px_rgba(239,68,68,0.26)] transition hover:bg-red-400 disabled:cursor-wait disabled:bg-red-500/70"
                   >
-                    {room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}
+                    {joiningRoomCode === room.code ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {joiningRoomCode === room.code ? "กำลังเข้า..." : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}
                   </button>
                 </div>
               )) : (
@@ -6906,6 +7024,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               emptyText="ช่องเจ้าของห้องว่าง"
               canTake={currentIsSpectator && !currentRoom.seats.host}
               onTake={() => takeFieldSlot("host")}
+              currentParticipantId={participant.id}
             />
             <RoomSeatCard
               label="ฝั่งผู้ท้าชิง"
@@ -6916,6 +7035,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               emptyText="รอผู้ท้าชิง"
               canTake={currentIsSpectator && !currentRoom.seats.challenger}
               onTake={() => takeFieldSlot("challenger")}
+              currentParticipantId={participant.id}
             />
             <div className="md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
               <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">กติกาห้อง</div>
@@ -6937,7 +7057,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               ) : null}
             </div>
             <div className="md:col-span-2">
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
             </div>
           </div>
 
@@ -7050,6 +7170,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   disabled={disabled}
                   disabledReason={disabledReason}
                   onClick={() => toggleDeckCard(card.cardNo)}
+                  onPreview={setDeckPreviewCard}
+                  onPreviewEnd={() => setDeckPreviewCard(null)}
                 />
               );
             })}
@@ -7066,6 +7188,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   key={card.cardNo}
                   type="button"
                   onClick={() => toggleDeckCard(card.cardNo)}
+                  onMouseEnter={() => setDeckPreviewCard(card)}
+                  onMouseLeave={() => setDeckPreviewCard(null)}
+                  onPointerEnter={() => setDeckPreviewCard(card)}
+                  onPointerMove={() => setDeckPreviewCard(card)}
+                  onPointerLeave={() => setDeckPreviewCard(null)}
+                  onFocus={() => setDeckPreviewCard(card)}
+                  onBlur={() => setDeckPreviewCard(null)}
                   className="flex w-full items-center gap-3 rounded-xl border border-white/8 bg-black/24 p-2 text-left transition hover:border-amber-300/40 hover:bg-amber-300/6"
                 >
                   <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-300 text-xs font-black text-black">
@@ -7100,6 +7229,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </button>
           </div>
         ) : null}
+        <CardHoverPreview card={deckPreviewCard} onClose={() => setDeckPreviewCard(null)} passive />
       </main>
     );
   }
@@ -7514,7 +7644,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
           {currentRoom ? (
             <div className="triad-room-actions-mobile space-y-2 2xl:hidden">
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
               {deckSelectionActive ? (
                 <DeckSelectionStatusBanner
                   title="กำลังเลือกเด็ค"
@@ -7533,7 +7663,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex 2xl:h-[calc(100vh-136px)] 2xl:max-h-[calc(100vh-136px)]">
           {currentRoom ? (
             <div className="space-y-2">
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} onSend={sendRoomChat} />
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
               {deckSelectionActive ? (
                 <DeckSelectionStatusBanner
                   title="กำลังเลือกเด็ค"
