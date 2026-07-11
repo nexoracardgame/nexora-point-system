@@ -258,13 +258,13 @@ const MIN_SYNC_GAP_MS = 140;
 const TRIAD_RESUME_ROOM_CACHE_KEY = "nexora:triad:active-room";
 const TRIAD_BOT_ID = "triad-bot-level-99";
 const rankFrames = [
-  { key: "bronze", name: "???????????", aura: "from-orange-700/40 via-amber-900/18 to-black/20", ring: "border-orange-400/58 shadow-[0_0_26px_rgba(251,146,60,0.24)]", badge: "bg-orange-400 text-black" },
-  { key: "silver", name: "?????????????", aura: "from-white/46 via-slate-300/18 to-black/18", ring: "border-slate-100/75 shadow-[0_0_34px_rgba(226,232,240,0.3)]", badge: "bg-slate-100 text-black" },
-  { key: "gold", name: "??????????", aura: "from-yellow-100/62 via-amber-400/28 to-black/18", ring: "border-yellow-200/90 shadow-[0_0_42px_rgba(250,204,21,0.44)]", badge: "bg-yellow-200 text-black" },
-  { key: "platinum", name: "???????????????", aura: "from-cyan-100/58 via-teal-300/24 to-black/20", ring: "border-cyan-100/85 shadow-[0_0_46px_rgba(125,211,252,0.42)]", badge: "bg-cyan-100 text-black" },
-  { key: "diamond", name: "????????????", aura: "from-sky-100/70 via-blue-400/32 to-violet-400/16", ring: "border-sky-100 shadow-[0_0_56px_rgba(96,165,250,0.54)]", badge: "bg-sky-200 text-black" },
-  { key: "master", name: "?????????????", aura: "from-fuchsia-200/64 via-rose-500/28 to-violet-700/24", ring: "border-fuchsia-100 shadow-[0_0_64px_rgba(217,70,239,0.55)]", badge: "bg-fuchsia-200 text-black" },
-  { key: "god-of-legends", name: "????? God Of Legends", aura: "from-yellow-100/80 via-rose-300/42 to-violet-400/32", ring: "border-yellow-100 shadow-[0_0_82px_rgba(250,204,21,0.72)]", badge: "bg-gradient-to-r from-yellow-100 via-rose-200 to-violet-200 text-black" },
+  { key: "bronze", name: "Bronze", aura: "from-orange-700/40 via-amber-900/18 to-black/20", ring: "border-orange-400/58 shadow-[0_0_26px_rgba(251,146,60,0.24)]", badge: "bg-orange-400 text-black" },
+  { key: "silver", name: "Silver", aura: "from-white/46 via-slate-300/18 to-black/18", ring: "border-slate-100/75 shadow-[0_0_34px_rgba(226,232,240,0.3)]", badge: "bg-slate-100 text-black" },
+  { key: "gold", name: "Gold", aura: "from-yellow-100/62 via-amber-400/28 to-black/18", ring: "border-yellow-200/90 shadow-[0_0_42px_rgba(250,204,21,0.44)]", badge: "bg-yellow-200 text-black" },
+  { key: "platinum", name: "Platinum", aura: "from-cyan-100/58 via-teal-300/24 to-black/20", ring: "border-cyan-100/85 shadow-[0_0_46px_rgba(125,211,252,0.42)]", badge: "bg-cyan-100 text-black" },
+  { key: "diamond", name: "Diamond", aura: "from-sky-100/70 via-blue-400/32 to-violet-400/16", ring: "border-sky-100 shadow-[0_0_56px_rgba(96,165,250,0.54)]", badge: "bg-sky-200 text-black" },
+  { key: "master", name: "Master", aura: "from-fuchsia-200/64 via-rose-500/28 to-violet-700/24", ring: "border-fuchsia-100 shadow-[0_0_64px_rgba(217,70,239,0.55)]", badge: "bg-fuchsia-200 text-black" },
+  { key: "god-of-legends", name: "God Of Legends", aura: "from-yellow-100/80 via-rose-300/42 to-violet-400/32", ring: "border-yellow-100 shadow-[0_0_82px_rgba(250,204,21,0.72)]", badge: "bg-gradient-to-r from-yellow-100 via-rose-200 to-violet-200 text-black" },
 ] as const;
 
 type SkillTargetId = "player-top" | "bot-top";
@@ -682,7 +682,7 @@ function MiniProfileHover({
   size?: "sm" | "md";
   currentParticipantId?: string;
 }) {
-  const profileName = name || participant?.name || "???????";
+  const profileName = name || participant?.name || "ผู้เล่น";
   const profileImage = image || participant?.image || "/avatar.png";
   const frame = rankFrames[rankIndexForParticipant(participant || { id: profileName }, profile)] || rankFrames[0];
   const avatarSize = size === "md" ? "h-11 w-11" : "h-9 w-9";
@@ -718,21 +718,21 @@ function MiniProfileHover({
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <div className="rounded-xl border border-emerald-200/16 bg-emerald-300/10 px-2 py-2 text-center">
-            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100/60">???</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100/60">ชนะ</div>
             <div className="mt-1 text-lg font-black text-emerald-100">{wins.toLocaleString()}</div>
           </div>
           <div className="rounded-xl border border-rose-200/16 bg-rose-300/10 px-2 py-2 text-center">
-            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-rose-100/60">???</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-rose-100/60">แพ้</div>
             <div className="mt-1 text-lg font-black text-rose-100">{losses.toLocaleString()}</div>
           </div>
           <div className="rounded-xl border border-amber-200/16 bg-amber-300/10 px-2 py-2 text-center">
-            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/60">???%</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/60">ชนะ%</div>
             <div className="mt-1 text-lg font-black text-amber-100">{winRate}%</div>
           </div>
         </div>
         <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-black leading-5 ${frame.badge}`}>
           {profile?.rankName || frame.name}
-          {profile?.nextRankWins ? <span className="ml-2 opacity-70">??? {Math.max(0, profile.nextRankWins - wins).toLocaleString()} ???????????????</span> : <span className="ml-2 opacity-80">??????????</span>}
+          {profile?.nextRankWins ? <span className="ml-2 opacity-70">อีก {Math.max(0, profile.nextRankWins - wins).toLocaleString()} ชนะเพื่อแรงก์ถัดไป</span> : <span className="ml-2 opacity-80">แรงก์สูงสุดแล้ว</span>}
         </div>
         <BattleMiniFriendButton targetUserId={participant?.id} currentUserId={currentParticipantId} />
       </div>
