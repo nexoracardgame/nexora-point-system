@@ -4822,16 +4822,50 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     };
   };
 
+  const shouldKeepOptimisticRoomOverIncoming = (optimisticRoom: TriadRoom | null | undefined, incomingRoom: TriadRoom) => {
+    if (!optimisticRoom || optimisticRoom.code !== incomingRoom.code) return false;
+    if (Date.now() >= optimisticRoomLockUntilRef.current) return false;
+    if (incomingRoom.game.matchEndedAt) return false;
+    if (roomProgressValue(incomingRoom) > roomProgressValue(optimisticRoom)) return false;
+    if (
+      incomingRoom.game.fightNo === optimisticRoom.game.fightNo &&
+      incomingRoom.game.activeTurn === optimisticRoom.game.activeTurn &&
+      incomingRoom.game.turns.some((turn) => turn.turn === incomingRoom.game.activeTurn)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  const mergeOptimisticRoomOverIncoming = (incomingRoom: TriadRoom, optimisticRoom: TriadRoom) => {
+    const stableIncoming = mergeRoomWithStableChat(optimisticRoom, incomingRoom);
+    return {
+      ...stableIncoming,
+      game: {
+        ...stableIncoming.game,
+        triangles: {
+          host: {
+            top: stableIncoming.game.triangles.host.top || optimisticRoom.game.triangles.host.top,
+            left: stableIncoming.game.triangles.host.left || optimisticRoom.game.triangles.host.left,
+            right: stableIncoming.game.triangles.host.right || optimisticRoom.game.triangles.host.right,
+          },
+          challenger: {
+            top: stableIncoming.game.triangles.challenger.top || optimisticRoom.game.triangles.challenger.top,
+            left: stableIncoming.game.triangles.challenger.left || optimisticRoom.game.triangles.challenger.left,
+            right: stableIncoming.game.triangles.challenger.right || optimisticRoom.game.triangles.challenger.right,
+          },
+        },
+      },
+    };
+  };
+
   const mergeIncomingRooms = (current: TriadRoom[], nextRooms: TriadRoom[]) =>
     mergeRoomListsWithStableChat(current, nextRooms).map((room) => {
       const optimisticRoom = activeRoomSnapshotRef.current;
       if (
-        optimisticRoom &&
-        optimisticRoom.code === room.code &&
-        Date.now() < optimisticRoomLockUntilRef.current &&
-        !roomDecksReadyForBattle(room)
+        optimisticRoom && shouldKeepOptimisticRoomOverIncoming(optimisticRoom, room)
       ) {
-        return keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(room, optimisticRoom));
+        return keepPendingOpeningTieBreakChoice(mergeOptimisticRoomOverIncoming(room, optimisticRoom));
       }
       return keepPendingOpeningTieBreakChoice(room);
     }).concat((() => {
@@ -4843,11 +4877,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const mergeIncomingRoom = (current: TriadRoom[], room: TriadRoom) => {
     const optimisticRoom = activeRoomSnapshotRef.current;
     const stableRoom =
-      optimisticRoom &&
-      optimisticRoom.code === room.code &&
-      Date.now() < optimisticRoomLockUntilRef.current &&
-      !roomDecksReadyForBattle(room)
-        ? mergeRoomWithStableChat(room, optimisticRoom)
+      optimisticRoom && shouldKeepOptimisticRoomOverIncoming(optimisticRoom, room)
+        ? mergeOptimisticRoomOverIncoming(room, optimisticRoom)
         : room;
     return mergeRoomByCode(current, keepPendingOpeningTieBreakChoice(stableRoom));
   };
@@ -4947,7 +4978,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     });
     const payload = await response.json().catch(() => ({}));
     const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
-    if (actionRoom) optimisticRoomLockUntilRef.current = 0;
+    if (actionRoom) {
+      optimisticRoomLockUntilRef.current =
+        body.action === "lock-card" && !payload.resolved
+          ? Math.max(optimisticRoomLockUntilRef.current, Date.now() + 1400)
+          : 0;
+    }
     let nextRooms = Array.isArray(payload.rooms) ? normalizeApiRooms(payload.rooms) : rooms;
     if ((body.action === "disband" || (body.action === "leave" && !actionRoom)) && activeRoomCodeRef.current) {
       nextRooms = nextRooms.filter((room) => room.code !== activeRoomCodeRef.current);
@@ -5991,7 +6027,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       void postRoomAction({ action: "run-bot", code: currentRoom.code }).then((result) => {
         if (!result.ok) botRunKeyRef.current = "";
       });
-    }, 420);
+    }, 25);
     return () => window.clearTimeout(timer);
   }, [currentRoom, hasBotOpponent, participant.id]);
 

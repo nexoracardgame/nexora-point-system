@@ -1920,7 +1920,6 @@ function lockBotCard(room: StoredTriadRoom) {
   if (!isTriadBotParticipant(room.seats.challenger)) return false;
   const lane = laneForTurn(room.game.activeTurn);
   if (room.game.triangles.challenger[lane]) return false;
-  if (!room.game.triangles.host[lane]) return false;
   const cardNo = chooseBotCardForTurn(room);
   if (!cardNo) return false;
   room.game.triangles.challenger[lane] = cardNo;
