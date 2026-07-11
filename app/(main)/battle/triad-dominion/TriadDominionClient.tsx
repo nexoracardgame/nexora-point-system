@@ -2444,6 +2444,13 @@ function HandCard({
   onPreviewEnd: () => void;
 }) {
   const holdPreviewPointerRef = useRef<number | null>(null);
+  const playStampRef = useRef(0);
+  const playCardOnce = () => {
+    const now = Date.now();
+    if (now - playStampRef.current < 220) return;
+    playStampRef.current = now;
+    onClick();
+  };
   const isPreviewOnlyInput = () =>
     Boolean(previewOnly) ||
     (typeof window !== "undefined" &&
@@ -2463,11 +2470,11 @@ function HandCard({
           event.stopPropagation();
           return;
         }
-        if (disabled || used) {
+        if (disabled) {
           onPreview(card);
           return;
         }
-        onClick();
+        playCardOnce();
       }}
       onMouseEnter={() => {
         if (isPreviewOnlyInput()) return;
@@ -2505,15 +2512,15 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
-          if (disabled || used) {
+          if (disabled) {
             onPreview(card);
             return;
           }
           closeHoldPreview();
-          onClick();
+          playCardOnce();
           return;
         }
-        if (disabled || used) return;
+        if (disabled) return;
         onPreview(card);
         const target = document
           .elementFromPoint(event.clientX, event.clientY)
@@ -2525,6 +2532,12 @@ function HandCard({
         if (isPreviewOnlyInput()) {
           event.preventDefault();
           event.stopPropagation();
+          if (disabled) {
+            onPreview(card);
+            return;
+          }
+          closeHoldPreview();
+          playCardOnce();
           return;
         }
       }}
@@ -4615,14 +4628,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [cardsByNo, currentDeckMode, currentRoom, deckCatalog, roomPlayerSide]);
   const isPvpRoom = Boolean(currentRoom && roomPlayerSide && opponentSide);
   const roomBattleReady = roomDecksReadyForBattle(currentRoom);
-  const pvpTurnTimedOut = Boolean(
-    isPvpRoom &&
-      roomBattleReady &&
-      currentRoom &&
-      currentRoom.status === "playing" &&
-      (timeLeft <= 0 || roomTurnSecondsLeft(currentRoom) <= 0)
-  );
-  const pvpPlacementClosed = Boolean(isPvpRoom && (roomTurnResolved || pvpTurnTimedOut));
+  const pvpPlacementClosed = Boolean(isPvpRoom && roomTurnResolved);
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
     : "เรา";
@@ -6118,10 +6124,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               [lane]: playerForLock[lane],
             },
           },
-          usedCards: {
-            ...room.game.usedCards,
-            [roomPlayerSide]: Array.from(new Set([...(room.game.usedCards[roomPlayerSide] || []), playerForLock[lane]].filter(Boolean))),
-          },
         },
       }));
       setTurnLocked(true);
@@ -6243,13 +6245,41 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const placeAndLockCard = (lane: Lane, cardNo: string) => {
     setPlacementLane(lane);
+    if (currentRoom && roomPlayerSide && opponentSide) {
+      const roomActiveLane = laneForTurn(currentRoom.game.activeTurn);
+      const roomTurnResolvedNow = currentRoom.game.turns.some((turn) => turn.turn === currentRoom.game.activeTurn);
+      if (lane !== roomActiveLane || roomTurnResolvedNow || matchDone) return;
+      const existingRoomCard = currentRoom.game.triangles[roomPlayerSide]?.[roomActiveLane] || "";
+      if (existingRoomCard && existingRoomCard !== cardNo) {
+        setBattleLog((current) => ["ตานี้ล็อกการ์ดไปแล้ว รอผลจากระบบ", ...current]);
+        return;
+      }
+      const card = cardsByNo.get(cardNo);
+      if (!card) return;
+      if (roomActiveLane === "top" && card.kind !== "monster") {
+        setBattleLog((current) => ["ตาแรกต้องวางการ์ดมอนสเตอร์เท่านั้น", ...current]);
+        return;
+      }
+      if (currentDeckMode === "monster" && card.kind !== "monster") {
+        setBattleLog((current) => ["โหมด MONSTER ใช้การ์ดมอนสเตอร์เท่านั้น", ...current]);
+        return;
+      }
+      if ((currentDeckMode === "skill" || currentDeckMode === "all") && roomActiveLane !== "top" && card.kind !== "skill") {
+        setBattleLog((current) => ["ตานี้ต้องใช้การ์ดสกิล", ...current]);
+        return;
+      }
+      setActiveTurn(currentRoom.game.activeTurn);
+      setPlayer((current) => ({ ...current, [roomActiveLane]: cardNo }));
+      lockFight(cardNo, roomActiveLane);
+      return;
+    }
     if (setPlayerLane(lane, cardNo)) {
       lockFight(cardNo, lane);
     }
   };
 
   const placeCardFromHand = (cardNo: string) => {
-    placeAndLockCard(laneForTurn(activeTurn), cardNo);
+    placeAndLockCard(currentRoom ? laneForTurn(currentRoom.game.activeTurn) : laneForTurn(activeTurn), cardNo);
   };
 
   const confirmSkillTarget = () => {
