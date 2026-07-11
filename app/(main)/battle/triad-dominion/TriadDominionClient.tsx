@@ -4611,7 +4611,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       currentRoom.status === "playing" &&
       (timeLeft <= 0 || roomTurnSecondsLeft(currentRoom) <= 0)
   );
-  const pvpPlacementClosed = Boolean(isPvpRoom && (roomTurnResolved || currentResult || pvpTurnTimedOut));
+  const pvpPlacementClosed = Boolean(isPvpRoom && (roomTurnResolved || pvpTurnTimedOut));
   const playerLabel = roomPlayerSide
     ? currentRoom?.seats[roomPlayerSide]?.name || "เรา"
     : "เรา";
@@ -4634,6 +4634,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const displayFightScore = spectatorBattleState?.fightScore || fightScore;
   const displayTimeLeft = spectatorBattleState?.timeLeft ?? timeLeft;
   const displayTurnLocked = spectatorBattleState?.turnLocked ?? turnLocked;
+  const ownActiveLaneLocked = Boolean(
+    currentRoom && roomPlayerSide
+      ? currentRoom.game.triangles[roomPlayerSide]?.[laneForTurn(currentRoom.game.activeTurn)]
+      : player[laneForTurn(activeTurn)]
+  );
+  const handPlacementLocked = Boolean(matchDone || pvpPlacementClosed || (isPvpRoom ? ownActiveLaneLocked : displayTurnLocked));
   const placementLocked = Boolean(displayTurnLocked || matchDone || pvpPlacementClosed);
   const displayPlayerName = spectatorBattleState?.playerName || playerLabel;
   const displayBotName = spectatorBattleState?.botName || opponentLabel;
@@ -5970,7 +5976,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setBattleLog((current) => ["หมดเวลาหรือตานี้ถูกตัดสินแล้ว ไม่สามารถวางการ์ดเพิ่มได้ กดพร้อมเพื่อไปต่อเท่านั้น", ...current]);
       return false;
     }
-    if (turnLocked || matchDone || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return false;
+    if (handPlacementLocked || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return false;
     const alreadyPlayedLane = (["top", "left", "right"] as Lane[]).find((item) => item !== lane && player[item] === cardNo);
     if (alreadyPlayedLane) return false;
     const card = cardsByNo.get(cardNo);
@@ -7698,7 +7704,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               currentParticipantId={participant.id}
               placementLane={placementLane}
               timeLeft={displayTimeLeft}
-              turnLocked={placementLocked}
+              turnLocked={handPlacementLocked}
               pendingSkillChoice={pendingSkillChoice}
               waitingSkillChoice={waitingSkillChoice}
               revealAllCards={isSpectator}
@@ -7729,7 +7735,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               player={player}
               placementLane={placementLane}
               activeLane={laneForTurn(activeTurn)}
-              locked={placementLocked}
+              locked={handPlacementLocked}
               highlightCardNo={displayRandomDrawCardNo}
               onSelectLane={setPlacementLane}
               onPlayCard={placeCardFromHand}
