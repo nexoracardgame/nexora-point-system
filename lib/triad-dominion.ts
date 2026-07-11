@@ -2425,7 +2425,6 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
       targetLabel: item.targetLabel,
     });
   }
-  return { player: effectivePlayer, opponent: effectiveOpponent, events };
 
   const swapSkills = [
     { side: "player" as const, rule: getLaneSkillRule(player, turn, skippedSkillCardNos) },

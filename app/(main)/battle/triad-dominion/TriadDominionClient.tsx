@@ -4288,6 +4288,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const roomPlayerSide: RoomPlayerSide | null = participantRoomSide(currentRoom, participant);
   const isFieldPlayer = Boolean(roomPlayerSide);
   const isSpectator = Boolean(currentRoom && !isFieldPlayer && currentRoom.spectators.some((viewer) => viewer.id === participant.id));
+  const matchEndingTurn =
+    currentRoom?.game.activeTurn === 1 || currentRoom?.game.activeTurn === 2 || currentRoom?.game.activeTurn === 3
+      ? currentRoom.game.activeTurn
+      : activeTurn;
+  const matchEndingReveal = revealed[matchEndingTurn];
+  const matchFinalVisible = Boolean(
+    matchDone &&
+      (!currentRoom?.game.matchEndedAt || surrenderedSide || isSpectator || matchEndingReveal?.scored)
+  );
   const opponentSide: RoomPlayerSide | null = roomPlayerSide === "host" ? "challenger" : roomPlayerSide === "challenger" ? "host" : null;
   const displayUsedPlayerSet = new Set([
     ...usedPlayerSet,
@@ -5294,13 +5303,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, participant.id, phase]);
 
   useEffect(() => {
-    if (!currentRoom?.game.matchEndedAt || !isRoomController) return;
-    const delay = Math.max(0, 6500 - (Date.now() - currentRoom.game.matchEndedAt));
+    if (!currentRoom?.game.matchEndedAt || !isRoomController || !matchFinalVisible) return;
     const timer = window.setTimeout(() => {
       void postRoomAction({ action: "continue", code: currentRoom.code });
-    }, delay);
+    }, 6500);
     return () => window.clearTimeout(timer);
-  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, isRoomController]);
+  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, isRoomController, matchFinalVisible]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -7107,7 +7115,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ยอมแพ้
         </button>
       ) : null}
-      {matchDone ? (
+      {matchFinalVisible ? (
         <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} />
       ) : null}
       <OpeningTieBreakOverlay
@@ -7365,7 +7373,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
           <div className="triad-game-status grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
               <div className="rounded-xl border border-white/8 bg-black/24 p-4">
-                {matchDone ? (
+                {matchFinalVisible ? (
                   <div className="flex items-center gap-3">
                     <Trophy className="h-7 w-7 text-amber-300" />
                     <div>
@@ -7404,7 +7412,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               </div>
 
               <div className="flex flex-wrap gap-2 md:justify-end">
-                {matchDone ? (
+                {matchFinalVisible ? (
                   isPvpRoom ? (
                     <div className="grid min-w-[220px] grid-cols-1 gap-2 sm:grid-cols-2">
                       <button
