@@ -713,12 +713,19 @@ function MiniProfileHover({
     if (!anchorRef.current || typeof window === "undefined") return;
     const rect = anchorRef.current.getBoundingClientRect();
     const width = 288;
+    const estimatedHeight = 272;
     const safe = 12;
-    const left = align === "right" ? rect.right - width : rect.left;
+    const gap = 12;
+    const preferredLeft = align === "right" ? rect.left - width - gap : rect.right + gap;
+    const fallbackLeft = align === "right" ? rect.right + gap : rect.left - width - gap;
+    const hasPreferredRoom = preferredLeft >= safe && preferredLeft + width <= window.innerWidth - safe;
+    const left = hasPreferredRoom ? preferredLeft : fallbackLeft;
+    const preferredTop = placement === "top" ? rect.top - estimatedHeight - gap : rect.bottom + gap;
     setPanelStyle({
       left: Math.min(Math.max(safe, left), window.innerWidth - width - safe),
-      top: placement === "top" ? Math.max(safe, rect.top - 10) : Math.min(window.innerHeight - safe, rect.bottom + 10),
-      transform: placement === "top" ? "translateY(-100%)" : "translateY(0)",
+      top: Math.min(Math.max(safe, preferredTop), Math.max(safe, window.innerHeight - estimatedHeight - safe)),
+      maxHeight: Math.max(220, window.innerHeight - safe * 2),
+      overflowY: "auto",
     });
   };
   const showPanel = () => {
@@ -748,7 +755,7 @@ function MiniProfileHover({
   }, [open, align, placement]);
 
   return (
-    <div className="relative z-50 inline-flex shrink-0 items-center">
+    <div className="triad-mini-profile-anchor relative z-50 inline-flex shrink-0 items-center">
       <button
         ref={anchorRef}
         type="button"
@@ -771,7 +778,7 @@ function MiniProfileHover({
         ) : null}
       </button>
       <div
-        className={`nexora-battle-preview-portal pointer-events-auto fixed z-[9999] w-72 max-w-[calc(100vw-24px)] rounded-2xl border border-amber-100/28 bg-[#07080d]/96 p-3 text-left shadow-[0_28px_90px_rgba(0,0,0,0.72),0_0_56px_rgba(251,191,36,0.22)] backdrop-blur-xl transition duration-150 ${
+        className={`nexora-battle-preview-portal triad-mini-profile-panel pointer-events-auto fixed z-[9999] w-72 max-w-[calc(100vw-24px)] rounded-2xl border border-amber-100/28 bg-[#07080d]/96 p-3 text-left shadow-[0_28px_90px_rgba(0,0,0,0.72),0_0_56px_rgba(251,191,36,0.22)] backdrop-blur-xl transition duration-150 ${
           open && portalReady ? "visible opacity-100" : "invisible opacity-0"
         }`}
         style={panelStyle}
