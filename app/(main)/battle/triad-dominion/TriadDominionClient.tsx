@@ -5680,6 +5680,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           });
           return;
         }
+        if (room) {
+          forceApplyServerRoom(room);
+        }
         void syncRooms({ force: true }).catch(() => null);
         return;
       }
@@ -5968,7 +5971,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setTimeLeft(roomTurnSecondsLeft(currentRoom));
     setPlayer((current) => {
       const next = { ...serverPlayerTriangle };
-      if (!turnResolved && !serverPlayerTriangle[activeLane] && current[activeLane]) {
+      if (
+        Date.now() < optimisticRoomLockUntilRef.current &&
+        !turnResolved &&
+        !serverPlayerTriangle[activeLane] &&
+        current[activeLane]
+      ) {
         next[activeLane] = current[activeLane];
       }
       return next;
