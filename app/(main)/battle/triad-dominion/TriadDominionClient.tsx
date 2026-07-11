@@ -838,7 +838,8 @@ function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhas
   const spectator = room.spectators.some((viewer) => viewer.id === participantId);
   const fieldPlayer = room.seats.host?.id === participantId || room.seats.challenger?.id === participantId;
   if (!spectator && !fieldPlayer) return null;
-  if (spectator) return "battle";
+  if (room.status !== "playing") return "room";
+  if (spectator) return roomDecksReadyForBattle(room) ? "battle" : "room";
   return roomDecksReadyForBattle(room) ? "battle" : "deck";
 }
 
