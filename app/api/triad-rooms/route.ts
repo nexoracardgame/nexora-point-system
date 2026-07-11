@@ -16,6 +16,7 @@ import {
   moveTriadParticipantToSpectator,
   resetTriadRoomBattle,
   resetTriadRoomOpeningTieBreak,
+  setTriadRoomDeckMode,
   readyTriadRoomDeck,
   setTriadRoomDeck,
   setTriadRoomBotOpponent,
@@ -194,6 +195,16 @@ export async function POST(request: Request) {
 
   if (action === "set-bot") {
     const result = await setTriadRoomBotOpponent(cleanText(body.code), participant.id, Boolean(body.enabled));
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : 409 },
+      result.ok ? { action, code: getPayloadRoomCode(result), room: result.room } : null
+    );
+  }
+
+  if (action === "set-mode") {
+    const deckMode = body.deckMode === "monster" || body.deckMode === "skill" ? body.deckMode : "all";
+    const result = await setTriadRoomDeckMode(cleanText(body.code), participant.id, deckMode);
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

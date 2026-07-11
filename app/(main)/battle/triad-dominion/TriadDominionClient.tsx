@@ -692,11 +692,65 @@ function MiniProfileHover({
   const losses = profile?.losses || 0;
   const totalMatches = wins + losses;
   const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  };
+  const updatePanelPosition = () => {
+    if (!anchorRef.current || typeof window === "undefined") return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const width = 288;
+    const safe = 12;
+    const left = align === "right" ? rect.right - width : rect.left;
+    setPanelStyle({
+      left: Math.min(Math.max(safe, left), window.innerWidth - width - safe),
+      top: placement === "top" ? Math.max(safe, rect.top - 10) : Math.min(window.innerHeight - safe, rect.bottom + 10),
+      transform: placement === "top" ? "translateY(-100%)" : "translateY(0)",
+    });
+  };
+  const showPanel = () => {
+    clearCloseTimer();
+    updatePanelPosition();
+    setOpen(true);
+  };
+  const scheduleClose = () => {
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => setOpen(false), 120);
+  };
+
+  useEffect(() => {
+    setPortalReady(true);
+    return () => clearCloseTimer();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePanelPosition();
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [open, align, placement]);
 
   return (
-    <div className="group relative z-50 inline-flex shrink-0 items-center">
+    <div className="relative z-50 inline-flex shrink-0 items-center">
       <button
+        ref={anchorRef}
         type="button"
+        onMouseEnter={showPanel}
+        onMouseLeave={scheduleClose}
+        onPointerEnter={showPanel}
+        onPointerLeave={scheduleClose}
+        onFocus={showPanel}
+        onBlur={scheduleClose}
         className={`relative grid ${avatarSize} place-items-center rounded-full border ${frame.ring} bg-black/70 p-[3px] outline-none transition hover:scale-105 focus:scale-105`}
       >
         <span className={`absolute -inset-2 rounded-full bg-gradient-to-br ${frame.aura} opacity-70 blur-lg`} />
@@ -710,9 +764,16 @@ function MiniProfileHover({
         ) : null}
       </button>
       <div
-        className={`pointer-events-auto invisible absolute z-[160] w-72 rounded-2xl border border-amber-100/24 bg-[#07080d]/96 p-3 text-left opacity-0 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_42px_rgba(251,191,36,0.18)] backdrop-blur-xl transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
-          placement === "top" ? "bottom-[calc(100%+0.55rem)]" : "top-[calc(100%+0.55rem)]"
-        } ${align === "right" ? "right-0" : "left-0"}`}
+        className={`nexora-battle-preview-portal pointer-events-auto fixed z-[9999] w-72 max-w-[calc(100vw-24px)] rounded-2xl border border-amber-100/28 bg-[#07080d]/96 p-3 text-left shadow-[0_28px_90px_rgba(0,0,0,0.72),0_0_56px_rgba(251,191,36,0.22)] backdrop-blur-xl transition duration-150 ${
+          open && portalReady ? "visible opacity-100" : "invisible opacity-0"
+        }`}
+        style={panelStyle}
+        onMouseEnter={showPanel}
+        onMouseLeave={scheduleClose}
+        onPointerEnter={showPanel}
+        onPointerLeave={scheduleClose}
+        onFocus={showPanel}
+        onBlur={scheduleClose}
       >
         <div className="flex items-center gap-3">
           <RankAvatar participant={participant || undefined} name={profileName} image={profileImage} profile={profile} size="md" />
@@ -4288,6 +4349,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const resultAdvanceKeyRef = useRef("");
   const turnReadyRecoveryKeyRef = useRef("");
   const deckBattleStartKeyRef = useRef("");
+  const matchFinalAutoContinueKeyRef = useRef("");
   const startedBattleRoomKeysRef = useRef<Set<string>>(new Set());
   const optimisticRoomLockUntilRef = useRef(0);
   const [lobbyMessage, setLobbyMessage] = useState("");
@@ -4322,6 +4384,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [pendingTurnReadyKey, setPendingTurnReadyKey] = useState("");
   const [turnReadySubmittingKey, setTurnReadySubmittingKey] = useState("");
   const [deckReadySubmitting, setDeckReadySubmitting] = useState(false);
+  const [roomModeSubmitting, setRoomModeSubmitting] = useState<DeckMode | null>(null);
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const openingTieBreakPendingKeyRef = useRef("");
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
@@ -5155,6 +5218,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setLobbyMessage(!hasBotOpponent ? "BOT Level.99 ลงฝั่งผู้ท้าชิงแล้ว" : "เอา BOT Level.99 ออกจากห้องแล้ว");
   };
 
+  const changeRoomDeckMode = async (deckMode: DeckMode) => {
+    if (!currentRoom || !isRoomController || currentRoom.status !== "waiting" || currentDeckMode === deckMode) return;
+    setRoomModeSubmitting(deckMode);
+    setLobbyMessage("");
+    const result = await postRoomAction({
+      action: "set-mode",
+      code: currentRoom.code,
+      deckMode,
+    });
+    setRoomModeSubmitting(null);
+    if (!result.ok) {
+      setLobbyMessage("เปลี่ยนโหมดห้องไม่สำเร็จ");
+      return;
+    }
+    const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
+    if (room) {
+      setStableActiveRoomSnapshot(room);
+      setRooms((current) => mergeIncomingRoom(current, room));
+    }
+    setLobbyMessage("เปลี่ยนโหมดห้องแล้ว");
+  };
+
   const startRoomGame = async () => {
     if (!currentRoom || !isRoomController || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
     const result = await postRoomAction({ action: "start", code: currentRoom.code });
@@ -5183,7 +5268,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const continueRoomBattle = async () => {
-    if (!currentRoom || !isRoomController) return;
+    if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
     const result = await postRoomAction({ action: "continue", code: currentRoom.code });
     if (!result.ok) {
       setLobbyMessage("เริ่มสู้ต่อในห้องนี้ไม่ได้");
@@ -5494,12 +5579,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, participant.id, phase]);
 
   useEffect(() => {
-    if (!currentRoom?.game.matchEndedAt || !isRoomController || !matchFinalVisible) return;
+    if (!currentRoom?.game.matchEndedAt || !matchFinalVisible || !participantInRoom(currentRoom, participant.id)) {
+      matchFinalAutoContinueKeyRef.current = "";
+      return;
+    }
+    const continueKey = `${currentRoom.code}:${currentRoom.game.matchEndedAt}:${currentRoom.game.matchWinner || "done"}`;
+    if (matchFinalAutoContinueKeyRef.current === continueKey) return;
+    matchFinalAutoContinueKeyRef.current = continueKey;
     const timer = window.setTimeout(() => {
-      void postRoomAction({ action: "continue", code: currentRoom.code });
+      void postRoomAction({ action: "continue", code: currentRoom.code })
+        .then(() => syncRooms({ force: true }))
+        .catch(() => syncRooms({ force: true }).catch(() => null));
     }, 6500);
     return () => window.clearTimeout(timer);
-  }, [currentRoom?.code, currentRoom?.game.matchEndedAt, isRoomController, matchFinalVisible]);
+  }, [currentRoom, currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, matchFinalVisible, participant.id]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -7123,6 +7216,47 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             />
             <div className="md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
               <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">กติกาห้อง</div>
+              <div className="mb-4 rounded-2xl border border-amber-200/14 bg-black/28 p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/54">โหมดห้อง</div>
+                    <div className="mt-1 text-sm font-black text-white">{currentDeckModeTitle}</div>
+                  </div>
+                  {isRoomController && currentRoom.status === "waiting" ? (
+                    <div className="text-[10px] font-bold text-white/42">หัวห้องเปลี่ยนได้ก่อนเริ่มเกม</div>
+                  ) : null}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {([
+                    ["all", "ALL IN ONE", "มอนสเตอร์ + สกิล"],
+                    ["monster", "MONSTER", "มอนสเตอร์ล้วน"],
+                    ["skill", "SKILL", "10 มอนสเตอร์ + 10 สกิล"],
+                  ] as Array<[DeckMode, string, string]>).map(([mode, title, description]) => {
+                    const active = currentDeckMode === mode;
+                    const submitting = roomModeSubmitting === mode;
+                    const disabled = !isRoomController || currentRoom.status !== "waiting" || active || Boolean(roomModeSubmitting);
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => changeRoomDeckMode(mode)}
+                        disabled={disabled}
+                        className={`relative min-h-16 rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed ${
+                          active
+                            ? "border-amber-100/70 bg-amber-300 text-black shadow-[0_0_34px_rgba(251,191,36,0.22)]"
+                            : "border-white/10 bg-white/[0.045] text-white hover:border-amber-200/40 hover:bg-amber-200/10 disabled:opacity-45"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black uppercase tracking-[0.12em]">{title}</span>
+                          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : active ? <Check className="h-4 w-4" /> : null}
+                        </div>
+                        <div className={`mt-1 text-[11px] font-bold ${active ? "text-black/60" : "text-white/46"}`}>{description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="grid gap-2 text-sm font-semibold leading-6 text-white/58 sm:grid-cols-2">
                 <div>คนที่ 2 จะลงช่องผู้ท้าชิงให้อัตโนมัติ</div>
                 <div>ก่อนเริ่มเกม ผู้เล่นย้ายไปเป็นผู้ชมได้</div>

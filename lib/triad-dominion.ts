@@ -441,6 +441,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     card.cardNo !== "259" &&
     card.cardNo !== "227" &&
     card.cardNo !== "245" &&
+    card.cardNo !== "249" &&
     (shape === "unparsed" ||
       shape === "element-transform" ||
       /ไม่ใช่|หรือมากกว่า|หรือต่ำกว่า|จบไฟต์|ยกเลิก|ทำลาย/.test(card.skillText));
@@ -450,11 +451,11 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -1949,6 +1950,13 @@ function applySkill(
     const event = applyMechanicalTrap(rule, side, ownScore, opponentScore, blockers);
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${event.summary}`);
     events.push(event);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "249") {
+    const mistEvents = applyAllFieldStatRule(rule, side, ownScore, opponentScore, blockers);
+    events.push(...mistEvents);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: applied all-field non-water SUPPORT change`);
     return { unresolved, events };
   }
 
