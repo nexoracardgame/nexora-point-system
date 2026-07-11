@@ -8,6 +8,9 @@ import {
   chooseTriadRoomOpeningTieBreak,
   chooseTriadRoomSkillTarget,
   disbandTriadRoom,
+  gmRefreshTriadRoom,
+  gmResetTriadRoomDeckSelection,
+  gmRestartTriadRoomTurn,
   joinTriadRoom,
   listTriadRankProfiles,
   leaveTriadRoom,
@@ -131,6 +134,31 @@ export async function POST(request: Request) {
     if (error) return error;
     const result = await clearTriadRooms();
     return roomActionJson(result, undefined, { action, refresh: true });
+  }
+
+  if (action === "gm-reset-decks" || action === "gm-refresh-app" || action === "gm-restart-turn") {
+    const { error } = await requireAdminActor();
+    if (error) return error;
+    const code = cleanText(body.code);
+    const result =
+      action === "gm-reset-decks"
+        ? await gmResetTriadRoomDeckSelection(code)
+        : action === "gm-refresh-app"
+          ? await gmRefreshTriadRoom(code)
+          : await gmRestartTriadRoomTurn(code);
+    return roomActionJson(
+      result,
+      { status: result.ok ? 200 : result.reason === "not_found" ? 404 : 409 },
+      result.ok
+        ? {
+            action,
+            code: getPayloadRoomCode(result) || code,
+            room: result.room,
+            refresh: true,
+            reload: action === "gm-refresh-app",
+          }
+        : null
+    );
   }
 
   const participant = participantFromActor(body, actor);

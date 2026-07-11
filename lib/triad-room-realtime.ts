@@ -7,5 +7,6 @@ export type TriadRoomRealtimePayload = {
   room?: unknown;
   deleted?: boolean;
   refresh?: boolean;
+  reload?: boolean;
   at?: number;
 };

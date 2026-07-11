@@ -95,6 +95,7 @@ type Props = {
     id: string;
     name: string;
     image: string;
+    role?: string;
   };
 };
 
@@ -105,6 +106,7 @@ type RoomAccess = "public" | "private";
 type RoomStatus = "waiting" | "playing";
 type RoomPlayerSide = "host" | "challenger";
 type DeckMode = "all" | "monster" | "skill";
+type GmRescueAction = "gm-reset-decks" | "gm-refresh-app" | "gm-restart-turn";
 
 type RoomParticipant = {
   id: string;
@@ -334,6 +336,11 @@ function uniqueByNo(cards: CardView[]) {
 
 function safeText(value: unknown) {
   return String(value || "").trim();
+}
+
+function isClientAdminRole(role?: string | null) {
+  const normalized = safeText(role).toLowerCase();
+  return normalized === "admin" || normalized === "gm" || normalized === "superadmin";
 }
 
 function safeTimeMs(value: unknown, fallback = Date.now()) {
@@ -3361,6 +3368,130 @@ function BattleRoomChatPanel({
   );
 }
 
+const gmRescueCopy: Record<GmRescueAction, { title: string; body: string; button: string; tone: string }> = {
+  "gm-reset-decks": {
+    title: "รีเซ็ตห้องเลือกเด็คใหม่",
+    body: "บังคับรีเซ็ตสนามทั้งหมด ให้ผู้เล่นทั้งสองฝั่งสุ่มพูลการ์ดใหม่และเลือกเด็คใหม่โดยไม่ต้องออกห้อง",
+    button: "รีเซ็ตเลือกเด็ค",
+    tone: "from-red-600 via-black to-red-950 border-red-300/45 text-red-50",
+  },
+  "gm-refresh-app": {
+    title: "อัปเดท/รีเฟรชสนามล่าสุด",
+    body: "บังคับทุกคนในห้องโหลดแพตช์ล่าสุดและเชื่อมกลับห้องเดิมทันที สถานะการเล่นยังอยู่ ไม่ต้องเลือกเด็คใหม่",
+    button: "อัปเดทสนาม",
+    tone: "from-cyan-500 via-black to-slate-950 border-cyan-200/45 text-cyan-50",
+  },
+  "gm-restart-turn": {
+    title: "เริ่มตานี้ใหม่",
+    body: "ล้างเฉพาะตาปัจจุบัน ให้ทั้งสองฝั่งเลือกการ์ดลงใหม่ในตาเดิม เช่นอยู่ตา 3 ก็เริ่มตา 3 ใหม่เท่านั้น",
+    button: "เริ่มตานี้ใหม่",
+    tone: "from-amber-400 via-black to-red-950 border-amber-200/45 text-amber-50",
+  },
+};
+
+function GmRescuePanel({
+  open,
+  confirmAction,
+  submitting,
+  onToggle,
+  onAskConfirm,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  confirmAction: GmRescueAction | null;
+  submitting: boolean;
+  onToggle: () => void;
+  onAskConfirm: (action: GmRescueAction) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const confirm = confirmAction ? gmRescueCopy[confirmAction] : null;
+  return (
+    <>
+      <div className="fixed right-3 top-[46%] z-[120] flex items-center gap-2 2xl:right-[360px]">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="grid h-14 w-14 place-items-center rounded-2xl border border-red-300/55 bg-[radial-gradient(circle_at_35%_25%,rgba(248,113,113,0.65),rgba(10,10,12,0.94)_58%,rgba(127,29,29,0.95))] text-red-50 shadow-[0_0_38px_rgba(239,68,68,0.48),0_18px_46px_rgba(0,0,0,0.55)] transition hover:scale-105"
+          title="GM Rescue Tools"
+        >
+          <Swords className="h-6 w-6" />
+        </button>
+        <div
+          className={`overflow-hidden rounded-2xl border border-red-300/26 bg-black/88 shadow-[0_24px_80px_rgba(0,0,0,0.62),0_0_54px_rgba(239,68,68,0.22)] backdrop-blur-xl transition-all duration-200 ${
+            open ? "w-[min(330px,calc(100vw-92px))] opacity-100" : "w-0 opacity-0"
+          }`}
+        >
+          <div className="min-w-[300px] p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100/62">GM RESCUE</div>
+                <div className="text-sm font-black text-white">เครื่องมือแก้สนามสด</div>
+              </div>
+              <div className="rounded-full border border-red-200/28 bg-red-500/12 px-2 py-1 text-[10px] font-black text-red-100">ADMIN</div>
+            </div>
+            <div className="grid gap-2">
+              {(Object.keys(gmRescueCopy) as GmRescueAction[]).map((action) => {
+                const item = gmRescueCopy[action];
+                return (
+                  <button
+                    key={action}
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => onAskConfirm(action)}
+                    className={`rounded-xl border bg-gradient-to-r ${item.tone} px-3 py-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] transition hover:scale-[1.015] disabled:cursor-not-allowed disabled:opacity-45`}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-black">
+                      {action === "gm-refresh-app" ? <Zap className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                      {item.button}
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-white/58">{item.body}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+      {confirm ? (
+        <div className="fixed inset-0 z-[130] grid place-items-center bg-black/72 p-4 backdrop-blur-sm">
+          <div className="w-[min(560px,calc(100vw-24px))] overflow-hidden rounded-[26px] border border-red-200/35 bg-[#08070a] text-center shadow-[0_0_100px_rgba(239,68,68,0.34)]">
+            <div className={`border-b bg-gradient-to-r ${confirm.tone} p-5`}>
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/30 bg-black/42">
+                <Swords className="h-7 w-7" />
+              </div>
+              <div className="mt-3 text-2xl font-black text-white">{confirm.title}</div>
+            </div>
+            <div className="p-5">
+              <div className="mx-auto max-w-md text-sm font-semibold leading-6 text-white/68">{confirm.body}</div>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={onCancel}
+                  className="h-12 rounded-xl border border-white/14 bg-white/8 text-sm font-black text-white transition hover:bg-white/12 disabled:opacity-45"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={onConfirm}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black text-white shadow-[0_0_34px_rgba(239,68,68,0.34)] transition hover:bg-red-400 disabled:opacity-45"
+                >
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
+                  ยืนยัน
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function DeckSelectionStatusBanner({
   title,
   leftName,
@@ -4375,6 +4506,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [joiningRoomCode, setJoiningRoomCode] = useState("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
   const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
+  const [gmPanelOpen, setGmPanelOpen] = useState(false);
+  const [gmConfirmAction, setGmConfirmAction] = useState<GmRescueAction | null>(null);
+  const [gmSubmitting, setGmSubmitting] = useState(false);
   const activeRoomCodeRef = useRef("");
   const activeRoomSnapshotRef = useRef<TriadRoom | null>(null);
   const pvpTurnKeyRef = useRef("");
@@ -4511,6 +4645,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const roomPlayerSide: RoomPlayerSide | null = participantRoomSide(currentRoom, participant);
   const isFieldPlayer = Boolean(roomPlayerSide);
   const isSpectator = Boolean(currentRoom && !isFieldPlayer && currentRoom.spectators.some((viewer) => viewer.id === participant.id));
+  const canUseGmRescuePanel = Boolean(currentRoom && isSpectator && isClientAdminRole(currentUser.role));
   const matchEndingTurn =
     currentRoom?.game.activeTurn === 1 || currentRoom?.game.activeTurn === 2 || currentRoom?.game.activeTurn === 3
       ? currentRoom.game.activeTurn
@@ -5390,6 +5525,39 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPhase("room");
   };
 
+  const confirmGmRescueAction = async () => {
+    if (!currentRoom || !gmConfirmAction || gmSubmitting || !canUseGmRescuePanel) return;
+    const action = gmConfirmAction;
+    setGmSubmitting(true);
+    const result = await postRoomAction({ action, code: currentRoom.code }).catch(() => null);
+    setGmSubmitting(false);
+    if (!result?.ok) {
+      setLobbyMessage("GM action failed");
+      void syncRooms({ force: true }).catch(() => null);
+      return;
+    }
+    setGmConfirmAction(null);
+    setGmPanelOpen(false);
+    if (action === "gm-reset-decks") {
+      const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || currentRoom;
+      setPhase(phaseForRoomWithBattleLock(room, "room") || "room");
+      void syncRooms({ force: true }).catch(() => null);
+    } else if (action === "gm-restart-turn") {
+      setTurnLocked(false);
+      setPendingSkillChoice(null);
+      setPendingBlessingChoice(null);
+      setRevealed((current) => ({
+        ...current,
+        [currentRoom.game.activeTurn]: { player: false, bot: false, scored: false },
+      }));
+      setTimeLeft(TURN_SECONDS);
+      void syncRooms({ force: true }).catch(() => null);
+    } else if (action === "gm-refresh-app") {
+      writeCachedTriadRoom(participant.id, currentRoom);
+      window.setTimeout(() => window.location.reload(), 160);
+    }
+  };
+
   const disbandRoom = async () => {
     if (!currentRoom || !isRoomHost) return;
     await postRoomAction({ action: "disband", code: currentRoom.code });
@@ -5467,6 +5635,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const code = safeText(event.code || room?.code);
 
       if (event.refresh) {
+        if (event.reload && code && (activeRoomCodeRef.current === code || activeRoomSnapshotRef.current?.code === code)) {
+          if (room) writeCachedTriadRoom(participant.id, room);
+          void syncRooms({ force: true }).finally(() => {
+            window.setTimeout(() => window.location.reload(), 120);
+          });
+          return;
+        }
         void syncRooms({ force: true }).catch(() => null);
         return;
       }
@@ -7598,6 +7773,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ) : null}
       {matchFinalVisible ? (
         <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} onExitLobby={leaveRoom} />
+      ) : null}
+      {canUseGmRescuePanel ? (
+        <GmRescuePanel
+          open={gmPanelOpen}
+          confirmAction={gmConfirmAction}
+          submitting={gmSubmitting}
+          onToggle={() => setGmPanelOpen((current) => !current)}
+          onAskConfirm={setGmConfirmAction}
+          onCancel={() => setGmConfirmAction(null)}
+          onConfirm={confirmGmRescueAction}
+        />
       ) : null}
       <OpeningTieBreakOverlay
         tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}

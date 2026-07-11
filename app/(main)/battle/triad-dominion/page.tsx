@@ -48,6 +48,7 @@ export default async function TriadDominionPage() {
         id: userId,
         name: String(sessionUser?.name || "PLAYER"),
         image: String(sessionUser?.image || "/avatar.png"),
+        role: String(sessionUser?.role || "USER"),
       }}
     />
   );

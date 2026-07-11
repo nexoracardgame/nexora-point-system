@@ -3145,6 +3145,85 @@ export async function resetTriadRoomBattle(code: string, participantId: string) 
   });
 }
 
+export async function gmResetTriadRoomDeckSelection(code: string) {
+  await warmBotMemory();
+  return withRoomMutationLock(code, async () => {
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    const chat = room.game.chat;
+    room.status = "playing";
+    room.game = {
+      ...freshGameForRoom(room, `gm-reset:${Date.now()}`),
+      chat,
+    };
+    if (isTriadBotParticipant(room.seats.challenger)) {
+      ensureBotDeckReady(room);
+    }
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room) };
+  });
+}
+
+export async function gmRefreshTriadRoom(code: string) {
+  await warmBotMemory();
+  return withRoomMutationLock(code, async () => {
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    enforceDeckGate(room);
+    markExpiredSkillChoices(room);
+    resolveIfBothLocked(room);
+    runBotBrain(room);
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room) };
+  });
+}
+
+export async function gmRestartTriadRoomTurn(code: string) {
+  await warmBotMemory();
+  return withRoomMutationLock(code, async () => {
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    enforceDeckGate(room);
+    if (room.status !== "playing" || !battleDecksReady(room)) {
+      await upsertStoredRoom(room);
+      return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
+    }
+
+    const turn = room.game.activeTurn;
+    const lane = laneForTurn(turn);
+    const removedResult = room.game.turns.find((item) => item.turn === turn);
+    if (removedResult?.winner === "player") {
+      room.game.matchScore.host = Math.max(0, (room.game.matchScore.host || 0) - 1);
+    } else if (removedResult?.winner === "opponent") {
+      room.game.matchScore.challenger = Math.max(0, (room.game.matchScore.challenger || 0) - 1);
+    }
+
+    const hostCard = room.game.triangles.host[lane];
+    const challengerCard = room.game.triangles.challenger[lane];
+    room.game.triangles.host[lane] = "";
+    room.game.triangles.challenger[lane] = "";
+    room.game.usedCards.host = (room.game.usedCards.host || []).filter((cardNo) => cardNo !== hostCard);
+    room.game.usedCards.challenger = (room.game.usedCards.challenger || []).filter((cardNo) => cardNo !== challengerCard);
+    room.game.turns = room.game.turns.filter((item) => item.turn !== turn);
+    room.game.skillChoices = room.game.skillChoices.filter(
+      (choice) => choice.fightNo !== room.game.fightNo || choice.turn !== turn
+    );
+    room.game.turnReady = { host: false, challenger: false };
+    room.game.turnStartedAt = Date.now();
+    room.game.matchWinner = "";
+    room.game.surrenderedBy = "";
+    room.game.matchEndedAt = 0;
+    room.game.rankedRecordedAt = 0;
+    room.game.rankUpEvents = [];
+    if (turn === 1) {
+      room.game.openerTieBreak = emptyOpeningTieBreak();
+    }
+    runBotBrain(room);
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), restartedTurn: turn };
+  });
+}
+
 export async function sendTriadRoomChatMessage(code: string, participant: TriadRoomParticipant, textInput: string) {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
