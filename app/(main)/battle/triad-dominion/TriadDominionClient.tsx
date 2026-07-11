@@ -1158,6 +1158,9 @@ function roomBattleStartKey(room: TriadRoom) {
 
 function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextRoom: TriadRoom) {
   if (!currentRoom || currentRoom.code !== nextRoom.code) return false;
+  if (currentRoom.status === "playing" && nextRoom.status === "waiting") {
+    return true;
+  }
   if (
     currentRoom.status === "playing" &&
     nextRoom.status === "playing" &&
@@ -4541,6 +4544,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const matchFinalAutoContinueKeyRef = useRef("");
   const startedBattleRoomKeysRef = useRef<Set<string>>(new Set());
   const optimisticRoomLockUntilRef = useRef(0);
+  const startRoomLockRef = useRef<{ code: string; until: number }>({ code: "", until: 0 });
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
   const [botDeck, setBotDeck] = useState<string[]>([]);
@@ -5511,13 +5515,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const startRoomGame = async () => {
     if (!currentRoom || !isRoomController || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    const code = currentRoom.code;
     const startedAsFieldPlayer = Boolean(
       currentRoom.seats.host?.id === participant.id || currentRoom.seats.challenger?.id === participant.id
     );
+    startRoomLockRef.current = { code, until: Date.now() + 5000 };
     resetBattle();
     setPhase(startedAsFieldPlayer ? "deck" : "battle");
-    const result = await postRoomAction({ action: "start", code: currentRoom.code });
+    const result = await postRoomAction({ action: "start", code });
     if (!result.ok) {
+      startRoomLockRef.current = { code: "", until: 0 };
       setLobbyMessage("เจ้าของห้องเริ่มเกมได้เมื่อมีผู้เล่นครบ 2 ฝั่ง");
       setPhase("room");
       void syncRooms({ force: true }).catch(() => null);
@@ -5528,6 +5535,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       startedRoom?.seats.host?.id === participant.id || startedRoom?.seats.challenger?.id === participant.id
     );
     setPhase(serverStartedAsFieldPlayer ? "deck" : "battle");
+    window.setTimeout(() => {
+      if (startRoomLockRef.current.code === code) {
+        startRoomLockRef.current = { code: "", until: 0 };
+      }
+    }, 5200);
   };
 
   const leaveRoom = async () => {
@@ -5894,11 +5906,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   useEffect(() => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
     if (currentRoom.status === "waiting" && (phase === "deck" || phase === "battle")) {
+      if (startRoomLockRef.current.code === currentRoom.code && Date.now() < startRoomLockRef.current.until) return;
       resetBattle();
       setPhase("room");
       return;
     }
     if (currentRoom.status === "playing") {
+      if (startRoomLockRef.current.code === currentRoom.code) {
+        startRoomLockRef.current = { code: "", until: 0 };
+      }
       if (roomDecksReadyForBattle(currentRoom)) markBattleStartedForRoom(currentRoom);
       const nextPhase = phaseForRoomWithBattleLock(currentRoom);
       if ((phase === "battle" || hasBattleStartedForRoom(currentRoom)) && nextPhase === "deck") return;
