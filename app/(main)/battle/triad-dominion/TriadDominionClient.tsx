@@ -3795,7 +3795,17 @@ function SpectatorAvatarRail({
   );
 }
 
-function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeTurn: TriadTurn }) {
+function ResultBanner({
+  result,
+  activeTurn,
+  playerName = "เรา",
+  opponentName = "คู่แข่ง",
+}: {
+  result: TriadTurnResult;
+  activeTurn: TriadTurn;
+  playerName?: string;
+  opponentName?: string;
+}) {
   const title =
     result.winner === "draw"
       ? "ตานี้เสมอ"
@@ -3808,6 +3818,13 @@ function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeT
       : result.winner === "player"
         ? "border-emerald-300/35 from-emerald-300/20 to-cyan-300/8"
         : "border-rose-300/35 from-rose-400/20 to-amber-300/8";
+  const neutralTitle =
+    result.winner === "draw"
+      ? "ตานี้เสมอ"
+      : result.winner === "player"
+        ? `${playerName} ได้แต้ม +1`
+        : `${opponentName} ได้แต้ม +1`;
+  void title;
 
   return (
     <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-r ${tone} p-4 shadow-[0_18px_54px_rgba(0,0,0,0.35)]`}>
@@ -3818,7 +3835,7 @@ function ResultBanner({ result, activeTurn }: { result: TriadTurnResult; activeT
             ผลตาที่ {activeTurn}
           </div>
           <div className="mt-1 text-[clamp(1.25rem,3vw,2.4rem)] font-black uppercase leading-none text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.28)]">
-            {title}
+            {neutralTitle}
           </div>
         </div>
         <div className="rounded-2xl border border-amber-200/35 bg-black/54 px-4 py-2 text-right shadow-[0_0_28px_rgba(251,191,36,0.16)]">
@@ -4286,6 +4303,10 @@ function CompactBattleBoard({
     setPreviewCard(null);
     setPreviewMode("hover");
   };
+  const botRoleLabel = revealAllCards ? "ฝั่งบน" : "คู่แข่ง";
+  const playerRoleLabel = revealAllCards ? "ฝั่งล่าง" : "เรา";
+  void botRoleLabel;
+  void playerRoleLabel;
   return (
     <div className={`triad-compact-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0`}>
       <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
@@ -4946,6 +4967,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       : displayMatchScore.player > displayMatchScore.bot
         ? `${playerLabel} ชนะ`
         : `${opponentLabel} ชนะ`;
+
+  const neutralPlayerLabel = isSpectator ? displayPlayerName : playerLabel;
+  const neutralOpponentLabel = isSpectator ? displayBotName : opponentLabel;
+  const neutralWinnerText = forcedWinnerLabel
+    ? `${forcedWinnerLabel} ชนะ`
+    : displayMatchScore.player === displayMatchScore.bot
+      ? "เสมอกัน"
+      : displayMatchScore.player > displayMatchScore.bot
+        ? `${neutralPlayerLabel} ชนะ`
+        : `${neutralOpponentLabel} ชนะ`;
+  void winnerText;
 
   const finalMatchScore = forcedWinnerSide
     ? forcedWinnerSide === roomPlayerSide
@@ -7877,7 +7909,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </button>
       ) : null}
       {matchFinalVisible ? (
-        <MatchFinalOverlay winner={winnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} onExitLobby={leaveRoom} />
+        <MatchFinalOverlay winner={neutralWinnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} onExitLobby={leaveRoom} />
       ) : null}
       {canUseGmRescuePanel ? (
         <GmRescuePanel
@@ -8149,7 +8181,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   <div className="flex items-center gap-3">
                     <Trophy className="h-7 w-7 text-amber-300" />
                     <div>
-                      <div className="text-2xl font-black">{winnerText}</div>
+                      <div className="text-2xl font-black">{neutralWinnerText}</div>
                       <div className="text-sm font-semibold text-white/52">
                         คะแนนรวม {displayMatchScore.player}-{displayMatchScore.bot}
                       </div>
@@ -8157,7 +8189,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   </div>
                 ) : displayCurrentResult && activeTurnScored ? (
                   <div>
-                    <ResultBanner result={displayCurrentResult} activeTurn={displayActiveTurn} />
+                    <ResultBanner
+                      result={displayCurrentResult}
+                      activeTurn={displayActiveTurn}
+                      playerName={neutralPlayerLabel}
+                      opponentName={neutralOpponentLabel}
+                    />
                     {isPvpRoom && opponentTurnReady && !myTurnReady ? (
                       <div className="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-200/24 bg-emerald-300/10 px-3 py-2 text-xs font-black text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.14)]">
                         <Check className="h-4 w-4 shrink-0" />
