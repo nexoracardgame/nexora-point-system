@@ -1077,6 +1077,10 @@ function roomProgressValue(room: TriadRoom) {
   return room.game.fightNo * 10 + room.game.activeTurn;
 }
 
+function roomBattleStartKey(room: TriadRoom) {
+  return `${room.code}:${Number(room.game.deckStartedAt || 0)}`;
+}
+
 function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextRoom: TriadRoom) {
   if (!currentRoom || currentRoom.code !== nextRoom.code) return false;
   if (
@@ -4284,6 +4288,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const resultAdvanceKeyRef = useRef("");
   const turnReadyRecoveryKeyRef = useRef("");
   const deckBattleStartKeyRef = useRef("");
+  const startedBattleRoomKeysRef = useRef<Set<string>>(new Set());
   const optimisticRoomLockUntilRef = useRef(0);
   const [lobbyMessage, setLobbyMessage] = useState("");
   const [playerDeck, setPlayerDeck] = useState<string[]>([]);
@@ -4333,7 +4338,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setActiveRoomCode(cachedRoom.code);
     setActiveRoomSnapshot(cachedRoom);
     setRooms((current) => mergeRoomByCode(current, cachedRoom));
-    setPhase(cachedRoom.status === "playing" ? phaseForPlayingRoom(cachedRoom, participant.id) || "battle" : "room");
+    if (roomDecksReadyForBattle(cachedRoom)) markBattleStartedForRoom(cachedRoom);
+    setPhase(cachedRoom.status === "playing" ? phaseForRoomWithBattleLock(cachedRoom, "battle") || "battle" : "room");
   }, [participant.id]);
 
   const playerDeckCards = playerDeck.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -4364,6 +4370,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       shouldKeepCurrentRoomSnapshot(activeSnapshotRoom, activeListedRoom))
       ? activeSnapshotRoom
       : activeListedRoom || activeSnapshotRoom;
+  const markBattleStartedForRoom = (room: TriadRoom | null | undefined) => {
+    if (!room) return;
+    startedBattleRoomKeysRef.current.add(roomBattleStartKey(room));
+  };
+  const hasBattleStartedForRoom = (room: TriadRoom | null | undefined) =>
+    Boolean(room && startedBattleRoomKeysRef.current.has(roomBattleStartKey(room)));
+  const phaseForRoomWithBattleLock = (room: TriadRoom, fallback: BattlePhase | null = null): BattlePhase | null => {
+    const nextPhase = phaseForPlayingRoom(room, participant.id) || fallback;
+    return nextPhase === "deck" && hasBattleStartedForRoom(room) ? "battle" : nextPhase;
+  };
   const currentDeckMode: DeckMode = currentRoom?.game.deckMode || "all";
   const currentDeckModeTitle =
     currentDeckMode === "monster"
@@ -4768,7 +4784,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       activeRoomCodeRef.current = reconnectRoom.code;
       setActiveRoomCode(reconnectRoom.code);
       setStableActiveRoomSnapshot(reconnectRoom);
-      setPhase(reconnectRoom.status === "playing" ? phaseForPlayingRoom(reconnectRoom, participant.id) || "battle" : "room");
+      if (roomDecksReadyForBattle(reconnectRoom)) markBattleStartedForRoom(reconnectRoom);
+      setPhase(reconnectRoom.status === "playing" ? phaseForRoomWithBattleLock(reconnectRoom, "battle") || "battle" : "room");
       setLobbyMessage("");
     }
     if (
@@ -4841,9 +4858,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const stableActionRoom = keepPendingOpeningTieBreakChoice(mergeRoomWithStableChat(activeRoomSnapshotRef.current, actionRoom));
       const activeStableRoom = setStableActiveRoomSnapshot(stableActionRoom);
       if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
-        const nextPhase = payload.battleReady ? "battle" : phaseForPlayingRoom(activeStableRoom, participant.id);
+        if (payload.battleReady || roomDecksReadyForBattle(activeStableRoom)) markBattleStartedForRoom(activeStableRoom);
+        const nextPhase = payload.battleReady ? "battle" : phaseForRoomWithBattleLock(activeStableRoom);
         if (nextPhase) {
-          setPhase((currentPhase) => (currentPhase === "battle" && nextPhase === "deck" ? currentPhase : nextPhase));
+          setPhase((currentPhase) =>
+            (currentPhase === "battle" || hasBattleStartedForRoom(activeStableRoom)) && nextPhase === "deck"
+              ? "battle"
+              : nextPhase
+          );
         }
       }
     } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
@@ -5018,7 +5040,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     activeRoomCodeRef.current = room.code;
     setActiveRoomCode(room.code);
     setLobbyMessage("");
-    setPhase(room.status === "playing" ? phaseForPlayingRoom(room, participant.id) || "deck" : "room");
+    if (roomDecksReadyForBattle(room)) markBattleStartedForRoom(room);
+    setPhase(room.status === "playing" ? phaseForRoomWithBattleLock(room, "deck") || "deck" : "room");
   };
 
   const enterRoom = async (codeInput = joinCode, forceSpectator = false, passwordInput = joinPassword) => {
@@ -5051,7 +5074,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setActiveRoomCode(optimisticRoom.code);
       setStableActiveRoomSnapshot(optimisticRoom);
       setRooms((current) => mergeIncomingRoom(current, optimisticRoom));
-      setPhase(optimisticRoom.status === "playing" ? phaseForPlayingRoom(optimisticRoom, participant.id) || "battle" : "room");
+      if (roomDecksReadyForBattle(optimisticRoom)) markBattleStartedForRoom(optimisticRoom);
+      setPhase(optimisticRoom.status === "playing" ? phaseForRoomWithBattleLock(optimisticRoom, "battle") || "battle" : "room");
     } else {
       setLobbyMessage("กำลังเข้าห้อง...");
     }
@@ -5101,7 +5125,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setStableActiveRoomSnapshot(joinedRoom);
     setJoiningRoomCode("");
     setLobbyMessage(result.payload?.joinedAs === "spectator" ? "เข้ามาเป็นผู้ชมแล้ว" : "");
-    setPhase(joinedRoom.status === "playing" ? phaseForPlayingRoom(joinedRoom, participant.id) || "battle" : "room");
+    if (roomDecksReadyForBattle(joinedRoom)) markBattleStartedForRoom(joinedRoom);
+    setPhase(joinedRoom.status === "playing" ? phaseForRoomWithBattleLock(joinedRoom, "battle") || "battle" : "room");
   };
 
   const moveToSpectator = async () => {
@@ -5288,8 +5313,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (roomIncludesMe) {
         setPhase((currentPhase) => {
           if (room.status === "playing") {
-            const nextPhase = phaseForPlayingRoom(room, participant.id) || currentPhase;
-            return currentPhase === "battle" && nextPhase === "deck" ? currentPhase : nextPhase;
+            if (roomDecksReadyForBattle(room)) markBattleStartedForRoom(room);
+            const nextPhase = phaseForRoomWithBattleLock(room, currentPhase) || currentPhase;
+            return (currentPhase === "battle" || hasBattleStartedForRoom(room)) && nextPhase === "deck"
+              ? "battle"
+              : nextPhase;
           }
           if (currentPhase === "deck" || currentPhase === "battle" || currentPhase === "lobby") return "room";
           return currentPhase;
@@ -5458,8 +5486,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
     if (currentRoom.status === "playing") {
-      const nextPhase = phaseForPlayingRoom(currentRoom, participant.id);
-      if (phase === "battle" && nextPhase === "deck") return;
+      if (roomDecksReadyForBattle(currentRoom)) markBattleStartedForRoom(currentRoom);
+      const nextPhase = phaseForRoomWithBattleLock(currentRoom);
+      if ((phase === "battle" || hasBattleStartedForRoom(currentRoom)) && nextPhase === "deck") return;
       if (nextPhase && phase !== nextPhase) setPhase(nextPhase);
     }
   }, [currentRoom, participant.id, phase]);
@@ -5476,6 +5505,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
     const decksReadyForBattle = roomDecksReadyForBattle(currentRoom);
     if (!decksReadyForBattle) {
+      if (hasBattleStartedForRoom(currentRoom)) return;
       const ownDeck = currentRoom.game.decks[roomPlayerSide];
       const enemyDeck = currentRoom.game.decks[opponentSide];
       if (ownDeckReady || phase !== "deck") setPlayerDeck(ownDeck);
@@ -5685,6 +5715,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         },
       }));
       if (roomDecksReadyForBattle(optimisticRoom)) {
+        markBattleStartedForRoom(optimisticRoom);
         setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
@@ -5708,6 +5739,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setBotDeck(enemyDeck);
       setPlayerDeck(ownDeck);
       if (result.payload?.battleReady || roomDecksReadyForBattle(room)) {
+        markBattleStartedForRoom(room);
         setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
@@ -5741,6 +5773,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           if (result.ok) {
             const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
             if (result.payload?.battleReady || roomDecksReadyForBattle(room)) {
+              markBattleStartedForRoom(room || currentRoom);
               setPhase("battle");
               setBattleLog(["หมดเวลาเลือกเด็ค ระบบล็อกเด็คเท่าที่เลือกไว้แล้ว"]);
             }
@@ -5763,6 +5796,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (deckBattleStartKeyRef.current === startKey && phase === "battle") return;
     deckBattleStartKeyRef.current = startKey;
 
+    markBattleStartedForRoom(currentRoom);
     resetBattlePlayState();
     setPhase("battle");
     setBattleLog((current) => (current.length ? current : ["ทั้งสองฝั่งล็อคเด็คแล้ว เริ่มสู้กันได้เลย"]));
