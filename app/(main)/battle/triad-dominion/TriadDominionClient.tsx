@@ -251,10 +251,10 @@ const TURN_SECONDS = 120;
 const RESULT_SECONDS = 60;
 const SPECTATOR_LIMIT = 10;
 const ROOM_API_PATH = "/api/triad-rooms";
-const LOBBY_SYNC_MS = 1800;
-const ACTIVE_ROOM_SYNC_MS = 1000;
-const HIDDEN_SYNC_MS = 4000;
-const MIN_SYNC_GAP_MS = 140;
+const LOBBY_SYNC_MS = 1200;
+const ACTIVE_ROOM_SYNC_MS = 450;
+const HIDDEN_SYNC_MS = 2500;
+const MIN_SYNC_GAP_MS = 35;
 const TRIAD_RESUME_ROOM_CACHE_KEY = "nexora:triad:active-room";
 const TRIAD_BOT_ID = "triad-bot-level-99";
 const rankFrames = [
@@ -4373,6 +4373,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
+  const deckSyncTimerRef = useRef<number | null>(null);
   const resultAdvanceKeyRef = useRef("");
   const turnReadyRecoveryKeyRef = useRef("");
   const deckBattleStartKeyRef = useRef("");
@@ -4974,12 +4975,32 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     const syncAfterAction = () => void syncRooms({ force: true }).catch(() => null);
     if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(syncAfterAction, { timeout: 900 });
+      window.requestIdleCallback(syncAfterAction, { timeout: 180 });
     } else {
-      globalThis.setTimeout(syncAfterAction, 260);
+      globalThis.setTimeout(syncAfterAction, 60);
     }
     return { ok: response.ok, status: response.status, payload };
   };
+
+  const scheduleDeckSync = (deck: string[]) => {
+    if (!currentRoom || !roomPlayerSide || !opponentSide) return;
+    const code = currentRoom.code;
+    if (deckSyncTimerRef.current) {
+      window.clearTimeout(deckSyncTimerRef.current);
+    }
+    deckSyncTimerRef.current = window.setTimeout(() => {
+      deckSyncTimerRef.current = null;
+      void postRoomAction({ action: "set-deck", code, deck }).catch(() => null);
+    }, 120);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (deckSyncTimerRef.current) {
+        window.clearTimeout(deckSyncTimerRef.current);
+      }
+    };
+  }, []);
 
   const sendRoomChat = async (textInput: string) => {
     const text = textInput.trim().replace(/\s+/g, " ").slice(0, 240);
@@ -5275,39 +5296,55 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const startRoomGame = async () => {
     if (!currentRoom || !isRoomController || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    const startedAsFieldPlayer = Boolean(
+      currentRoom.seats.host?.id === participant.id || currentRoom.seats.challenger?.id === participant.id
+    );
+    resetBattle();
+    setPhase(startedAsFieldPlayer ? "deck" : "battle");
     const result = await postRoomAction({ action: "start", code: currentRoom.code });
     if (!result.ok) {
       setLobbyMessage("เจ้าของห้องเริ่มเกมได้เมื่อมีผู้เล่นครบ 2 ฝั่ง");
+      setPhase("room");
+      void syncRooms({ force: true }).catch(() => null);
       return;
     }
-    resetBattle();
     const startedRoom = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0] || currentRoom;
-    const startedAsFieldPlayer = Boolean(
+    const serverStartedAsFieldPlayer = Boolean(
       startedRoom?.seats.host?.id === participant.id || startedRoom?.seats.challenger?.id === participant.id
     );
-    setPhase(startedAsFieldPlayer ? "deck" : "battle");
+    setPhase(serverStartedAsFieldPlayer ? "deck" : "battle");
   };
 
   const leaveRoom = async () => {
-    if (currentRoom) {
-      await postRoomAction({ action: "leave", code: currentRoom.code });
-    }
+    const code = currentRoom?.code || "";
     activeRoomCodeRef.current = "";
     activeRoomSnapshotRef.current = null;
     setActiveRoomCode("");
     setActiveRoomSnapshot(null);
     writeCachedTriadRoom(participant.id, null);
     setPhase("lobby");
+    if (code) {
+      await postRoomAction({ action: "leave", code }).catch(() => null);
+      activeRoomCodeRef.current = "";
+      activeRoomSnapshotRef.current = null;
+      setActiveRoomCode("");
+      setActiveRoomSnapshot(null);
+      writeCachedTriadRoom(participant.id, null);
+      setPhase("lobby");
+    }
   };
 
   const continueRoomBattle = async () => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
-    const result = await postRoomAction({ action: "continue", code: currentRoom.code });
+    const code = currentRoom.code;
+    resetBattle();
+    setPhase("room");
+    const result = await postRoomAction({ action: "continue", code });
     if (!result.ok) {
       setLobbyMessage("เริ่มสู้ต่อในห้องนี้ไม่ได้");
+      void syncRooms({ force: true }).catch(() => null);
       return;
     }
-    resetBattle();
     setPhase("room");
   };
 
@@ -5783,11 +5820,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
-      void postRoomAction({
-        action: "set-deck",
-        code: currentRoom.code,
-        deck: nextDeck,
-      });
+      scheduleDeckSync(nextDeck);
     }
   };
 
@@ -6609,8 +6642,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
           setTurnReadySubmittingKey((current) => (current === readyKey ? "" : current));
         }
-        scheduleReadySync(450);
-        scheduleReadySync(1400);
+        scheduleReadySync(120);
+        scheduleReadySync(650);
       })
       .catch(() => {
         setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
