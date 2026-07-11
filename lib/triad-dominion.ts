@@ -451,11 +451,11 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     name: card.name,
     shape,
     effects,
-    target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "018" || card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -1185,6 +1185,86 @@ function applyHydroburst255(
     type: rule.shape,
     text: rule.text,
     summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} แต้มไม่เกิน 5,000 ได้รับบัฟ ${applied.join(", ")}${blocked.length > 0 ? `; ${blocked.join(", ")}` : ""}`,
+    targetLabel,
+  } satisfies TriadSkillEvent;
+}
+
+function applyGoldenRegis018Strict(
+  rule: TriadSkillRule,
+  side: "player" | "opponent",
+  ownScore: TriadScoreState,
+  blockers: StatGainBlocker[] = []
+) {
+  const effect: TriadSkillEffect = { metric: "attack", delta: 5000 };
+  const targetContribution = ownScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = "มอนสเตอร์ธาตุทองฝั่งผู้ใช้สกิล";
+
+  if (!targetContribution || targetContribution.card.kind !== "monster") {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ใบ 018 ไม่พบมอนสเตอร์ฝั่งผู้ใช้สกิล จึงไม่เกิดผล",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (targetContribution.card.element !== "gold") {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} ไม่ใช่ธาตุทอง ใบ 018 จึงไม่เกิดผล`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: "ใบ 018 เป็นบัฟ ATTACK จึงทำงานเฉพาะตาที่ใช้ค่า ATTACK คิดคะแนน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  const blocker = blockers.find((item) =>
+    item.targetSide === side &&
+    statGainBlockerApplies(item, effect, targetContribution)
+  );
+  if (blocker) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `ธาตุทองเข้าเงื่อนไขแล้ว แต่ ATTACK +5,000 ถูกบล็อกโดย No.${blocker.rule.cardNo}`,
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  ownScore.total += effect.delta;
+  targetContribution.value += effect.delta;
+  ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: No.${targetContribution.card.cardNo} ATK +${effect.delta.toLocaleString()}`);
+  return {
+    cardNo: rule.cardNo,
+    name: rule.name,
+    side,
+    type: rule.shape,
+    text: rule.text,
+    summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} เป็นธาตุทอง ได้ ATTACK +${effect.delta.toLocaleString()} จนจบตา`,
     targetLabel,
   } satisfies TriadSkillEvent;
 }
@@ -2067,6 +2147,11 @@ function applySkill(
       events.push(applyScoreStateTopSwap(rule, side, side === "player" ? ownScore : opponentScore, side === "player" ? opponentScore : ownScore, boardState));
       return { unresolved, events };
     }
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "018") {
+    events.push(applyGoldenRegis018Strict(rule, side, ownScore, blockers));
     return { unresolved, events };
   }
 

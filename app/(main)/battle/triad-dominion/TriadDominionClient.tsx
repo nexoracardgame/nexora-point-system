@@ -1620,6 +1620,10 @@ function monsterHasVerdant019Element(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.element === "wood");
 }
 
+function monsterHasGoldenRegis018Element(card?: CardView) {
+  return Boolean(card?.kind === "monster" && card.element === "gold");
+}
+
 function monsterHasPitfall223Stat(card?: CardView) {
   return Boolean(card?.kind === "monster" && card.attack <= 2000);
 }
@@ -1692,6 +1696,10 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
     const ownCard = side === "player" ? playerTop : botTop;
     return monsterHasHydroburst255Stat(ownCard) ? [ownTarget] : [];
   }
+  if (card?.cardNo === "018") {
+    const ownCard = side === "player" ? playerTop : botTop;
+    return monsterHasGoldenRegis018Element(ownCard) ? [ownTarget] : [];
+  }
   if (card?.cardNo === "019") {
     const ownCard = side === "player" ? playerTop : botTop;
     return monsterHasVerdant019Element(ownCard) ? [ownTarget] : [];
@@ -1722,6 +1730,8 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
 function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView): SkillTargetId[] {
   const selectable = getSelectableSkillTargetIds(card, side, playerTop, botTop);
   if (selectable.length > 0 || card?.cardNo === "254") return selectable;
+  const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
+  if (rule?.elementCondition) return [];
   const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
   const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
   const ownCard = side === "player" ? playerTop : botTop;
