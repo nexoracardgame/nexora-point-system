@@ -4891,6 +4891,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
   }, [bothDecksReady, currentRoom, deckReadySubmitting, ownDeckReady, phase]);
   const deckSelectionActive = Boolean(currentRoom && currentRoom.status === "playing" && !bothDecksReady);
+  const spectatorDeckSelectionWaiting = Boolean(isSpectator && deckSelectionActive);
   const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
   const deckValidation = validateDeckForMode(playerDeckCards, currentDeckMode);
   const deckSelectionGuide =
@@ -6284,27 +6285,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const timer = window.setInterval(() => {
       const nextLeft = roomDeckSecondsLeft(currentRoom);
       setDeckTimeLeft(nextLeft);
-      if (phase === "deck" && nextLeft <= 0 && roomPlayerSide && opponentSide && !ownDeckReady && !deckReadySubmitting) {
-        setDeckReadySubmitting(true);
-        void postRoomAction({
-          action: "ready-deck",
-          code: currentRoom.code,
-          deck: playerDeck,
-        }).then((result) => {
-          setDeckReadySubmitting(false);
-          if (result.ok) {
-            const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
-            if (result.payload?.battleReady || roomDecksReadyForBattle(room)) {
-              markBattleStartedForRoom(room || currentRoom);
-              setPhase("battle");
-              setBattleLog(["หมดเวลาเลือกเด็ค ระบบล็อกเด็คเท่าที่เลือกไว้แล้ว"]);
-            }
-          }
-        });
-      }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [currentRoom, deckSelectionActive, ownDeckReady, opponentSide, phase, playerDeck, roomPlayerSide]);
+  }, [currentRoom, deckSelectionActive, phase]);
 
   useEffect(() => {
     if (!currentRoom || currentRoom.status !== "playing") return;
@@ -7884,7 +7867,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           <div className="triad-deck-readybar fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-amber-200/24 bg-black/78 p-3 shadow-[0_0_44px_rgba(251,191,36,0.12)] backdrop-blur-md xl:bottom-5">
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/62">
-                ล็อกเด็คอัตโนมัติใน {deckTimerText}
+                เวลาเลือกเด็ค {deckTimerText}
               </div>
               <div className="mt-1 truncate text-sm font-bold text-white/70">
                 {ownDeckReady ? "เด็คคุณล็อกแล้ว รออีกฝ่าย" : `เลือกไว้ ${playerDeck.length}/${DECK_SIZE} ใบ กดพร้อมแล้วจะแก้ไม่ได้`}
@@ -7906,7 +7889,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
+    <main className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
           type="button"
@@ -7959,7 +7942,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ออกห้อง
         </button>
       ) : null}
-      {deckSelectionActive ? (
+      {deckSelectionActive && !isSpectator ? (
         <div className="px-2 pt-16 sm:px-3">
           <div className="ml-auto w-full sm:w-[min(390px,100%)]">
             <DeckSelectionStatusBanner
@@ -8051,7 +8034,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
       <section className={`triad-game-layout grid min-h-0 max-w-full gap-2 p-2 sm:gap-3 sm:p-3 2xl:grid-cols-[minmax(0,1fr)_clamp(300px,18vw,340px)] ${deckSelectionActive ? "pt-2 sm:pt-3" : "pt-2 sm:pt-2"}`}>
         <section className="triad-game-playarea grid min-h-0 max-w-full grid-rows-[minmax(330px,auto)_auto_auto] gap-2 sm:grid-rows-[minmax(420px,auto)_auto_auto] sm:gap-3 2xl:grid-rows-[minmax(470px,calc(100vh-390px))_auto_auto]">
-          {deckSelectionActive ? (
+          {deckSelectionActive && !isSpectator ? (
             <div className="rounded-2xl border border-amber-200/16 bg-amber-300/10 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.24)] backdrop-blur-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -8075,51 +8058,77 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
           {isSpectator ? (
             <div className="triad-spectator-live-stack grid gap-2 sm:gap-3">
-              <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
-              <CompactBattleBoard
-                cardsByNo={cardsByNo}
-                lockedFight={displayLockedFight}
-                player={displayPlayer}
-                revealed={displayRevealed}
-                activeTurn={displayActiveTurn}
-                matchScore={displayMatchScore}
-                fightNo={displayFightNo}
-                fightScore={displayFightScore}
-                playerDeckLeft={Math.max(0, displayPlayerDeckCards.length)}
-                botDeckLeft={Math.max(0, displayBotDeckCards.length)}
-                playerGraveCards={playerGraveCards}
-                botGraveCards={botGraveCards}
-                playerName={displayPlayerName}
-                botName={displayBotName}
-                playerImage={displayPlayerImage}
-                botImage={displayBotImage}
-                playerParticipant={displayPlayerParticipant}
-                botParticipant={displayBotParticipant}
-                rankProfiles={rankProfiles}
-                currentParticipantId={participant.id}
-                placementLane={placementLane}
-                timeLeft={displayTimeLeft}
-                turnLocked={placementLocked}
-                pendingSkillChoice={pendingSkillChoice}
-                waitingSkillChoice={waitingSkillChoice}
-                revealAllCards={isSpectator}
-                randomCard={randomDrawCard}
-                blessingAuras={displayBlessingAuras}
-                skillOpenerName={displaySkillOpenerName}
-                skillSecondName={displaySkillSecondName}
-                nextSkillOpenerName={displayNextSkillOpenerName}
-                nextSkillSecondName={displayNextSkillSecondName}
-                onSelectSkillTarget={(target) =>
-                  setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
-                }
-                onConfirmSkillTarget={confirmSkillTarget}
-                onDrawRandomCard={() => {
-                  void drawRandomCard();
-                }}
-                onSelectLane={setPlacementLane}
-                onPlaceCard={placeAndLockCard}
-              />
-              <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
+              {!spectatorDeckSelectionWaiting ? (
+                <SpectatorDeckStrip title={`ฝั่งบน · ${displayBotName}`} cards={displayBotDeckCards} tone="top" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
+              ) : null}
+              <div className="triad-spectator-board-shell relative min-h-0">
+                <CompactBattleBoard
+                  cardsByNo={cardsByNo}
+                  lockedFight={displayLockedFight}
+                  player={displayPlayer}
+                  revealed={displayRevealed}
+                  activeTurn={displayActiveTurn}
+                  matchScore={displayMatchScore}
+                  fightNo={displayFightNo}
+                  fightScore={displayFightScore}
+                  playerDeckLeft={Math.max(0, displayPlayerDeckCards.length)}
+                  botDeckLeft={Math.max(0, displayBotDeckCards.length)}
+                  playerGraveCards={playerGraveCards}
+                  botGraveCards={botGraveCards}
+                  playerName={displayPlayerName}
+                  botName={displayBotName}
+                  playerImage={displayPlayerImage}
+                  botImage={displayBotImage}
+                  playerParticipant={displayPlayerParticipant}
+                  botParticipant={displayBotParticipant}
+                  rankProfiles={rankProfiles}
+                  currentParticipantId={participant.id}
+                  placementLane={placementLane}
+                  timeLeft={displayTimeLeft}
+                  turnLocked={placementLocked}
+                  pendingSkillChoice={pendingSkillChoice}
+                  waitingSkillChoice={waitingSkillChoice}
+                  revealAllCards={isSpectator}
+                  randomCard={randomDrawCard}
+                  blessingAuras={displayBlessingAuras}
+                  skillOpenerName={displaySkillOpenerName}
+                  skillSecondName={displaySkillSecondName}
+                  nextSkillOpenerName={displayNextSkillOpenerName}
+                  nextSkillSecondName={displayNextSkillSecondName}
+                  onSelectSkillTarget={(target) =>
+                    setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
+                  }
+                  onConfirmSkillTarget={confirmSkillTarget}
+                  onDrawRandomCard={() => {
+                    void drawRandomCard();
+                  }}
+                  onSelectLane={setPlacementLane}
+                  onPlaceCard={placeAndLockCard}
+                />
+                {spectatorDeckSelectionWaiting ? (
+                  <div className="triad-spectator-waiting-overlay pointer-events-none absolute inset-x-3 top-3 z-[86] flex flex-col gap-3 sm:inset-x-5 sm:top-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="max-w-[min(620px,100%)] rounded-2xl border border-amber-100/22 bg-black/62 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.38),0_0_38px_rgba(251,191,36,0.1)] backdrop-blur-md">
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/62">
+                        <Clock3 className="h-3.5 w-3.5 text-amber-300" />
+                        กำลังเลือกเด็ค
+                      </div>
+                      <div className="mt-1 text-base font-black text-white sm:text-xl">
+                        {currentRoom?.seats.host?.name || "ฝั่งบน"} และ {currentRoom?.seats.challenger?.name || "ฝั่งล่าง"} กำลังเตรียมเด็ค
+                      </div>
+                      <div className="mt-1 text-xs font-semibold leading-5 text-white/58">
+                        ผู้ชมเห็นสนามจริงได้ทันที เกมจะเริ่มเมื่อทั้งสองฝั่งกดพร้อมครบ
+                      </div>
+                    </div>
+                    <div className="w-fit rounded-2xl border border-amber-100/22 bg-black/68 px-4 py-3 text-left shadow-[0_18px_60px_rgba(0,0,0,0.38)] backdrop-blur-md lg:text-right">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/52">เวลาเลือกเด็ค</div>
+                      <div className="text-4xl font-black leading-none text-amber-100 sm:text-5xl">{deckTimerText}</div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              {!spectatorDeckSelectionWaiting ? (
+                <SpectatorDeckStrip title={`ฝั่งล่าง · ${displayPlayerName}`} cards={displayPlayerDeckCards} tone="bottom" onPreview={setSpectatorPreviewCard} onPreviewEnd={() => setSpectatorPreviewCard(null)} />
+              ) : null}
             </div>
           ) : (
             <CompactBattleBoard

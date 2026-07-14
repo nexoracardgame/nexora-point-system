@@ -1668,6 +1668,10 @@ function ensureBotDeckReady(room: StoredTriadRoom) {
   return changed;
 }
 
+function shouldAutoCompleteDeckForSide(room: StoredTriadRoom, side: TriadRoomSlot) {
+  return isTriadBotParticipant(room.seats[side]);
+}
+
 function botTargetToken(side: TriadRoomSlot, targetSide: TriadRoomSlot) {
   if (side === "host") return targetSide === "host" ? "player-top" : "bot-top";
   return targetSide === "challenger" ? "player-top" : "bot-top";
@@ -2074,6 +2078,7 @@ function enforceDeckGate(room: StoredTriadRoom) {
   const deckSelectionExpired = Date.now() - Number(room.game.deckStartedAt || Date.now()) >= DECK_SELECTION_TIMEOUT_MS;
   if (!deckSelectionFinalized && deckSelectionExpired) {
     (["host", "challenger"] as TriadRoomSlot[]).forEach((side) => {
+      if (!shouldAutoCompleteDeckForSide(room, side)) return;
       const autoDeck = autoCompleteDeckForMode(
         deckMode,
         room.game.decks[side],

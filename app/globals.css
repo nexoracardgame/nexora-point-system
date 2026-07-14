@@ -3079,6 +3079,36 @@ textarea {
   }
 }
 
+.nexora-battle-shell .triad-spectator-deck-waiting .triad-game-layout {
+  align-items: start;
+}
+
+.nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-live-stack {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-board-shell {
+  min-height: min(660px, calc(100vh - 220px));
+}
+
+.nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-board {
+  height: min(660px, calc(100vh - 220px));
+  min-height: min(660px, calc(100vh - 220px));
+}
+
+@media (min-width: 1536px) {
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-game-playarea {
+    grid-template-rows: minmax(620px, calc(100vh - 210px)) auto !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-live-stack,
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-board-shell,
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-board {
+    height: 100% !important;
+    min-height: 620px !important;
+  }
+}
+
 @media (max-width: 950px), (hover: none) and (pointer: coarse) {
   .nexora-battle-shell .triad-effect-timeline {
     left: clamp(0.6rem, 5.8dvw, 7.2rem) !important;
@@ -3361,6 +3391,21 @@ textarea {
     max-width: calc(100dvw - 8rem) !important;
   }
 
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-live-stack {
+    grid-template-rows: minmax(0, auto) !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-board {
+    height: clamp(22rem, 72dvh, 38rem) !important;
+    min-height: clamp(22rem, 72dvh, 38rem) !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-waiting-overlay {
+    top: clamp(0.55rem, 2dvh, 0.9rem) !important;
+    left: clamp(0.55rem, 2dvw, 0.9rem) !important;
+    right: clamp(0.55rem, 2dvw, 0.9rem) !important;
+  }
+
   .nexora-battle-shell .triad-spectator-mode .triad-effect-timeline {
     position: absolute !important;
     left: clamp(0.35rem, 1.6dvw, 0.65rem) !important;
@@ -3410,6 +3455,11 @@ textarea {
 
   .nexora-battle-shell .triad-spectator-board .triad-board-phase-card {
     width: min(50dvw, 18rem) !important;
+  }
+
+  .nexora-battle-shell .triad-spectator-deck-waiting .triad-spectator-board {
+    height: clamp(15.8rem, 71dvh, 21rem) !important;
+    min-height: clamp(15.8rem, 71dvh, 21rem) !important;
   }
 
   .nexora-battle-shell .triad-spectator-mode .triad-effect-timeline {
