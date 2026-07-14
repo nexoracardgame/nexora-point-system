@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: RouteProps) {
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions();
-    await syncPendingCardSetRedemptionPricing();
+    await syncPendingCardSetRedemptionPricing(undefined, "all");
 
     const before = await findRedemption(safeCode);
     if (!before) {

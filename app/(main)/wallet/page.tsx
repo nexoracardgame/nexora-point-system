@@ -15,7 +15,10 @@ import {
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { ensureCardRareRedemptionSchema } from "@/lib/card-rare-redemptions";
-import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
+import {
+  ensureCardSetRedemptionSchema,
+  syncPendingCardSetRedemptionPricing,
+} from "@/lib/card-set-redemptions";
 import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatThaiDateTime, formatThaiTimeAgo } from "@/lib/thai-time";
 
@@ -221,6 +224,7 @@ export default async function WalletPage() {
       await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT').catch(() => undefined);
       await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "evidenceJson" TEXT').catch(() => undefined);
       await ensureCardSetRedemptionSchema();
+      await syncPendingCardSetRedemptionPricing(user.id, "all");
       await ensureCardRareRedemptionSchema();
 
       [pointLogs, coupons, cardSetRedemptions, cardRareRedemptions] = await Promise.all([

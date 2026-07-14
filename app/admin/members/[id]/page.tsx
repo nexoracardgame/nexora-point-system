@@ -5,7 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { formatThaiDateTime } from "@/lib/thai-time";
 import { expireStaleCardRareRedemptions } from "@/lib/card-rare-redemptions";
-import { expireStaleCardSetRedemptions } from "@/lib/card-set-redemptions";
+import {
+  expireStaleCardSetRedemptions,
+  syncPendingCardSetRedemptionPricing,
+} from "@/lib/card-set-redemptions";
 import AdminUserAvatar from "@/app/admin/AdminUserAvatar";
 import PointLogEvidenceImages from "@/app/admin/point-logs/PointLogEvidenceImages";
 import MemberActions from "./MemberActions";
@@ -183,6 +186,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     expireStaleCardSetRedemptions(user.id).catch(() => undefined),
     expireStaleCardRareRedemptions(user.id).catch(() => undefined),
   ]);
+  await syncPendingCardSetRedemptionPricing(user.id, "all").catch(
+    () => undefined
+  );
 
   const [
     localProfile,

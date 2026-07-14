@@ -163,7 +163,7 @@ export async function GET() {
     }
 
     await expireStaleCardSetRedemptions(userId);
-    await syncPendingCardSetRedemptionPricing(userId);
+    await syncPendingCardSetRedemptionPricing(userId, "all");
     const active = await getActiveRedemption(userId);
 
     return NextResponse.json(
@@ -232,7 +232,7 @@ export async function POST(req: Request) {
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions(userId);
-    await syncPendingCardSetRedemptionPricing(userId);
+    await syncPendingCardSetRedemptionPricing(userId, "all");
 
     const active = await getActiveRedemption(userId);
     if (active) {

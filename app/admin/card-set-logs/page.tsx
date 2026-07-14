@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { ensureCardSetRedemptionSchema } from "@/lib/card-set-redemptions";
+import {
+  ensureCardSetRedemptionSchema,
+  syncPendingCardSetRedemptionPricing,
+} from "@/lib/card-set-redemptions";
 import { prisma } from "@/lib/prisma";
 import { formatThaiDateTime } from "@/lib/thai-time";
 
@@ -45,6 +48,7 @@ export default async function CardSetLogsPage({ searchParams }: PageProps) {
   const keyword = normalize(q);
 
   await ensureCardSetRedemptionSchema();
+  await syncPendingCardSetRedemptionPricing(undefined, "all");
 
   const rows = await prisma.$queryRawUnsafe<CardSetLogRow[]>(
     `

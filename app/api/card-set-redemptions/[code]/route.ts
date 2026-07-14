@@ -60,7 +60,7 @@ export async function GET(_req: Request, { params }: RouteProps) {
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions();
-    await syncPendingCardSetRedemptionPricing();
+    await syncPendingCardSetRedemptionPricing(undefined, "all");
 
     const redemption = await findRedemption(safeCode);
     if (!redemption) {

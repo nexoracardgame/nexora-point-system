@@ -367,8 +367,15 @@ function parseCardSetRedemptionItems(row: CardSetRedemptionRecord): CardSetRedem
   ];
 }
 
-export async function syncPendingCardSetRedemptionPricing(userId?: string) {
+export async function syncPendingCardSetRedemptionPricing(
+  userId?: string,
+  scope: "pending" | "all" = "pending"
+) {
   await ensureCardSetRedemptionSchema();
+  const statusCondition =
+    scope === "all"
+      ? `r."status" IN ('pending', 'approved', 'cancelled', 'expired')`
+      : `r."status" = 'pending' AND r."expiresAt" > CURRENT_TIMESTAMP`;
 
   const rows = userId
     ? await prisma.$queryRawUnsafe<CardSetRedemptionRecord[]>(
@@ -381,8 +388,7 @@ export async function syncPendingCardSetRedemptionPricing(userId?: string) {
             u."lineId" AS "userLineId"
           FROM "CardSetRedemption" r
           LEFT JOIN "User" u ON u."id" = r."userId"
-          WHERE r."status" = 'pending'
-            AND r."expiresAt" > CURRENT_TIMESTAMP
+          WHERE ${statusCondition}
             AND r."userId" = $1
         `,
         userId
@@ -396,8 +402,7 @@ export async function syncPendingCardSetRedemptionPricing(userId?: string) {
           u."lineId" AS "userLineId"
         FROM "CardSetRedemption" r
         LEFT JOIN "User" u ON u."id" = r."userId"
-        WHERE r."status" = 'pending'
-          AND r."expiresAt" > CURRENT_TIMESTAMP
+        WHERE ${statusCondition}
       `);
 
   for (const row of rows) {
@@ -435,7 +440,6 @@ export async function syncPendingCardSetRedemptionPricing(userId?: string) {
               "nexValue" = $8,
               "itemsJson" = $9
           WHERE "id" = $1
-            AND "status" = 'pending'
         `,
         row.id,
         firstItem.setId,
@@ -461,7 +465,6 @@ export async function syncPendingCardSetRedemptionPricing(userId?: string) {
               "conditionLabel" = $8,
               "nexValue" = $9
           WHERE "redemptionId" = $1
-            AND "status" = 'pending'
             AND ("setId" = $2 OR "setOrder" = $4)
             AND "redemptionType" = $7
         `,
