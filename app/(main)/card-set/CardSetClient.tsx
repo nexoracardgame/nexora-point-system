@@ -84,6 +84,7 @@ type Redemption = {
 
 type SelectedSet = {
   setId: string;
+  redemptionType: CardSetRedemptionType;
   quantity: string;
 };
 
@@ -102,6 +103,13 @@ function normalizeQuantityInput(value: string) {
 
 function normalize(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function selectionKey(
+  setId: string,
+  redemptionType: CardSetRedemptionType = "standard"
+) {
+  return `${setId}::${redemptionType}`;
 }
 
 function formatRemaining(ms: number) {
@@ -144,10 +152,23 @@ export default function CardSetClient({
           const set = setById.get(item.setId);
           if (!set) return null;
           const quantity = parseSelectedQuantity(item.quantity);
+          const bonusOption = set.bonusOptions.find(
+            (option) => option.type === item.redemptionType
+          );
+          const nexValue =
+            item.redemptionType === "standard"
+              ? set.nexValue
+              : bonusOption?.nexValue || 0;
+          if (item.redemptionType !== "standard" && !bonusOption) {
+            return null;
+          }
           return {
             set,
+            redemptionType: item.redemptionType,
+            label: bonusOption?.label || "แบบธรรมดา",
+            nexValue,
             quantity,
-            lineTotalNex: set.nexValue * quantity,
+            lineTotalNex: nexValue * quantity,
           };
         })
         .filter(
@@ -155,6 +176,9 @@ export default function CardSetClient({
             item
           ): item is {
             set: CardSetItem;
+            redemptionType: CardSetRedemptionType;
+            label: string;
+            nexValue: number;
             quantity: number;
             lineTotalNex: number;
           } => item !== null && item.quantity > 0
@@ -295,21 +319,61 @@ export default function CardSetClient({
 
   function toggleSet(set: CardSetItem) {
     if (!multiMode || isPending) return;
+    const key = selectionKey(set.id, "standard");
     setSelected((current) => {
       const next = { ...current };
-      if (next[set.id]) {
-        delete next[set.id];
+      if (next[key]) {
+        delete next[key];
       } else {
-        next[set.id] = { setId: set.id, quantity: "1" };
+        next[key] = {
+          setId: set.id,
+          redemptionType: "standard",
+          quantity: "1",
+        };
       }
       return next;
     });
   }
 
-  function updateQuantity(setId: string, value: string) {
+  function toggleBonusOption(
+    set: CardSetItem,
+    redemptionType: Exclude<CardSetRedemptionType, "standard">
+  ) {
+    if (!multiMode || isPending) return;
+    const key = selectionKey(set.id, redemptionType);
+    setSelected((current) => {
+      const next = { ...current };
+      if (next[key]) {
+        delete next[key];
+      } else {
+        next[key] = {
+          setId: set.id,
+          redemptionType,
+          quantity: "1",
+        };
+      }
+      return next;
+    });
+  }
+
+  function updateQuantity(
+    setId: string,
+    redemptionType: CardSetRedemptionType,
+    value: string
+  ) {
     const quantity = normalizeQuantityInput(value);
+    const key = selectionKey(setId, redemptionType);
     setSelected((current) =>
-      current[setId] ? { ...current, [setId]: { setId, quantity } } : current
+      current[key]
+        ? {
+            ...current,
+            [key]: {
+              setId,
+              redemptionType,
+              quantity,
+            },
+          }
+        : current
     );
   }
 
@@ -335,9 +399,9 @@ export default function CardSetClient({
     }
 
     await createQr(
-      validItems.map(({ set, quantity }) => ({
+      validItems.map(({ set, redemptionType, quantity }) => ({
         setId: set.id,
-        redemptionType: "standard" as const,
+        redemptionType,
         quantity,
       })),
       () => {
@@ -492,20 +556,33 @@ export default function CardSetClient({
 
         <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredSets.map((set) => {
-            const selectedSet = selected[set.id];
+            const standardKey = selectionKey(set.id, "standard");
+            const selectedSet = selected[standardKey];
+            const selectedBonusOptions = set.bonusOptions.filter(
+              (option) => selected[selectionKey(set.id, option.type)]
+            );
+            const hasAnySelection =
+              Boolean(selectedSet) || selectedBonusOptions.length > 0;
             return (
               <article
                 key={set.id}
                 onClick={() => toggleSet(set)}
                 className={`group relative overflow-hidden rounded-[28px] border bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.96))] p-3 shadow-[0_18px_70px_rgba(0,0,0,0.34)] transition duration-300 ${
-                  selectedSet
+                  hasAnySelection
                     ? "border-amber-300/70 shadow-[0_0_34px_rgba(251,191,36,0.18)]"
                     : "border-white/10 hover:-translate-y-1 hover:border-amber-300/24"
                 } ${multiMode && !isPending ? "cursor-pointer" : ""}`}
               >
-                {selectedSet ? (
+                {hasAnySelection ? (
                   <div className="absolute left-1/2 top-3 z-20 grid h-11 w-11 -translate-x-1/2 place-items-center rounded-full bg-[linear-gradient(135deg,#fff7ad,#fbbf24,#a16207)] text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] ring-2 ring-white/40">
-                    <Check className="h-6 w-6 stroke-[4]" />
+                    {selectedBonusOptions.length > 0 ? (
+                      <span className="text-sm font-black">
+                        {Number(Boolean(selectedSet)) +
+                          selectedBonusOptions.length}
+                      </span>
+                    ) : (
+                      <Check className="h-6 w-6 stroke-[4]" />
+                    )}
                   </div>
                 ) : null}
 
@@ -576,7 +653,11 @@ export default function CardSetClient({
                         value={selectedSet?.quantity ?? ""}
                         disabled={!selectedSet}
                         onChange={(event) =>
-                          updateQuantity(set.id, event.target.value)
+                          updateQuantity(
+                            set.id,
+                            "standard",
+                            event.target.value
+                          )
                         }
                         className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-black/55 px-4 text-lg font-black text-white outline-none disabled:opacity-45"
                       />
@@ -601,6 +682,58 @@ export default function CardSetClient({
                             parseSelectedQuantity(selectedSet?.quantity)
                         )}{" "}
                         NEX
+                        {set.bonusOptions.length > 0 ? (
+                          <div className="mt-3 grid gap-2">
+                            {set.bonusOptions.map((option) => {
+                              const optionKey = selectionKey(
+                                set.id,
+                                option.type
+                              );
+                              const optionSelected = Boolean(
+                                selected[optionKey]
+                              );
+
+                              return (
+                                <button
+                                  key={option.type}
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleBonusOption(set, option.type);
+                                  }}
+                                  onMouseDown={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                  className={`flex w-full items-start gap-2 rounded-2xl border px-3 py-2 text-left transition ${
+                                    optionSelected
+                                      ? "border-amber-500/65 bg-amber-300 text-black shadow-[0_0_18px_rgba(251,191,36,0.25)]"
+                                      : "border-black/10 bg-black/[0.06] text-black hover:border-amber-500/45"
+                                  }`}
+                                >
+                                  <span
+                                    className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${
+                                      optionSelected
+                                        ? "border-black bg-black text-amber-200"
+                                        : "border-black/25 bg-white"
+                                    }`}
+                                  >
+                                    {optionSelected ? (
+                                      <Check className="h-3.5 w-3.5" />
+                                    ) : null}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="line-clamp-2 text-[11px] font-black leading-4">
+                                      {option.label}
+                                    </span>
+                                    <span className="mt-1 inline-flex rounded-full bg-black px-2.5 py-1 text-[10px] font-black text-amber-200">
+                                      {formatNumber(option.nexValue)} NEX
+                                    </span>
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                       </div>
                     ) : set.bonusOptions.length > 0 ? (
                       <div className="mt-2 rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-black text-amber-800">

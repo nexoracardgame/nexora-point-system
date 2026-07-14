@@ -3391,19 +3391,19 @@ const gmRescueCopy: Record<GmRescueAction, { title: string; body: string; button
     title: "รีเซ็ตห้องเลือกเด็คใหม่",
     body: "บังคับรีเซ็ตสนามทั้งหมด ให้ผู้เล่นทั้งสองฝั่งสุ่มพูลการ์ดใหม่และเลือกเด็คใหม่โดยไม่ต้องออกห้อง",
     button: "รีเซ็ตเลือกเด็ค",
-    tone: "from-red-600 via-black to-red-950 border-red-300/45 text-red-50",
+    tone: "border-red-200/28 text-red-50 shadow-[0_0_30px_rgba(248,113,113,0.12)] hover:border-red-200/54",
   },
   "gm-refresh-app": {
     title: "อัปเดท/รีเฟรชสนามล่าสุด",
     body: "บังคับทุกคนในห้องโหลดแพตช์ล่าสุดและเชื่อมกลับห้องเดิมทันที สถานะการเล่นยังอยู่ ไม่ต้องเลือกเด็คใหม่",
     button: "อัปเดทสนาม",
-    tone: "from-cyan-500 via-black to-slate-950 border-cyan-200/45 text-cyan-50",
+    tone: "border-cyan-100/28 text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.12)] hover:border-cyan-100/54",
   },
   "gm-restart-turn": {
     title: "เริ่มตานี้ใหม่",
     body: "ล้างเฉพาะตาปัจจุบัน ให้ทั้งสองฝั่งเลือกการ์ดลงใหม่ในตาเดิม เช่นอยู่ตา 3 ก็เริ่มตา 3 ใหม่เท่านั้น",
     button: "เริ่มตานี้ใหม่",
-    tone: "from-amber-400 via-black to-red-950 border-amber-200/45 text-amber-50",
+    tone: "border-amber-100/30 text-amber-50 shadow-[0_0_30px_rgba(251,191,36,0.13)] hover:border-amber-100/58",
   },
 };
 
@@ -3427,29 +3427,29 @@ function GmRescuePanel({
   const confirm = confirmAction ? gmRescueCopy[confirmAction] : null;
   return (
     <>
-      <div className="fixed right-3 top-[46%] z-[120] flex items-center gap-2 2xl:right-[360px]">
+      <div className="triad-gm-rescue fixed bottom-[calc(var(--app-mobile-nav-height)+86px)] right-3 top-auto z-[120] flex flex-row-reverse items-end gap-2 sm:bottom-auto sm:top-[46%] sm:flex-row sm:items-center 2xl:right-[360px]">
         <button
           type="button"
           onClick={onToggle}
-          className="grid h-14 w-14 place-items-center rounded-2xl border border-red-300/55 bg-[radial-gradient(circle_at_35%_25%,rgba(248,113,113,0.65),rgba(10,10,12,0.94)_58%,rgba(127,29,29,0.95))] text-red-50 shadow-[0_0_38px_rgba(239,68,68,0.48),0_18px_46px_rgba(0,0,0,0.55)] transition hover:scale-105"
+          className="grid h-12 w-12 place-items-center rounded-2xl border border-red-100/32 bg-[radial-gradient(circle_at_35%_22%,rgba(255,255,255,0.13),transparent_32%),linear-gradient(145deg,rgba(20,20,24,0.96),rgba(0,0,0,0.92))] text-red-50 shadow-[0_0_26px_rgba(248,113,113,0.34),0_18px_48px_rgba(0,0,0,0.58),inset_0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-md transition hover:-translate-y-0.5 hover:scale-105 hover:border-red-100/58 sm:h-14 sm:w-14"
           title="GM Rescue Tools"
         >
           <Swords className="h-6 w-6" />
         </button>
         <div
-          className={`overflow-hidden rounded-2xl border border-red-300/26 bg-black/88 shadow-[0_24px_80px_rgba(0,0,0,0.62),0_0_54px_rgba(239,68,68,0.22)] backdrop-blur-xl transition-all duration-200 ${
-            open ? "w-[min(330px,calc(100vw-92px))] opacity-100" : "w-0 opacity-0"
+          className={`triad-gm-rescue-panel max-h-[min(72dvh,520px)] overflow-hidden rounded-2xl border border-white/12 bg-black/82 shadow-[0_26px_90px_rgba(0,0,0,0.68),0_0_44px_rgba(255,255,255,0.055),inset_0_0_0_1px_rgba(255,255,255,0.045)] backdrop-blur-2xl transition-all duration-200 ${
+            open ? "w-[min(390px,calc(100vw-86px))] opacity-100" : "w-0 opacity-0"
           }`}
         >
-          <div className="min-w-[300px] p-3">
+          <div className="min-w-[min(360px,calc(100vw-86px))] max-h-[min(72dvh,520px)] overflow-y-auto p-3.5 sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100/62">GM RESCUE</div>
-                <div className="text-sm font-black text-white">เครื่องมือแก้สนามสด</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/42">GM RESCUE</div>
+                <div className="text-base font-black text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.16)]">เครื่องมือแก้สนามสด</div>
               </div>
-              <div className="rounded-full border border-red-200/28 bg-red-500/12 px-2 py-1 text-[10px] font-black text-red-100">ADMIN</div>
+              <div className="rounded-full border border-white/14 bg-white/[0.045] px-2.5 py-1 text-[10px] font-black text-white/72 shadow-[0_0_20px_rgba(255,255,255,0.05)]">ADMIN</div>
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2.5">
               {(Object.keys(gmRescueCopy) as GmRescueAction[]).map((action) => {
                 const item = gmRescueCopy[action];
                 return (
@@ -3458,13 +3458,16 @@ function GmRescuePanel({
                     type="button"
                     disabled={submitting}
                     onClick={() => onAskConfirm(action)}
-                    className={`rounded-xl border bg-gradient-to-r ${item.tone} px-3 py-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] transition hover:scale-[1.015] disabled:cursor-not-allowed disabled:opacity-45`}
+                    className={`group relative overflow-hidden rounded-xl border bg-[radial-gradient(circle_at_8%_0%,rgba(255,255,255,0.105),transparent_34%),linear-gradient(135deg,rgba(18,18,22,0.96),rgba(0,0,0,0.9))] ${item.tone} px-3.5 py-3.5 text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45`}
                   >
-                    <div className="flex items-center gap-2 text-sm font-black">
-                      {action === "gm-refresh-app" ? <Zap className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                    <div className="absolute inset-y-2 left-0 w-px bg-current opacity-45 shadow-[0_0_18px_currentColor]" />
+                    <div className="flex items-center gap-2 text-sm font-black text-white">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.045] text-current shadow-[0_0_18px_currentColor]">
+                        {action === "gm-refresh-app" ? <Zap className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                      </span>
                       {item.button}
                     </div>
-                    <div className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-white/58">{item.body}</div>
+                    <div className="mt-2 line-clamp-3 text-[11px] font-semibold leading-5 text-white/58 group-hover:text-white/72">{item.body}</div>
                   </button>
                 );
               })}
@@ -3473,11 +3476,11 @@ function GmRescuePanel({
         </div>
       </div>
       {confirm ? (
-        <div className="fixed inset-0 z-[130] grid place-items-center bg-black/72 p-4 backdrop-blur-sm">
-          <div className="w-[min(560px,calc(100vw-24px))] overflow-hidden rounded-[26px] border border-red-200/35 bg-[#08070a] text-center shadow-[0_0_100px_rgba(239,68,68,0.34)]">
-            <div className={`border-b bg-gradient-to-r ${confirm.tone} p-5`}>
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/30 bg-black/42">
-                <Swords className="h-7 w-7" />
+        <div className="fixed inset-0 z-[130] grid place-items-center bg-black/62 p-4 backdrop-blur-sm">
+          <div className="w-[min(560px,calc(100vw-24px))] overflow-hidden rounded-[26px] border border-white/14 bg-black/90 text-center shadow-[0_0_100px_rgba(255,255,255,0.08),0_30px_100px_rgba(0,0,0,0.72)]">
+            <div className={`border-b border-white/10 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.12),transparent_38%),linear-gradient(135deg,rgba(18,18,22,0.98),rgba(0,0,0,0.92))] ${confirm.tone} p-5`}>
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/16 bg-white/[0.045] shadow-[0_0_28px_currentColor]">
+                <Swords className="h-7 w-7 text-current" />
               </div>
               <div className="mt-3 text-2xl font-black text-white">{confirm.title}</div>
             </div>
@@ -3488,7 +3491,7 @@ function GmRescuePanel({
                   type="button"
                   disabled={submitting}
                   onClick={onCancel}
-                  className="h-12 rounded-xl border border-white/14 bg-white/8 text-sm font-black text-white transition hover:bg-white/12 disabled:opacity-45"
+                  className="h-12 rounded-xl border border-white/14 bg-white/[0.045] text-sm font-black text-white transition hover:border-white/24 hover:bg-white/[0.07] disabled:opacity-45"
                 >
                   ยกเลิก
                 </button>
@@ -3496,7 +3499,7 @@ function GmRescuePanel({
                   type="button"
                   disabled={submitting}
                   onClick={onConfirm}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black text-white shadow-[0_0_34px_rgba(239,68,68,0.34)] transition hover:bg-red-400 disabled:opacity-45"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-red-100/30 bg-[linear-gradient(135deg,rgba(26,26,30,0.98),rgba(0,0,0,0.94))] text-sm font-black text-white shadow-[0_0_34px_rgba(248,113,113,0.2),inset_0_0_0_1px_rgba(255,255,255,0.05)] transition hover:border-red-100/58 disabled:opacity-45"
                 >
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
                   ยืนยัน

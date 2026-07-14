@@ -13,6 +13,7 @@ import {
   getCardSetBonusOptions,
   getCardSetRedemptionChoice,
   serializeCardSetRedemption,
+  syncPendingCardSetRedemptionPricing,
   type CardSetRedemptionItem,
   type CardSetRedemptionRecord,
   type CardSetRedemptionType,
@@ -162,6 +163,7 @@ export async function GET() {
     }
 
     await expireStaleCardSetRedemptions(userId);
+    await syncPendingCardSetRedemptionPricing(userId);
     const active = await getActiveRedemption(userId);
 
     return NextResponse.json(
@@ -230,6 +232,7 @@ export async function POST(req: Request) {
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions(userId);
+    await syncPendingCardSetRedemptionPricing(userId);
 
     const active = await getActiveRedemption(userId);
     if (active) {

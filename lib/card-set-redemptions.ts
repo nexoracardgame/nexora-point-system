@@ -71,6 +71,20 @@ export type CardSetRedemptionItem = {
   lineTotalNex: number;
 };
 
+function normalizeCardSetRedemptionType(
+  value: unknown
+): CardSetRedemptionType {
+  const type = String(value || "standard").trim();
+  return (
+    type === "foil_bonus" ||
+    type === "foil_sequence_1" ||
+    type === "foil_sequence_9" ||
+    type === "foil_sequence_18"
+      ? type
+      : "standard"
+  ) as CardSetRedemptionType;
+}
+
 export function getCardSetById(setId: string) {
   return (
     nexoraCollectionSets.find((set) => set.id === setId) ||
@@ -176,6 +190,44 @@ export function getCardSetCoverImage(set: NexoraCollectionSet) {
   return firstCardId ? `/cards/${firstCardId}.jpg` : "/avatar.png";
 }
 
+function normalizeCardSetRedemptionItem(
+  item: CardSetRedemptionItem
+): CardSetRedemptionItem {
+  const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
+  const fallbackNexValue = Number(item.nexValue || 0);
+  const set =
+    getCardSetById(item.setId) ||
+    getCardSetById(String(item.setOrder || "")) ||
+    null;
+
+  if (!set) {
+    return {
+      ...item,
+      redemptionType: normalizeCardSetRedemptionType(item.redemptionType),
+      nexValue: fallbackNexValue,
+      quantity,
+      lineTotalNex: fallbackNexValue * quantity,
+    };
+  }
+
+  const choice = getCardSetRedemptionChoice(
+    set,
+    normalizeCardSetRedemptionType(item.redemptionType)
+  );
+
+  return {
+    setId: set.id,
+    setOrder: set.order,
+    setName: set.name,
+    rewardLabel: choice.rewardLabel,
+    redemptionType: choice.redemptionType,
+    conditionLabel: choice.conditionLabel,
+    nexValue: choice.nexValue,
+    quantity,
+    lineTotalNex: choice.nexValue * quantity,
+  };
+}
+
 export async function ensureCardSetRedemptionSchema() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "CardSetRedemption" (
@@ -275,21 +327,21 @@ function parseCardSetRedemptionItems(row: CardSetRedemptionRecord): CardSetRedem
             const setOrder = Number(item?.setOrder || 0);
             if (!setId || !setName || !Number.isFinite(nexValue)) return null;
 
-            return {
+            return normalizeCardSetRedemptionItem({
               setId,
               setOrder,
               setName,
               rewardLabel: String(item?.rewardLabel || setName),
-              redemptionType: String(
-                item?.redemptionType || "standard"
-              ) as CardSetRedemptionType,
+              redemptionType: normalizeCardSetRedemptionType(
+                item?.redemptionType
+              ),
               conditionLabel: item?.conditionLabel
                 ? String(item.conditionLabel)
                 : null,
               nexValue,
               quantity,
               lineTotalNex: Number(item?.lineTotalNex || nexValue * quantity),
-            };
+            });
           })
           .filter((item): item is CardSetRedemptionItem => Boolean(item));
       }
@@ -301,18 +353,130 @@ function parseCardSetRedemptionItems(row: CardSetRedemptionRecord): CardSetRedem
   const quantity = 1;
   const nexValue = Number(row.nexValue || 0);
   return [
-    {
+    normalizeCardSetRedemptionItem({
       setId: row.setId,
       setOrder: row.setOrder,
       setName: row.setName,
       rewardLabel: row.rewardLabel,
-      redemptionType: row.redemptionType || "standard",
+      redemptionType: normalizeCardSetRedemptionType(row.redemptionType),
       conditionLabel: row.conditionLabel || null,
       nexValue,
       quantity,
       lineTotalNex: nexValue,
-    },
+    }),
   ];
+}
+
+export async function syncPendingCardSetRedemptionPricing(userId?: string) {
+  await ensureCardSetRedemptionSchema();
+
+  const rows = userId
+    ? await prisma.$queryRawUnsafe<CardSetRedemptionRecord[]>(
+        `
+          SELECT
+            r.*,
+            u."name" AS "userName",
+            u."displayName" AS "userDisplayName",
+            u."image" AS "userImage",
+            u."lineId" AS "userLineId"
+          FROM "CardSetRedemption" r
+          LEFT JOIN "User" u ON u."id" = r."userId"
+          WHERE r."status" = 'pending'
+            AND r."expiresAt" > CURRENT_TIMESTAMP
+            AND r."userId" = $1
+        `,
+        userId
+      )
+    : await prisma.$queryRawUnsafe<CardSetRedemptionRecord[]>(`
+        SELECT
+          r.*,
+          u."name" AS "userName",
+          u."displayName" AS "userDisplayName",
+          u."image" AS "userImage",
+          u."lineId" AS "userLineId"
+        FROM "CardSetRedemption" r
+        LEFT JOIN "User" u ON u."id" = r."userId"
+        WHERE r."status" = 'pending'
+          AND r."expiresAt" > CURRENT_TIMESTAMP
+      `);
+
+  for (const row of rows) {
+    const items = parseCardSetRedemptionItems(row);
+    if (!items.length) continue;
+
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalNex = items.reduce((sum, item) => sum + item.lineTotalNex, 0);
+    const firstItem = items[0];
+    if (!firstItem) continue;
+    const rewardLabel =
+      items.length === 1 && totalQuantity === 1
+        ? firstItem.rewardLabel
+        : `CARD SET ${items.length} เซ็ต / ${totalQuantity} ชุด`;
+    const setName =
+      items.length === 1 ? firstItem.setName : `CARD SET ${totalQuantity} ชุด`;
+    const nextItemsJson = JSON.stringify(items);
+
+    if (
+      row.itemsJson !== nextItemsJson ||
+      Number(row.nexValue || 0) !== totalNex ||
+      row.rewardLabel !== rewardLabel ||
+      row.conditionLabel !== firstItem.conditionLabel ||
+      row.redemptionType !== firstItem.redemptionType
+    ) {
+      await prisma.$executeRawUnsafe(
+        `
+          UPDATE "CardSetRedemption"
+          SET "setId" = $2,
+              "setOrder" = $3,
+              "setName" = $4,
+              "rewardLabel" = $5,
+              "redemptionType" = $6,
+              "conditionLabel" = $7,
+              "nexValue" = $8,
+              "itemsJson" = $9
+          WHERE "id" = $1
+            AND "status" = 'pending'
+        `,
+        row.id,
+        firstItem.setId,
+        firstItem.setOrder,
+        setName,
+        rewardLabel,
+        firstItem.redemptionType,
+        firstItem.conditionLabel,
+        totalNex,
+        nextItemsJson
+      );
+    }
+
+    for (const item of items) {
+      await prisma.$executeRawUnsafe(
+        `
+          UPDATE "CardSetRedemptionLog"
+          SET "setId" = $3,
+              "setOrder" = $4,
+              "setName" = $5,
+              "rewardLabel" = $6,
+              "redemptionType" = $7,
+              "conditionLabel" = $8,
+              "nexValue" = $9
+          WHERE "redemptionId" = $1
+            AND "status" = 'pending'
+            AND ("setId" = $2 OR "setOrder" = $4)
+            AND "redemptionType" = $7
+        `,
+        row.id,
+        item.setId,
+        item.setId,
+        item.setOrder,
+        item.setName,
+        item.rewardLabel,
+        item.redemptionType,
+        item.conditionLabel,
+        item.nexValue
+      );
+    }
+  }
 }
 
 export async function expireStaleCardSetRedemptions(userId?: string) {
@@ -398,17 +562,23 @@ export function serializeCardSetRedemption(row: CardSetRedemptionRecord) {
   const items = parseCardSetRedemptionItems(row);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalNex = items.reduce((sum, item) => sum + item.lineTotalNex, 0);
+  const firstItem = items[0] || null;
+  const useSingleItemFields = Boolean(firstItem && items.length === 1);
 
   return {
     id: row.id,
     code: row.code,
     userId: row.userId,
-    setId: row.setId,
-    setOrder: row.setOrder,
-    setName: row.setName,
-    rewardLabel: row.rewardLabel,
-    redemptionType: row.redemptionType || "standard",
-    conditionLabel: row.conditionLabel || null,
+    setId: firstItem?.setId || row.setId,
+    setOrder: firstItem?.setOrder || row.setOrder,
+    setName: useSingleItemFields ? firstItem?.setName || row.setName : row.setName,
+    rewardLabel: useSingleItemFields
+      ? firstItem?.rewardLabel || row.rewardLabel
+      : row.rewardLabel,
+    redemptionType: firstItem?.redemptionType || row.redemptionType || "standard",
+    conditionLabel: useSingleItemFields
+      ? firstItem?.conditionLabel || null
+      : row.conditionLabel || null,
     nexValue: totalNex || Number(row.nexValue || 0),
     items,
     itemCount: items.length,

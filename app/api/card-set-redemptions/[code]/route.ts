@@ -7,6 +7,7 @@ import {
   ensureCardSetRedemptionSchema,
   expireStaleCardSetRedemptions,
   serializeCardSetRedemption,
+  syncPendingCardSetRedemptionPricing,
   type CardSetRedemptionRecord,
 } from "@/lib/card-set-redemptions";
 
@@ -59,6 +60,7 @@ export async function GET(_req: Request, { params }: RouteProps) {
 
     await ensureCardSetRedemptionSchema();
     await expireStaleCardSetRedemptions();
+    await syncPendingCardSetRedemptionPricing();
 
     const redemption = await findRedemption(safeCode);
     if (!redemption) {
