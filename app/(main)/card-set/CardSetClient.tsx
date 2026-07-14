@@ -32,6 +32,7 @@ type CardSetItem = {
   order: number;
   name: string;
   subtitle: string;
+  story: string;
   reward: string;
   tier: string;
   stars: string;
@@ -265,7 +266,14 @@ export default function CardSetClient({
     if (!keyword) return sets;
 
     return sets.filter((set) =>
-      [set.name, set.subtitle, set.reward, String(set.order), `set ${set.order}`]
+      [
+        set.name,
+        set.subtitle,
+        set.story,
+        set.reward,
+        String(set.order),
+        `set ${set.order}`,
+      ]
         .map(normalize)
         .some((field) => field.includes(keyword))
     );
@@ -634,6 +642,9 @@ export default function CardSetClient({
                   <p className="mt-2 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-white/48">
                     {set.subtitle}
                   </p>
+                  <div className="mt-3 rounded-[18px] border border-amber-200/14 bg-amber-200/[0.06] px-3 py-2 text-xs font-bold leading-5 text-amber-50/78">
+                    {set.story}
+                  </div>
 
                   {multiMode ? (
                     <div
@@ -831,6 +842,9 @@ export default function CardSetClient({
               <div className="text-xl font-black">{confirmSet.name}</div>
               <div className="mt-1 text-sm font-bold text-black/48">
                 {confirmSet.reward}
+              </div>
+              <div className="mt-3 rounded-2xl bg-black/[0.05] px-3 py-2 text-xs font-bold leading-5 text-black/62">
+                {confirmSet.story}
               </div>
             </div>
 

@@ -44,6 +44,7 @@ export default async function CardSetPage() {
         order: set.order,
         name: set.name,
         subtitle: set.subtitle,
+        story: set.story,
         reward: set.reward,
         tier: set.tier,
         stars: set.stars,
