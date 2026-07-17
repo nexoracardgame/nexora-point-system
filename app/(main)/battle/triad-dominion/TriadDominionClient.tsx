@@ -5228,6 +5228,47 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setDeckTimeLeft(roomDeckSecondsLeft(room));
   };
 
+  const resetLocalRestartedTurnState = (room: TriadRoom) => {
+    const restartedTurn = room.game.activeTurn;
+    const restartedLane = laneForTurn(restartedTurn);
+    optimisticRoomLockUntilRef.current = 0;
+    pvpTurnKeyRef.current = `${room.code}:${room.game.fightNo}:${room.game.activeTurn}`;
+    turnReadyRecoveryKeyRef.current = "";
+    resultAdvanceKeyRef.current = "";
+    setPendingTurnReadyKey("");
+    setTurnReadySubmittingKey("");
+    setTurnLocked(false);
+    setPendingSkillChoice(null);
+    setPendingBlessingChoice(null);
+    setTimeLeft(roomTurnSecondsLeft(room));
+    setResultTimeLeft(RESULT_SECONDS);
+    setActiveTurn(restartedTurn);
+    setFightNo(room.game.fightNo);
+    setPlacementLane(restartedLane);
+    setRevealed((current) => ({
+      ...current,
+      [restartedTurn]: { player: false, bot: false, scored: false },
+    }));
+    if (roomPlayerSide && opponentSide) {
+      const previewTriangles = applyRoomBlessingPreview(
+        room,
+        room.game.triangles.host,
+        room.game.triangles.challenger
+      );
+      setPlayer(previewTriangles[roomPlayerSide]);
+      setLockedFight({
+        fightNo: room.game.fightNo,
+        player: previewTriangles[roomPlayerSide],
+        bot: previewTriangles[opponentSide],
+        turns: roomPlayerSide === "host" ? room.game.turns : room.game.turns.map(flipTriadResult),
+      });
+    }
+    setBattleLog((current) => [
+      `GM รีตาที่ ${restartedTurn} แล้ว เลือกการ์ดลงสนามใหม่ได้เลย`,
+      ...current,
+    ]);
+  };
+
   const postRoomAction = async (body: Record<string, unknown>) => {
     const response = await fetch(ROOM_API_PATH, {
       method: "POST",
@@ -5264,6 +5305,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           );
       if (body.action === "gm-reset-decks") {
         resetLocalDeckSelectionState(activeStableRoom);
+      } else if (body.action === "gm-restart-turn") {
+        resetLocalRestartedTurnState(activeStableRoom);
       }
       if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
         if (payload.battleReady || roomDecksReadyForBattle(activeStableRoom)) rememberDeckBattleStart(activeStableRoom);
@@ -5685,14 +5728,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase(phaseForRoomWithBattleLock(room, "room") || "room");
       void syncRooms({ force: true }).catch(() => null);
     } else if (action === "gm-restart-turn") {
-      setTurnLocked(false);
-      setPendingSkillChoice(null);
-      setPendingBlessingChoice(null);
-      setRevealed((current) => ({
-        ...current,
-        [currentRoom.game.activeTurn]: { player: false, bot: false, scored: false },
-      }));
-      setTimeLeft(TURN_SECONDS);
+      setPhase("battle");
       void syncRooms({ force: true }).catch(() => null);
     } else if (action === "gm-refresh-app") {
       writeCachedTriadRoom(participant.id, currentRoom);
@@ -5788,6 +5824,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           const stableRoom = forceApplyServerRoom(room);
           if (event.action === "gm-reset-decks") {
             resetLocalDeckSelectionState(stableRoom);
+          } else if (event.action === "gm-restart-turn") {
+            resetLocalRestartedTurnState(stableRoom);
           }
         }
         void syncRooms({ force: true }).catch(() => null);
