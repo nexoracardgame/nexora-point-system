@@ -4680,7 +4680,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const roomActiveTurnResolved = Boolean(
     currentRoom?.game.turns.some((turn) => turn.turn === currentRoom.game.activeTurn)
   );
-  const roomActiveTurnScored = Boolean(currentRoom && revealed[currentRoom.game.activeTurn]?.scored);
+  const roomActiveTurnScored = Boolean(
+    currentRoom &&
+      (revealed[currentRoom.game.activeTurn]?.scored ||
+        currentRoom.game.turns.some((turn) => turn.turn === currentRoom.game.activeTurn))
+  );
   const fightScore = lockedFight ? getFightScore(lockedFight.turns, revealed) : { player: 0, bot: 0 };
   const playerGraveCards = gravePlayerCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
   const botGraveCards = graveBotCards.map((cardNo) => cardsByNo.get(cardNo)).filter(Boolean) as CardView[];
@@ -7018,7 +7022,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const markRoomTurnReady = () => {
     if (!currentRoom || !roomPlayerSide || !currentTurnReadyKey) return false;
-    if (!revealed[currentRoom.game.activeTurn]?.scored) return false;
+    const readyTurn = currentRoom.game.activeTurn;
+    const hasServerResult = currentRoom.game.turns.some((turn) => turn.turn === readyTurn);
+    if (!revealed[readyTurn]?.scored && !hasServerResult) return false;
+    if (!revealed[readyTurn]?.scored && hasServerResult) {
+      setRevealed((current) => ({
+        ...current,
+        [readyTurn]: { player: true, bot: true, scored: true },
+      }));
+    }
     if (
       pendingTurnReadyKey === currentTurnReadyKey ||
       turnReadySubmittingKey === currentTurnReadyKey ||
@@ -7150,7 +7162,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const displayCurrentResult = spectatorBattleState?.lockedFight?.turns.find((turn) => turn.turn === displayActiveTurn) || currentResult;
   const revealState = displayRevealed[displayActiveTurn];
-  const activeTurnScored = Boolean(revealState?.scored);
+  const activeTurnScored = Boolean(revealState?.scored || (isPvpRoom && roomTurnResolved));
   const canRevealTurn = Boolean(displayCurrentResult) && (displayTurnLocked || Boolean(isPvpRoom && roomTurnResolved));
   const showReadyAdvanceButton = Boolean(
       !isSpectator &&
