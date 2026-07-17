@@ -4657,6 +4657,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
   const hasBattleStartedForRoom = (room: TriadRoom | null | undefined) =>
     Boolean(room && startedBattleRoomKeysRef.current.has(roomBattleStartKey(room)));
+  const deckBattleStartKeyForRoom = (room: TriadRoom) =>
+    `${roomBattleStartKey(room)}:${Number(room.game.turnStartedAt || 0)}`;
+  const rememberDeckBattleStart = (room: TriadRoom | null | undefined) => {
+    if (!room) return;
+    markBattleStartedForRoom(room);
+    deckBattleStartKeyRef.current = deckBattleStartKeyForRoom(room);
+  };
   const phaseForRoomWithBattleLock = (room: TriadRoom, fallback: BattlePhase | null = null): BattlePhase | null => {
     const nextPhase = phaseForPlayingRoom(room, participant.id) || fallback;
     return nextPhase === "deck" && hasBattleStartedForRoom(room) ? "battle" : nextPhase;
@@ -5259,7 +5266,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         resetLocalDeckSelectionState(activeStableRoom);
       }
       if (participantInRoom(activeStableRoom, participant.id) && activeStableRoom.status === "playing") {
-        if (payload.battleReady || roomDecksReadyForBattle(activeStableRoom)) markBattleStartedForRoom(activeStableRoom);
+        if (payload.battleReady || roomDecksReadyForBattle(activeStableRoom)) rememberDeckBattleStart(activeStableRoom);
         const nextPhase = payload.battleReady ? "battle" : phaseForRoomWithBattleLock(activeStableRoom);
         if (nextPhase) {
           setPhase((currentPhase) =>
@@ -6241,7 +6248,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         },
       }));
       if (roomDecksReadyForBattle(optimisticRoom)) {
-        markBattleStartedForRoom(optimisticRoom);
+        rememberDeckBattleStart(optimisticRoom);
         setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
@@ -6265,7 +6272,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setBotDeck(enemyDeck);
       setPlayerDeck(ownDeck);
       if (result.payload?.battleReady || roomDecksReadyForBattle(room)) {
-        markBattleStartedForRoom(room);
+        rememberDeckBattleStart(room);
         setPhase("battle");
         setBattleLog(["ทั้งสองฝั่งพร้อมแล้ว เริ่มสู้ได้ทันที"]);
       } else {
@@ -6300,12 +6307,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
-    const startKey = `${currentRoom.code}:${currentRoom.game.deckReady.host ? 1 : 0}:${currentRoom.game.deckReady.challenger ? 1 : 0}`;
-    if (deckBattleStartKeyRef.current === startKey && phase === "battle") return;
+    const startKey = deckBattleStartKeyForRoom(currentRoom);
+    if (deckBattleStartKeyRef.current === startKey) {
+      if (phase !== "battle") setPhase("battle");
+      return;
+    }
+    const alreadyInBattle = phase === "battle" || hasBattleStartedForRoom(currentRoom);
     deckBattleStartKeyRef.current = startKey;
 
     markBattleStartedForRoom(currentRoom);
-    resetBattlePlayState();
+    if (!alreadyInBattle) resetBattlePlayState();
     setPhase("battle");
     setBattleLog((current) => (current.length ? current : ["ทั้งสองฝั่งล็อคเด็คแล้ว เริ่มสู้กันได้เลย"]));
   }, [currentRoom, phase]);
