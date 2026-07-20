@@ -656,7 +656,7 @@ export default async function WalletPage() {
     })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 8);
+    .slice(0, 12);
 
   const activityDetails: WalletActivityDetailItem[] = activities.map((item) => ({
     id: item.id,
@@ -916,7 +916,7 @@ export default async function WalletPage() {
 
             <div className="mt-6">
               <h2 className="text-xl font-black">Recent Movement</h2>
-              <WalletActivityDetails items={activityDetails.slice(0, 4)} />
+              <WalletActivityDetails items={activityDetails} />
             </div>
           </section>
         </main>
