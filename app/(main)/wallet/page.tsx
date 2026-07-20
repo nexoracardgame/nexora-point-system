@@ -14,13 +14,10 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
-import { ensureCardRareRedemptionSchema } from "@/lib/card-rare-redemptions";
-import {
-  ensureCardSetRedemptionSchema,
-  syncPendingCardSetRedemptionPricing,
-} from "@/lib/card-set-redemptions";
-import { ensureCouponRollbackSchema } from "@/lib/coupon-rollback-schema";
 import { formatThaiDateTime, formatThaiTimeAgo } from "@/lib/thai-time";
+import WalletActivityDetails, {
+  type WalletActivityDetailItem,
+} from "./WalletActivityDetails";
 
 export const revalidate = 30;
 export const dynamic = "force-dynamic";
@@ -31,6 +28,13 @@ type ActivityItem = {
   subtitle: string;
   createdAt: Date;
   tone: "emerald" | "amber" | "cyan" | "white";
+  category: string;
+  status: string;
+  amountLabel: string;
+  detailRows: Array<{
+    label: string;
+    value: string;
+  }>;
 };
 
 type WalletCardSetRedemption = {
@@ -61,6 +65,39 @@ type WalletCardRareRedemption = {
   approvedAt: Date | null;
 };
 
+type WalletUser = {
+  id: string;
+  lineId: string;
+  name: string | null;
+  displayName?: string | null;
+  image: string | null;
+  nexPoint: number;
+  coin: number;
+  createdAt: Date;
+};
+
+type WalletPointLog = {
+  id: string;
+  point: number | null;
+  amount: number | null;
+  type: string | null;
+  note: string | null;
+  createdAt: Date;
+};
+
+type WalletCoupon = {
+  id: string;
+  code: string;
+  used: boolean;
+  createdAt: Date;
+  usedAt: Date | null;
+  reward: {
+    name: string;
+    nexCost: number | null;
+    coinCost: number | null;
+  };
+};
+
 function safeImage(image?: string | null) {
   const value = String(image || "").trim();
   return value || "/avatar.png";
@@ -68,6 +105,12 @@ function safeImage(image?: string | null) {
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("th-TH");
+}
+
+function formatCost(nexCost?: number | null, coinCost?: number | null) {
+  if (nexCost != null) return `${formatNumber(Number(nexCost))} NEX`;
+  if (coinCost != null) return `${formatNumber(Number(coinCost))} COIN`;
+  return "-";
 }
 
 function activityToneClass(tone: ActivityItem["tone"]) {
@@ -81,6 +124,135 @@ function activityToneClass(tone: ActivityItem["tone"]) {
     default:
       return "border-white/10 bg-white/[0.06] text-white/70";
   }
+}
+
+async function readWalletUser(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      lineId: true,
+      name: true,
+      displayName: true,
+      image: true,
+      nexPoint: true,
+      coin: true,
+      createdAt: true,
+    },
+  });
+}
+
+async function readPointLogs(lineId: string): Promise<WalletPointLog[]> {
+  if (!lineId) return [];
+
+  try {
+    return await prisma.$queryRawUnsafe<WalletPointLog[]>(
+      `
+        SELECT "id", "point", "amount", "type", "note", "createdAt"
+        FROM "PointLog"
+        WHERE "lineId" = $1
+        ORDER BY "createdAt" DESC
+        LIMIT 12
+      `,
+      lineId
+    );
+  } catch {
+    return prisma.$queryRawUnsafe<WalletPointLog[]>(
+      `
+        SELECT "id", "point", "amount", "type", NULL::text AS "note", "createdAt"
+        FROM "PointLog"
+        WHERE "lineId" = $1
+        ORDER BY "createdAt" DESC
+        LIMIT 12
+      `,
+      lineId
+    );
+  }
+}
+
+async function readWalletCoupons(userId: string): Promise<WalletCoupon[]> {
+  const query = {
+    include: {
+      reward: {
+        select: {
+          name: true,
+          nexCost: true,
+          coinCost: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc" as const,
+    },
+    take: 12,
+  };
+
+  try {
+    return await prisma.coupon.findMany({
+      where: {
+        userId,
+        reversedAt: null,
+      },
+      ...query,
+    });
+  } catch {
+    return prisma.coupon.findMany({
+      where: {
+        userId,
+      },
+      ...query,
+    });
+  }
+}
+
+async function readCardSetRedemptions(userId: string) {
+  return prisma.$queryRawUnsafe<WalletCardSetRedemption[]>(
+    `
+      SELECT
+        "id",
+        "code",
+        "setOrder",
+        "setName",
+        "rewardLabel",
+        "redemptionType",
+        "conditionLabel",
+        "nexValue",
+        "status",
+        "createdAt",
+        "approvedAt"
+      FROM "CardSetRedemption"
+      WHERE "userId" = $1
+        AND "status" = 'approved'
+      ORDER BY COALESCE("approvedAt", "createdAt") DESC
+      LIMIT 12
+    `,
+    userId
+  );
+}
+
+async function readCardRareRedemptions(userId: string) {
+  return prisma.$queryRawUnsafe<WalletCardRareRedemption[]>(
+    `
+      SELECT
+        "id",
+        "code",
+        "cardNo",
+        "cardName",
+        "rewardLabel",
+        "optionKey",
+        "conditionLabel",
+        "nexValue",
+        "status",
+        "createdAt",
+        "approvedAt"
+      FROM "CardRareRedemption"
+      WHERE "userId" = $1
+        AND "status" = 'approved'
+      ORDER BY COALESCE("approvedAt", "createdAt") DESC
+      LIMIT 12
+    `,
+    userId
+  );
 }
 
 function formatCardSetActivitySubtitle(redemption: WalletCardSetRedemption) {
@@ -115,6 +287,16 @@ function buildPointLogActivity(log: {
       subtitle: "แอดมินย้อนกลับรายการแลกคูปองและคืน COIN เข้ากระเป๋าแล้ว",
       createdAt: log.createdAt,
       tone: "cyan",
+      category: "COIN",
+      status: "Refunded",
+      amountLabel: `${formatNumber(amount)} COIN`,
+      detailRows: [
+        { label: "Record ID", value: log.id },
+        { label: "Type", value: type },
+        { label: "Amount", value: `${formatNumber(amount)} COIN` },
+        { label: "Note", value: note || "Coupon rollback refund" },
+        { label: "Created", value: formatThaiDateTime(log.createdAt) },
+      ],
     };
   }
 
@@ -125,6 +307,16 @@ function buildPointLogActivity(log: {
       subtitle: "แอดมินย้อนกลับรายการแลกคูปองและคืน NEX เข้ากระเป๋าแล้ว",
       createdAt: log.createdAt,
       tone: "emerald",
+      category: "NEX",
+      status: "Refunded",
+      amountLabel: `${formatNumber(point)} NEX`,
+      detailRows: [
+        { label: "Record ID", value: log.id },
+        { label: "Type", value: type },
+        { label: "Amount", value: `${formatNumber(point)} NEX` },
+        { label: "Note", value: note || "Coupon rollback refund" },
+        { label: "Created", value: formatThaiDateTime(log.createdAt) },
+      ],
     };
   }
 
@@ -147,6 +339,25 @@ function buildPointLogActivity(log: {
           )} ใบ`),
     createdAt: log.createdAt,
     tone: isAdminCoin ? "cyan" : "emerald",
+    category: isAdminCoin ? "COIN" : "NEX",
+    status: isAdminCoin || isAdminNex ? "Admin adjusted" : "Recorded",
+    amountLabel: isAdminCoin
+      ? `${amount >= 0 ? "+" : "-"}${formatNumber(Math.abs(amount))} COIN`
+      : `${point >= 0 ? "+" : "-"}${formatNumber(Math.abs(point))} NEX`,
+    detailRows: [
+      { label: "Record ID", value: log.id },
+      { label: "Type", value: type || "point" },
+      {
+        label: "NEX",
+        value: `${point >= 0 ? "+" : "-"}${formatNumber(Math.abs(point))}`,
+      },
+      {
+        label: "COIN / Qty",
+        value: `${amount >= 0 ? "+" : "-"}${formatNumber(Math.abs(amount))}`,
+      },
+      { label: "Note", value: note || "Wallet point activity" },
+      { label: "Created", value: formatThaiDateTime(log.createdAt) },
+    ],
   };
 }
 
@@ -169,148 +380,35 @@ export default async function WalletPage() {
     redirect("/login");
   }
 
-  let user:
-    | {
-        id: string;
-        lineId: string;
-        name: string | null;
-        displayName?: string | null;
-        image: string | null;
-        nexPoint: number;
-        coin: number;
-        createdAt: Date;
-      }
-    | null = null;
-  let pointLogs: Array<{
-    id: string;
-    point: number | null;
-    amount: number | null;
-    type: string | null;
-    note: string | null;
-    createdAt: Date;
-  }> = [];
-  let coupons: Array<{
-    id: string;
-    code: string;
-    used: boolean;
-    createdAt: Date;
-    usedAt: Date | null;
-    reward: {
-      name: string;
-      nexCost: number | null;
-      coinCost: number | null;
-    };
-  }> = [];
+  let user: WalletUser | null = null;
+  let pointLogs: WalletPointLog[] = [];
+  let coupons: WalletCoupon[] = [];
   let cardSetRedemptions: WalletCardSetRedemption[] = [];
   let cardRareRedemptions: WalletCardRareRedemption[] = [];
 
   try {
-    user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        lineId: true,
-        name: true,
-        displayName: true,
-        image: true,
-        nexPoint: true,
-        coin: true,
-        createdAt: true,
-      },
-    });
+    user = await readWalletUser(userId);
 
     if (user) {
-      await ensureCouponRollbackSchema();
-      await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "note" TEXT').catch(() => undefined);
-      await prisma.$executeRawUnsafe('ALTER TABLE "PointLog" ADD COLUMN IF NOT EXISTS "evidenceJson" TEXT').catch(() => undefined);
-      await ensureCardSetRedemptionSchema();
-      await syncPendingCardSetRedemptionPricing(user.id, "all");
-      await ensureCardRareRedemptionSchema();
-
-      [pointLogs, coupons, cardSetRedemptions, cardRareRedemptions] = await Promise.all([
-        prisma.$queryRawUnsafe<
-          Array<{
-            id: string;
-            point: number | null;
-            amount: number | null;
-            type: string | null;
-            note: string | null;
-            createdAt: Date;
-          }>
-        >(
-          `
-            SELECT "id", "point", "amount", "type", "note", "createdAt"
-            FROM "PointLog"
-            WHERE "lineId" = $1
-            ORDER BY "createdAt" DESC
-            LIMIT 12
-          `,
-          user.lineId
-        ),
-        prisma.coupon.findMany({
-          where: {
-            userId: user.id,
-            reversedAt: null,
-          },
-          include: {
-            reward: {
-              select: {
-                name: true,
-                nexCost: true,
-                coinCost: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 12,
-        }),
-        prisma.$queryRawUnsafe<WalletCardSetRedemption[]>(
-          `
-            SELECT
-              "id",
-              "code",
-              "setOrder",
-              "setName",
-              "rewardLabel",
-              "redemptionType",
-              "conditionLabel",
-              "nexValue",
-              "status",
-              "createdAt",
-              "approvedAt"
-            FROM "CardSetRedemption"
-            WHERE "userId" = $1
-              AND "status" = 'approved'
-            ORDER BY COALESCE("approvedAt", "createdAt") DESC
-            LIMIT 12
-          `,
-          user.id
-        ),
-        prisma.$queryRawUnsafe<WalletCardRareRedemption[]>(
-          `
-            SELECT
-              "id",
-              "code",
-              "cardNo",
-              "cardName",
-              "rewardLabel",
-              "optionKey",
-              "conditionLabel",
-              "nexValue",
-              "status",
-              "createdAt",
-              "approvedAt"
-            FROM "CardRareRedemption"
-            WHERE "userId" = $1
-              AND "status" = 'approved'
-            ORDER BY COALESCE("approvedAt", "createdAt") DESC
-            LIMIT 12
-          `,
-          user.id
-        ),
+      const [
+        pointLogResult,
+        couponResult,
+        cardSetResult,
+        cardRareResult,
+      ] = await Promise.allSettled([
+        readPointLogs(user.lineId),
+        readWalletCoupons(user.id),
+        readCardSetRedemptions(user.id),
+        readCardRareRedemptions(user.id),
       ]);
+
+      pointLogs =
+        pointLogResult.status === "fulfilled" ? pointLogResult.value : [];
+      coupons = couponResult.status === "fulfilled" ? couponResult.value : [];
+      cardSetRedemptions =
+        cardSetResult.status === "fulfilled" ? cardSetResult.value : [];
+      cardRareRedemptions =
+        cardRareResult.status === "fulfilled" ? cardRareResult.value : [];
     }
   } catch {
     user = null;
@@ -486,6 +584,21 @@ export default async function WalletPage() {
             : "คูปองพร้อมใช้งาน",
       createdAt: coupon.createdAt,
       tone: coupon.used ? ("white" as const) : ("amber" as const),
+      category: "COUPON",
+      status: coupon.used ? "Used" : "Ready",
+      amountLabel: formatCost(coupon.reward.nexCost, coupon.reward.coinCost),
+      detailRows: [
+        { label: "Coupon ID", value: coupon.id },
+        { label: "Code", value: coupon.code },
+        { label: "Reward", value: coupon.reward.name },
+        { label: "Cost", value: formatCost(coupon.reward.nexCost, coupon.reward.coinCost) },
+        { label: "Status", value: coupon.used ? "Used" : "Ready to use" },
+        { label: "Created", value: formatThaiDateTime(coupon.createdAt) },
+        {
+          label: "Used",
+          value: coupon.usedAt ? formatThaiDateTime(coupon.usedAt) : "-",
+        },
+      ],
     })),
     ...cardSetRedemptions.map((redemption) => ({
       id: `card-set-${redemption.id}`,
@@ -495,6 +608,24 @@ export default async function WalletPage() {
       }`,
       createdAt: redemption.approvedAt || redemption.createdAt,
       tone: "amber" as const,
+      category: "CARD SET",
+      status: "Approved",
+      amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
+      detailRows: [
+        { label: "Redemption ID", value: redemption.id },
+        { label: "Code", value: redemption.code },
+        { label: "Set", value: `CARD SET ${redemption.setOrder}: ${redemption.setName}` },
+        { label: "Reward", value: redemption.rewardLabel },
+        { label: "Type", value: redemption.redemptionType || "standard" },
+        { label: "Condition", value: redemption.conditionLabel || "-" },
+        { label: "Value", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
+        { label: "Status", value: redemption.status },
+        { label: "Created", value: formatThaiDateTime(redemption.createdAt) },
+        {
+          label: "Approved",
+          value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
+        },
+      ],
     })),
     ...cardRareRedemptions.map((redemption) => ({
       id: `card-rare-${redemption.id}`,
@@ -504,10 +635,41 @@ export default async function WalletPage() {
       }`,
       createdAt: redemption.approvedAt || redemption.createdAt,
       tone: "cyan" as const,
+      category: "CARD RARE",
+      status: "Approved",
+      amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
+      detailRows: [
+        { label: "Redemption ID", value: redemption.id },
+        { label: "Code", value: redemption.code },
+        { label: "Card", value: `No. ${redemption.cardNo}: ${redemption.cardName}` },
+        { label: "Reward", value: redemption.rewardLabel },
+        { label: "Option", value: redemption.optionKey || "standard" },
+        { label: "Condition", value: redemption.conditionLabel || "-" },
+        { label: "Value", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
+        { label: "Status", value: redemption.status },
+        { label: "Created", value: formatThaiDateTime(redemption.createdAt) },
+        {
+          label: "Approved",
+          value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
+        },
+      ],
     })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 8);
+
+  const activityDetails: WalletActivityDetailItem[] = activities.map((item) => ({
+    id: item.id,
+    title: item.title,
+    subtitle: item.subtitle,
+    createdAtLabel: formatThaiTimeAgo(item.createdAt),
+    createdAtFull: formatThaiDateTime(item.createdAt),
+    tone: item.tone,
+    category: item.category,
+    status: item.status,
+    amountLabel: item.amountLabel,
+    detailRows: item.detailRows,
+  }));
 
   const assetCards = [
     {
@@ -754,29 +916,13 @@ export default async function WalletPage() {
 
             <div className="mt-6">
               <h2 className="text-xl font-black">Recent Movement</h2>
-              <div className="mt-4 overflow-hidden rounded-[24px] border border-white/10">
-                {(activities.length ? activities.slice(0, 4) : assetCards).map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="grid grid-cols-[1fr_auto] gap-3 border-b border-white/8 px-4 py-3 last:border-b-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-bold text-white">
-                        {"title" in item ? item.title : item.label}
-                      </div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-5 text-white/42">{item.subtitle}</div>
-                    </div>
-                    <div className="text-right text-sm font-black text-white/78">
-                      {"createdAt" in item ? formatThaiTimeAgo(item.createdAt) : index === 0 ? "Live" : "Ready"}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <WalletActivityDetails items={activityDetails.slice(0, 4)} />
             </div>
           </section>
         </main>
       </div>
 
+      {false ? (
       <div className="hidden min-h-screen bg-[#090909] text-white">
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.16),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.1),transparent_18%),linear-gradient(180deg,#090909_0%,#0b0b0d_42%,#101119_100%)]" />
@@ -1052,6 +1198,7 @@ export default async function WalletPage() {
         </section>
       </div>
       </div>
+      ) : null}
     </>
   );
 }
