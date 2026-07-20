@@ -46,6 +46,7 @@ type WalletCardSetRedemption = {
   redemptionType: string | null;
   conditionLabel: string | null;
   nexValue: number;
+  itemsJson: string | null;
   status: string;
   createdAt: Date;
   approvedAt: Date | null;
@@ -60,9 +61,17 @@ type WalletCardRareRedemption = {
   optionKey: string | null;
   conditionLabel: string | null;
   nexValue: number;
+  itemsJson: string | null;
   status: string;
   createdAt: Date;
   approvedAt: Date | null;
+};
+
+type WalletRedeemedCardItem = {
+  no: string;
+  name: string;
+  quantity?: number;
+  valueLabel?: string;
 };
 
 type WalletUser = {
@@ -117,14 +126,54 @@ function detailRows(
   rows: Array<{
     label: string;
     value?: string | null;
+    cardItems?: WalletRedeemedCardItem[];
   }>
 ) {
   return rows
     .map((row) => ({
       label: row.label,
       value: String(row.value || "").trim(),
+      cardItems: row.cardItems,
     }))
-    .filter((row) => row.value && row.value !== "-");
+    .filter((row) => (row.value && row.value !== "-") || row.cardItems?.length);
+}
+
+function parseRedeemedCardItems(
+  itemsJson: string | null | undefined,
+  fallback?: WalletRedeemedCardItem | null
+): WalletRedeemedCardItem[] {
+  const items: WalletRedeemedCardItem[] = [];
+
+  if (itemsJson) {
+    try {
+      const parsed = JSON.parse(itemsJson);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          const no = String(item?.cardNo || item?.setOrder || item?.setId || "").trim();
+          const name = String(item?.cardName || item?.setName || "").trim();
+          const quantity = Math.max(1, Math.floor(Number(item?.quantity || 1)));
+          const value = Number(item?.lineTotalNex || item?.nexValue || 0);
+
+          if (!no && !name) continue;
+
+          items.push({
+            no,
+            name,
+            quantity,
+            valueLabel: value > 0 ? `${formatNumber(value)} NEX` : undefined,
+          });
+        }
+      }
+    } catch {
+      // Older rows may not have item-level JSON.
+    }
+  }
+
+  if (!items.length && fallback?.name) {
+    items.push(fallback);
+  }
+
+  return items;
 }
 
 function activityToneClass(tone: ActivityItem["tone"]) {
@@ -231,6 +280,7 @@ async function readCardSetRedemptions(userId: string) {
         "redemptionType",
         "conditionLabel",
         "nexValue",
+        "itemsJson",
         "status",
         "createdAt",
         "approvedAt"
@@ -256,6 +306,7 @@ async function readCardRareRedemptions(userId: string) {
         "optionKey",
         "conditionLabel",
         "nexValue",
+        "itemsJson",
         "status",
         "createdAt",
         "approvedAt"
@@ -613,54 +664,66 @@ export default async function WalletPage() {
         },
       ]),
     })),
-    ...cardSetRedemptions.map((redemption) => ({
-      id: `card-set-${redemption.id}`,
-      title: `แลก CARD SET ${redemption.setOrder}: ${redemption.setName}`,
-      subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX • ${
-        formatCardSetActivitySubtitle(redemption)
-      }`,
-      createdAt: redemption.approvedAt || redemption.createdAt,
-      tone: "amber" as const,
-      category: "CARD SET",
-      status: "สำเร็จ",
-      amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
-      detailRows: detailRows([
-        { label: "รหัสรายการ", value: redemption.code },
-        { label: "ชุดการ์ด", value: `CARD SET ${redemption.setOrder}: ${redemption.setName}` },
-        { label: "รายละเอียดรางวัล", value: redemption.rewardLabel },
-        { label: "เงื่อนไขพิเศษ", value: redemption.conditionLabel },
-        { label: "ได้รับ", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
-        { label: "วันที่ส่งรายการ", value: formatThaiDateTime(redemption.createdAt) },
-        {
-          label: "วันที่อนุมัติ",
-          value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
-        },
-      ]),
-    })),
-    ...cardRareRedemptions.map((redemption) => ({
-      id: `card-rare-${redemption.id}`,
-      title: `แลก CARD RARE No. ${redemption.cardNo}: ${redemption.cardName}`,
-      subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX${
-        redemption.conditionLabel ? ` • ${redemption.conditionLabel}` : ""
-      }`,
-      createdAt: redemption.approvedAt || redemption.createdAt,
-      tone: "cyan" as const,
-      category: "CARD RARE",
-      status: "สำเร็จ",
-      amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
-      detailRows: detailRows([
-        { label: "รหัสรายการ", value: redemption.code },
-        { label: "การ์ด", value: `No. ${redemption.cardNo}: ${redemption.cardName}` },
-        { label: "รายละเอียดรางวัล", value: redemption.rewardLabel },
-        { label: "เงื่อนไขพิเศษ", value: redemption.conditionLabel },
-        { label: "ได้รับ", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
-        { label: "วันที่ส่งรายการ", value: formatThaiDateTime(redemption.createdAt) },
-        {
-          label: "วันที่อนุมัติ",
-          value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
-        },
-      ]),
-    })),
+    ...cardSetRedemptions.map((redemption) => {
+      const cardItems = parseRedeemedCardItems(redemption.itemsJson, {
+        no: String(redemption.setOrder || ""),
+        name: redemption.setName,
+        valueLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
+      });
+
+      return {
+        id: `card-set-${redemption.id}`,
+        title: `แลก CARD SET ${redemption.setOrder}: ${redemption.setName}`,
+        subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX • ${
+          formatCardSetActivitySubtitle(redemption)
+        }`,
+        createdAt: redemption.approvedAt || redemption.createdAt,
+        tone: "amber" as const,
+        category: "CARD SET",
+        status: "สำเร็จ",
+        amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
+        detailRows: detailRows([
+          { label: "รหัสรายการ", value: redemption.code },
+          { label: "รายการการ์ด", value: "แตะเพื่อดูรายการการ์ด", cardItems },
+          { label: "รายละเอียดรางวัล", value: redemption.rewardLabel },
+          { label: "เงื่อนไขพิเศษ", value: redemption.conditionLabel },
+          { label: "ได้รับ", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
+          { label: "วันที่ส่งรายการ", value: formatThaiDateTime(redemption.createdAt) },
+          {
+            label: "วันที่อนุมัติ",
+            value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
+          },
+        ]),
+      };
+    }),
+    ...cardRareRedemptions.map((redemption) => {
+      const cardItems = parseRedeemedCardItems(redemption.itemsJson);
+
+      return {
+        id: `card-rare-${redemption.id}`,
+        title: `แลก CARD RARE No. ${redemption.cardNo}: ${redemption.cardName}`,
+        subtitle: `${formatNumber(Number(redemption.nexValue || 0))} NEX${
+          redemption.conditionLabel ? ` • ${redemption.conditionLabel}` : ""
+        }`,
+        createdAt: redemption.approvedAt || redemption.createdAt,
+        tone: "cyan" as const,
+        category: "CARD RARE",
+        status: "สำเร็จ",
+        amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
+        detailRows: detailRows([
+          { label: "รหัสรายการ", value: redemption.code },
+          { label: "รายการการ์ด", value: "แตะเพื่อดูรายการการ์ด", cardItems },
+          { label: "รายละเอียดรางวัล", value: redemption.rewardLabel },
+          { label: "เงื่อนไขพิเศษ", value: redemption.conditionLabel },
+          { label: "ได้รับ", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
+          { label: "วันที่ส่งรายการ", value: formatThaiDateTime(redemption.createdAt) },
+          {
+            label: "วันที่อนุมัติ",
+            value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
+          },
+        ]),
+      };
+    }),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 12);

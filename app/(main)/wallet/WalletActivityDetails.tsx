@@ -17,6 +17,12 @@ export type WalletActivityDetailItem = {
   detailRows: Array<{
     label: string;
     value: string;
+    cardItems?: Array<{
+      no: string;
+      name: string;
+      quantity?: number;
+      valueLabel?: string;
+    }>;
   }>;
 };
 
@@ -58,6 +64,7 @@ export default function WalletActivityDetails({
 }: WalletActivityDetailsProps) {
   const [mounted, setMounted] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const active = useMemo(
     () => items.find((item) => item.id === activeId) || null,
     [activeId, items]
@@ -69,6 +76,7 @@ export default function WalletActivityDetails({
 
   useEffect(() => {
     if (!active) return;
+    setExpandedRows({});
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -197,19 +205,89 @@ export default function WalletActivityDetails({
                   </div>
 
                   <div className="mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-black/18">
-                    {active.detailRows.map((row) => (
-                      <div
-                        key={`${row.label}-${row.value}`}
-                        className="grid gap-1 border-b border-white/8 px-4 py-3 last:border-b-0 sm:grid-cols-[150px_1fr] sm:gap-4"
-                      >
-                        <div className="text-xs font-bold uppercase tracking-[0.12em] text-white/36">
-                          {row.label}
+                    {active.detailRows.map((row) => {
+                      const rowKey = `${active.id}-${row.label}`;
+                      const hasCards = Boolean(row.cardItems?.length);
+                      const expanded = Boolean(expandedRows[rowKey]);
+
+                      return (
+                        <div
+                          key={`${row.label}-${row.value}`}
+                          className="border-b border-white/8 last:border-b-0"
+                        >
+                          {hasCards ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedRows((current) => ({
+                                  ...current,
+                                  [rowKey]: !current[rowKey],
+                                }))
+                              }
+                              className="grid w-full gap-1 px-4 py-3 text-left transition hover:bg-white/[0.04] sm:grid-cols-[150px_1fr] sm:gap-4"
+                            >
+                              <div className="text-xs font-bold uppercase tracking-[0.12em] text-white/36">
+                                {row.label}
+                              </div>
+                              <div className="flex min-w-0 items-center justify-between gap-3 text-sm font-semibold leading-6 text-cyan-100">
+                                <span>{row.value}</span>
+                                <ChevronRight
+                                  className={`h-4 w-4 shrink-0 transition ${
+                                    expanded ? "rotate-90 opacity-90" : "opacity-55"
+                                  }`}
+                                />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="grid gap-1 px-4 py-3 sm:grid-cols-[150px_1fr] sm:gap-4">
+                              <div className="text-xs font-bold uppercase tracking-[0.12em] text-white/36">
+                                {row.label}
+                              </div>
+                              <div className="min-w-0 break-words text-sm font-semibold leading-6 text-white/82">
+                                {row.value || "-"}
+                              </div>
+                            </div>
+                          )}
+
+                          {hasCards && expanded ? (
+                            <div className="px-3 pb-3 sm:pl-[166px] sm:pr-4">
+                              <div className="max-h-[34vh] space-y-2 overflow-y-auto rounded-[18px] border border-white/10 bg-white/[0.035] p-2">
+                                {row.cardItems?.map((card, index) => (
+                                  <div
+                                    key={`${card.no}-${card.name}-${index}`}
+                                    className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-white/8 bg-black/18 px-3 py-2.5 sm:grid-cols-[auto_1fr_auto]"
+                                  >
+                                    <div className="grid h-8 min-w-8 place-items-center rounded-xl bg-white/[0.08] px-2 text-xs font-black text-white/72">
+                                      {index + 1}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-black text-white">
+                                        {card.no ? `No. ${card.no}` : "CARD"}
+                                      </div>
+                                      <div className="mt-0.5 break-words text-xs leading-5 text-white/56">
+                                        {card.name}
+                                      </div>
+                                    </div>
+                                    <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs font-bold text-white/68 sm:col-span-1 sm:justify-end sm:text-right">
+                                      {card.quantity && card.quantity > 1 ? (
+                                        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">
+                                          x{card.quantity}
+                                        </span>
+                                      ) : null}
+                                      {card.valueLabel ? (
+                                        <span className="rounded-full border border-cyan-200/14 bg-cyan-200/10 px-2 py-1 text-cyan-100">
+                                          {card.valueLabel}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                        <div className="min-w-0 break-words text-sm font-semibold leading-6 text-white/82">
-                          {row.value || "-"}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
