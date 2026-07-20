@@ -166,7 +166,7 @@ export default function WalletActivityDetails({
                       type="button"
                       onClick={() => setActiveId(null)}
                       className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/70 transition hover:bg-white/[0.1] hover:text-white"
-                      aria-label="Close activity detail"
+                      aria-label="ปิดรายละเอียดรายการ"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -176,7 +176,7 @@ export default function WalletActivityDetails({
                     <div className="rounded-[22px] border border-white/10 bg-white/[0.045] p-4">
                       <div className="flex items-center gap-2 text-xs font-bold uppercase text-white/42">
                         <Sparkles className="h-4 w-4" />
-                        Value
+                        มูลค่า
                       </div>
                       <div className="mt-2 text-2xl font-black text-white">
                         {active.amountLabel || "-"}
@@ -185,7 +185,7 @@ export default function WalletActivityDetails({
                     <div className="rounded-[22px] border border-white/10 bg-white/[0.045] p-4">
                       <div className="flex items-center gap-2 text-xs font-bold uppercase text-white/42">
                         <Clock3 className="h-4 w-4" />
-                        Time
+                        เวลา
                       </div>
                       <div className="mt-2 text-base font-black text-white">
                         {active.createdAtLabel}

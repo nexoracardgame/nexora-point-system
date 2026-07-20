@@ -113,6 +113,20 @@ function formatCost(nexCost?: number | null, coinCost?: number | null) {
   return "-";
 }
 
+function detailRows(
+  rows: Array<{
+    label: string;
+    value?: string | null;
+  }>
+) {
+  return rows
+    .map((row) => ({
+      label: row.label,
+      value: String(row.value || "").trim(),
+    }))
+    .filter((row) => row.value && row.value !== "-");
+}
+
 function activityToneClass(tone: ActivityItem["tone"]) {
   switch (tone) {
     case "emerald":
@@ -288,15 +302,14 @@ function buildPointLogActivity(log: {
       createdAt: log.createdAt,
       tone: "cyan",
       category: "COIN",
-      status: "Refunded",
+      status: "คืนแล้ว",
       amountLabel: `${formatNumber(amount)} COIN`,
-      detailRows: [
-        { label: "Record ID", value: log.id },
-        { label: "Type", value: type },
-        { label: "Amount", value: `${formatNumber(amount)} COIN` },
-        { label: "Note", value: note || "Coupon rollback refund" },
-        { label: "Created", value: formatThaiDateTime(log.createdAt) },
-      ],
+      detailRows: detailRows([
+        { label: "รายการ", value: "คืน COIN จากคูปอง" },
+        { label: "จำนวน", value: `${formatNumber(amount)} COIN` },
+        { label: "หมายเหตุ", value: note },
+        { label: "วันที่ทำรายการ", value: formatThaiDateTime(log.createdAt) },
+      ]),
     };
   }
 
@@ -308,15 +321,14 @@ function buildPointLogActivity(log: {
       createdAt: log.createdAt,
       tone: "emerald",
       category: "NEX",
-      status: "Refunded",
+      status: "คืนแล้ว",
       amountLabel: `${formatNumber(point)} NEX`,
-      detailRows: [
-        { label: "Record ID", value: log.id },
-        { label: "Type", value: type },
-        { label: "Amount", value: `${formatNumber(point)} NEX` },
-        { label: "Note", value: note || "Coupon rollback refund" },
-        { label: "Created", value: formatThaiDateTime(log.createdAt) },
-      ],
+      detailRows: detailRows([
+        { label: "รายการ", value: "คืน NEX จากคูปอง" },
+        { label: "จำนวน", value: `${formatNumber(point)} NEX` },
+        { label: "หมายเหตุ", value: note },
+        { label: "วันที่ทำรายการ", value: formatThaiDateTime(log.createdAt) },
+      ]),
     };
   }
 
@@ -340,24 +352,26 @@ function buildPointLogActivity(log: {
     createdAt: log.createdAt,
     tone: isAdminCoin ? "cyan" : "emerald",
     category: isAdminCoin ? "COIN" : "NEX",
-    status: isAdminCoin || isAdminNex ? "Admin adjusted" : "Recorded",
+    status: isAdminCoin || isAdminNex ? "ปรับยอดแล้ว" : "ได้รับแล้ว",
     amountLabel: isAdminCoin
       ? `${amount >= 0 ? "+" : "-"}${formatNumber(Math.abs(amount))} COIN`
       : `${point >= 0 ? "+" : "-"}${formatNumber(Math.abs(point))} NEX`,
-    detailRows: [
-      { label: "Record ID", value: log.id },
-      { label: "Type", value: type || "point" },
+    detailRows: detailRows([
+      {
+        label: "รายการ",
+        value: isAdminCoin || isAdminNex ? "ปรับยอดโดยแอดมิน" : "ได้รับจากการสแกนการ์ด",
+      },
       {
         label: "NEX",
-        value: `${point >= 0 ? "+" : "-"}${formatNumber(Math.abs(point))}`,
+        value: isAdminCoin ? "" : `${point >= 0 ? "+" : "-"}${formatNumber(Math.abs(point))}`,
       },
       {
-        label: "COIN / Qty",
-        value: `${amount >= 0 ? "+" : "-"}${formatNumber(Math.abs(amount))}`,
+        label: "COIN",
+        value: isAdminCoin ? `${amount >= 0 ? "+" : "-"}${formatNumber(Math.abs(amount))}` : "",
       },
-      { label: "Note", value: note || "Wallet point activity" },
-      { label: "Created", value: formatThaiDateTime(log.createdAt) },
-    ],
+      { label: "หมายเหตุ", value: note },
+      { label: "วันที่ทำรายการ", value: formatThaiDateTime(log.createdAt) },
+    ]),
   };
 }
 
@@ -585,20 +599,19 @@ export default async function WalletPage() {
       createdAt: coupon.createdAt,
       tone: coupon.used ? ("white" as const) : ("amber" as const),
       category: "COUPON",
-      status: coupon.used ? "Used" : "Ready",
+      status: coupon.used ? "ใช้แล้ว" : "พร้อมใช้",
       amountLabel: formatCost(coupon.reward.nexCost, coupon.reward.coinCost),
-      detailRows: [
-        { label: "Coupon ID", value: coupon.id },
-        { label: "Code", value: coupon.code },
-        { label: "Reward", value: coupon.reward.name },
-        { label: "Cost", value: formatCost(coupon.reward.nexCost, coupon.reward.coinCost) },
-        { label: "Status", value: coupon.used ? "Used" : "Ready to use" },
-        { label: "Created", value: formatThaiDateTime(coupon.createdAt) },
+      detailRows: detailRows([
+        { label: "รหัสคูปอง", value: coupon.code },
+        { label: "รางวัล", value: coupon.reward.name },
+        { label: "ใช้แต้ม/เหรียญ", value: formatCost(coupon.reward.nexCost, coupon.reward.coinCost) },
+        { label: "สถานะ", value: coupon.used ? "ใช้แล้ว" : "พร้อมใช้" },
+        { label: "วันที่แลก", value: formatThaiDateTime(coupon.createdAt) },
         {
-          label: "Used",
+          label: "วันที่ใช้",
           value: coupon.usedAt ? formatThaiDateTime(coupon.usedAt) : "-",
         },
-      ],
+      ]),
     })),
     ...cardSetRedemptions.map((redemption) => ({
       id: `card-set-${redemption.id}`,
@@ -609,23 +622,20 @@ export default async function WalletPage() {
       createdAt: redemption.approvedAt || redemption.createdAt,
       tone: "amber" as const,
       category: "CARD SET",
-      status: "Approved",
+      status: "สำเร็จ",
       amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
-      detailRows: [
-        { label: "Redemption ID", value: redemption.id },
-        { label: "Code", value: redemption.code },
-        { label: "Set", value: `CARD SET ${redemption.setOrder}: ${redemption.setName}` },
-        { label: "Reward", value: redemption.rewardLabel },
-        { label: "Type", value: redemption.redemptionType || "standard" },
-        { label: "Condition", value: redemption.conditionLabel || "-" },
-        { label: "Value", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
-        { label: "Status", value: redemption.status },
-        { label: "Created", value: formatThaiDateTime(redemption.createdAt) },
+      detailRows: detailRows([
+        { label: "รหัสรายการ", value: redemption.code },
+        { label: "ชุดการ์ด", value: `CARD SET ${redemption.setOrder}: ${redemption.setName}` },
+        { label: "รายละเอียดรางวัล", value: redemption.rewardLabel },
+        { label: "เงื่อนไขพิเศษ", value: redemption.conditionLabel },
+        { label: "ได้รับ", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
+        { label: "วันที่ส่งรายการ", value: formatThaiDateTime(redemption.createdAt) },
         {
-          label: "Approved",
+          label: "วันที่อนุมัติ",
           value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
         },
-      ],
+      ]),
     })),
     ...cardRareRedemptions.map((redemption) => ({
       id: `card-rare-${redemption.id}`,
@@ -636,23 +646,20 @@ export default async function WalletPage() {
       createdAt: redemption.approvedAt || redemption.createdAt,
       tone: "cyan" as const,
       category: "CARD RARE",
-      status: "Approved",
+      status: "สำเร็จ",
       amountLabel: `${formatNumber(Number(redemption.nexValue || 0))} NEX`,
-      detailRows: [
-        { label: "Redemption ID", value: redemption.id },
-        { label: "Code", value: redemption.code },
-        { label: "Card", value: `No. ${redemption.cardNo}: ${redemption.cardName}` },
-        { label: "Reward", value: redemption.rewardLabel },
-        { label: "Option", value: redemption.optionKey || "standard" },
-        { label: "Condition", value: redemption.conditionLabel || "-" },
-        { label: "Value", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
-        { label: "Status", value: redemption.status },
-        { label: "Created", value: formatThaiDateTime(redemption.createdAt) },
+      detailRows: detailRows([
+        { label: "รหัสรายการ", value: redemption.code },
+        { label: "การ์ด", value: `No. ${redemption.cardNo}: ${redemption.cardName}` },
+        { label: "รายละเอียดรางวัล", value: redemption.rewardLabel },
+        { label: "เงื่อนไขพิเศษ", value: redemption.conditionLabel },
+        { label: "ได้รับ", value: `${formatNumber(Number(redemption.nexValue || 0))} NEX` },
+        { label: "วันที่ส่งรายการ", value: formatThaiDateTime(redemption.createdAt) },
         {
-          label: "Approved",
+          label: "วันที่อนุมัติ",
           value: redemption.approvedAt ? formatThaiDateTime(redemption.approvedAt) : "-",
         },
-      ],
+      ]),
     })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
