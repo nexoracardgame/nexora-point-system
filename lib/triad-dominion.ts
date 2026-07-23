@@ -455,7 +455,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     duration: "turn",
     allowedTurns: inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : card.cardNo === "272" ? { mode: "include", elements: ["fire"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -933,7 +933,7 @@ type StatUseBlocker = {
   rule: TriadSkillRule;
 };
 
-function elementConditionMatches(rule: TriadSkillRule, card: TriadCard) {
+export function triadSkillElementConditionMatches(rule: TriadSkillRule, card: Pick<TriadCard, "element">) {
   if (!rule.elementCondition) return true;
   const listed = rule.elementCondition.elements.includes(card.element);
   return rule.elementCondition.mode === "include" ? listed : !listed;
@@ -964,7 +964,7 @@ function applyAllFieldStatRule(
 
     for (const item of scoreItems) {
       if (item.score.metric !== effect.metric) continue;
-      const eligible = item.score.contributions.filter((contribution) => elementConditionMatches(rule, contribution.card));
+      const eligible = item.score.contributions.filter((contribution) => triadSkillElementConditionMatches(rule, contribution.card));
       const unblocked = eligible.filter((contribution) => {
         const blocker = blockers.find((candidate) =>
           candidate.targetSide === item.targetSide &&
@@ -1848,7 +1848,7 @@ function applyMechanicalTrap(
 
   for (const item of scoreItems) {
     if (item.score.metric !== effect.metric) continue;
-    const eligible = item.score.contributions.filter((contribution) => elementConditionMatches(rule, contribution.card));
+    const eligible = item.score.contributions.filter((contribution) => triadSkillElementConditionMatches(rule, contribution.card));
     const unblocked = eligible.filter((contribution) => {
       const blocker = blockers.find((candidate) =>
         candidate.targetSide === item.targetSide &&
@@ -2208,7 +2208,7 @@ function applySkill(
 
   for (const effect of rule.effects) {
     if (targetScore.metric !== "total" && effect.metric === targetScore.metric) {
-      const eligibleContributions = targetScore.contributions.filter((item) => elementConditionMatches(rule, item.card));
+      const eligibleContributions = targetScore.contributions.filter((item) => triadSkillElementConditionMatches(rule, item.card));
       const affectsAll = rule.target === "all" || rule.target.endsWith("-all");
       const intendedContributions = affectsAll ? eligibleContributions : eligibleContributions.slice(0, 1);
       const affectedCount = intendedContributions.length;

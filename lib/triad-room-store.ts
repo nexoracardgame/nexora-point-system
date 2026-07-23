@@ -4,6 +4,7 @@ import {
   resolveTriadTurn,
   triadCardByNo,
   triadCards,
+  triadSkillElementConditionMatches,
   triadSkillRuleByNo,
   type TriadLane,
   type TriadRpsChoice,
@@ -2187,7 +2188,9 @@ function orderedSkillChoiceCandidates(room: StoredTriadRoom) {
   return skillChoiceOrder(room)
     .map((side) => {
       const cardNo = room.game.triangles[side][lane];
-      return cardNo && canUseManualSkillChoice(room, cardNo)
+      const rule = cardNo ? triadSkillRuleByNo.get(cleanCardNo(cardNo)) : undefined;
+      const hasLegalElementTarget = !cardNo || !rule?.elementCondition || legalManualSkillTargetSlots(room, side, cardNo).length > 0;
+      return cardNo && canUseManualSkillChoice(room, cardNo) && hasLegalElementTarget
         ? {
             side,
             cardNo,
@@ -2230,6 +2233,9 @@ function applyTurnBlessings(room: StoredTriadRoom) {
           ? `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "เรา" : "ตรงข้าม"}เป็น No.${choice.blessingPreviewTopNo}`
           : `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "เรา" : "ตรงข้าม"}`,
       });
+      if (choice.blessingPreviewTopNo) {
+        events[events.length - 1].summary = `${events[events.length - 1].summary} จบตาจะกลับเป็นมอนสเตอร์เดิม`;
+      }
       continue;
     }
     if (choice.selectedTarget === "reroll-opponent") {
@@ -2242,6 +2248,9 @@ function applyTurnBlessings(room: StoredTriadRoom) {
           ? `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "ตรงข้าม" : "เรา"}เป็น No.${choice.blessingPreviewTopNo}`
           : `No.254 ขอพรศักดิ์สิทธิ์: เปลี่ยนมอนสเตอร์หลักฝั่ง${choice.side === "host" ? "ตรงข้าม" : "เรา"}`,
       });
+      if (choice.blessingPreviewTopNo) {
+        events[events.length - 1].summary = `${events[events.length - 1].summary} จบตาจะกลับเป็นมอนสเตอร์เดิม`;
+      }
     }
   }
   return { player: hostTriangle, opponent: challengerTriangle, events };
@@ -2262,6 +2271,28 @@ function selectedTargetSlot(side: TriadRoomSlot, selectedTarget: string): TriadR
   if (selectedTarget !== "player-top" && selectedTarget !== "bot-top") return "";
   if (side === "host") return selectedTarget === "player-top" ? "host" : "challenger";
   return selectedTarget === "player-top" ? "challenger" : "host";
+}
+
+function skillTargetSlotMatchesElementCondition(cardNo: string, targetSlot: TriadRoomSlot, room: StoredTriadRoom) {
+  const rule = triadSkillRuleByNo.get(cleanCardNo(cardNo));
+  if (!rule?.elementCondition) return true;
+  const targetCard = triadCardByNo.get(room.game.triangles[targetSlot].top);
+  return Boolean(targetCard?.kind === "monster" && triadSkillElementConditionMatches(rule, targetCard));
+}
+
+function legalManualSkillTargetSlots(room: StoredTriadRoom, side: TriadRoomSlot, cardNo: string) {
+  const rule = triadSkillRuleByNo.get(cleanCardNo(cardNo));
+  if (!rule) return [] as TriadRoomSlot[];
+  const opponentSide: TriadRoomSlot = side === "host" ? "challenger" : "host";
+  const baseTargets: TriadRoomSlot[] =
+    rule.target.startsWith("own")
+      ? [side]
+      : rule.target.startsWith("opponent")
+        ? [opponentSide]
+        : rule.target === "any-one" || rule.target === "all"
+          ? [side, opponentSide]
+          : [side];
+  return baseTargets.filter((targetSlot) => skillTargetSlotMatchesElementCondition(cardNo, targetSlot, room));
 }
 
 function selectedSkillTargets(room: StoredTriadRoom, opener: TriadRoomSlot) {
@@ -2741,6 +2772,12 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
       }
       const targetSlots = targetSequence.map((target) => selectedTargetSlot(side, target));
       if (targetSlots.some((slot) => !slot || !room.game.triangles[slot].top)) {
+        return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+      }
+    } else {
+      const targetSlot = selectedTargetSlot(side, cleanTarget);
+      const legalTargetSlots = legalManualSkillTargetSlots(room, side, choice.cardNo);
+      if (!targetSlot || !legalTargetSlots.includes(targetSlot)) {
         return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
       }
     }

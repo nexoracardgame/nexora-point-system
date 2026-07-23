@@ -40,6 +40,7 @@ import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import {
   resolveTriadTurn,
   triadCardByNo,
+  triadSkillElementConditionMatches,
   triadSkillRuleByNo,
   type TriadCard,
   type TriadCardKind,
@@ -1402,6 +1403,15 @@ function applyRoomBlessingPreview(
   return { host: nextHost, challenger: nextChallenger };
 }
 
+function restoreLockedFightAfterBlessing(fight: LockedFight, blessing: PendingBlessingChoice | null) {
+  if (!blessing?.choice) return fight;
+  return {
+    ...fight,
+    player: { ...blessing.player },
+    bot: { ...blessing.bot },
+  };
+}
+
 function getUsedFromFights(fights: LockedFight[]) {
   return new Set(
     fights.flatMap((fight) => [
@@ -1672,6 +1682,17 @@ function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): S
     .filter((item): item is SkillTargetId => item === "player-top" || item === "bot-top");
 }
 
+function targetMatchesSkillElementCondition(
+  rule: ReturnType<typeof triadSkillRuleByNo.get>,
+  target: SkillTargetId,
+  playerTop?: CardView,
+  botTop?: CardView
+) {
+  if (!rule?.elementCondition) return true;
+  const targetCard = target === "player-top" ? playerTop : botTop;
+  return Boolean(targetCard?.kind === "monster" && triadSkillElementConditionMatches(rule, targetCard));
+}
+
 function isTwoStepTargetSkill(card?: CardView) {
   return card?.cardNo === "232";
 }
@@ -1689,67 +1710,69 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
   const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
+  const withElementCondition = (targets: SkillTargetId[]) =>
+    targets.filter((target) => targetMatchesSkillElementCondition(rule, target, playerTop, botTop));
 
   if (card?.cardNo === "254") return [];
   if (!rule) return [ownTarget];
-  if (card?.cardNo === "234") return [ownTarget];
+  if (card?.cardNo === "234") return withElementCondition([ownTarget]);
   if (card?.cardNo === "232") {
-    return [
+    return withElementCondition([
       playerTop?.kind === "monster" ? "player-top" as const : null,
       botTop?.kind === "monster" ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target));
+    ].filter((target): target is SkillTargetId => Boolean(target)));
   }
   if (card?.cardNo === "231") {
-    return [
+    return withElementCondition([
       monsterHasUnequalStats(playerTop) ? "player-top" as const : null,
       monsterHasUnequalStats(botTop) ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target));
+    ].filter((target): target is SkillTargetId => Boolean(target)));
   }
   if (card?.cardNo === "227") {
-    return [
+    return withElementCondition([
       monsterHasGravityFieldStat(playerTop) ? "player-top" as const : null,
       monsterHasGravityFieldStat(botTop) ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target));
+    ].filter((target): target is SkillTargetId => Boolean(target)));
   }
   if (card?.cardNo === "259") {
-    return [
+    return withElementCondition([
       monsterHasTidebombStat(playerTop) ? "player-top" as const : null,
       monsterHasTidebombStat(botTop) ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target));
+    ].filter((target): target is SkillTargetId => Boolean(target)));
   }
   if (card?.cardNo === "255") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasHydroburst255Stat(ownCard) ? [ownTarget] : [];
+    return monsterHasHydroburst255Stat(ownCard) ? withElementCondition([ownTarget]) : [];
   }
   if (card?.cardNo === "018") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasGoldenRegis018Element(ownCard) ? [ownTarget] : [];
+    return monsterHasGoldenRegis018Element(ownCard) ? withElementCondition([ownTarget]) : [];
   }
   if (card?.cardNo === "019") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasVerdant019Element(ownCard) ? [ownTarget] : [];
+    return monsterHasVerdant019Element(ownCard) ? withElementCondition([ownTarget]) : [];
   }
   if (card?.cardNo === "223") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasPitfall223Stat(ownCard) ? [ownTarget] : [];
+    return monsterHasPitfall223Stat(ownCard) ? withElementCondition([ownTarget]) : [];
   }
   if (card?.cardNo === "238") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasMetalShield238Stat(ownCard) ? [ownTarget] : [];
+    return monsterHasMetalShield238Stat(ownCard) ? withElementCondition([ownTarget]) : [];
   }
   if (card?.cardNo === "239") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasIronWings239Stat(ownCard) ? [ownTarget] : [];
+    return monsterHasIronWings239Stat(ownCard) ? withElementCondition([ownTarget]) : [];
   }
   if (card?.cardNo === "243") {
     const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasCounterBlade243Stat(ownCard) ? [ownTarget] : [];
+    return monsterHasCounterBlade243Stat(ownCard) ? withElementCondition([ownTarget]) : [];
   }
-  if (rule.target.startsWith("own")) return [ownTarget];
-  if (rule.target.startsWith("opponent")) return [opponentTarget];
-  if (rule.target === "any-one" || rule.target === "all") return [ownTarget, opponentTarget];
+  if (rule.target.startsWith("own")) return withElementCondition([ownTarget]);
+  if (rule.target.startsWith("opponent")) return withElementCondition([opponentTarget]);
+  if (rule.target === "any-one" || rule.target === "all") return withElementCondition([ownTarget, opponentTarget]);
 
-  return [ownTarget];
+  return withElementCondition([ownTarget]);
 }
 
 function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView): SkillTargetId[] {
@@ -6766,8 +6789,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const chooseBlessing = (choice: BlessingChoice) => {
     if (!pendingBlessingChoice) return;
     const blessingCard = cardsByNo.get("254");
-    let nextPlayer = { ...pendingBlessingChoice.player };
-    let nextBot = { ...pendingBlessingChoice.bot };
+    const originalPlayer = { ...pendingBlessingChoice.player };
+    const originalBot = { ...pendingBlessingChoice.bot };
+    let nextPlayer = { ...originalPlayer };
+    let nextBot = { ...originalBot };
     let summary = "ขอพรศักดิ์สิทธิ์ทำงานแล้ว";
     let drawnCardNo = "";
     let previewTopCardNo = "";
@@ -6798,8 +6823,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         choice,
         drawnCardNo: "",
         previewTopCardNo: "",
-        player: nextPlayer,
-        bot: nextBot,
+        player: originalPlayer,
+        bot: originalBot,
       });
       void postRoomAction({
         action: "choose-skill-target",
@@ -6811,9 +6836,44 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           setBattleLog((current) => ["ขอพรศักดิ์สิทธิ์ยืนยันไม่สำเร็จ", ...current]);
           return;
         }
-        setBattleLog((current) => [summary, ...current]);
+        const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
+        const serverChoice = room?.game.skillChoices.find(
+          (item) =>
+            item.fightNo === room.game.fightNo &&
+            item.turn === room.game.activeTurn &&
+            item.side === roomPlayerSide &&
+            item.cardNo === "254" &&
+            item.selectedTarget === choice &&
+            !item.skipped
+        );
+        const serverDrawnCardNo = serverChoice?.blessingDrawCardNo || "";
+        const serverPreviewTopCardNo = serverChoice?.blessingPreviewTopNo || "";
+        const serverSummary =
+          choice === "draw-skill"
+            ? serverDrawnCardNo
+              ? `No.254 ขอพรศักดิ์สิทธิ์: เปิดสกิลเพิ่ม No.${serverDrawnCardNo} แทน No.254 เฉพาะตานี้`
+              : "No.254 ขอพรศักดิ์สิทธิ์: สุ่มสกิลเพิ่มไม่สำเร็จ"
+            : serverPreviewTopCardNo
+              ? `No.254 ขอพรศักดิ์สิทธิ์: สุ่มเปลี่ยนมอนสเตอร์${choice === "reroll-own" ? "ฝั่งเรา" : "ฝั่งตรงข้าม"}เป็น No.${serverPreviewTopCardNo} เฉพาะตานี้ จบตาจะกลับเป็นมอนสเตอร์เดิม`
+              : `No.254 ขอพรศักดิ์สิทธิ์: สุ่มเปลี่ยนมอนสเตอร์${choice === "reroll-own" ? "ฝั่งเรา" : "ฝั่งตรงข้าม"}ไม่สำเร็จ`;
+        setPendingBlessingChoice((current) =>
+          current
+            ? {
+                ...current,
+                choice,
+                drawnCardNo: serverDrawnCardNo,
+                previewTopCardNo: serverPreviewTopCardNo,
+              }
+            : current
+        );
+        if (serverDrawnCardNo || serverPreviewTopCardNo) setRandomDrawCardNo(serverDrawnCardNo || serverPreviewTopCardNo);
+        setBattleLog((current) => [serverSummary || summary, ...current]);
       });
       return;
+    }
+
+    if ((choice === "reroll-own" || choice === "reroll-opponent") && previewTopCardNo) {
+      summary = `${summary} จบตาจะกลับเป็นมอนสเตอร์เดิม`;
     }
 
     const result = resolveTriadTurn({
@@ -6843,8 +6903,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       choice,
       drawnCardNo,
       previewTopCardNo,
-      player: nextPlayer,
-      bot: nextBot,
+      player: originalPlayer,
+      bot: originalBot,
     });
     if (drawnCardNo) setRandomDrawCardNo(drawnCardNo);
     setBattleLog((current) => [summary, ...current]);
@@ -7097,13 +7157,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     const lane = laneForTurn(activeTurn);
     const nextActiveTurn = (activeTurn + 1) as TriadTurn;
+    const restoredFight = restoreLockedFightAfterBlessing(lockedFight, pendingBlessingChoice);
 
     setUsedPlayerCards((current) =>
-      Array.from(new Set([...current, lockedFight.player[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
+      Array.from(new Set([...current, restoredFight.player[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
     );
     setUsedBotCards((current) =>
-      Array.from(new Set([...current, lockedFight.bot[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
+      Array.from(new Set([...current, restoredFight.bot[lane]].filter((cardNo): cardNo is string => Boolean(cardNo))))
     );
+    setPlayer(restoredFight.player);
+    setLockedFight(restoredFight);
     setPendingSkillChoice(null);
     setPendingBlessingChoice(null);
     setRandomDrawCardNo("");
@@ -7120,25 +7183,26 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       markRoomTurnReady();
       return;
     }
+    const restoredFight = restoreLockedFightAfterBlessing(lockedFight, pendingBlessingChoice);
 
     const nextUsedPlayer = [
       ...usedPlayerCards,
-      lockedFight.player.top,
-      lockedFight.player.left || "",
-      lockedFight.player.right || "",
+      restoredFight.player.top,
+      restoredFight.player.left || "",
+      restoredFight.player.right || "",
     ].filter(Boolean);
     const nextUsedBot = [
       ...usedBotCards,
-      lockedFight.bot.top,
-      lockedFight.bot.left || "",
-      lockedFight.bot.right || "",
+      restoredFight.bot.top,
+      restoredFight.bot.left || "",
+      restoredFight.bot.right || "",
     ].filter(Boolean);
     const nextAvailablePlayer = playerDeckCards.filter((card) => !new Set(nextUsedPlayer).has(card.cardNo));
 
-    const completedPlayerCards = [lockedFight.player.top, lockedFight.player.left, lockedFight.player.right].filter(
+    const completedPlayerCards = [restoredFight.player.top, restoredFight.player.left, restoredFight.player.right].filter(
       (cardNo): cardNo is string => Boolean(cardNo)
     );
-    const completedBotCards = [lockedFight.bot.top, lockedFight.bot.left, lockedFight.bot.right].filter(
+    const completedBotCards = [restoredFight.bot.top, restoredFight.bot.left, restoredFight.bot.right].filter(
       (cardNo): cardNo is string => Boolean(cardNo)
     );
     setGravePlayerCards((current) => Array.from(new Set([...current, ...completedPlayerCards])));
