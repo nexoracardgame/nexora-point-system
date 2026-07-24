@@ -810,9 +810,10 @@ function applyGravityField(
   }
 
   const targetSide = normalizedTarget === ownTarget ? side : side === "player" ? "opponent" : "player";
-  const qualifyingMetrics: TriadMetric[] = [];
-  if (targetContribution.card.attack >= 7000) qualifyingMetrics.push("attack");
-  if (targetContribution.card.support >= 7000) qualifyingMetrics.push("support");
+  const qualifyingMetrics: TriadMetric[] =
+    targetScore.metric === "attack" || targetScore.metric === "support"
+      ? (targetContribution.card[targetScore.metric] > 7000 ? [targetScore.metric] : [])
+      : (["attack", "support"] as TriadMetric[]).filter((metric) => targetContribution.card[metric] > 7000);
 
   if (qualifyingMetrics.length === 0) {
     return {
@@ -844,9 +845,9 @@ function applyGravityField(
       blocked.push(`${label} ถูกล็อคโดย No.${blocker.rule.cardNo}`);
       continue;
     }
-    if (targetScore.metric === metric) {
+    if (targetScore.metric === metric || targetScore.metric === "total") {
       targetScore.total -= originalValue;
-      targetContribution.value = 0;
+      targetContribution.value = Math.max(0, targetContribution.value - originalValue);
       targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} ${originalValue.toLocaleString()} -> 0`);
     }
     applied.push(`${label} ${originalValue.toLocaleString()} -> 0`);

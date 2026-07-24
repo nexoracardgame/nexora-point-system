@@ -2143,15 +2143,18 @@ function metalSwordTargets(room: StoredTriadRoom) {
   ].filter((side): side is TriadRoomSlot => Boolean(side));
 }
 
-function monsterHasGravityFieldStat(cardNo: string) {
+function monsterHasGravityFieldStat(cardNo: string, turn?: TriadTurn) {
   const card = triadCardByNo.get(cleanText(cardNo));
-  return Boolean(card?.kind === "monster" && (card.attack >= 7000 || card.support >= 7000));
+  if (!card || card.kind !== "monster") return false;
+  if (turn === 2) return card.attack > 7000;
+  if (turn === 3) return card.support > 7000;
+  return card.attack > 7000 || card.support > 7000;
 }
 
 function gravityFieldTargets(room: StoredTriadRoom) {
   return [
-    monsterHasGravityFieldStat(room.game.triangles.host.top) ? ("host" as const) : null,
-    monsterHasGravityFieldStat(room.game.triangles.challenger.top) ? ("challenger" as const) : null,
+    monsterHasGravityFieldStat(room.game.triangles.host.top, room.game.activeTurn) ? ("host" as const) : null,
+    monsterHasGravityFieldStat(room.game.triangles.challenger.top, room.game.activeTurn) ? ("challenger" as const) : null,
   ].filter((side): side is TriadRoomSlot => Boolean(side));
 }
 
