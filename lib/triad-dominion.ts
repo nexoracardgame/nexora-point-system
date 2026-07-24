@@ -208,7 +208,15 @@ function normalizeElement(value?: string, cardNo?: string): TriadElement {
 }
 
 function formatElementName(element: TriadElement) {
-  return triadElementThai[element] || triadElementThai.unknown;
+  const readableElementThai: Record<TriadElement, string> = {
+    earth: "ดิน",
+    water: "น้ำ",
+    wood: "ไม้",
+    fire: "ไฟ",
+    gold: "ทอง",
+    unknown: "ไม่ทราบ",
+  };
+  return readableElementThai[element] || readableElementThai.unknown;
 }
 
 function normalizeSkillElementText(value: string) {
@@ -532,6 +540,15 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
   const blockedTopMetricSet = new Set(blockedTopMetrics);
   const top = getCard(triangle.top);
   const laneCard = getCard(triangle[selectedLane(turn)]);
+  const fieldMetricContributions = (metric: TriadMetric) =>
+    (["top", "left", "right"] as TriadLane[])
+      .map((lane) => {
+        const card = getCard(triangle[lane]);
+        if (!card || card.kind !== "monster") return null;
+        const value = lane === "top" && blockedTopMetricSet.has(metric) ? 0 : card[metric] || 0;
+        return { card, lane, value };
+      })
+      .filter((item): item is { card: TriadCard; lane: TriadLane; value: number } => Boolean(item));
   if (turn === 1) {
     const topAttack = blockedTopMetricSet.has("attack") ? 0 : top?.attack || 0;
     const topSupport = blockedTopMetricSet.has("support") ? 0 : top?.support || 0;
@@ -539,6 +556,7 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
       metric: "total" as const,
       total: topAttack + topSupport,
       contributions: top ? [{ card: top, lane: "top" as TriadLane, value: topAttack + topSupport }] : [],
+      fieldContributions: top ? [{ card: top, lane: "top" as TriadLane, value: topAttack + topSupport }] : [],
       breakdown: top ? [`No.${top.cardNo} ${top.name}: ATK ${topAttack} + SUP ${topSupport}`] : [],
     };
   }
@@ -555,6 +573,7 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
       top ? { card: top, lane: "top" as TriadLane, value: topValue } : null,
       laneCard?.kind === "monster" ? { card: laneCard, lane: selectedLane(turn), value: laneValue } : null,
     ].filter((item): item is { card: TriadCard; lane: TriadLane; value: number } => Boolean(item)),
+    fieldContributions: fieldMetricContributions(metric),
     breakdown: [
       top ? `No.${top.cardNo} ${top.name}: ${label} ${topValue}` : "",
       laneCard?.kind === "monster" ? `No.${laneCard.cardNo} ${laneCard.name}: ${label} ${laneValue}` : "",
@@ -942,7 +961,8 @@ export function triadSkillElementConditionMatches(rule: TriadSkillRule, card: Pi
 function elementConditionLabel(rule: TriadSkillRule) {
   if (!rule.elementCondition) return "";
   const elements = rule.elementCondition.elements.map(formatElementName).join("/");
-  return rule.elementCondition.mode === "include" ? `ต้องเป็นธาตุ${elements}` : `ต้องไม่ใช่ธาตุ${elements}`;
+  if (rule.elementCondition.mode === "include") return `ต้องเป็นธาตุ${elements}`;
+  return `ต้องไม่ใช่ธาตุ${elements}`;
 }
 
 function applyAllFieldStatRule(
@@ -953,8 +973,8 @@ function applyAllFieldStatRule(
   blockers: StatGainBlocker[]
 ) {
   const scoreItems = [
-    { score: ownScore, targetSide: side, label: "user" },
-    { score: opponentScore, targetSide: side === "player" ? "opponent" as const : "player" as const, label: "opponent" },
+    { score: ownScore, targetSide: side, label: "ฝั่งผู้ใช้สกิล" },
+    { score: opponentScore, targetSide: side === "player" ? "opponent" as const : "player" as const, label: "ฝั่งตรงข้าม" },
   ];
   const events: TriadSkillEvent[] = [];
 
@@ -964,7 +984,9 @@ function applyAllFieldStatRule(
 
     for (const item of scoreItems) {
       if (item.score.metric !== effect.metric) continue;
-      const eligible = item.score.contributions.filter((contribution) => triadSkillElementConditionMatches(rule, contribution.card));
+      const activeContributions = item.score.contributions;
+      const fieldContributions = "fieldContributions" in item.score ? item.score.fieldContributions : activeContributions;
+      const eligible = fieldContributions.filter((contribution) => triadSkillElementConditionMatches(rule, contribution.card));
       const unblocked = eligible.filter((contribution) => {
         const blocker = blockers.find((candidate) =>
           candidate.targetSide === item.targetSide &&
@@ -979,8 +1001,12 @@ function applyAllFieldStatRule(
       item.score.total += totalDelta;
       unblocked.forEach((contribution) => {
         contribution.value += effect.delta;
+        const activeContribution = activeContributions.find((item) => item.lane === contribution.lane && item.card.cardNo === contribution.card.cardNo);
+        if (activeContribution && activeContribution !== contribution) {
+          activeContribution.value += effect.delta;
+        }
       });
-      item.score.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${effect.metric.toUpperCase()} ${totalDelta.toLocaleString()} (${item.label}, ${unblocked.length})`);
+      item.score.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${effect.metric.toUpperCase()} ${totalDelta.toLocaleString()} (${item.label}, ${unblocked.length} field monsters)`);
       applied.push(`${item.label} ${unblocked.length}`);
     }
 
@@ -993,21 +1019,24 @@ function applyAllFieldStatRule(
         type: rule.shape,
         text: rule.text,
         summary: blocked.length > 0
-          ? `${metricLabel} change found valid targets, but was blocked (${blocked.join(", ")})`
-          : `No valid ${metricLabel} targets matched this turn`,
+          ? `พบเป้าหมาย ${metricLabel} ที่เข้าเงื่อนไข แต่ถูกบล็อก (${blocked.join(", ")})`
+          : `ไม่มีเป้าหมาย ${metricLabel} ที่เข้าเงื่อนไขในตานี้`,
         blocked: true,
       });
       continue;
     }
 
     const condition = elementConditionLabel(rule);
+    const targetText = rule.cardNo === "249"
+      ? "มอนสเตอร์ทุกใบทั้งสองสนามที่ไม่ใช่ธาตุน้ำ"
+      : `มอนสเตอร์ทุกใบทั้งสองสนาม${condition ? `ที่${condition}` : ""}`;
     events.push({
       cardNo: rule.cardNo,
       name: rule.name,
       side,
       type: rule.shape,
       text: rule.text,
-      summary: `${metricLabel} ${effect.delta >= 0 ? "+" : ""}${effect.delta.toLocaleString()} applies to all matching monsters on both fields${condition ? ` (${condition})` : ""}: ${applied.join(", ")}${blocked.length > 0 ? `; blocked ${blocked.join(", ")}` : ""}`,
+      summary: `${metricLabel} ${effect.delta >= 0 ? "+" : ""}${effect.delta.toLocaleString()} ใช้กับ${targetText}: ${applied.join(", ")}${blocked.length > 0 ? `; ถูกบล็อก ${blocked.join(", ")}` : ""}`,
     });
   }
 
@@ -1273,9 +1302,13 @@ function applyEarthRebirth225Strict(
   rule: TriadSkillRule,
   side: "player" | "opponent",
   ownScore: TriadScoreState,
-  blockers: StatGainBlocker[] = []
+  blockers: StatGainBlocker[] = [],
+  selectedTarget = ""
 ) {
-  const targetContribution = ownScore.contributions.find((item) => item.card.kind === "monster" && item.card.attack <= 5000);
+  const ownTarget = side === "player" ? "player-top" : "bot-top";
+  const targetContribution = selectedTarget && selectedTarget !== ownTarget
+    ? undefined
+    : ownScore.contributions.find((item) => item.lane === "top" && item.card.kind === "monster");
   const targetLabel = "มอนสเตอร์ฝั่งผู้ใช้สกิลที่ ATK ไม่เกิน 5,000";
   if (!targetContribution) {
     return {
@@ -1285,6 +1318,19 @@ function applyEarthRebirth225Strict(
       type: rule.shape,
       text: rule.text,
       summary: "ไม่พบมอนสเตอร์ฝั่งผู้ใช้สกิลที่มี ATK 5,000 หรือต่ำกว่า ใบ 225 จึงไม่ทำงาน",
+      targetLabel,
+      blocked: true,
+    } satisfies TriadSkillEvent;
+  }
+
+  if (targetContribution.card.attack > 5000) {
+    return {
+      cardNo: rule.cardNo,
+      name: rule.name,
+      side,
+      type: rule.shape,
+      text: rule.text,
+      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มี ATK ${targetContribution.card.attack.toLocaleString()} เกิน 5,000 จึงไม่เข้าเงื่อนไขใบ 225`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
@@ -2161,7 +2207,7 @@ function applySkill(
   }
 
   if (rule.cardNo === "225") {
-    events.push(applyEarthRebirth225Strict(rule, side, ownScore, blockers));
+    events.push(applyEarthRebirth225Strict(rule, side, ownScore, blockers, selectedTarget));
     return { unresolved, events };
   }
 

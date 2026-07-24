@@ -2275,8 +2275,11 @@ function selectedTargetSlot(side: TriadRoomSlot, selectedTarget: string): TriadR
 
 function skillTargetSlotMatchesElementCondition(cardNo: string, targetSlot: TriadRoomSlot, room: StoredTriadRoom) {
   const rule = triadSkillRuleByNo.get(cleanCardNo(cardNo));
-  if (!rule?.elementCondition) return true;
   const targetCard = triadCardByNo.get(room.game.triangles[targetSlot].top);
+  if (cleanCardNo(cardNo) === "225") {
+    return Boolean(targetCard?.kind === "monster" && targetCard.attack <= 5000);
+  }
+  if (!rule?.elementCondition) return true;
   return Boolean(targetCard?.kind === "monster" && triadSkillElementConditionMatches(rule, targetCard));
 }
 
