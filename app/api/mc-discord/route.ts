@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "crypto";
+import { createHash, createHmac, randomBytes } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ const ALLOWED_ACTIONS = new Set([
   "guild",
   "guild-list",
   "oauth-complete",
+  "proxy-diagnostics",
   "roles",
   "server-status",
 ]);
@@ -115,6 +116,10 @@ function canonicalDiscordProof(data: {
 
 function signDiscordProof(secret: string, proof: ReturnType<typeof buildDiscordProof>) {
   return createHmac("sha256", secret).update(canonicalDiscordProof(proof)).digest("hex");
+}
+
+function fingerprintSecret(secret: string) {
+  return createHash("sha256").update(secret).digest("hex").slice(0, 12);
 }
 
 function buildDiscordProof(input: {
@@ -226,6 +231,7 @@ async function completeDiscordOAuth(body: Record<string, unknown>, proxySecret: 
     joinOk,
     inviteUrl: MC_DISCORD_INVITE_URL,
     proof,
+    proxySecretFingerprint: fingerprintSecret(proxySecret),
     signature,
     user: {
       id: proof.userId,
@@ -366,6 +372,15 @@ export async function POST(request: Request) {
         message: error instanceof Error ? error.message : "Discord OAuth proxy failed",
       });
     }
+  }
+
+  if (action === "proxy-diagnostics") {
+    return jsonResponse({
+      ok: true,
+      proxySecretFingerprint: fingerprintSecret(expectedSecret),
+      proxySecretLength: expectedSecret.length,
+      checkedAt: new Date().toISOString(),
+    });
   }
 
   if (action === "server-status") {
