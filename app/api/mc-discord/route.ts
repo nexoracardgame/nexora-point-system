@@ -96,20 +96,12 @@ function resolveDiscordPath(action: string, body: Record<string, unknown>) {
 
 function canonicalDiscordProof(data: {
   expiresAt: number;
-  globalName: string;
-  joinStatus: string;
-  linkedAt: string;
   linkToken: string;
   userId: string;
-  username: string;
 }) {
   return [
     data.linkToken,
     data.userId,
-    data.username,
-    data.globalName,
-    data.linkedAt,
-    data.joinStatus,
     String(data.expiresAt),
   ].join("\n");
 }
