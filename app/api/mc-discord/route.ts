@@ -4,7 +4,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
-const MC_DISCORD_PROXY_BUILD = "roster-fixed-ranges-v1";
+const MC_DISCORD_PROXY_BUILD = "roster-fixed-ranges-v2";
+const DISCORD_ROSTER_RETRY_LIMIT = 3;
 const ALLOWED_ACTIONS = new Set([
   "assign-role",
   "bot",
@@ -358,6 +359,22 @@ function getDiscordBotHeaders(botToken: string, json = false) {
   };
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getDiscordRetryAfterMs(response: Response, json: Record<string, unknown>) {
+  const bodyRetryAfter = Number(json.retry_after);
+  if (Number.isFinite(bodyRetryAfter) && bodyRetryAfter > 0) {
+    return Math.ceil((bodyRetryAfter < 100 ? bodyRetryAfter * 1000 : bodyRetryAfter) + 150);
+  }
+  const headerRetryAfter = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(headerRetryAfter) && headerRetryAfter > 0) {
+    return Math.ceil((headerRetryAfter < 100 ? headerRetryAfter * 1000 : headerRetryAfter) + 150);
+  }
+  return 1150;
+}
+
 function getRosterMessageKey(content: string) {
   const markerMatch = content.match(/\bROSTER KEY\s+(roster-[a-z0-9-]+)\b/i);
   if (markerMatch) return markerMatch[1].toLowerCase();
@@ -408,35 +425,56 @@ async function fetchRecentRosterCandidates(channelId: string, botToken: string, 
 }
 
 async function patchRosterMessage(channelId: string, messageId: string, content: string, botToken: string) {
-  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/${messageId}`, {
-    method: "PATCH",
-    headers: getDiscordBotHeaders(botToken, true),
-    body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
-    cache: "no-store",
-  });
-  const json = (await readDiscordJson(response)) as Record<string, unknown>;
-  return { ok: response.ok, status: response.status, json };
+  for (let attempt = 0; attempt <= DISCORD_ROSTER_RETRY_LIMIT; attempt += 1) {
+    const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/${messageId}`, {
+      method: "PATCH",
+      headers: getDiscordBotHeaders(botToken, true),
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+      cache: "no-store",
+    });
+    const json = (await readDiscordJson(response)) as Record<string, unknown>;
+    if (response.status === 429 && attempt < DISCORD_ROSTER_RETRY_LIMIT) {
+      await sleep(getDiscordRetryAfterMs(response, json));
+      continue;
+    }
+    return { ok: response.ok, status: response.status, json };
+  }
+  return { ok: false, status: 429, json: { message: "Discord roster patch retry limit reached" } };
 }
 
 async function createRosterMessage(channelId: string, content: string, botToken: string) {
-  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
-    method: "POST",
-    headers: getDiscordBotHeaders(botToken, true),
-    body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
-    cache: "no-store",
-  });
-  const json = (await readDiscordJson(response)) as Record<string, unknown>;
-  return { ok: response.ok, status: response.status, json };
+  for (let attempt = 0; attempt <= DISCORD_ROSTER_RETRY_LIMIT; attempt += 1) {
+    const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
+      method: "POST",
+      headers: getDiscordBotHeaders(botToken, true),
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+      cache: "no-store",
+    });
+    const json = (await readDiscordJson(response)) as Record<string, unknown>;
+    if (response.status === 429 && attempt < DISCORD_ROSTER_RETRY_LIMIT) {
+      await sleep(getDiscordRetryAfterMs(response, json));
+      continue;
+    }
+    return { ok: response.ok, status: response.status, json };
+  }
+  return { ok: false, status: 429, json: { message: "Discord roster create retry limit reached" } };
 }
 
 async function deleteRosterMessage(channelId: string, messageId: string, botToken: string) {
-  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/${messageId}`, {
-    method: "DELETE",
-    headers: getDiscordBotHeaders(botToken),
-    cache: "no-store",
-  });
-  if (response.status === 404) return true;
-  return response.ok || response.status === 204;
+  for (let attempt = 0; attempt <= DISCORD_ROSTER_RETRY_LIMIT; attempt += 1) {
+    const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/${messageId}`, {
+      method: "DELETE",
+      headers: getDiscordBotHeaders(botToken),
+      cache: "no-store",
+    });
+    if (response.status === 404) return true;
+    if (response.status !== 429) return response.ok || response.status === 204;
+    const json = (await readDiscordJson(response)) as Record<string, unknown>;
+    if (attempt < DISCORD_ROSTER_RETRY_LIMIT) {
+      await sleep(getDiscordRetryAfterMs(response, json));
+    }
+  }
+  return false;
 }
 
 async function bulkDeleteRosterMessages(channelId: string, messageIds: string[], botToken: string) {
@@ -450,17 +488,28 @@ async function bulkDeleteRosterMessages(channelId: string, messageIds: string[],
       continue;
     }
 
-    const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/bulk-delete`, {
-      method: "POST",
-      headers: getDiscordBotHeaders(botToken, true),
-      body: JSON.stringify({ messages: chunk }),
-      cache: "no-store",
-    });
+    let bulkDeleted = false;
+    for (let attempt = 0; attempt <= DISCORD_ROSTER_RETRY_LIMIT; attempt += 1) {
+      const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/bulk-delete`, {
+        method: "POST",
+        headers: getDiscordBotHeaders(botToken, true),
+        body: JSON.stringify({ messages: chunk }),
+        cache: "no-store",
+      });
 
-    if (response.ok || response.status === 204) {
-      deleted += chunk.length;
-      continue;
+      if (response.ok || response.status === 204) {
+        deleted += chunk.length;
+        bulkDeleted = true;
+        break;
+      }
+      if (response.status !== 429) break;
+      const json = (await readDiscordJson(response)) as Record<string, unknown>;
+      if (attempt < DISCORD_ROSTER_RETRY_LIMIT) {
+        await sleep(getDiscordRetryAfterMs(response, json));
+      }
     }
+
+    if (bulkDeleted) continue;
 
     for (const messageId of chunk) {
       if (await deleteRosterMessage(channelId, messageId, botToken)) deleted += 1;
