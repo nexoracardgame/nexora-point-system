@@ -13,6 +13,7 @@ const ALLOWED_ACTIONS = new Set([
   "proxy-diagnostics",
   "roles",
   "server-status",
+  "sync-roster-message",
 ]);
 
 const MC_DISCORD_CLIENT_ID = "1544896499241062541";
@@ -56,6 +57,10 @@ function cleanOAuthCode(value: unknown) {
 
 function cleanText(value: unknown, maxLength = 120) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function cleanDiscordMessageContent(value: unknown) {
+  return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").slice(0, 2000);
 }
 
 async function readDiscordJson(response: Response) {
@@ -337,6 +342,198 @@ async function getFiveMStatus(body: Record<string, unknown>) {
   return buildFiveMUnknown(endpoints[0], errors.join(" | "));
 }
 
+type RosterMessageCandidate = {
+  id: string;
+  key: string;
+  content: string;
+};
+
+function getDiscordBotHeaders(botToken: string, json = false) {
+  return {
+    Authorization: `Bot ${botToken}`,
+    ...(json ? { "Content-Type": "application/json" } : {}),
+    Accept: "application/json",
+    "User-Agent": "DiscordBot (THE MC CLUB Roster Sync; 1.0)",
+  };
+}
+
+function getRosterMessageKey(content: string) {
+  const markerMatch = content.match(/\bROSTER KEY\s+(roster-\d+)\b/i);
+  if (markerMatch) return markerMatch[1].toLowerCase();
+  const pageMatch = content.match(/\bPAGE\s+(\d+)\s*\/\s*\d+\b/i);
+  if (!pageMatch) return "";
+  const page = Number(pageMatch[1]);
+  return Number.isFinite(page) && page > 0 ? `roster-${page}` : "";
+}
+
+async function fetchRecentRosterCandidates(channelId: string, botToken: string) {
+  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages?limit=100`, {
+    method: "GET",
+    headers: getDiscordBotHeaders(botToken),
+    cache: "no-store",
+  });
+  if (!response.ok) return [];
+  const json = await readDiscordJson(response);
+  if (!Array.isArray(json)) return [];
+
+  const candidates: RosterMessageCandidate[] = [];
+  for (const item of json) {
+    const raw = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const author = raw.author && typeof raw.author === "object" ? raw.author as Record<string, unknown> : {};
+    const content = String(raw.content || "");
+    if (author.bot !== true || content.indexOf("THE MC CLUB MEMBER ROSTER") === -1) continue;
+    const id = cleanSnowflake(raw.id);
+    const key = getRosterMessageKey(content);
+    if (id && key) candidates.push({ id, key, content });
+  }
+  return candidates;
+}
+
+async function patchRosterMessage(channelId: string, messageId: string, content: string, botToken: string) {
+  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/${messageId}`, {
+    method: "PATCH",
+    headers: getDiscordBotHeaders(botToken, true),
+    body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+    cache: "no-store",
+  });
+  const json = (await readDiscordJson(response)) as Record<string, unknown>;
+  return { ok: response.ok, status: response.status, json };
+}
+
+async function createRosterMessage(channelId: string, content: string, botToken: string) {
+  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: getDiscordBotHeaders(botToken, true),
+    body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+    cache: "no-store",
+  });
+  const json = (await readDiscordJson(response)) as Record<string, unknown>;
+  return { ok: response.ok, status: response.status, json };
+}
+
+async function deleteRosterMessage(channelId: string, messageId: string, botToken: string) {
+  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/${messageId}`, {
+    method: "DELETE",
+    headers: getDiscordBotHeaders(botToken),
+    cache: "no-store",
+  });
+  if (response.status === 404) return true;
+  return response.ok || response.status === 204;
+}
+
+async function syncRosterMessages(body: Record<string, unknown>, botToken: string) {
+  const channelId = cleanSnowflake(body.channelId);
+  const rawMessages = Array.isArray(body.messages) ? body.messages : [];
+  if (!channelId) return { ok: false, message: "Missing roster channelId" };
+  if (!rawMessages.length) return { ok: false, message: "Missing roster messages" };
+
+  const recentCandidates = await fetchRecentRosterCandidates(channelId, botToken);
+  const recentByKey = new Map<string, string>();
+  const duplicateIds = new Set<string>();
+  for (const candidate of recentCandidates) {
+    if (!recentByKey.has(candidate.key)) {
+      recentByKey.set(candidate.key, candidate.id);
+    } else {
+      duplicateIds.add(candidate.id);
+    }
+  }
+
+  const results: Array<{
+    key: string;
+    ok: boolean;
+    messageId: string;
+    status: number;
+    mode: "created" | "updated" | "failed";
+    error?: unknown;
+  }> = [];
+
+  for (let index = 0; index < Math.min(rawMessages.length, 12); index += 1) {
+    const raw = rawMessages[index] && typeof rawMessages[index] === "object"
+      ? rawMessages[index] as Record<string, unknown>
+      : {};
+    const key = cleanText(raw.key || `page-${index + 1}`, 40) || `page-${index + 1}`;
+    const content = cleanDiscordMessageContent(raw.content);
+    const existingMessageId = cleanSnowflake(raw.messageId);
+    if (!content) {
+      results.push({ key, ok: false, messageId: existingMessageId, status: 400, mode: "failed", error: "empty content" });
+      continue;
+    }
+
+    let updated = false;
+    let blockedByPatchFailure = false;
+    const messageIdCandidates = [recentByKey.get(key), existingMessageId]
+      .filter((value): value is string => Boolean(value))
+      .filter((value, itemIndex, list) => list.indexOf(value) === itemIndex);
+
+    for (const messageId of messageIdCandidates) {
+      const patchResponse = await patchRosterMessage(channelId, messageId, content, botToken);
+      if (patchResponse.ok) {
+        results.push({
+          key,
+          ok: true,
+          messageId: cleanSnowflake(patchResponse.json.id) || messageId,
+          status: patchResponse.status,
+          mode: "updated",
+        });
+        updated = true;
+        break;
+      }
+      if (patchResponse.status !== 404) {
+        results.push({
+          key,
+          ok: false,
+          messageId,
+          status: patchResponse.status,
+          mode: "failed",
+          error: patchResponse.json,
+        });
+        blockedByPatchFailure = true;
+        break;
+      }
+    }
+
+    if (blockedByPatchFailure) continue;
+
+    if (!updated) {
+      const createResponse = await createRosterMessage(channelId, content, botToken);
+      results.push({
+        key,
+        ok: createResponse.ok,
+        messageId: cleanSnowflake(createResponse.json.id),
+        status: createResponse.status,
+        mode: createResponse.ok ? "created" : "failed",
+        error: createResponse.ok ? undefined : createResponse.json,
+      });
+    }
+  }
+
+  const failed = results.filter((item) => !item.ok);
+  let deleted = 0;
+  if (!failed.length) {
+    const activeIds = new Set(results.map((item) => item.messageId).filter(Boolean));
+    const staleIds = new Set<string>();
+    recentCandidates.forEach((candidate) => {
+      if (!activeIds.has(candidate.id)) staleIds.add(candidate.id);
+    });
+    duplicateIds.forEach((messageId) => {
+      if (!activeIds.has(messageId)) staleIds.add(messageId);
+    });
+    for (const messageId of Array.from(staleIds).slice(0, 60)) {
+      if (await deleteRosterMessage(channelId, messageId, botToken)) deleted += 1;
+    }
+  }
+
+  return {
+    ok: failed.length === 0,
+    channelId,
+    deleted,
+    messages: results,
+    message: failed.length
+      ? `Roster sync failed for ${failed.length}/${results.length} message(s)`
+      : `Roster synced ${results.length} message(s), cleaned ${deleted} stale message(s)`,
+  };
+}
+
 export async function POST(request: Request) {
   const expectedSecret = process.env.MC_DISCORD_PROXY_SECRET?.trim();
   if (!expectedSecret) {
@@ -390,6 +587,17 @@ export async function POST(request: Request) {
 
   const botToken = process.env.DISCORD_BOT_TOKEN?.trim();
   if (!botToken) return jsonResponse({ ok: false, message: "Discord bot token is not configured" }, 500);
+
+  if (action === "sync-roster-message") {
+    try {
+      return jsonResponse(await syncRosterMessages(body, botToken));
+    } catch (error) {
+      return jsonResponse({
+        ok: false,
+        message: error instanceof Error ? error.message : "Roster sync failed",
+      }, 200);
+    }
+  }
 
   const resolved = resolveDiscordPath(action, body);
   if (!resolved.ok) return jsonResponse(resolved, 400);
