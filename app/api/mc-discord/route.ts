@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
+const MC_DISCORD_PROXY_BUILD = "roster-fixed-ranges-v1";
 const ALLOWED_ACTIONS = new Set([
   "assign-role",
   "bot",
@@ -358,7 +359,7 @@ function getDiscordBotHeaders(botToken: string, json = false) {
 }
 
 function getRosterMessageKey(content: string) {
-  const markerMatch = content.match(/\bROSTER KEY\s+(roster-\d+)\b/i);
+  const markerMatch = content.match(/\bROSTER KEY\s+(roster-[a-z0-9-]+)\b/i);
   if (markerMatch) return markerMatch[1].toLowerCase();
   const pageMatch = content.match(/\bPAGE\s+(\d+)\s*\/\s*\d+\b/i);
   if (!pageMatch) return "";
@@ -366,26 +367,43 @@ function getRosterMessageKey(content: string) {
   return Number.isFinite(page) && page > 0 ? `roster-${page}` : "";
 }
 
-async function fetchRecentRosterCandidates(channelId: string, botToken: string) {
-  const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages?limit=100`, {
-    method: "GET",
-    headers: getDiscordBotHeaders(botToken),
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const json = await readDiscordJson(response);
-  if (!Array.isArray(json)) return [];
-
+async function fetchRecentRosterCandidates(channelId: string, botToken: string, maxMessages = 500) {
   const candidates: RosterMessageCandidate[] = [];
-  for (const item of json) {
-    const raw = item && typeof item === "object" ? item as Record<string, unknown> : {};
-    const author = raw.author && typeof raw.author === "object" ? raw.author as Record<string, unknown> : {};
-    const content = String(raw.content || "");
-    if (author.bot !== true || content.indexOf("THE MC CLUB MEMBER ROSTER") === -1) continue;
-    const id = cleanSnowflake(raw.id);
-    const key = getRosterMessageKey(content);
-    if (id && key) candidates.push({ id, key, content });
+  let before = "";
+  let scanned = 0;
+
+  for (let page = 0; page < 5 && scanned < maxMessages; page += 1) {
+    const url = new URL(`${DISCORD_API_BASE}/channels/${channelId}/messages`);
+    url.searchParams.set("limit", String(Math.min(100, maxMessages - scanned)));
+    if (before) url.searchParams.set("before", before);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getDiscordBotHeaders(botToken),
+      cache: "no-store",
+    });
+    if (!response.ok) break;
+
+    const json = await readDiscordJson(response);
+    if (!Array.isArray(json) || !json.length) break;
+    scanned += json.length;
+
+    for (const item of json) {
+      const raw = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      const author = raw.author && typeof raw.author === "object" ? raw.author as Record<string, unknown> : {};
+      const content = String(raw.content || "");
+      if (author.bot !== true || content.indexOf("THE MC CLUB MEMBER ROSTER") === -1) continue;
+      const id = cleanSnowflake(raw.id);
+      if (!id) continue;
+      candidates.push({ id, key: getRosterMessageKey(content), content });
+    }
+
+    const last = json[json.length - 1];
+    const rawLast = last && typeof last === "object" ? last as Record<string, unknown> : {};
+    before = cleanSnowflake(rawLast.id);
+    if (!before || json.length < 100) break;
   }
+
   return candidates;
 }
 
@@ -421,6 +439,37 @@ async function deleteRosterMessage(channelId: string, messageId: string, botToke
   return response.ok || response.status === 204;
 }
 
+async function bulkDeleteRosterMessages(channelId: string, messageIds: string[], botToken: string) {
+  const ids = Array.from(new Set(messageIds.map(cleanSnowflake).filter(Boolean)));
+  let deleted = 0;
+
+  for (let index = 0; index < ids.length; index += 100) {
+    const chunk = ids.slice(index, index + 100);
+    if (chunk.length === 1) {
+      if (await deleteRosterMessage(channelId, chunk[0], botToken)) deleted += 1;
+      continue;
+    }
+
+    const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages/bulk-delete`, {
+      method: "POST",
+      headers: getDiscordBotHeaders(botToken, true),
+      body: JSON.stringify({ messages: chunk }),
+      cache: "no-store",
+    });
+
+    if (response.ok || response.status === 204) {
+      deleted += chunk.length;
+      continue;
+    }
+
+    for (const messageId of chunk) {
+      if (await deleteRosterMessage(channelId, messageId, botToken)) deleted += 1;
+    }
+  }
+
+  return deleted;
+}
+
 async function syncRosterMessages(body: Record<string, unknown>, botToken: string) {
   const channelId = cleanSnowflake(body.channelId);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
@@ -431,7 +480,9 @@ async function syncRosterMessages(body: Record<string, unknown>, botToken: strin
   const recentByKey = new Map<string, string>();
   const duplicateIds = new Set<string>();
   for (const candidate of recentCandidates) {
-    if (!recentByKey.has(candidate.key)) {
+    if (!candidate.key) {
+      duplicateIds.add(candidate.id);
+    } else if (!recentByKey.has(candidate.key)) {
       recentByKey.set(candidate.key, candidate.id);
     } else {
       duplicateIds.add(candidate.id);
@@ -447,11 +498,11 @@ async function syncRosterMessages(body: Record<string, unknown>, botToken: strin
     error?: unknown;
   }> = [];
 
-  for (let index = 0; index < Math.min(rawMessages.length, 12); index += 1) {
+  for (let index = 0; index < Math.min(rawMessages.length, 6); index += 1) {
     const raw = rawMessages[index] && typeof rawMessages[index] === "object"
       ? rawMessages[index] as Record<string, unknown>
       : {};
-    const key = cleanText(raw.key || `page-${index + 1}`, 40) || `page-${index + 1}`;
+    const key = cleanText(raw.key || `roster-${index + 1}`, 40) || `roster-${index + 1}`;
     const content = cleanDiscordMessageContent(raw.content);
     const existingMessageId = cleanSnowflake(raw.messageId);
     if (!content) {
@@ -518,9 +569,7 @@ async function syncRosterMessages(body: Record<string, unknown>, botToken: strin
     duplicateIds.forEach((messageId) => {
       if (!activeIds.has(messageId)) staleIds.add(messageId);
     });
-    for (const messageId of Array.from(staleIds).slice(0, 60)) {
-      if (await deleteRosterMessage(channelId, messageId, botToken)) deleted += 1;
-    }
+    deleted = await bulkDeleteRosterMessages(channelId, Array.from(staleIds), botToken);
   }
 
   return {
@@ -566,6 +615,7 @@ export async function POST(request: Request) {
   if (action === "proxy-diagnostics") {
     return jsonResponse({
       ok: true,
+      build: MC_DISCORD_PROXY_BUILD,
       proxySecretFingerprint: fingerprintSecret(expectedSecret),
       proxySecretLength: expectedSecret.length,
       checkedAt: new Date().toISOString(),
