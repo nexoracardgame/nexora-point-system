@@ -71,8 +71,23 @@ export async function POST(request: Request) {
         body: text.slice(0, 500),
       });
     }
+    if (parsedBody.debug) {
+      return new NextResponse(text || "{}", {
+        status: upstream.ok ? 200 : 502,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store, max-age=0",
+        },
+      });
+    }
   } catch (error) {
     console.error("NOC FOAM LINE WEBHOOK PROXY ERROR:", error);
+    if (parsedBody.debug) {
+      return noStoreJson({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }, { status: 500 });
+    }
   }
 
   return noStoreJson({
@@ -84,11 +99,13 @@ export async function POST(request: Request) {
 function safeParseWebhookBody(rawBody: string) {
   try {
     const data = JSON.parse(rawBody || "{}") as {
+      debug?: string;
       events?: Array<{ type?: string; message?: { type?: string } }>;
     };
     const events = Array.isArray(data.events) ? data.events : [];
     return {
       eventCount: events.length,
+      debug: data.debug || "",
       eventTypes: events.map((event) =>
         [event.type || "unknown", event.message?.type || ""].filter(Boolean).join(":")
       ),
@@ -96,6 +113,7 @@ function safeParseWebhookBody(rawBody: string) {
   } catch {
     return {
       eventCount: 0,
+      debug: "",
       eventTypes: ["invalid-json"],
     };
   }
