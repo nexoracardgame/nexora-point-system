@@ -1,6 +1,7 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const DEFAULT_APPS_SCRIPT_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbzCJozWvXbAfgQk_WcuudfKO-uzCDO3NyCDDdsTFbiUFvxWfXBgHe8xCZhBYHKyEN1F/exec";
@@ -42,36 +43,41 @@ export async function POST(request: Request) {
     eventTypes: parsedBody.eventTypes,
   });
 
-  after(async () => {
-    try {
-      const upstream = await fetch(targetUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": contentType,
-        },
-        body: rawBody || JSON.stringify({ events: [] }),
-        redirect: "follow",
-      });
-      const text = await upstream.text().catch(() => "");
-      console.info("NOC FOAM LINE WEBHOOK UPSTREAM:", {
-        ok: upstream.ok,
+  if (parsedBody.eventCount === 0) {
+    return noStoreJson({
+      ok: true,
+      queued: true,
+    });
+  }
+
+  try {
+    const upstream = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": contentType,
+      },
+      body: rawBody || JSON.stringify({ events: [] }),
+      redirect: "follow",
+    });
+    const text = await upstream.text().catch(() => "");
+    console.info("NOC FOAM LINE WEBHOOK UPSTREAM:", {
+      ok: upstream.ok,
+      status: upstream.status,
+      body: text.slice(0, 300),
+    });
+    if (!upstream.ok) {
+      console.error("NOC FOAM LINE WEBHOOK UPSTREAM ERROR:", {
         status: upstream.status,
-        body: text.slice(0, 300),
+        body: text.slice(0, 500),
       });
-      if (!upstream.ok) {
-        console.error("NOC FOAM LINE WEBHOOK UPSTREAM ERROR:", {
-          status: upstream.status,
-          body: text.slice(0, 500),
-        });
-      }
-    } catch (error) {
-      console.error("NOC FOAM LINE WEBHOOK PROXY ERROR:", error);
     }
-  });
+  } catch (error) {
+    console.error("NOC FOAM LINE WEBHOOK PROXY ERROR:", error);
+  }
 
   return noStoreJson({
     ok: true,
-    queued: true,
+    forwarded: true,
   });
 }
 
