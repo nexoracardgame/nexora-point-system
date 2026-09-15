@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,29 +33,29 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const targetUrl = getAppsScriptWebhookUrl();
 
-  try {
-    const upstream = await fetch(targetUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": request.headers.get("content-type") || "application/json",
-      },
-      body: rawBody || JSON.stringify({ events: [] }),
-      redirect: "follow",
-    });
-    const text = await upstream.text().catch(() => "");
+  after(async () => {
+    try {
+      const upstream = await fetch(targetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": request.headers.get("content-type") || "application/json",
+        },
+        body: rawBody || JSON.stringify({ events: [] }),
+        redirect: "follow",
+      });
+      if (!upstream.ok) {
+        console.error("NOC FOAM LINE WEBHOOK UPSTREAM ERROR:", {
+          status: upstream.status,
+          body: (await upstream.text().catch(() => "")).slice(0, 500),
+        });
+      }
+    } catch (error) {
+      console.error("NOC FOAM LINE WEBHOOK PROXY ERROR:", error);
+    }
+  });
 
-    return noStoreJson({
-      ok: true,
-      upstreamOk: upstream.ok,
-      upstreamStatus: upstream.status,
-      upstreamBody: text.slice(0, 500),
-    });
-  } catch (error) {
-    console.error("NOC FOAM LINE WEBHOOK PROXY ERROR:", error);
-    return noStoreJson({
-      ok: true,
-      upstreamOk: false,
-      upstreamStatus: 0,
-    });
-  }
+  return noStoreJson({
+    ok: true,
+    queued: true,
+  });
 }
