@@ -32,21 +32,35 @@ export async function GET() {
 export async function POST(request: Request) {
   const rawBody = await request.text();
   const targetUrl = getAppsScriptWebhookUrl();
+  const contentType = request.headers.get("content-type") || "application/json";
+  const bodyPreview = rawBody.slice(0, 300);
+
+  console.info("NOC FOAM LINE WEBHOOK RECEIVED:", {
+    bytes: rawBody.length,
+    contentType,
+    preview: bodyPreview,
+  });
 
   after(async () => {
     try {
       const upstream = await fetch(targetUrl, {
         method: "POST",
         headers: {
-          "Content-Type": request.headers.get("content-type") || "application/json",
+          "Content-Type": contentType,
         },
         body: rawBody || JSON.stringify({ events: [] }),
         redirect: "follow",
       });
+      const text = await upstream.text().catch(() => "");
+      console.info("NOC FOAM LINE WEBHOOK UPSTREAM:", {
+        ok: upstream.ok,
+        status: upstream.status,
+        body: text.slice(0, 300),
+      });
       if (!upstream.ok) {
         console.error("NOC FOAM LINE WEBHOOK UPSTREAM ERROR:", {
           status: upstream.status,
-          body: (await upstream.text().catch(() => "")).slice(0, 500),
+          body: text.slice(0, 500),
         });
       }
     } catch (error) {
