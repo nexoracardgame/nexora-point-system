@@ -4,7 +4,6 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_APPS_SCRIPT_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbzCJozWvXbAfgQk_WcuudfKO-uzCDO3NyCDDdsTFbiUFvxWfXBgHe8xCZhBYHKyEN1F/exec";
-const DEFAULT_WEBHOOK_SECRET = "noc-foam-ai-2026";
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -15,7 +14,7 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 function getAppsScriptWebhookUrl() {
   const baseUrl =
     process.env.NOC_FOAM_APPS_SCRIPT_WEBHOOK_URL || DEFAULT_APPS_SCRIPT_WEBHOOK_URL;
-  const secret = process.env.NOC_FOAM_WEBHOOK_SECRET || DEFAULT_WEBHOOK_SECRET;
+  const secret = process.env.NOC_FOAM_WEBHOOK_SECRET;
   if (!secret) return baseUrl;
 
   const url = new URL(baseUrl);
