@@ -32,21 +32,36 @@ export async function GET() {
 export async function POST(request: Request) {
   const rawBody = await request.text();
   const targetUrl = getAppsScriptWebhookUrl();
+  const contentType = request.headers.get("content-type") || "application/json";
+  const parsedBody = safeParseWebhookBody(rawBody);
+
+  console.info("NOC FOAM LINE WEBHOOK RECEIVED:", {
+    bytes: rawBody.length,
+    contentType,
+    eventCount: parsedBody.eventCount,
+    eventTypes: parsedBody.eventTypes,
+  });
 
   after(async () => {
     try {
       const upstream = await fetch(targetUrl, {
         method: "POST",
         headers: {
-          "Content-Type": request.headers.get("content-type") || "application/json",
+          "Content-Type": contentType,
         },
         body: rawBody || JSON.stringify({ events: [] }),
         redirect: "follow",
       });
+      const text = await upstream.text().catch(() => "");
+      console.info("NOC FOAM LINE WEBHOOK UPSTREAM:", {
+        ok: upstream.ok,
+        status: upstream.status,
+        body: text.slice(0, 300),
+      });
       if (!upstream.ok) {
         console.error("NOC FOAM LINE WEBHOOK UPSTREAM ERROR:", {
           status: upstream.status,
-          body: (await upstream.text().catch(() => "")).slice(0, 500),
+          body: text.slice(0, 500),
         });
       }
     } catch (error) {
@@ -58,4 +73,24 @@ export async function POST(request: Request) {
     ok: true,
     queued: true,
   });
+}
+
+function safeParseWebhookBody(rawBody: string) {
+  try {
+    const data = JSON.parse(rawBody || "{}") as {
+      events?: Array<{ type?: string; message?: { type?: string } }>;
+    };
+    const events = Array.isArray(data.events) ? data.events : [];
+    return {
+      eventCount: events.length,
+      eventTypes: events.map((event) =>
+        [event.type || "unknown", event.message?.type || ""].filter(Boolean).join(":")
+      ),
+    };
+  } catch {
+    return {
+      eventCount: 0,
+      eventTypes: ["invalid-json"],
+    };
+  }
 }
