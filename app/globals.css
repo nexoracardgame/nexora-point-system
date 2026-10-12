@@ -1225,19 +1225,31 @@ textarea {
   max-width: 100%;
 }
 
-.nexora-battle-shell .triad-tiebreak-result-overlay {
+.triad-tiebreak-result-overlay {
   padding: max(0.7rem, env(safe-area-inset-top)) max(0.7rem, env(safe-area-inset-right)) max(0.7rem, env(safe-area-inset-bottom)) max(0.7rem, env(safe-area-inset-left)) !important;
   background:
     radial-gradient(circle at 50% 45%, rgba(251, 191, 36, 0.22), rgba(0, 0, 0, 0.78) 42%, rgba(0, 0, 0, 0.94) 100%) !important;
 }
 
-.nexora-battle-shell .triad-tiebreak-result-panel {
+.triad-tiebreak-result-panel {
   width: min(640px, calc(100% - 1.2rem)) !important;
   max-height: calc(100% - 1.2rem) !important;
   margin: auto !important;
   overflow: auto !important;
   -webkit-overflow-scrolling: touch;
   transform: translateZ(0);
+}
+
+@media (max-height: 500px) {
+  .triad-rps-panel { padding: 12px !important; }
+  .triad-rps-header > div { margin-top: 4px !important; }
+  .triad-rps-header > div:first-child { width: 28px; height: 28px; margin-top: 0 !important; }
+  .triad-rps-header > div:nth-child(3) { font-size: 20px; }
+  .triad-rps-header p { margin-top: 6px; font-size: 12px; line-height: 18px; }
+  .triad-rps-panel > .mt-5 { margin-top: 10px !important; }
+  .triad-rps-panel > .grid > div { padding: 8px !important; }
+  .triad-rps-panel button { height: 38px !important; }
+  .triad-rps-panel > button { margin-top: 8px !important; }
 }
 
 @media (hover: none) and (pointer: coarse) {
@@ -1297,12 +1309,12 @@ textarea {
     letter-spacing: 0.08em !important;
   }
 
-  .nexora-battle-shell .triad-tiebreak-result-overlay {
+  .triad-tiebreak-result-overlay {
     padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left)) !important;
     backdrop-filter: blur(8px) brightness(0.72) !important;
   }
 
-  .nexora-battle-shell .triad-tiebreak-result-panel {
+  .triad-tiebreak-result-panel {
     width: min(560px, 62%) !important;
     min-width: min(300px, calc(100% - 0.8rem)) !important;
     max-height: calc(100% - 0.8rem) !important;
@@ -1310,16 +1322,16 @@ textarea {
     padding: clamp(0.7rem, 2.4svh, 1.05rem) !important;
   }
 
-  .nexora-battle-shell .triad-tiebreak-result-title {
+  .triad-tiebreak-result-title {
     font-size: clamp(1.35rem, 6.8svh, 2.65rem) !important;
   }
 
-  .nexora-battle-shell .triad-tiebreak-result-choices {
+  .triad-tiebreak-result-choices {
     gap: clamp(0.35rem, 1.6svh, 0.65rem) !important;
     margin-top: clamp(0.6rem, 2svh, 0.9rem) !important;
   }
 
-  .nexora-battle-shell .triad-tiebreak-result-note {
+  .triad-tiebreak-result-note {
     margin-top: clamp(0.55rem, 1.9svh, 0.85rem) !important;
     padding: clamp(0.45rem, 1.6svh, 0.7rem) clamp(0.65rem, 2.4svh, 0.95rem) !important;
     font-size: clamp(0.72rem, 2.6svh, 1rem) !important;

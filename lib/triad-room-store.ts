@@ -2032,8 +2032,11 @@ function freshGame(): TriadRoomGame {
 
 function freshGameForRoom(room: StoredTriadRoom, seed: string | number = Date.now()) {
   const deckMode = room.game.deckMode || "all";
+  const nextGame = freshGame();
+  nextGame.deckStartedAt = Math.max(nextGame.deckStartedAt, Number(room.game.deckStartedAt || 0) + 1);
+  nextGame.turnStartedAt = nextGame.deckStartedAt;
   return {
-    ...freshGame(),
+    ...nextGame,
     deckMode,
     selectionPools: buildSelectionPools(deckMode, `${room.code}:${seed}`),
     chat: room.game.chat,
@@ -2622,11 +2625,14 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
   };
 }
 
-export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
+export async function setTriadRoomDeck(code: string, participantId: string, deck: string[], deckStartedAt?: number) {
   return withRoomMutationLock(code, async () => {
     await warmBotMemory();
     const room = await getStoredRoom(code);
     if (!room) return { ok: false as const, reason: "not_found" as const };
+    if (deckStartedAt !== undefined && deckStartedAt !== room.game.deckStartedAt) {
+      return { ok: false as const, reason: "stale_deck_session" as const, room: publicRoom(room) };
+    }
     repairSelectionPools(room);
     enforceDeckGate(room);
     const side = sideForParticipant(room, participantId);
@@ -2641,11 +2647,14 @@ export async function setTriadRoomDeck(code: string, participantId: string, deck
   });
 }
 
-export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[]) {
+export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[], deckStartedAt?: number) {
   return withRoomMutationLock(code, async () => {
     await warmBotMemory();
     const room = await getStoredRoom(code);
     if (!room) return { ok: false as const, reason: "not_found" as const };
+    if (deckStartedAt !== undefined && deckStartedAt !== room.game.deckStartedAt) {
+      return { ok: false as const, reason: "stale_deck_session" as const, room: publicRoom(room) };
+    }
     repairSelectionPools(room);
     enforceDeckGate(room);
     const side = sideForParticipant(room, participantId);

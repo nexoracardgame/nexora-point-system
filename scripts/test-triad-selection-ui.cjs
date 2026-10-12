@@ -1,0 +1,98 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const ts = require('typescript');
+const { chromium } = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const source = fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx', 'utf8');
+const ast = ts.createSourceFile('client.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const compile = code => ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+let deckEffect;
+function visit(node) {
+  if (ts.isCallExpression(node) && node.expression.getText(ast) === 'useEffect' && node.arguments[0]?.getText(ast).includes('const sessionKey =')) deckEffect = node.arguments[0].getText(ast);
+  ts.forEachChild(node, visit);
+}
+visit(ast);
+assert.ok(deckEffect);
+let selected = [];
+let resets = 0;
+const state = {
+  roomPlayerSide: 'host', opponentSide: 'challenger', phase: 'deck', ownDeckReady: false,
+  localDeckSessionRef: { current: '' },
+  roomBattleStartKey: room => `${room.code}:${room.game.deckStartedAt}`,
+  roomDecksReadyForBattle: () => false, hasBattleStartedForRoom: () => false,
+  roomDeckSecondsLeft: () => 300, TURN_SECONDS: 120,
+  resetLocalDeckSelectionState: () => { selected = []; resets++; },
+  setPlayerDeck: deck => { selected = [...deck]; },
+};
+for (const setter of new Set(deckEffect.match(/\bset[A-Z]\w+/g))) state[setter] ||= () => {};
+const context = vm.createContext(state);
+vm.runInContext(compile(`const syncDeck = ${deckEffect};`), context);
+context.currentRoom = { code: 'room', game: { deckStartedAt: 100, decks: { host: [], challenger: [] } } };
+vm.runInContext('syncDeck()', context);
+selected = ['007', '008'];
+for (let i = 0; i < 10; i++) vm.runInContext('syncDeck()', context);
+assert.deepEqual(selected, ['007', '008']);
+assert.equal(resets, 1);
+context.currentRoom = { code: 'room', game: { deckStartedAt: 101, decks: { host: [], challenger: [] } } };
+vm.runInContext('syncDeck()', context);
+assert.deepEqual(selected, []);
+assert.equal(resets, 2);
+selected = ['009'];
+vm.runInContext('syncDeck()', context);
+assert.deepEqual(selected, ['009']);
+// A reconnect restores only the current server draft, without repeating hydration.
+context.currentRoom = { code: 'other', game: { deckStartedAt: 102, decks: { host: ['010'], challenger: [] } } };
+vm.runInContext('syncDeck()', context);
+assert.deepEqual(selected, ['010']);
+
+const names = new Set(['rpsIcon', 'OpeningTieBreakOverlay', 'OpeningTieBreakResultOverlay']);
+const parts = ast.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text)).map(node => node.getText(ast));
+const labels = ast.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(d => d.name.getText(ast) === 'rpsLabel'));
+const component = compile(`const {createPortal}=require('react-dom'); const {Hand,Scissors,Swords,Trophy,Loader2,RotateCcw}=require('lucide-react');\n${labels.getText(ast)}\n${parts.join('\n')}\nexports.Choose=OpeningTieBreakOverlay; exports.Result=OpeningTieBreakResultOverlay;`);
+const modules = {};
+for (const [id, pkg, file] of [
+  ['react', 'react', 'react.production.js'], ['react/jsx-runtime', 'react', 'react-jsx-runtime.production.js'],
+  ['react-dom', 'react-dom', 'react-dom.production.js'], ['react-dom/client', 'react-dom', 'react-dom-client.production.js'],
+  ['scheduler', 'scheduler', 'scheduler.production.js'],
+]) modules[id] = fs.readFileSync(path.join(path.dirname(require.resolve(pkg)), 'cjs', file), 'utf8');
+modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'), 'utf8');
+modules.rps = component;
+const bundle = Object.entries(modules).map(([id, code]) => `${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
+const cssFiles = [];
+function collect(dir) { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const p = path.join(dir, entry.name); if (entry.isDirectory()) collect(p); else if (p.endsWith('.css')) cssFiles.push(p); } }
+collect('.next/static');
+const css = cssFiles.map(file => fs.readFileSync(file, 'utf8')).join('\n');
+const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div style="transform:translateZ(0);height:100px;overflow:hidden" id="root"></div><div class="nexora-battle-preview-portal" style="position:fixed;inset:0;background:red">Card preview</div><script>
+const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}
+const React=require('react'),R=require('rps'),root=require('react-dom/client').createRoot(document.getElementById('root'));
+window.chosen='';window.mount=(round=1,resolved=false)=>{root.render(React.createElement(React.Fragment,null,React.createElement(R.Choose,{tieBreak:{status:resolved?'resolved':'waiting',round,choices:{},winner:resolved?'host':''},hostName:'ผู้เล่นหนึ่ง',challengerName:'ผู้เล่นสอง',ownSide:'host',isSpectator:false,pendingChoice:null,onChoose:c=>window.chosen=c,onReset:()=>{}}),React.createElement(R.Result,{tieBreak:{status:'resolved',winner:'host',choices:{host:'rock',challenger:'scissors'}},hostName:'ผู้เล่นหนึ่ง',challengerName:'ผู้เล่นสอง',visible:resolved}))) };mount();
+</script></body></html>`;
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  try {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', err => errors.push(err.message));
+    await page.route('https://selection.test/', route => route.fulfill({ body: html, contentType: 'text/html' }));
+    fs.mkdirSync('artifacts/triad-selection', { recursive: true });
+    for (const [width, height] of [[1440, 900], [390, 844], [844, 390]]) {
+      await page.setViewportSize({ width, height });
+      await page.goto('https://selection.test/');
+      const button = page.getByRole('button', { name: 'ค้อน', exact: true });
+      await button.waitFor();
+      assert.equal(await button.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), true);
+      await button.click();
+      assert.equal(await page.evaluate(() => chosen), 'rock');
+      await page.evaluate(() => mount(2));
+      await page.getByRole('button', { name: 'กระดาษ', exact: true }).click();
+      assert.equal(await page.evaluate(() => chosen), 'paper');
+      await page.screenshot({ path: `artifacts/triad-selection/rps-${width}.png` });
+      await page.evaluate(() => mount(2, true));
+      await page.locator('.triad-tiebreak-result-panel').waitFor();
+      assert.equal(await page.locator('.triad-tiebreak-result-panel').evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), true);
+    }
+    assert.deepEqual(errors, []);
+    console.log('Selection UI: draft survives polling, resets once, reconnect hydrates, RPS above preview on desktop/mobile/landscape passed');
+  } finally { await browser.close(); }
+})().catch(err => { console.error(err); process.exitCode = 1; });

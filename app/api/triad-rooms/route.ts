@@ -251,7 +251,7 @@ export async function POST(request: Request) {
 
   if (action === "set-deck") {
     const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
-    const result = await setTriadRoomDeck(cleanText(body.code), participant.id, deck);
+    const result = await setTriadRoomDeck(cleanText(body.code), participant.id, deck, typeof body.deckStartedAt === "number" ? body.deckStartedAt : undefined);
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },
@@ -261,7 +261,7 @@ export async function POST(request: Request) {
 
   if (action === "ready-deck") {
     const deck = Array.isArray(body.deck) ? body.deck.map((item) => cleanText(item)).filter(Boolean) : [];
-    const result = await readyTriadRoomDeck(cleanText(body.code), participant.id, deck);
+    const result = await readyTriadRoomDeck(cleanText(body.code), participant.id, deck, typeof body.deckStartedAt === "number" ? body.deckStartedAt : undefined);
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

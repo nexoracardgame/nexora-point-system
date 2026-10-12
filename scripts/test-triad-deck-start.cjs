@@ -43,8 +43,8 @@ const call = (name, ...args) => context[name](...args);
 const clientSource = fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx', 'utf8');
 const clientAst = ts.createSourceFile('client.tsx', clientSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const clientFunctions = clientAst.statements.filter(node => ts.isFunctionDeclaration(node) &&
-  ['roomDecksReadyForBattle', 'roomTurnSecondsLeft'].includes(node.name?.text));
-assert.equal(clientFunctions.length, 2);
+  ['roomDecksReadyForBattle', 'roomTurnSecondsLeft', 'shouldKeepCurrentRoomSnapshot', 'roomProgressValue', 'roomBattleStartKey'].includes(node.name?.text));
+assert.equal(clientFunctions.length, 5);
 const clientContext = vm.createContext({ Date: { now: () => now }, DECK_SIZE: 20, TURN_SECONDS: 120 });
 vm.runInContext(ts.transpileModule(clientFunctions.map(node => node.getText(clientAst)).join('\n'), {
   compilerOptions: { target: ts.ScriptTarget.ES2020 },
@@ -73,6 +73,28 @@ function assertStarted(room, mode) {
 }
 
 (async () => {
+  const previous = roomFor('all');
+  previous.updatedAt = now;
+  previous.game.decks.host = Array.from({ length: 20 }, (_, i) => `m${i}`);
+  previous.game.decks.challenger = previous.game.decks.host;
+  previous.game.deckReady = { host: true, challenger: true };
+  const fresh = roomFor('all');
+  fresh.game.deckStartedAt = previous.game.deckStartedAt + 1;
+  fresh.updatedAt = now + 1;
+  assert.equal(clientContext.shouldKeepCurrentRoomSnapshot(previous, fresh), false);
+  assert.equal(clientContext.shouldKeepCurrentRoomSnapshot(fresh, previous), true);
+  const stale = structuredClone(fresh);
+  stale.updatedAt = fresh.updatedAt - 1;
+  stale.game.decks.host = previous.game.decks.host;
+  assert.equal(clientContext.shouldKeepCurrentRoomSnapshot(fresh, stale), true);
+  stored = structuredClone(fresh);
+  const beforeStale = JSON.stringify(stored);
+  for (const name of ['setTriadRoomDeck', 'readyTriadRoomDeck']) {
+    const rejected = await call(name, 'test', 'host', previous.game.decks.host, previous.game.deckStartedAt);
+    assert.equal(rejected.reason, 'stale_deck_session');
+    assert.equal(JSON.stringify(stored), beforeStale);
+  }
+  console.log('Deck reset: stale snapshots and old set/ready requests rejected');
   for (const mode of ['all', 'monster', 'skill']) {
     for (const partial of [false, true]) {
       const room = roomFor(mode, true);
