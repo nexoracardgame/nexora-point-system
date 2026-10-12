@@ -327,6 +327,7 @@ export async function POST(request: Request) {
     const result = await advanceTriadRoomTurn(cleanText(body.code), participant.id, {
       fightNo: Number(body.fightNo) || undefined,
       turn: requestedTurn === 1 || requestedTurn === 2 || requestedTurn === 3 ? requestedTurn : undefined,
+      deckStartedAt: typeof body.deckStartedAt === "number" ? body.deckStartedAt : undefined,
     });
     return roomActionJson(
       result,

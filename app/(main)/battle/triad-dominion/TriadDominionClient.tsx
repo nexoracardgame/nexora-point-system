@@ -39,6 +39,7 @@ import {
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import BattleCinematic from "./BattleCinematic";
 import { primeBattleAudio } from "./BattleAudio";
+import { battleArenaForSeed, type TriadArena } from "@/lib/triad-arena";
 import {
   resolveTriadTurn,
   triadCardByNo,
@@ -2057,21 +2058,21 @@ function BoardCardSlot({
       {aura ? (
         <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-white/[0.035]" />
       ) : null}
-      <div className="relative overflow-hidden rounded-[10px] bg-black aspect-[3/4]">
+      <div className="relative overflow-hidden rounded-[6px] bg-black aspect-[5/7]" data-board-card data-active={active || Boolean(aura)}>
         <div className="pointer-events-none absolute inset-0 z-[2] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),transparent_18%,transparent_68%,rgba(0,0,0,0.34))]" />
         <div className="pointer-events-none absolute inset-x-[14%] top-0 z-[3] h-px bg-gradient-to-r from-transparent via-white/55 to-transparent" />
         {card && !hidden ? (
-          <Image src={card.sourceImage} alt={card.name} fill sizes="128px" className="object-cover" />
+          <Image src={card.sourceImage} alt={card.name} fill sizes="(max-width: 700px) 120px, 200px" className="object-contain" />
         ) : (
           <>
             <Image
               src={TRIAD_CARD_BACK_SRC}
               alt={`${label} card back`}
               fill
-              sizes="128px"
+              sizes="(max-width: 700px) 120px, 200px"
               quality={72}
               priority={active}
-              className="object-cover"
+              className="object-contain"
             />
             <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_22%,rgba(0,0,0,0.22))]" />
           </>
@@ -2124,7 +2125,7 @@ function BoardPile({
           <Image src={card.sourceImage} alt={card.name} fill sizes="94px" className="object-cover opacity-80" />
         </div>
       ))}
-      <div className="relative z-10 rounded-md bg-black/55 px-2 py-1 text-center backdrop-blur-sm">
+      <div className={`relative z-10 rounded-md bg-black/55 px-2 py-1 text-center backdrop-blur-sm ${rotate ? "rotate-180" : ""}`}>
         <div className="text-[clamp(0.52rem,2.2cqw,0.78rem)] font-black uppercase leading-none text-white">
           {label}
         </div>
@@ -2395,7 +2396,7 @@ function BoardTriangle({
   const lanes = tone === "bot" ? botLanes : playerLanes;
 
   return (
-    <div className={`grid grid-cols-2 justify-items-center gap-x-[var(--triad-slot-gap,clamp(5px,1vw,14px))] gap-y-0 ${tone === "player" ? "items-end -translate-y-0.5 sm:-translate-y-2" : "items-start translate-y-0.5 sm:translate-y-2"}`}>
+    <div className={`triad-arena-triangle grid grid-cols-2 justify-items-center gap-x-[var(--triad-slot-gap,clamp(5px,1vw,14px))] gap-y-0 ${tone === "player" ? "items-end -translate-y-0.5 sm:-translate-y-2" : "items-start translate-y-0.5 sm:translate-y-2"}`}>
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         const card = cardNo ? cardsByNo.get(cardNo) : undefined;
@@ -4231,6 +4232,9 @@ function TimeoutWarningOverlay({
 function CompactBattleBoard({
   cardsByNo,
   onCinematicActivity,
+  onCinematicComplete,
+  battleSessionKey,
+  arena,
   lockedFight,
   player,
   revealed,
@@ -4272,6 +4276,9 @@ function CompactBattleBoard({
 }: {
   cardsByNo: Map<string, CardView>;
   onCinematicActivity?: (playing: boolean) => void;
+  onCinematicComplete?: (key: string) => void;
+  battleSessionKey: string;
+  arena: TriadArena;
   lockedFight: LockedFight | null;
   player: TriadTriangle;
   revealed: Record<TriadTurn, TurnReveal>;
@@ -4318,7 +4325,7 @@ function CompactBattleBoard({
   const activeLane = laneForTurn(activeTurn);
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const [completedCinematic, setCompletedCinematic] = useState("");
-  const cinematicKey = currentResult ? `${fightNo}:${activeTurn}:${playerTriangle[activeLane]}:${botTriangle[activeLane]}:${JSON.stringify(currentResult)}` : "";
+  const cinematicKey = currentResult ? `${battleSessionKey}:${fightNo}:${activeTurn}:${playerTriangle[activeLane]}:${botTriangle[activeLane]}:${JSON.stringify(currentResult)}` : "";
   const cinematicPlaying = Boolean(battleActive && currentResult && (revealAllCards || revealed[activeTurn]?.scored) && completedCinematic !== cinematicKey);
   useLayoutEffect(() => {
     onCinematicActivity?.(cinematicPlaying);
@@ -4373,12 +4380,11 @@ function CompactBattleBoard({
   void botRoleLabel;
   void playerRoleLabel;
   return (
-    <div className={`triad-compact-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [--triad-card-size:clamp(40px,12.5cqw,86px)] [--triad-pile-size:clamp(34px,8.8cqw,68px)] [--triad-slot-gap:clamp(4px,1.7cqw,10px)] [--triad-top-card-size:clamp(44px,13cqw,90px)] [container-type:inline-size] sm:min-h-[clamp(390px,64dvh,640px)] 2xl:min-h-0`}>
+    <div data-battle-arena={arena.id} className={`triad-compact-board triad-arena-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [container-type:inline-size]`} style={{ "--arena-color": arena.color } as CSSProperties}>
       <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(251,191,36,0.12),transparent_20%),radial-gradient(circle_at_20%_30%,rgba(124,58,237,0.18),transparent_16%),radial-gradient(circle_at_78%_70%,rgba(14,165,233,0.14),transparent_18%),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_42px),linear-gradient(180deg,#171008,#050506)]" />
-      <div className="absolute inset-x-0 top-0 h-[10%] border-b border-amber-100/20 bg-[linear-gradient(180deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
-      <div className="absolute inset-x-0 bottom-0 h-[10%] border-t border-amber-100/20 bg-[linear-gradient(0deg,rgba(255,244,214,0.28),rgba(0,0,0,0.14))]" />
-      <div className="absolute left-1/2 top-0 h-full w-[9%] -translate-x-1/2 border-x border-amber-100/14 bg-black/20" />
+      <img className="triad-arena-background" src={arena.image} alt="" draggable={false} />
+      <div className="triad-arena-shade" />
+      <div className="triad-arena-title"><Sparkles size={15} /><span>{arena.name}</span><small>ธาตุ{arena.element}</small></div>
       <div className="triad-opponent-scoreplate pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
         <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />
         <div className="min-w-0 max-w-[120px] sm:max-w-none">
@@ -4410,7 +4416,11 @@ function CompactBattleBoard({
           cardsByNo={cardsByNo}
           playerName={playerName}
           opponentName={botName}
-          onComplete={() => setCompletedCinematic(cinematicKey)}
+          arena={arena}
+          onComplete={() => {
+            setCompletedCinematic(cinematicKey);
+            onCinematicComplete?.(`${battleSessionKey}:${fightNo}:${activeTurn}`);
+          }}
         />
       ) : null}
       {!cinematicPlaying ? <RevealSpotlight
@@ -4530,6 +4540,10 @@ function emptyRevealState(): Record<TriadTurn, TurnReveal> {
 export default function TriadDominionClient({ cards, reviewSkills, summary, currentUser }: Props) {
   const router = useRouter();
   const [cinematicActive, setCinematicActive] = useState(false);
+  const [completedCinematicTurn, setCompletedCinematicTurn] = useState("");
+  const [autoAdvanceRetry, setAutoAdvanceRetry] = useState(0);
+  const autoAdvanceAttemptRef = useRef("");
+  const soloArenaSeedRef = useRef(Date.now());
   useEffect(() => {
     const unlock = () => { void primeBattleAudio(); };
     window.addEventListener("pointerdown", unlock, { passive: true });
@@ -4757,6 +4771,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return nextPhase === "deck" && hasBattleStartedForRoom(room) ? "battle" : nextPhase;
   };
   const currentDeckMode: DeckMode = currentRoom?.game.deckMode || "all";
+  const battleSessionKey = currentRoom ? roomBattleStartKey(currentRoom) : `solo:${soloArenaSeedRef.current}`;
+  const arena = useMemo(() => battleArenaForSeed(battleSessionKey), [battleSessionKey]);
   const currentDeckModeTitle =
     currentDeckMode === "monster"
       ? "โหมดมอนสเตอร์"
@@ -5375,13 +5391,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      signal: body.action === "choose-skill-target" ? AbortSignal.timeout(10000) : undefined,
+      signal: body.action === "choose-skill-target" || body.action === "advance-turn" ? AbortSignal.timeout(10000) : undefined,
       body: JSON.stringify({ ...body, participant }),
     });
     const payload = await response.json().catch(() => ({}));
     const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
     if (
-      (body.action === "set-deck" || body.action === "ready-deck" || (body.action === "choose-skill-target" && typeof body.deckStartedAt === "number")) &&
+      (body.action === "set-deck" || body.action === "ready-deck" || ((body.action === "choose-skill-target" || body.action === "advance-turn") && typeof body.deckStartedAt === "number")) &&
       (activeRoomCodeRef.current !== body.code ||
         activeRoomSnapshotRef.current?.game.deckStartedAt !== body.deckStartedAt)
     ) {
@@ -6159,7 +6175,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (openerTieBreakAdvanceTimerRef.current) window.clearTimeout(openerTieBreakAdvanceTimerRef.current);
     openerTieBreakAdvanceTimerRef.current = window.setTimeout(() => {
       openerTieBreakAdvanceTimerRef.current = null;
-      void postRoomAction({ action: "advance-turn", code: currentRoom.code });
+      void postRoomAction({ action: "advance-turn", code: currentRoom.code, fightNo: currentRoom.game.fightNo, turn: currentRoom.game.activeTurn, deckStartedAt: currentRoom.game.deckStartedAt }).catch(() => { void syncRooms({ force: true }).catch(() => null); });
     }, 4600);
   }, [
     currentRoom?.code,
@@ -6536,6 +6552,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, hasBotOpponent, participant.id]);
 
   function resetBattle() {
+    soloArenaSeedRef.current = Date.now();
+    setCompletedCinematicTurn("");
+    autoAdvanceAttemptRef.current = "";
     setPhase("deck");
     setPlayerDeck([]);
     setBotDeck([]);
@@ -6562,7 +6581,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const setPlayerLane = (lane: Lane, cardNo: string) => {
     if (pvpPlacementClosed) {
-      setBattleLog((current) => ["หมดเวลาหรือตานี้ถูกตัดสินแล้ว ไม่สามารถวางการ์ดเพิ่มได้ กดพร้อมเพื่อไปต่อเท่านั้น", ...current]);
+      setBattleLog((current) => ["ตานี้ถูกตัดสินแล้ว กำลังแสดงผลการปะทะก่อนเริ่มตาถัดไป", ...current]);
       return false;
     }
     if (handPlacementLocked || displayUsedPlayerSet.has(cardNo) || lane !== laneForTurn(activeTurn)) return false;
@@ -7225,22 +7244,26 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     const readyKey = currentTurnReadyKey;
+    const attemptedKey = autoAdvanceAttemptRef.current;
     setPendingTurnReadyKey(readyKey);
     setTurnReadySubmittingKey(readyKey);
-    optimisticRoomLockUntilRef.current = Date.now() + 2600;
-    patchCurrentRoom((room) => ({
-      ...room,
-      game: {
-        ...room.game,
-        turnReady: { ...room.game.turnReady, [roomPlayerSide]: true },
-      },
-    }));
 
     const actionPayload = {
       action: "advance-turn",
       code: currentRoom.code,
       fightNo: currentRoom.game.fightNo,
       turn: currentRoom.game.activeTurn,
+      deckStartedAt: currentRoom.game.deckStartedAt,
+    };
+    const retryAdvance = () => {
+      setPendingTurnReadyKey((current) => current === readyKey ? "" : current);
+      setTurnReadySubmittingKey((current) => current === readyKey ? "" : current);
+      void syncRooms({ force: true }).catch(() => null);
+      window.setTimeout(() => {
+        if (autoAdvanceAttemptRef.current !== attemptedKey) return;
+        autoAdvanceAttemptRef.current = "";
+        setAutoAdvanceRetry((current) => current + 1);
+      }, 1200);
     };
     const scheduleReadySync = (delayMs: number) => {
       window.setTimeout(() => void syncRooms({ force: true }).catch(() => null), delayMs);
@@ -7249,8 +7272,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     void postRoomAction(actionPayload)
       .then((result) => {
         if (!result.ok) {
-          setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
-          void syncRooms({ force: true }).catch(() => null);
+          retryAdvance();
           return;
         }
         const room = normalizeApiRooms(result.payload?.room ? [result.payload.room] : [])[0];
@@ -7265,8 +7287,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         scheduleReadySync(650);
       })
       .catch(() => {
-        setPendingTurnReadyKey((current) => (current === readyKey ? "" : current));
-        void syncRooms({ force: true }).catch(() => null);
+        retryAdvance();
       })
       .finally(() => {
         setTurnReadySubmittingKey((current) => (current === readyKey ? "" : current));
@@ -7353,64 +7374,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const revealState = displayRevealed[displayActiveTurn];
   const activeTurnScored = Boolean(revealState?.scored || (isPvpRoom && roomTurnResolved));
   const canRevealTurn = Boolean(displayCurrentResult) && (displayTurnLocked || Boolean(isPvpRoom && roomTurnResolved));
-  const showReadyAdvanceButton = Boolean(
-      !isSpectator &&
-      isPvpRoom &&
-      roomPlayerSide &&
-      (displayTurnLocked || roomTurnResolved) &&
-      displayLockedFight &&
-      activeTurnScored &&
-      !matchDone &&
-      (displayActiveTurn < 3 || displayRevealed[3].scored)
-  );
-  const readyAdvanceTargetLabel =
-    displayActiveTurn >= 3 ? (displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป") : "ตาถัดไป";
-  const renderReadyAdvanceButton = () =>
-    showReadyAdvanceButton ? (
-      <ReadyAdvanceButton
-        label={readyAdvanceTargetLabel}
-        readyCount={readyCount}
-        myReady={myTurnReady}
-        opponentReady={opponentTurnReady}
-        opponentName={opponentLabel}
-        onClick={displayActiveTurn >= 3 ? nextFight : nextTurn}
-        disabled={myTurnReady || turnReadySubmittingKey === currentTurnReadyKey}
-      />
-    ) : null;
-  const renderRoomBattleActions = () =>
-    showReadyAdvanceButton ? (
-      <div className="triad-ready-advance-sidebar space-y-2">
-        {renderReadyAdvanceButton()}
-      </div>
-    ) : null;
+  const autoCinematicTurnKey = `${battleSessionKey}:${currentRoom?.game.fightNo || fightNo}:${currentRoom?.game.activeTurn || activeTurn}`;
   useEffect(() => {
-    if (phase !== "battle" || matchDone || !lockedFight || !activeTurnScored || isPvpRoom) {
-      resultAdvanceKeyRef.current = "";
-      return;
-    }
-
-    const advanceKey = `${activeRoomCode || "solo"}:${fightNo}:${activeTurn}:${currentResult?.winner || "resolved"}`;
-    if (resultAdvanceKeyRef.current !== advanceKey) {
-      resultAdvanceKeyRef.current = advanceKey;
-      setResultTimeLeft(RESULT_SECONDS);
-    }
-
-    const timer = window.setInterval(() => {
-      setResultTimeLeft((current) => {
-        if (current <= 1) {
-          window.clearInterval(timer);
-          setTimeout(() => {
-            if (activeTurn >= 3) nextFight();
-            else nextTurn();
-          }, 0);
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [activeRoomCode, activeTurn, activeTurnScored, currentResult?.winner, fightNo, isPvpRoom, lockedFight, matchDone, phase]);
+    if (phase !== "battle" || matchDone || isSpectator || !activeTurnScored || completedCinematicTurn !== autoCinematicTurnKey) return;
+    if (currentRoom && (!roomPlayerSide || (currentRoom.game.activeTurn === 1 && currentRoom.game.turns.find(turn => turn.turn === 1)?.winner === "draw"))) return;
+    if (autoAdvanceAttemptRef.current === autoCinematicTurnKey) return;
+    autoAdvanceAttemptRef.current = autoCinematicTurnKey;
+    if (currentRoom) markRoomTurnReady();
+    else if (activeTurn >= 3) nextFight();
+    else nextTurn();
+  }, [completedCinematicTurn, autoCinematicTurnKey, autoAdvanceRetry, activeTurnScored, phase, matchDone, isSpectator, roomPlayerSide, currentRoom?.game.activeTurn, currentRoom?.game.turns]);
 
   const revealButtonLabel =
     !canRevealTurn
@@ -8340,6 +8313,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   timeLeft={displayTimeLeft}
                   battleActive={phase === "battle" && !deckSelectionActive}
                   onCinematicActivity={setCinematicActive}
+                  onCinematicComplete={setCompletedCinematicTurn}
+                  battleSessionKey={battleSessionKey}
+                  arena={arena}
                   turnLocked={placementLocked}
                   pendingSkillChoice={pendingSkillChoice}
                   waitingSkillChoice={waitingSkillChoice}
@@ -8411,6 +8387,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               timeLeft={displayTimeLeft}
               battleActive={phase === "battle" && !deckSelectionActive}
               onCinematicActivity={setCinematicActive}
+              onCinematicComplete={setCompletedCinematicTurn}
+              battleSessionKey={battleSessionKey}
+              arena={arena}
               turnLocked={handPlacementLocked}
               pendingSkillChoice={pendingSkillChoice}
               waitingSkillChoice={waitingSkillChoice}
@@ -8430,7 +8409,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               }}
               onSelectLane={setPlacementLane}
               onPlaceCard={placeAndLockCard}
-              readyAdvanceSlot={showReadyAdvanceButton ? renderReadyAdvanceButton() : null}
             />
           )}
           <BlessingChoiceOverlay card={pendingBlessingChoice && !pendingBlessingChoice.choice ? cardsByNo.get("254") : undefined} onChoose={chooseBlessing} />
@@ -8473,11 +8451,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                     {isPvpRoom && opponentTurnReady && !myTurnReady ? (
                       <div className="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-200/24 bg-emerald-300/10 px-3 py-2 text-xs font-black text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.14)]">
                         <Check className="h-4 w-4 shrink-0" />
-                        <span>{opponentLabel} กดพร้อมแล้ว รอคุณกดพร้อมเพื่อไปต่อ</span>
+                        <span>อีกฝ่ายดูผลการปะทะจบแล้ว</span>
                       </div>
                     ) : null}
                     <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-200/20 bg-amber-200/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-amber-100">
-                      ตาถัดไปอัตโนมัติใน {Math.floor(resultTimeLeft / 60)}:{String(resultTimeLeft % 60).padStart(2, "0")}
+                      {cinematicActive ? "กำลังแสดงผลการปะทะ" : "กำลังเข้าสู่ตาถัดไปอัตโนมัติ"}
                     </div>
                   </div>
                 ) : (
@@ -8527,33 +8505,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                       เริ่มใหม่
                     </button>
                   )
-                ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && displayRevealed[3].scored ? (
-                  isPvpRoom ? (
-                    null
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={nextFight}
-                      className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
-                    >
-                      {displayFightNo >= 3 ? "จบเกม" : "รอบถัดไป"}
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  )
-                ) : !isSpectator && (!isPvpRoom || roomPlayerSide) && displayTurnLocked && displayLockedFight && activeTurnScored && displayActiveTurn < 3 ? (
-                  isPvpRoom ? (
-                    null
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={nextTurn}
-                      className="inline-flex h-full min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-black transition hover:bg-amber-100 md:flex-none"
-                    >
-                      ตาถัดไป
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  )
-                ) : (
+                ) : activeTurnScored ? null : (
                   <>
                     {!isSpectator && canRevealTurn && displayLockedFight && !activeTurnScored ? (
                       <button
@@ -8608,7 +8560,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   compact
                 />
               ) : null}
-              {renderRoomBattleActions()}
             </div>
           ) : null}
         </section>
@@ -8627,7 +8578,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   compact
                 />
               ) : null}
-              {renderRoomBattleActions()}
             </div>
           ) : null}
 

@@ -2947,7 +2947,7 @@ export async function resetTriadRoomOpeningTieBreak(code: string, participant: s
 export async function advanceTriadRoomTurn(
   code: string,
   participantId: string,
-  context: { fightNo?: number; turn?: TriadTurn } = {}
+  context: { fightNo?: number; turn?: TriadTurn; deckStartedAt?: number } = {}
 ) {
   return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
@@ -2957,6 +2957,9 @@ export async function advanceTriadRoomTurn(
     return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   }
 
+  if (context.deckStartedAt !== undefined && context.deckStartedAt !== room.game.deckStartedAt) {
+    return { ok: true as const, room: publicRoom(room), advanced: false as const, stale: true as const };
+  }
   if (
     context.fightNo &&
     context.turn &&
