@@ -2054,13 +2054,7 @@ function BoardCardSlot({
               : ""
       }`}
     >
-      <div className={`pointer-events-none absolute -inset-2 rounded-[18px] bg-black/45 opacity-25 blur-xl transition-opacity duration-200 ${active || aura ? "opacity-40" : ""}`} />
-      {aura ? (
-        <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-white/[0.035]" />
-      ) : null}
-      <div className="relative overflow-hidden rounded-[6px] bg-black aspect-[5/7]" data-board-card data-active={active || Boolean(aura)}>
-        <div className="pointer-events-none absolute inset-0 z-[2] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),transparent_18%,transparent_68%,rgba(0,0,0,0.34))]" />
-        <div className="pointer-events-none absolute inset-x-[14%] top-0 z-[3] h-px bg-gradient-to-r from-transparent via-white/55 to-transparent" />
+      <div className="relative overflow-hidden rounded-[6px] bg-transparent aspect-[815/1110]" data-board-card data-active={active || Boolean(aura)}>
         {card && !hidden ? (
           <Image src={card.sourceImage} alt={card.name} fill sizes="(max-width: 700px) 120px, 200px" className="object-contain" />
         ) : (
@@ -2072,13 +2066,11 @@ function BoardCardSlot({
               sizes="(max-width: 700px) 120px, 200px"
               quality={72}
               priority={active}
-              className="object-contain"
+              className="triad-card-back-art object-contain"
             />
-            <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_22%,rgba(0,0,0,0.22))]" />
           </>
         )}
       </div>
-      <div className={`pointer-events-none absolute -bottom-2 left-1/2 h-3 w-[78%] -translate-x-1/2 rounded-full bg-black/70 blur-md ${active ? "opacity-90" : "opacity-55"}`} />
     </div>
   );
 }
@@ -4325,7 +4317,7 @@ function CompactBattleBoard({
   const activeLane = laneForTurn(activeTurn);
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
   const [completedCinematic, setCompletedCinematic] = useState("");
-  const cinematicKey = currentResult ? `${battleSessionKey}:${fightNo}:${activeTurn}:${playerTriangle[activeLane]}:${botTriangle[activeLane]}:${JSON.stringify(currentResult)}` : "";
+  const cinematicKey = currentResult ? `${battleSessionKey}:${fightNo}:${activeTurn}` : "";
   const cinematicPlaying = Boolean(battleActive && currentResult && (revealAllCards || revealed[activeTurn]?.scored) && completedCinematic !== cinematicKey);
   useLayoutEffect(() => {
     onCinematicActivity?.(cinematicPlaying);
@@ -4417,13 +4409,14 @@ function CompactBattleBoard({
           playerName={playerName}
           opponentName={botName}
           arena={arena}
+          landscape
           onComplete={() => {
             setCompletedCinematic(cinematicKey);
             onCinematicComplete?.(`${battleSessionKey}:${fightNo}:${activeTurn}`);
           }}
         />
       ) : null}
-      {!cinematicPlaying ? <RevealSpotlight
+      {!cinematicPlaying && !showResolvedBoard ? <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
         botCard={botTriangle[activeLane] ? cardsByNo.get(botTriangle[activeLane]) : undefined}
         showPlayer={playerVisible(activeLane)}

@@ -4,7 +4,7 @@ const ts = require('typescript');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync('app/(main)/battle/triad-dominion/BattleCinematic.tsx','utf8');
 const ast = ts.createSourceFile('cinematic.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-const names = new Set(['buildBattleSteps','battleHpAtStep']);
+const names = new Set(['buildBattleSteps','battleHpAtStep','battleEmpowermentAtStep']);
 const code = ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)).map(n=>n.getText(ast)).join('\n');
 const context = vm.createContext({exports:{},triadSkillRuleByNo:new Map()});
 vm.runInContext(ts.transpileModule(code,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,context);
@@ -18,6 +18,20 @@ for(const reduced of [true,false]){
   assert.equal(timingContext.exports.battleStepDuration('skill',reduced,200),7000);
 }
 const a={cardNo:'A',kind:'monster'},b={cardNo:'B',kind:'monster'};
+context.triadSkillRuleByNo.set('018',{target:'own-main',allowedTurns:[2,3],effects:[{delta:2000}]});
+context.triadSkillRuleByNo.set('249',{target:'all',allowedTurns:[2,3],effects:[{delta:-3000}]});
+context.triadSkillRuleByNo.set('inactive',{target:'own-main',allowedTurns:[3],effects:[{delta:2000}]});
+for(const turn of [2,3]){
+  const result={turn,metric:'attack',playerTotal:7000,opponentTotal:6000,prioritySide:'player',winner:'player',skillEvents:[{side:'player',cardNo:'018',summary:'buff',type:'stat'},{side:'opponent',cardNo:'249',summary:'debuff',type:'stat'}]};
+  const steps=context.buildBattleSteps(result,{cardNo:'018',kind:'skill'},{cardNo:'249',kind:'skill'},a,b);
+  const strike=steps.findIndex(s=>s.kind==='strike');
+  assert.equal(steps[strike].cardNo,'A');
+  assert.equal(context.battleEmpowermentAtStep(steps,strike,'player').cardNo,'018');
+  assert.equal(context.battleEmpowermentAtStep(steps,strike,'opponent'),undefined,'Debuff is not an empowerment');
+  assert.equal(context.battleEmpowermentAtStep(steps,1,'player'),undefined,'Power transfers before it carries into strikes');
+}
+const blockedSteps=context.buildBattleSteps({turn:2,playerTotal:1,opponentTotal:1,skillEvents:[{side:'player',cardNo:'inactive',summary:'inactive',type:'stat'}]},a,b);
+assert.equal(context.battleEmpowermentAtStep(blockedSteps,2,'player'),undefined,'Inactive skills cannot power a monster');
 for(const priority of ['player','opponent']){
   const result={turn:1,metric:'total',playerTotal:10000,opponentTotal:12000,winner:'opponent',prioritySide:priority,skillEvents:[]};
   const steps=context.buildBattleSteps(result,a,b);

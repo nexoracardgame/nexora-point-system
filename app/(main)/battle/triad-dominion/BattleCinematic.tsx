@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FastForward, Shield, Sparkles, Swords, Volume2, VolumeX, Trophy, ArrowDown, ArrowUp, RefreshCw } from "lucide-react";
 import { createPortal } from "react-dom";
 import BattleParticles from "./BattleParticles";
@@ -11,7 +11,7 @@ import styles from "./BattleCinematic.module.css";
 import type { TriadArena } from "@/lib/triad-arena";
 
 type Side = "player" | "opponent";
-type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
+type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; recipient?: Side | "both"; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
 
 export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard, opponentCard?: TriadCard, playerMainCard?: TriadCard, opponentMainCard?: TriadCard): Step[] {
   const skills: Step[] = result.skillEvents.map((event) => {
@@ -20,10 +20,13 @@ export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard
     const deltas = rule?.effects?.map((effect) => effect.delta) || [];
     const positive = deltas.some(delta => delta > 0);
     const negative = deltas.some(delta => delta < 0);
+    const other: Side = event.side === "player" ? "opponent" : "player";
+    const recipient = event.targetLabel?.includes("ฝ่ายตรงข้าม") ? other : event.targetLabel?.includes("ฝ่ายผู้ใช้") || event.targetLabel?.includes("ฝ่ายเรา") ? event.side : rule?.target === "all" ? "both" : rule?.target.startsWith("opponent") ? other : event.side;
     return {
     side: event.side, cardNo: event.cardNo, kind: "skill", summary: event.summary,
     blocked: Boolean(inactive || event.blocked || event.type === "skill-cancel" || event.type === "block-stat-gain"),
     inactive,
+    recipient,
     field: !inactive && ["all", "own-all", "opponent-all"].includes(rule?.target || ""),
     effect: event.type === "element-transform" ? "transform" : event.type === "swap-control" ? "swap" : positive && negative ? "shift" : negative ? "debuff" : positive ? "buff" : undefined,
   }; });
@@ -45,6 +48,14 @@ export function battleHpAtStep(result: TriadTurnResult, steps: Step[], index: nu
     hp[step.side === "player" ? "opponent" : "player"] -= step.value || 0;
   }
   return hp;
+}
+
+export function battleEmpowermentAtStep(steps: Step[], index: number, side: Side) {
+  const end = Math.min(steps.length, index + (steps[index]?.kind === "skill" ? 0 : 1));
+  for (let i = end - 1; i >= 0; i--) {
+    const item = steps[i];
+    if (item.kind === "skill" && !item.blocked && ["buff", "shift", "transform"].includes(item.effect || "") && (item.recipient === side || item.recipient === "both")) return item;
+  }
 }
 
 function HpMeter({ side, name, initial, value, reduced }: { side: Side; name: string; initial: number; value: number; reduced: boolean }) {
@@ -75,10 +86,11 @@ function HpMeter({ side, name, initial, value, reduced }: { side: Side; name: st
   </div>;
 }
 
-export default function BattleCinematic({ result, playerCard, opponentCard, playerMainCard, opponentMainCard, cardsByNo, playerName, opponentName, arena, onComplete }: {
+export default function BattleCinematic({ result, playerCard, opponentCard, playerMainCard, opponentMainCard, cardsByNo, playerName, opponentName, arena, landscape = false, onComplete }: {
   result: TriadTurnResult; playerCard?: TriadCard; opponentCard?: TriadCard;
   playerMainCard?: TriadCard; opponentMainCard?: TriadCard;
   arena?: TriadArena;
+  landscape?: boolean;
   cardsByNo: Map<string, TriadCard>; playerName: string; opponentName: string; onComplete: () => void;
 }) {
   const steps = useMemo(() => buildBattleSteps(result, playerCard, opponentCard, playerMainCard, opponentMainCard), [result, playerCard, opponentCard, playerMainCard, opponentMainCard]);
@@ -92,6 +104,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   const stepClockRef = useRef({ index: -1, at: 0 });
   const completeRef = useRef(onComplete);
   const finishedRef = useRef(false);
+  const arenaRef = useRef<HTMLDivElement>(null);
   completeRef.current = onComplete;
   const currentKind = steps[index]?.kind;
   const currentSummaryLength = steps[index]?.summary.length || 0;
@@ -101,7 +114,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
     cancelAudioRef.current();
     completeRef.current();
   };
-  useEffect(() => {
+  useLayoutEffect(() => {
     setMounted(true);
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     let saved = false;
@@ -125,14 +138,21 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   const attacker = cardsByNo.get(step.cardNo) || (step.side === "player" ? playerCard : opponentCard);
   const playerFighter = playerCard?.kind === "monster" ? playerCard : playerMainCard || playerCard;
   const opponentFighter = opponentCard?.kind === "monster" ? opponentCard : opponentMainCard || opponentCard;
-  const activePlayer = step.kind === "skill" && step.side === "player" ? attacker : playerFighter;
-  const activeOpponent = step.kind === "skill" && step.side === "opponent" ? attacker : opponentFighter;
+  const activePlayer = playerFighter;
+  const activeOpponent = opponentFighter;
   const actorName = step.side === "player" ? playerName : opponentName;
-  const element = attacker?.element || "unknown";
+  const powerForAttacker = battleEmpowermentAtStep(steps, index, step.side);
+  const infusedCard = step.kind === "strike" && powerForAttacker ? cardsByNo.get(powerForAttacker.cardNo) : undefined;
+  const element = infusedCard?.element || attacker?.element || "unknown";
   const color = { fire: "#ff654e", water: "#52d7ff", wood: "#67f0a3", earth: "#f3cd64", gold: "#e8f0ff", unknown: "#c5a6ff" }[element];
   const final = step.kind === "result";
   const intro = step.kind === "intro";
   const hp = battleHpAtStep(result, steps, index, impactedIndex === index);
+  const empowered = (side: Side) => battleEmpowermentAtStep(steps, index, side);
+  const receivingSkill = step.kind === "skill" && !step.blocked;
+  useLayoutEffect(() => {
+    arenaRef.current?.getAnimations({ subtree: true }).forEach(animation => { animation.currentTime = 0; });
+  }, [index, mounted]);
   useEffect(() => {
     if (step.kind !== "strike") return;
     const timer = window.setTimeout(() => setImpactedIndex(index), reduced ? 250 : BATTLE_CONTACT_MS);
@@ -161,10 +181,10 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   };
   if (!mounted) return null;
   return createPortal(
-    <div className={`${styles.overlay} ${reduced ? styles.reduced : ""}`} data-battle-cinematic data-step={index} data-kind={step.kind} data-element={element} data-effect={step.blocked ? "blocked" : step.effect || step.kind} style={{ "--impact": color, "--motion-duration": `${BATTLE_MOTION_MS}ms`, "--contact-delay": `${BATTLE_CONTACT_MS}ms` } as CSSProperties}>
+    <div className={`${styles.overlay} ${landscape ? styles.landscape : ""} ${reduced ? styles.reduced : ""}`} data-battle-cinematic data-step={index} data-kind={step.kind} data-element={element} data-effect={step.blocked ? "blocked" : step.effect || step.kind} style={{ "--impact": color, "--motion-duration": `${BATTLE_MOTION_MS}ms`, "--contact-delay": `${BATTLE_CONTACT_MS}ms` } as CSSProperties}>
       {arena ? <div className={styles.environment}><img src={arena.image} alt="" draggable={false} /><div /></div> : null}
       <div className={styles.toolbar}>
-        <label className={styles.motion}><input type="checkbox" checked={reduced} onChange={toggleReduced} /> ลดการเคลื่อนไหว</label>
+        <label className={styles.motion} title="ลดการเคลื่อนไหว"><input type="checkbox" aria-label="ลดการเคลื่อนไหว" checked={reduced} onChange={toggleReduced} /><span>ลดการเคลื่อนไหว</span></label>
         <button type="button" onClick={toggleSound} title={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-label={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-pressed={!muted && soundReady}>{muted || !soundReady ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>
         <button type="button" onClick={finish} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
       </div>
@@ -177,15 +197,24 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
         <HpMeter side="player" name={playerName} initial={Math.max(0, result.playerTotal)} value={hp.player} reduced={reduced} />
         <HpMeter side="opponent" name={opponentName} initial={Math.max(0, result.opponentTotal)} value={hp.opponent} reduced={reduced} />
       </div>
-      <div key={index} className={`${styles.arena} ${step.kind === "strike" ? styles.strike : step.kind === "skill" ? styles.cast : ""} ${step.side === "opponent" ? styles.fromOpponent : styles.fromPlayer} ${step.blocked ? styles.blocked : ""} ${step.field ? styles.field : ""} ${final ? styles.final : ""}`}>
-        {!final && !intro ? <BattleParticles color={color} element={element} side={step.side} skill={step.kind === "skill"} field={Boolean(step.field)} blocked={Boolean(step.blocked)} reduced={reduced} effect={step.effect} /> : null}
-        {[{ side: "player", card: activePlayer }, { side: "opponent", card: activeOpponent }].map(({ side, card }) => (
-          <div key={side} data-fighter={step.side === side ? "source" : "target"} className={`${styles.fighter} ${side === "player" ? styles.player : styles.opponent} ${step.side === side ? styles.source : styles.target} ${final && result.winner !== "draw" ? result.winner === side ? styles.winner : styles.defeated : ""}`}>
+      <div ref={arenaRef} className={`${styles.arena} ${step.kind === "strike" ? styles.strike : step.kind === "skill" ? styles.cast : ""} ${step.side === "opponent" ? styles.fromOpponent : styles.fromPlayer} ${step.blocked ? styles.blocked : ""} ${step.field ? styles.field : ""} ${final ? styles.final : ""}`}>
+        {!final && !intro ? <BattleParticles key={index} color={color} element={element} side={step.side} skill={step.kind === "skill"} skillRecipient={step.recipient} field={Boolean(step.field)} blocked={Boolean(step.blocked)} reduced={reduced} effect={step.effect} /> : null}
+        {[{ side: "player" as const, card: activePlayer }, { side: "opponent" as const, card: activeOpponent }].map(({ side, card }) => {
+          const power = empowered(side);
+          const receiving = receivingSkill && (step.recipient === side || step.recipient === "both");
+          const powerCard = power ? cardsByNo.get(power.cardNo) : undefined;
+          const powerColor = { fire: "#ff8c68", water: "#71dfff", wood: "#79f2b0", earth: "#f4d475", gold: "#fff0ae", unknown: "#bce8ff" }[powerCard?.element || "unknown"];
+          return <div key={side} data-fighter={step.side === side ? "source" : "target"} data-side={side} data-empowered={Boolean(power)} className={`${styles.fighter} ${side === "player" ? styles.player : styles.opponent} ${step.side === side ? styles.source : styles.target} ${power && !final ? styles.empowered : ""} ${receiving ? styles.receiving : ""} ${final && result.winner !== "draw" ? result.winner === side ? styles.winner : styles.defeated : ""}`} style={{ "--power-color": receiving ? color : powerColor } as CSSProperties}>
             <div className={styles.card}>
               {card ? <img src={card.sourceImage} alt={card.name} draggable={false} /> : <Swords size={40} />}
             </div>
-          </div>
-        ))}
+            {(power || (receiving && step.effect !== "debuff" && step.effect !== "swap")) && !final ? <div className={styles.weaponAura} aria-hidden="true"><Swords size={36} strokeWidth={1.5} /></div> : null}
+          </div>;
+        })}
+        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`} style={{ "--skill-travel": `calc(${step.side === "player" ? "1" : "-1"} * (var(--card-width) * .84 + ${step.recipient !== "both" && step.recipient !== step.side ? "var(--transfer-distance)" : "0px"}))` } as CSSProperties}>
+          <img src={attacker.sourceImage} alt={attacker.name} draggable={false} />
+          <span>{step.blocked ? "สกิลถูกระงับ" : step.effect === "debuff" ? "ส่งผลลดพลัง" : "ส่งพลังสกิล"}</span>
+        </div> : null}
         <span className={`${styles.name} ${styles.playerName}`}>{playerName}</span>
         <span className={`${styles.name} ${styles.opponentName}`}>{opponentName}</span>
         {!final && step.kind === "strike" ? <>

@@ -18,7 +18,7 @@ const modules = {
   scheduler: fs.readFileSync(path.join(schedulerDir, 'cjs/scheduler.production.js'), 'utf8'),
   'lucide-react': fs.readFileSync(require.resolve('lucide-react'), 'utf8'),
   './BattleCinematic.module.css': 'exports.default = new Proxy({}, { get: (_, key) => key });',
-  '@/lib/triad-dominion': 'exports.triadSkillRuleByNo = new Map([["249", {target:"all",effects:[{metric:"support",delta:-3000}]}]]);',
+  '@/lib/triad-dominion': 'exports.triadSkillRuleByNo = new Map([["249", {target:"all",effects:[{metric:"support",delta:-3000}]}],["018",{target:"own-main",allowedTurns:[2,3],effects:[{metric:"attack",delta:2000}]}]]);',
   cinematic: compiled,
   './BattleParticles': ts.transpileModule(fs.readFileSync(dir + 'BattleParticles.tsx', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
@@ -39,7 +39,8 @@ for(const method of ['createBufferSource','createOscillator']){const original=Au
 window.player={cardNo:'007',name:'Fire Warrior',element:'fire',kind:'monster',sourceImage:'/cards/007.jpg',attack:8000,support:2000};
 window.opponent={cardNo:'008',name:'Water Guardian',element:'water',kind:'monster',sourceImage:'/cards/008.jpg',attack:6000,support:3000};
 window.result={turn:2,prioritySide:'opponent',metric:'attack',playerTotal:8000,opponentTotal:6000,winner:'player',skillEvents:[]};
-window.finished=0;window.mount=(events=[], key='battle')=>{window.result.skillEvents=events;root.render(React.createElement(C.default,{key,result:JSON.parse(JSON.stringify(window.result)),playerCard:window.player,opponentCard:window.opponent,cardsByNo:new Map([['007',window.player],['008',window.opponent],['249',{...window.opponent,cardNo:'249',name:'Veil of Mist',kind:'skill'}]]),playerName:'ผู้เล่นฝ่ายหนึ่ง',opponentName:'ผู้เล่นฝ่ายสอง',onComplete:()=>{window.finished++}}))};
+window.skill={...window.player,cardNo:'018',name:'Power Imbuement',element:'gold',kind:'skill',sourceImage:'/cards/018.jpg'};
+window.finished=0;window.mount=(events=[], key='battle')=>{window.result.skillEvents=events;root.render(React.createElement(C.default,{key,landscape:window.forceLandscape||false,result:JSON.parse(JSON.stringify(window.result)),playerCard:window.useSkill?window.skill:window.player,opponentCard:window.opponent,playerMainCard:window.player,opponentMainCard:window.opponent,arena:{id:'gold',name:'ปราการทองคำ',image:'/battle-arenas/gold.webp'},cardsByNo:new Map([['007',window.player],['008',window.opponent],['018',window.skill],['249',{...window.opponent,cardNo:'249',name:'Veil of Mist',kind:'skill'}]]),playerName:'ผู้เล่นฝ่ายหนึ่ง',opponentName:'ผู้เล่นฝ่ายสอง',onComplete:()=>{window.finished++}}))};
 window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent);window.mount();
 </script></body></html>`;
 (async () => {
@@ -54,8 +55,28 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       if (url.pathname === '/') return route.fulfill({ body: html, contentType: 'text/html' });
       const asset = path.resolve('public', '.' + url.pathname);
       if (!asset.startsWith(path.resolve('public') + path.sep)) return route.abort();
-      return route.fulfill({ body: fs.readFileSync(asset), contentType: asset.endsWith('.wav') ? 'audio/wav' : asset.endsWith('.png') ? 'image/png' : 'image/jpeg' });
+      return route.fulfill({ body: fs.readFileSync(asset), contentType: asset.endsWith('.wav') ? 'audio/wav' : asset.endsWith('.webp') ? 'image/webp' : asset.endsWith('.png') ? 'image/png' : 'image/jpeg' });
     });
+    if(process.env.TRIAD_CINEMATIC_FOCUSED){
+      for(const [width,height] of [[1440,900],[844,390],[390,844],[320,568]]){
+        await page.setViewportSize({width,height});await page.goto('https://cinematic.test/');
+        await page.evaluate(()=>{forceLandscape=true;useSkill=true;result.turn=3;result.prioritySide='player';mount([{side:'player',cardNo:'018',summary:'เสริมพลังให้มอนสเตอร์หลักก่อนเข้าปะทะ',type:'stat'}],'focused')});
+        await page.waitForSelector('[data-skill-transfer]');
+        await page.waitForTimeout(700);await page.screenshot({path:`artifacts/triad-cinematic/focused-transfer-${width}.png`});
+        for(const selector of ['.heading','.hpRow','.caption','.card','[data-skill-transfer]']){
+          const boxes=await page.locator(selector).evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}}));
+          assert.ok(boxes.every(r=>r.x>=-1&&r.y>=-1&&r.right<=width+1&&r.bottom<=height+1),`${selector} fits ${width}: ${JSON.stringify(boxes)}`);
+        }
+        const heading=await page.locator('.heading').boundingBox(),toolbar=await page.locator('.toolbar').boundingBox();
+        assert.ok(heading.x+heading.width<=toolbar.x||toolbar.x+toolbar.width<=heading.x||heading.y+heading.height<=toolbar.y||toolbar.y+toolbar.height<=heading.y,'Heading and compact toolbar must not overlap');
+        await page.evaluate(()=>{window.monster=document.querySelector('[data-side="player"] .card img')});
+        await page.waitForSelector('[data-kind="strike"]');
+        assert.ok(await page.evaluate(()=>monster===document.querySelector('[data-side="player"] .card img')));
+        assert.equal(await page.locator('[data-side="player"]').getAttribute('data-empowered'),'true');
+        await page.waitForTimeout(1250);await page.screenshot({path:`artifacts/triad-cinematic/focused-strike-${width}.png`});
+      }
+      assert.deepEqual(errors,[]);console.log('Focused skill transfer and empowered strikes passed on desktop and rotated mobile');return;
+    }
     for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]]) {
       await page.setViewportSize({ width, height });
       await page.goto('https://cinematic.test/');
@@ -71,6 +92,7 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       });
       const cardSize = await page.locator('.card').first().evaluate(el => el.getBoundingClientRect().width);
       assert.ok(cardSize >= (height < 500 ? 75 : width > 700 ? 200 : 100), `Card must be large at ${width}x${height}: ${cardSize}`);
+      assert.ok(await page.locator('.card').first().evaluate(el=>getComputedStyle(el).borderTopWidth==='0px'&&Math.abs(el.clientWidth/el.clientHeight-815/1110)<.005),'Only native image ratio, no outer border');
       await page.evaluate(() => {
         for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = 1100; }
       });
@@ -137,6 +159,37 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     assert.equal(await page.locator('[data-hp-side="opponent"]').getAttribute('data-hp-value'),'2000');
     assert.equal(await page.locator('[data-hp-side="player"] .hpFill').evaluate(el=>el.style.width),'0%');
     await page.screenshot({path:'artifacts/triad-cinematic/hp-counterattack.png'});
+    for(const turn of [2,3]){
+      await page.evaluate(t=>{useSkill=true;result.turn=t;result.prioritySide='player';mount([{side:'player',cardNo:'018',summary:'เพิ่มพลังให้มอนสเตอร์หลักก่อนเข้าปะทะ',type:'stat'}],'imbue-'+t)},turn);
+      await page.waitForSelector('[data-skill-transfer]');
+      assert.equal(await page.locator('[data-side="player"] .card img').getAttribute('alt'),'Fire Warrior','Monster never swaps into skill art');
+      assert.equal(await page.locator('[data-skill-transfer]').getAttribute('data-recipient'),'player');
+      await page.waitForTimeout(700);
+      await page.screenshot({path:`artifacts/triad-cinematic/skill-transfer-turn-${turn}.png`});
+      await page.evaluate(()=>{window.stableArena=document.querySelector('.arena');window.stableMonster=document.querySelector('[data-side="player"] .card img');window.blankFrames=0;window.tracking=true;function track(){if(!tracking)return;if(!document.querySelector('[data-battle-cinematic]'))blankFrames++;requestAnimationFrame(track)}track();window.poll=setInterval(()=>mount([{side:'player',cardNo:'018',summary:'เพิ่มพลังให้มอนสเตอร์หลักก่อนเข้าปะทะ',type:'stat'}],'imbue-'+result.turn),180)});
+      await page.waitForSelector('[data-kind="strike"]');
+      assert.equal(await page.locator('[data-side="player"]').getAttribute('data-empowered'),'true');
+      assert.equal(await page.locator('[data-battle-cinematic]').getAttribute('data-element'),'gold','Imbued element follows the attack');
+      assert.ok(await page.evaluate(()=>stableArena===document.querySelector('.arena')&&stableMonster===document.querySelector('[data-side="player"] .card img')),'Arena and monster image must not remount between skill and strike');
+      assert.equal(await page.evaluate(()=>blankFrames),0,'No empty overlay frame during polling or skill-to-strike transition');
+      await page.evaluate(()=>{tracking=false;clearInterval(poll)});
+      await page.screenshot({path:`artifacts/triad-cinematic/empowered-strike-turn-${turn}.png`});
+    }
+    await page.evaluate(()=>{useSkill=false});
+    for(const [width,height] of [[390,844],[320,568]]){
+      await page.setViewportSize({width,height});await page.goto('https://cinematic.test/');
+      await page.evaluate(()=>{forceLandscape=true;mount([],'landscape')});
+      await page.waitForSelector('[data-kind="strike"]');
+      assert.ok(await page.locator('[data-battle-cinematic]').evaluate(el=>el.clientWidth>el.clientHeight),'Mobile cinematic is logically landscape');
+      for(const selector of ['.heading','.hpRow','.caption','.card']){
+        const boxes=await page.locator(selector).evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}}));
+        assert.ok(boxes.every(r=>r.x>=-1&&r.y>=-1&&r.right<=width+1&&r.bottom<=height+1),`Rotated ${selector} fits ${width}x${height}: ${JSON.stringify(boxes)}`);
+      }
+      await page.waitForTimeout(1200);
+      assert.ok(await page.locator('[data-battle-particles]').evaluate(c=>c.getContext('2d').getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v>0)));
+      await page.screenshot({path:`artifacts/triad-cinematic/landscape-mobile-${width}.png`});
+    }
+    await page.setViewportSize({width:1440,height:900});
     // Sound must decode, schedule on contact, stop on mute/skip, and remember mute.
     await page.goto('https://cinematic.test/');
     await page.getByRole('button',{name:'เปิดเสียงการต่อสู้'}).click();
@@ -157,6 +210,6 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     await page.getByRole('button',{name:'ข้ามอนิเมชั่น'}).click();
     assert.ok(await page.evaluate(before => audioStops>before,stopsBeforeSkip));
     assert.deepEqual(errors, []);
-    console.log('Cinematic: visible HP, slower playback, hit-stop, five elements, skill state, victory/draw, audio timing/mute/skip/persistence, responsive collision, polling, reduced motion passed');
+    console.log('Cinematic: native card edges, HP, turn 2/3 skill transfer, persistent empowerment, stable DOM/no blank frames, mobile landscape, hit-stop, five elements, victory/draw, audio, polling and reduced motion passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

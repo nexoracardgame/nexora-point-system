@@ -6,9 +6,10 @@ import { BATTLE_CONTACT_MS, BATTLE_HIT_STOP_MS } from "./BattleTiming";
 
 const textures = ["spark_01", "flare_01", "smoke_01", "slash_01", "magic_01"];
 
-export default function BattleParticles({ color, element, side, skill, field, blocked, reduced, effect }: {
+export default function BattleParticles({ color, element, side, skill, skillRecipient, field, blocked, reduced, effect }: {
   color: string; element: TriadElement; side: "player" | "opponent"; skill: boolean; field: boolean; blocked: boolean; reduced: boolean;
   effect?: "buff" | "debuff" | "shift" | "transform" | "swap";
+  skillRecipient?: "player" | "opponent" | "both";
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -32,12 +33,13 @@ export default function BattleParticles({ color, element, side, skill, field, bl
     canvas.height = Math.round(height * dpr);
     ctx.scale(dpr, dpr);
     const mobile = width < 600;
-    const bounds = canvas.getBoundingClientRect();
-    const target = canvas.parentElement?.querySelector('[data-fighter="target"]')?.getBoundingClientRect();
-    const source = canvas.parentElement?.querySelector('[data-fighter="source"]')?.getBoundingClientRect();
-    const sourceX = source ? source.left + source.width / 2 - bounds.left : width * (side === "player" ? .23 : .77);
-    const targetX = skill ? width / 2 : target ? target.left + target.width / 2 - bounds.left : width * (side === "player" ? .77 : .23);
-    const targetY = target ? target.top + target.height / 2 - bounds.top : height * .39;
+    // Local coordinates also work when the entire mobile arena is rotated.
+    const target = canvas.parentElement?.querySelector<HTMLElement>('[data-fighter="target"]');
+    const source = canvas.parentElement?.querySelector<HTMLElement>('[data-fighter="source"]');
+    const sourceX = source ? source.offsetLeft + source.offsetWidth / 2 : width * (side === "player" ? .23 : .77);
+    const recipient = skill && skillRecipient !== "both" ? canvas.parentElement?.querySelector<HTMLElement>(`[data-side="${skillRecipient || side}"]`) : target;
+    const targetX = skill && skillRecipient === "both" ? width / 2 : recipient ? recipient.offsetLeft + recipient.offsetWidth / 2 : width * (side === "player" ? .77 : .23);
+    const targetY = recipient ? recipient.offsetTop + recipient.offsetHeight / 2 : height * .39;
     const particles = Array.from({ length: mobile ? 50 : 90 }, (_, i) => ({
       angle: i * 2.39996,
       speed: 90 + (i * 37 % 230),
@@ -76,7 +78,7 @@ export default function BattleParticles({ color, element, side, skill, field, bl
       // Energy gathers first; particles release on the same frame as card contact.
       if (elapsed < contact) {
         const charge = Math.min(elapsed / contact, 1);
-        const x = skill ? width / 2 : sourceX + (targetX - sourceX) * Math.max(0, (charge - .4) / .6);
+        const x = sourceX + (targetX - sourceX) * Math.max(0, (charge - .4) / .6);
         sprite(skill ? 4 : 1, x, targetY, 55 + charge * 160, elapsed * 2, charge * .7);
         for (let i = 0; i < 10; i++) sprite(0, x + Math.cos(i + elapsed * 8) * 55 * (1 - charge), targetY + Math.sin(i + elapsed * 8) * 55 * (1 - charge), 16, i, charge);
       }
@@ -168,6 +170,6 @@ export default function BattleParticles({ color, element, side, skill, field, bl
     };
     frame = requestAnimationFrame(draw);
     return () => { stopped = true; cancelAnimationFrame(frame); ctx.clearRect(0, 0, width, height); };
-  }, [color, element, side, skill, field, blocked, reduced, effect]);
+  }, [color, element, side, skill, skillRecipient, field, blocked, reduced, effect]);
   return <canvas ref={ref} data-battle-particles data-particle-element={element} aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 4 }} />;
 }

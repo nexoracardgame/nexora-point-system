@@ -3588,9 +3588,12 @@ textarea {
 .nexora-battle-shell .triad-arena-board [data-triad-lane="left"] { grid-column:1 !important; }
 .nexora-battle-shell .triad-arena-board [data-triad-lane="right"] { grid-column:3 !important; }
 .nexora-battle-shell .triad-arena-board .triad-arena-triangle,.nexora-battle-shell .triad-arena-board [data-triad-lane] { translate:none !important; }
+.nexora-battle-shell .triad-arena-board [data-triad-lane],.nexora-battle-shell .triad-arena-board [data-triad-lane] > .group { border:0 !important; box-shadow:none !important; background:transparent !important; }
 .nexora-battle-shell .triad-arena-board [data-triad-lane] > .group { width:100% !important; }
-.nexora-battle-shell .triad-arena-board [data-board-card] { border:1px solid #ffffff70; box-shadow:0 12px 22px #0009; }
-.nexora-battle-shell .triad-arena-board [data-board-card][data-active="true"] { border:2px solid var(--arena-color); box-shadow:0 0 0 3px #101c22b0,0 0 22px color-mix(in srgb,var(--arena-color) 40%,transparent); }
+.nexora-battle-shell .triad-arena-board [data-board-card] { aspect-ratio:815 / 1110; border:0; box-shadow:none; background:transparent; filter:drop-shadow(0 12px 10px #0009); }
+.nexora-battle-shell .triad-arena-board [data-board-card][data-active="true"] { filter:drop-shadow(0 0 10px var(--arena-color)) drop-shadow(0 12px 10px #0009); }
+/* The source back has a black export margin outside its silver card edge. */
+.nexora-battle-shell .triad-arena-board .triad-card-back-art { transform:scale(1.078,1.048); object-fit:fill !important; }
 .nexora-battle-shell .triad-arena-board .triad-player-scoreplate { top:12px !important; bottom:auto !important; right:12px !important; }
 .nexora-battle-shell .triad-arena-board .triad-opponent-scoreplate { top:12px !important; left:12px !important; }
 .nexora-battle-shell .triad-arena-board .triad-player-scoreplate,.nexora-battle-shell .triad-arena-board .triad-opponent-scoreplate { background:#071319e8 !important; border-radius:6px !important; padding:8px 10px !important; max-width:30% !important; }

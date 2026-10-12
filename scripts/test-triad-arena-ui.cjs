@@ -23,7 +23,7 @@ const modules={${bundle}},cache={};function require(id){if(cache[id])return cach
 const React=require('react'),root=require('react-dom/client').createRoot(document.getElementById('root')),Board=require('board').default;
 const cards=Array.from({length:6},(_,i)=>({cardNo:String(i+1).padStart(3,'0'),name:'Card '+i,kind:'monster',sourceImage:'/cards/'+String(i+1).padStart(3,'0')+'.jpg'}));
 const triangle={top:'001',left:'002',right:'003'},bot={top:'004',left:'005',right:'006'};
-window.mount=(id='wood')=>root.render(React.createElement(Board,{arena:require('arena').triadArenas.find(a=>a.id===id),battleSessionKey:'test',cardsByNo:new Map(cards.map(c=>[c.cardNo,c])),lockedFight:{player:triangle,bot,turns:[]},player:triangle,revealed:{1:{player:true,bot:true,scored:false},2:{player:true,bot:true,scored:false},3:{player:true,bot:true,scored:false}},activeTurn:1,matchScore:{player:1,bot:2},fightNo:1,fightScore:{player:0,bot:0},playerDeckLeft:17,botDeckLeft:17,playerGraveCards:[],botGraveCards:[],playerName:'ผู้เล่นทดสอบ',botName:'BOT Level.99',playerImage:'',botImage:'',placementLane:'top',timeLeft:90,battleActive:true,turnLocked:true,pendingSkillChoice:null,onSelectSkillTarget:()=>{},onConfirmSkillTarget:()=>{},onDrawRandomCard:()=>{},onSelectLane:()=>{},onPlaceCard:()=>{}}));mount();
+window.mount=(id='wood')=>root.render(React.createElement(Board,{arena:require('arena').triadArenas.find(a=>a.id===id),battleSessionKey:'test',cardsByNo:new Map(cards.map(c=>[c.cardNo,c])),lockedFight:{player:triangle,bot,turns:[]},player:triangle,revealed:{1:{player:true,bot:!window.hideBot,scored:false},2:{player:true,bot:!window.hideBot,scored:false},3:{player:true,bot:!window.hideBot,scored:false}},activeTurn:1,matchScore:{player:1,bot:2},fightNo:1,fightScore:{player:0,bot:0},playerDeckLeft:17,botDeckLeft:17,playerGraveCards:[],botGraveCards:[],playerName:'ผู้เล่นทดสอบ',botName:'BOT Level.99',playerImage:'',botImage:'',placementLane:'top',timeLeft:90,battleActive:true,turnLocked:true,pendingSkillChoice:null,onSelectSkillTarget:()=>{},onConfirmSkillTarget:()=>{},onDrawRandomCard:()=>{},onSelectLane:()=>{},onPlaceCard:()=>{}}));mount();
 </script></body></html>`;
 (async()=>{
  fs.mkdirSync('artifacts/triad-arena',{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -33,6 +33,7 @@ window.mount=(id='wood')=>root.render(React.createElement(Board,{arena:require('
  for(const [width,height] of [[1440,900],[1920,1080],[390,650],[320,568],[844,390]]){
   await page.setViewportSize({width,height});await page.goto('https://arena.test/');await page.waitForSelector('[data-board-card]');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
   const rects=await page.locator('[data-board-card]').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}}));assert.equal(rects.length,6);
+  assert.ok(await page.locator('[data-board-card]').evaluateAll(els=>els.every(el=>getComputedStyle(el).borderTopWidth==='0px'&&Math.abs(el.clientWidth/el.clientHeight-815/1110)<.02)),'Identical native card ratios without outer frames');
   const rotated=width<700;
   const local=await page.locator('.triad-arena-triangle').evaluateAll(els=>els.map(el=>{const main=el.querySelector('[data-triad-lane="top"]'),left=el.querySelector('[data-triad-lane="left"]');return {mainY:main.offsetTop,leftY:left.offsetTop,mainX:main.offsetLeft,leftX:left.offsetLeft}}));
   assert.ok(local[0].mainY>local[0].leftY,'Opponent pyramid points toward center');assert.ok(local[1].mainY<local[1].leftY,'Player monster is the pyramid apex');
@@ -45,6 +46,7 @@ window.mount=(id='wood')=>root.render(React.createElement(Board,{arena:require('
  }
  await page.setViewportSize({width:1440,height:900});
  for(const id of ['fire','water','earth','wood','gold']){await page.evaluate(id=>mount(id),id);await page.waitForFunction(()=>document.querySelector('.triad-arena-background').complete);await page.screenshot({path:`artifacts/triad-arena/${id}.png`});}
+ await page.evaluate(()=>{hideBot=true;mount('earth')});await page.waitForSelector('.triad-card-back-art');await page.waitForFunction(()=>[...document.images].every(i=>i.complete));await page.screenshot({path:'artifacts/triad-arena/native-card-back.png'});
  assert.deepEqual(errors,[]);console.log('Arena UI: NEXORA pyramid apexes, six cards, no overlaps, desktop/mobile landscape rotation, HUD bounds and five terrain images passed');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
