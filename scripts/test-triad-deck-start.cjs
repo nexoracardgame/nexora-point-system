@@ -36,6 +36,15 @@ vm.runInContext(ts.transpileModule(functions.map(node => node.getText(ast)).join
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText, context);
 const call = (name, ...args) => context[name](...args);
+const clientSource = fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx', 'utf8');
+const clientAst = ts.createSourceFile('client.tsx', clientSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const clientFunctions = clientAst.statements.filter(node => ts.isFunctionDeclaration(node) &&
+  ['roomDecksReadyForBattle', 'roomTurnSecondsLeft'].includes(node.name?.text));
+assert.equal(clientFunctions.length, 2);
+const clientContext = vm.createContext({ Date: { now: () => now }, DECK_SIZE: 20, TURN_SECONDS: 120 });
+vm.runInContext(ts.transpileModule(clientFunctions.map(node => node.getText(clientAst)).join('\n'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2020 },
+}).outputText, clientContext);
 const poolFor = mode => cards.filter(card => mode !== 'monster' || card.kind === 'monster').map(card => card.cardNo);
 function roomFor(mode, expired = false) {
   const started = now - (expired ? 300_000 : 10_000);
@@ -74,14 +83,20 @@ function assertStarted(room, mode) {
       assert.equal(JSON.stringify(room), before);
     }
     const waiting = roomFor(mode);
+    waiting.game.turnStartedAt = now - 102_000;
+    assert.equal(clientContext.roomTurnSecondsLeft(waiting), 120);
     call('enforceDeckGate', waiting);
     assert.equal(waiting.game.turnStartedAt, waiting.game.deckStartedAt);
     const readyDeck = call('autoCompleteDeckForMode', mode, [], poolFor(mode), 'ready');
     waiting.game.decks.host = readyDeck;
     waiting.game.deckReady.host = true;
+    assert.equal(clientContext.roomTurnSecondsLeft(waiting), 120);
     now += 300_000;
     call('enforceDeckGate', waiting);
     assertStarted(waiting, mode);
+    assert.equal(clientContext.roomTurnSecondsLeft(waiting), 120);
+    now += 102_000;
+    assert.equal(clientContext.roomTurnSecondsLeft(waiting), 18);
     assert.deepEqual(Array.from(waiting.game.decks.host), Array.from(readyDeck));
 
     stored = roomFor(mode);

@@ -1230,6 +1230,7 @@ function mergeRoomChatMessages(currentMessages: RoomChatMessage[], nextMessages:
 }
 
 function roomTurnSecondsLeft(room: TriadRoom) {
+  if (room.status !== "playing" || !roomDecksReadyForBattle(room)) return TURN_SECONDS;
   const elapsedSeconds = Math.floor((Date.now() - room.game.turnStartedAt) / 1000);
   return Math.max(0, TURN_SECONDS - elapsedSeconds);
 }
@@ -4224,6 +4225,7 @@ function CompactBattleBoard({
   currentParticipantId,
   placementLane,
   timeLeft,
+  battleActive,
   turnLocked,
   pendingSkillChoice,
   waitingSkillChoice,
@@ -4263,6 +4265,7 @@ function CompactBattleBoard({
   currentParticipantId?: string;
   placementLane: Lane;
   timeLeft: number;
+  battleActive: boolean;
   turnLocked: boolean;
   pendingSkillChoice: PendingSkillChoice | null;
   waitingSkillChoice?: PendingSkillChoice | null;
@@ -4304,7 +4307,7 @@ function CompactBattleBoard({
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
   const botAuraByLane: Partial<Record<Lane, TargetAura>> = {};
   const timeoutMissingNames =
-    timeLeft <= 30 && timeLeft > 0 && !currentResult
+    battleActive && timeLeft <= 30 && timeLeft > 0 && !currentResult
       ? [
           !displayPlayerTriangle[activeLane] ? playerName : "",
           !displayBotTriangle[activeLane] ? botName : "",
@@ -4394,7 +4397,7 @@ function CompactBattleBoard({
         }}
         onConfirm={onConfirmSkillTarget}
       />
-      {!pendingSkillChoice && !waitingSkillChoice ? (
+      {battleActive && !pendingSkillChoice && !waitingSkillChoice ? (
         <TimeoutWarningOverlay secondsLeft={timeLeft} missingNames={timeoutMissingNames} />
       ) : null}
       {!pendingSkillChoice && waitingSkillChoice ? (
@@ -8222,6 +8225,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   currentParticipantId={participant.id}
                   placementLane={placementLane}
                   timeLeft={displayTimeLeft}
+                  battleActive={phase === "battle" && !deckSelectionActive}
                   turnLocked={placementLocked}
                   pendingSkillChoice={pendingSkillChoice}
                   waitingSkillChoice={waitingSkillChoice}
@@ -8291,6 +8295,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               currentParticipantId={participant.id}
               placementLane={placementLane}
               timeLeft={displayTimeLeft}
+              battleActive={phase === "battle" && !deckSelectionActive}
               turnLocked={handPlacementLocked}
               pendingSkillChoice={pendingSkillChoice}
               waitingSkillChoice={waitingSkillChoice}
