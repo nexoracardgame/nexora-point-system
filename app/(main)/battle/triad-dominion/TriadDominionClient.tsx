@@ -3975,9 +3975,12 @@ function SkillTargetOverlay({
   selectedTarget: PendingSkillChoice["selectedTarget"];
   timeLeft: number;
   onSelect: (target: SkillTargetSelection) => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }) {
   const [portalReady, setPortalReady] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const sendingRef = useRef(false);
   useEffect(() => {
     setPortalReady(true);
   }, []);
@@ -3997,13 +4000,14 @@ function SkillTargetOverlay({
 
   if (!portalReady || typeof document === "undefined") return null;
   const overlay = (
-    <div className="triad-skill-target-overlay nexora-battle-target-portal fixed inset-0 z-[5000] grid place-items-center p-3">
+    <div className="triad-skill-target-overlay nexora-battle-target-portal triad-target-v2 fixed inset-0 grid place-items-center p-3" role="dialog" aria-modal="true" aria-label="เลือกเป้าหมายสกิล" style={{ zIndex: 2147483120 }}>
       <div className="triad-skill-target-panel max-h-full w-full overflow-auto rounded-2xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] backdrop-blur-md sm:p-5">
         <div className="triad-skill-target-header text-center">
           <div className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-200/70">เลือกเป้าหมายสกิล</div>
           <div className="mt-1 text-2xl font-black uppercase text-white">{card.name}</div>
           <div className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/62">{card.skillText}</div>
-          <div className="mt-3 text-lg font-black text-amber-200">
+          <div className="triad-target-timer mt-3 text-lg font-black text-amber-200" data-urgent={timeLeft <= 10}>
+            <Clock3 className="h-4 w-4" />
             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
           </div>
           {requiresTwoTargets ? (
@@ -4018,11 +4022,13 @@ function SkillTargetOverlay({
           ) : null}
         </div>
 
-        <div className="triad-skill-target-list mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="triad-skill-target-list mt-5 grid gap-3" data-target-count={targets.length}>
           {targets.length > 0 ? targets.map((target) => (
             <button
               key={target.id}
               type="button"
+              disabled={sending || timeLeft <= 0}
+              aria-pressed={selectedTargets.includes(target.id) || effectiveSelectedTarget === target.id}
               onClick={() => onSelect(requiresTwoTargets ? nextTwoStepTargetSelection(selectedTarget, target.id) : target.id)}
               className={`triad-skill-target-choice rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
                 selectedTargets.includes(target.id) || effectiveSelectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
@@ -4034,9 +4040,11 @@ function SkillTargetOverlay({
                   {selectedTargets[0] === target.id ? "ตัวที่ 1: ลด ATK" : "ตัวที่ 2: เพิ่ม ATK"}
                 </div>
               ) : null}
-              <div className="triad-skill-target-card mx-auto w-[clamp(90px,18vw,150px)]">
-                <BoardCardSlot card={target.card} label={target.label} tone={target.id === "player-top" ? "player" : "bot"} />
+              <div className="triad-skill-target-card mx-auto">
+                {target.card ? <img src={target.card.sourceImage} alt={target.card.name} draggable={false} /> : <div className="triad-target-hidden"><Shield className="h-10 w-10" /><span>การ์ดคู่แข่ง</span></div>}
               </div>
+              <div className="triad-target-name">{target.card?.name || target.label}</div>
+              {target.card ? <div className="triad-target-stats"><span>ATK {target.card.attack.toLocaleString()}</span><span>SUP {target.card.support.toLocaleString()}</span></div> : null}
             </button>
           )) : (
             <div className="triad-skill-target-empty rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-center text-sm font-bold text-white/58">
@@ -4045,17 +4053,27 @@ function SkillTargetOverlay({
           )}
         </div>
 
+        <div className="triad-target-footer">
+        {error ? <div role="alert" className="triad-target-error">{error}</div> : null}
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
+            if (sendingRef.current || timeLeft <= 0) return;
+            sendingRef.current = true;
+            setSending(true);
+            setError("");
             if (!requiresTwoTargets && !selectedTarget && targets.length === 1) onSelect(targets[0].id);
-            onConfirm();
+            try { await onConfirm(); }
+            catch { setError("ส่งเป้าหมายไม่สำเร็จ ลองยืนยันอีกครั้งได้"); }
+            finally { sendingRef.current = false; setSending(false); }
           }}
-          disabled={!effectiveSelectedTarget}
+          disabled={!effectiveSelectedTarget || sending || timeLeft <= 0}
           className="triad-skill-target-confirm mt-5 h-12 w-full rounded-2xl bg-violet-300 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/30"
         >
-          ยืนยันเป้าหมาย
+          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+          {sending ? "กำลังยืนยัน" : timeLeft <= 0 ? "หมดเวลา กำลังดำเนินต่อ" : "ยืนยันเป้าหมาย"}
         </button>
+        </div>
       </div>
     </div>
   );
@@ -4402,6 +4420,7 @@ function CompactBattleBoard({
         nextSkillSecondName={nextSkillSecondName}
       /> : null}
       <SkillTargetOverlay
+        key={`${fightNo}:${activeTurn}:${pendingSkillChoice?.cardNo || "none"}`}
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
         side={pendingSkillChoice?.side || "player"}
         playerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
@@ -5337,12 +5356,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
+      signal: body.action === "choose-skill-target" ? AbortSignal.timeout(10000) : undefined,
       body: JSON.stringify({ ...body, participant }),
     });
     const payload = await response.json().catch(() => ({}));
     const actionRoom = normalizeApiRooms(payload.room ? [payload.room] : [])[0] || null;
     if (
-      (body.action === "set-deck" || body.action === "ready-deck") &&
+      (body.action === "set-deck" || body.action === "ready-deck" || (body.action === "choose-skill-target" && typeof body.deckStartedAt === "number")) &&
       (activeRoomCodeRef.current !== body.code ||
         activeRoomSnapshotRef.current?.game.deckStartedAt !== body.deckStartedAt)
     ) {
@@ -6296,8 +6316,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           : "",
     }));
 
+    let lastDeadlineSync = 0;
     const tick = () => {
-      setTimeLeft(Math.max(0, Math.ceil((ownPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000)));
+      const remaining = Math.max(0, Math.ceil((ownPendingRoomSkillChoice.deadlineAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0 && Date.now() - lastDeadlineSync >= 1000) {
+        lastDeadlineSync = Date.now();
+        void syncRooms({ force: true }).catch(() => null);
+      }
     };
     tick();
     const timer = window.setInterval(tick, 250);
@@ -6773,8 +6799,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     placeAndLockCard(currentRoom ? laneForTurn(currentRoom.game.activeTurn) : laneForTurn(activeTurn), cardNo);
   };
 
-  const confirmSkillTarget = () => {
-    if (!pendingSkillChoice || !lockedFight) return;
+  const confirmSkillTarget = async () => {
+    if (!pendingSkillChoice || !lockedFight) {
+      if (currentRoom) void syncRooms({ force: true }).catch(() => null);
+      throw new Error("skill_state_not_ready");
+    }
     const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
     const fallbackTargets = getPlayableSkillTargetIds(
       skillCard,
@@ -6801,36 +6830,27 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (currentRoom && roomPlayerSide && opponentSide) {
-      optimisticRoomLockUntilRef.current = Date.now() + 3200;
-      patchCurrentRoom((room) => ({
-        ...room,
-        game: {
-          ...room.game,
-          skillChoices: room.game.skillChoices.map((choice) =>
-            choice.fightNo === room.game.fightNo &&
-            choice.turn === room.game.activeTurn &&
-            choice.side === roomPlayerSide &&
-            !choice.selectedTarget &&
-            !choice.skipped
-              ? { ...choice, selectedTarget }
-              : choice
-          ),
-        },
-      }));
-      setPendingSkillChoice(null);
-      void postRoomAction({
+      const result = await postRoomAction({
         action: "choose-skill-target",
         code: currentRoom.code,
         selectedTarget,
-      }).then((result) => {
-        if (!result.ok) {
-          optimisticRoomLockUntilRef.current = 0;
-          void syncRooms({ force: true }).catch(() => null);
-          setBattleLog((current) => ["เลือกเป้าหมายสกิลไม่สำเร็จ หรือหมดเวลา 30 วินาทีแล้ว", ...current]);
-          return;
-        }
-        setBattleLog((current) => [`${skillCard?.name || pendingSkillChoice.cardNo}: ยืนยันเป้าหมายแล้ว`, ...current]);
-      });
+        deckStartedAt: currentRoom.game.deckStartedAt,
+        fightNo: currentRoom.game.fightNo,
+        turn: currentRoom.game.activeTurn,
+        cardNo: pendingSkillChoice.cardNo,
+        deadlineAt: ownPendingRoomSkillChoice?.deadlineAt,
+      }).catch(() => null);
+      if (!result) {
+        void syncRooms({ force: true }).catch(() => null);
+        throw new Error("skill_target_network");
+      }
+      if (!result.ok) {
+        optimisticRoomLockUntilRef.current = 0;
+        void syncRooms({ force: true }).catch(() => null);
+        setBattleLog((current) => ["เลือกเป้าหมายสกิลไม่สำเร็จ หรือหมดเวลา 30 วินาทีแล้ว", ...current]);
+        throw new Error("skill_target_rejected");
+      }
+      setBattleLog((current) => [`${skillCard?.name || pendingSkillChoice.cardNo}: ยืนยันเป้าหมายแล้ว`, ...current]);
       return;
     }
 
@@ -6902,6 +6922,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         action: "choose-skill-target",
         code: currentRoom.code,
         selectedTarget: choice,
+        deckStartedAt: currentRoom.game.deckStartedAt,
+        fightNo: currentRoom.game.fightNo,
+        turn: currentRoom.game.activeTurn,
+        cardNo: "254",
+        deadlineAt: ownPendingRoomSkillChoice?.deadlineAt,
       }).then((result) => {
         if (!result.ok) {
           void syncRooms({ force: true }).catch(() => null);
@@ -6940,6 +6965,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         );
         if (serverDrawnCardNo || serverPreviewTopCardNo) setRandomDrawCardNo(serverDrawnCardNo || serverPreviewTopCardNo);
         setBattleLog((current) => [serverSummary || summary, ...current]);
+      }).catch(() => {
+        if (activeRoomSnapshotRef.current?.game.deckStartedAt !== currentRoom.game.deckStartedAt) return;
+        setPendingBlessingChoice((current) => current ? { ...current, choice: undefined } : current);
+        void syncRooms({ force: true }).catch(() => null);
+        setBattleLog((current) => ["ส่งคำขอพรไม่สำเร็จ เลือกใหม่ได้", ...current]);
       });
       return;
     }

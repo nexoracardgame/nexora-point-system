@@ -3498,3 +3498,59 @@ textarea {
     opacity: 0.45;
   }
 }
+
+.triad-target-v2.nexora-battle-target-portal {
+  z-index: 2147483120 !important;
+  background: rgba(3, 8, 12, 0.86);
+  backdrop-filter: blur(6px);
+  color: #f6f8fa;
+}
+.triad-target-v2 .triad-skill-target-panel {
+  width: min(94dvw, 780px) !important;
+  padding: 24px !important;
+  border: 1px solid #84acb94d !important;
+  border-radius: 8px !important;
+  background: #0c1319 !important;
+  box-shadow: 0 24px 90px #0009 !important;
+}
+.triad-target-v2 .triad-skill-target-header { position: relative; }
+.triad-target-v2 .triad-skill-target-header > div:first-child { color: #7ee4d7; letter-spacing: 0; }
+.triad-target-v2 .triad-skill-target-header .text-2xl { font-size: 24px !important; line-height: 1.3 !important; }
+.triad-target-v2 .triad-skill-target-header .text-sm { font-size: 14px !important; line-height: 1.6 !important; max-height: 88px !important; }
+.triad-target-v2 .triad-target-timer { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-variant-numeric: tabular-nums; color: #f8d36e; }
+.triad-target-v2 .triad-target-timer[data-urgent="true"] { color: #ff9188; }
+.triad-target-v2 .triad-skill-target-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; margin-top: 20px; gap: 16px !important; }
+.triad-target-v2 .triad-skill-target-list[data-target-count="1"] { grid-template-columns: minmax(0, 360px) !important; justify-content: center; }
+.triad-target-v2 .triad-skill-target-choice { border-radius: 8px !important; padding: 14px !important; background: #ffffff04; transform: none !important; }
+.triad-target-v2 .triad-skill-target-choice[aria-pressed="true"] { border-color: #79e6c8 !important; background: #79e6c80d !important; box-shadow: inset 0 0 0 1px #79e6c8, 0 0 20px #79e6c815 !important; }
+.triad-target-v2 .triad-skill-target-choice:disabled { cursor: default; }
+.triad-target-v2 .triad-skill-target-card { width: min(190px, 28dvh) !important; aspect-ratio: 5 / 7; }
+.triad-target-v2 .triad-skill-target-card img { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
+.triad-target-v2 .triad-target-hidden { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #17272e; border: 1px solid #ffffff30; border-radius: 6px; font-size: 13px; }
+.triad-target-v2 .triad-target-name { margin-top: 10px; text-align: center; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.triad-target-v2 .triad-target-stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 12px; color: #b8c7cd; }
+.triad-target-v2 .triad-target-footer { padding-top: 16px; }
+.triad-target-v2 .triad-skill-target-confirm { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px !important; margin-top: 0 !important; border-radius: 6px !important; background: #7ee4d7; letter-spacing: 0; }
+.triad-target-v2 .triad-skill-target-confirm:disabled { background: #ffffff12; color: #a3b3bc; }
+.triad-target-v2 .triad-target-error { margin-bottom: 10px; color: #ff9e91; font-size: 13px; text-align: center; }
+@media (max-width: 600px) {
+  .triad-target-v2 .triad-skill-target-panel { padding: 14px !important; }
+  .triad-target-v2 .triad-skill-target-header .text-2xl { font-size: 20px !important; }
+  .triad-target-v2 .triad-skill-target-header .text-sm { font-size: 12px !important; max-height: 76px !important; }
+  .triad-target-v2 .triad-skill-target-card { width: min(138px, 31dvw, 26dvh) !important; }
+  .triad-target-v2 .triad-skill-target-list { gap: 10px !important; }
+  .triad-target-v2 .triad-skill-target-choice { padding: 10px !important; }
+}
+@media (max-height: 500px) {
+  .triad-target-v2 .triad-skill-target-panel { padding: 12px !important; }
+  .triad-target-v2 .triad-skill-target-header .text-2xl { font-size: 18px !important; }
+  .triad-target-v2 .triad-skill-target-header .text-sm { max-height: 36px !important; font-size: 12px !important; }
+  .triad-target-v2 .triad-skill-target-card { width: 80px !important; }
+  .triad-target-v2 .triad-skill-target-choice { grid-template-columns: 90px minmax(0, 1fr); column-gap: 12px; align-content: center !important; }
+  .triad-target-v2 .triad-skill-target-choice > div:not(.triad-skill-target-card) { grid-column: 2; }
+  .triad-target-v2 .triad-skill-target-card { grid-column: 1; grid-row: 1 / span 4; width: 90px !important; }
+  .triad-target-v2 .triad-skill-target-list { margin-top: 8px; }
+  .triad-target-v2 .triad-target-name { margin-top: 4px; font-size: 12px; }
+  .triad-target-v2 .triad-target-footer { padding-top: 8px; }
+  .triad-target-v2 .triad-skill-target-confirm { height: 38px !important; }
+}

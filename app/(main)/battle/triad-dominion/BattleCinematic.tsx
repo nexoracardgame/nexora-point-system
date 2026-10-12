@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FastForward, Shield, Sparkles, Swords } from "lucide-react";
+import { createPortal } from "react-dom";
+import BattleParticles from "./BattleParticles";
 import { triadSkillRuleByNo, type TriadCard, type TriadTurnResult } from "@/lib/triad-dominion";
 import styles from "./BattleCinematic.module.css";
 
@@ -30,6 +32,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
   const steps = useMemo(() => buildBattleSteps(result, playerCard, opponentCard), [result, playerCard, opponentCard]);
   const [index, setIndex] = useState(0);
   const [reduced, setReduced] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const completeRef = useRef(onComplete);
   const finishedRef = useRef(false);
   completeRef.current = onComplete;
@@ -40,6 +43,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
     completeRef.current();
   };
   useEffect(() => {
+    setMounted(true);
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     let saved = false;
     try { saved = localStorage.getItem("triad-reduced-motion") === "1"; } catch { /* Storage may be disabled. */ }
@@ -50,7 +54,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
       if (index >= steps.length - 1) {
         if (!finishedRef.current) { finishedRef.current = true; completeRef.current(); }
       } else setIndex((current) => current + 1);
-    }, reduced ? 450 : currentKind === "skill" ? 1500 : 1100);
+    }, reduced ? 450 : currentKind === "skill" ? 1500 : currentKind === "strike" ? 1350 : 1100);
     return () => window.clearTimeout(timer);
   }, [index, steps.length, reduced, currentKind]);
   const step = steps[Math.min(index, steps.length - 1)];
@@ -66,7 +70,8 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
       return !current;
     });
   };
-  return (
+  if (!mounted) return null;
+  return createPortal(
     <div className={`${styles.overlay} ${reduced ? styles.reduced : ""}`} data-battle-cinematic data-step={index} style={{ "--impact": color } as CSSProperties}>
       <div className={styles.toolbar}>
         <label className={styles.motion}><input type="checkbox" checked={reduced} onChange={toggleReduced} /> ลดการเคลื่อนไหว</label>
@@ -78,6 +83,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
         {!final && attacker ? <small>No.{attacker.cardNo} · {attacker.name}</small> : null}
       </div>
       <div key={index} className={`${styles.arena} ${step.kind === "strike" ? styles.strike : styles.cast} ${step.side === "opponent" ? styles.fromOpponent : styles.fromPlayer} ${step.blocked ? styles.blocked : ""} ${step.field ? styles.field : ""} ${final ? styles.final : ""}`}>
+        {!final ? <BattleParticles color={color} side={step.side} skill={step.kind === "skill"} field={Boolean(step.field)} blocked={Boolean(step.blocked)} reduced={reduced} /> : null}
         {[{ side: "player", card: activePlayer }, { side: "opponent", card: activeOpponent }].map(({ side, card }) => (
           <div key={side} className={`${styles.fighter} ${side === "player" ? styles.player : styles.opponent} ${step.side === side ? styles.source : styles.target}`}>
             <div className={styles.card}>
@@ -91,7 +97,6 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
           <div className={styles.trail} />
           <div className={styles.burst}>
             {step.blocked ? <Shield size={64} strokeWidth={1.5} /> : step.kind === "skill" ? <Sparkles size={52} /> : <Swords size={48} />}
-            {Array.from({ length: 12 }, (_, i) => <i key={i} style={{ "--ray": `${i * 30}deg` } as CSSProperties} />)}
           </div>
           {step.field ? <div className={styles.wave} /> : null}
           {step.value !== undefined ? <div className={styles.number}><span>แต้มปะทะ</span>{step.value.toLocaleString()}</div> : null}
@@ -100,6 +105,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, card
       </div>
       <div className={styles.caption}>{step.summary || (final ? `${playerName} · ${opponentName}` : step.kind === "strike" ? result.metric === "attack" ? "ATK" : result.metric === "support" ? "SUP" : "ATK + SUP" : "เปิดใช้ผลสกิล")}</div>
       <div className={styles.progress}>{steps.map((_, i) => <i key={i} className={i <= index ? styles.passed : ""} />)}</div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -2736,9 +2736,15 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   };
 }
 
-export async function chooseTriadRoomSkillTarget(code: string, participantId: string, selectedTarget: string) {
+export async function chooseTriadRoomSkillTarget(code: string, participantId: string, selectedTarget: string, expected: { deckStartedAt?: number; fightNo?: number; turn?: number; cardNo?: string; deadlineAt?: number } = {}) {
+  return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  if ((expected.deckStartedAt !== undefined && expected.deckStartedAt !== room.game.deckStartedAt) ||
+      (expected.fightNo !== undefined && expected.fightNo !== room.game.fightNo) ||
+      (expected.turn !== undefined && expected.turn !== room.game.activeTurn)) {
+    return { ok: false as const, reason: "stale_skill_choice" as const, room: publicRoom(room) };
+  }
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   const turn = room.game.activeTurn;
@@ -2749,6 +2755,13 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     (item) => item.fightNo === room.game.fightNo && item.turn === turn && item.side === side && item.lane === lane
   );
   if (!choice) return { ok: false as const, reason: "no_choice" as const, room: publicRoom(room) };
+  if ((expected.cardNo !== undefined && expected.cardNo !== choice.cardNo) ||
+      (expected.deadlineAt !== undefined && expected.deadlineAt !== choice.deadlineAt)) {
+    return { ok: false as const, reason: "stale_skill_choice" as const, room: publicRoom(room) };
+  }
+  if (choice.selectedTarget) {
+    return { ok: choice.selectedTarget === cleanText(selectedTarget), reason: "already_selected" as const, room: publicRoom(room), resolved: room.game.turns.some((item) => item.turn === turn) };
+  }
   if (choice.skipped || Date.now() > choice.deadlineAt) {
     choice.skipped = true;
     resolveIfBothLocked(room);
@@ -2813,6 +2826,7 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     room: publicRoom(room),
     resolved: room.game.turns.some((item) => item.turn === room.game.activeTurn),
   };
+  });
 }
 
 export async function chooseTriadRoomOpeningTieBreak(

@@ -46,10 +46,10 @@ context.currentRoom = { code: 'other', game: { deckStartedAt: 102, decks: { host
 vm.runInContext('syncDeck()', context);
 assert.deepEqual(selected, ['010']);
 
-const names = new Set(['rpsIcon', 'OpeningTieBreakOverlay', 'OpeningTieBreakResultOverlay']);
+const names = new Set(['rpsIcon', 'OpeningTieBreakOverlay', 'OpeningTieBreakResultOverlay', 'SkillTargetOverlay', 'parseSkillTargetSelection', 'nextTwoStepTargetSelection', 'isTwoStepTargetSkill']);
 const parts = ast.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text)).map(node => node.getText(ast));
 const labels = ast.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(d => d.name.getText(ast) === 'rpsLabel'));
-const component = compile(`const {createPortal}=require('react-dom'); const {Hand,Scissors,Swords,Trophy,Loader2,RotateCcw}=require('lucide-react');\n${labels.getText(ast)}\n${parts.join('\n')}\nexports.Choose=OpeningTieBreakOverlay; exports.Result=OpeningTieBreakResultOverlay;`);
+const component = compile(`const {createPortal}=require('react-dom'); const {useEffect,useState,useRef}=require('react'); const {Hand,Scissors,Swords,Trophy,Loader2,RotateCcw,Clock3,Shield,Check}=require('lucide-react'); const getPlayableSkillTargetIds=()=>window.twoTargets?['player-top','bot-top']:['player-top'];\n${labels.getText(ast)}\n${parts.join('\n')}\nexports.Choose=OpeningTieBreakOverlay; exports.Result=OpeningTieBreakResultOverlay; exports.Target=SkillTargetOverlay;`);
 const modules = {};
 for (const [id, pkg, file] of [
   ['react', 'react', 'react.production.js'], ['react/jsx-runtime', 'react', 'react-jsx-runtime.production.js'],
@@ -67,6 +67,9 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</st
 const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}
 const React=require('react'),R=require('rps'),root=require('react-dom/client').createRoot(document.getElementById('root'));
 window.chosen='';window.mount=(round=1,resolved=false)=>{root.render(React.createElement(React.Fragment,null,React.createElement(R.Choose,{tieBreak:{status:resolved?'resolved':'waiting',round,choices:{},winner:resolved?'host':''},hostName:'ผู้เล่นหนึ่ง',challengerName:'ผู้เล่นสอง',ownSide:'host',isSpectator:false,pendingChoice:null,onChoose:c=>window.chosen=c,onReset:()=>{}}),React.createElement(R.Result,{tieBreak:{status:'resolved',winner:'host',choices:{host:'rock',challenger:'scissors'}},hostName:'ผู้เล่นหนึ่ง',challengerName:'ผู้เล่นสอง',visible:resolved}))) };mount();
+window.twoTargets=false; window.requests=0; window.fail=true; window.targetTime=28;
+function Target(){const [selected,setSelected]=React.useState('');return React.createElement(R.Target,{card:{cardNo:window.twoTargets?'232':'235',name:'ตราผนึกหิน',skillText:'เลือกมอนสเตอร์บนสนามเรา 1 ใบ เพิ่ม ATTACK +2000 และ SUPPORT +2000 จนจบตา'},side:'player',playerTop:{sourceImage:'/cards/007.jpg',name:'มอนสเตอร์หลักเรา',attack:6700,support:3200},botTop:{sourceImage:'/cards/008.jpg',name:'มอนสเตอร์คู่แข่ง',attack:6000,support:2000},selectedTarget:selected,timeLeft:window.targetTime,onSelect:setSelected,onConfirm:async()=>{window.requests++;await new Promise(r=>setTimeout(r,300));if(window.fail)throw Error('network');root.render(null);}})}
+window.mountTarget=(two=false,time=28)=>{window.twoTargets=two;window.targetTime=time;root.render(React.createElement(Target,{key:two+':'+time}));};
 </script></body></html>`;
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -74,7 +77,13 @@ window.chosen='';window.mount=(round=1,resolved=false)=>{root.render(React.creat
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', err => errors.push(err.message));
-    await page.route('https://selection.test/', route => route.fulfill({ body: html, contentType: 'text/html' }));
+    await page.route('https://selection.test/**', route => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/') return route.fulfill({ body: html, contentType: 'text/html' });
+      const asset = path.resolve('public', '.' + url.pathname);
+      if (!asset.startsWith(path.resolve('public') + path.sep)) return route.abort();
+      return route.fulfill({ body: fs.readFileSync(asset), contentType: 'image/jpeg' });
+    });
     fs.mkdirSync('artifacts/triad-selection', { recursive: true });
     for (const [width, height] of [[1440, 900], [390, 844], [844, 390]]) {
       await page.setViewportSize({ width, height });
@@ -91,8 +100,35 @@ window.chosen='';window.mount=(round=1,resolved=false)=>{root.render(React.creat
       await page.evaluate(() => mount(2, true));
       await page.locator('.triad-tiebreak-result-panel').waitFor();
       assert.equal(await page.locator('.triad-tiebreak-result-panel').evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), true);
+      await page.evaluate(() => mountTarget());
+      const confirm = page.getByRole('button', { name: 'ยืนยันเป้าหมาย', exact: true });
+      await confirm.waitFor();
+      await page.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
+      assert.equal(await page.locator('.triad-skill-target-choice').count(), 1);
+      assert.equal(await confirm.isEnabled(), true);
+      assert.equal(await confirm.evaluate(el => { const r = el.getBoundingClientRect(); return r.bottom <= innerHeight && r.top >= 0 && el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), true);
+      await page.screenshot({ path: `artifacts/triad-selection/target-${width}.png` });
+      await confirm.click();
+      await page.getByRole('alert').waitFor();
+      assert.equal(await confirm.isEnabled(), true);
+      assert.equal(await page.evaluate(() => requests), 1);
+      await page.evaluate(() => window.fail = false);
+      await confirm.click();
+      await page.locator('.triad-target-v2').waitFor({ state: 'detached' });
+      assert.equal(await page.evaluate(() => requests), 2);
+      await page.evaluate(() => mountTarget(true));
+      await confirm.waitFor();
+      assert.equal(await confirm.isEnabled(), false);
+      const options = page.locator('.triad-skill-target-choice');
+      await options.nth(0).click();
+      assert.equal(await confirm.isEnabled(), false);
+      await options.nth(1).click();
+      assert.equal(await confirm.isEnabled(), true);
+      await page.evaluate(() => mountTarget(false, 0));
+      await page.getByRole('button', { name: 'หมดเวลา กำลังดำเนินต่อ' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'หมดเวลา กำลังดำเนินต่อ' }).isEnabled(), false);
     }
     assert.deepEqual(errors, []);
-    console.log('Selection UI: draft survives polling, resets once, reconnect hydrates, RPS above preview on desktop/mobile/landscape passed');
+    console.log('Selection UI: draft polling/reset/reconnect, RPS layering, target auto-select, two-step, network retry, deadline and visible confirm on desktop/mobile/landscape passed');
   } finally { await browser.close(); }
 })().catch(err => { console.error(err); process.exitCode = 1; });

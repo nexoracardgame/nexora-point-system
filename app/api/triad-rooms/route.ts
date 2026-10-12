@@ -279,7 +279,13 @@ export async function POST(request: Request) {
   }
 
   if (action === "choose-skill-target") {
-    const result = await chooseTriadRoomSkillTarget(cleanText(body.code), participant.id, cleanText(body.selectedTarget));
+    const result = await chooseTriadRoomSkillTarget(cleanText(body.code), participant.id, cleanText(body.selectedTarget), {
+      deckStartedAt: typeof body.deckStartedAt === "number" ? body.deckStartedAt : undefined,
+      fightNo: typeof body.fightNo === "number" ? body.fightNo : undefined,
+      turn: typeof body.turn === "number" ? body.turn : undefined,
+      cardNo: typeof body.cardNo === "string" ? cleanText(body.cardNo) : undefined,
+      deadlineAt: typeof body.deadlineAt === "number" ? body.deadlineAt : undefined,
+    });
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

@@ -20,6 +20,9 @@ const modules = {
   './BattleCinematic.module.css': 'exports.default = new Proxy({}, { get: (_, key) => key });',
   '@/lib/triad-dominion': 'exports.triadSkillRuleByNo = new Map([["249", {target:"all"}]]);',
   cinematic: compiled,
+  './BattleParticles': ts.transpileModule(fs.readFileSync(dir + 'BattleParticles.tsx', 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText,
 };
 const bundle = Object.entries(modules).map(([id, code]) => `${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#090c0e;font-family:Arial,sans-serif}#root{position:relative;width:100%;height:100vh;min-height:480px}${fs.readFileSync(dir + 'BattleCinematic.module.css', 'utf8')}</style></head><body><div id="root"></div><script>
@@ -43,14 +46,20 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       if (url.pathname === '/') return route.fulfill({ body: html, contentType: 'text/html' });
       const asset = path.resolve('public', '.' + url.pathname);
       if (!asset.startsWith(path.resolve('public') + path.sep)) return route.abort();
-      return route.fulfill({ body: fs.readFileSync(asset), contentType: 'image/jpeg' });
+      return route.fulfill({ body: fs.readFileSync(asset), contentType: asset.endsWith('.png') ? 'image/png' : 'image/jpeg' });
     });
-    for (const [width, height] of [[1440, 900], [390, 844], [320, 568]]) {
+    for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]]) {
       await page.setViewportSize({ width, height });
       await page.goto('https://cinematic.test/');
       await page.waitForSelector('[data-battle-cinematic]');
       assert.deepEqual(await page.evaluate(() => steps().map(step => step.side)), ['opponent', 'player', 'player']);
       await page.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
+      await page.waitForFunction(() => {
+        const c = document.querySelector('[data-battle-particles]');
+        return c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0);
+      });
+      const cardSize = await page.locator('.card').first().evaluate(el => el.getBoundingClientRect().width);
+      assert.ok(cardSize >= (height < 500 ? 85 : width > 700 ? 200 : 105), `Card must be large at ${width}x${height}: ${cardSize}`);
       await page.evaluate(() => {
         for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = 520; }
       });
@@ -61,6 +70,9 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       });
       assert.ok(hit < 60, `Cards must collide at ${width}px: ${hit}`);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.goto('https://cinematic.test/');
+      await page.waitForSelector('[data-battle-cinematic]');
+      await page.waitForTimeout(600);
       await page.screenshot({ path: `artifacts/triad-cinematic/strike-${width}.png` });
       await page.locator('button[aria-label="ข้ามอนิเมชั่น"]').click();
       assert.equal(await page.evaluate(() => finished), 1);
@@ -80,6 +92,6 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     await page.waitForSelector('.reduced');
     await page.waitForFunction(() => finished === 1);
     assert.deepEqual(errors, []);
-    console.log('Cinematic: desktop/mobile collision, assets, skip, server polling, field skill, reduced motion passed');
+    console.log('Cinematic: large cards, nonblank particle canvas, desktop/mobile/landscape collision, assets, skip, server polling, field skill, reduced motion passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
