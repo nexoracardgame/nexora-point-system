@@ -37,6 +37,7 @@ import {
   Zap,
 } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
+import BattleCinematic from "./BattleCinematic";
 import {
   resolveTriadTurn,
   triadCardByNo,
@@ -4289,6 +4290,9 @@ function CompactBattleBoard({
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
+  const [completedCinematic, setCompletedCinematic] = useState("");
+  const cinematicKey = currentResult ? `${fightNo}:${activeTurn}:${playerTriangle[activeLane]}:${botTriangle[activeLane]}:${JSON.stringify(currentResult)}` : "";
+  const cinematicPlaying = Boolean(battleActive && currentResult && (revealAllCards || revealed[activeTurn]?.scored) && completedCinematic !== cinematicKey);
   const hasSwapResult = Boolean(currentResult?.skillEvents.some((event) => event.type === "swap-control"));
   const showResolvedBoard = Boolean(currentResult && revealed[activeTurn]?.scored);
   const displayPlayerTriangle =
@@ -4364,7 +4368,19 @@ function CompactBattleBoard({
         </div>
         <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />
       </div>
-      <RevealSpotlight
+      {cinematicPlaying && currentResult ? (
+        <BattleCinematic
+          key={cinematicKey}
+          result={currentResult}
+          playerCard={cardsByNo.get(playerTriangle[activeLane] || "")}
+          opponentCard={cardsByNo.get(botTriangle[activeLane] || "")}
+          cardsByNo={cardsByNo}
+          playerName={playerName}
+          opponentName={botName}
+          onComplete={() => setCompletedCinematic(cinematicKey)}
+        />
+      ) : null}
+      {!cinematicPlaying ? <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
         botCard={botTriangle[activeLane] ? cardsByNo.get(botTriangle[activeLane]) : undefined}
         showPlayer={playerVisible(activeLane)}
@@ -4378,7 +4394,7 @@ function CompactBattleBoard({
         skillSecondName={skillSecondName}
         nextSkillOpenerName={nextSkillOpenerName}
         nextSkillSecondName={nextSkillSecondName}
-      />
+      /> : null}
       <SkillTargetOverlay
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
         side={pendingSkillChoice?.side || "player"}
