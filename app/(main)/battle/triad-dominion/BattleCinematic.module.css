@@ -1,7 +1,7 @@
 .overlay { position:fixed; inset:0; z-index:2147483050; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; background:rgba(4,8,11,.95); color:#fff; pointer-events:auto; isolation:isolate; }
 .environment { position:absolute; inset:0; z-index:-1; pointer-events:none; }
 .environment img { width:100%; height:100%; object-fit:cover; object-position:center; }
-.environment > div { position:absolute; inset:0; background:rgba(3,8,12,.72); }
+.environment > div { position:absolute; inset:0; background:rgba(3,8,12,.56); }
 .toolbar { position:absolute; top:max(16px,env(safe-area-inset-top)); right:20px; left:20px; display:flex; align-items:center; justify-content:flex-end; gap:16px; z-index:5; }
 .toolbar button { display:grid; place-items:center; width:40px; height:40px; border:1px solid #ffffff40; border-radius:6px; color:#fff; background:#ffffff10; cursor:pointer; }
 .toolbar button:hover { background:#ffffff25; }
@@ -114,19 +114,20 @@
 }
 @media (prefers-reduced-motion:reduce) { .overlay * { animation:none !important; } .burst,.trail,.wave { display:none; } }
 
-.heading,.caption,.name,.intent,.hpTitle,.hpValue { text-shadow:0 2px 4px #000,0 0 10px #000; }
-.heading { padding:8px 12px; background:#03090dd9; border-radius:6px; width:fit-content; max-width:90%; }
-.hpMeter { padding:10px 12px; border-radius:6px; background:#03090ddd; }
-.caption { padding:8px 14px; border-radius:6px; background:#03090deb; color:#f1f6f8; }
-.name { padding:4px 6px; border-radius:4px; background:#03090ddd; color:#fff; }
-.intent { font-weight:700; background:#03090ddd; border-radius:4px; }
-.motion { padding:6px 8px; border-radius:4px; background:#03090de8; color:#f1f6f8; }
+.heading,.caption,.name,.intent,.hpTitle,.hpValue { text-shadow:0 1px 2px #000c,0 2px 8px #000a; }
+.heading { padding:8px 12px; background:transparent; width:fit-content; max-width:90%; }
+.heading strong { color:#fff; text-shadow:0 2px 6px #000b,0 0 16px color-mix(in srgb,var(--impact) 22%,transparent); }
+.hpMeter { padding:10px 12px; border-radius:6px; background:#10252d45; backdrop-filter:blur(8px); box-shadow:inset 0 1px 0 #ffffff22; }
+.caption { padding:8px 14px; background:transparent; color:#f5f9fc; font-weight:600; }
+.name { padding:4px 6px; background:transparent; color:#fff; font-weight:700; }
+.intent { font-weight:700; background:transparent; }
+.motion { padding:6px 8px; border-radius:4px; background:#ffffff10; backdrop-filter:blur(6px); color:#f1f6f8; }
 .empowered .card { filter:drop-shadow(0 0 16px var(--power-color)) drop-shadow(0 18px 14px #000); }
-.weaponAura { position:absolute; right:-14px; bottom:8%; display:grid; place-items:center; width:52px; height:52px; color:var(--power-color,var(--impact)); filter:drop-shadow(0 0 8px currentColor); background:#03090dbd; border-radius:50%; pointer-events:none; }
+.weaponAura { position:absolute; right:-14px; bottom:8%; display:grid; place-items:center; width:52px; height:52px; color:var(--power-color,var(--impact)); filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 2px 3px #000); pointer-events:none; }
 .receiving .card { animation:imbue var(--motion-duration) ease-out both; }
 .skillTransfer { position:absolute; top:8px; width:calc(var(--card-width) * .48); z-index:6; pointer-events:none; animation:skillTransfer var(--motion-duration) ease-in-out both; }
 .skillTransfer img { display:block; width:100%; aspect-ratio:815 / 1110; object-fit:contain; border-radius:4px; filter:drop-shadow(0 0 12px var(--impact)); }
-.skillTransfer span { position:absolute; top:100%; left:50%; transform:translateX(-50%); padding:4px 8px; background:#03090df2; color:#fff; font-size:12px; font-weight:700; border-radius:4px; white-space:nowrap; }
+.skillTransfer span { position:absolute; top:100%; left:50%; transform:translateX(-50%); padding:4px 8px; color:#fff; font-size:12px; font-weight:700; text-shadow:0 1px 3px #000,0 0 10px #0009; white-space:nowrap; }
 .skillPlayer { left:calc(var(--edge) - var(--card-width) * .58); }
 .skillOpponent { right:calc(var(--edge) - var(--card-width) * .58); }
 .skillBlocked { animation-name:skillReject; }
