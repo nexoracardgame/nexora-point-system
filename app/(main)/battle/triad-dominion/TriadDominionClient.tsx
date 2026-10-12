@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import BattleCinematic from "./BattleCinematic";
+import { primeBattleAudio } from "./BattleAudio";
 import {
   resolveTriadTurn,
   triadCardByNo,
@@ -4520,6 +4521,15 @@ function emptyRevealState(): Record<TriadTurn, TurnReveal> {
 
 export default function TriadDominionClient({ cards, reviewSkills, summary, currentUser }: Props) {
   const router = useRouter();
+  useEffect(() => {
+    const unlock = () => { void primeBattleAudio(); };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
   const cardsByNo = useMemo(() => new Map(cards.map((card) => [card.cardNo, card])), [cards]);
   const deckCatalog = useMemo(
     () => uniqueByNo(cards.filter((card) => card.kind !== "unknown")),

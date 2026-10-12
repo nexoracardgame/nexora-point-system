@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { TriadElement } from "@/lib/triad-dominion";
 
 const textures = ["spark_01", "flare_01", "smoke_01", "slash_01", "magic_01"];
 
-export default function BattleParticles({ color, side, skill, field, blocked, reduced }: {
-  color: string; side: "player" | "opponent"; skill: boolean; field: boolean; blocked: boolean; reduced: boolean;
+export default function BattleParticles({ color, element, side, skill, field, blocked, reduced, effect }: {
+  color: string; element: TriadElement; side: "player" | "opponent"; skill: boolean; field: boolean; blocked: boolean; reduced: boolean;
+  effect?: "buff" | "debuff" | "shift" | "transform" | "swap";
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -29,8 +31,12 @@ export default function BattleParticles({ color, side, skill, field, blocked, re
     canvas.height = Math.round(height * dpr);
     ctx.scale(dpr, dpr);
     const mobile = width < 600;
-    const targetX = skill ? width / 2 : side === "player" ? width * (mobile ? .82 : .77) : width * (mobile ? .18 : .23);
-    const targetY = height * .39;
+    const bounds = canvas.getBoundingClientRect();
+    const target = canvas.parentElement?.querySelector('[data-fighter="target"]')?.getBoundingClientRect();
+    const source = canvas.parentElement?.querySelector('[data-fighter="source"]')?.getBoundingClientRect();
+    const sourceX = source ? source.left + source.width / 2 - bounds.left : width * (side === "player" ? .23 : .77);
+    const targetX = skill ? width / 2 : target ? target.left + target.width / 2 - bounds.left : width * (side === "player" ? .77 : .23);
+    const targetY = target ? target.top + target.height / 2 - bounds.top : height * .39;
     const particles = Array.from({ length: mobile ? 50 : 90 }, (_, i) => ({
       angle: i * 2.39996,
       speed: 90 + (i * 37 % 230),
@@ -60,13 +66,13 @@ export default function BattleParticles({ color, side, skill, field, blocked, re
     };
     const draw = (now: number) => {
       if (stopped) return;
-      const elapsed = (now - startedAt) / 1000;
+      const realElapsed = (now - startedAt) / 1000;
+      const elapsed = !skill && realElapsed > .52 ? realElapsed < .60 ? .52 : realElapsed - .08 : realElapsed;
       ctx.clearRect(0, 0, width, height);
       ctx.globalCompositeOperation = "lighter";
       // Energy gathers first; particles release on the same frame as card contact.
       if (elapsed < .52) {
         const charge = Math.min(elapsed / .52, 1);
-        const sourceX = side === "player" ? width * .23 : width * .77;
         const x = skill ? width / 2 : sourceX + (targetX - sourceX) * Math.max(0, (charge - .4) / .6);
         sprite(skill ? 4 : 1, x, targetY, 55 + charge * 160, elapsed * 2, charge * .7);
         for (let i = 0; i < 10; i++) sprite(0, x + Math.cos(i + elapsed * 8) * 55 * (1 - charge), targetY + Math.sin(i + elapsed * 8) * 55 * (1 - charge), 16, i, charge);
@@ -76,12 +82,75 @@ export default function BattleParticles({ color, side, skill, field, blocked, re
         const flash = Math.max(0, 1 - hit * 8);
         sprite(1, targetX, targetY, (mobile ? 240 : 420) + hit * 200, 0, flash);
         sprite(blocked ? 4 : 3, targetX, targetY, mobile ? 190 : 310, side === "player" ? -.7 : .7, Math.max(0, 1 - hit * 3));
-        for (const p of particles) {
+        for (const [i, p] of particles.entries()) {
           if (hit > p.life) continue;
           const distance = p.speed * hit;
-          sprite(0, targetX + Math.cos(p.angle) * distance, targetY + Math.sin(p.angle) * distance + hit * hit * 55, p.size * (1 - hit / p.life), p.angle + hit * p.spin, Math.pow(1 - hit / p.life, 1.5));
+          const x = targetX + Math.cos(p.angle) * distance;
+          const y = targetY + Math.sin(p.angle) * distance + hit * hit * (element === "earth" ? 180 : 55);
+          const size = p.size * (1 - hit / p.life);
+          const opacity = Math.pow(1 - hit / p.life, 1.5);
+          if (blocked || element === "gold" || element === "unknown") {
+            sprite(0, x, y, size, p.angle + hit * p.spin, opacity);
+          } else if (element === "fire") {
+            sprite(i % 3 ? 0 : 1, x, y - hit * 70, size * (i % 3 ? 1 : 2), p.angle, opacity);
+          } else {
+            ctx.save(); ctx.globalAlpha = opacity; ctx.fillStyle = color;
+            ctx.translate(x, y); ctx.rotate(p.angle + hit * p.spin);
+            ctx.beginPath();
+            if (element === "earth") {
+              ctx.moveTo(-size / 2, -size / 3); ctx.lineTo(size / 4, -size / 2);
+              ctx.lineTo(size / 2, size / 3); ctx.lineTo(-size / 3, size / 2); ctx.closePath();
+            } else {
+              ctx.ellipse(0, 0, size * (element === "wood" ? .65 : .3), size * .65, 0, 0, Math.PI * 2);
+            }
+            ctx.fill(); ctx.restore();
+          }
         }
-        for (let i = 0; i < 5; i++) sprite(2, targetX + Math.cos(i * 1.26) * hit * 80, targetY + Math.sin(i * 1.26) * hit * 60, 80 + hit * 150, i + hit, Math.max(0, .14 - hit * .12));
+        if (element === "fire" || element === "earth") for (let i = 0; i < 5; i++) sprite(2, targetX + Math.cos(i * 1.26) * hit * 80, targetY + Math.sin(i * 1.26) * hit * 60, 80 + hit * 150, i + hit, Math.max(0, .14 - hit * .12));
+        if (!blocked && hit < .75) {
+          ctx.save(); ctx.globalAlpha = Math.max(0, 1 - hit / .75); ctx.strokeStyle = color;
+          const extent = Math.min(hit * 600 + 35, mobile ? 100 : 180);
+          if (element === "wood") {
+            ctx.lineWidth = 4;
+            for (let i = 0; i < 5; i++) {
+              const angle = i * Math.PI * .4;
+              ctx.beginPath(); ctx.moveTo(targetX + Math.cos(angle) * extent, targetY + Math.sin(angle) * extent);
+              ctx.quadraticCurveTo(targetX + Math.cos(angle + .8) * extent * .6, targetY + Math.sin(angle + .8) * extent * .6, targetX, targetY); ctx.stroke();
+            }
+          } else if (element === "earth") {
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 7; i++) {
+              const angle = i * .9;
+              ctx.beginPath(); ctx.moveTo(targetX, targetY);
+              ctx.lineTo(targetX + Math.cos(angle) * extent * .55, targetY + Math.sin(angle) * extent * .55);
+              ctx.lineTo(targetX + Math.cos(angle + .18) * extent, targetY + Math.sin(angle + .18) * extent); ctx.stroke();
+            }
+          } else if (element === "water") {
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 3; i++) {
+              ctx.beginPath(); ctx.ellipse(targetX, targetY, extent * (1 + i * .25), extent * (.45 + i * .1), -.25, 0, Math.PI * 2); ctx.stroke();
+            }
+          } else if (element === "gold") {
+            ctx.lineWidth = 2; ctx.beginPath();
+            for (let i = 0; i <= 6; i++) {
+              const angle = i * Math.PI / 3 + hit;
+              const x = targetX + Math.cos(angle) * extent;
+              const y = targetY + Math.sin(angle) * extent;
+              if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          }
+          if (effect === "buff" || effect === "debuff") {
+            ctx.lineWidth = 3;
+            const direction = effect === "debuff" ? 1 : -1;
+            for (let i = 0; i < 5; i++) {
+              const x = targetX + (i - 2) * 24;
+              const y = targetY + direction * hit * 100;
+              ctx.beginPath(); ctx.moveTo(x - 7, y - direction * 7); ctx.lineTo(x, y); ctx.lineTo(x + 7, y - direction * 7); ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
         if (hit < .55) {
           ctx.strokeStyle = blocked ? "#b9e7ff" : color;
           ctx.lineWidth = 4 * (1 - hit / .55);
@@ -92,10 +161,10 @@ export default function BattleParticles({ color, side, skill, field, blocked, re
           ctx.globalAlpha = 1;
         }
       }
-      if (elapsed < 1.5) frame = requestAnimationFrame(draw);
+      if (realElapsed < 1.6) frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
     return () => { stopped = true; cancelAnimationFrame(frame); ctx.clearRect(0, 0, width, height); };
-  }, [color, side, skill, field, blocked, reduced]);
-  return <canvas ref={ref} data-battle-particles aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 4 }} />;
+  }, [color, element, side, skill, field, blocked, reduced, effect]);
+  return <canvas ref={ref} data-battle-particles data-particle-element={element} aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 4 }} />;
 }

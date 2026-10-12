@@ -16,7 +16,7 @@
 .card img { width:100%; height:100%; object-fit:contain; }
 .source { z-index:3; }
 .source .card { border-color:var(--impact); box-shadow:0 0 30px color-mix(in srgb,var(--impact) 35%,transparent),0 24px 35px #000; }
-.name { position:absolute; top:360px; width:var(--card-width); text-align:center; font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
+.name { position:absolute; top:360px; width:var(--card-width); text-align:center; font-size:14px; line-height:1.4; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 .playerName { left:var(--edge); }
 .opponentName { right:var(--edge); }
 .strike .source { animation:lungPlayer 1350ms cubic-bezier(.18,.7,.2,1) both; }
@@ -42,14 +42,28 @@
 .scores span { font-size:12px; color:#9caab7; }
 .final .fighter { animation:none; }
 .final .name { display:none; }
-.final .card { border-color:var(--impact); }
+.final .card { border-color:#ffffff70; }
+.winner .card { border-color:#ffe48b; box-shadow:0 0 40px #ffd46e66,0 24px 35px #000; animation:victory 1000ms ease-out both; }
+.defeated .card { opacity:.72; }
+.verdict { position:absolute; top:128px; left:calc(50% - 34px); width:68px; height:68px; display:grid; place-items:center; border:1px solid #ffe48b80; border-radius:50%; color:#ffe48b; box-shadow:0 0 30px #ffd46e30; animation:seal 800ms ease-out both; }
+.intent { position:absolute; top:0; display:flex; align-items:center; justify-content:center; gap:6px; width:var(--card-width); height:22px; font-size:12px; color:var(--impact); }
+.playerIntent { left:var(--edge); } .opponentIntent { right:var(--edge); }
+.strike .target .card { animation:targetLock 1350ms ease-out both; }
+.skillState { position:absolute; top:398px; left:15%; right:15%; display:flex; align-items:center; justify-content:center; gap:8px; font-size:18px; font-weight:700; animation:skillState 1500ms ease-out both; }
+.buff { color:#7bf0b8; } .debuff { color:#ff9787; }
+.drawClash { position:absolute; left:38%; right:38%; top:150px; height:4px; background:#c6e9ef; box-shadow:0 0 22px #91d0dd; animation:balance 1100ms ease-out both; }
 .reduced * { animation:none !important; }
 .reduced .burst,.reduced .trail,.reduced .wave { display:none; }
 .reduced .number { transform:translateX(-50%); }
-@keyframes lungPlayer { 0%,100% { transform:translateX(0) rotateY(0); } 20% { transform:translateX(-24px) translateY(-15px) rotateY(-18deg) rotate(-9deg) scale(1.06); } 38%,42% { transform:translateX(var(--travel)) translateY(-10px) rotateY(12deg) rotate(12deg) scale(1.08); } 65% { transform:translateX(8%) rotate(-3deg); } }
-@keyframes lungOpponent { 0%,100% { transform:translateX(0) rotateY(0); } 20% { transform:translateX(24px) translateY(-15px) rotateY(18deg) rotate(9deg) scale(1.06); } 38%,42% { transform:translateX(calc(-1 * var(--travel))) translateY(-10px) rotateY(-12deg) rotate(-12deg) scale(1.08); } 65% { transform:translateX(-8%) rotate(3deg); } }
-@keyframes recoil { 0%,37%,100% { transform:translateX(0); filter:brightness(1); } 40% { transform:translateX(18px) rotate(10deg); filter:brightness(1.8); } 44% { transform:translateX(-12px) rotate(-7deg); } 51% { transform:translateX(7px); } }
-@keyframes camera { 0%,38%,52%,100% { transform:translate(0); } 40% { transform:translate(-5px,4px); } 43% { transform:translate(5px,-3px); } 46% { transform:translate(-3px,2px); } 49% { transform:translate(2px,-1px); } }
+@keyframes lungPlayer { 0%,100% { transform:translateX(0) rotateY(0); } 20% { transform:translateX(-24px) translateY(-15px) rotateY(-18deg) rotate(-9deg) scale(1.06); } 38%,44.4% { transform:translateX(var(--travel)) translateY(-10px) rotateY(12deg) rotate(12deg) scale(1.08); } 65% { transform:translateX(8%) rotate(-3deg); } }
+@keyframes lungOpponent { 0%,100% { transform:translateX(0) rotateY(0); } 20% { transform:translateX(24px) translateY(-15px) rotateY(18deg) rotate(9deg) scale(1.06); } 38%,44.4% { transform:translateX(calc(-1 * var(--travel))) translateY(-10px) rotateY(-12deg) rotate(-12deg) scale(1.08); } 65% { transform:translateX(-8%) rotate(3deg); } }
+@keyframes recoil { 0%,37%,100% { transform:translateX(0); filter:brightness(1); } 38.5%,44.4% { transform:translateX(14px) rotate(8deg); filter:brightness(1.65); } 47% { transform:translateX(-12px) rotate(-7deg); } 54% { transform:translateX(7px); } }
+@keyframes camera { 0%,44.4%,58%,100% { transform:translate(0); } 46% { transform:translate(-5px,4px); } 49% { transform:translate(5px,-3px); } 52% { transform:translate(-3px,2px); } 55% { transform:translate(2px,-1px); } }
+@keyframes targetLock { 0%,35% { border-color:var(--impact); box-shadow:inset 0 0 0 2px var(--impact),0 0 18px color-mix(in srgb,var(--impact) 30%,transparent); } 60%,100% { border-color:#ffffff80; } }
+@keyframes victory { from { transform:translateY(0) scale(1); } to { transform:translateY(-6px) scale(1.03); } }
+@keyframes seal { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
+@keyframes skillState { 0%,30% { opacity:0; transform:translateY(12px); } 50%,100% { opacity:1; transform:translateY(0); } }
+@keyframes balance { 0% { transform:scaleX(0); opacity:0; } 45% { transform:scaleX(1); opacity:1; } 100% { transform:scaleX(.1); opacity:0; } }
 @keyframes charge { 0%,100% { transform:translateY(0) scale(1); } 35%,65% { transform:translateY(-18px) rotateY(-8deg) scale(1.08); filter:brightness(1.3); } }
 @keyframes burst { 0%,33% { opacity:0; transform:scale(.3); } 40% { opacity:1; transform:scale(1.15); } 75% { opacity:.7; } 100% { opacity:0; transform:scale(1.5); } }
 @keyframes trail { 0%,23% { opacity:0; transform:scaleX(0); } 37% { opacity:.8; transform:scaleX(1); } 55%,100% { opacity:0; transform:scaleX(1); } }
@@ -63,12 +77,14 @@
   .burst { top:85px; } .trail { top:120px; }
   .number { top:285px; font-size:34px; } .scores { top:286px; gap:16px; } .scores strong { font-size:28px; }
   .caption { font-size:13px; min-height:40px; } .guard { top:288px; font-size:13px; }
+  .skillState { top:288px; font-size:15px; } .verdict { top:92px; width:56px; height:56px; left:calc(50% - 28px); } .drawClash { top:120px; }
 }
-@media (max-width:350px) { .arena { --card-width:110px; --card-height:154px; height:302px; } .name { top:224px; } .number,.scores,.guard { top:255px; } }
+@media (max-width:350px) { .arena { --card-width:110px; --card-height:154px; height:312px; } .name { top:224px; } .number,.scores,.guard,.skillState { top:268px; } }
 @media (max-height:600px) and (min-width:701px) {
   .heading { margin-top:44px; } .heading strong { font-size:20px; margin-top:4px; } .heading small { font-size:12px; }
   .arena { --card-width:96px; --card-height:134px; height:218px; }
   .fighter { top:12px; } .name { top:157px; font-size:12px; } .number,.scores,.guard { top:183px; } .number,.scores strong { font-size:28px; }
   .trail { top:90px; } .burst { top:58px; } .caption { font-size:12px; min-height:28px; } .progress { margin:6px 0; }
+  .intent { top:-8px; font-size:11px; } .skillState { top:183px; font-size:14px; } .verdict { top:54px; width:48px; height:48px; left:calc(50% - 24px); } .drawClash { top:78px; }
 }
 @media (prefers-reduced-motion:reduce) { .overlay * { animation:none !important; } .burst,.trail,.wave { display:none; } }
