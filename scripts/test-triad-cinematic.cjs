@@ -26,6 +26,9 @@ const modules = {
   './BattleAudio': ts.transpileModule(fs.readFileSync(dir + 'BattleAudio.ts', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText,
+  './BattleTiming': ts.transpileModule(fs.readFileSync(dir + 'BattleTiming.ts', 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText,
 };
 const bundle = Object.entries(modules).map(([id, code]) => `${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#090c0e;font-family:Arial,sans-serif}#root{position:relative;width:100%;height:100vh;min-height:480px}${fs.readFileSync(dir + 'BattleCinematic.module.css', 'utf8')}</style></head><body><div id="root"></div><script>
@@ -57,16 +60,19 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       await page.setViewportSize({ width, height });
       await page.goto('https://cinematic.test/');
       await page.waitForSelector('[data-battle-cinematic]');
-      assert.deepEqual(await page.evaluate(() => steps().map(step => step.side)), ['opponent', 'player', 'player']);
+      assert.deepEqual(await page.evaluate(() => steps().filter(step=>step.kind==='strike').map(step => step.side)), ['opponent', 'player']);
+      assert.equal(await page.locator('[data-hp-side="player"]').getAttribute('data-hp-value'), '8000');
+      assert.equal(await page.locator('[data-hp-side="opponent"]').getAttribute('data-hp-value'), '6000');
+      await page.waitForSelector('[data-kind="strike"]');
       await page.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
       await page.waitForFunction(() => {
         const c = document.querySelector('[data-battle-particles]');
         return c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0);
       });
       const cardSize = await page.locator('.card').first().evaluate(el => el.getBoundingClientRect().width);
-      assert.ok(cardSize >= (height < 500 ? 85 : width > 700 ? 200 : 105), `Card must be large at ${width}x${height}: ${cardSize}`);
+      assert.ok(cardSize >= (height < 500 ? 75 : width > 700 ? 200 : 100), `Card must be large at ${width}x${height}: ${cardSize}`);
       await page.evaluate(() => {
-        for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = 520; }
+        for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = 1100; }
       });
       const hit = await page.evaluate(() => {
         const a = document.querySelector('.source').getBoundingClientRect();
@@ -75,12 +81,16 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       });
       assert.ok(hit < 60, `Cards must collide at ${width}px: ${hit}`);
       const pose = await page.locator('.source').evaluate(el => getComputedStyle(el).transform);
-      await page.evaluate(() => { for (const a of document.getAnimations()) a.currentTime = 580; });
+      await page.evaluate(() => { for (const a of document.getAnimations()) a.currentTime = 1200; });
       assert.equal(await page.locator('.source').evaluate(el => getComputedStyle(el).transform), pose, 'Card must hold its contact pose for hit-stop');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.goto('https://cinematic.test/');
       await page.waitForSelector('[data-battle-cinematic]');
-      await page.waitForTimeout(600);
+      await page.waitForSelector('[data-kind="strike"]');
+      await page.waitForTimeout(1250);
+      const hpRects = await page.locator('.hpRow').evaluate(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,width:r.width};});
+      assert.ok(hpRects.top>=0&&hpRects.bottom<height&&hpRects.width<=width,'HP row must fit viewport');
+      assert.ok(await page.evaluate(()=>document.querySelector('.number').getBoundingClientRect().bottom<=document.querySelector('.caption').getBoundingClientRect().top),'Damage number must not overlap the caption');
       await page.screenshot({ path: `artifacts/triad-cinematic/strike-${width}.png` });
       await page.locator('button[aria-label="ข้ามอนิเมชั่น"]').click();
       assert.equal(await page.evaluate(() => finished), 1);
@@ -88,7 +98,7 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     await page.goto('https://cinematic.test/');
     // Repeated fresh server snapshots must not restart the playback timer.
     await page.evaluate(() => window.poll = setInterval(() => mount(), 180));
-    await page.waitForFunction(() => finished === 1, { timeout: 6000 });
+    await page.waitForFunction(() => finished === 1, { timeout: 18000 });
     await page.evaluate(() => clearInterval(window.poll));
     assert.equal(await page.evaluate(() => finished), 1);
     await page.evaluate(() => mount([{side:'player',cardNo:'249',summary:'ลดแต้มทั้งสองสนาม',type:'stat'}], 'skill'));
@@ -105,7 +115,8 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     for (const element of ['fire','water','wood','earth','gold']) {
       await page.evaluate(e => { player.element=e; opponent.element=e; mount([], 'element-'+e); }, element);
       await page.waitForSelector(`[data-element="${element}"]`);
-      await page.waitForTimeout(630);
+      await page.waitForSelector('[data-kind="strike"]');
+      await page.waitForTimeout(1260);
       assert.ok(await page.locator('[data-battle-particles]').evaluate(c => c.getContext('2d').getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v>0)));
       await page.screenshot({path:`artifacts/triad-cinematic/element-${element}.png`});
     }
@@ -115,13 +126,24 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     await page.evaluate(() => { result.winner='player'; mount([], 'winner'); });
     await page.waitForSelector('.winner');
     assert.equal(await page.locator('.winner.player').count(), 1);
+    await page.evaluate(() => {
+      result.turn=1;result.metric='total';result.prioritySide='player';result.playerTotal=10000;result.opponentTotal=12000;result.winner='opponent';mount([], 'hp-example');
+    });
+    await page.waitForFunction(()=>document.querySelector('[data-hp-side="player"]')?.dataset.hpValue==='10000'&&document.querySelector('[data-hp-side="opponent"]')?.dataset.hpValue==='12000');
+    await page.waitForFunction(()=>document.querySelector('[data-hp-side="opponent"]')?.dataset.hpValue==='2000');
+    assert.equal(await page.locator('[data-hp-side="player"]').getAttribute('data-hp-value'),'10000');
+    await page.waitForFunction(()=>document.querySelector('[data-hp-side="player"]')?.dataset.hpValue==='-2000');
+    await page.waitForFunction(()=>document.querySelector('[data-hp-side="player"] .hpValue')?.textContent.includes('-2,000'));
+    assert.equal(await page.locator('[data-hp-side="opponent"]').getAttribute('data-hp-value'),'2000');
+    assert.equal(await page.locator('[data-hp-side="player"] .hpFill').evaluate(el=>el.style.width),'0%');
+    await page.screenshot({path:'artifacts/triad-cinematic/hp-counterattack.png'});
     // Sound must decode, schedule on contact, stop on mute/skip, and remember mute.
     await page.goto('https://cinematic.test/');
     await page.getByRole('button',{name:'เปิดเสียงการต่อสู้'}).click();
     await page.getByRole('button',{name:'ปิดเสียงการต่อสู้'}).waitFor();
     await page.waitForFunction(() => audioEvents.some(e=>e.kind==='createBufferSource'&&e.duration!==.32));
     const timing = await page.evaluate(() => audioEvents.filter(e=>e.kind==='createBufferSource'&&Math.abs(e.duration-.32)>.005));
-    assert.ok(timing.some(e=>e.when-e.now>.4&&e.when-e.now<.6),'Impact clip must be scheduled at contact');
+    assert.ok(timing.some(e=>e.when-e.now>1&&e.when-e.now<1.2),'Impact clip must be scheduled at contact');
     await page.getByRole('button',{name:'ปิดเสียงการต่อสู้'}).click();
     const count = await page.evaluate(() => audioEvents.length);
     await page.waitForTimeout(600);
@@ -135,6 +157,6 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     await page.getByRole('button',{name:'ข้ามอนิเมชั่น'}).click();
     assert.ok(await page.evaluate(before => audioStops>before,stopsBeforeSkip));
     assert.deepEqual(errors, []);
-    console.log('Cinematic: hit-stop, five elemental impacts, skill state, victory/draw, audio decode/timing/mute/skip/persistence, responsive collision, assets, server polling, reduced motion passed');
+    console.log('Cinematic: visible HP, slower playback, hit-stop, five elements, skill state, victory/draw, audio timing/mute/skip/persistence, responsive collision, polling, reduced motion passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

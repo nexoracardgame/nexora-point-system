@@ -1,4 +1,5 @@
 import type { TriadElement } from "@/lib/triad-dominion";
+import { BATTLE_CONTACT_MS } from "./BattleTiming";
 
 const clips = {
   fire: "impactPunch_heavy_000", water: "impactGlass_medium_000", wood: "impactPlank_medium_000",
@@ -63,7 +64,7 @@ export function playBattleSequence({ element, kind, side, blocked, draw, reduced
   if (kind === "result") {
     (draw ? [220, 277] : [330, 440, 660]).forEach((note, i) => tone(note, note, start + i * .09, .35, .035));
   } else {
-    const hitAt = start + (reduced ? .08 : .52);
+    const hitAt = start + (reduced ? .25 : BATTLE_CONTACT_MS / 1000);
     if (!reduced) {
       // The filtered sweep follows the card; the impact is scheduled on its contact frame.
       const noise = context.createBuffer(1, Math.ceil(context.sampleRate * .32), context.sampleRate);
@@ -76,8 +77,8 @@ export function playBattleSequence({ element, kind, side, blocked, draw, reduced
       const gain = connect(source, .06, pan);
       source.disconnect(); source.connect(filter).connect(gain);
       source.addEventListener("ended", () => filter.disconnect(), { once: true });
-      source.start(start + .16);
-      if (kind === "skill") tone(180, 580, start, .5, .025, pan);
+      source.start(start + .70);
+      if (kind === "skill") tone(180, 580, start, .95, .025, pan);
     }
     const buffer = buffers.get(clips[blocked ? "guard" : element]);
     if (buffer) {

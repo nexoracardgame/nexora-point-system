@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Fragment, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Bot,
@@ -4230,6 +4230,7 @@ function TimeoutWarningOverlay({
 
 function CompactBattleBoard({
   cardsByNo,
+  onCinematicActivity,
   lockedFight,
   player,
   revealed,
@@ -4270,6 +4271,7 @@ function CompactBattleBoard({
   nextSkillSecondName,
 }: {
   cardsByNo: Map<string, CardView>;
+  onCinematicActivity?: (playing: boolean) => void;
   lockedFight: LockedFight | null;
   player: TriadTriangle;
   revealed: Record<TriadTurn, TurnReveal>;
@@ -4318,6 +4320,10 @@ function CompactBattleBoard({
   const [completedCinematic, setCompletedCinematic] = useState("");
   const cinematicKey = currentResult ? `${fightNo}:${activeTurn}:${playerTriangle[activeLane]}:${botTriangle[activeLane]}:${JSON.stringify(currentResult)}` : "";
   const cinematicPlaying = Boolean(battleActive && currentResult && (revealAllCards || revealed[activeTurn]?.scored) && completedCinematic !== cinematicKey);
+  useLayoutEffect(() => {
+    onCinematicActivity?.(cinematicPlaying);
+    return () => onCinematicActivity?.(false);
+  }, [cinematicPlaying, onCinematicActivity]);
   const hasSwapResult = Boolean(currentResult?.skillEvents.some((event) => event.type === "swap-control"));
   const showResolvedBoard = Boolean(currentResult && revealed[activeTurn]?.scored);
   const displayPlayerTriangle =
@@ -4399,6 +4405,8 @@ function CompactBattleBoard({
           result={currentResult}
           playerCard={cardsByNo.get(playerTriangle[activeLane] || "")}
           opponentCard={cardsByNo.get(botTriangle[activeLane] || "")}
+          playerMainCard={cardsByNo.get(playerTriangle.top || "")}
+          opponentMainCard={cardsByNo.get(botTriangle.top || "")}
           cardsByNo={cardsByNo}
           playerName={playerName}
           opponentName={botName}
@@ -4521,6 +4529,7 @@ function emptyRevealState(): Record<TriadTurn, TurnReveal> {
 
 export default function TriadDominionClient({ cards, reviewSkills, summary, currentUser }: Props) {
   const router = useRouter();
+  const [cinematicActive, setCinematicActive] = useState(false);
   useEffect(() => {
     const unlock = () => { void primeBattleAudio(); };
     window.addEventListener("pointerdown", unlock, { passive: true });
@@ -6084,6 +6093,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (
       !currentRoom ||
       firstTurnResult?.winner !== "draw" ||
+      cinematicActive ||
       tieBreak?.status !== "resolved" ||
       !tieBreak.winner
     ) {
@@ -6109,6 +6119,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setOpeningTieBreakResultVisible(false);
     }, 4600);
   }, [
+    cinematicActive,
     currentRoom?.code,
     currentRoom?.game.activeTurn,
     currentRoom?.game.fightNo,
@@ -6129,6 +6140,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       !currentRoom ||
       !roomPlayerSide ||
       currentRoom.game.activeTurn !== 1 ||
+      cinematicActive ||
       firstTurnResult?.winner !== "draw" ||
       tieBreak?.status !== "resolved" ||
       !tieBreak.winner
@@ -6157,6 +6169,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     currentRoom?.game.openerTieBreak.winner,
     currentRoom?.game.turns,
     roomPlayerSide,
+    cinematicActive,
   ]);
 
   useEffect(() => {
@@ -6179,7 +6192,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, participant.id, phase]);
 
   useEffect(() => {
-    if (!currentRoom?.game.matchEndedAt || !matchFinalVisible || !participantInRoom(currentRoom, participant.id)) {
+    if (cinematicActive || !currentRoom?.game.matchEndedAt || !matchFinalVisible || !participantInRoom(currentRoom, participant.id)) {
       matchFinalAutoContinueKeyRef.current = "";
       return;
     }
@@ -6192,7 +6205,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         .catch(() => syncRooms({ force: true }).catch(() => null));
     }, 6500);
     return () => window.clearTimeout(timer);
-  }, [currentRoom, currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, matchFinalVisible, participant.id]);
+  }, [cinematicActive, currentRoom, currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, matchFinalVisible, participant.id]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -8155,7 +8168,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         />
       ) : null}
       <OpeningTieBreakOverlay
-        tieBreak={currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
+        tieBreak={!cinematicActive && currentRoom?.game.activeTurn === 1 ? currentRoom?.game.openerTieBreak : null}
         hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
         challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
         ownSide={roomPlayerSide}
@@ -8171,7 +8184,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         tieBreak={currentRoom?.game.openerTieBreak}
         hostName={currentRoom?.seats.host?.name || "ฝั่งบน"}
         challengerName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
-        visible={openingTieBreakResultVisible}
+        visible={openingTieBreakResultVisible && !cinematicActive}
       />
       {false && currentRoom ? (
         <button
@@ -8326,6 +8339,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   placementLane={placementLane}
                   timeLeft={displayTimeLeft}
                   battleActive={phase === "battle" && !deckSelectionActive}
+                  onCinematicActivity={setCinematicActive}
                   turnLocked={placementLocked}
                   pendingSkillChoice={pendingSkillChoice}
                   waitingSkillChoice={waitingSkillChoice}
@@ -8396,6 +8410,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               placementLane={placementLane}
               timeLeft={displayTimeLeft}
               battleActive={phase === "battle" && !deckSelectionActive}
+              onCinematicActivity={setCinematicActive}
               turnLocked={handPlacementLocked}
               pendingSkillChoice={pendingSkillChoice}
               waitingSkillChoice={waitingSkillChoice}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { TriadElement } from "@/lib/triad-dominion";
+import { BATTLE_CONTACT_MS, BATTLE_HIT_STOP_MS } from "./BattleTiming";
 
 const textures = ["spark_01", "flare_01", "smoke_01", "slash_01", "magic_01"];
 
@@ -67,17 +68,19 @@ export default function BattleParticles({ color, element, side, skill, field, bl
     const draw = (now: number) => {
       if (stopped) return;
       const realElapsed = (now - startedAt) / 1000;
-      const elapsed = !skill && realElapsed > .52 ? realElapsed < .60 ? .52 : realElapsed - .08 : realElapsed;
+      const contact = BATTLE_CONTACT_MS / 1000;
+      const stop = BATTLE_HIT_STOP_MS / 1000;
+      const elapsed = !skill && realElapsed > contact ? realElapsed < contact + stop ? contact : realElapsed - stop : realElapsed;
       ctx.clearRect(0, 0, width, height);
       ctx.globalCompositeOperation = "lighter";
       // Energy gathers first; particles release on the same frame as card contact.
-      if (elapsed < .52) {
-        const charge = Math.min(elapsed / .52, 1);
+      if (elapsed < contact) {
+        const charge = Math.min(elapsed / contact, 1);
         const x = skill ? width / 2 : sourceX + (targetX - sourceX) * Math.max(0, (charge - .4) / .6);
         sprite(skill ? 4 : 1, x, targetY, 55 + charge * 160, elapsed * 2, charge * .7);
         for (let i = 0; i < 10; i++) sprite(0, x + Math.cos(i + elapsed * 8) * 55 * (1 - charge), targetY + Math.sin(i + elapsed * 8) * 55 * (1 - charge), 16, i, charge);
       }
-      const hit = elapsed - .52;
+      const hit = elapsed - contact;
       if (hit >= 0) {
         const flash = Math.max(0, 1 - hit * 8);
         sprite(1, targetX, targetY, (mobile ? 240 : 420) + hit * 200, 0, flash);
@@ -161,7 +164,7 @@ export default function BattleParticles({ color, element, side, skill, field, bl
           ctx.globalAlpha = 1;
         }
       }
-      if (realElapsed < 1.6) frame = requestAnimationFrame(draw);
+      if (realElapsed < 2.4) frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
     return () => { stopped = true; cancelAnimationFrame(frame); ctx.clearRect(0, 0, width, height); };
