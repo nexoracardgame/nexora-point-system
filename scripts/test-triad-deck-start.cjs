@@ -10,6 +10,8 @@ const names = new Set([
   'deckCardCounts', 'validateDeckForMode', 'shuffled', 'autoCompleteDeckForMode',
   'battleDecksReady', 'finalizeDeckSelection', 'enforceDeckGate', 'withRoomMutationLock',
   'setTriadRoomDeck', 'readyTriadRoomDeck',
+  'normalizeRpsChoice', 'rpsWinner', 'settleOpeningTieBreak',
+  'chooseTriadRoomOpeningTieBreak', 'resetTriadRoomOpeningTieBreak', 'botChooseOpeningTieBreak',
 ]);
 const functions = ast.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text));
 assert.equal(functions.length, names.size);
@@ -28,6 +30,8 @@ const context = vm.createContext({
   globalForTriadRooms: {}, cleanText: value => String(value || '').trim(),
   warmBotMemory: async () => {}, repairSelectionPools: () => false,
   runBotBrain: () => false, publicRoom: room => structuredClone(room),
+  resolveIfBothLocked: () => {}, healTriadRoomState: room => context.settleOpeningTieBreak(room),
+  isTriadBotParticipant: participant => participant?.id === 'bot',
   sideForParticipant: (_, id) => id,
   getStoredRoom: async () => { await new Promise(resolve => setTimeout(resolve, 2)); return structuredClone(stored); },
   upsertStoredRoom: async room => { await new Promise(resolve => setTimeout(resolve, 2)); stored = structuredClone(room); },
@@ -109,4 +113,60 @@ function assertStarted(room, mode) {
     assert.deepEqual(Array.from(stored.game.decks.host), Array.from(readyDeck));
     console.log(`${mode}: timeout, partial decks, locked deck, simultaneous ready passed`);
   }
+  const choices = ['rock', 'paper', 'scissors'];
+  function rpsRoom() {
+    const room = roomFor('all');
+    room.game.turns = [{ turn: 1, winner: 'draw' }];
+    room.game.openerTieBreak = {
+      ...call('emptyOpeningTieBreak'), status: 'waiting', reason: 'first_turn_score_draw',
+    };
+    return room;
+  }
+  for (const host of choices) {
+    for (const challenger of choices) {
+      stored = rpsRoom();
+      const expected = call('rpsWinner', host, challenger);
+      const results = await Promise.all([
+        call('chooseTriadRoomOpeningTieBreak', 'test', 'host', host, { fightNo: 1, round: 1 }),
+        call('chooseTriadRoomOpeningTieBreak', 'test', 'challenger', challenger, { fightNo: 1, round: 1 }),
+      ]);
+      assert.ok(results.every(result => result.ok));
+      assert.equal(stored.game.turns[0].winner, 'draw');
+      if (expected === 'draw') {
+        assert.equal(stored.game.activeTurn, 1);
+        assert.equal(stored.game.openerTieBreak.round, 2);
+        assert.equal(Object.keys(stored.game.openerTieBreak.choices).length, 0);
+        const stale = await call('chooseTriadRoomOpeningTieBreak', 'test', 'host', host, { fightNo: 1, round: 1 });
+        assert.equal(stale.reason, 'stale_round');
+        assert.equal(Object.keys(stored.game.openerTieBreak.choices).length, 0);
+        await call('chooseTriadRoomOpeningTieBreak', 'test', 'host', 'rock', { fightNo: 1, round: 2 });
+        await call('chooseTriadRoomOpeningTieBreak', 'test', 'challenger', 'scissors', { fightNo: 1, round: 2 });
+      } else {
+        assert.equal(stored.game.openerTieBreak.winner, expected);
+      }
+      assert.equal(stored.game.activeTurn, 2);
+      assert.equal(stored.game.openerTieBreak.status, 'resolved');
+      assert.equal((await call('resetTriadRoomOpeningTieBreak', 'test', 'host')).reason, 'not_available');
+      assert.equal(stored.game.activeTurn, 2);
+    }
+  }
+  stored = rpsRoom();
+  await call('chooseTriadRoomOpeningTieBreak', 'test', 'host', 'rock', { round: 1 });
+  assert.equal((await call('chooseTriadRoomOpeningTieBreak', 'test', 'host', 'rock', { round: 1 })).ok, true);
+  assert.equal((await call('chooseTriadRoomOpeningTieBreak', 'test', 'host', 'paper', { round: 1 })).reason, 'choice_locked');
+  assert.equal(stored.game.openerTieBreak.choices.host, 'rock');
+  await call('resetTriadRoomOpeningTieBreak', 'test', 'host');
+  assert.equal(stored.game.openerTieBreak.round, 2);
+  assert.equal((await call('resetTriadRoomOpeningTieBreak', 'test', 'host', { round: 1 })).reason, 'stale_round');
+  assert.equal(stored.game.openerTieBreak.round, 2);
+  assert.equal((await call('chooseTriadRoomOpeningTieBreak', 'test', 'host', 'rock', { round: 1 })).reason, 'stale_round');
+  for (const choice of choices) {
+    const room = rpsRoom();
+    room.seats.challenger.id = 'bot';
+    call('botChooseOpeningTieBreak', room);
+    room.game.openerTieBreak.choices.host = choice;
+    assert.equal(call('settleOpeningTieBreak', room), true);
+    assert.ok(room.game.openerTieBreak.status === 'resolved' || room.game.openerTieBreak.round === 2);
+  }
+  console.log('RPS: all 9 pairs, concurrent choices, draw replay, stale requests, duplicate choices, reset, bot passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

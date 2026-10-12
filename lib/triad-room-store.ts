@@ -2809,8 +2809,10 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
 export async function chooseTriadRoomOpeningTieBreak(
   code: string,
   participant: string | TriadRoomParticipant,
-  choice: TriadRpsChoice
+  choice: TriadRpsChoice,
+  context: { fightNo?: number; round?: number } = {}
 ) {
+  return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side =
@@ -2821,10 +2823,23 @@ export async function chooseTriadRoomOpeningTieBreak(
   const cleanChoice = normalizeRpsChoice(choice);
   if (cleanChoice === "unknown") return { ok: false as const, reason: "invalid_choice" as const, room: publicRoom(room) };
   const tieBreak = room.game.openerTieBreak;
+  if (
+    (context.fightNo !== undefined && context.fightNo !== room.game.fightNo) ||
+    (context.round !== undefined && context.round !== (tieBreak.round || 1))
+  ) {
+    return { ok: false as const, reason: "stale_round" as const, room: publicRoom(room) };
+  }
   if (tieBreak.status !== "waiting" || tieBreak.fightNo !== room.game.fightNo) {
     return { ok: false as const, reason: "not_waiting" as const, room: publicRoom(room) };
   }
 
+  if (room.status !== "playing" || room.game.activeTurn !== 1 || room.game.turns.find((turn) => turn.turn === 1)?.winner !== "draw") {
+    return { ok: false as const, reason: "not_waiting" as const, room: publicRoom(room) };
+  }
+  const existingChoice = tieBreak.choices[side] || "unknown";
+  if (existingChoice !== "unknown") {
+    return { ok: existingChoice === cleanChoice, reason: existingChoice === cleanChoice ? undefined : "choice_locked" as const, room: publicRoom(room) };
+  }
   const nextChoices = { ...tieBreak.choices, [side]: cleanChoice };
   const winner = rpsWinner(nextChoices.host || "unknown", nextChoices.challenger || "unknown");
   room.game.openerTieBreak = {
@@ -2856,9 +2871,10 @@ export async function chooseTriadRoomOpeningTieBreak(
   healTriadRoomState(room);
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), resolved: room.game.openerTieBreak.status === "resolved" };
+  });
 }
 
-export async function resetTriadRoomOpeningTieBreak(code: string, participant: string | TriadRoomParticipant) {
+export async function resetTriadRoomOpeningTieBreak(code: string, participant: string | TriadRoomParticipant, context: { fightNo?: number; round?: number } = {}) {
   return withRoomMutationLock(code, async () => {
     const room = await getStoredRoom(code);
     if (!room) return { ok: false as const, reason: "not_found" as const };
@@ -2871,11 +2887,17 @@ export async function resetTriadRoomOpeningTieBreak(code: string, participant: s
       return { ok: false as const, reason: "bot_seat" as const, room: publicRoom(room) };
     }
     const firstTurnResult = room.game.turns.find((turn) => turn.turn === 1);
-    if (room.status !== "playing" || firstTurnResult?.winner !== "draw") {
+    if (room.status !== "playing" || firstTurnResult?.winner !== "draw" || room.game.activeTurn !== 1 || room.game.openerTieBreak.status !== "waiting") {
       return { ok: false as const, reason: "not_available" as const, room: publicRoom(room) };
     }
 
     const previousTieBreak = room.game.openerTieBreak;
+    if (
+      (context.fightNo !== undefined && context.fightNo !== room.game.fightNo) ||
+      (context.round !== undefined && context.round !== (previousTieBreak.round || 1))
+    ) {
+      return { ok: false as const, reason: "stale_round" as const, room: publicRoom(room) };
+    }
     room.game.activeTurn = 1;
     room.game.turnReady = { host: false, challenger: false };
     room.game.turnStartedAt = Date.now();

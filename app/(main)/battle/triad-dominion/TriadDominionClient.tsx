@@ -5431,6 +5431,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     openingTieBreakPendingChoiceRef.current = choice;
     openingTieBreakPendingKeyRef.current = choiceKey;
     setOpeningTieBreakPendingChoice(choice);
+    const recoverChoice = () => {
+      if (openingTieBreakPendingKeyRef.current !== choiceKey) return;
+      openingTieBreakPendingChoiceRef.current = null;
+      openingTieBreakPendingKeyRef.current = "";
+      setOpeningTieBreakPendingChoice(null);
+      patchCurrentRoom((room) => {
+        if (openingTieBreakChoiceKey(room.code, room.game.openerTieBreak, roomPlayerSide) !== choiceKey || room.game.openerTieBreak.status !== "waiting") return room;
+        const choices = { ...room.game.openerTieBreak.choices };
+        delete choices[roomPlayerSide];
+        return { ...room, game: { ...room.game, openerTieBreak: { ...room.game.openerTieBreak, choices } } };
+      });
+      void syncRooms({ force: true }).catch(() => null);
+      setBattleLog((current) => ["เลือกเป่ายิงฉุบไม่สำเร็จ ระบบจะซิงก์สถานะล่าสุดอีกครั้ง", ...current]);
+    };
     patchCurrentRoom((room) => ({
       ...room,
       game: {
@@ -5448,15 +5462,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       action: "choose-opening-tiebreak",
       code: currentRoom.code,
       choice,
+      fightNo: currentRoom.game.fightNo,
+      round: tieBreak.round || 1,
     }).then((result) => {
       if (!result.ok) {
-        openingTieBreakPendingChoiceRef.current = null;
-        openingTieBreakPendingKeyRef.current = "";
-        setOpeningTieBreakPendingChoice(null);
-        void syncRooms({ force: true }).catch(() => null);
-        setBattleLog((current) => ["เลือกเป่ายิงฉุบไม่สำเร็จ ระบบจะซิงก์สถานะล่าสุดอีกครั้ง", ...current]);
+        recoverChoice();
       }
-    });
+    }).catch(recoverChoice);
   };
 
   const resetOpeningTieBreak = () => {
@@ -5471,11 +5483,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     void postRoomAction({
       action: "reset-opening-tiebreak",
       code: currentRoom.code,
+      fightNo: currentRoom.game.fightNo,
+      round: currentRoom.game.openerTieBreak.round || 1,
     }).then((result) => {
       if (!result.ok) {
         setBattleLog((current) => ["Reset RPS failed. Syncing latest room state.", ...current]);
       }
       void syncRooms({ force: true }).catch(() => null);
+    }).catch(() => {
+      void syncRooms({ force: true }).catch(() => null);
+      setBattleLog((current) => ["Reset RPS failed. Syncing latest room state.", ...current]);
     }).finally(() => {
       setOpeningTieBreakResetting(false);
     });

@@ -291,7 +291,11 @@ export async function POST(request: Request) {
     const result = await chooseTriadRoomOpeningTieBreak(
       cleanText(body.code),
       participant,
-      body.choice === "rock" || body.choice === "scissors" || body.choice === "paper" ? body.choice : "unknown"
+      body.choice === "rock" || body.choice === "scissors" || body.choice === "paper" ? body.choice : "unknown",
+      {
+        fightNo: typeof body.fightNo === "number" ? body.fightNo : undefined,
+        round: typeof body.round === "number" ? body.round : undefined,
+      }
     );
     return roomActionJson(
       result,
@@ -301,7 +305,10 @@ export async function POST(request: Request) {
   }
 
   if (action === "reset-opening-tiebreak") {
-    const result = await resetTriadRoomOpeningTieBreak(cleanText(body.code), participant);
+    const result = await resetTriadRoomOpeningTieBreak(cleanText(body.code), participant, {
+      fightNo: typeof body.fightNo === "number" ? body.fightNo : undefined,
+      round: typeof body.round === "number" ? body.round : undefined,
+    });
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },
