@@ -6357,10 +6357,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   useEffect(() => {
     if (!currentRoom || (!deckSelectionActive && phase !== "deck")) return;
-    const timer = window.setInterval(() => {
+    let syncing = false;
+    let lastDeadlineSync = 0;
+    const tick = () => {
       const nextLeft = roomDeckSecondsLeft(currentRoom);
       setDeckTimeLeft(nextLeft);
-    }, 1000);
+      if (nextLeft === 0 && !syncing && Date.now() - lastDeadlineSync >= 1000) {
+        syncing = true;
+        lastDeadlineSync = Date.now();
+        void syncRooms({ force: true }).catch(() => null).finally(() => { syncing = false; });
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
     return () => window.clearInterval(timer);
   }, [currentRoom, deckSelectionActive, phase]);
 

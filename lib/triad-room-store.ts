@@ -1148,20 +1148,26 @@ export async function listTriadRooms() {
   await warmBotMemory();
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
-  for (const room of aliveRooms) {
-    const selectionPoolsChanged = repairSelectionPools(room);
-    const deckGateChanged = enforceDeckGate(room);
-    const choicesExpired = markExpiredSkillChoices(room);
-    const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    resolveIfBothLocked(room);
-    const botChanged = runBotBrain(room);
-    const stateHealed = healTriadRoomState(room);
-    const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
-    if (selectionPoolsChanged || deckGateChanged || choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
-      await upsertStoredRoom(room);
-    }
+  const currentRooms: StoredTriadRoom[] = [];
+  for (const snapshot of aliveRooms) {
+    await withRoomMutationLock(snapshot.code, async () => {
+      const room = await getStoredRoom(snapshot.code);
+      if (!room) return;
+      const selectionPoolsChanged = repairSelectionPools(room);
+      const deckGateChanged = enforceDeckGate(room);
+      const choicesExpired = markExpiredSkillChoices(room);
+      const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
+      resolveIfBothLocked(room);
+      const botChanged = runBotBrain(room);
+      const stateHealed = healTriadRoomState(room);
+      const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
+      if (selectionPoolsChanged || deckGateChanged || choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
+        await upsertStoredRoom(room);
+      }
+      currentRooms.push(room);
+    });
   }
-  return aliveRooms.map(publicRoom);
+  return currentRooms.map(publicRoom);
 }
 
 export async function createTriadRoom(input: {
@@ -1609,9 +1615,8 @@ function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[], seed = "") {
 function autoCompleteDeckForMode(mode: TriadDeckMode, currentDeck: string[], pool: string[], seed = "") {
   const selected = Array.from(new Set(normalizeDeckForMode(mode, currentDeck)));
   const selectedSet = new Set(selected);
-  const rankedPool = chooseBotDeckForMode(mode, pool, seed).filter((cardNo) => !selectedSet.has(cardNo));
-  const fallbackPool = Array.from(new Set(pool.map(cleanText).filter(Boolean))).filter((cardNo) => !selectedSet.has(cardNo));
-  const append = [...rankedPool, ...fallbackPool];
+  const append = shuffled(Array.from(new Set(pool.map(cleanText).filter(Boolean))), seed)
+    .filter((cardNo) => !selectedSet.has(cardNo));
 
   if (mode === "monster") {
     return [
@@ -1667,10 +1672,6 @@ function ensureBotDeckReady(room: StoredTriadRoom) {
   room.game.decks.challenger = botDeck;
   room.game.deckReady.challenger = true;
   return changed;
-}
-
-function shouldAutoCompleteDeckForSide(room: StoredTriadRoom, side: TriadRoomSlot) {
-  return isTriadBotParticipant(room.seats[side]);
 }
 
 function botTargetToken(side: TriadRoomSlot, targetSide: TriadRoomSlot) {
@@ -1992,9 +1993,7 @@ function runBotBrain(room: StoredTriadRoom) {
   if (room.status === "playing") {
     changed = ensureBotDeckReady(room) || changed;
     if (battleDecksReady(room)) {
-      const wasReady = battleDecksReady(room);
-      finalizeDeckSelection(room);
-      changed = !wasReady || changed;
+      changed = finalizeDeckSelection(room) || changed;
       for (let index = 0; index < 4; index += 1) {
         const before = JSON.stringify({
           triangles: room.game.triangles,
@@ -2053,7 +2052,7 @@ function battleDecksReady(room: StoredTriadRoom) {
 
 function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
   if (!battleDecksReady(room)) return false;
-  if (!force) return false;
+  if (!force && Number(room.game.turnStartedAt) > Number(room.game.deckStartedAt)) return false;
   room.game.deckReady = { host: true, challenger: true };
   room.game.usedCards = { host: [], challenger: [] };
   room.game.triangles = { host: emptyTriangle(), challenger: emptyTriangle() };
@@ -2075,11 +2074,12 @@ function finalizeDeckSelection(room: StoredTriadRoom, force = false) {
 function enforceDeckGate(room: StoredTriadRoom) {
   if (room.status !== "playing") return false;
   const deckMode = room.game.deckMode || "all";
-  const deckSelectionFinalized = Number(room.game.turnStartedAt || 0) > Number(room.game.deckStartedAt || 0);
+  const deckSelectionFinalized = battleDecksReady(room) && Number(room.game.turnStartedAt || 0) > Number(room.game.deckStartedAt || 0);
+  if (deckSelectionFinalized) return false;
   const deckSelectionExpired = Date.now() - Number(room.game.deckStartedAt || Date.now()) >= DECK_SELECTION_TIMEOUT_MS;
   if (!deckSelectionFinalized && deckSelectionExpired) {
     (["host", "challenger"] as TriadRoomSlot[]).forEach((side) => {
-      if (!shouldAutoCompleteDeckForSide(room, side)) return;
+      if (room.game.deckReady[side] && validateDeckForMode(deckMode, room.game.decks[side]).ok) return;
       const autoDeck = autoCompleteDeckForMode(
         deckMode,
         room.game.decks[side],
@@ -2121,7 +2121,7 @@ function enforceDeckGate(room: StoredTriadRoom) {
   room.game.matchEndedAt = 0;
   room.game.rankedRecordedAt = 0;
   room.game.rankUpEvents = [];
-  room.game.turnStartedAt = Date.now();
+  room.game.turnStartedAt = room.game.deckStartedAt;
   return true;
 }
 
@@ -2623,49 +2623,55 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
 }
 
 export async function setTriadRoomDeck(code: string, participantId: string, deck: string[]) {
-  await warmBotMemory();
-  const room = await getStoredRoom(code);
-  if (!room) return { ok: false as const, reason: "not_found" as const };
-  repairSelectionPools(room);
-  enforceDeckGate(room);
-  const side = sideForParticipant(room, participantId);
-  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
-  if (room.game.deckReady[side]) {
-    return { ok: false as const, reason: "deck_locked" as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
-  }
-  room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
-  await upsertStoredRoom(room);
-  return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+  return withRoomMutationLock(code, async () => {
+    await warmBotMemory();
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    repairSelectionPools(room);
+    enforceDeckGate(room);
+    const side = sideForParticipant(room, participantId);
+    if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+    if (room.game.deckReady[side]) {
+      await upsertStoredRoom(room);
+      return { ok: false as const, reason: "deck_locked" as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+    }
+    room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+  });
 }
 
 export async function readyTriadRoomDeck(code: string, participantId: string, deck: string[]) {
-  await warmBotMemory();
-  const room = await getStoredRoom(code);
-  if (!room) return { ok: false as const, reason: "not_found" as const };
-  repairSelectionPools(room);
-  enforceDeckGate(room);
-  const side = sideForParticipant(room, participantId);
-  if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
-  const wasBattleReady = battleDecksReady(room);
-  if (!room.game.deckReady[side]) {
-    room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
-    const validation = validateDeckForMode(room.game.deckMode || "all", room.game.decks[side]);
-    if (!validation.ok) {
-      return {
-        ok: false as const,
-        reason: "invalid_deck" as const,
-        room: publicRoom(room),
-        battleReady: battleDecksReady(room),
-      };
+  return withRoomMutationLock(code, async () => {
+    await warmBotMemory();
+    const room = await getStoredRoom(code);
+    if (!room) return { ok: false as const, reason: "not_found" as const };
+    repairSelectionPools(room);
+    enforceDeckGate(room);
+    const side = sideForParticipant(room, participantId);
+    if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
+    const wasBattleReady = battleDecksReady(room);
+    if (!room.game.deckReady[side]) {
+      room.game.decks[side] = normalizeDeckForMode(room.game.deckMode || "all", deck);
+      const validation = validateDeckForMode(room.game.deckMode || "all", room.game.decks[side]);
+      if (!validation.ok) {
+        return {
+          ok: false as const,
+          reason: "invalid_deck" as const,
+          room: publicRoom(room),
+          battleReady: battleDecksReady(room),
+        };
+      }
+      room.game.deckReady[side] = true;
     }
-    room.game.deckReady[side] = true;
-  }
-  if (!wasBattleReady && battleDecksReady(room)) {
-    finalizeDeckSelection(room, true);
-  }
-  runBotBrain(room);
-  await upsertStoredRoom(room);
-  return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+    if (!wasBattleReady && battleDecksReady(room)) {
+      finalizeDeckSelection(room, true);
+    }
+    runBotBrain(room);
+    enforceDeckGate(room);
+    await upsertStoredRoom(room);
+    return { ok: true as const, room: publicRoom(room), battleReady: battleDecksReady(room) };
+  });
 }
 
 export async function lockTriadRoomCard(code: string, participantId: string, cardNo: string) {
