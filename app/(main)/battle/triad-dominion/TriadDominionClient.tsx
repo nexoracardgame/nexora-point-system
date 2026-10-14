@@ -3734,6 +3734,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
         <button className="nexora-command-mode" onClick={() => setPanel("create")}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
+        <button className="nexora-command-mode" onClick={() => window.location.assign("/battle/pentad-dominion")}><div><strong>PENTAD DOMINION</strong><small>อำนาจห้าผนึก · ฐาน 5 ใบ</small></div><Layers3 /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span><button onClick={() => setPanel("join")}><Eye className="h-4 w-4" />สนามสด {rooms.filter(room => room.status === "playing").length}</button></footer>

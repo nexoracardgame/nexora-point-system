@@ -107,10 +107,13 @@ export type TriadTurnInput = {
   opponent: TriadTriangle;
   prioritySide?: "player" | "opponent";
   skippedSkillCardNos?: string[];
+  excludedRandomMonsterNos?: string[];
+  randomMonsterSeed?: string;
   skillTargets?: Partial<Record<"player" | "opponent", Partial<Record<string, "player-top" | "bot-top" | string>>>>;
 };
 
 export type TriadTurnResult = {
+  skillEligibilityTurn?: "combined";
   turn: TriadTurn;
   prioritySide: "player" | "opponent";
   metric: "total" | TriadMetric;
@@ -2516,7 +2519,7 @@ function collectSkillCancels(
   return { cancelledSkillCardNos, events };
 }
 
-function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
+function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set(), excludedRandomMonsterNos: string[] = [], randomMonsterSeed?: string) {
   const effectivePlayer = { ...player };
   const effectiveOpponent = { ...opponent };
   const events: TriadSkillEvent[] = [];
@@ -2541,8 +2544,8 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
   for (const item of flashZoomSkills) {
     const originalTop = item.target.top;
     const replacement = pickFlashZoomMonster(
-      `flash-zoom:${turn}:${item.side}:${player.top}:${player.left}:${player.right}:${opponent.top}:${opponent.left}:${opponent.right}`,
-      [player.top, player.left || "", player.right || "", opponent.top, opponent.left || "", opponent.right || ""]
+      randomMonsterSeed ? `${randomMonsterSeed}:${item.side}` : `flash-zoom:${turn}:${item.side}:${player.top}:${player.left}:${player.right}:${opponent.top}:${opponent.left}:${opponent.right}`,
+      [player.top, player.left || "", player.right || "", opponent.top, opponent.left || "", opponent.right || "", ...excludedRandomMonsterNos]
     );
     if (!originalTop || !replacement) {
       events.push({
@@ -2628,7 +2631,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     ...energyReversalLocks.lockedSkillCardNos,
   ]);
   const statUseBlocks = collectStatUseBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
-  const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos);
+  const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos, input.excludedRandomMonsterNos, input.randomMonsterSeed);
   const boardState: TriadEffectiveBoardState = {
     player: preScore.player,
     opponent: preScore.opponent,

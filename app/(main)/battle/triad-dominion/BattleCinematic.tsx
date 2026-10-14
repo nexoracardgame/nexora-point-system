@@ -16,7 +16,7 @@ type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "
 export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard, opponentCard?: TriadCard, playerMainCard?: TriadCard, opponentMainCard?: TriadCard): Step[] {
   const skills: Step[] = result.skillEvents.map((event) => {
     const rule = triadSkillRuleByNo.get(event.cardNo);
-    const inactive = rule?.allowedTurns?.includes(result.turn) === false;
+    const inactive = result.skillEligibilityTurn !== "combined" && rule?.allowedTurns?.includes(result.turn) === false;
     const deltas = rule?.effects?.map((effect) => effect.delta) || [];
     const positive = deltas.some(delta => delta > 0);
     const negative = deltas.some(delta => delta < 0);

@@ -1,0 +1,147 @@
+.shell { position:fixed; inset:0; z-index:100; display:flex; flex-direction:column; overflow:hidden; background:#060908; color:#fff; font-size:16px; isolation:isolate; --mint:#8ce9ce; --gold:#f0ce7a; }
+.shell *, .chat *, .choiceOverlay * { box-sizing:border-box; letter-spacing:0; }
+.shell::before { content:""; position:absolute; inset:0; z-index:-2; background:var(--pentad-arena) center/cover; }
+.shell::after { content:""; position:absolute; inset:0; z-index:-1; background:#05070865; pointer-events:none; }
+.shell button, .choiceOverlay button, .chat button { cursor:pointer; font:inherit; }
+.shell button:disabled, .choiceOverlay button:disabled { cursor:default; }
+.shell button:focus-visible, .chat button:focus-visible, .choiceOverlay button:focus-visible { outline:2px solid #8ce9ce; outline-offset:3px; }
+.header { display:flex; align-items:center; gap:20px; min-height:66px; padding:10px 24px; background:#060909e8; border-bottom:1px solid #e0c37966; flex-shrink:0; }
+.brand { font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#fff5df; }
+.brand small { display:block; font:10px Arial,sans-serif; color:#bfeae1; }
+.roomCode { color:#edd7a5; font-size:14px; }
+.headerActions { margin-left:auto; display:flex; align-items:center; gap:16px; }
+.headerActions span { display:flex; align-items:center; gap:8px; font-weight:bold; font-variant-numeric:tabular-nums; font-size:22px; }
+.headerActions button { padding:6px; color:#fff; }
+.spin { animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.error { position:absolute; top:72px; left:50%; transform:translateX(-50%); z-index:30; display:flex; align-items:center; gap:16px; padding:12px 18px; background:#491d25f5; border:1px solid #ff9c9c; border-radius:4px; max-width:90%; }
+.primary { background:#f0ce7a !important; color:#121610 !important; font-weight:bold !important; border:1px solid #fff4c4 !important; }
+.primary:disabled { opacity:.5; }
+.lobby { flex:1; min-height:0; position:relative; background:url('/images/triad/nexora-command-original.webp') center/cover; display:flex; justify-content:space-between; align-items:center; padding:40px; }
+.lobbyTitle { align-self:flex-start; text-shadow:0 3px 8px #000; }
+.lobbyTitle h1 { font-family:Georgia,serif; font-size:40px; margin:0; }
+.lobbyTitle p { font-size:24px; color:#f0ce7a; margin:8px 0; }
+.lobbyTitle span { color:#d9e6e4; }
+.lobbyActions { width:360px; max-width:42%; display:flex; flex-direction:column; gap:16px; max-height:85%; padding:20px; background:#060b0dec; border:1px solid #ddc18480; border-radius:4px; }
+.lobbyActions > button { padding:18px; display:flex; gap:10px; align-items:center; justify-content:space-between; }
+.lobbyActions form { display:flex; gap:6px; }
+.lobbyActions input { min-width:0; width:100%; background:#0008; border:1px solid #adc4b660; padding:10px; border-radius:4px; }
+.roomList { overflow:auto; min-height:0; }
+.roomList > div { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #fff3; }
+.roomList span { flex:1; min-width:0; }
+.roomList small { display:block; font-size:12px; color:#bdc8c4; overflow-wrap:anywhere; }
+.waiting { position:relative; flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; background:url('/images/triad/nexora-command-original.webp') center/cover; }
+.waiting h1 { font:700 36px Georgia,serif; text-shadow:0 2px 8px #000; }
+.versus { display:flex; width:75%; justify-content:space-between; gap:80px; }
+.seat { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:#060a0ccc; border-block:1px solid #dfc17d80; flex:1; padding:30px; min-width:0; }
+.seat img { width:100px; height:100px; object-fit:cover; border:2px solid #d6be7b; border-radius:50%; }
+.seat strong { font-size:22px; overflow-wrap:anywhere; }
+.vs { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font:italic bold 40px Georgia,serif; color:#f0ce7a; text-shadow:0 0 24px #000; }
+.waitingActions { display:flex; gap:16px; align-items:center; background:#070a0dc9; padding:12px; }
+.waitingActions button,.deckActions button { display:flex; gap:10px; align-items:center; padding:12px 20px; background:#162522; border:1px solid #97c7b466; border-radius:4px; }
+.waitingActions span { display:flex; gap:8px; align-items:center; }
+.deckBuilder { display:grid; grid-template-columns:minmax(280px,32%) 1fr; flex:1; min-height:0; gap:16px; padding:16px; background:#060b0de8; }
+.deckTray { display:flex; flex-direction:column; min-height:0; gap:12px; padding-bottom:170px; }
+.deckTray h2 { font-size:22px; margin:0; display:flex; justify-content:space-between; }
+.deckTray h2 b { color:#f0ce7a; }
+.tabs { display:flex; gap:6px; }
+.tabs button { flex:1; padding:10px 5px; background:#121e1d; border-bottom:2px solid #819d9160; font-size:14px; }
+.tabs b { display:block; }
+.tabs button[aria-pressed=true] { color:#8ce9ce; border-color:#8ce9ce; }
+.elementCounts { display:flex; flex-wrap:wrap; gap:10px; color:#dbe9df; font-size:13px; }
+.chosenCards { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-content:start; gap:6px; flex:1; min-height:0; overflow:auto; }
+.deckActions { display:flex; gap:8px; flex-wrap:wrap; }
+.readiness { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#b9d9cc; }
+.catalog { display:flex; flex-direction:column; min-height:0; gap:12px; }
+.filters { display:flex; gap:12px; flex-shrink:0; }
+.filters label { display:flex; align-items:center; gap:8px; flex:1; padding:8px 12px; background:#0c1415; border:1px solid #cfdfd750; border-radius:4px; }
+.filters input { width:100%; min-width:0; background:transparent; outline:none; }
+.filters select { padding:8px; background:#12211f; border:1px solid #cfdfd750; border-radius:4px; color:#fff; }
+.catalogCards { min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); align-content:start; gap:10px; padding:4px; }
+.card { position:relative; display:block; width:100%; aspect-ratio:815/1110; padding:0; border:0; background:none; border-radius:0; transition:transform 150ms ease,filter 150ms ease; }
+.card img { display:block; width:100%; height:100%; object-fit:contain; border:0; border-radius:0; }
+.card:not(:disabled):hover { transform:translateY(-4px); filter:drop-shadow(0 0 8px #8ce9ce); }
+.badge { position:absolute; right:0; top:0; background:#070d0fe8; color:#fff7de; padding:2px 7px; border-radius:3px; font-size:12px; font-weight:bold; }
+.battle { flex:1; min-height:0; position:relative; display:flex; flex-direction:column; }
+.battleStatus { position:absolute; top:10px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:2px; z-index:2; padding:6px 20px; background:#080d10da; border-radius:4px; text-align:center; }
+.battleStatus span { color:#d9ebdf; font-size:12px; }
+.battleStatus strong { font-size:20px; color:#f0ce7a; }
+.scoreboard { position:absolute; top:16px; inset-inline:20px; display:flex; justify-content:space-between; gap:30%; z-index:2; pointer-events:none; }
+.scoreboard > span { display:flex; align-items:center; gap:14px; padding:8px 14px; background:#050b0ee8; border:1px solid #dde4cd80; border-radius:4px; max-width:35%; overflow-wrap:anywhere; font-weight:bold; }
+.scoreboard b { display:grid; place-items:center; width:38px; height:38px; flex-shrink:0; border-radius:50%; background:#7cddd0; color:#101711; font-size:24px; }
+.scoreboard span:last-child b { background:#f18487; }
+.board { flex:1; min-height:0; position:relative; margin-top:65px; margin-bottom:10px; }
+.formation { position:absolute; left:50%; transform:translateX(-50%); width:min(70%,1100px); height:45%; --card-height:min(16vh,190px); }
+.upper { top:0; }
+.lower { bottom:0; }
+.formation .card { position:absolute; height:var(--card-height); width:auto; aspect-ratio:815/1110; filter:drop-shadow(0 3px 8px #000a); }
+.formation .mainCard { left:50%; transform:translateX(-50%); z-index:2; }
+.upper .mainCard { bottom:0; }
+.lower .mainCard { top:0; }
+.formation .skillCard:nth-child(2) { left:25%; }
+.formation .skillCard:nth-child(3) { right:25%; }
+.formation .skillCard:nth-child(4) { left:8%; }
+.formation .skillCard:nth-child(5) { right:8%; }
+.upper .skillCard { top:0; }
+.lower .skillCard { bottom:0; }
+.hand { height:165px; min-height:0; background:#05090eeb; border-top:1px solid #e3d59477; padding:8px 20px 8px 340px; flex-shrink:0; }
+.handTitle { display:flex; align-items:center; gap:8px; font-size:14px; margin-bottom:4px; }
+.handCards { display:flex; gap:8px; height:120px; overflow-x:auto; padding:4px; }
+.handCards .card { width:auto; height:100%; flex-shrink:0; }
+.notice { position:absolute; top:80px; left:20px; font-size:12px; padding:5px 10px; background:#06100fdc; max-width:33%; border-radius:4px; }
+.surrender { position:absolute; right:18px; bottom:18px; padding:10px; background:#090b0de8; color:#ffd2cf; border-radius:4px; }
+.endgame { position:absolute; inset:0; background:#050809d9; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:5; gap:12px; }
+.endgame h1 { font-size:36px; margin:0; max-width:90%; overflow-wrap:anywhere; text-align:center; }
+.endgame strong { font-size:46px; color:#f0ce7a; }
+.endgame button { display:flex; align-items:center; gap:10px; padding:12px 24px; border-radius:4px; }
+.hudPlane { position:fixed; inset:0; z-index:2147483070; pointer-events:none; }
+.chat { position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); pointer-events:auto; width:310px; max-height:190px; color:#fff; background:#0308099c; border:1px solid #d1e5d833; border-radius:4px; backdrop-filter:blur(3px); font-size:13px; }
+.chatToggle { display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; color:#f0ce7a; background:#0003; }
+.messages { overflow:auto; height:102px; padding:5px 10px; scrollbar-width:thin; }
+.messages p { margin:0 0 4px; overflow-wrap:anywhere; text-shadow:0 1px 2px #000; }
+.messages strong { color:#8ce9ce; }
+.chat form { display:flex; padding:5px; gap:4px; background:#0005; }
+.chat input { width:100%; min-width:0; background:#0004; padding:6px; color:#fff; outline:none; border:1px solid #9ac2af50; border-radius:3px; }
+.chat form button { padding:6px; color:#f0ce7a; }
+.chatClosed { width:120px; }
+.choiceOverlay { position:fixed; inset:0; z-index:2147483080; display:flex; align-items:center; justify-content:center; background:#010708bc; backdrop-filter:blur(4px); color:#fff; }
+.choicePanel { width:min(800px,90%); max-height:90%; overflow:auto; background:#080e12f5; border:1px solid #a4e7d795; border-radius:6px; padding:24px; text-align:center; box-shadow:0 0 50px #7fe8c321; }
+.choicePanel h2 { font-size:26px; margin:5px 0 10px; }
+.choicePanel small { color:#a7ebd4; }
+.choicePanel p { font-size:16px; color:#edf6f3; margin:5px 0 16px; line-height:1.6; }
+.choicePanel > strong { color:#f0ce7a; font-size:28px; }
+.choiceCards { display:flex; align-items:center; justify-content:center; gap:25px; margin:16px 0 0; }
+.choiceCards > div { display:flex; flex-direction:column; gap:8px; align-items:center; }
+.choiceCards .card { width:auto; height:min(28vh,250px); }
+.choiceCards > button { padding:20px; background:#153d35; border:1px solid #8ce9ce; border-radius:4px; }
+.sequenceChoice { display:flex; align-items:center; gap:12px; }
+.elementClash { position:fixed; inset:0; z-index:2147483050; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background-position:center; background-size:cover; color:white; text-align:center; }
+.elementClash h2 { font-size:22px; padding:8px 20px; background:#050b0ddd; border-radius:4px; }
+.elementClash h1 { font-size:30px; color:#b9f9dc; text-shadow:0 2px 8px #000; margin:0; }
+.elementClash p { font-size:22px; padding:4px 20px; background:#050b0dcc; border-radius:4px; }
+.elementClash > div { display:flex; align-items:center; gap:100px; }
+.elementClash section { width:auto; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.elementClash .card { width:auto; height:min(38vh,340px); }
+.elementWinner .card { animation:elementWin 1800ms ease both; }
+.elementLoser .card { animation:elementLose 1800ms ease both; }
+.elementClash strong,.elementClash span { background:#060c0de0; padding:3px 12px; border-radius:4px; }
+@keyframes elementWin { 0% { transform:scale(.88); } 55% { transform:scale(1.08); filter:drop-shadow(0 0 28px #a6ffdc); } 100% { transform:scale(1); filter:drop-shadow(0 0 12px #a6ffdc); } }
+@keyframes elementLose { 0% { opacity:1; } 60% { transform:translateX(12px); } 100% { opacity:.6; filter:grayscale(.6); } }
+@media (min-width:2000px) { .header { min-height:90px; padding-inline:40px; } .brand { font-size:36px; } .shell { font-size:20px; } .hand { height:220px; padding-left:440px; } .handCards { height:168px; } .chat { width:400px; max-height:220px; font-size:16px; } .messages { height:135px; } .catalogCards { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); } .deckTray { padding-bottom:220px; } }
+@media (max-height:600px) and (orientation:landscape) { .header { min-height:44px; padding:4px 12px; gap:12px; } .brand { font-size:20px; } .brand small { font-size:8px; } .headerActions span { font-size:18px; } .error { top:46px; padding:6px 10px; font-size:12px; } .lobby { padding:20px; } .lobbyTitle h1 { font-size:24px; } .lobbyTitle p { font-size:18px; } .lobbyActions { padding:10px; gap:10px; width:280px; max-height:95%; } .lobbyActions > button { padding:12px; } .lobbyTitle span { font-size:12px; } .waiting { gap:10px; } .waiting h1 { font-size:24px; } .seat { padding:12px; gap:8px; } .seat img { width:60px; height:60px; } .seat strong { font-size:16px; } .waitingActions { padding:6px; } .waitingActions button { padding:7px 12px; font-size:14px; } .deckBuilder { padding:8px; gap:8px; grid-template-columns:33% 1fr; } .deckTray { gap:6px; padding-bottom:95px; } .deckTray h2 { font-size:16px; } .tabs button { font-size:11px; padding:4px; } .elementCounts { gap:5px; font-size:10px; } .chosenCards { gap:3px; grid-template-columns:repeat(5,minmax(0,1fr)); } .catalogCards { grid-template-columns:repeat(auto-fill,minmax(70px,1fr)); gap:6px; } .filters label { padding:4px; } .filters input,.filters select { font-size:12px; } .catalog { gap:6px; } .deckActions button { padding:5px 7px; font-size:12px; gap:4px; } .deckActions svg { width:14px; height:14px; } .readiness { font-size:10px; } .battleStatus { top:4px; padding:3px 10px; } .battleStatus strong { font-size:14px; } .battleStatus span { font-size:10px; } .scoreboard { top:6px; inset-inline:10px; } .scoreboard > span { font-size:12px; padding:4px 8px; gap:6px; } .scoreboard b { width:26px; height:26px; font-size:18px; } .board { margin-top:46px; margin-bottom:4px; } .formation { width:78%; --card-height:min(20vh,100px); } .hand { height:98px; padding:4px 8px 4px 200px; } .handTitle { font-size:11px; margin:0; } .handCards { height:72px; gap:4px; } .chat { width:184px; bottom:6px; left:6px; max-height:98px; font-size:10px; } .chatToggle { padding:3px 5px; } .messages { height:39px; padding:2px 5px; } .chat form { padding:2px; } .chat input { padding:3px; font-size:11px; } .chat form button { padding:3px; } .chatClosed { width:95px; } .notice { top:55px; left:8px; font-size:10px; max-width:24%; } .surrender { right:6px; bottom:6px; padding:5px; } .choicePanel { padding:12px; } .choicePanel h2 { font-size:20px; margin-bottom:4px; } .choicePanel p { font-size:12px; margin-bottom:4px; } .choicePanel > strong { font-size:22px; } .choiceCards { gap:16px; margin-top:6px; } .choiceCards .card { height:32vh; } .choiceCards > button { font-size:12px; padding:10px; } .endgame h1 { font-size:24px; } .endgame strong { font-size:30px; } }
+@media (max-height:600px) and (orientation:landscape) { .elementClash { gap:6px; } .elementClash h2 { margin:0; font-size:16px; } .elementClash h1 { font-size:22px; } .elementClash p { margin:0; font-size:16px; } .elementClash .card { height:30vh; } .elementClash > div { gap:60px; } }
+@media (orientation:portrait) and (max-width:1000px) {
+  .shell,.hudPlane,.choiceOverlay,.elementClash { width:100dvh; height:100dvw; inset:auto; top:50%; left:50%; transform:translate(-50%,-50%) rotate(90deg); }
+  .header { min-height:44px; padding:4px 12px; gap:10px; } .brand { font-size:20px; } .brand small { font-size:8px; } .roomCode { font-size:12px; } .headerActions span { font-size:16px; }
+  .lobby { padding:16px; } .lobbyTitle h1 { font-size:24px; } .lobbyTitle p { font-size:18px; } .lobbyTitle span { font-size:12px; } .lobbyActions { padding:10px; gap:8px; width:280px; max-height:95%; } .lobbyActions > button { padding:10px; }
+  .waiting { gap:8px; } .waiting h1 { font-size:24px; } .seat { padding:10px; gap:6px; } .seat img { width:50px; height:50px; } .seat strong { font-size:14px; } .waitingActions { padding:6px; } .waitingActions button { padding:6px 12px; font-size:13px; }
+  .deckBuilder { padding:8px; gap:8px; grid-template-columns:33% 1fr; } .deckTray { gap:5px; padding-bottom:92px; } .deckTray h2 { font-size:16px; } .tabs button { font-size:11px; padding:4px; } .elementCounts { gap:4px; font-size:10px; } .chosenCards { gap:3px; } .catalogCards { grid-template-columns:repeat(auto-fill,minmax(68px,1fr)); gap:5px; } .filters input,.filters select { font-size:12px; } .filters label { padding:4px; } .deckActions button { padding:4px 6px; font-size:11px; gap:3px; } .deckActions svg { width:13px; height:13px; } .readiness { font-size:10px; }
+  .battleStatus { top:4px; padding:3px 10px; } .battleStatus strong { font-size:14px; } .battleStatus span { font-size:10px; } .scoreboard { top:6px; inset-inline:10px; } .scoreboard > span { font-size:12px; padding:4px 8px; gap:6px; } .scoreboard b { width:26px; height:26px; font-size:18px; } .board { margin-top:46px; margin-bottom:4px; } .formation { width:78%; --card-height:min(20vw,100px); }
+  .hand { height:98px; padding:4px 8px 4px 200px; } .handTitle { font-size:11px; margin:0; } .handCards { height:72px; gap:4px; } .chat { width:184px; bottom:6px; left:6px; max-height:98px; font-size:10px; } .chatToggle { padding:3px 5px; } .messages { height:39px; padding:2px 5px; } .chat form { padding:2px; } .chat input { padding:3px; font-size:11px; } .chat form button { padding:3px; } .chatClosed { width:95px; }
+  .choicePanel { padding:12px; } .choicePanel h2 { font-size:20px; margin-bottom:4px; } .choicePanel p { font-size:12px; margin-bottom:4px; } .choicePanel > strong { font-size:22px; } .choiceCards { gap:16px; margin-top:6px; } .choiceCards .card { height:30vw; } .choiceCards > button { font-size:12px; padding:10px; }
+  .elementClash { gap:6px; } .elementClash h2 { margin:0; font-size:16px; } .elementClash h1 { font-size:22px; } .elementClash p { margin:0; font-size:16px; } .elementClash .card { height:30vw; } .elementClash > div { gap:60px; }
+}
+@media (max-width:700px) and (orientation:landscape), (max-height:700px) and (orientation:portrait) { .waitingActions { align-self:flex-end; margin-right:12px; margin-left:200px; gap:6px; font-size:11px; } .waitingActions button { font-size:11px; padding:6px 8px; gap:5px; } .waitingActions svg { width:15px; height:15px; } }
+@media (max-height:600px) and (orientation:landscape) { .formation { --card-height:17vh; } }
+@media (max-width:1000px) and (orientation:portrait) { .formation { --card-height:17vw; } }
+@media (prefers-reduced-motion:reduce) { .card { transition:none; } .spin,.elementClash .card { animation:none; } }
