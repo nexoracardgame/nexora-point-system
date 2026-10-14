@@ -6432,7 +6432,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }, [currentRoom, isPvpRoom, opponentSide, ownPendingRoomSkillChoice, roomPlayerSide, waitingPendingRoomSkillChoice]);
 
   const toggleDeckCard = (cardNo: string) => {
-    if (ownDeckReady || deckReadySubmitting) return;
+    if (currentRoom?.status === "waiting" || ownDeckReady || deckReadySubmitting) return;
     const card = cardsByNo.get(cardNo);
     if (!selectableDeckCatalog.some((item) => item.cardNo === cardNo) || !card) return;
     const selected = playerDeck.includes(cardNo);
@@ -6486,7 +6486,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const enterBattle = async () => {
-    if (ownDeckReady || deckReadySubmitting) return;
+    if (currentRoom?.status === "waiting" || ownDeckReady || deckReadySubmitting) return;
     const monsterCount = playerDeckCards.filter((card) => card.kind === "monster").length;
     if (!currentRoom && monsterCount < 3) {
       setBattleLog(["เด็คต้องมีมอนสเตอร์อย่างน้อย 3 ใบ เพื่อใช้เป็นการ์ดหลักของแต่ละรอบ"]);
@@ -8021,8 +8021,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   if (phase === "deck") {
-    const deckReadyDisabled = deckReadySubmitting || (currentRoom ? ownDeckReady || !deckValidation.valid : !deckValidation.valid);
-    const deckReadyLabel = deckReadySubmitting ? "กำลังยืนยัน" : ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
+    const deckSessionOpening = currentRoom?.status === "waiting";
+    const deckReadyDisabled = deckSessionOpening || deckReadySubmitting || (currentRoom ? ownDeckReady || !deckValidation.valid : !deckValidation.valid);
+    const deckReadyLabel = deckSessionOpening ? "กำลังเปิดสนาม" : deckReadySubmitting ? "กำลังยืนยัน" : ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
       <main className="triad-deck-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
@@ -8095,7 +8096,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             {selectableDeckCatalog.map((card) => {
               const selected = playerDeck.includes(card.cardNo);
               const disabled =
-                ownDeckReady || deckReadySubmitting ||
+                deckSessionOpening || ownDeckReady || deckReadySubmitting ||
                 (playerDeck.length >= DECK_SIZE && !selected) ||
                 (currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT) ||
                 (currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT);
@@ -8167,7 +8168,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             <button
               type="button"
               onClick={enterBattle}
-              disabled={ownDeckReady || deckReadySubmitting || !deckValidation.valid}
+              disabled={deckSessionOpening || ownDeckReady || deckReadySubmitting || !deckValidation.valid}
               className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-6 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 disabled:hover:from-white/10"
             >
               {ownDeckReady ? "พร้อมแล้ว" : "พร้อม"}

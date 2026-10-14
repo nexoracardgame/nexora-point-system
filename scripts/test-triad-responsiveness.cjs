@@ -11,11 +11,11 @@ const response = payload => ({ok:true,status:200,json:async()=>payload});
 const client=parse(process.env.TRIAD_CLIENT_SOURCE || 'app/(main)/battle/triad-dominion/TriadDominionClient.tsx');
 const selected=new Map();let phaseEffect;
 function visit(n){
- if(ts.isVariableDeclaration(n)&&['createRoom','startRoomGame','syncRooms','postRoomAction','enterBattle'].includes(n.name.getText(client)))selected.set(n.name.getText(client),n.initializer.getText(client));
+ if(ts.isVariableDeclaration(n)&&['createRoom','startRoomGame','syncRooms','postRoomAction','enterBattle','toggleDeckCard'].includes(n.name.getText(client)))selected.set(n.name.getText(client),n.initializer.getText(client));
  if(ts.isCallExpression(n)&&n.expression.getText(client)==='useEffect'&&n.arguments[0]?.getText(client).includes('startRoomLockRef.current.code === currentRoom.code'))phaseEffect=n.arguments[0].getText(client);
  ts.forEachChild(n,visit);
 }
-visit(client);assert.equal(selected.size,5);assert.ok(phaseEffect);
+visit(client);assert.equal(selected.size,6);assert.ok(phaseEffect);
 function makeClient(){
  let roomList=[],phases=[],messages=[],resetCount=0;
  const c=vm.createContext({exports:{},Date,Number,URLSearchParams,AbortSignal,ROOM_API_PATH:'/api/triad-rooms',MIN_SYNC_GAP_MS:0,participant:{id:'host'},roomAccess:'public',roomPassword:'',createRoomWithBot:false,currentRoom:null,rooms:[],phase:'lobby',isRoomController:true,
@@ -26,7 +26,7 @@ function makeClient(){
   window:{setTimeout:()=>1,clearTimeout:()=>{}},globalThis:undefined,
  });
  c.globalThis=c;
- vm.runInContext(compile([...selected].map(([name,code])=>`const ${name}=${code};`).join('\n')+`\nconst phaseEffect=${phaseEffect};globalThis.handlers={createRoom,startRoomGame,syncRooms,postRoomAction,enterBattle,phaseEffect};`),c);
+ vm.runInContext(compile([...selected].map(([name,code])=>`const ${name}=${code};`).join('\n')+`\nconst phaseEffect=${phaseEffect};globalThis.handlers={createRoom,startRoomGame,syncRooms,postRoomAction,enterBattle,toggleDeckCard,phaseEffect};`),c);
  return {c,phases,messages,getRooms:()=>roomList,resets:()=>resetCount};
 }
 const room=(status='waiting',epoch=100)=>({code:'123456',status,hostId:'host',seats:{host:{id:'host'},challenger:{id:'challenger'}},spectators:[],game:{deckStartedAt:epoch,activeTurn:1,fightNo:1,turns:[],deckReady:{host:false,challenger:false},decks:{host:[],challenger:[]}}});
@@ -43,6 +43,7 @@ const room=(status='waiting',epoch=100)=>({code:'123456',status,hostId:'host',se
  c.dialogOpen=true;const creating=c.handlers.createRoom('all');assert.equal(c.creatingRoom,true,'Create responds before network');assert.equal(c.dialogOpen,true,'Dialog does not blink back to lobby');
  await c.handlers.createRoom('all');assert.equal(posts,1,'Duplicate create is blocked');
  create.resolve(response({room:room()}));await creating;assert.equal(c.dialogOpen,false);assert.equal(c.phase,'room');assert.equal(c.creatingRoom,false);assert.equal(c.activeRoomCodeRef.current,'123456');
+ c.handlers.toggleDeckCard('007');await c.handlers.enterBattle();assert.equal(posts,1,'Opening preview cannot select or submit cards from an old deck epoch');
  const start=deferred();c.fetch=async()=>{posts++;return start.promise};const starting=c.handlers.startRoomGame();assert.equal(c.phase,'deck','Start transitions before network');
  assert.equal(c.startRoomLockRef.current.until,Infinity);await c.handlers.startRoomGame();assert.equal(posts,2,'Duplicate start is blocked');c.handlers.phaseEffect();assert.equal(c.phase,'deck','Waiting snapshot cannot reverse pending start');
  start.resolve(response({room:room('playing',200)}));await starting;assert.equal(c.startingRoomCodeRef.current,'');assert.equal(c.phase,'deck');assert.equal(state.resets(),1);
