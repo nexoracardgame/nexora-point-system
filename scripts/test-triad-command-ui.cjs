@@ -37,12 +37,13 @@ await page.route('https://command.test/**',serve);
 for(const [width,height] of [[3840,2160],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]){
 await page.setViewportSize({width,height});await page.goto('https://command.test/');await page.waitForSelector('.nexora-command-mode');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
 await page.evaluate(()=>new Promise((resolve,reject)=>{const i=new window.Image();i.onload=resolve;i.onerror=reject;i.src='/images/triad/nexora-command.webp'}));
-await page.waitForSelector('.nexora-command-foreground img');
-assert.ok(await page.locator('.nexora-command-scene img').evaluateAll(els=>els.every(e=>e.complete&&e.naturalWidth>=1024)),'Both native scene layers render');
+await page.waitForSelector('.nexora-command-world');
+assert.equal(await page.locator('.nexora-command-scene img').count(),1,'Original artwork is a single intact image, not repainted layers');
+assert.ok(await page.locator('.nexora-command-world').evaluate(e=>e.complete&&e.naturalWidth===1672&&e.currentSrc.endsWith('/nexora-command-original.webp')),'Exact original artwork renders');
 if(width===1440){
- const before=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);await page.waitForTimeout(750);const after=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);assert.notEqual(before,after,'Camera breathes continuously');
- await page.mouse.move(800,460);await page.waitForTimeout(420);assert.notEqual(await page.locator('.nexora-command-art').evaluate(e=>getComputedStyle(e).transform),await page.locator('.nexora-command-foreground').evaluate(e=>getComputedStyle(e).transform),'Scene layers have distinct parallax');
- await page.getByRole('button',{name:'หยุดการเคลื่อนไหว',exact:true}).click();await page.waitForSelector('[data-motion="paused"]');assert.equal(await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).animationPlayState),'paused');
+ const before=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);await page.waitForTimeout(750);const after=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);assert.equal(before,after,'No automatic enlargement of the original image');
+ await page.mouse.move(800,460);await page.waitForTimeout(420);assert.equal(await page.locator('.nexora-command-art').evaluate(e=>getComputedStyle(e).transform),'none','Pointer movement never distorts the artwork');
+ await page.getByRole('button',{name:'หยุดการเคลื่อนไหว',exact:true}).click();await page.waitForSelector('[data-motion="paused"]');assert.equal(await page.locator('.nexora-command-shards i').first().evaluate(e=>getComputedStyle(e).animationPlayState),'paused');
  const frozen=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);await page.waitForTimeout(350);assert.equal(await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform),frozen);
  await page.getByRole('button',{name:'เปิดการเคลื่อนไหว',exact:true}).click();await page.waitForSelector('[data-motion="running"]');
  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForSelector('[data-motion="paused"]');assert.equal(await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).animationName),'none');await page.emulateMedia({reducedMotion:'no-preference'});

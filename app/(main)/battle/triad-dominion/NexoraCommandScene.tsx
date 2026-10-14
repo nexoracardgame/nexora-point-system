@@ -27,10 +27,7 @@ export default function NexoraCommandScene() {
     <div className="nexora-command-scene" data-motion={running ? "running" : "paused"} aria-hidden="true">
       <div className="nexora-command-camera">
         <div className="nexora-command-art">
-          <picture><source media="(max-width:900px)" srcSet="/images/triad/nexora-world-small.webp 1x, /images/triad/nexora-world.webp 2x" /><img className="nexora-command-world" src="/images/triad/nexora-world.webp" alt="" decoding="async" fetchPriority="high" /></picture>
-        </div>
-        <div className="nexora-command-foreground">
-          <picture><source media="(max-width:900px)" srcSet="/images/triad/nexora-duelists-small.webp 1x, /images/triad/nexora-duelists.webp 2x" /><img src="/images/triad/nexora-duelists.webp" alt="" decoding="async" fetchPriority="high" /></picture>
+          <img className="nexora-command-world" src="/images/triad/nexora-command-original.webp" alt="" decoding="async" fetchPriority="high" />
         </div>
         <div className="nexora-command-shards">{Array.from({ length: 16 }, (_, index) => <i key={index} style={{ left: `${22 + (index * 37 % 54)}%`, top: `${12 + (index * 23 % 72)}%`, animationDelay: `${-index * .7}s`, animationDuration: `${7 + index % 5}s` }} />)}</div>
       </div>
