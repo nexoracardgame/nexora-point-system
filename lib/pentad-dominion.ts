@@ -122,7 +122,11 @@ export function resolvePentadTurn(input: {
   const support = sup ? { host: sup.playerTotal, challenger: sup.opponentTotal } : basic.support;
   const totals = metric === "total" ? { host: attack.host + support.host, challenger: attack.challenger + support.challenger } : metric === "attack" ? attack : support;
   const winner = input.turn === 1 ? comparePentadPower(attack, support, input.finalDuel) : totals.host === totals.challenger ? "draw" : totals.host > totals.challenger ? "host" : "challenger";
-  const events = [...(atk?.skillEvents || []), ...(sup?.skillEvents || [])].filter((event, index, all) => all.findIndex(other => other.side === event.side && other.cardNo === event.cardNo && other.summary === event.summary) === index);
+  const metricEvents = [
+    ...(atk?.skillEvents || []).filter(event => triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(2) !== false),
+    ...(sup?.skillEvents || []).filter(event => triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(3) !== false),
+  ];
+  const events = metricEvents.filter((event, index, all) => all.findIndex(other => other.side === event.side && other.cardNo === event.cardNo && other.summary === event.summary) === index);
   const effective = atk || sup;
   return { winner, reason: metric === "total" ? "พลังรวม ATK + SUP" : metric === "attack" ? "พลัง ATTACK" : "พลัง SUPPORT", attack, support, totals, events, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
 }
