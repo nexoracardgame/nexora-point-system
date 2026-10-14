@@ -35,9 +35,15 @@
 .nexora-deck-header-actions button { background:transparent; border:0; color:#fff; padding:6px; cursor:pointer; }
 .nexora-deck-layout { flex:1; min-height:0; display:grid; grid-template-columns:minmax(260px,32%) minmax(0,1fr); gap:16px; padding:16px; background:#050710b8; }
 .nexora-deck-layout { position:relative; padding-bottom:100px !important; }
-.nexora-deck-actions { position:absolute; right:16px; bottom:16px; width:min(420px,52%); display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; z-index:5; }
+.nexora-deck-actions { position:absolute; right:16px; bottom:16px; width:min(620px,60%); display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; z-index:5; }
 .nexora-deck-actions .nexora-deck-ready { min-width:150px; padding:8px 24px; }
 .nexora-deck-actions > div { margin:0; }
+.nexora-deck-tools { display:flex; gap:8px; }
+.nexora-deck-tools button { display:flex; align-items:center; justify-content:center; gap:8px; background:#162522; color:#fff; border:1px solid #97c7b466; cursor:pointer; }
+.nexora-deck-tools button:disabled { opacity:.5; cursor:default; }
+.nexora-deck-header > div:not(.nexora-deck-header-actions) { min-width:0; }
+.nexora-deck-header strong { overflow-wrap:anywhere; font-size:16px; line-height:1.3; }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .nexora-deck-header strong { font-size:12px; } .nexora-deck-tools { gap:4px; } .nexora-deck-tools button { font-size:11px; gap:4px; } }
 .nexora-deck-actions button { min-height:44px; padding:8px 24px; border-radius:4px; }
 .nexora-deck-actions > .nexora-deck-readiness { flex-basis:100%; text-align:right; }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .nexora-deck-layout { padding-bottom:70px !important; } .nexora-deck-actions { right:8px; bottom:8px; gap:4px; } .nexora-deck-actions .nexora-deck-ready { min-width:90px; padding:5px 12px; } }

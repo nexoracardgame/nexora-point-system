@@ -9,6 +9,7 @@ modules['next/navigation']='exports.useRouter=()=>({prefetch:()=>{},replace:path
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
 modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));
 modules['@/components/DeckPreparation']=transpile(fs.readFileSync('components/DeckPreparation.tsx','utf8'));
+modules['@/lib/deck-reroll']=transpile(fs.readFileSync('lib/deck-reroll.ts','utf8'));
 modules['@/lib/supabase-browser']='exports.getBrowserSupabaseClient=()=>null;';
 modules['@/lib/battle-ui-state']=transpile(fs.readFileSync('lib/battle-ui-state.ts','utf8'),'lib/battle-ui-state.ts');
 modules['../triad-dominion/BattleAudio']=modules['./BattleAudio']='exports.primeBattleAudio=async()=>false;exports.playMenuCue=()=>{};exports.battleAudioReady=()=>false;exports.playBattleSequence=()=>()=>{};';
@@ -61,6 +62,7 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
     assert.ok((await page.locator('.penta_shell').getAttribute('style')).includes('nexora-command-original.webp'),'Waiting header and room use only the lobby wallpaper');
     await page.getByRole('button',{name:'เพิ่มบอท'}).click();await page.getByRole('button',{name:'เริ่มเกม'}).click();await page.waitForSelector('[data-pentad-phase="deck"]');
     await page.getByRole('button',{name:'เติมเด็ค'}).click();await page.getByRole('button',{name:'พร้อม',exact:true}).waitFor();
+    if(width===1280){await page.getByRole('button',{name:'ล้างเด็ค',exact:true}).click();assert.equal(await page.locator('.penta_chosenCards .penta_card').count(),0);await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();assert.equal(await page.locator('.penta_chosenCards .penta_card').count(),5);}
     await page.getByRole('button',{name:'พร้อม',exact:true}).click();await page.waitForSelector('[data-pentad-phase="select"]');
     for(const button of await page.locator('.penta_header button,.triad-battle-chat-hud input').all())assert.ok(inside(await button.boundingBox(),width,height),'Controls fit '+width);
     const boxes=await page.locator('.penta_scoreboard > .nexora-arena-scoreplate,.penta_battleStatus,.penta_headerActions').evaluateAll(elements=>elements.map(element=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));

@@ -19,6 +19,13 @@ function load(file) {
 const rules = load('lib/pentad-dominion.ts');
 const store = load('lib/pentad-room-store.ts');
 const triad = load('lib/triad-dominion.ts');
+const reroll = load('lib/deck-reroll.ts');
+for(const mode of ['all','monster','skill'])for(let i=0;i<50;i++){
+  const deck=reroll.randomTriadDeck(triad.triadCards,mode);assert.equal(deck.length,20);assert.equal(new Set(deck).size,20);
+  const monsters=deck.filter(no=>triad.triadCardByNo.get(no).kind==='monster').length;
+  assert.ok(mode==='all'?monsters>=3:monsters===(mode==='monster'?20:10));
+}
+const first=rules.completePentadDeck(rules.emptyPentadDeck());const next=reroll.freshDeck(()=>rules.completePentadDeck(rules.emptyPentadDeck()),first,d=>[...d.monsters,...d.hand,...d.reserve]);assert.deepEqual(rules.validatePentadDeck(next),[]);assert.notDeepEqual([...next.monsters,...next.hand,...next.reserve].sort(),[...first.monsters,...first.hand,...first.reserve].sort());
 const host = { id: 'a', name: 'A', image: '/avatar.png' };
 const rival = { id: 'b', name: 'B', image: '/avatar.png' };
 const sides = ['host', 'challenger'];

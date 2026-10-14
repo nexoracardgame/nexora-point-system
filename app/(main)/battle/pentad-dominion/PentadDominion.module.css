@@ -219,6 +219,7 @@
 .phaseMeta { padding:6px 12px; border:1px solid #fef3c724; border-radius:6px; background:#16333c66; color:#edf5f8; text-shadow:0 1px 3px #000b; text-align:center; font-size:12px; font-weight:700; }
 .header { background:#06090980; }
 .brand { display:flex; align-items:center; gap:12px; }
+.brand { min-width:0; font-size:16px; max-width:75%; line-height:1.3; }
 .logo { width:100px; height:42px; object-fit:contain; }
 .passwordPanel { position:absolute; z-index:40; top:50%; left:50%; transform:translate(-50%,-50%); background:#0c1319; border:1px solid #84acb94d; border-radius:8px; padding:24px; display:grid; gap:16px; }
 .passwordPanel input { display:block; width:100%; padding:10px; background:#ffffff0c; border:1px solid #ffffff30; }

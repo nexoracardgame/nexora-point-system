@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
-import { DeckPreparationHeader, DeckPreparationLayout } from "@/components/DeckPreparation";
+import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from "@/components/DeckPreparation";
+import { freshDeck, randomTriadDeck } from "@/lib/deck-reroll";
 import { BattleArenaScoreplate, BattleArenaPhaseTrack } from "@/components/BattleArenaHud";
 import {
   Bot,
@@ -7958,12 +7959,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
       <main className="nexora-command-deck triad-deck-screen nexora-deck-screen">
-        <DeckPreparationHeader title={currentDeckModeTitle} time={deckTimerText} onExit={leaveRoom} />
+        <DeckPreparationHeader title={TRIAD_TITLE} time={deckTimerText} onExit={leaveRoom} />
         <DeckPreparationLayout tray={<>
           <h2>เตรียมเด็ค <b>{playerDeck.length}/{DECK_SIZE}</b></h2>
           <div className="nexora-deck-guide">{deckSelectionGuide}<br />{deckSelectionNotice}</div>
           <div className="nexora-deck-chosen">{playerDeckCards.map(card => <button key={card.cardNo} type="button" aria-label={`นำ No.${card.cardNo} ออกจากเด็ค`} disabled={ownDeckReady || deckReadySubmitting} onClick={() => toggleDeckCard(card.cardNo)} onMouseEnter={() => setDeckPreviewCard(card)} onMouseLeave={() => setDeckPreviewCard(null)}><img src={card.sourceImage} alt={card.name} /><span>−</span></button>)}</div>
-        </>} actions={<><button type="button" className="nexora-deck-ready" onClick={enterBattle} disabled={deckReadyDisabled}><Check size={18} />{deckReadyLabel}</button><div className="nexora-deck-readiness">{ownDeckReady ? "คุณพร้อมแล้ว" : "กำลังจัดเด็ค"} · {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}</div></>} catalog={<div className="nexora-deck-grid">{selectableDeckCatalog.map(card => {
+        </>} actions={<><DeckPreparationTools disabled={deckSessionOpening || ownDeckReady || deckReadySubmitting} onShuffle={() => { const next=freshDeck(()=>randomTriadDeck(selectableDeckCatalog,currentDeckMode),playerDeck,value=>value);setPlayerDeck(next);if(currentRoom && roomPlayerSide)scheduleDeckSync(next); }} onClear={()=>{setPlayerDeck([]);if(currentRoom && roomPlayerSide)scheduleDeckSync([]);}} /><button type="button" className="nexora-deck-ready" onClick={enterBattle} disabled={deckReadyDisabled}><Check size={18} />{deckReadyLabel}</button><div className="nexora-deck-readiness">{ownDeckReady ? "คุณพร้อมแล้ว" : "กำลังจัดเด็ค"} · {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}</div></>} catalog={<div className="nexora-deck-grid">{selectableDeckCatalog.map(card => {
           const selected = playerDeck.includes(card.cardNo);
           const disabled = deckSessionOpening || ownDeckReady || deckReadySubmitting ||
             (playerDeck.length >= DECK_SIZE && !selected) ||
@@ -8067,7 +8068,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               Battle Room
             </div>
             <div className="mt-1 truncate text-xl font-black uppercase tracking-normal text-white sm:text-2xl">
-              {currentDeckModeTitle}
+              {TRIAD_TITLE}
             </div>
           </div>
           </div>
