@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat from "@/components/BattleArenaChat";
+import { BattleArenaScoreplate, BattleArenaPhaseTrack } from "@/components/BattleArenaHud";
 import {
   Bot,
   Check,
@@ -2014,31 +2015,7 @@ function FighterPanel({
 }
 
 function PhaseTrack({ activeTurn }: { activeTurn: TriadTurn }) {
-  const steps = [
-    ["เตรียม", 0],
-    ["ตา 1", 1],
-    ["ตา 2", 2],
-    ["ตา 3", 3],
-    ["จบ", 4],
-  ] as const;
-
-  return (
-    <div className="triad-phase-track relative overflow-hidden rounded-[18px] border border-amber-100/24 bg-[linear-gradient(180deg,rgba(30,21,9,0.94),rgba(9,7,5,0.88))] p-1.5 shadow-[0_16px_46px_rgba(0,0,0,0.36),inset_0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
-      <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/55 to-transparent" />
-      <div className="triad-phase-track-grid grid grid-cols-5 gap-1">
-        {steps.map(([label, value]) => (
-          <div
-            key={label}
-            className={`triad-phase-step rounded-xl px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-xs ${
-              value === activeTurn ? "bg-amber-200 text-black shadow-[0_0_26px_rgba(251,191,36,0.34)]" : "text-amber-100/38"
-            }`}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <BattleArenaPhaseTrack activeTurn={activeTurn} />;
 }
 
 function BoardCardSlot({
@@ -4520,26 +4497,8 @@ function CompactBattleBoard({
       <img className="triad-arena-background" src={arena.image} alt="" draggable={false} />
       <div className="triad-arena-shade" />
       <div className="triad-arena-title"><Sparkles size={15} /><span>{arena.name}</span><small>ธาตุ{arena.element}</small></div>
-      <div className="triad-opponent-scoreplate pointer-events-auto absolute left-2 top-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-cyan-200/22 bg-black/62 px-2 py-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:left-4 sm:top-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
-        <MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />
-        <div className="min-w-0 max-w-[120px] sm:max-w-none">
-          <div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/58">คู่แข่ง</div>
-          <div className="truncate text-xs font-black text-white sm:text-base">{botName}</div>
-        </div>
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-cyan-100 bg-cyan-500 text-sm font-black text-white shadow-[0_0_22px_rgba(34,211,238,0.32)] sm:h-9 sm:w-9 sm:text-lg">
-          {matchScore.bot}
-        </div>
-      </div>
-      <div className="triad-player-scoreplate pointer-events-auto absolute bottom-2 right-2 z-[70] flex max-w-[46%] items-center gap-1.5 rounded-xl border border-red-200/24 bg-black/62 px-2 py-1.5 text-right shadow-[0_16px_44px_rgba(0,0,0,0.42)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:max-w-[360px] sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2">
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-red-100 bg-red-500 text-sm font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.32)] sm:h-9 sm:w-9 sm:text-lg">
-          {matchScore.player}
-        </div>
-        <div className="min-w-0 max-w-[120px] sm:max-w-none">
-          <div className="text-[9px] font-black uppercase tracking-[0.18em] text-red-100/58">เรา</div>
-          <div className="truncate text-xs font-black text-white sm:text-base">{playerName}</div>
-        </div>
-        <MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />
-      </div>
+      <BattleArenaScoreplate name={botName} score={matchScore.bot} avatar={<MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />} />
+      <BattleArenaScoreplate name={playerName} score={matchScore.player} player avatar={<MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />} />
       {cinematicPlaying && currentResult ? (
         <BattleCinematic
           key={cinematicKey}

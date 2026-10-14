@@ -3,6 +3,29 @@
   background:rgba(0,0,0,.42);
 }
 .triad-battle-chat-hud-frame > div > .triad-battle-chat-hud { max-width:inherit; }
+.nexora-arena-scoreplate { position:absolute; top:12px; z-index:70; display:flex; align-items:center; gap:8px; width:max-content; max-width:30%; padding:8px 10px; color:white; background:#16333c66; border:1px solid #cffafe38; border-radius:6px; box-shadow:inset 0 1px 0 #ffffff22; text-shadow:0 1px 3px #000b; backdrop-filter:blur(12px); pointer-events:auto; }
+.nexora-arena-scoreplate.triad-opponent-scoreplate { left:12px; }
+.nexora-arena-scoreplate.triad-player-scoreplate { right:12px; text-align:right; border-color:#fecaca3d; }
+.nexora-arena-scoreplate > .min-w-0 { min-width:0; }
+.nexora-arena-scoreplate .text-xs { font-size:16px; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nexora-arena-scoreplate [class~="text-[9px]"] { font-size:11px; color:#d5e9ed99; }
+.nexora-arena-points { display:grid; place-items:center; flex-shrink:0; width:36px; height:36px; border:2px solid #cffafe; border-radius:50%; background:#06b6d4; font-size:18px; box-shadow:0 0 22px #22d3ee52; }
+.triad-player-scoreplate .nexora-arena-points { border-color:#fee2e2; background:#ef4444; box-shadow:0 0 22px #ef444452; }
+.nexora-arena-avatar { width:36px; height:36px; flex-shrink:0; border:1px solid #f0ce7a66; border-radius:50%; object-fit:cover; }
+.nexora-arena-phase-track { overflow:hidden; border:1px solid #fef3c73d; border-radius:18px; padding:6px; background:linear-gradient(180deg,#1e1509f0,#090705e0); box-shadow:0 16px 46px #0006,inset 0 0 0 1px #ffffff0d; backdrop-filter:blur(12px); }
+.nexora-arena-phase-track > .triad-phase-track-grid { display:grid; gap:4px; }
+.nexora-arena-phase-track .triad-phase-step { padding:8px; border-radius:12px; text-align:center; color:#fef3c761; font-size:13px; font-weight:900; letter-spacing:0; white-space:nowrap; }
+.nexora-arena-phase-track .nexora-phase-active { background:#fde68a; color:#000; box-shadow:0 0 26px #fbbf2457; }
+.nexora-card-art-frame { position:absolute; inset:0; overflow:hidden; border-radius:6px; background:transparent; }
+.nexora-card-art-frame .nexora-card-back-art { transform:scale(1.078,1.048); object-fit:fill; }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) {
+  .nexora-arena-scoreplate { top:6px; max-width:30%; padding:5px 7px; gap:5px; }
+  .nexora-arena-scoreplate .text-xs { font-size:12px; }
+  .nexora-arena-scoreplate [class~="text-[9px]"] { font-size:9px; }
+  .nexora-arena-points,.nexora-arena-avatar { width:26px; height:26px; font-size:16px; }
+  .nexora-arena-phase-track { padding:4px; }
+  .nexora-arena-phase-track .triad-phase-step { padding:4px 2px; font-size:10px; }
+}
 .triad-chat-hud-messages { max-height:min(190px,26cqh); font-size:15px; padding:8px 10px; }
 .triad-battle-chat-hud input { font-size:15px; padding:9px 0; }
 .triad-battle-chat-hud button { width:34px; height:34px; }

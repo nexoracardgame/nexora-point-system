@@ -12,6 +12,7 @@ import type { PentadRoom, PentadRound } from "@/lib/pentad-room-store";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { useBattleArenaActivity } from "@/lib/battle-ui-state";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { BattleArenaScoreplate, BattleArenaPhaseTrack } from "@/components/BattleArenaHud";
 import BattleCinematic from "../triad-dominion/BattleCinematic";
 import { playMenuCue, primeBattleAudio } from "../triad-dominion/BattleAudio";
 import styles from "./PentadDominion.module.css";
@@ -45,7 +46,7 @@ function Card({ no, onClick, disabled, badge, className = "" }: { no?: string; o
     onPointerUp={cancelHold} onPointerCancel={cancelHold}>
     {/* Native card artwork contains its own border. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img src={card?.sourceImage || BACK} alt={card?.name || "การ์ดคว่ำ"} draggable={false} />
+    <span className="nexora-card-art-frame"><img className={card ? "" : "nexora-card-back-art"} src={card?.sourceImage || BACK} alt={card?.name || "การ์ดคว่ำ"} draggable={false} /></span>
     {badge && <span className={styles.badge}>{badge}</span>}
   </button>;
 }
@@ -248,7 +249,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
 
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><main className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
     <header className={styles.header}>
-      <Link href="/battle/triad-dominion" className={styles.brand}>NEXORA <small>PENTAD DOMINION</small></Link>
+      <Link href="/battle/triad-dominion" className={styles.brand}><small><Swords size={12} /> BATTLE ROOM</small>อำนาจห้าผนึก</Link>
       {!room && <Link href="/battle/triad-dominion" className={styles.backLobby}>กลับหน้า PLAY</Link>}
       {room && <span className={styles.roomCode}>ห้อง {room.code}</span>}
       <div className={styles.headerActions}>{busy && <Loader2 className={styles.spin} aria-label="กำลังส่งคำสั่ง" />}{room && <><span><Clock3 size={16} /> {countdown(room.deadline - now)}</span><button title="ออกจากห้อง" aria-label="ออกจากห้อง" onClick={() => { busyRef.current=false;setBusy(false);void act("leave",{},true); }}><LogOut /></button></>}</div>
@@ -268,12 +269,13 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       {side && <div className={styles.catalog}><div className={styles.filters}><label><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหาการ์ด" aria-label="ค้นหาการ์ด" /></label><select aria-label="ธาตุ" value={element} onChange={event => setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{pentadElements.map(value => <option key={value} value={value}>{pentadElementNames[value]}</option>)}</select></div><div className={styles.catalogCards}>{selectedCards.filter(card => !fixedDeck || deck[group].includes(card.cardNo)).map(card => <Card key={card.cardNo} no={card.cardNo} disabled={fixedDeck || room.ready[side] || busy || total.includes(card.cardNo)} badge={String(total.filter(no => no === card.cardNo).length || "+")} onClick={() => changeDeck({ ...deck, [group]: [...deck[group], card.cardNo] })} />)}</div></div>}
     </section> : <section className={styles.battle}>
       <div className={styles.battleStatus}><span>ไฟต์ {room.fight}/3 · ตา {room.turn}/5</span><strong>{room.finalDuel ? "ตัดสินมอนสเตอร์สุดท้าย" : phaseNames[room.phase]}</strong><span>{room.turn === 1 ? "ธาตุปะทะ" : room.turn < 4 ? "ATTACK" : "SUPPORT"}</span></div>
-      <div className={styles.scoreboard}>{[upperSide, lowerSide].map(player => <span key={player} title={room.seats[player]?.name}><span className={styles.playerName}>{room.seats[player]?.name}</span><b>{room.score[player]}</b></span>)}</div>
+      <div className={styles.scoreboard}>{[upperSide, lowerSide].map(player => <BattleArenaScoreplate key={player} name={room.seats[player]?.name || ""} score={room.score[player]} player={player === lowerSide} avatar={<img className="nexora-arena-avatar" src={room.seats[player]?.image || "/avatar.png"} alt="" />} />)}</div>
       <div className={styles.board} data-pentad-chat-arena>{[upperSide, lowerSide].map(player => <div key={player} className={`${styles.formation} ${player === lowerSide ? styles.lower : styles.upper}`} data-pentad-side={player}>{[0, 1, 2, 3, 4].map(index => {
         const selected = player === side ? ownPick : room.picks[player];
         const placed = index === room.turn - 1 && room.phase === "select" && Boolean(selected);
         return <Card key={index} no={placed && selected !== "hidden" ? selected : room.board[player][index]} className={`${index === 0 ? styles.mainCard : styles.skillCard} ${placed ? styles.placed : ""}`} badge={placed ? "พร้อม" : String(index + 1)} />;
       })}</div>)}</div>
+      <div className={styles.phaseHud}><BattleArenaPhaseTrack activeTurn={room.phase === "finished" ? 6 : room.turn} turns={5} /><div className={styles.phaseMeta}>ไฟต์ {room.fight}/3 · คะแนน {room.score[lowerSide]}-{room.score[upperSide]} · เวลา {countdown(room.deadline - now)}</div></div>
       {room.phase === "select" && <div className={styles.hand}><div className={styles.handTitle}><Layers3 size={18} /><strong>{!side ? "กำลังรอผู้เล่นเลือกการ์ด" : ownPick ? "ลงการ์ดแล้ว รออีกฝ่าย" : room.turn > 1 && side !== room.opener && !room.picks[room.opener] ? `รอ ${room.seats[room.opener]?.name} เปิดก่อน` : "เลือกการ์ดลงสนาม"}</strong></div><div className={styles.handCards}>{side && available(side).map((no, index) => <Card key={`${no}:${index}`} no={no} disabled={Boolean(ownPick) || (room.turn > 1 && side !== room.opener && !room.picks[room.opener])} onClick={() => void pickCard(no)} />)}</div></div>}
       {room.notice && <p className={styles.notice}>{room.notice}</p>}
       {room.phase === "finished" && <div className={styles.endgame}><h1>{room.winner === "draw" ? "เสมอ" : `${room.seats[room.winner as PentadSide]?.name || "ผู้เล่น"} ชนะ`}</h1><strong>{room.score.host} : {room.score.challenger}</strong><p>{room.notice}</p><button className={styles.primary} onClick={() => void act("leave")} disabled={busy}><LogOut /> กลับล็อบบี้</button></div>}

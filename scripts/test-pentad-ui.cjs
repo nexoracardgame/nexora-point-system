@@ -7,6 +7,7 @@ modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
 modules['next/link']=`const React=require('react');exports.default=({href,children,...props})=>React.createElement('a',{href,...props},children);exports.__esModule=true;`;
 modules['next/navigation']='exports.useRouter=()=>({replace:path=>{window.navigationTarget=path;}});';
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
+modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));
 modules['@/lib/supabase-browser']='exports.getBrowserSupabaseClient=()=>null;';
 modules['@/lib/battle-ui-state']=transpile(fs.readFileSync('lib/battle-ui-state.ts','utf8'),'lib/battle-ui-state.ts');
 modules['../triad-dominion/BattleAudio']=modules['./BattleAudio']='exports.primeBattleAudio=async()=>false;exports.playMenuCue=()=>{};exports.battleAudioReady=()=>false;exports.playBattleSequence=()=>()=>{};';
@@ -59,9 +60,14 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
     await page.getByRole('button',{name:'เติมเด็ค'}).click();await page.getByRole('button',{name:'พร้อม',exact:true}).waitFor();
     await page.getByRole('button',{name:'พร้อม',exact:true}).click();await page.waitForSelector('[data-pentad-phase="select"]');
     for(const button of await page.locator('.penta_header button,.triad-battle-chat-hud input').all())assert.ok(inside(await button.boundingBox(),width,height),'Controls fit '+width);
-    const boxes=await page.locator('.penta_scoreboard > span,.penta_battleStatus,.penta_headerActions').evaluateAll(elements=>elements.map(element=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));
+    const boxes=await page.locator('.penta_scoreboard > .nexora-arena-scoreplate,.penta_battleStatus,.penta_headerActions').evaluateAll(elements=>elements.map(element=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));
     for(let a=0;a<boxes.length;a++)for(let b=a+1;b<boxes.length;b++){const x=boxes[a],y=boxes[b];assert.ok(x.x+x.w<=y.x+1||y.x+y.w<=x.x+1||x.y+x.h<=y.y+1||y.y+y.h<=x.y+1,'Timer and status never cover scores');}
     await page.screenshot({path:`artifacts/pentad-ui/battle-${width}x${height}.png`});
+    const backStyle=await page.locator('.nexora-card-back-art').first().evaluate(img=>({transform:getComputedStyle(img).transform,overflow:getComputedStyle(img.parentElement).overflow}));
+    assert.match(backStyle.transform,/1\.078/,'Card back export margins are cropped exactly like Triad');assert.equal(backStyle.overflow,'hidden');
+    assert.equal(await page.locator('.penta_battleStatus').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','No separate black status strip');
+    assert.equal(await page.locator('.nexora-arena-scoreplate').count(),2,'Both scores use the shared Triad scoreplate');
+    assert.equal(await page.locator('.nexora-arena-phase-track .triad-phase-step').count(),7,'Same phase track has preparation, five turns and finish');
     assert.equal(await page.locator('.penta_formation .penta_card').count(),10);
     const boardCards=await page.locator('.penta_formation .penta_card').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,ratio:e.clientWidth/e.clientHeight}}));
     for(const card of boardCards){assert.ok(inside(card,width,height),'All ten cards fit '+width);assert.ok(Math.abs(card.ratio-815/1110)<.025,'Native ratio preserved');}
