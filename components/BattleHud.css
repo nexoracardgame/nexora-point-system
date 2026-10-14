@@ -39,6 +39,17 @@
 .nexora-deck-actions .nexora-deck-ready { min-width:150px; padding:8px 24px; }
 .nexora-deck-actions > div { margin:0; }
 .nexora-deck-tools { display:flex; gap:8px; }
+.nexora-arena-progress { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 10px; padding:5px 8px; background:#16333c66; border:1px solid #fef3c724; border-radius:6px; color:#edf5f8; text-shadow:0 1px 3px #000b; font-size:11px; line-height:1.4; }
+.nexora-arena-progress span { white-space:nowrap; }
+.nexora-arena-progress b { color:#fff; font-variant-numeric:tabular-nums; }
+.nexora-arena-surface::before,.nexora-arena-surface::after { display:none !important; }
+.nexora-arena-surface { --arena-card-height:min(16dvh,190px); }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board { background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board [data-board-card] { overflow:hidden; border-radius:6px; }
+.nexora-battle-shell .triad-arena-board { --triad-top-card-size:var(--triad-card-size) !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board { --triad-card-size:min(calc(var(--arena-card-height) * 815 / 1110),calc((100cqh - 208px) * .23),168px) !important; }
+@media (max-width:1000px) and (orientation:portrait) { .nexora-arena-surface { --arena-card-height:min(17dvw,190px); } }
+@media (max-height:600px), (max-width:900px) and (orientation:portrait) { .nexora-arena-progress { font-size:10px; padding:4px 6px; gap:2px 8px; } }
 .nexora-deck-tools button { display:flex; align-items:center; justify-content:center; gap:8px; background:#162522; color:#fff; border:1px solid #97c7b466; cursor:pointer; }
 .nexora-deck-tools button:disabled { opacity:.5; cursor:default; }
 .nexora-deck-header > div:not(.nexora-deck-header-actions) { min-width:0; }

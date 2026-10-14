@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from "@/components/DeckPreparation";
 import { freshDeck, randomTriadDeck } from "@/lib/deck-reroll";
-import { BattleArenaScoreplate, BattleArenaPhaseTrack } from "@/components/BattleArenaHud";
+import { BattleArenaScoreplate, BattleArenaPhaseTrack, BattleArenaProgress, BattleArenaSurface, BattleArenaCardFrame } from "@/components/BattleArenaHud";
 import {
   Bot,
   Check,
@@ -2051,7 +2051,7 @@ function BoardCardSlot({
     >
       <div className="relative overflow-hidden rounded-[6px] bg-transparent aspect-[815/1110]" data-board-card data-active={active || Boolean(aura)}>
         {card && !hidden ? (
-          <Image src={card.sourceImage} alt={card.name} fill sizes="(max-width: 700px) 120px, 200px" className="object-contain" />
+          <BattleArenaCardFrame><Image src={card.sourceImage} alt={card.name} fill sizes="(max-width: 700px) 120px, 200px" className="object-contain" /></BattleArenaCardFrame>
         ) : (
           <>
             <Image
@@ -2061,7 +2061,7 @@ function BoardCardSlot({
               sizes="(max-width: 700px) 120px, 200px"
               quality={72}
               priority={active}
-              className="triad-card-back-art object-contain"
+              className="triad-card-back-art nexora-card-back-art object-contain"
             />
           </>
         )}
@@ -4485,8 +4485,6 @@ function CompactBattleBoard({
   return (
     <div data-battle-arena={arena.id} className={`triad-compact-board triad-arena-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [container-type:inline-size]`} style={{ "--arena-color": arena.color } as CSSProperties}>
       <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
-      <img className="triad-arena-background" src={arena.image} alt="" draggable={false} />
-      <div className="triad-arena-shade" />
       <div className="triad-arena-title"><Sparkles size={15} /><span>{arena.name}</span><small>ธาตุ{arena.element}</small></div>
       <BattleArenaScoreplate name={botName} score={matchScore.bot} avatar={<MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />} />
       <BattleArenaScoreplate name={playerName} score={matchScore.player} player avatar={<MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />} />
@@ -4607,9 +4605,7 @@ function CompactBattleBoard({
       <div className="triad-board-phase-hud pointer-events-none absolute inset-x-2 bottom-1 z-[65] flex justify-center sm:bottom-2">
         <div className="triad-board-phase-card pointer-events-auto w-[min(500px,82cqw)] space-y-1.5">
           <PhaseTrack activeTurn={activeTurn} />
-          <div className="triad-board-phase-meta rounded-full border border-amber-100/14 bg-black/48 px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/62 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
-            เกม {matchScore.player}-{matchScore.bot} / รอบ {fightScore.player}-{fightScore.bot} / เวลา {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
-          </div>
+          <BattleArenaProgress fight={fightNo} turn={activeTurn} turns={3} time={`${Math.floor(timeLeft/60)}:${String(timeLeft%60).padStart(2,"0")}`} playerScore={fightScore.player} opponentScore={fightScore.bot} scoreLabel="แต้มไฟต์นี้" wins={{player:matchScore.player,opponent:matchScore.bot}} />
         </div>
       </div>
     </div>
@@ -7981,7 +7977,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main style={{backgroundImage:`linear-gradient(#05070865,#05070865),url('${arena.image}')`,backgroundSize:"cover",backgroundPosition:"center"}} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
+    <BattleArenaSurface image={arena.image} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
       {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
@@ -8468,6 +8464,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </aside>
       </section>
-    </main>
+    </BattleArenaSurface>
   );
 }

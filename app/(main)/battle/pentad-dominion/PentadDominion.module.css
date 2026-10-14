@@ -216,6 +216,7 @@
 @media (orientation:portrait) and (max-width:1000px) { .choiceCards .card { height:28vw; } }
 @media (prefers-reduced-motion:reduce) { .card { transition:none; } .spin,.elementClash .card { animation:none; } }
 .phaseHud { width:min(560px,88%); margin:0 auto 12px; flex-shrink:0; display:grid; gap:6px; }
+.formation { --card-height:min(var(--arena-card-height),40cqh); }
 .phaseMeta { padding:6px 12px; border:1px solid #fef3c724; border-radius:6px; background:#16333c66; color:#edf5f8; text-shadow:0 1px 3px #000b; text-align:center; font-size:12px; font-weight:700; }
 .header { background:#06090980; }
 .brand { display:flex; align-items:center; gap:12px; }
