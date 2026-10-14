@@ -46,8 +46,9 @@
 .nexora-command-sheet-body { min-height:0; overflow:auto; flex:1; scrollbar-width:thin; }
 .nexora-play-drawer-backdrop { position:absolute; inset:0; z-index:24; background:#02040888; backdrop-filter:blur(9px); animation:nexora-drawer-fade 240ms ease-out both; }
 .nexora-command-sheet.nexora-play-drawer { z-index:25; }
-.nexora-play-drawer-character { position:absolute; left:8%; bottom:0; width:44%; height:92%; object-fit:contain; object-position:center bottom; pointer-events:none; filter:drop-shadow(0 12px 30px #0009); animation:nexora-character-arrive 440ms cubic-bezier(.2,.8,.2,1) both; }
-.nexora-command-sheet.nexora-play-drawer { top:0; bottom:0; right:0; width:46%; max-width:780px; padding:36px; border-radius:0; border:0; border-left:1px solid #e5c27c80; background:#080d12fa; box-shadow:-24px 0 80px #0008; animation:nexora-drawer-arrive 340ms cubic-bezier(.2,.8,.2,1) both; }
+.nexora-play-drawer-character { position:absolute; left:auto; right:min(46%,780px); bottom:0; width:40%; height:92%; object-fit:contain; object-position:right bottom; pointer-events:none; filter:drop-shadow(0 12px 30px #0009); animation:nexora-character-arrive 440ms cubic-bezier(.2,.8,.2,1) both; }
+.nexora-command-sheet.nexora-play-drawer { top:0; bottom:0; right:0; width:46%; max-width:780px; padding:36px 36px 36px 70px; border-radius:0; border:0; background:#00000085; backdrop-filter:blur(5px); clip-path:polygon(5% 0,100% 0,100% 96%,94% 100%,0 100%,0 18%); box-shadow:-24px 0 80px #0005; animation:nexora-drawer-arrive 340ms cubic-bezier(.2,.8,.2,1) both; }
+.nexora-play-drawer::before { content:""; position:absolute; left:26px; top:8%; bottom:4%; width:1px; background:#e5c27c55; transform:skewY(-12deg); pointer-events:none; }
 .nexora-play-drawer .nexora-command-sheet-head { margin-bottom:30px; }
 .nexora-play-drawer .nexora-command-sheet-head h2 { font-size:28px; }
 .nexora-play-drawer .nexora-command-sheet-head button { width:44px; height:44px; border:1px solid #ffffff26; border-radius:4px; }
@@ -61,8 +62,9 @@
 @keyframes nexora-character-arrive { from { opacity:0; transform:translateX(45px); } to { opacity:1; transform:translateX(0); } }
 @keyframes nexora-drawer-fade { from { opacity:0; } to { opacity:1; } }
 @media (max-height:600px), (max-width:900px) and (orientation:portrait) {
-  .nexora-command-sheet.nexora-play-drawer { width:56%; padding:14px 18px; }
-  .nexora-play-drawer-character { left:0; width:44%; height:92%; }
+  .nexora-command-sheet.nexora-play-drawer { width:56%; padding:14px 18px 14px 36px; }
+  .nexora-play-drawer-character { right:56%; width:44%; height:92%; }
+  .nexora-play-drawer::before { left:14px; }
   .nexora-play-drawer .nexora-command-sheet-head { margin-bottom:8px; }
   .nexora-play-drawer .nexora-command-sheet-head h2 { font-size:20px; }
   .nexora-play-drawer .nexora-command-sheet-head button { width:32px; height:32px; }
@@ -72,6 +74,13 @@
   .nexora-play-drawer .nexora-command-sheet-body { justify-content:flex-start; }
 }
 @media (prefers-reduced-motion:reduce) { .nexora-play-drawer,.nexora-play-drawer-backdrop,.nexora-play-drawer-character { animation:none !important; } }
+@media (max-height:340px) and (orientation:landscape), (max-width:340px) and (orientation:portrait) {
+  .nexora-play-drawer .nexora-command-sheet-head { margin-bottom:4px; }
+  .nexora-play-drawer .nexora-command-sheet-head h2 { font-size:17px; }
+  .nexora-play-drawer .nexora-command-segment { margin:5px 0; }
+  .nexora-play-drawer .nexora-command-segment button { min-height:40px; }
+  .nexora-play-drawer .nexora-command-primary { min-height:40px; margin-top:4px; }
+}
 .nexora-command-sheet label { display:block; color:#cfdae0; font-size:13px; margin-bottom:12px; }
 .nexora-command-sheet input { display:block; width:100%; height:42px; margin-top:6px; padding:8px 12px; background:#03080c; border:1px solid #b5cbd04a; border-radius:4px; outline:none; color:white; }
 .nexora-command-sheet input:focus { border-color:#e5c27c; }
