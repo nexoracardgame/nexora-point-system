@@ -11,6 +11,27 @@ let loading: Promise<void> | null = null;
 
 export function battleAudioReady() { return audio?.state === "running"; }
 
+export function playMenuCue() {
+  if (document.hidden) return;
+  try { if (localStorage.getItem("triad-battle-muted") === "1") return; } catch { /* Optional preference. */ }
+  if (!audio || audio.state !== "running") {
+    void primeBattleAudio().then(ready => { if (ready) playMenuCue(); });
+    return;
+  }
+  const now = audio.currentTime;
+  const tone = audio.createOscillator();
+  const gain = audio.createGain();
+  tone.type = "sine";
+  tone.frequency.setValueAtTime(660, now);
+  tone.frequency.exponentialRampToValueAtTime(990, now + .045);
+  gain.gain.setValueAtTime(.0001, now);
+  gain.gain.exponentialRampToValueAtTime(.035, now + .008);
+  gain.gain.exponentialRampToValueAtTime(.0001, now + .075);
+  tone.connect(gain).connect(audio.destination);
+  tone.start(now); tone.stop(now + .08);
+  tone.addEventListener("ended", () => { tone.disconnect(); gain.disconnect(); }, { once: true });
+}
+
 export async function primeBattleAudio() {
   try {
     if (!audio || audio.state === "closed") {

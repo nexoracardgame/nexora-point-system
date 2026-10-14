@@ -1,0 +1,10 @@
+const fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ast=ts.createSourceFile('audio.ts',fs.readFileSync('app/(main)/battle/triad-dominion/BattleAudio.ts','utf8'),ts.ScriptTarget.Latest,true);
+const cue=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='playMenuCue').getText(ast);
+const code=ts.transpileModule(cue,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+let muted=false,starts=0,disconnected=0;
+const frequency={setValueAtTime(){},exponentialRampToValueAtTime(){}};
+const gain={gain:frequency,connect(){return this},disconnect(){disconnected++}};
+const context=vm.createContext({exports:{},document:{hidden:false},localStorage:{getItem:()=>muted?'1':'0'},audio:{state:'running',currentTime:10,destination:{},createGain:()=>gain,createOscillator:()=>({frequency,connect:()=>gain,start:()=>starts++,stop:at=>assert.ok(Math.abs(at-10.08)<.001),disconnect:()=>disconnected++,addEventListener:(_,fn)=>fn()})},primeBattleAudio:async()=>false});
+vm.runInContext(code,context);context.exports.playMenuCue();assert.equal(starts,1);assert.equal(disconnected,2,'Audio nodes are released');muted=true;context.exports.playMenuCue();assert.equal(starts,1,'Shared mute preference blocks menu sound');muted=false;context.document.hidden=true;context.exports.playMenuCue();assert.equal(starts,1,'Inactive tabs never play menu cues');
+console.log('Menu audio: shared mute, hidden-tab suppression, short cue and node cleanup passed');

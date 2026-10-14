@@ -7,7 +7,7 @@
 .nexora-command-lobby { position:relative; height:100%; isolation:isolate; overflow:hidden; }
 .nexora-command * { letter-spacing:0 !important; box-sizing:border-box; }
 .nexora-command-art { position:absolute; inset:-12px; z-index:-2; background:url('/images/triad/nexora-command.webp') center/cover; transform:translate(var(--command-x,0px),var(--command-y,0px)); transition:transform 240ms ease-out; pointer-events:none; }
-.nexora-command-shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,#040609df,transparent 45%,#040609a6),linear-gradient(0deg,#020506c9,transparent 65%); pointer-events:none; }
+.nexora-command-shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,#040609bb,transparent 24%,transparent 60%,#04060990),linear-gradient(0deg,#020506ac,transparent 40%); pointer-events:none; }
 .nexora-command-brand { position:absolute; top:28px; left:30px; }
 .nexora-command-brand h1 { font-family:Georgia,'Times New Roman',serif; font-size:54px; line-height:1; color:#f0ece3; text-shadow:0 2px 4px #000,0 0 24px #deb56750; margin:0; }
 .nexora-command-brand > span { display:block; margin-top:7px; color:#dacba9; font-size:12px; }
@@ -81,7 +81,7 @@
 .nexora-command-room-chat .triad-battle-chat-hud { bottom:16px; }
 .nexora-command-sheet [class*=rounded] { border-radius:6px; }
 .nexora-command-deck { position:relative; isolation:isolate; background:#05080d !important; }
-.nexora-command-deck::before { content:''; position:fixed; inset:0; z-index:-1; background:linear-gradient(#03080ecf,#03080ee8),url('/images/triad/nexora-command.webp') center/cover; pointer-events:none; }
+.nexora-command-deck::before { content:''; position:fixed; inset:0; z-index:-1; background:linear-gradient(#03080ecf,#03080ee8),url('/images/triad/nexora-command-detail.webp') center/cover; pointer-events:none; }
 .nexora-command-deck > section:first-child > .absolute { display:none; }
 .nexora-battle-shell .nexora-command-deck > section:first-child h1 { font-size:28px !important; letter-spacing:0 !important; }
 .nexora-command-deck button,.nexora-command-deck [class*=rounded] { border-radius:6px; }
@@ -139,4 +139,43 @@
 @media (prefers-reduced-motion:reduce) {
   .nexora-command-art,.nexora-command button { transition:none !important; transform:none !important; }
   .nexora-command-mode::after { display:none; }
+}
+
+.nexora-command-scene { position:absolute; inset:0; z-index:-2; pointer-events:none; overflow:hidden; animation:nexora-command-arrive 1200ms cubic-bezier(.16,.8,.24,1) both; }
+.nexora-command-camera { position:absolute; inset:-2%; animation:nexora-command-breathe 18s ease-in-out infinite alternate; transform-origin:43% 35%; }
+.nexora-command-scene .nexora-command-art { inset:0; z-index:0; background:none; transform:translate(calc(var(--command-x,0px) * .55),calc(var(--command-y,0px) * .55)); transition:transform 400ms ease-out; }
+.nexora-command-scene picture { display:block; position:absolute; inset:0; }
+.nexora-command-scene img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; }
+.nexora-command-foreground { position:absolute; inset:0; transform:translate(calc(var(--command-x,0px) * 1.5),calc(var(--command-y,0px) * 1.5)); transition:transform 350ms ease-out; }
+.nexora-command-foreground picture { animation:nexora-command-float 9s ease-in-out infinite alternate; }
+.nexora-command-shards { position:absolute; inset:0; transform:translate(calc(var(--command-x,0px) * 2),calc(var(--command-y,0px) * 2)); transition:transform 450ms ease-out; }
+.nexora-command-shards i { position:absolute; width:2px; height:8px; background:#ffe3a4; box-shadow:0 0 5px #ffc85799; animation:nexora-command-shard 9s linear infinite; opacity:0; }
+.nexora-command-scene-controls { position:absolute; z-index:18; top:20px; right:24px; display:flex; gap:4px; }
+.nexora-command-scene-controls button { display:grid; place-items:center; width:32px; height:32px; border-radius:4px; background:#07111c90; color:#dbe6e8; border:1px solid #bfcdd233; cursor:pointer; }
+.nexora-command-scene-controls svg { width:16px; height:16px; }
+.nexora-command-scene-controls button:hover { color:#f7d88d; border-color:#f7d88d88; }
+.nexora-command-scene-controls button:focus-visible { outline:2px solid #9ae8df; outline-offset:2px; }
+.nexora-command-lobby .nexora-command-status { right:112px; }
+.nexora-command-brand h1 { background:linear-gradient(110deg,#f5eddc 30%,#fff 46%,#ffe8aa 50%,#fff 54%,#f5eddc 68%); background-size:300% 100%; background-clip:text; -webkit-background-clip:text; color:transparent; text-shadow:none; filter:drop-shadow(0 2px 2px #000) drop-shadow(0 0 8px #e5c27c44); font-weight:600; animation:nexora-command-wordmark 12s ease-in-out infinite; }
+.nexora-command-scene[data-motion=paused] * { animation-play-state:paused !important; transition:none !important; }
+.nexora-command-scene[data-motion=paused] { animation-play-state:paused; }
+.nexora-command-lobby:has([data-motion=paused]) .nexora-command-brand h1 { animation-play-state:paused; }
+.nexora-command-scene[data-motion=paused] .nexora-command-art,.nexora-command-scene[data-motion=paused] .nexora-command-foreground,.nexora-command-scene[data-motion=paused] .nexora-command-shards { transform:none; }
+.nexora-command-room .nexora-command-scene-controls { top:auto; bottom:16px; right:20px; }
+@keyframes nexora-command-breathe { from { transform:scale(1.005); } to { transform:scale(1.045) translate(-.35%,.2%); } }
+@keyframes nexora-command-arrive { from { transform:scale(1.065); } to { transform:scale(1); } }
+@keyframes nexora-command-float { from { transform:translateY(0); } to { transform:translateY(-5px); } }
+@keyframes nexora-command-shard { 0%,100% { opacity:0; transform:translate(0,28px) rotate(25deg); } 15%,70% { opacity:.6; } 90% { opacity:0; transform:translate(14px,-42px) rotate(60deg); } }
+@keyframes nexora-command-wordmark { 0%,70% { background-position:100% 0; } 95%,100% { background-position:0 0; } }
+@media (max-height:600px), (max-width:900px) and (orientation:portrait) {
+  .nexora-command-scene-controls { top:8px; right:12px; }
+  .nexora-command-scene-controls button { width:26px; height:26px; }
+  .nexora-command-lobby .nexora-command-status { right:78px; }
+  .nexora-command-shards i:nth-child(n+9) { display:none; }
+  .nexora-command-foreground img { object-fit:contain; mask-image:linear-gradient(90deg,transparent 8%,#000 16%,#000 94%,transparent); }
+  .nexora-command-room .nexora-command-scene-controls { bottom:52px; right:6px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .nexora-command-scene,.nexora-command-scene *,.nexora-command-brand h1 { animation:none !important; transition:none !important; }
+  .nexora-command-shards { display:none; }
 }

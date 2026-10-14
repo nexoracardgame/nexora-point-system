@@ -38,8 +38,9 @@ import {
 } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import BattleCinematic from "./BattleCinematic";
+import NexoraCommandScene from "./NexoraCommandScene";
 import "./NexoraCommand.css";
-import { primeBattleAudio } from "./BattleAudio";
+import { playMenuCue, primeBattleAudio } from "./BattleAudio";
 import { battleArenaForSeed, type TriadArena } from "@/lib/triad-arena";
 import {
   resolveTriadTurn,
@@ -3707,15 +3708,19 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   useEffect(() => () => cancelAnimationFrame(pointerFrame.current), []);
   const profile = profileForParticipant(participant, rankProfiles);
   return (
-    <div className="nexora-command-lobby" onPointerMove={(event) => {
+    <div ref={artRef} className="nexora-command-lobby" onClickCapture={(event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>("button");
+      if (button && !button.disabled && !button.hasAttribute("data-command-audio-control")) playMenuCue();
+    }} onPointerMove={(event) => {
       if (event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (!event.currentTarget.querySelector('[data-motion="running"]')) return;
       const rect = event.currentTarget.getBoundingClientRect();
       const x = ((event.clientX - rect.left) / rect.width - .5) * 14;
       const y = ((event.clientY - rect.top) / rect.height - .5) * 8;
       cancelAnimationFrame(pointerFrame.current);
       pointerFrame.current = requestAnimationFrame(() => { artRef.current?.style.setProperty("--command-x", `${x}px`); artRef.current?.style.setProperty("--command-y", `${y}px`); });
     }} onPointerLeave={() => { cancelAnimationFrame(pointerFrame.current); artRef.current?.style.setProperty("--command-x", "0px"); artRef.current?.style.setProperty("--command-y", "0px"); }}>
-      <div ref={artRef} className="nexora-command-art" /><div className="nexora-command-shade" />
+      <NexoraCommandScene /><div className="nexora-command-shade" />
       <header className="nexora-command-brand"><h1>NEXORA</h1><span>CARD GAME · TRIAD DOMINION</span>
         <div className="nexora-command-profile"><img src={participant.image || "/avatar.png"} alt="" /><div><strong>{participant.name}</strong><small>{profile?.rankName || "BRONZE"} · {profile?.wins || 0} ชัยชนะ</small></div></div>
       </header>
@@ -7780,7 +7785,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     return (
       <main className="nexora-command nexora-command-room triad-room-screen">
-        <div className="nexora-command-art" /><div className="nexora-command-shade" />
+        <NexoraCommandScene /><div className="nexora-command-shade" />
         <section className="triad-room-hero relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0">
             <Image

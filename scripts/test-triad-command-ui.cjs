@@ -8,9 +8,12 @@ const transpile=code=>ts.transpileModule(code,{compilerOptions:{module:ts.Module
 const modules={};
 for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
+modules['./BattleAudio']=`exports.primeBattleAudio=()=>Promise.resolve(false);exports.playMenuCue=()=>{if(localStorage.getItem('triad-battle-muted')!=='1')window.uiCues=(window.uiCues||0)+1;};`;
+modules['./NexoraCommandScene']=transpile(fs.readFileSync('app/(main)/battle/triad-dominion/NexoraCommandScene.tsx','utf8'));
 const start=source.indexOf('<main className="nexora-command nexora-command-room');
 const roomMarkup=source.slice(start,source.indexOf('</main>',start)+7);
 modules.test=transpile(`import {useState,useEffect,useLayoutEffect,useRef,Fragment} from 'react';import {Bot,Check,Clock3,ChevronRight,Crown,Eye,House,KeyRound,Layers3,Lock,Loader2,MessageCircle,Plus,SendHorizontal,Search,Smile,Swords,Trophy,UserPlus,Users,X} from 'lucide-react';
+import NexoraCommandScene from './NexoraCommandScene';import {playMenuCue} from './BattleAudio';
 const Image=({fill,priority,sizes,...p})=><img {...p} style={fill?{position:'absolute',inset:0,width:'100%',height:'100%'}:{}}/>;
 const profileForParticipant=()=>({rankName:'BRONZE',wins:18}),rankFrames=[{name:'BRONZE'}],rankIndexForParticipant=()=>0,isBotParticipant=p=>p?.id==='bot';
 const MiniProfileHover=({participant,size})=><button className={size==='xl'?'h-32 w-32':'h-9 w-9'}><img src={participant.image} alt={participant.name} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/></button>;
@@ -29,10 +32,23 @@ const css=fs.readdirSync('.next/static/chunks').filter(f=>f.endsWith('.css')).ma
 const html=`<!doctype html><html><head><meta charset="utf-8"><style>${css}body{margin:0;background:#080b0e}#root{position:relative!important;inset:auto!important;width:100%!important;height:100dvh!important;max-height:none!important;max-width:none!important;margin:0!important;padding:0!important;box-sizing:border-box}@media(max-width:900px) and (orientation:portrait){#root{width:100dvh!important;height:100dvw!important;min-height:0!important}}</style></head><body><div id="root" class="nexora-battle-shell"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const React=require('react'),root=require('react-dom/client').createRoot(document.getElementById('root'));window.mount=room=>root.render(React.createElement(room?require('test').TestRoom:require('test').TestLobby));mount(false);</script></body></html>`;
 (async()=>{fs.mkdirSync('artifacts/triad-command',{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});
 try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.route('https://command.test/**',route=>{const url=new URL(route.request().url());if(url.pathname==='/')return route.fulfill({body:html,contentType:'text/html'});const asset=path.resolve('public','.'+url.pathname);if(!asset.startsWith(path.resolve('public')+path.sep))return route.abort();return route.fulfill({body:fs.readFileSync(asset),contentType:asset.endsWith('.webp')?'image/webp':'image/jpeg'});});
-for(const [width,height] of [[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]){
+const serve=route=>{const url=new URL(route.request().url());if(url.pathname==='/')return route.fulfill({body:html,contentType:'text/html'});const asset=path.resolve('public','.'+url.pathname);if(!asset.startsWith(path.resolve('public')+path.sep))return route.abort();return route.fulfill({body:fs.readFileSync(asset),contentType:asset.endsWith('.webp')?'image/webp':'image/jpeg'});};
+await page.route('https://command.test/**',serve);
+for(const [width,height] of [[3840,2160],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]){
 await page.setViewportSize({width,height});await page.goto('https://command.test/');await page.waitForSelector('.nexora-command-mode');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
 await page.evaluate(()=>new Promise((resolve,reject)=>{const i=new window.Image();i.onload=resolve;i.onerror=reject;i.src='/images/triad/nexora-command.webp'}));
+await page.waitForSelector('.nexora-command-foreground img');
+assert.ok(await page.locator('.nexora-command-scene img').evaluateAll(els=>els.every(e=>e.complete&&e.naturalWidth>=1024)),'Both native scene layers render');
+if(width===1440){
+ const before=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);await page.waitForTimeout(750);const after=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);assert.notEqual(before,after,'Camera breathes continuously');
+ await page.mouse.move(800,460);await page.waitForTimeout(420);assert.notEqual(await page.locator('.nexora-command-art').evaluate(e=>getComputedStyle(e).transform),await page.locator('.nexora-command-foreground').evaluate(e=>getComputedStyle(e).transform),'Scene layers have distinct parallax');
+ await page.getByRole('button',{name:'หยุดการเคลื่อนไหว',exact:true}).click();await page.waitForSelector('[data-motion="paused"]');assert.equal(await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).animationPlayState),'paused');
+ const frozen=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);await page.waitForTimeout(350);assert.equal(await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform),frozen);
+ await page.getByRole('button',{name:'เปิดการเคลื่อนไหว',exact:true}).click();await page.waitForSelector('[data-motion="running"]');
+ await page.emulateMedia({reducedMotion:'reduce'});await page.waitForSelector('[data-motion="paused"]');assert.equal(await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).animationName),'none');await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>window.hiddenScene});hiddenScene=true;document.dispatchEvent(new Event('visibilitychange'))});await page.waitForSelector('[data-motion="paused"]');await page.evaluate(()=>{hiddenScene=false;document.dispatchEvent(new Event('visibilitychange'))});await page.waitForSelector('[data-motion="running"]');
+ await page.getByRole('button',{name:'ปิดเสียงเมนู',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('triad-battle-muted')),'1');await page.getByRole('button',{name:'เปิดเสียงเมนู',exact:true}).click();
+}
 for(const button of await page.locator('.nexora-command-mode,.nexora-command-nav button').all()){const r=await button.boundingBox();assert.ok(r.x>=0&&r.y>=0&&r.x+r.width<=width+1&&r.y+r.height<=height+1,'Every lobby command fits');}
 await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});
 assert.equal(await page.locator('main').evaluate(e=>e.scrollHeight>e.clientHeight+1),false,'No lobby page overflow '+JSON.stringify(await page.locator('main').evaluate(e=>({client:e.clientHeight,scroll:e.scrollHeight,padding:getComputedStyle(e).padding}))));
@@ -46,4 +62,5 @@ await page.getByRole('button',{name:'เริ่มเกม',exact:true}).clic
 await page.getByRole('textbox',{name:'ข้อความแชตสนาม'}).fill('พร้อมต่อสู้');
 assert.deepEqual(errors,[]);console.log('Command lobby + room '+width+'x'+height+': controls, join, create, ranks, mode, start and chat passed');
 }
+const retina=await browser.newPage({viewport:{width:844,height:390},deviceScaleFactor:2});await retina.route('https://command.test/**',serve);await retina.goto('https://command.test/');await retina.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));assert.ok(await retina.locator('.nexora-command-scene img').evaluateAll(els=>els.every(e=>!e.currentSrc.includes('-small.webp'))),'High-DPI mobile selects full native sources instead of low-resolution variants');await retina.close();
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
