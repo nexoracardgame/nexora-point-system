@@ -44,6 +44,34 @@
 .nexora-command-sheet-head h2 { font-size:22px; font-weight:700; margin:0; }
 .nexora-command-sheet-head button { width:32px; height:32px; display:grid; place-items:center; cursor:pointer; }
 .nexora-command-sheet-body { min-height:0; overflow:auto; flex:1; scrollbar-width:thin; }
+.nexora-play-drawer-backdrop { position:absolute; inset:0; z-index:24; background:#02040888; backdrop-filter:blur(9px); animation:nexora-drawer-fade 240ms ease-out both; }
+.nexora-command-sheet.nexora-play-drawer { z-index:25; }
+.nexora-play-drawer-character { position:absolute; left:8%; bottom:0; width:44%; height:92%; object-fit:contain; object-position:center bottom; pointer-events:none; filter:drop-shadow(0 12px 30px #0009); animation:nexora-character-arrive 440ms cubic-bezier(.2,.8,.2,1) both; }
+.nexora-command-sheet.nexora-play-drawer { top:0; bottom:0; right:0; width:46%; max-width:780px; padding:36px; border-radius:0; border:0; border-left:1px solid #e5c27c80; background:#080d12fa; box-shadow:-24px 0 80px #0008; animation:nexora-drawer-arrive 340ms cubic-bezier(.2,.8,.2,1) both; }
+.nexora-play-drawer .nexora-command-sheet-head { margin-bottom:30px; }
+.nexora-play-drawer .nexora-command-sheet-head h2 { font-size:28px; }
+.nexora-play-drawer .nexora-command-sheet-head button { width:44px; height:44px; border:1px solid #ffffff26; border-radius:4px; }
+.nexora-play-drawer .nexora-command-segment { gap:12px; margin:20px 0; }
+.nexora-play-drawer .nexora-command-segment button { min-height:76px; padding:12px; font-size:18px; font-weight:800; border:1px solid #e5c27c55; background:#111c22; color:#e6edf0; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); transition:background 140ms ease,filter 140ms ease; }
+.nexora-play-drawer .nexora-command-segment button[aria-pressed=true] { background:#e5c27c; color:#101719; }
+.nexora-play-drawer .nexora-command-segment button:hover { filter:brightness(1.15); }
+.nexora-play-drawer .nexora-command-primary { min-height:64px; font-size:18px; font-weight:900; margin-top:12px; }
+.nexora-play-drawer .nexora-command-sheet-body { display:flex; flex-direction:column; justify-content:center; padding-bottom:12px; }
+@keyframes nexora-drawer-arrive { from { transform:translateX(100%); } to { transform:translateX(0); } }
+@keyframes nexora-character-arrive { from { opacity:0; transform:translateX(45px); } to { opacity:1; transform:translateX(0); } }
+@keyframes nexora-drawer-fade { from { opacity:0; } to { opacity:1; } }
+@media (max-height:600px), (max-width:900px) and (orientation:portrait) {
+  .nexora-command-sheet.nexora-play-drawer { width:56%; padding:14px 18px; }
+  .nexora-play-drawer-character { left:0; width:44%; height:92%; }
+  .nexora-play-drawer .nexora-command-sheet-head { margin-bottom:8px; }
+  .nexora-play-drawer .nexora-command-sheet-head h2 { font-size:20px; }
+  .nexora-play-drawer .nexora-command-sheet-head button { width:32px; height:32px; }
+  .nexora-play-drawer .nexora-command-segment { margin:8px 0; gap:8px; }
+  .nexora-play-drawer .nexora-command-segment button { min-height:48px; font-size:13px; padding:7px; }
+  .nexora-play-drawer .nexora-command-primary { min-height:44px; font-size:13px; margin-top:8px; }
+  .nexora-play-drawer .nexora-command-sheet-body { justify-content:flex-start; }
+}
+@media (prefers-reduced-motion:reduce) { .nexora-play-drawer,.nexora-play-drawer-backdrop,.nexora-play-drawer-character { animation:none !important; } }
 .nexora-command-sheet label { display:block; color:#cfdae0; font-size:13px; margin-bottom:12px; }
 .nexora-command-sheet input { display:block; width:100%; height:42px; margin-top:6px; padding:8px 12px; background:#03080c; border:1px solid #b5cbd04a; border-radius:4px; outline:none; color:white; }
 .nexora-command-sheet input:focus { border-color:#e5c27c; }

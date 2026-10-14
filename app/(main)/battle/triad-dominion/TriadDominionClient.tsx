@@ -3676,6 +3676,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
   const [format, setFormat] = useState<"triad" | "pentad">("triad");
+  useEffect(() => { if (!panel) return; const close=(event:KeyboardEvent)=>{if(event.key === "Escape")setPanel(null);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close); }, [panel]);
   const [pentadRooms, setPentadRooms] = useState<{ code: string; host: string; phase: string }[]>([]);
   useEffect(() => {
     if (panel !== "join" || format !== "pentad") return;
@@ -3725,7 +3726,8 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span><button onClick={() => setPanel("join")}><Eye className="h-4 w-4" />สนามสด {rooms.filter(room => room.status === "playing").length}</button></footer>
-      {panel ? <section className="nexora-command-sheet" role="dialog" aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
+      {panel === "create" && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true"><img className="nexora-play-drawer-character" src="/images/triad/play-drawer-character.webp" alt="" draggable={false} /></div>}
+      {panel ? <section className={`nexora-command-sheet ${panel === "create" ? "nexora-play-drawer" : ""}`} role="dialog" aria-modal={panel === "create"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
         <div className="nexora-command-sheet-head"><h2>{panel === "create" ? "สร้างสนามประลอง" : panel === "join" ? "เข้าร่วมสนาม" : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
