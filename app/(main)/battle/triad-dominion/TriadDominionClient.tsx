@@ -4730,6 +4730,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [botChanging, setBotChanging] = useState(false);
   const botChangingRef = useRef(false);
   const creatingRoomRef = useRef(false);
+  const dismissedRoomCodesRef = useRef(new Set<string>());
+  useEffect(() => { router.prefetch("/battle/pentad-dominion"); }, [router]);
   const startingRoomCodeRef = useRef("");
   const roomResponseRevisionRef = useRef(0);
   const [createRoomMode, setCreateRoomMode] = useState<DeckMode>("all");
@@ -5341,7 +5343,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const activeCode = activeRoomCodeRef.current;
     const snapshotCode = activeRoomSnapshotRef.current?.code || "";
     const knownActiveCode = activeCode || snapshotCode;
-    const reconnectRoom = !roomOnly && !creatingRoomRef.current && !activeCode ? nextRooms.find((room) => participantInRoom(room, participant.id)) : null;
+    const reconnectRoom = !roomOnly && !creatingRoomRef.current && !activeCode ? nextRooms.find((room) => !dismissedRoomCodesRef.current.has(room.code) && participantInRoom(room, participant.id)) : null;
     if (reconnectRoom) {
       activeRoomCodeRef.current = reconnectRoom.code;
       setActiveRoomCode(reconnectRoom.code);
@@ -5772,7 +5774,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const response=await fetch("/api/pentad-rooms",{method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({action:"create",access,password,deckSource:deckMode === "all" ? "all" : "random",playWithBot:createRoomWithBot})});
       const data=await response.json();
       if (!response.ok || !data.room?.code) { setLobbyMessage(data.error || "สร้างห้องไม่สำเร็จ");return; }
-      setCreateModeDialogOpen(false);router.push(`/battle/pentad-dominion?room=${data.room.code}`);return;
+      router.push(`/battle/pentad-dominion?room=${data.room.code}`);return;
     }
     const result = await postRoomAction({
       action: "create",
@@ -5981,6 +5983,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     joiningRoomCodeRef.current = "";
     setJoiningRoomCode("");
     const code = currentRoom?.code || "";
+    if (code) dismissedRoomCodesRef.current.add(code);
     activeRoomCodeRef.current = "";
     activeRoomSnapshotRef.current = null;
     setActiveRoomCode("");
@@ -7960,9 +7963,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           <h2>เตรียมเด็ค <b>{playerDeck.length}/{DECK_SIZE}</b></h2>
           <div className="nexora-deck-guide">{deckSelectionGuide}<br />{deckSelectionNotice}</div>
           <div className="nexora-deck-chosen">{playerDeckCards.map(card => <button key={card.cardNo} type="button" aria-label={`นำ No.${card.cardNo} ออกจากเด็ค`} disabled={ownDeckReady || deckReadySubmitting} onClick={() => toggleDeckCard(card.cardNo)} onMouseEnter={() => setDeckPreviewCard(card)} onMouseLeave={() => setDeckPreviewCard(null)}><img src={card.sourceImage} alt={card.name} /><span>−</span></button>)}</div>
-          <button type="button" className="nexora-deck-ready" onClick={enterBattle} disabled={deckReadyDisabled}><Check size={18} />{deckReadyLabel}</button>
-          <div className="nexora-deck-readiness">{ownDeckReady ? "คุณพร้อมแล้ว" : "กำลังจัดเด็ค"} · {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}</div>
-        </>} catalog={<div className="nexora-deck-grid">{selectableDeckCatalog.map(card => {
+        </>} actions={<><button type="button" className="nexora-deck-ready" onClick={enterBattle} disabled={deckReadyDisabled}><Check size={18} />{deckReadyLabel}</button><div className="nexora-deck-readiness">{ownDeckReady ? "คุณพร้อมแล้ว" : "กำลังจัดเด็ค"} · {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}</div></>} catalog={<div className="nexora-deck-grid">{selectableDeckCatalog.map(card => {
           const selected = playerDeck.includes(card.cardNo);
           const disabled = deckSessionOpening || ownDeckReady || deckReadySubmitting ||
             (playerDeck.length >= DECK_SIZE && !selected) ||

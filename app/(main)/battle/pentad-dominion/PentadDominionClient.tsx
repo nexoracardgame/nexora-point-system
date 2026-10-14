@@ -89,6 +89,7 @@ function ElementClash({ round, room, arenaImage, onComplete }: { round: PentadRo
 
 export default function PentadDominionClient({ userId, initialRoomCode = "", initialSpectate = false }: { userId: string; initialRoomCode?: string; initialSpectate?: boolean }) {
   const router = useRouter();
+  useEffect(()=>{router.prefetch("/battle/triad-dominion");},[router]);
   const [room, setRoom] = useState<PentadRoom | null>(null);
   const roomRef = useRef(room); roomRef.current = room;
   const [rooms, setRooms] = useState<Listing[]>([]);
@@ -157,16 +158,17 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     if (["create", "join", "leave"].includes(action)) loadGeneration.current++;
     if (action === "join") setEntering(true);
     const generation = loadGeneration.current;
+    if (action === "leave") { try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/battle/triad-dominion"); }
     try {
       const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, signal:AbortSignal.timeout(12000), body: JSON.stringify({ action, code: current?.code, epoch: current?.epoch, ...extra }) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return false;
       if (data.closed) { try{localStorage.removeItem("nexora:pentad:room");}catch{} router.replace("/battle/triad-dominion");return false; }
       if (!response.ok) throw new Error(data.error || "คำสั่งไม่สำเร็จ");
-      if (action === "leave") { loadGeneration.current++; roomRef.current = null; setRoom(null); setPresentation(null); try { localStorage.removeItem("nexora:pentad:room"); } catch { /* Storage may be unavailable. */ } router.replace("/battle/triad-dominion"); }
+      if (action === "leave") { loadGeneration.current++; }
       else if (data.room) accept(data.room);
       return true;
-    } catch (err) { if (generation === loadGeneration.current) { setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); if (current) void load(current.code); } return false; }
+    } catch (err) { if (generation === loadGeneration.current && action !== "leave") { setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); if (current) void load(current.code); } return false; }
     finally { if (action === "join") setEntering(false); if (!background) { busyRef.current = false; setBusy(false); } }
   };
   useLayoutEffect(() => {
@@ -262,12 +264,12 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       <h1>อำนาจห้าผนึก</h1><div className={styles.versus}>{(["host", "challenger"] as const).map(player => <div key={player} className={styles.seat}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={room.seats[player]?.image || "/avatar.png"} alt="" /><strong>{room.seats[player]?.name || "รอผู้ท้าชิง"}</strong></div>)}</div>
       <span className={styles.vs}>VS</span><div className={styles.waitingActions}>{side === "host" && <><button disabled={busy || Boolean(room.seats.challenger)} onClick={() => void act("bot")}><Bot /> เพิ่มบอท</button><button className={styles.primary} disabled={busy || !room.seats.challenger} onClick={() => void act("start")}><Swords /> เริ่มเกม</button></>}<span><Eye size={18} /> ผู้ชม {room.spectators.length}/10</span></div>
     </section> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
-        {!side ? <h3>ผู้เล่นกำลังเตรียมเด็ค</h3> : <><div className={styles.tabs}>{(["monsters", "hand", "reserve"] as const).map(key => <button key={key} aria-pressed={group === key} onClick={() => setGroup(key)}>{key === "monsters" ? "มอนสเตอร์" : key === "hand" ? "บนมือ" : "กองเสริม"}<b>{deck[key].length}/{key === "monsters" ? 5 : key === "hand" ? 15 : 10}</b></button>)}</div>
+        {!side ? <h3>ผู้เล่นกำลังเตรียมเด็ค</h3> : <><div className={styles.tabs}>{(["monsters", "hand", "reserve"] as const).map(key => <button key={key} aria-pressed={group === key} onClick={() => setGroup(key)}>{key === "monsters" ? "มอนสเตอร์" : key === "hand" ? "สกิล" : "กองเสริมสกิล"}<b>{deck[key].length}/{key === "monsters" ? 5 : key === "hand" ? 15 : 10}</b></button>)}</div>
         <div className={styles.elementCounts}>{pentadElements.map(value => <span key={value}>{pentadElementNames[value]} {total.filter(no => triadCardByNo.get(no)?.element === value).length}/6</span>)}</div>
         <div className={styles.chosenCards}>{deck[group].map((no, index) => <Card key={`${no}:${index}`} no={no} badge={fixedDeck ? undefined : "−"} disabled={fixedDeck || room.ready[side] || busy} onClick={() => changeDeck({ ...deck, [group]: deck[group].filter((_, i) => i !== index) })} />)}</div>
-        <div className={styles.deckActions}>{!fixedDeck && <button title="สุ่มเติมเด็ค" disabled={busy || room.ready[side]} onClick={() => changeDeck(completePentadDeck(deck,Math.random,room.pools))}><Shuffle /> เติมเด็ค</button>}<button className={styles.primary} disabled={busy || room.ready[side] || validatePentadDeck(deck).length > 0} onClick={() => void act("ready", { deck })}><Check /> {room.ready[side] ? "พร้อมแล้ว" : "พร้อม"}</button></div></>}
+</>}
         <div className={styles.readiness}>{(["host", "challenger"] as const).map(player => <span key={player}>{room.seats[player]?.name} {room.ready[player] ? "✓ พร้อม" : "กำลังจัดเด็ค"}</span>)}</div>
-      </>} catalog={<>{side && <div className={styles.catalog}><div className={styles.filters}><label><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหาการ์ด" aria-label="ค้นหาการ์ด" /></label><select aria-label="ธาตุ" value={element} onChange={event => setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{pentadElements.map(value => <option key={value} value={value}>{pentadElementNames[value]}</option>)}</select></div><div className={styles.catalogCards}>{selectedCards.filter(card => !fixedDeck || deck[group].includes(card.cardNo)).map(card => <Card key={card.cardNo} no={card.cardNo} disabled={fixedDeck || room.ready[side] || busy || total.includes(card.cardNo)} badge={String(total.filter(no => no === card.cardNo).length || "+")} onClick={() => changeDeck({ ...deck, [group]: [...deck[group], card.cardNo] })} />)}</div></div>}</>} /> : <section className={styles.battle}>
+      </>} actions={<>{side && <><div className={styles.deckActions}>{!fixedDeck && <button title="สุ่มเติมเด็ค" disabled={busy || room.ready[side]} onClick={() => changeDeck(completePentadDeck(deck,Math.random,room.pools))}><Shuffle /> เติมเด็ค</button>}<button className={styles.primary} disabled={busy || room.ready[side] || validatePentadDeck(deck).length > 0} onClick={() => void act("ready", { deck })}><Check /> {room.ready[side] ? "พร้อมแล้ว" : "พร้อม"}</button></div></>}</>} catalog={<>{side && <div className={styles.catalog}><div className={styles.filters}><label><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหาการ์ด" aria-label="ค้นหาการ์ด" /></label><select aria-label="ธาตุ" value={element} onChange={event => setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{pentadElements.map(value => <option key={value} value={value}>{pentadElementNames[value]}</option>)}</select></div><div className={styles.catalogCards}>{selectedCards.filter(card => !fixedDeck || deck[group].includes(card.cardNo)).map(card => <Card key={card.cardNo} no={card.cardNo} disabled={fixedDeck || room.ready[side] || busy || total.includes(card.cardNo)} badge={String(total.filter(no => no === card.cardNo).length || "+")} onClick={() => changeDeck({ ...deck, [group]: [...deck[group], card.cardNo] })} />)}</div></div>}</>} /> : <section className={styles.battle}>
       <div className={styles.battleStatus}><span>ไฟต์ {room.fight}/3 · ตา {room.turn}/5</span><strong>{room.finalDuel ? "ตัดสินมอนสเตอร์สุดท้าย" : phaseNames[room.phase]}</strong><span>{room.turn === 1 ? "ธาตุปะทะ" : room.turn < 4 ? "ATTACK" : "SUPPORT"}</span></div>
       <div className={styles.scoreboard}>{[upperSide, lowerSide].map(player => <BattleArenaScoreplate key={player} name={room.seats[player]?.name || ""} score={room.score[player]} player={player === lowerSide} avatar={<img className="nexora-arena-avatar" src={room.seats[player]?.image || "/avatar.png"} alt="" />} />)}</div>
       <div className={styles.board} data-pentad-chat-arena>{[upperSide, lowerSide].map(player => <div key={player} className={`${styles.formation} ${player === lowerSide ? styles.lower : styles.upper}`} data-pentad-side={player}>{[0, 1, 2, 3, 4].map(index => {
