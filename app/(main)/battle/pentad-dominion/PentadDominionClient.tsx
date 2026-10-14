@@ -127,6 +127,13 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const accept = (next: PentadRoom) => {
     const previous = roomRef.current;
     if (previous && previous.code === next.code && previous.version > next.version) return;
+    if (next.phase === "finished" && ![next.seats.host?.id, next.seats.challenger?.id].includes(userId)) {
+      loadGeneration.current++;
+      try { localStorage.removeItem("nexora:pentad:room"); } catch { /* Navigation must work without storage. */ }
+      router.replace("/battle/triad-dominion");
+      void fetch("/api/pentad-rooms", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"leave",code:next.code}), keepalive:true }).catch(()=>{});
+      return;
+    }
     const pending = pendingPickRef.current;
     if (pending && (next.code !== pending.code || next.epoch !== pending.epoch || Boolean(next.picks[pending.side]))) { pendingPickRef.current = null; setPendingPick(null); }
     const round = next.rounds.at(-1);
@@ -149,7 +156,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       const response = await fetch(`/api/pentad-rooms${selectedCode ? `?room=${selectedCode}` : ""}`, { cache: "no-store", signal:AbortSignal.timeout(12000) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return;
-      if (data.closed) { roomRef.current=null;setRoom(null);setPresentation(null);try{localStorage.removeItem("nexora:pentad:room");}catch{}setError(data.error);return; }
+      if (data.closed) { loadGeneration.current++;try{localStorage.removeItem("nexora:pentad:room");}catch{}router.replace("/battle/triad-dominion");return; }
       if (!response.ok) throw new Error(data.error || "โหลดห้องไม่สำเร็จ");
       if (data.room) accept(data.room); else setRooms(data.rooms || []);
     } catch (err) { if (generation === loadGeneration.current) setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); }
@@ -256,10 +263,10 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
 
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><BattleArenaSurface image={room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image} className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
     {room && room.phase !== "deck" && <BattleArenaHeader title={PENTAD_TITLE} code={room.code} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} onSurrender={side && room.phase !== "waiting" && room.phase !== "finished" ? ()=>{if(window.confirm("ยืนยันยอมแพ้?"))void act("surrender");} : undefined} />}
-    {room?.phase === "deck" ? <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} /> : !room ? <header className={styles.header}><Link href="/battle/triad-dominion" className={styles.backLobby}>กลับหน้า PLAY</Link></header> : null}
+    {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
     {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}
-    {!room ? <section className={styles.entering}>{entering ? <><Loader2 className={styles.spin} /><strong>กำลังเข้าสนาม</strong></> : <Link href="/battle/triad-dominion" className={styles.backLobby}>กลับหน้า PLAY</Link>}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
+    {!room ? <section className={styles.entering}>{entering && <><Loader2 className={styles.spin} /><strong>กำลังเข้าสนาม</strong></>}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
       <h1>อำนาจห้าผนึก</h1><div className={styles.versus}>{(["host", "challenger"] as const).map(player => <div key={player} className={styles.seat}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={room.seats[player]?.image || "/avatar.png"} alt="" /><strong>{room.seats[player]?.name || "รอผู้ท้าชิง"}</strong></div>)}</div>
       <span className={styles.vs}>VS</span><div className={styles.waitingActions}>{side === "host" && <><button disabled={busy || Boolean(room.seats.challenger)} onClick={() => void act("bot")}><Bot /> เพิ่มบอท</button><button className={styles.primary} disabled={busy || !room.seats.challenger} onClick={() => void act("start")}><Swords /> เริ่มเกม</button></>}<span><Eye size={18} /> ผู้ชม {room.spectators.length}/10</span></div>
     </section> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>

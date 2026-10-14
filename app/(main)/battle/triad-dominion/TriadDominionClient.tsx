@@ -5965,6 +5965,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPhase("lobby");
     if (code) {
       await postRoomAction({ action: "leave", code }).catch(() => null);
+      if (activeRoomCodeRef.current && activeRoomCodeRef.current !== code) return;
       activeRoomCodeRef.current = "";
       activeRoomSnapshotRef.current = null;
       setActiveRoomCode("");
@@ -5973,6 +5974,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase("lobby");
     }
   };
+
+  useLayoutEffect(() => {
+    if (isSpectator && matchDone && currentRoom) void leaveRoom();
+  }, [isSpectator, matchDone, currentRoom?.code]);
 
   const continueRoomBattle = async () => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
@@ -7963,7 +7968,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ยอมแพ้
         </button>
       ) : null}
-      {matchFinalVisible ? (
+      {matchFinalVisible && !isSpectator ? (
         <MatchFinalOverlay winner={neutralWinnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} onExitLobby={leaveRoom} />
       ) : null}
       {canUseGmRescuePanel ? (

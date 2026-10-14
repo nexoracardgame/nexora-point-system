@@ -2,6 +2,10 @@ const fs = require('node:fs'), path = require('node:path'), ts = require('typesc
 const {chromium} = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const source = fs.readFileSync(process.env.TRIAD_CLIENT_SOURCE || 'app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
 const ast = ts.createSourceFile('client.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+let spectatorExitEffect='';
+function findSpectatorExit(node){if(ts.isCallExpression(node)&&node.expression.getText(ast)==='useLayoutEffect'&&node.arguments[0]?.getText(ast).includes('isSpectator && matchDone && currentRoom'))spectatorExitEffect=node.arguments[0].getText(ast);ts.forEachChild(node,findSpectatorExit);}
+findSpectatorExit(ast);assert.ok(spectatorExitEffect,'Actual spectator auto-exit hook exists');
+for(const [spectator,finished,present,expected] of [[true,true,true,1],[true,false,true,0],[false,true,true,0],[true,true,false,0]]){let exits=0;require('node:vm').runInNewContext(`(${spectatorExitEffect})()`,{isSpectator:spectator,matchDone:finished,currentRoom:present?{code:'123456'}:null,leaveRoom:()=>{exits++;}});assert.equal(exits,expected,'Only spectators automatically leave completed games');}
 const names = new Set(['CompactBattleBoard','BoardTriangle','BoardCardSlot','BoardPile','PhaseTrack','SpectatorDeckStrip','BattleRoomChatPanel','BattleRoomChatHud','laneForTurn','turnForLane','parseSkillTargetSelection','PlayerHand','HandCard']);
 const extracted = ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)).map(n=>n.getText(ast)).join('\n');
 let waitingOverlay='';

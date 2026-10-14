@@ -29,7 +29,7 @@ const html=`<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing
 const nodeCache={};function load(file){if(nodeCache[file])return nodeCache[file].exports;const module=nodeCache[file]={exports:{}};const localRequire=id=>id==='./prisma'?{prisma:{}}:id==='@/public/cards/card-skill-db.json'?require('../public/cards/card-skill-db.json'):id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id);vm.runInThisContext(`(function(require,module,exports){${transpile(fs.readFileSync(file,'utf8'),file)}\n})`,{filename:file})(localRequire,module,module.exports);return module.exports;}
 const store=load('lib/pentad-room-store.ts'),rules=load('lib/pentad-dominion.ts');
 const actor={id:'a',name:'ผู้เล่นทดสอบ',image:'/avatar.png'},rival={id:'b',name:'คู่ต่อสู้',image:'/avatar.png'};
-let room=null,serialVersion=10000,pickDelay=0,pickRequests=0,targetFail=false,targetRequests=0;
+let room=null,serialVersion=10000,pickDelay=0,pickRequests=0,targetFail=false,targetRequests=0,forceClosed=false;
 function preparation(){room=store.newPentadRoom('123456',actor);room.seats.challenger=rival;room.phase='deck';room.epoch=1;room.deadline=Date.now()+600000;return room;}
 function battle(){preparation();room.phase='select';room.epoch=2;room.decks.host=rules.completePentadDeck(rules.emptyPentadDeck());room.decks.challenger=rules.completePentadDeck(rules.emptyPentadDeck());room.ready={host:true,challenger:true};room.board={host:['021','001','003','004','005'],challenger:['099','002','016','017','018']};room.turn=2;room.picks={host:'',challenger:''};room.deadline=Date.now()+120000;return room;}
 const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&rect.y+rect.height<=h+1;
@@ -39,6 +39,7 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
   await page.route('https://pentad.test/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname.startsWith('/api/')) {
+      if(forceClosed && route.request().method()==='GET')return route.fulfill({status:404,json:{closed:true,error:'ห้องถูกปิดแล้ว'}});
       try{
         if(route.request().method()==='POST') {
           const body=route.request().postDataJSON();
@@ -112,5 +113,8 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
   const draft='พิมพ์ระหว่างการต่อสู้';await page.getByRole('textbox',{name:'ข้อความแชตสนาม'}).fill(draft);await sync();await page.waitForSelector('.cine_overlay');assert.equal(await page.getByRole('textbox',{name:'ข้อความแชตสนาม'}).inputValue(),draft);await page.getByRole('textbox',{name:'ข้อความแชตสนาม'}).fill(draft+'ได้');await page.getByRole('button',{name:'ส่งข้อความ'}).click();await page.getByText(draft+'ได้',{exact:false}).waitFor();await page.screenshot({path:'artifacts/pentad-ui/cinematic-chat.png'});
   assert.deepEqual(errors,[]);console.log('Pentad UI: ordered transfer choice, live chat through shared cinematic, no browser errors passed');
   await page.getByRole('button',{name:'ข้ามอนิเมชั่น'}).click();battle();room.createdAt=Date.now()+100;room.turn=1;const opening=rules.resolvePentadTurn({fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host'});room.phase='result';room.rounds=[{...opening,id:1,fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host',endsAt:Date.now()+40000,finalDuel:false}];room.deadline=room.rounds[0].endsAt;await sync();await page.getByText('ตรวจความสัมพันธ์ธาตุ',{exact:true}).waitFor();await page.getByText('ธาตุเสริมพลัง',{exact:true}).waitFor({timeout:5000});await page.screenshot({path:'artifacts/pentad-ui/element-boost.png'});await page.getByText(/สกิลนี้ไม่ใช่การเพิ่มหรือลดค่าพลัง/).waitFor({timeout:5000});console.log('Pentad UI: select/confirm, failed-request retry, history and staged elemental boost explanations passed');
+  battle();room.phase='finished';room.winner='host';await page.reload();await page.waitForSelector('[data-pentad-phase="finished"]');assert.equal(await page.evaluate(()=>window.navigationTarget),undefined,'Players retain their result screen');
+  room.seats.host={...actor,id:'other-host'};room.seats.challenger={...rival,id:'other-rival'};room.spectators=[actor];await page.reload();await page.waitForFunction(()=>window.navigationTarget==='/battle/triad-dominion');assert.equal(await page.locator('.penta_endgame').count(),0,'Spectators never need a return button');
+  forceClosed=true;await page.reload();await page.waitForFunction(()=>window.navigationTarget==='/battle/triad-dominion');assert.equal(await page.getByText('กลับหน้า PLAY',{exact:true}).count(),0,'Closed room redirects without a manual return page');assert.equal(await page.evaluate(()=>localStorage.getItem('nexora:pentad:room')),null);console.log('Pentad spectator finished and closed-room automatic exits passed');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});
