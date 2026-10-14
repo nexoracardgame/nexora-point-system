@@ -3627,3 +3627,159 @@ textarea {
   .nexora-battle-shell .triad-arena-board .triad-board-phase-hud { bottom:6px !important; }
   .nexora-battle-shell .triad-arena-board .triad-board-phase-meta { padding:3px 8px !important; font-size:10px !important; }
 }
+
+/* Spectator rails have a fixed budget; the battlefield owns all remaining space. */
+.nexora-battle-shell .triad-dominion-game.triad-spectator-mode {
+  display:flex !important; flex-direction:column !important;
+  height:100% !important; min-height:0 !important; overflow:hidden !important;
+  container-type:size; padding:0 !important;
+  --spectator-rail-height:clamp(64px,12cqh,156px);
+}
+.nexora-battle-shell .triad-spectator-mode .triad-game-roombar {
+  position:relative !important; inset:auto !important;
+  flex:0 0 auto !important; margin:6px 8px 0 !important;
+  padding:6px 12px !important; max-height:none !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-game-roombar > div {
+  display:grid !important; grid-template-columns:minmax(0,1fr) auto auto !important;
+  align-items:center !important; gap:12px !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-game-layout {
+  display:grid !important; position:relative; flex:1 1 0 !important;
+  height:0 !important; min-height:0 !important; overflow:hidden !important;
+  grid-template-columns:minmax(0,1fr) !important; grid-template-rows:minmax(0,1fr) !important;
+  padding:8px !important; gap:8px !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-game-playarea {
+  display:grid !important; grid-template-rows:minmax(0,1fr) !important;
+  height:100% !important; min-height:0 !important; overflow:hidden !important;
+  gap:0 !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-live-stack {
+  display:grid !important; height:100% !important; min-height:0 !important;
+  grid-template-rows:var(--spectator-rail-height) minmax(0,1fr) var(--spectator-rail-height) !important;
+  gap:6px !important; overflow:hidden !important;
+}
+.nexora-battle-shell .triad-spectator-mode.triad-spectator-deck-waiting .triad-spectator-live-stack {
+  grid-template-rows:minmax(0,1fr) !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-strip {
+  display:grid !important; grid-template-rows:18px minmax(0,1fr) !important;
+  height:100% !important; min-height:0 !important; max-height:none !important;
+  padding:4px 8px !important; gap:3px !important; border-radius:6px !important;
+  overflow:hidden !important; box-shadow:none !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-strip > div:first-child {
+  margin:0 !important; gap:8px !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-strip > div:first-child > div {
+  font-size:11px !important; letter-spacing:0 !important; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-cards {
+  display:flex !important; justify-content:space-between; align-items:center;
+  min-height:0; gap:4px !important; overflow-x:auto !important; overflow-y:hidden !important;
+  padding:0 !important; scrollbar-width:none; overscroll-behavior-x:contain;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-cards > button {
+  flex:0 0 auto !important; height:100% !important;
+  width:auto !important; min-width:0 !important; aspect-ratio:815/1110 !important;
+  border:0 !important; border-radius:4px !important; box-shadow:none !important;
+  transform:none !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-spectator-board-shell {
+  height:100% !important; min-height:0 !important; overflow:hidden;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-compact-board.triad-spectator-board {
+  height:100% !important; min-height:0 !important; max-height:none !important;
+  border-radius:8px !important;
+  --triad-card-size:min(16cqw,calc((100cqh - 180px)*0.23),230px) !important;
+  --triad-top-card-size:min(19cqw,calc((100cqh - 180px)*0.25),260px) !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-board-field-grid {
+  grid-template-rows:60px minmax(0,1fr) 12px minmax(0,1fr) 84px !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-board-phase-hud {
+  inset-inline:8px !important; bottom:8px !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-board-phase-card {
+  width:min(560px,75%) !important; max-width:none !important;
+}
+.nexora-battle-shell .triad-spectator-mode .triad-game-layout > aside {
+  display:none !important;
+}
+.nexora-battle-shell .triad-spectator-chat-drawer {
+  position:absolute; right:12px; bottom:12px; z-index:95;
+  width:max-content; max-width:calc(100% - 24px);
+}
+.nexora-battle-shell .triad-spectator-chat-drawer > summary {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  cursor:pointer; min-height:34px; padding:6px 12px; border-radius:6px;
+  background:#142e36; border:1px solid #81dae066; color:#eafcff; font-size:12px;
+  list-style:none;
+}
+.nexora-battle-shell .triad-spectator-chat-drawer > summary::-webkit-details-marker { display:none; }
+.nexora-battle-shell .triad-spectator-chat-drawer[open] {
+  width:min(340px,calc(100% - 24px)); bottom:8px;
+}
+.nexora-battle-shell .triad-spectator-chat-drawer .triad-battle-chat-panel {
+  height:min(340px,60cqh) !important; min-height:0 !important; max-height:none !important;
+  background:#091419f5 !important;
+}
+@media (min-height:600px) and (max-height:800px) and (min-width:901px) {
+  .nexora-battle-shell .triad-dominion-game.triad-spectator-mode { --spectator-rail-height:64px; }
+  .nexora-battle-shell .triad-spectator-mode .triad-compact-board.triad-spectator-board {
+    --triad-card-size:min(16cqw,calc((100cqh - 154px)*0.23),230px) !important;
+    --triad-top-card-size:min(19cqw,calc((100cqh - 154px)*0.25),260px) !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-board-field-grid {
+    grid-template-rows:44px minmax(0,1fr) 6px minmax(0,1fr) 84px !important; padding:6px 12px !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-board-phase-meta { padding:3px 8px !important; }
+}
+@media (min-width:1200px) and (min-height:600px) {
+  .nexora-battle-shell .triad-spectator-mode .triad-game-layout {
+    grid-template-columns:minmax(0,1fr) clamp(240px,17vw,320px) !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-layout > aside {
+    display:flex !important; height:100% !important; max-height:100% !important;
+    min-height:0 !important; overflow:hidden !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-layout > aside > div:first-child {
+    display:flex; flex-direction:column; flex:1; min-height:0; gap:8px;
+  }
+  .nexora-battle-shell .triad-spectator-mode aside .triad-battle-chat-panel {
+    flex:1; height:0 !important; min-height:0 !important; max-height:none !important; margin:0;
+  }
+  .nexora-battle-shell .triad-spectator-chat-drawer { display:none; }
+}
+@media (max-height:599px), (max-width:900px) and (orientation:portrait) {
+  .nexora-battle-shell .triad-dominion-game.triad-spectator-mode { --spectator-rail-height:40px; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-roombar { height:34px !important; margin:2px 4px 0 !important; padding:2px 6px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-roombar > div > div:first-child > .min-w-0 > div:first-child { display:none !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-roombar .text-xl { font-size:13px !important; margin:0; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-roombar .h-10 { height:28px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-roombar > div > button { display:inline-flex !important; font-size:11px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-roombar .triad-spectator-avatar-rail { max-height:24px; overflow:hidden; }
+  .nexora-battle-shell .triad-spectator-mode .triad-game-layout { padding:3px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-spectator-live-stack { gap:3px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-strip {
+    grid-template-columns:100px minmax(0,1fr) !important; grid-template-rows:minmax(0,1fr) !important;
+    padding:2px 4px !important; gap:4px !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-strip > div:first-child { flex-direction:column; align-items:start; justify-content:center; gap:0 !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-spectator-deck-strip > div:first-child > div { max-width:100%; font-size:10px !important; padding:0 !important; border:0; }
+  .nexora-battle-shell .triad-spectator-mode .triad-compact-board.triad-spectator-board {
+    --triad-card-size:min(14cqw,calc((100cqh - 112px)*0.23),92px) !important;
+    --triad-top-card-size:min(17cqw,calc((100cqh - 112px)*0.25),104px) !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-board-field-grid {
+    grid-template-rows:34px minmax(0,1fr) 4px minmax(0,1fr) 60px !important; padding:4px 8px !important;
+  }
+  .nexora-battle-shell .triad-spectator-mode .triad-board-phase-hud { bottom:3px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-board-phase-card { width:min(480px,68%) !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-board-phase-meta { padding:2px 4px !important; }
+  .nexora-battle-shell .triad-spectator-mode .triad-arena-title { display:none; }
+  .nexora-battle-shell .triad-spectator-chat-drawer { bottom:6px; right:6px; }
+  .nexora-battle-shell .triad-spectator-chat-drawer > summary { min-height:28px; padding:4px 6px; font-size:11px; }
+}

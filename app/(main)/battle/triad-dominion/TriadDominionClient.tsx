@@ -3628,7 +3628,7 @@ function SpectatorDeckStrip({
             onFocus={() => onPreview?.(card)}
             onBlur={onPreviewEnd}
             onClick={() => onPreview?.(card)}
-            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-md border border-white/10 bg-black shadow-[0_10px_18px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/55 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
+            className="group relative aspect-[815/1110] min-w-0 overflow-hidden rounded-md bg-transparent transition duration-200 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-amber-200/70"
           >
             <Image
               src={card.sourceImage}
@@ -3638,7 +3638,7 @@ function SpectatorDeckStrip({
               quality={92}
               unoptimized
               loading="eager"
-              className="object-cover transition duration-200 group-hover:scale-[1.04]"
+              className="object-contain"
             />
             <div className="absolute left-1 top-1 rounded bg-black/72 px-1 py-0.5 text-[8px] font-black text-white">{card.cardNo}</div>
           </button>
@@ -8613,7 +8613,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           ) : null}
 
-          {currentRoom ? (
+          {currentRoom && isSpectator ? (
+            <details className="triad-spectator-chat-drawer">
+              <summary aria-label="แชตสนาม"><MessageCircle className="h-4 w-4" /><span>แชตสนาม</span></summary>
+              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
+            </details>
+          ) : null}
+          {currentRoom && !isSpectator ? (
             <div className="triad-room-actions-mobile space-y-2 2xl:hidden">
               <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
               {deckSelectionActive ? (
