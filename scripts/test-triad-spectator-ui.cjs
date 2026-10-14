@@ -2,7 +2,7 @@ const fs = require('node:fs'), path = require('node:path'), ts = require('typesc
 const {chromium} = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const source = fs.readFileSync(process.env.TRIAD_CLIENT_SOURCE || 'app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
 const ast = ts.createSourceFile('client.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-const names = new Set(['CompactBattleBoard','BoardTriangle','BoardCardSlot','BoardPile','PhaseTrack','SpectatorDeckStrip','BattleRoomChatPanel','BattleRoomChatHud','laneForTurn','turnForLane','parseSkillTargetSelection']);
+const names = new Set(['CompactBattleBoard','BoardTriangle','BoardCardSlot','BoardPile','PhaseTrack','SpectatorDeckStrip','BattleRoomChatPanel','BattleRoomChatHud','laneForTurn','turnForLane','parseSkillTargetSelection','PlayerHand','HandCard']);
 const extracted = ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)).map(n=>n.getText(ast)).join('\n');
 let waitingOverlay='';
 function findWaiting(node){if(ts.isJsxElement(node)&&node.openingElement.attributes.properties.some(attribute=>ts.isJsxAttribute(attribute)&&attribute.name.text==='className'&&attribute.initializer?.getText(ast).includes('triad-spectator-waiting-overlay')))waitingOverlay=node.getText(ast);else ts.forEachChild(node,findWaiting);}
@@ -13,27 +13,29 @@ for (const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx
 modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'),'utf8');
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
 modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));
+modules['@/components/BattleArenaControls']=transpile(fs.readFileSync('components/BattleArenaControls.tsx','utf8'));
 const roombar = source.slice(source.indexOf('<section className="triad-game-roombar'), source.indexOf('<section className="hidden relative overflow-hidden border-b',source.indexOf('<section className="triad-game-roombar')));
 modules.test = transpile(`import {useState,useLayoutEffect,useEffect,useRef,Fragment} from 'react';import {createPortal} from 'react-dom';import {Sparkles,Swords,MessageCircle,SendHorizontal,Smile,Clock3} from 'lucide-react';
 import BattleArenaChat from '@/components/BattleArenaChat';
 import { BattleArenaScoreplate, BattleArenaPhaseTrack, BattleArenaProgress, BattleArenaCardFrame, BattleArenaSurface } from '@/components/BattleArenaHud';
+import { BattleArenaHeader, BattleArenaFormation, BattleArenaHand, BattleArenaStatus } from '@/components/BattleArenaControls';
 const TRIAD_TITLE='Triad Dominion (อำนาจสามผนึก) ฐาน 3 ใบ';
 const playCardDeployment=()=>()=>{},TRIAD_CARD_BACK_SRC='/cards/card-backs/card-backs.png';
 const Image=({fill,priority,quality,sizes,...props})=><img {...props} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}/>;
 const MiniProfileHover=()=>null,CardHoverPreview=()=>null,RevealSpotlight=()=>null,SkillTargetOverlay=()=>null,TimeoutWarningOverlay=()=>null,BattleCinematic=()=>null;
 const profileForParticipant=()=>null,getPlayableSkillTargetIds=()=>[];
 const deckTimerText='9:59';
-const cards=Array.from({length:20},(_,i)=>({cardNo:String(i+1).padStart(3,'0'),name:'Card '+i,kind:'monster',sourceImage:'/cards/'+String(i+1).padStart(3,'0')+'.jpg'}));
+const cards=Array.from({length:20},(_,i)=>({cardNo:String(i+1).padStart(3,'0'),name:'Card '+i,kind:i<10?'monster':'skill',sourceImage:'/cards/'+String(i+1).padStart(3,'0')+'.jpg'}));
 const triangle={top:'001',left:'002',right:'003'},bot={top:'004',left:'005',right:'006'};
 const currentRoom={code:'123456',seats:{},spectators:[],game:{chat:[{id:'initial',senderId:'other',senderName:'The Hope',text:'พร้อมสู้แล้ว!',createdAt:Date.now()}]}},isFieldPlayer=false,matchDone=false,currentDeckModeTitle='โหมดรวม',SPECTATOR_LIMIT=10,rankProfiles=[],participant={id:'viewer'};
 const surrenderBattle=()=>{},leaveRoom=()=>{},sendRoomChat=async text=>{currentRoom.game.chat.push({id:String(Date.now()),senderId:'viewer',senderName:'ผู้ชม',text,createdAt:Date.now()});window.sentText=text;window.mount(false);return true;};
 window.floodChat=()=>{currentRoom.game.chat=Array.from({length:45},(_,i)=>({id:'long-'+i,senderId:'other',senderName:'ผู้ชมทดสอบ',text:'ข้อความยาวสำหรับทดสอบพื้นที่แชตโดยไม่บังการ์ดหรือส่วนควบคุมสนาม '.repeat(3),createdAt:Date.now()}));window.mount(false);};
 const SpectatorAvatarRail=()=> <div className="triad-spectator-avatar-rail">ผู้ชม</div>;
 ${extracted}
-export default function Test({waiting=false}){return <BattleArenaSurface image={require('arena').triadArenas[0].image} className={'triad-dominion-game triad-spectator-mode '+(waiting?'triad-spectator-deck-waiting':'')}>
+export default function Test({waiting=false}){if(window.testHand)return <BattleArenaSurface image={require('arena').triadArenas[0].image} className="triad-dominion-game"><PlayerHand cards={cards} usedSet={new Set()} player={{}} placementLane="top" activeLane="top" locked={false} onSelectLane={()=>{}} onPlayCard={no=>window.picked=no} onDropToLane={()=>{}} /></BattleArenaSurface>;return <BattleArenaSurface image={require('arena').triadArenas[0].image} className={'triad-dominion-game triad-spectator-mode '+(waiting?'triad-spectator-deck-waiting':'')}>
 <BattleRoomChatHud room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={Boolean(window.cinematicChat)}/>
 {window.cinematicChat&&createPortal(<div data-test-cinematic style={{position:'fixed',inset:0,zIndex:2147483050,background:'#123'}}/>,document.body)}
-${roombar}
+<BattleArenaHeader title={TRIAD_TITLE} code="123456" time="1:30" onExit={leaveRoom}/>
 <section className="triad-game-layout"><section className="triad-game-playarea"><div className="triad-spectator-live-stack">
 {!waiting&&<SpectatorDeckStrip title="ฝั่งบน · The Hope" cards={cards} tone="top" onPreview={()=>window.previews=(window.previews||0)+1}/>}
 <div className="triad-spectator-board-shell relative min-h-0"><CompactBattleBoard arena={require('arena').triadArenas[0]} battleSessionKey="test" cardsByNo={new Map(cards.map(c=>[c.cardNo,c]))} lockedFight={{player:triangle,bot,turns:[]}} player={triangle} revealed={{1:{player:true,bot:true,scored:false},2:{player:true,bot:true,scored:false},3:{player:true,bot:true,scored:false}}} activeTurn={1} matchScore={{player:0,bot:0}} fightNo={1} fightScore={{player:0,bot:0}} playerDeckLeft={20} botDeckLeft={20} playerGraveCards={[]} botGraveCards={[]} playerName="ผู้เล่นทดสอบ" botName="The Hope" playerImage="" botImage="" placementLane="top" timeLeft={90} battleActive={!waiting} turnLocked revealAllCards pendingSkillChoice={null} onSelectSkillTarget={()=>{}} onConfirmSkillTarget={()=>{}} onDrawRandomCard={()=>{}} onSelectLane={()=>{}} onPlaceCard={()=>{}}/>{waiting&&${waitingOverlay}}</div>
@@ -68,7 +70,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}body
   assert.equal(await page.locator('.triad-spectator-deck-cards > button').count(),40);
   assert.ok(await page.locator('.triad-spectator-deck-cards > button').evaluateAll(els=>els.every(e=>Math.abs(e.clientWidth/e.clientHeight-815/1110)<.04)),'Native rail card ratio');
   const local=await page.locator('.triad-arena-triangle').evaluateAll(els=>els.map(e=>({main:e.querySelector('[data-triad-lane="top"]').offsetTop,left:e.querySelector('[data-triad-lane="left"]').offsetTop})));
-  assert.ok(local[0].main>local[0].left&&local[1].main<local[1].left,'NEXORA pyramid intact');
+  assert.ok(local[0].main>local[0].left&&local[1].main<local[1].left,'NEXORA pyramid intact '+JSON.stringify(local));
   await page.screenshot({path:`artifacts/triad-spectator/screen-${width}-${height}.png`});
   assert.equal(await page.locator('.triad-battle-chat-hud').count(),1,'One chat instance');
   const chat=await page.locator('.triad-battle-chat-hud').boundingBox();
@@ -97,5 +99,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}body
   const overlay=await page.locator('.triad-spectator-waiting-overlay').boundingBox();for(const plate of await page.locator('.triad-opponent-scoreplate,.triad-player-scoreplate').all()){const score=await plate.boundingBox();assert.ok(disjoint(overlay,score),'Deck selection timer never covers scores '+JSON.stringify({width,height,overlay,score}));}
   assert.deepEqual(errors,[]);console.log(`Spectator ${width}x${height}: dominant arena, six readable cards, native ratios, pyramid, no overlaps, chat and waiting passed`);
  }
+ await page.setViewportSize({width:1920,height:1080});await page.evaluate(()=>{window.testHand=true;mount(false);});await page.locator('.nexora-arena-hand').waitFor();
+ for(const [label,count] of [['มอนสเตอร์',10],['สกิล',10],['ทั้งหมด',20]]){await page.getByRole('button',{name:label,exact:true}).click();assert.equal(await page.locator('.nexora-arena-hand-cards > button').count(),count,'Triad hand filter '+label);}
+ await page.getByRole('button',{name:'มอนสเตอร์',exact:true}).click();await page.locator('.nexora-arena-hand-cards > button').first().click();assert.equal(await page.evaluate(()=>window.picked),'001','Filtering never changes card identity');assert.deepEqual(errors,[]);console.log('Triad actual hand: all/monster/skill filters and selection passed');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

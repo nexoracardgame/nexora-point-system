@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from "@/components/DeckPreparation";
 import { freshDeck, randomTriadDeck } from "@/lib/deck-reroll";
 import { BattleArenaScoreplate, BattleArenaPhaseTrack, BattleArenaProgress, BattleArenaSurface, BattleArenaCardFrame } from "@/components/BattleArenaHud";
@@ -2383,7 +2384,7 @@ function BoardTriangle({
   const lanes = tone === "bot" ? botLanes : playerLanes;
 
   return (
-    <div className={`triad-arena-triangle grid grid-cols-2 justify-items-center gap-x-[var(--triad-slot-gap,clamp(5px,1vw,14px))] gap-y-0 ${tone === "player" ? "items-end -translate-y-0.5 sm:-translate-y-2" : "items-start translate-y-0.5 sm:translate-y-2"}`}>
+    <BattleArenaFormation upper={tone === "bot"} className="triad-arena-triangle">
       {lanes.map(({ lane, label, className }) => {
         const cardNo = triangle[lane];
         const card = cardNo ? cardsByNo.get(cardNo) : undefined;
@@ -2394,6 +2395,7 @@ function BoardTriangle({
             <button
               type="button"
               data-triad-lane={lane}
+              data-arena-slot={lane === "top" ? 0 : lane === "left" ? 1 : 3}
               onClick={() => {
                 if (card && canPreview) onPreview?.(card, "modal");
                 onSlotClick?.(lane);
@@ -2459,7 +2461,7 @@ function BoardTriangle({
           100% { transform: translateX(0) scale(1) rotate(0); filter: blur(0); opacity: 1; }
         }
       `}</style>
-    </div>
+    </BattleArenaFormation>
   );
 }
 
@@ -2610,8 +2612,8 @@ function HandCard({
               : "border-white/14 hover:-translate-y-2 hover:border-amber-200/70"
       }`}
     >
-      <div className="relative aspect-[3/4]">
-        <Image src={card.sourceImage} alt={card.name} fill sizes="110px" draggable={false} className="select-none object-cover [-webkit-touch-callout:none]" />
+      <div className="relative aspect-[815/1110]">
+        <BattleArenaCardFrame><Image src={card.sourceImage} alt={card.name} fill sizes="110px" draggable={false} className="select-none object-contain [-webkit-touch-callout:none]" /></BattleArenaCardFrame>
         {used ? <div className="absolute inset-0 bg-black/62" /> : null}
       </div>
       {used ? (
@@ -2654,6 +2656,7 @@ function PlayerHand({
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
   const [splitHandLayout, setSplitHandLayout] = useState(false);
+  const [handFilter, setHandFilter] = useState<ArenaCardFilter>("all");
   const placedByNo = new Map<string, Lane>();
   (["top", "left", "right"] as Lane[]).forEach((lane) => {
     const cardNo = player[lane];
@@ -2707,8 +2710,6 @@ function PlayerHand({
     onPlayCard(cardNo);
     setPreviewCard(null);
   };
-  const monsterCards = cards.filter((card) => card.kind !== "skill");
-  const skillCards = cards.filter((card) => card.kind === "skill");
   const renderHandCard = (card: CardView) => {
     const placedLane = placedByNo.get(card.cardNo);
     const unavailable = usedSet.has(card.cardNo) || Boolean(placedLane && placedLane !== activeLane);
@@ -2718,7 +2719,7 @@ function PlayerHand({
         card={card}
         used={unavailable}
         placedLane={placedLane}
-        disabled={locked}
+        disabled={locked || unavailable || (activeLane === "top" && card.kind === "skill")}
         highlighted={highlightCardNo === card.cardNo}
         previewOnly={splitHandLayout}
         onClick={() => onPlayCard(card.cardNo)}
@@ -2732,38 +2733,9 @@ function PlayerHand({
   return (
     <div className="triad-player-hand relative z-[90] rounded-xl border border-white/8 bg-black/28 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.32)] [container-type:inline-size]">
       <CardHoverPreview card={previewCard} onClose={() => setPreviewCard(null)} onUseCard={canUsePreviewCard ? usePreviewCard : undefined} passive />
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
-          การ์ดในมือ
-        </div>
-        <div className="flex gap-1">
-          {(["top", "left", "right"] as Lane[]).map((lane) => (
-            <button
-              key={lane}
-              type="button"
-              onClick={() => lane === activeLane && onSelectLane(lane)}
-              disabled={locked || lane !== activeLane}
-              className={`h-7 rounded-lg border px-2 text-[10px] font-black uppercase transition ${
-                placementLane === lane
-                  ? "border-amber-300 bg-amber-300 text-black"
-                  : "border-white/10 bg-white/5 text-white/55 hover:border-amber-300/50"
-              } disabled:opacity-35`}
-            >
-              {lane === "top" ? "หลัก" : lane === "left" ? "โจมตี" : "ช่วย"}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className={`triad-hand-grid ${splitHandLayout ? "triad-hand-grid-split" : ""} grid min-h-0 grid-cols-[repeat(auto-fit,minmax(clamp(48px,6.2vw,82px),1fr))] gap-1.5 overflow-visible pb-1`}>
-        <div className="triad-hand-row triad-hand-row-monster">
-          <div className="triad-hand-row-label">มอนสเตอร์</div>
-          {monsterCards.map(renderHandCard)}
-        </div>
-        <div className="triad-hand-row triad-hand-row-skill">
-          <div className="triad-hand-row-label">สกิล</div>
-          {skillCards.map(renderHandCard)}
-        </div>
-      </div>
+      <BattleArenaHand title={activeLane === "top" ? "เลือกมอนสเตอร์ลงสนาม" : "เลือกการ์ดลงสนาม"} filter={handFilter} onFilterChange={setHandFilter}>
+        {cards.filter(card => handFilter === "all" || card.kind === handFilter).map(renderHandCard)}
+      </BattleArenaHand>
     </div>
   );
 }
@@ -4487,7 +4459,7 @@ function CompactBattleBoard({
   return (
     <div data-battle-arena={arena.id} className={`triad-compact-board triad-arena-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [container-type:inline-size]`} style={{ "--arena-color": arena.color } as CSSProperties}>
       <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
-      <div className="triad-arena-title"><Sparkles size={15} /><span>{arena.name}</span><small>ธาตุ{arena.element}</small></div>
+      <BattleArenaStatus fight={fightNo} turn={activeTurn} turns={3} title={pendingSkillChoice || waitingSkillChoice ? "เลือกเป้าหมายสกิล" : turnLocked ? "ปะทะ" : "เลือกการ์ด"} hint={activeTurn === 1 ? "มอนสเตอร์ปะทะ" : activeTurn === 2 ? "ATTACK" : "SUPPORT"} />
       <BattleArenaScoreplate name={botName} score={matchScore.bot} avatar={<MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />} />
       <BattleArenaScoreplate name={playerName} score={matchScore.player} player avatar={<MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />} />
       {cinematicPlaying && currentResult ? (
@@ -8048,47 +8020,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
       ) : null}
       {isSpectator ? <CardHoverPreview card={spectatorPreviewCard} onClose={() => setSpectatorPreviewCard(null)} passive /> : null}
-      <section className="triad-game-roombar relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(230px,0.85fr)_minmax(260px,1fr)_auto] lg:items-center">
-          <div className="flex min-w-0 items-center gap-2">
-            <img className="h-10 w-24 shrink-0 object-contain" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
-            {currentRoom && isFieldPlayer && !matchDone ? (
-              <button
-                type="button"
-                onClick={surrenderBattle}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-200/35 bg-red-500 px-3 text-[11px] font-black uppercase tracking-[0.1em] text-white shadow-[0_0_30px_rgba(239,68,68,0.22)] transition hover:bg-red-400 sm:px-4"
-              >
-                <Swords className="h-4 w-4" />
-                ยอมแพ้
-              </button>
-            ) : null}
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/52">
-              <Swords className="h-3.5 w-3.5 text-amber-300" />
-              Battle Room
-            </div>
-            <div className="mt-1 truncate text-xl font-black uppercase tracking-normal text-white sm:text-2xl">
-              {TRIAD_TITLE}
-            </div>
-          </div>
-          </div>
-          <div className="min-w-0 lg:justify-self-end">
-            <div className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/38 lg:text-right">
-              ผู้ชม {currentRoom?.spectators.length || 0}/{SPECTATOR_LIMIT}
-            </div>
-            <SpectatorAvatarRail spectators={currentRoom?.spectators || []} rankProfiles={rankProfiles} currentParticipantId={participant.id} />
-          </div>
-          {currentRoom ? (
-            <button
-              type="button"
-              onClick={leaveRoom}
-              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/55 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/70 transition hover:border-white/30 lg:justify-self-end"
-            >
-              ออกห้อง
-            </button>
-          ) : null}
-        </div>
-      </section>
+      <BattleArenaHeader title={TRIAD_TITLE} code={currentRoom?.code} time={`${Math.floor(displayTimeLeft / 60)}:${String(displayTimeLeft % 60).padStart(2, "0")}`} onExit={leaveRoom} onSurrender={currentRoom && isFieldPlayer && !matchDone ? surrenderBattle : undefined} />
       <section className="hidden relative overflow-hidden border-b border-white/8 bg-[#070b12] px-4 py-5 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.22),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(14,165,233,0.16),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">

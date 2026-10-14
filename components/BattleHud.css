@@ -44,6 +44,58 @@
 .nexora-arena-progress b { color:#fff; font-variant-numeric:tabular-nums; }
 .nexora-arena-surface::before,.nexora-arena-surface::after { display:none !important; }
 .nexora-arena-surface { --arena-card-height:min(16dvh,190px); }
+.nexora-arena-formation { position:relative !important; width:min(70%,1100px) !important; height:100%; margin-inline:auto; display:block !important; transform:none !important; container-type:size; --formation-card-height:min(var(--arena-card-height),calc(100cqh - 8px)); }
+.nexora-arena-formation > [data-arena-slot] { position:absolute !important; width:calc(var(--formation-card-height) * 815 / 1110) !important; height:var(--formation-card-height) !important; margin:0 !important; transform:none !important; padding:0; border:0; background:transparent; }
+.nexora-arena-formation > [data-arena-slot="0"] { left:50% !important; transform:translateX(-50%) !important; top:0; }
+.nexora-arena-formation > [data-arena-slot="1"] { left:25% !important; bottom:0; }
+.nexora-arena-formation > [data-arena-slot="2"] { left:8% !important; bottom:0; }
+.nexora-arena-formation > [data-arena-slot="3"] { right:25% !important; bottom:0; }
+.nexora-arena-formation > [data-arena-slot="4"] { right:8% !important; bottom:0; }
+.nexora-arena-formation[data-floating="true"] { position:absolute !important; left:50% !important; transform:translateX(-50%) !important; height:45% !important; }
+.nexora-arena-formation[data-floating="true"][data-upper="true"] { top:0; bottom:auto; }
+.nexora-arena-formation[data-floating="true"][data-upper="false"] { bottom:0; top:auto; }
+.nexora-arena-formation[data-upper="true"] > [data-arena-slot] { top:0; bottom:auto; }
+.nexora-arena-formation[data-upper="true"] > [data-arena-slot="0"] { top:auto; bottom:0; }
+.nexora-arena-formation [data-board-card],.nexora-arena-formation > [data-arena-slot] > button { position:relative !important; inset:auto !important; width:100% !important; height:100% !important; transform:none !important; }
+.nexora-arena-formation > [data-arena-slot] > .group { width:100% !important; }
+.nexora-arena-surface .nexora-arena-formation[style] { transform:none !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation { display:block !important; width:min(70%,1100px) !important; height:100% !important; margin:0 auto !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation > [data-arena-slot] { position:absolute !important; width:calc(var(--formation-card-height) * 815 / 1110) !important; height:var(--formation-card-height) !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation > [data-arena-slot="0"] { transform:translateX(-50%) !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation[data-upper="false"] { height:calc(100% - 8px) !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation > [data-arena-slot] { top:auto !important; bottom:0 !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation > [data-arena-slot="0"] { top:0 !important; bottom:auto !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation[data-upper="true"] > [data-arena-slot] { top:0 !important; bottom:auto !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation[data-upper="true"] > [data-arena-slot="0"] { top:auto !important; bottom:0 !important; }
+.nexora-arena-header { display:flex; align-items:center; gap:16px; min-height:66px; padding:10px 24px; flex-shrink:0; background:#06090980; border-bottom:1px solid #e0c37944; color:#fff; }
+.nexora-arena-status { position:absolute; top:10px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:2px; z-index:2; padding:6px 20px; background:transparent; text-shadow:0 2px 4px #000,0 0 12px #000; text-align:center; }
+.nexora-arena-status span { color:#d9ebdf; font-size:12px; }
+.nexora-arena-status strong { font-size:20px; color:#f0ce7a; }
+.nexora-battle-shell .triad-dominion-game { border:0 !important; border-radius:0 !important; }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .nexora-arena-status { top:4px; padding:3px 10px; } .nexora-arena-status strong { font-size:14px; } .nexora-arena-status span { font-size:10px; } }
+.nexora-arena-header > img { width:100px; height:42px; object-fit:contain; }
+.nexora-arena-brand { min-width:0; }
+.nexora-arena-brand small { display:flex; align-items:center; gap:5px; font-size:10px; color:#edd7a5; }
+.nexora-arena-brand strong { display:block; font-size:18px; line-height:1.3; overflow-wrap:anywhere; }
+.nexora-arena-room-code { color:#edd7a5; font-size:12px; white-space:nowrap; }
+.nexora-arena-header-actions { margin-left:auto; display:flex; align-items:center; gap:16px; flex-shrink:0; }
+.nexora-arena-header-actions span { display:flex; align-items:center; gap:6px; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; }
+.nexora-arena-header-actions button { padding:6px; color:white; background:transparent; border:0; cursor:pointer; }
+.nexora-arena-hand { height:165px; min-height:0; flex-shrink:0; padding:8px 20px; background:#0006; border-top:1px solid #e3d59433; }
+.nexora-arena-hand-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:28px; }
+.nexora-arena-hand-heading strong { display:flex; align-items:center; gap:8px; font-size:13px; }
+.nexora-arena-hand-filters { display:flex; gap:4px; }
+.nexora-arena-hand-filters button { padding:5px 12px; border:1px solid #e3d59444; border-radius:4px; color:#eee; background:#080c1080; font-size:12px; cursor:pointer; }
+.nexora-arena-hand-filters button[aria-pressed=true] { background:#f0ce7a; color:#121610; }
+.nexora-arena-hand-cards { display:flex; align-items:stretch; gap:8px; height:120px; overflow-x:auto; padding:4px; }
+.nexora-arena-hand-cards > button { width:auto !important; height:100% !important; flex:0 0 auto !important; aspect-ratio:815/1110; padding:0 !important; border:0 !important; background:transparent !important; }
+.nexora-arena-hand-cards > button > .relative { width:100%; height:100%; border-radius:6px; overflow:hidden; }
+.nexora-battle-shell .triad-dominion-game .triad-game-roombar { display:none !important; }
+.nexora-battle-shell .triad-dominion-game .triad-player-hand { padding:0 !important; border:0 !important; border-radius:0 !important; height:auto !important; background:transparent !important; }
+.nexora-battle-shell .triad-dominion-game .triad-player-hand > .hidden { display:none !important; }
+.nexora-battle-shell .triad-dominion-game .triad-arena-board .nexora-arena-formation [data-board-card] { width:100% !important; height:var(--formation-card-height) !important; }
+@media (min-width:2000px) { .nexora-arena-header { min-height:90px; padding-inline:40px; } .nexora-arena-hand { height:220px; } .nexora-arena-hand-cards { height:168px; } }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .nexora-arena-header { min-height:44px; padding:4px 12px; gap:8px; } .nexora-arena-header > img { width:66px; height:28px; } .nexora-arena-brand strong { font-size:12px; } .nexora-arena-brand small { font-size:8px; } .nexora-arena-header-actions { gap:8px; } .nexora-arena-header-actions span { font-size:16px; } .nexora-arena-room-code { font-size:10px; } .nexora-arena-hand { height:98px; padding:4px 8px; } .nexora-arena-hand-heading { min-height:20px; gap:4px; } .nexora-arena-hand-heading strong { font-size:10px; gap:4px; } .nexora-arena-hand-filters button { font-size:10px; padding:3px 6px; } .nexora-arena-hand-cards { height:72px; gap:4px; } }
 .nexora-battle-shell .triad-dominion-game .triad-arena-board { background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; }
 .nexora-battle-shell .triad-dominion-game .triad-arena-board [data-board-card] { overflow:hidden; border-radius:6px; }
 .nexora-battle-shell .triad-arena-board { --triad-top-card-size:var(--triad-card-size) !important; }
