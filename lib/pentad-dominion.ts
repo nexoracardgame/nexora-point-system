@@ -77,6 +77,7 @@ export type PentadResolution = {
   totals: Record<PentadSide, number>;
   events: TriadTurnResult["skillEvents"];
   effective: Record<PentadSide, string>;
+  stages?: { title: string; detail: string }[];
 };
 
 export function comparePentadPower(attack: Record<PentadSide, number>, support: Record<PentadSide, number>, totalOnly = false): PentadSide | "draw" {
@@ -95,7 +96,8 @@ export function resolvePentadTurn(input: {
   const relation = pentadElementRelation(host.element, challenger.element);
   const basic = { attack: { host: host.attack, challenger: challenger.attack }, support: { host: host.support, challenger: challenger.support } };
   if (input.turn === 1 && relation.winner && !input.finalDuel) return {
-    ...basic, winner: relation.winner, reason: `ธาตุ${pentadElementNames[triadCardByNo.get(input.mains[relation.winner])!.element]}ชนะธาตุ`,
+    ...basic, winner: relation.winner, reason: `ธาตุ${pentadElementNames[triadCardByNo.get(input.mains[relation.winner])!.element]}ชนะธาตุ${pentadElementNames[triadCardByNo.get(input.mains[otherPentadSide(relation.winner)])!.element]}`,
+    stages: [{ title: "เปิดมอนสเตอร์พร้อมกัน", detail: `ดิน น้ำ ไม้ ไฟ ทอง · วัดความสัมพันธ์ธาตุก่อนค่าพลัง` }, { title: "ธาตุพิชิต", detail: `ธาตุ${pentadElementNames[triadCardByNo.get(input.mains[relation.winner])!.element]}ชนะธาตุ${pentadElementNames[triadCardByNo.get(input.mains[otherPentadSide(relation.winner)])!.element]} ได้ 1 คะแนนทันที ไม่วัด ATK / SUP` }],
     totals: { host: host.attack + host.support, challenger: challenger.attack + challenger.support }, events: [], effective: { ...input.mains },
   };
   const skills = { ...input.skills };
@@ -109,6 +111,7 @@ export function resolvePentadTurn(input: {
   };
   const run = (turn: 2 | 3) => resolveTriadTurn({
     turn, prioritySide: input.opener === "host" ? "player" : "opponent",
+    combinedStatConditions: input.turn === 1 || (input.fight === 3 && input.turn === 4),
     player: { top: host.cardNo, [turn === 2 ? "left" : "right"]: skills.host },
     opponent: { top: challenger.cardNo, [turn === 2 ? "left" : "right"]: skills.challenger },
     skillTargets: targets,
@@ -129,5 +132,20 @@ export function resolvePentadTurn(input: {
   ];
   const events = metricEvents.filter((event, index, all) => all.findIndex(other => other.side === event.side && other.cardNo === event.cardNo && other.summary === event.summary) === index);
   const effective = atk || sup;
-  return { winner, reason: metric === "total" ? "พลังรวม ATK + SUP" : metric === "attack" ? "พลัง ATTACK" : "พลัง SUPPORT", attack, support, totals, events, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
+  const stages: NonNullable<PentadResolution["stages"]> = [];
+  if (input.turn === 1 && !input.finalDuel) {
+    stages.push({ title: "ตรวจความสัมพันธ์ธาตุ", detail: `ธาตุ${pentadElementNames[host.element]} ปะทะ ธาตุ${pentadElementNames[challenger.element]}` });
+    if (relation.boosted) {
+      const boosted = relation.boosted;
+      const source = otherPentadSide(boosted);
+      stages.push({ title: "ธาตุเสริมพลัง", detail: `ธาตุ${pentadElementNames[triadCardByNo.get(input.mains[source])!.element]}เสริมธาตุ${pentadElementNames[triadCardByNo.get(input.mains[boosted])!.element]} · จั่วกองเสริม 1 ใบ` });
+      const drawn = triadCardByNo.get(input.skills[boosted]);
+      stages.push({ title: drawn ? `จั่ว No.${drawn.cardNo} ${drawn.name}` : "กองเสริมหมด", detail: !drawn ? "ไม่มีสกิลเสริม วัดค่าพลังมอนสเตอร์" : !skills[boosted] ? "สกิลนี้ไม่ใช่การเพิ่มหรือลดค่าพลัง จึงไม่ทำงานตาแรก" : events.filter(event => event.side === (boosted === "host" ? "player" : "opponent")).map(event => event.summary).join(" · ") || "ตรวจเงื่อนไขสกิลก่อนวัดพลังรวม" });
+    } else stages.push({ title: "ธาตุเดียวกัน", detail: "ไม่มีฝ่ายชนะด้วยธาตุ วัด ATK + SUP" });
+    stages.push({ title: "เปรียบเทียบพลังรวม", detail: `${attack.host.toLocaleString()} + ${support.host.toLocaleString()} = ${totals.host.toLocaleString()} / ${attack.challenger.toLocaleString()} + ${support.challenger.toLocaleString()} = ${totals.challenger.toLocaleString()}` });
+    if (totals.host === totals.challenger) stages.push({ title: "พลังรวมเสมอ · วัด ATK", detail: `${attack.host.toLocaleString()} / ${attack.challenger.toLocaleString()}` });
+    if (totals.host === totals.challenger && attack.host === attack.challenger) stages.push({ title: "ATK เสมอ · วัด SUP", detail: `${support.host.toLocaleString()} / ${support.challenger.toLocaleString()}` });
+    if (winner === "draw") stages.push({ title: "เสมอทุกค่า", detail: "ทิ้งมอนสเตอร์ทั้งสองฝ่าย เลือกตัวใหม่ ไม่มีเป่ายิงฉุบ" });
+  }
+  return { winner, stages, reason: metric === "total" ? "พลังรวม ATK + SUP" : metric === "attack" ? "พลัง ATTACK" : "พลัง SUPPORT", attack, support, totals, events, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
 }

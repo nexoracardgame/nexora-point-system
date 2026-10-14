@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   if (!body) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
   const participant = { id: actor.id, name: actor.name || "PLAYER", image: actor.image || "/avatar.png" };
   try {
-    if (body.action === "create") { const room = await createPentadRoom(participant); return json({ room }); }
+    if (body.action === "create") { const room = await createPentadRoom(participant, body.deckSource === "random" ? "random" : "all"); return json({ room }); }
     const code = String(body.code || "");
     if (!/^\d{6}$/.test(code)) return json({ error: "รหัสห้องไม่ถูกต้อง" }, 400);
     const room = await mutatePentadRoom(code, participant, body);

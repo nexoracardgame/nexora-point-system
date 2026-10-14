@@ -2174,10 +2174,15 @@ function monsterHasGravityFieldStat(cardNo: string, turn?: TriadTurn) {
 }
 
 function gravityFieldTargets(room: StoredTriadRoom) {
+  const value = (side: TriadRoomSlot) => {
+    const card = triadCardByNo.get(room.game.triangles[side].top);
+    return !card ? 0 : room.game.activeTurn === 2 ? card.attack : room.game.activeTurn === 3 ? card.support : Math.max(card.attack, card.support);
+  };
+  const highest = Math.max(value("host"), value("challenger"));
   return [
     monsterHasGravityFieldStat(room.game.triangles.host.top, room.game.activeTurn) ? ("host" as const) : null,
     monsterHasGravityFieldStat(room.game.triangles.challenger.top, room.game.activeTurn) ? ("challenger" as const) : null,
-  ].filter((side): side is TriadRoomSlot => Boolean(side));
+  ].filter((side): side is TriadRoomSlot => Boolean(side && highest > 7000 && value(side) === highest));
 }
 
 function parseBoardTargetSequence(value = "") {
@@ -2191,6 +2196,7 @@ function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
   if (cleanText(cardNo) === "265") return false;
   if (cleanText(cardNo) === "254") return true;
   if (cleanText(cardNo) === "227") return gravityFieldTargets(room).length > 0;
+  if (cleanText(cardNo) === "226") return legalManualSkillTargetSlots(room, "host", cardNo).length > 0;
   if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;
   return skillNeedsManualChoice(cardNo);
 }
@@ -2304,6 +2310,7 @@ function skillTargetSlotMatchesElementCondition(cardNo: string, targetSlot: Tria
   if (cleanCardNo(cardNo) === "225") {
     return Boolean(targetCard?.kind === "monster" && targetCard.attack <= 5000);
   }
+  if (cleanCardNo(cardNo) === "226") return Boolean(targetCard?.kind === "monster" && targetCard.attack <= 3000);
   if (!rule?.elementCondition) return true;
   return Boolean(targetCard?.kind === "monster" && triadSkillElementConditionMatches(rule, targetCard));
 }

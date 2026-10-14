@@ -8,6 +8,7 @@ export type PentadChoice = { side: PentadSide; cardNo: string; sourceCardNo?: st
 export type PentadRound = PentadResolution & { id: number; fight: number; turn: PentadTurn; mains: Record<PentadSide, string>; skills: Record<PentadSide, string>; opener: PentadSide; endsAt: number; finalDuel: boolean };
 export type PentadRoom = {
   code: string; version: number; epoch: number; createdAt: number; updatedAt: number;
+  deckSource?: "all" | "random";
   seats: Record<PentadSide, PentadParticipant | null>; spectators: PentadParticipant[];
   phase: "waiting" | "deck" | "select" | "target" | "result" | "finished";
   decks: Record<PentadSide, PentadDeck>; ready: Record<PentadSide, boolean>;
@@ -72,8 +73,13 @@ function targetOptions(room: PentadRoom, side: PentadSide, no: string) {
     const card = triadCardByNo.get(room.board[target][0]);
     if (!card) return false;
     if (no === "225" && card.attack > 5000) return false;
+    if (no === "226" && card.attack > 3000) return false;
     if (no === "231" && card.attack === card.support) return false;
-    if (no === "227" && (combined ? card.attack <= 7000 && card.support <= 7000 : room.turn < 4 ? card.attack <= 7000 : card.support <= 7000)) return false;
+    if (no === "227") {
+      const power = (no: string) => { const monster = triadCardByNo.get(no); return monster ? combined ? Math.max(monster.attack, monster.support) : room.turn < 4 ? monster.attack : monster.support : 0; };
+      const highest = Math.max(...sides.map(player => power(room.board[player][0])));
+      if (highest <= 7000 || power(card.cardNo) !== highest) return false;
+    }
     return triadSkillElementConditionMatches(rule, card);
   }).map(target => target === "host" ? "player-top" : "bot-top");
 }
@@ -134,7 +140,7 @@ function resolveRound(room: PentadRoom, now: number) {
   for (const no of Object.values(result.effective)) if (!Object.values(mains).includes(no)) room.spent.push(no);
   result.events.unshift(...blessingEvents);
   if (result.winner !== "draw" && !room.finalDuel) room.score[result.winner]++;
-  const duration = result.reason.startsWith("ธาตุ") ? 5500 : 12_000 + result.events.reduce((time, event) => time + Math.max(3500, Math.min(7000, event.summary.length * 35)), 0);
+  const duration = (result.reason.startsWith("ธาตุ") ? 5500 : 12_000 + result.events.reduce((time, event) => time + Math.max(3500, Math.min(7000, event.summary.length * 35)), 0)) + (result.stages?.length || 0) * 3000;
   const round: PentadRound = { ...result, id: room.rounds.length + 1, fight: room.fight, turn: room.turn, mains, skills, opener: room.opener, endsAt: now + duration, finalDuel: room.finalDuel };
   room.rounds.push(round); room.phase = "result"; room.deadline = round.endsAt; room.epoch++;
   room.completedBy = [];
@@ -226,7 +232,11 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
   if (action === "start") {
     requirePhase("waiting"); if (requireSeat() !== "host" || !room.seats.challenger) throw new Error("รอผู้ท้าชิงก่อน");
     room.phase = "deck"; room.deadline = now + PENTAD_DECK_MS; room.epoch++;
-    if (room.seats.challenger.id === PENTAD_BOT_ID) { room.decks.challenger = completePentadDeck(emptyPentadDeck(), random); room.ready.challenger = true; }
+    if (room.deckSource === "random") {
+      const shared = completePentadDeck(emptyPentadDeck(), random);
+      room.decks = pair(() => structuredClone(shared));
+    }
+    if (room.seats.challenger.id === PENTAD_BOT_ID) { if (room.deckSource !== "random") room.decks.challenger = completePentadDeck(emptyPentadDeck(), random); room.ready.challenger = true; }
     return;
   }
   if (action === "refresh") return;
@@ -237,6 +247,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     return;
   }
   const player = requireSeat();
+  if (action === "target" && Number(body.epoch) === room.epoch - 1 && room.phase === "result") return;
   if (Number(body.epoch) !== room.epoch) throw new Error("คำสั่งนี้เป็นของตาก่อนหน้า");
   if (action === "deck" || action === "ready") {
     requirePhase("deck");
@@ -245,6 +256,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     const deck = { monsters: raw?.monsters, hand: raw?.hand, reserve: raw?.reserve };
     if (!Object.values(deck).every(cards => Array.isArray(cards) && cards.every(no => typeof no === "string"))) throw new Error("ข้อมูลเด็คไม่ถูกต้อง");
     const valid = deck as PentadDeck;
+    if (room.deckSource === "random" && JSON.stringify(valid) !== JSON.stringify(room.decks[player])) throw new Error("โหมดสุ่มใช้เด็คเดียวกันทั้งสองฝ่าย ไม่สามารถเปลี่ยนการ์ดได้");
     const errors = validatePentadDeck(valid, action === "deck");
     if (errors.length) throw new Error(errors.join(" / "));
     room.decks[player] = structuredClone(valid); room.ready[player] = action === "ready"; return;
@@ -259,8 +271,12 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     room.picks[player] = no; return;
   }
   if (action === "target") {
-    requirePhase("target"); const choice = room.choices.find(item => !item.value);
+    requirePhase("target");
+    const requested = body.choiceIndex === undefined ? undefined : room.choices[Number(body.choiceIndex)];
+    if (requested && requested.side === player && requested.value === String(body.target) && requested.cardNo === body.cardNo && (requested.sourceCardNo || "") === (body.sourceCardNo || "")) return;
+    const choice = room.choices.find(item => !item.value);
     if (!choice || choice.side !== player) throw new Error("ยังไม่ถึงลำดับเลือกเป้าหมาย");
+    if (body.choiceIndex !== undefined && (requested !== choice || choice.cardNo !== body.cardNo || (choice.sourceCardNo || "") !== (body.sourceCardNo || ""))) throw new Error("คำขอเลือกเป้าหมายเปลี่ยนแล้ว");
     const value = String(body.target || "");
     if (!choice.options.includes(value)) throw new Error("เป้าหมายไม่เข้าเงื่อนไข");
     choice.value = value; settleChoice(room, choice, room.choices.indexOf(choice)); return;
@@ -279,10 +295,11 @@ export function publicPentadRoom(room: PentadRoom, id: string) {
   return copy;
 }
 
-export async function createPentadRoom(actor: PentadParticipant) {
+export async function createPentadRoom(actor: PentadParticipant, deckSource: "all" | "random" = "all") {
   await ensureSchema();
   for (let attempt = 0; attempt < 8; attempt++) {
     const room = newPentadRoom(String(randomInt(100000, 1000000)), actor);
+    room.deckSource = deckSource;
     const inserted = await prisma.$executeRawUnsafe(`INSERT INTO "PentadRoom" ("code", "data") VALUES ($1, $2::jsonb) ON CONFLICT DO NOTHING`, room.code, JSON.stringify(room));
     if (inserted) return room;
   }

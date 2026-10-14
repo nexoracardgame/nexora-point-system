@@ -109,6 +109,7 @@ export type TriadTurnInput = {
   skippedSkillCardNos?: string[];
   excludedRandomMonsterNos?: string[];
   randomMonsterSeed?: string;
+  combinedStatConditions?: boolean;
   copiedSkillCardNos?: Partial<Record<"player" | "opponent", string>>;
   skillTargets?: Partial<Record<"player" | "opponent", Partial<Record<string, "player-top" | "bot-top" | string>>>>;
 };
@@ -426,7 +427,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
       ? "swap-control"
       : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243"
         ? "stat"
-      : card.cardNo === "227"
+      : card.cardNo === "227" || card.cardNo === "226"
         ? "stat"
         : card.cardNo === "236"
         ? "skill-cancel"
@@ -452,6 +453,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     card.cardNo !== "234" &&
     card.cardNo !== "259" &&
     card.cardNo !== "227" &&
+    card.cardNo !== "226" &&
     card.cardNo !== "245" &&
     card.cardNo !== "249" &&
     (shape === "unparsed" ||
@@ -462,10 +464,10 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     cardNo: card.cardNo,
     name: card.name,
     shape,
-    effects,
+    effects: card.cardNo === "226" ? [{ metric: "support", delta: 0 }] : card.cardNo === "227" ? [{ metric: "attack", delta: 0 }, { metric: "support", delta: 0 }] : effects,
     target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "018" || card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
-    allowedTurns: inferAllowedTurns(card.skillText, shape),
+    allowedTurns: card.cardNo === "226" ? [1, 3] : card.cardNo === "227" ? [1, 2, 3] : inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
     elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : card.cardNo === "272" ? { mode: "include", elements: ["fire"] } : inferElementCondition(card),
     blockedMetric,
@@ -789,7 +791,8 @@ function applyGravityField(
   targetId: string | undefined,
   ownScore: ReturnType<typeof baseScore>,
   opponentScore: ReturnType<typeof baseScore>,
-  blockers: StatGainBlocker[] = []
+  blockers: StatGainBlocker[] = [],
+  combined = false
 ) {
   const ownTarget = side === "player" ? "player-top" : "bot-top";
   const opponentTarget = side === "player" ? "bot-top" : "player-top";
@@ -814,10 +817,10 @@ function applyGravityField(
   }
 
   const targetSide = normalizedTarget === ownTarget ? side : side === "player" ? "opponent" : "player";
-  const qualifyingMetrics: TriadMetric[] =
-    targetScore.metric === "attack" || targetScore.metric === "support"
-      ? (targetContribution.card[targetScore.metric] > 7000 ? [targetScore.metric] : [])
-      : (["attack", "support"] as TriadMetric[]).filter((metric) => targetContribution.card[metric] > 7000);
+  const metrics: TriadMetric[] = combined || targetScore.metric === "total" ? ["attack", "support"] : [targetScore.metric];
+  const mains = [ownScore, opponentScore].flatMap(score => score.contributions.filter(item => item.lane === "top").map(item => item.card));
+  const highest = Math.max(0, ...mains.flatMap(card => metrics.map(metric => card[metric])));
+  const qualifyingMetrics = metrics.filter(metric => highest > 7000 && targetContribution.card[metric] === highest);
 
   if (qualifyingMetrics.length === 0) {
     return {
@@ -827,7 +830,7 @@ function applyGravityField(
         side,
         type: rule.shape,
         text: rule.text,
-        summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} ไม่มี ATK หรือ SUP ตั้งแต่ 7,000 ขึ้นไป สกิลไม่เกิดผล`,
+        summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} ไม่ใช่ค่าพลังสูงที่สุดบนสนาม หรือค่าไม่เกิน 7,000 สกิลไม่เกิดผล`,
         targetLabel,
         blocked: true,
       } satisfies TriadSkillEvent,
@@ -850,8 +853,11 @@ function applyGravityField(
       continue;
     }
     if (targetScore.metric === metric || targetScore.metric === "total") {
-      targetScore.total -= originalValue;
-      targetContribution.value = Math.max(0, targetContribution.value - originalValue);
+      const removed = targetScore.metric === "total" ? Math.min(originalValue, targetContribution.value) : targetContribution.value;
+      targetScore.total -= removed;
+      targetContribution.value -= removed;
+      const field = targetScore.fieldContributions.find(item => item.lane === "top");
+      if (field) field.value = targetContribution.value;
       targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} ${originalValue.toLocaleString()} -> 0`);
     }
     applied.push(`${label} ${originalValue.toLocaleString()} -> 0`);
@@ -891,6 +897,7 @@ type TriadScoreState = ReturnType<typeof baseScore>;
 type TriadEffectiveBoardState = {
   player: TriadTriangle;
   opponent: TriadTriangle;
+  combinedStatConditions?: boolean;
 };
 
 function cloneTopContribution(score: TriadScoreState) {
@@ -2056,10 +2063,30 @@ function applySkill(
       selectedTarget,
       ownScore,
       opponentScore,
-      blockers
+      blockers,
+      boardState?.combinedStatConditions
     );
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${result.event.summary}`);
     events.push(result.event);
+    return { unresolved, events };
+  }
+
+  if (rule.cardNo === "226") {
+    const ownTarget = side === "player" ? "player-top" : "bot-top";
+    const score = selectedTarget === ownTarget ? ownScore : opponentScore;
+    const contribution = score.contributions.find(item => item.lane === "top");
+    const valid = Boolean(contribution && contribution.card.attack <= 3000);
+    const targetSide = score === ownScore ? side : side === "player" ? "opponent" : "player";
+    const blocked = blockers.some(item => item.targetSide === targetSide && statGainBlockerApplies(item, { metric: "support", delta: -1 }, { lane: "top" }));
+    if (valid && !blocked && contribution) {
+      const removed = score.metric === "total" ? Math.min(contribution.card.support, contribution.value) : contribution.value;
+      score.total -= removed; contribution.value -= removed;
+      const field = score.fieldContributions.find(item => item.lane === "top");
+      if (field) field.value = contribution.value;
+    }
+    const summary = !valid ? "เป้าหมายต้องมี ATK ไม่เกิน 3,000 สกิลไม่เกิดผล" : blocked ? "การลด SUPPORT ถูกสกิลป้องกันไว้" : `No.${contribution!.card.cardNo} SUPPORT กลายเป็น 0 จนจบตา`;
+    score.breakdown.push(`No.226: ${summary}`);
+    events.push({ cardNo: rule.cardNo, name: rule.name, side, type: rule.shape, text: rule.text, summary, blocked: !valid || blocked });
     return { unresolved, events };
   }
 
@@ -2661,6 +2688,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const boardState: TriadEffectiveBoardState = {
     player: preScore.player,
     opponent: preScore.opponent,
+    combinedStatConditions: input.combinedStatConditions,
   };
   const statGainBlockers: StatGainBlocker[] = [];
   const playerScore = baseScore(

@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Bot, Check, ChevronRight, Clock3, Eye, Flag, Layers3, Loader2, LogOut, Plus, Search, SendHorizontal, Shuffle, Swords, X } from "lucide-react";
+import { Bot, Check, ChevronRight, Clock3, Eye, Flag, History, Layers3, Loader2, LogOut, Plus, Search, SendHorizontal, Shuffle, Swords, X } from "lucide-react";
 import { triadCardByNo, triadCards, type TriadTurnResult } from "@/lib/triad-dominion";
 import { battleArenaForSeed } from "@/lib/triad-arena";
 import { completePentadDeck, emptyPentadDeck, otherPentadSide, pentadElements, pentadElementNames, validatePentadDeck, type PentadDeck, type PentadSide } from "@/lib/pentad-dominion";
@@ -52,9 +52,12 @@ function ChoiceOption({ target, room, disabled, onChoose }: { target: string; ro
 
 function ElementClash({ round, room, arenaImage, onComplete }: { round: PentadRound; room: PentadRoom; arenaImage: string; onComplete: () => void }) {
   const complete = useRef(onComplete); complete.current = onComplete;
-  useEffect(() => { const timer = setTimeout(() => complete.current(), Math.max(500, Math.min(5500, round.endsAt - Date.now()))); return () => clearTimeout(timer); }, [round.id, round.endsAt]);
+  const [stage, setStage] = useState(0);
+  const stages = round.stages?.length ? round.stages : [{ title: "ธาตุปะทะ", detail: round.reason }];
+  useEffect(() => { const timer = setInterval(() => setStage(value => value + 1), 3000); const end = setTimeout(() => complete.current(), stages.length * 3000); return () => { clearInterval(timer); clearTimeout(end); }; }, [round.id, stages.length]);
   const winner = round.winner === "draw" ? "host" : round.winner;
-  return createPortal(<div className={styles.elementClash} style={{ backgroundImage: `linear-gradient(#03070c80,#03070cb3),url('${arenaImage}')` }}><h2>ธาตุปะทะ</h2><div>{(["host", "challenger"] as const).map(side => <section key={side} className={side === winner ? styles.elementWinner : styles.elementLoser}><strong>{room.seats[side]?.name}</strong><Card no={round.mains[side]} /><span>ธาตุ{pentadElementNames[triadCardByNo.get(round.mains[side])!.element]}</span></section>)}</div><h1>{round.reason}</h1><p>{room.seats[winner]?.name} +1 คะแนน</p></div>, document.body);
+  const current = stages[Math.min(stage, stages.length - 1)];
+  return createPortal(<div className={styles.elementClash} style={{ backgroundImage: `linear-gradient(#03070c80,#03070cb3),url('${arenaImage}')` }}><h2>ธาตุปะทะ · {Math.min(stage + 1, stages.length)}/{stages.length}</h2><div>{(["host", "challenger"] as const).map(side => <section key={side} className={side === winner ? styles.elementWinner : styles.elementLoser}><strong>{room.seats[side]?.name}</strong><Card no={round.mains[side]} /><span>ธาตุ{pentadElementNames[triadCardByNo.get(round.mains[side])!.element]}</span></section>)}</div><h1>{current.title}</h1><p className={styles.stageDetail}>{current.detail}</p></div>, document.body);
 }
 
 export default function PentadDominionClient({ userId }: { userId: string }) {
@@ -81,6 +84,9 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
   const [pendingPick, setPendingPick] = useState<{ code: string; epoch: number; side: PentadSide; cardNo: string } | null>(null);
   const pendingPickRef = useRef(pendingPick); pendingPickRef.current = pendingPick;
   const [entering, setEntering] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState("");
+  const [introDone, setIntroDone] = useState("");
   const chatEnd = useRef<HTMLDivElement>(null);
   const side: PentadSide | undefined = room?.seats.host?.id === userId ? "host" : room?.seats.challenger?.id === userId ? "challenger" : undefined;
   const lowerSide = side || "host";
@@ -136,10 +142,12 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
   };
   useLayoutEffect(() => {
     setMounted(true); let saved: string | null = null;
-    try { saved = localStorage.getItem("nexora:pentad:room"); } catch { /* Start from the lobby without storage. */ }
+    const requested = new URLSearchParams(window.location.search).get("room");
+    try { saved = requested || localStorage.getItem("nexora:pentad:room"); } catch { saved = requested; }
     const restoring = saved && /^\d{6}$/.test(saved);
     if (restoring) setEntering(true);
-    void load(restoring ? saved || undefined : undefined).finally(() => setEntering(false));
+    if (requested && /^\d{6}$/.test(requested)) void act("join", { code: requested, spectate: new URLSearchParams(window.location.search).get("spectate") === "1" });
+    else void load(restoring ? saved || undefined : undefined).finally(() => setEntering(false));
     const clock = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(clock);
     // Initial restoration runs once; mutable room state lives in roomRef.
@@ -164,7 +172,7 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
     if (!room || room.phase !== "deck" || !side) return;
     let local: PentadDeck | null = null;
     try { local = JSON.parse(localStorage.getItem(deckKey(room, userId)) || "null"); } catch { /* Ignore corrupt local drafts. */ }
-    const initial = local && Array.isArray(local.monsters) && Array.isArray(local.hand) && Array.isArray(local.reserve) && !validatePentadDeck(local, true).length ? local : room.decks[side];
+    const initial = room.deckSource !== "random" && local && Array.isArray(local.monsters) && Array.isArray(local.hand) && Array.isArray(local.reserve) && !validatePentadDeck(local, true).length ? local : room.decks[side];
     setDeck(initial); deckRef.current = initial; dirtyDeck.current = Boolean(local);
     // Drafts restore only when entering a new preparation epoch, never on a poll.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,7 +194,7 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.deadline]);
-  const changeDeck = (next: PentadDeck) => { const errors = validatePentadDeck(next, true); if (errors.length) { setError(errors[0]); return; } dirtyDeck.current = true; deckRef.current = next; setDeck(next); };
+  const changeDeck = (next: PentadDeck) => { if (room?.deckSource === "random") return; const errors = validatePentadDeck(next, true); if (errors.length) { setError(errors[0]); return; } dirtyDeck.current = true; deckRef.current = next; setDeck(next); };
   const pickCard = async (cardNo: string) => {
     const current = roomRef.current;
     if (!current || !side || current.phase !== "select" || current.picks[side] || pendingPickRef.current) return;
@@ -207,7 +215,10 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
   const ownPick = side ? (pendingPick && pendingPick.epoch === room?.epoch ? pendingPick.cardNo : room?.picks[side]) : "";
   const selectedCards = triadCards.filter(card => card.kind === (group === "monsters" ? "monster" : "skill") && (element === "all" || element === card.element) && (!query || `${card.cardNo} ${card.name} ${card.skillText}`.toLowerCase().includes(query.toLowerCase())));
   const total = [...deck.monsters, ...deck.hand, ...deck.reserve];
+  const fixedDeck = room?.deckSource === "random";
   const pendingChoice = room?.choices.find(choice => !choice.value);
+  const choiceKey = pendingChoice ? `${room?.code}:${room?.epoch}:${room?.choices.indexOf(pendingChoice)}:${pendingChoice.sourceCardNo || pendingChoice.cardNo}` : "";
+  useEffect(() => setSelectedTarget(""), [choiceKey]);
   const panelStyle = { "--pentad-arena": `url('${arena.image}')` } as CSSProperties;
 
   return <main className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
@@ -230,11 +241,11 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
       <aside className={styles.deckTray}><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
         {!side ? <h3>ผู้เล่นกำลังเตรียมเด็ค</h3> : <><div className={styles.tabs}>{(["monsters", "hand", "reserve"] as const).map(key => <button key={key} aria-pressed={group === key} onClick={() => setGroup(key)}>{key === "monsters" ? "มอนสเตอร์" : key === "hand" ? "บนมือ" : "กองเสริม"}<b>{deck[key].length}/{key === "monsters" ? 5 : key === "hand" ? 15 : 10}</b></button>)}</div>
         <div className={styles.elementCounts}>{pentadElements.map(value => <span key={value}>{pentadElementNames[value]} {total.filter(no => triadCardByNo.get(no)?.element === value).length}/6</span>)}</div>
-        <div className={styles.chosenCards}>{deck[group].map((no, index) => <Card key={`${no}:${index}`} no={no} badge="−" disabled={room.ready[side] || busy} onClick={() => changeDeck({ ...deck, [group]: deck[group].filter((_, i) => i !== index) })} />)}</div>
-        <div className={styles.deckActions}><button title="สุ่มเติมเด็ค" disabled={busy || room.ready[side]} onClick={() => changeDeck(completePentadDeck(deck))}><Shuffle /> เติมเด็ค</button><button className={styles.primary} disabled={busy || room.ready[side] || validatePentadDeck(deck).length > 0} onClick={() => void act("ready", { deck })}><Check /> {room.ready[side] ? "พร้อมแล้ว" : "พร้อม"}</button></div></>}
+        <div className={styles.chosenCards}>{deck[group].map((no, index) => <Card key={`${no}:${index}`} no={no} badge={fixedDeck ? undefined : "−"} disabled={fixedDeck || room.ready[side] || busy} onClick={() => changeDeck({ ...deck, [group]: deck[group].filter((_, i) => i !== index) })} />)}</div>
+        <div className={styles.deckActions}>{!fixedDeck && <button title="สุ่มเติมเด็ค" disabled={busy || room.ready[side]} onClick={() => changeDeck(completePentadDeck(deck))}><Shuffle /> เติมเด็ค</button>}<button className={styles.primary} disabled={busy || room.ready[side] || validatePentadDeck(deck).length > 0} onClick={() => void act("ready", { deck })}><Check /> {room.ready[side] ? "พร้อมแล้ว" : "พร้อม"}</button></div></>}
         <div className={styles.readiness}>{(["host", "challenger"] as const).map(player => <span key={player}>{room.seats[player]?.name} {room.ready[player] ? "✓ พร้อม" : "กำลังจัดเด็ค"}</span>)}</div>
       </aside>
-      {side && <div className={styles.catalog}><div className={styles.filters}><label><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหาการ์ด" aria-label="ค้นหาการ์ด" /></label><select aria-label="ธาตุ" value={element} onChange={event => setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{pentadElements.map(value => <option key={value} value={value}>{pentadElementNames[value]}</option>)}</select></div><div className={styles.catalogCards}>{selectedCards.map(card => <Card key={card.cardNo} no={card.cardNo} disabled={room.ready[side] || busy} badge={String(total.filter(no => no === card.cardNo).length || "+")} onClick={() => changeDeck({ ...deck, [group]: [...deck[group], card.cardNo] })} />)}</div></div>}
+      {side && <div className={styles.catalog}><div className={styles.filters}><label><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหาการ์ด" aria-label="ค้นหาการ์ด" /></label><select aria-label="ธาตุ" value={element} onChange={event => setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{pentadElements.map(value => <option key={value} value={value}>{pentadElementNames[value]}</option>)}</select></div><div className={styles.catalogCards}>{selectedCards.filter(card => !fixedDeck || deck[group].includes(card.cardNo)).map(card => <Card key={card.cardNo} no={card.cardNo} disabled={fixedDeck || room.ready[side] || busy} badge={String(total.filter(no => no === card.cardNo).length || "+")} onClick={() => changeDeck({ ...deck, [group]: [...deck[group], card.cardNo] })} />)}</div></div>}
     </section> : <section className={styles.battle}>
       <div className={styles.battleStatus}><span>ไฟต์ {room.fight}/3 · ตา {room.turn}/5</span><strong>{room.finalDuel ? "ตัดสินมอนสเตอร์สุดท้าย" : phaseNames[room.phase]}</strong><span>{room.turn === 1 ? "ธาตุปะทะ" : room.fight === 3 && room.turn === 4 ? "ATK + SUP" : room.turn < 4 ? "ATTACK" : "SUPPORT"}</span></div>
       <div className={styles.scoreboard}>{[upperSide, lowerSide].map(player => <span key={player} title={room.seats[player]?.name}><span className={styles.playerName}>{room.seats[player]?.name}</span><b>{room.score[player]}</b></span>)}</div>
@@ -249,7 +260,9 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
       {side && room.phase !== "finished" && <button className={styles.surrender} title="ยอมแพ้" aria-label="ยอมแพ้" onClick={() => { if (window.confirm("ยืนยันยอมแพ้?")) void act("surrender"); }}><Flag size={18} /></button>}
     </section>}
     {mounted && room && createPortal(<div className={styles.hudPlane} data-pentad-phase={room.phase} data-cinematic-chat={Boolean(presentation)}><aside className={`${styles.chat} ${chatOpen ? "" : styles.chatClosed}`}><button className={styles.chatToggle} onClick={() => setChatOpen(!chatOpen)}>แชทสนาม {chatOpen ? <X size={14} /> : <Plus size={14} />}</button>{chatOpen && <><div className={styles.messages}>{room.chat.map(item => <p key={item.id}><strong>{item.name}</strong> {item.text}</p>)}<div ref={chatEnd} /></div><form onSubmit={async event => { event.preventDefault(); const text = message; if (!text.trim()) return; if (await act("chat", { text }, true)) setMessage(current => current === text ? "" : current); }}><input aria-label="ข้อความแชท" placeholder="พิมพ์ข้อความ…" value={message} maxLength={240} onChange={event => setMessage(event.target.value)} /><button aria-label="ส่งข้อความ" disabled={!message.trim()}><SendHorizontal size={18} /></button></form></>}</aside></div>, document.body)}
-    {mounted && !presentation && room?.phase === "target" && pendingChoice && createPortal(<div className={styles.choiceOverlay}><section className={styles.choicePanel}><small>{pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : "เลือกเป้าหมายสกิล"}</small><h2>{triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name}</h2><p>{triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText}</p><strong>{countdown(pendingChoice.deadline - now)}</strong><div className={styles.choiceCards}>{pendingChoice.options.map(target => <ChoiceOption key={target} target={target} room={room} disabled={busy || side !== pendingChoice.side} onChoose={() => void act("target", { target })} />)}</div>{side !== pendingChoice.side && <p>รอ {room.seats[pendingChoice.side]?.name} เลือกเป้าหมาย</p>}</section></div>, document.body)}
-    {cine && currentRound && presentation && (currentRound.reason.startsWith("ธาตุ") ? <ElementClash key={`${presentation.room.code}:${currentRound.id}`} round={currentRound} room={presentation.room} arenaImage={arena.image} onComplete={completeScene} /> : <BattleCinematic key={`${presentation.room.code}:${currentRound.id}`} result={cine} cardsByNo={triadCardByNo} playerCard={triadCardByNo.get(currentRound.skills.host || currentRound.mains.host)} opponentCard={triadCardByNo.get(currentRound.skills.challenger || currentRound.mains.challenger)} playerMainCard={triadCardByNo.get(currentRound.effective.host)} opponentMainCard={triadCardByNo.get(currentRound.effective.challenger)} playerName={presentation.room.seats.host?.name || "PLAYER"} opponentName={presentation.room.seats.challenger?.name || "PLAYER"} arena={arena} landscape onComplete={completeScene} />)}
+    {mounted && !presentation && room?.phase === "target" && pendingChoice && createPortal(<div className={styles.choiceOverlay}><section className={styles.choicePanel}><small>{pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : "เลือกเป้าหมายสกิล"}</small><h2>{triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name}</h2><p>{triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText}</p><strong>{countdown(pendingChoice.deadline - now)}</strong><div className={styles.choiceCards}>{pendingChoice.options.map(target => <div key={target} data-selected={selectedTarget === target}><ChoiceOption target={target} room={room} disabled={busy || side !== pendingChoice.side} onChoose={() => setSelectedTarget(target)} /></div>)}</div>{side === pendingChoice.side ? <button className={styles.primary} disabled={busy || !pendingChoice.options.includes(selectedTarget)} onClick={() => void act("target", { target: selectedTarget, choiceIndex: room.choices.indexOf(pendingChoice), cardNo: pendingChoice.cardNo, sourceCardNo: pendingChoice.sourceCardNo || "" })}><Check />ยืนยันเป้าหมาย</button> : <p>รอ {room.seats[pendingChoice.side]?.name} เลือกเป้าหมาย</p>}</section></div>, document.body)}
+    {mounted && room && createPortal(<div className={styles.hudPlane}><button className={styles.historyToggle} title="ประวัติการต่อสู้" aria-label="ประวัติการต่อสู้" onClick={() => setHistoryOpen(!historyOpen)}><History size={20} /></button></div>, document.body)}
+    {mounted && room && historyOpen && createPortal(<aside className={styles.historyPanel}><header><h2>บันทึกสนาม</h2><button aria-label="ปิดประวัติ" onClick={() => setHistoryOpen(false)}><X /></button></header>{room.rounds.length ? [...room.rounds].reverse().map(round => <details key={round.id} open={round.id === room.rounds.at(-1)?.id}><summary>ไฟต์ {round.fight} · ตา {round.turn} · {round.winner === "draw" ? "เสมอ" : `${room.seats[round.winner]?.name} ชนะ`}</summary><p>{round.reason} · {round.totals.host.toLocaleString()} : {round.totals.challenger.toLocaleString()}</p>{(["host", "challenger"] as const).map(player => <p key={player}><strong>{room.seats[player]?.name}</strong> · No.{round.mains[player]}{round.skills[player] ? ` · สกิล No.${round.skills[player]} ${triadCardByNo.get(round.skills[player])?.name || ""}` : ""}</p>)}{round.stages?.map((stage, index) => <p key={index}><b>{stage.title}</b><br />{stage.detail}</p>)}{round.events.map((event, index) => <p key={index}><b>{room.seats[event.side === "player" ? "host" : "challenger"]?.name} · No.{event.cardNo}</b><br />{event.summary}</p>)}</details>) : <p>ยังไม่มีตาที่ตัดสินผล</p>}</aside>, document.body)}
+    {cine && currentRound && presentation && (currentRound.turn === 1 && !currentRound.finalDuel && introDone !== `${presentation.room.code}:${currentRound.id}` ? <ElementClash key={`${presentation.room.code}:${currentRound.id}`} round={currentRound} room={presentation.room} arenaImage={arena.image} onComplete={() => { if (currentRound.reason.startsWith("ธาตุ")) completeScene(); else setIntroDone(`${presentation.room.code}:${currentRound.id}`); }} /> : <BattleCinematic key={`${presentation.room.code}:${currentRound.id}`} result={cine} cardsByNo={triadCardByNo} playerCard={triadCardByNo.get(currentRound.skills.host || currentRound.mains.host)} opponentCard={triadCardByNo.get(currentRound.skills.challenger || currentRound.mains.challenger)} playerMainCard={triadCardByNo.get(currentRound.effective.host)} opponentMainCard={triadCardByNo.get(currentRound.effective.challenger)} playerName={presentation.room.seats.host?.name || "PLAYER"} opponentName={presentation.room.seats.challenger?.name || "PLAYER"} arena={arena} landscape onComplete={completeScene} />)}
   </main>;
 }

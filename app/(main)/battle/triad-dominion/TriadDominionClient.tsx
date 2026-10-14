@@ -1791,8 +1791,17 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   return withElementCondition([ownTarget]);
 }
 
-function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView): SkillTargetId[] {
+function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView, turn: TriadTurn = 1): SkillTargetId[] {
   const selectable = getSelectableSkillTargetIds(card, side, playerTop, botTop);
+  if (card?.cardNo === "226") return selectable.filter(target => {
+    const monster = target === "player-top" ? playerTop : botTop;
+    return Boolean(monster?.kind === "monster" && monster.attack <= 3000);
+  });
+  if (card?.cardNo === "227") {
+    const value = (monster?: CardView) => !monster ? 0 : turn === 2 ? monster.attack : turn === 3 ? monster.support : Math.max(monster.attack, monster.support);
+    const highest = Math.max(value(playerTop), value(botTop));
+    return selectable.filter(target => highest > 7000 && value(target === "player-top" ? playerTop : botTop) === highest);
+  }
   if (selectable.length > 0 || card?.cardNo === "254") return selectable;
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
   if (rule?.elementCondition) return [];
@@ -3704,6 +3713,29 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   onCreate: () => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
+  const [format, setFormat] = useState<"triad" | "pentad">("triad");
+  const [deckSource, setDeckSource] = useState<"all" | "random">("all");
+  const [creatingPentad, setCreatingPentad] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [pentadRooms, setPentadRooms] = useState<{ code: string; host: string; phase: string }[]>([]);
+  useEffect(() => {
+    if (panel !== "join" || format !== "pentad") return;
+    const controller = new AbortController();
+    void fetch("/api/pentad-rooms", { cache: "no-store", signal: controller.signal }).then(response => response.json()).then(data => setPentadRooms(data.rooms || [])).catch(() => {});
+    return () => controller.abort();
+  }, [panel, format]);
+  const createRoom = async () => {
+    if (format === "triad") { onCreate(); return; }
+    if (creatingPentad) return;
+    setCreatingPentad(true); setCreateError("");
+    try {
+      const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", deckSource }) });
+      const data = await response.json();
+      if (!response.ok || !data.room?.code) throw new Error(data.error || "สร้างสนามไม่สำเร็จ");
+      onNavigate(`/battle/pentad-dominion?room=${data.room.code}`);
+    } catch (error) { setCreateError(error instanceof Error ? error.message : "เชื่อมต่อไม่สำเร็จ"); }
+    finally { setCreatingPentad(false); }
+  };
   const artRef = useRef<HTMLDivElement>(null);
   const pointerFrame = useRef(0);
   useEffect(() => () => cancelAnimationFrame(pointerFrame.current), []);
@@ -3735,7 +3767,6 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
         <button className="nexora-command-mode" onClick={() => setPanel("create")}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
-        <button className="nexora-command-mode" onClick={() => window.location.assign("/battle/pentad-dominion")}><div><strong>PENTAD DOMINION</strong><small>อำนาจห้าผนึก · ฐาน 5 ใบ</small></div><Layers3 /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span><button onClick={() => setPanel("join")}><Eye className="h-4 w-4" />สนามสด {rooms.filter(room => room.status === "playing").length}</button></footer>
@@ -3743,15 +3774,20 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <div className="nexora-command-sheet-head"><h2>{panel === "create" ? "สร้างสนามประลอง" : panel === "join" ? "เข้าร่วมสนาม" : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
-            <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
-            {roomAccess === "private" ? <label>รหัสผ่านห้อง<input value={roomPassword} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label> : null}
-            <button className="nexora-command-primary" onClick={onCreate} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />เลือกโหมดและสร้างห้อง</button>
+            <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
+            {format === "pentad" ? <div className="nexora-command-segment" role="group" aria-label="แหล่งการ์ด">{(["all", "random"] as const).map(value => <button key={value} aria-pressed={deckSource === value} onClick={() => setDeckSource(value)}>{value === "all" ? "ALL IN ONE" : "สุ่มเด็คเท่ากัน"}</button>)}</div> : <>
+              <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
+              {roomAccess === "private" ? <label>รหัสผ่านห้อง<input value={roomPassword} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label> : null}
+            </>}
+            <button className="nexora-command-primary" onClick={() => void createRoom()} disabled={creatingPentad || (format === "triad" && roomAccess === "private" && roomPassword.trim().length < 4)}>{creatingPentad ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}สร้างสนามประลอง</button>
+            {createError && <div role="alert" className="nexora-command-alert">{createError}</div>}
           </> : panel === "join" ? <>
-            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) onEnter(joinCode); }}>
+            <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
+            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/battle/pentad-dominion?room=${joinCode}`); else onEnter(joinCode); } }}>
               <label>หมายเลขห้อง<input value={joinCode} onChange={event => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} maxLength={6} inputMode="numeric" placeholder="000000" /></label>
               <button className="nexora-command-primary" disabled={joinCode.length !== 6 || joiningRoomCode === joinCode}>{joiningRoomCode === joinCode && joinCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}เข้าห้อง</button>
             </form>
-            <div className="nexora-command-room-list">{rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : <div className="nexora-command-alert">ยังไม่มีห้องเปิดอยู่</div>}</div>
+            <div className="nexora-command-room-list">{format === "pentad" ? pentadRooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.host} · {room.phase === "waiting" ? "รอผู้ท้าชิง" : "กำลังต่อสู้"}</small></div><button onClick={() => onNavigate(`/battle/pentad-dominion?room=${room.code}${room.phase === "waiting" ? "" : "&spectate=1"}`)}>{room.phase === "waiting" ? "เข้าห้อง" : "เข้าชม"}</button></article>) : rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : <div className="nexora-command-alert">ยังไม่มีห้องเปิดอยู่</div>}</div>
           </> : <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />}
           {lobbyMessage ? <div role="status" className="nexora-command-alert">{lobbyMessage}</div> : null}
         </div>
@@ -4074,10 +4110,12 @@ function SkillTargetOverlay({
   targetBotTop,
   selectedTarget,
   timeLeft,
+  turn = 1,
   onSelect,
   onConfirm,
 }: {
   card?: CardView;
+  turn?: TriadTurn;
   side: Side;
   playerTop?: CardView;
   botTop?: CardView;
@@ -4100,7 +4138,7 @@ function SkillTargetOverlay({
 
   const requiresTwoTargets = isTwoStepTargetSkill(card);
   const selectedTargets = parseSkillTargetSelection(selectedTarget);
-  const selectableTargetIds = new Set(getPlayableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop));
+  const selectableTargetIds = new Set(getPlayableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn));
   const targets = [
     { id: "player-top" as const, label: "การ์ดหลักเรา", card: playerTop, tone: "border-red-300/60" },
     { id: "bot-top" as const, label: "การ์ดหลักคู่แข่ง", card: botTop, tone: "border-cyan-300/60" },
@@ -4452,7 +4490,7 @@ function CompactBattleBoard({
   const skillChoiceForAura = pendingSkillChoice || waitingSkillChoice || null;
   const pendingSkillCard = pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined;
   const pendingFallbackTargets = pendingSkillChoice
-    ? getPlayableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top))
+    ? getPlayableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top), activeTurn)
     : [];
   const pendingTarget = pendingSkillChoice?.selectedTarget || (pendingFallbackTargets.length === 1 ? pendingFallbackTargets[0] : "");
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
@@ -4550,6 +4588,7 @@ function CompactBattleBoard({
       /> : null}
       <SkillTargetOverlay
         key={`${fightNo}:${activeTurn}:${pendingSkillChoice?.cardNo || "none"}`}
+        turn={activeTurn}
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
         side={pendingSkillChoice?.side || "player"}
         playerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
@@ -4561,7 +4600,7 @@ function CompactBattleBoard({
         onSelect={(target) => {
           if (!pendingSkillChoice) return;
           const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-          const selectable = new Set(getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined));
+          const selectable = new Set(getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined, activeTurn));
           if (!parseSkillTargetSelection(target).every((item) => selectable.has(item))) return;
           onSelectSkillTarget(target);
         }}
@@ -5377,6 +5416,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     if (
       knownActiveCode &&
+      roomOnly &&
       !creatingRoomRef.current &&
       !startPending &&
       joiningRoomCodeRef.current !== knownActiveCode &&
@@ -5588,7 +5628,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           );
         }
       }
-    } else if ((body.action === "disband" && appliesToActiveRoom) || (responseRooms && activeRoomCodeRef.current && !responseRooms.some((room) => room.code === activeRoomCodeRef.current))) {
+    } else if (body.action === "disband" && appliesToActiveRoom) {
       activeRoomCodeRef.current = "";
       activeRoomSnapshotRef.current = null;
       setActiveRoomCode("");
@@ -6156,6 +6196,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       }
 
       if (event.deleted && code) {
+        if (room) return; // A delayed deletion event cannot override a live room snapshot.
         setRooms((current) => current.filter((item) => item.code !== code));
         if (activeRoomCodeRef.current === code) {
           activeRoomCodeRef.current = "";
@@ -6910,7 +6951,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (playerCard && skillNeedsChoice(playerCard)) {
-      const targets = getPlayableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top));
+      const targets = getPlayableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top), activeTurn);
       if (targets.length === 0) {
         const result = resolveTriadTurn({
           turn: activeTurn,
@@ -7025,12 +7066,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       skillCard,
       pendingSkillChoice.side,
       cardsByNo.get(lockedFight.player.top),
-      cardsByNo.get(lockedFight.bot.top)
+      cardsByNo.get(lockedFight.bot.top), activeTurn
     );
     const selectedTarget = pendingSkillChoice.selectedTarget || (fallbackTargets.length === 1 ? fallbackTargets[0] : "");
     if (!selectedTarget) return;
     const selectableTargetIds = new Set(
-      getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top))
+      getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top), activeTurn)
     );
     const selectedTargets = parseSkillTargetSelection(selectedTarget);
     const validTargetSelection = isTwoStepTargetSkill(skillCard)

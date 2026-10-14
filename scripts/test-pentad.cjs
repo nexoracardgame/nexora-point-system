@@ -115,3 +115,35 @@ const last=room.rounds.at(-1);action(room,host,'complete',{roundId:last.id});tic
 console.log('Pentad No.245: all field skills, invalid choices, historical copy, follow-up target, scene completion and persistent main cards passed');
 const flash=rules.resolvePentadTurn({fight:3,turn:4,mains:{host:'177',challenger:'099'},skills:{host:'245',challenger:''},opener:'host',copiedSkills:{host:'265',challenger:''},spent:['021','022']});
 assert.notEqual(flash.effective.challenger,'099');assert.ok(!['021','022'].includes(flash.effective.challenger));assert.equal(flash.attack.challenger,triad.triadCardByNo.get(flash.effective.challenger).attack);assert.equal(flash.support.challenger,triad.triadCardByNo.get(flash.effective.challenger).support,'Copying No.265 uses one consistent replacement for ATK and SUP');
+const low=triad.triadCards.find(card=>card.kind==='monster'&&card.attack<=3000&&card.support>0);
+const high=triad.triadCards.find(card=>card.kind==='monster'&&card.attack>7000);
+const invalid=triad.triadCards.find(card=>card.kind==='monster'&&card.attack>3000);
+for(const owner of ['player','opponent']) {
+  const target=owner==='player'?'bot-top':'player-top';
+  const result=triad.resolveTriadTurn({turn:3,player:{top:low.cardNo,...(owner==='player'?{right:'226'}:{})},opponent:{top:low.cardNo,...(owner==='opponent'?{right:'226'}:{})},prioritySide:owner,skillTargets:{[owner]:{'226':target}}});
+  assert.equal(owner==='player'?result.opponentTotal:result.playerTotal,0,'226 zeros eligible SUPPORT from either side');
+}
+const fail226=triad.resolveTriadTurn({turn:3,player:{top:low.cardNo,right:'226'},opponent:{top:invalid.cardNo},skillTargets:{player:{'226':'bot-top'}}});
+assert.equal(fail226.opponentTotal,invalid.support,'226 does not activate above 3000 ATK');
+const zero227=triad.resolveTriadTurn({turn:2,player:{top:high.cardNo,left:'004'},opponent:{top:low.cardNo,left:'227'},prioritySide:'player',skillTargets:{opponent:{'227':'player-top'}}});
+assert.equal(zero227.playerTotal,0,'227 removes the buffed contribution, not only printed ATK');
+room=store.newPentadRoom('333333',host,now);room.deckSource='random';action(room,rival,'join');action(room,host,'start');
+assert.deepEqual(room.decks.host,room.decks.challenger,'Random mode deals exactly equal decks');
+assert.throws(()=>action(room,host,'deck',{deck:rules.emptyPentadDeck()}),/ไม่สามารถเปลี่ยน/);
+room=roomStart();room.phase='target';room.board={host:[low.cardNo],challenger:[invalid.cardNo]};room.turn=4;room.picks={host:'226',challenger:'004'};room.choices=[{side:'host',cardNo:'226',options:['player-top'],value:'',deadline:now+30000}];
+const identity={action:'target',epoch:room.epoch,choiceIndex:0,cardNo:'226',sourceCardNo:'',target:'player-top'};
+store.applyPentadAction(room,host,identity,now);store.applyPentadAction(room,host,identity,now);tick(room);store.applyPentadAction(room,host,identity,now);
+assert.equal(room.rounds.length,1,'Duplicate confirmation cannot resolve twice or bounce after result');
+assert.ok(rules.resolvePentadTurn({fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host'}).stages.some(stage=>stage.detail.includes('ไม่ใช่การเพิ่ม')),'Boost explanation says why non-stat skill is ignored');
+console.log('226/227 conditions, boosted stat zero, equal random decks, idempotent target and elemental trace passed');
+const clientSource=fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
+const clientAst=ts.createSourceFile('client.tsx',clientSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const targetFunction=clientAst.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='getPlayableSkillTargetIds');
+const ui=vm.createContext({getSelectableSkillTargetIds:()=>['player-top','bot-top'],triadSkillRuleByNo:triad.triadSkillRuleByNo});
+vm.runInContext(ts.transpileModule(targetFunction.getText(clientAst),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,ui);
+const a={kind:'monster',attack:8000,support:1000},b={kind:'monster',attack:7000,support:9000};
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,2).join(','),'player-top');
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,3).join(','),'bot-top');
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,1).join(','),'bot-top');
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'226'},'player',{...a,attack:3000},b,3).join(','),'player-top');
+console.log('Legacy target UI: exact 3000 boundary and highest relevant ATK/SUP filters passed');

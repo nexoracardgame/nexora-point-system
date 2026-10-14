@@ -145,6 +145,21 @@
 @media (max-height:600px) and (orientation:landscape) { .formation { --card-height:17vh; } }
 @media (max-width:1000px) and (orientation:portrait) { .formation { --card-height:17vw; } }
 .entering { flex:1; display:flex; align-items:center; justify-content:center; gap:12px; background:#060b0d url('/images/triad/nexora-command-original.webp') center/cover; }
+.choiceCards [data-selected="true"] { filter:drop-shadow(0 0 10px #72f3d0); }
+.choicePanel > .primary { margin:16px auto 0; min-height:44px; }
+.stageDetail { width:min(90%,1000px); max-height:22%; overflow:auto; text-align:center; padding:10px 18px; background:#03080de8; color:#fff; text-shadow:0 2px 3px #000; border-bottom:2px solid #72f3d0; }
+.elementClash h1 { max-width:90%; overflow-wrap:anywhere; }
+.historyPanel { position:fixed; z-index:2147483075; right:16px; top:65px; bottom:20px; width:min(480px,50vw); overflow:auto; padding:18px; background:#050b13f5; color:#eef7ff; border:1px solid #76d9d4; box-shadow:0 16px 60px #000a; }
+.historyPanel header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.historyPanel h2 { font-size:20px; }
+.historyPanel button { background:transparent; color:#fff; border:0; }
+.historyPanel details { padding:12px 0; border-top:1px solid #6c9ca54d; }
+.historyPanel summary { cursor:pointer; color:#a2f1dd; font-weight:700; }
+.historyPanel p { font-size:14px; line-height:1.55; margin:10px 0; }
+.historyToggle { position:absolute; top:85px; right:12px; width:38px; height:38px; pointer-events:auto; display:grid; place-items:center; background:#050b13ed; color:#a2f1dd; border:1px solid #76d9d4; border-radius:4px; }
+.historyPanel { pointer-events:auto; }
+@media (max-width:1000px) and (orientation:portrait) { .historyPanel { width:80dvh; height:80dvw; inset:auto; top:50%; left:50%; transform:translate(-50%,-50%) rotate(90deg); } }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .historyToggle { top:112px; width:30px; height:30px; } }
 .entering strong { padding:10px 20px; background:#03080dda; border-radius:4px; }
 .placed img { filter:drop-shadow(0 0 8px #85eacb); }
 .chat { width:420px; max-height:250px; font-size:15px; background:#030809b8; }

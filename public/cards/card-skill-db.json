@@ -3610,15 +3610,15 @@
       "skill": "แรงสะท้อนจากผืนหินผุดขึ้นฉับพลัน กลืนแรงสนับสนุน\nเลือกมอนสเตอร์บนสนามใครก็ได้ 1 ใบ\nที่ ATTACK 3000 หรือต่ำกว่า\nมอนสเตอร์นั้น SUPPORT กลายเป็น 0 จนจบตา",
       "atk": "",
       "sup": "",
-      "element": "",
+      "element": "earth",
       "rarity": "",
       "type": "",
       "rawText": "STONE TRAP\nCard No. 226\nกับดักหินแหลก\nแรงสะท้อนจากผืนหินผุดขึ้นฉับพลัน กลืนแรงสนับสนุน\nเลือกมอนสเตอร์บนสนามใครก็ได้ 1 ใบ\nที่ ATTACK 3000 หรือต่ำกว่า\nมอนสเตอร์นั้น SUPPORT กลายเป็น 0 จนจบตา",
       "confidence": "high",
-      "reviewed": false,
+      "reviewed": true,
       "sourceImage": "/cards/226.jpg",
       "scannedAt": "2026-05-07T04:20:24.757Z",
-      "notes": "ATK and SUP are not visible as base stats; they are mentioned within the skill text as conditions or effects. Element and Type are not explicitly stated on the card."
+      "notes": "Verified against card artwork: earth skill. Select one monster on either field with ATTACK <= 3000; its SUPPORT becomes 0 until end of turn. No base ATK/SUP."
     },
     {
       "cardNo": "227",
@@ -3626,15 +3626,15 @@
       "skill": "แรงกดทับจากปฐพีบิดเบี้ยวกลายเป็นแรงดึงถ่วงมหาศาล เลือกมอนสเตอร์บนสนามใครก็ได้ 1 ใบที่ ATTACK หรือ SUPPORT สูงที่สุด และมากกว่า 7000 มอนสเตอร์นั้น ค่าพลังส่วนนั้นกลายเป็น 0 จนจบตา",
       "atk": "",
       "sup": "",
-      "element": "",
+      "element": "earth",
       "rarity": "",
       "type": "",
       "rawText": "GRAVITY FIELD\nสนามแรงดึงถ่วง\nแรงกดทับจากปฐพีบิดเบี้ยวกลายเป็นแรงดึงถ่วงมหาศาล เลือกมอนสเตอร์บนสนามใครก็ได้ 1 ใบที่ ATTACK หรือ SUPPORT สูงที่สุด และมากกว่า 7000 มอนสเตอร์นั้น ค่าพลังส่วนนั้นกลายเป็น 0 จนจบตา\nCard No. 227",
       "confidence": "high",
-      "reviewed": false,
+      "reviewed": true,
       "sourceImage": "/cards/227.jpg",
       "scannedAt": "2026-05-07T04:20:35.467Z",
-      "notes": "ATK and SUP values are not present for this card itself, only referenced in the skill text for other monsters. Element and rarity are indicated by symbols (gem, peace sign) but no explicit text."
+      "notes": "Verified against card artwork: earth skill. Select a monster on either field whose relevant ATTACK or SUPPORT is highest and greater than 7000; that stat becomes 0 until end of turn. Exactly 7000 does not qualify. No base ATK/SUP."
     },
     {
       "cardNo": "228",
