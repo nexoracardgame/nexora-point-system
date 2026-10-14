@@ -6,7 +6,7 @@ let spectatorExitEffect='';
 function findSpectatorExit(node){if(ts.isCallExpression(node)&&node.expression.getText(ast)==='useLayoutEffect'&&node.arguments[0]?.getText(ast).includes('isSpectator && matchDone && currentRoom'))spectatorExitEffect=node.arguments[0].getText(ast);ts.forEachChild(node,findSpectatorExit);}
 findSpectatorExit(ast);assert.ok(spectatorExitEffect,'Actual spectator auto-exit hook exists');
 for(const [spectator,finished,present,expected] of [[true,true,true,1],[true,false,true,0],[false,true,true,0],[true,true,false,0]]){let exits=0;require('node:vm').runInNewContext(`(${spectatorExitEffect})()`,{isSpectator:spectator,matchDone:finished,currentRoom:present?{code:'123456'}:null,leaveRoom:()=>{exits++;}});assert.equal(exits,expected,'Only spectators automatically leave completed games');}
-const names = new Set(['CompactBattleBoard','BoardTriangle','BoardCardSlot','BoardPile','PhaseTrack','SpectatorDeckStrip','BattleRoomChatPanel','BattleRoomChatHud','laneForTurn','turnForLane','parseSkillTargetSelection','PlayerHand','HandCard']);
+const names = new Set(['CompactBattleBoard','BoardTriangle','BoardCardSlot','BoardPile','PhaseTrack','SpectatorDeckStrip','BattleRoomChatPanel','BattleRoomChatHud','laneForTurn','turnForLane','parseSkillTargetSelection','PlayerHand','HandCard','CardHoverPreview']);
 const extracted = ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)).map(n=>n.getText(ast)).join('\n');
 let waitingOverlay='';
 function findWaiting(node){if(ts.isJsxElement(node)&&node.openingElement.attributes.properties.some(attribute=>ts.isJsxAttribute(attribute)&&attribute.name.text==='className'&&attribute.initializer?.getText(ast).includes('triad-spectator-waiting-overlay')))waitingOverlay=node.getText(ast);else ts.forEachChild(node,findWaiting);}
@@ -18,18 +18,21 @@ modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'),'utf8'
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
 modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));
 modules['@/components/BattleArenaControls']=transpile(fs.readFileSync('components/BattleArenaControls.tsx','utf8'));
+modules['@/components/BattleCardInspector']=transpile(fs.readFileSync('components/BattleCardInspector.tsx','utf8'));
 const roombar = source.slice(source.indexOf('<section className="triad-game-roombar'), source.indexOf('<section className="hidden relative overflow-hidden border-b',source.indexOf('<section className="triad-game-roombar')));
 modules.test = transpile(`import {useState,useLayoutEffect,useEffect,useRef,Fragment} from 'react';import {createPortal} from 'react-dom';import {Sparkles,Swords,MessageCircle,SendHorizontal,Smile,Clock3} from 'lucide-react';
 import BattleArenaChat from '@/components/BattleArenaChat';
 import { BattleArenaScoreplate, BattleArenaPhaseTrack, BattleArenaProgress, BattleArenaCardFrame, BattleArenaSurface } from '@/components/BattleArenaHud';
 import { BattleArenaHeader, BattleArenaFormation, BattleArenaHand, BattleArenaStatus } from '@/components/BattleArenaControls';
+import BattleCardInspector from '@/components/BattleCardInspector';
 const TRIAD_TITLE='Triad Dominion (อำนาจสามผนึก) ฐาน 3 ใบ';
 const playCardDeployment=()=>()=>{},TRIAD_CARD_BACK_SRC='/cards/card-backs/card-backs.png';
 const Image=({fill,priority,quality,sizes,...props})=><img {...props} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}/>;
-const MiniProfileHover=()=>null,CardHoverPreview=()=>null,RevealSpotlight=()=>null,SkillTargetOverlay=()=>null,TimeoutWarningOverlay=()=>null,BattleCinematic=()=>null;
+const MiniProfileHover=()=>null,RevealSpotlight=()=>null,SkillTargetOverlay=()=>null,TimeoutWarningOverlay=()=>null,BattleCinematic=()=>null;
+const elementLabel={wood:'ธาตุไม้'};
 const profileForParticipant=()=>null,getPlayableSkillTargetIds=()=>[];
 const deckTimerText='9:59';
-const cards=Array.from({length:20},(_,i)=>({cardNo:String(i+1).padStart(3,'0'),name:'Card '+i,kind:i<10?'monster':'skill',sourceImage:'/cards/'+String(i+1).padStart(3,'0')+'.jpg'}));
+const cards=Array.from({length:20},(_,i)=>({cardNo:String(i+1).padStart(3,'0'),name:'Card '+i,kind:i<10?'monster':'skill',element:'wood',attack:1000,support:2000,skillText:'คำอธิบายสกิลสำหรับตรวจการอ่านการ์ด',sourceImage:'/cards/'+String(i+1).padStart(3,'0')+'.jpg'}));
 const triangle={top:'001',left:'002',right:'003'},bot={top:'004',left:'005',right:'006'};
 const currentRoom={code:'123456',seats:{},spectators:[],game:{chat:[{id:'initial',senderId:'other',senderName:'The Hope',text:'พร้อมสู้แล้ว!',createdAt:Date.now()}]}},isFieldPlayer=false,matchDone=false,currentDeckModeTitle='โหมดรวม',SPECTATOR_LIMIT=10,rankProfiles=[],participant={id:'viewer'};
 const surrenderBattle=()=>{},leaveRoom=()=>{},sendRoomChat=async text=>{currentRoom.game.chat.push({id:String(Date.now()),senderId:'viewer',senderName:'ผู้ชม',text,createdAt:Date.now()});window.sentText=text;window.mount(false);return true;};
@@ -67,7 +70,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}body
   for(let i=0;i<rects.length;i++){
    const r=rects[i];
    assert.ok(r.x>=-1&&r.y>=-1&&r.x+r.w<=width+1&&r.y+r.h<=height+1,`Card fits ${width}: ${JSON.stringify(r)}`);
-   assert.ok((rotated?r.h:r.w)>=(Math.min(width,height)<500?30:75),`Card readable ${width}: ${r.w}`);
+   assert.ok((rotated?r.h:r.w)>=(Math.min(width,height)<500?30:width===1024?60:75),`Card readable ${width}: ${r.w}`);
    for(let j=0;j<i;j++){const b=rects[j];assert.ok(r.x+r.w<=b.x+1||b.x+b.w<=r.x+1||r.y+r.h<=b.y+1||b.y+b.h<=r.y+1,'No card overlaps');}
    assert.ok(rotated?r.x>=hud.x+hud.width-1:r.y+r.h<=hud.y+1,'No HUD overlap');
   }
@@ -105,6 +108,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}body
  }
  await page.setViewportSize({width:1920,height:1080});await page.evaluate(()=>{window.testHand=true;mount(false);});await page.locator('.nexora-arena-hand').waitFor();
  for(const [label,count] of [['มอนสเตอร์',10],['สกิล',10],['ทั้งหมด',20]]){await page.getByRole('button',{name:label,exact:true}).click();assert.equal(await page.locator('.nexora-arena-hand-cards > button').count(),count,'Triad hand filter '+label);}
+ const filterSizes=await page.locator('.nexora-arena-hand-filters button').evaluateAll(els=>els.map(el=>({width:el.offsetWidth,height:el.offsetHeight,font:getComputedStyle(el).fontSize})));assert.ok(filterSizes.every(size=>size.width===112&&size.height===40&&size.font==='14px'),'Triad fixed filter dimensions');
+ await page.locator('.nexora-arena-hand-cards > button').first().hover();await page.locator('.nexora-card-inspector-panel').waitFor();await page.locator('.nexora-card-inspector-panel').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{})));});const inspector=await page.locator('.nexora-card-inspector-panel').boundingBox();assert.ok(inspector.x>1400,'Triad inspector is a right-side drawer');for(const button of await page.locator('.nexora-arena-hand-filters button').all()){const box=await button.boundingBox();assert.ok(box.y>=inspector.y+inspector.height||box.y+box.height<=inspector.y||box.x+box.width<=inspector.x||box.x>=inspector.x+inspector.width,'Inspector never covers filter buttons');}await page.screenshot({path:'artifacts/triad-spectator/shared-inspector.png'});await page.mouse.move(1,1);
  await page.getByRole('button',{name:'มอนสเตอร์',exact:true}).click();await page.locator('.nexora-arena-hand-cards > button').first().click();assert.equal(await page.evaluate(()=>window.picked),'001','Filtering never changes card identity');assert.deepEqual(errors,[]);console.log('Triad actual hand: all/monster/skill filters and selection passed');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

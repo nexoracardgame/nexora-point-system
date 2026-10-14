@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import BattleCardInspector from "@/components/BattleCardInspector";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from "@/components/DeckPreparation";
 import { freshDeck, randomTriadDeck } from "@/lib/deck-reroll";
@@ -3097,107 +3098,7 @@ function CardHoverPreview({
   }, [card, onClose]);
 
   if (!card || !portalReady || typeof document === "undefined") return null;
-  const isDeckPreview = variant === "deck";
-  const preview = (
-    <div
-      className={`triad-card-preview-overlay nexora-battle-preview-portal fixed inset-0 z-[5000] grid place-items-center p-4 backdrop-blur-[2px] ${isDeckPreview ? "bg-black/8" : "bg-black/18"} ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
-      role="dialog"
-      aria-modal="true"
-      onClick={(event) => {
-        if (event.currentTarget === event.target) onClose?.();
-      }}
-    >
-      <div
-        className={`triad-card-preview-panel ${interactive ? "pointer-events-auto" : "triad-card-preview-panel-passive pointer-events-none"} relative rounded-[24px] border border-amber-100/55 bg-black/88 p-4 shadow-[0_0_90px_rgba(251,191,36,0.42)] ${
-          isDeckPreview ? "grid w-[min(760px,92vw)] gap-4 md:grid-cols-[minmax(210px,310px)_1fr]" : "w-[min(430px,82vw)]"
-        }`}
-        onPointerDown={(event) => event.stopPropagation()}
-        onPointerUp={(event) => event.stopPropagation()}
-        onTouchStart={(event) => event.stopPropagation()}
-        onTouchEnd={(event) => event.stopPropagation()}
-      >
-        {onClose && !passive ? (
-          <button
-            type="button"
-            aria-label="ปิดหน้าต่างการ์ด"
-            onClick={onClose}
-            className="triad-card-preview-close absolute right-2 top-2 z-20 grid h-9 w-9 place-items-center rounded-full border border-white/16 bg-black/72 text-white shadow-[0_10px_28px_rgba(0,0,0,0.36)] transition hover:border-amber-100/55 hover:text-amber-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
-        <div
-          className={`triad-card-preview-image relative mx-auto aspect-[3/4] overflow-hidden rounded-[18px] border border-white/18 bg-black shadow-[0_22px_80px_rgba(0,0,0,0.55)] ${
-            isDeckPreview ? "w-[min(300px,62vw)] md:w-full" : "w-[min(330px,70vw)]"
-          }`}
-        >
-          <Image
-            src={card.sourceImage}
-            alt={card.name}
-            fill
-            sizes="(hover: none) and (pointer: coarse) 72svh, 360px"
-            className="object-contain"
-            priority
-            loading="eager"
-            unoptimized
-          />
-        </div>
-        <div className={`triad-card-preview-info rounded-2xl border border-white/10 bg-white/[0.045] p-3 ${isDeckPreview ? "mt-0 flex min-h-0 flex-col md:p-4" : "mt-3"}`}>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/58">No.{card.cardNo}</div>
-          <div className={`${isDeckPreview ? "text-2xl" : "text-xl"} mt-1 line-clamp-2 font-black leading-tight text-white`}>{card.name}</div>
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black text-black">
-            <span className="rounded-md bg-amber-200 px-2 py-1">ATK {card.attack.toLocaleString()}</span>
-            <span className="rounded-md bg-cyan-200 px-2 py-1">SUP {card.support.toLocaleString()}</span>
-            <span className={`rounded-md px-2 py-1 ${card.kind === "skill" ? "bg-violet-200" : "bg-emerald-200"}`}>
-              {card.kind === "skill" ? "สกิล" : elementLabel[card.element]}
-            </span>
-          </div>
-          <div
-            className={`triad-card-preview-text mt-3 text-sm font-semibold leading-6 text-white/76 ${
-              isDeckPreview ? "max-h-[min(280px,34vh)] flex-1 overflow-y-auto pr-1" : "max-h-28 overflow-hidden"
-            }`}
-          >
-            {card.skillText || "มอนสเตอร์ใช้ค่าสถานะในการปะทะ"}
-          </div>
-          {onUseCard && (!passive || allowMobileUse) ? (
-            <button
-              type="button"
-              className="triad-card-preview-use mt-3 flex w-full items-center justify-center rounded-xl border border-amber-100/70 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-4 py-3 text-sm font-black text-black shadow-[0_0_28px_rgba(251,191,36,0.55)] transition active:scale-[0.98]"
-              onPointerDown={(event) => event.stopPropagation()}
-              onPointerUp={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                useCardFromPreview();
-              }}
-              onTouchStart={(event) => event.stopPropagation()}
-              onTouchEnd={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                useCardFromPreview();
-              }}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                useCardFromPreview();
-              }}
-            >
-              เลือกการ์ดใบนี้ลงสนาม
-            </button>
-          ) : null}
-          {onClose && !passive ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/12 bg-white/8 text-sm font-black text-white transition hover:border-amber-100/45 hover:bg-amber-200/12 hover:text-amber-100"
-            >
-              ปิด
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-  return createPortal(preview, document.body);
+  return <BattleCardInspector card={card} element={elementLabel[card.element]} interactive={interactive} onClose={onClose} onUseCard={onUseCard && (!passive || allowMobileUse) ? useCardFromPreview : undefined} />;
 }
 
 function BattleRoomChatPanel({
