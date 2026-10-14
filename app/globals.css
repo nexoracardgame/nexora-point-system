@@ -3739,10 +3739,10 @@ textarea {
 }
 @media (min-width:1200px) and (min-height:600px) {
   .nexora-battle-shell .triad-spectator-mode .triad-game-layout {
-    grid-template-columns:minmax(0,1fr) clamp(240px,17vw,320px) !important;
+    grid-template-columns:minmax(0,1fr) !important;
   }
   .nexora-battle-shell .triad-spectator-mode .triad-game-layout > aside {
-    display:flex !important; height:100% !important; max-height:100% !important;
+    display:none !important; height:100% !important; max-height:100% !important;
     min-height:0 !important; overflow:hidden !important;
   }
   .nexora-battle-shell .triad-spectator-mode .triad-game-layout > aside > div:first-child {
@@ -3782,4 +3782,52 @@ textarea {
   .nexora-battle-shell .triad-spectator-mode .triad-arena-title { display:none; }
   .nexora-battle-shell .triad-spectator-chat-drawer { bottom:6px; right:6px; }
   .nexora-battle-shell .triad-spectator-chat-drawer > summary { min-height:28px; padding:4px 6px; font-size:11px; }
+}
+
+.nexora-battle-shell .triad-dominion-game .triad-game-layout { grid-template-columns:minmax(0,1fr) !important; }
+.nexora-battle-shell .triad-dominion-game .triad-game-layout > aside { display:none !important; }
+.triad-battle-chat-hud-frame {
+  position:fixed; z-index:2147483060; pointer-events:none; container-type:size;
+}
+.triad-battle-chat-hud {
+  position:absolute; left:max(12px,env(safe-area-inset-left)); bottom:max(12px,env(safe-area-inset-bottom));
+  width:min(350px,24cqw,calc((100cqw - 560px)/2 - 24px)); color:#fff; pointer-events:auto; font-family:inherit;
+  text-shadow:0 1px 3px #000; border-radius:6px;
+  background:rgba(0,0,0,.22); transition:background-color 160ms;
+}
+.triad-battle-chat-hud:hover,.triad-battle-chat-hud:focus-within { background:rgba(0,0,0,.68); }
+.triad-chat-hud-messages {
+  max-height:min(132px,22cqh); overflow-y:auto; overscroll-behavior:contain;
+  padding:6px 8px; scrollbar-width:thin; scrollbar-color:#ffffff55 transparent;
+  font-size:13px; line-height:1.5; overflow-wrap:anywhere;
+  mask-image:linear-gradient(transparent,#000 12px);
+}
+.triad-chat-hud-messages:empty { display:none; }
+.triad-chat-hud-line { margin:2px 0; }
+.triad-chat-hud-name { color:#95e8f5; font-weight:700; }
+.triad-chat-hud-own { color:#ffe291; font-weight:700; }
+.triad-battle-chat-hud form { display:flex; align-items:center; gap:6px; padding:4px 6px; border-top:1px solid #ffffff15; }
+.triad-battle-chat-hud input {
+  width:0; flex:1; min-width:0; font:inherit; font-size:13px; color:#fff;
+  background:transparent; outline:none; padding:6px 0; text-shadow:0 1px 3px #000;
+}
+.triad-battle-chat-hud input::placeholder { color:#e5eef0b0; }
+.triad-battle-chat-hud button {
+  width:30px; height:30px; flex-shrink:0; display:grid; place-items:center;
+  border-radius:4px; color:#a6f5e4; cursor:pointer;
+}
+.triad-battle-chat-hud button:hover { background:#ffffff18; }
+.triad-battle-chat-hud button:disabled { opacity:.35; cursor:default; }
+.triad-battle-chat-hud button:focus-visible { outline:2px solid #a6f5e4; }
+@media (max-height:599px), (max-width:900px) and (orientation:portrait) {
+  .triad-battle-chat-hud { width:min(220px,20cqw); left:max(6px,env(safe-area-inset-left)); bottom:max(5px,env(safe-area-inset-bottom)); }
+  .triad-chat-hud-messages { max-height:40px; font-size:11px; padding:3px 6px; line-height:1.3; }
+  .nexora-battle-shell .triad-dominion-game .triad-board-phase-hud { justify-content:flex-end !important; }
+  .nexora-battle-shell .triad-dominion-game .triad-board-phase-card { width:min(480px,72%) !important; }
+  .triad-battle-chat-hud form { padding:2px 4px; gap:4px; }
+  .triad-battle-chat-hud input { font-size:12px; padding:4px 0; }
+  .triad-battle-chat-hud button { width:26px; height:26px; }
+}
+@media (max-width:900px) and (orientation:portrait) {
+  .triad-battle-chat-hud-frame { transform:rotate(90deg) translateY(-100%); transform-origin:top left; }
 }

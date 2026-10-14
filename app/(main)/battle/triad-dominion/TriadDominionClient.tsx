@@ -3243,11 +3243,13 @@ function BattleRoomChatPanel({
   currentUserId,
   rankProfiles,
   onSend,
+  compact = false,
 }: {
   room: TriadRoom | null | undefined;
   currentUserId: string;
   rankProfiles: Record<string, TriadRankProfile>;
   onSend: (text: string) => Promise<boolean>;
+  compact?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -3287,6 +3289,26 @@ function BattleRoomChatPanel({
       setSending(false);
     });
   };
+
+  if (compact) return (
+    <section className="triad-battle-chat-hud" aria-label="แชตสนาม">
+      <div ref={messagesRef} className="triad-chat-hud-messages" role="log" aria-live="polite" aria-relevant="additions">
+        {messages.slice(-40).map((message) => (
+          <div key={message.id} className="triad-chat-hud-line">
+            <span className={message.senderId === currentUserId ? "triad-chat-hud-own" : "triad-chat-hud-name"}>{message.senderName}: </span>
+            <span>{message.text}</span>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <input aria-label="ข้อความแชตสนาม" value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} disabled={!room?.code} placeholder="แชตสนาม..." maxLength={240} />
+        <button type="submit" aria-label="ส่งข้อความ" title="ส่งข้อความ" disabled={!draft.trim() || !room?.code}>
+          <SendHorizontal className="h-4 w-4" />
+        </button>
+      </form>
+    </section>
+  );
 
   return (
     <section className="triad-battle-chat-panel flex min-h-[300px] flex-col rounded-2xl border border-amber-200/24 bg-[radial-gradient(circle_at_18%_0%,rgba(251,191,36,0.16),transparent_34%),linear-gradient(180deg,rgba(18,13,5,0.94),rgba(4,4,7,0.98))] shadow-[0_24px_70px_rgba(0,0,0,0.42),0_0_42px_rgba(251,191,36,0.08),inset_0_0_0_1px_rgba(255,244,214,0.055)] 2xl:h-[min(560px,calc(100vh-300px))] 2xl:min-h-[380px]">
@@ -3413,6 +3435,30 @@ function BattleRoomChatPanel({
         </div>
       </form>
     </section>
+  );
+}
+
+function BattleRoomChatHud({ cinematicActive, ...props }: Parameters<typeof BattleRoomChatPanel>[0] & { cinematicActive: boolean }) {
+  const [frame, setFrame] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const board = document.querySelector<HTMLElement>(".nexora-battle-shell .triad-arena-board");
+    const measure = () => {
+      const rotated = window.matchMedia("(max-width:900px) and (orientation:portrait)").matches;
+      const rect = !cinematicActive ? board?.getBoundingClientRect() : null;
+      const next = { left: rect?.left || 0, top: rect?.top || 0, width: rotated ? (rect?.height ?? window.innerHeight) : (rect?.width ?? window.innerWidth), height: rotated ? (rect?.width ?? window.innerWidth) : (rect?.height ?? window.innerHeight) };
+      setFrame((current) => current && Object.keys(next).every((key) => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (board) observer.observe(board);
+    window.addEventListener("resize", measure);
+    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
+  }, [cinematicActive]);
+  if (!frame) return null;
+  return createPortal(
+    <div className="triad-battle-chat-hud-frame" style={frame} data-cinematic-chat={cinematicActive}>
+      <BattleRoomChatPanel {...props} compact />
+    </div>, document.body
   );
 }
 
@@ -8182,6 +8228,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   return (
     <main className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
+      {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
           type="button"
@@ -8613,45 +8660,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           ) : null}
 
-          {currentRoom && isSpectator ? (
-            <details className="triad-spectator-chat-drawer">
-              <summary aria-label="แชตสนาม"><MessageCircle className="h-4 w-4" /><span>แชตสนาม</span></summary>
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
-            </details>
-          ) : null}
-          {currentRoom && !isSpectator ? (
-            <div className="triad-room-actions-mobile space-y-2 2xl:hidden">
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
-              {deckSelectionActive ? (
-                <DeckSelectionStatusBanner
-                  title="กำลังเลือกเด็ค"
-                  leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
-                  rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
-                  timerText={deckTimerText}
-                  message="รอทั้งสองฝั่งกดพร้อมครบก่อนเริ่มสนามจริง"
-                  compact
-                />
-              ) : null}
-            </div>
-          ) : null}
         </section>
 
         <aside className="hidden min-h-0 flex-col gap-3 overflow-visible 2xl:flex 2xl:h-[calc(100vh-136px)] 2xl:max-h-[calc(100vh-136px)]">
-          {currentRoom ? (
-            <div className="space-y-2">
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
-              {deckSelectionActive ? (
-                <DeckSelectionStatusBanner
-                  title="กำลังเลือกเด็ค"
-                  leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
-                  rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
-                  timerText={deckTimerText}
-                  message="รอทั้งสองฝั่งกดพร้อมครบก่อนเริ่มสนามจริง"
-                  compact
-                />
-              ) : null}
-            </div>
-          ) : null}
 
           <div className="hidden min-h-0 rounded-xl border border-white/8 bg-white/[0.035] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
