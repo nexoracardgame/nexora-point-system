@@ -57,7 +57,8 @@ function ElementClash({ round, room, arenaImage, onComplete }: { round: PentadRo
   useEffect(() => { const timer = setInterval(() => setStage(value => value + 1), 3000); const end = setTimeout(() => complete.current(), stages.length * 3000); return () => { clearInterval(timer); clearTimeout(end); }; }, [round.id, stages.length]);
   const winner = round.winner === "draw" ? "host" : round.winner;
   const current = stages[Math.min(stage, stages.length - 1)];
-  return createPortal(<div className={styles.elementClash} style={{ backgroundImage: `linear-gradient(#03070c80,#03070cb3),url('${arenaImage}')` }}><h2>ธาตุปะทะ · {Math.min(stage + 1, stages.length)}/{stages.length}</h2><div>{(["host", "challenger"] as const).map(side => <section key={side} className={side === winner ? styles.elementWinner : styles.elementLoser}><strong>{room.seats[side]?.name}</strong><Card no={round.mains[side]} /><span>ธาตุ{pentadElementNames[triadCardByNo.get(round.mains[side])!.element]}</span></section>)}</div><h1>{current.title}</h1><p className={styles.stageDetail}>{current.detail}</p></div>, document.body);
+  const resolved = stage >= stages.length - 1 && round.winner !== "draw";
+  return createPortal(<div className={styles.elementClash} style={{ backgroundImage: `linear-gradient(#03070c80,#03070cb3),url('${arenaImage}')` }}><h2>ธาตุปะทะ · {Math.min(stage + 1, stages.length)}/{stages.length}</h2><div>{(["host", "challenger"] as const).map(side => <section key={side} className={resolved ? side === winner ? styles.elementWinner : styles.elementLoser : undefined}><strong>{room.seats[side]?.name}</strong><Card no={round.mains[side]} /><span>ธาตุ{pentadElementNames[triadCardByNo.get(round.mains[side])!.element]}</span></section>)}</div><h1>{current.title}</h1><p className={styles.stageDetail}>{current.detail}</p></div>, document.body);
 }
 
 export default function PentadDominionClient({ userId }: { userId: string }) {
