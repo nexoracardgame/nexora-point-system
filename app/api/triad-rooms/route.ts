@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getApiActor, requireAdminActor, type ApiActor } from "@/lib/admin-auth";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 import {
@@ -15,6 +15,7 @@ import {
   listTriadRankProfiles,
   leaveTriadRoom,
   listTriadRooms,
+  getTriadRoomForParticipant,
   lockTriadRoomCard,
   moveTriadParticipantToSpectator,
   resetTriadRoomBattle,
@@ -95,7 +96,8 @@ async function roomActionJson(
   realtime?: TriadRoomRealtimePayload | null
 ) {
   if (realtime) {
-    await publishTriadRoomRealtime(realtime);
+    const notification = structuredClone(realtime);
+    after(() => publishTriadRoomRealtime(notification));
   }
   return noStoreJson(body, init);
 }
@@ -110,15 +112,23 @@ function participantFromActor(body: Record<string, unknown>, actor: ApiActor): T
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const actor = await getApiActor();
   if (!actor) return noStoreJson({ error: "unauthorized" }, { status: 401 });
 
-  const [rooms, rankProfiles] = await Promise.all([listTriadRooms(), listTriadRankProfiles()]);
+  const params = new URL(request.url).searchParams;
+  const code = cleanText(params.get("room"));
+  if (code && !/^\d{6}$/.test(code)) return noStoreJson({ error: "invalid_room" }, { status: 400 });
+  const includeRanks = code ? params.get("ranks") === "1" : params.get("ranks") !== "0";
+  const [rooms, rankProfiles] = await Promise.all([
+    code ? getTriadRoomForParticipant(code, actor.id).then(room => room ? [room] : []) : listTriadRooms(),
+    includeRanks ? listTriadRankProfiles() : Promise.resolve(null),
+  ]);
   return noStoreJson({
     rooms,
-    rankProfiles,
-    leaderboard: rankProfiles.filter((profile) => profile.wins > 0),
+    scope: code ? "room" : "lobby",
+    code: code || undefined,
+    ...(rankProfiles ? { rankProfiles, leaderboard: rankProfiles.filter((profile) => profile.wins > 0) } : {}),
   });
 }
 

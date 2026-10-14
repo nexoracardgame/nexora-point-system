@@ -203,6 +203,7 @@ const globalForTriadRooms = globalThis as {
   nexoraTriadRankProfiles?: TriadRankProfile[];
   nexoraTriadBotMemory?: Map<string, TriadBotMemoryEntry>;
   nexoraTriadBotMemoryHydrated?: boolean;
+  nexoraTriadBotMemoryHydrationPromise?: Promise<void>;
   nexoraTriadRoomSchemaPromise?: Promise<void>;
   nexoraTriadRoomMutationLocks?: Map<string, Promise<void>>;
 };
@@ -929,12 +930,15 @@ async function dbDeleteBotMemoryEntries(keys: string[]) {
 
 async function warmBotMemory() {
   if (globalForTriadRooms.nexoraTriadBotMemoryHydrated) return;
-  try {
-    await hydrateBotMemoryFromDb();
-  } catch (error) {
-    console.error("TRIAD BOT MEMORY LOAD FALLBACK:", error);
-    globalForTriadRooms.nexoraTriadBotMemoryHydrated = true;
+  if (!globalForTriadRooms.nexoraTriadBotMemoryHydrationPromise) {
+    globalForTriadRooms.nexoraTriadBotMemoryHydrationPromise = hydrateBotMemoryFromDb().catch(error => {
+      console.error("TRIAD BOT MEMORY LOAD FALLBACK:", error);
+      globalForTriadRooms.nexoraTriadBotMemoryHydrated = true;
+    }).finally(() => {
+      globalForTriadRooms.nexoraTriadBotMemoryHydrationPromise = undefined;
+    });
   }
+  await globalForTriadRooms.nexoraTriadBotMemoryHydrationPromise;
 }
 
 function memoryAddRankResult(participant: TriadRoomParticipant, result: "win" | "loss") {
@@ -1145,14 +1149,25 @@ async function pruneExpiredRooms(rooms: StoredTriadRoom[]) {
 }
 
 export async function listTriadRooms() {
-  await warmBotMemory();
   const storedRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const aliveRooms = await pruneExpiredRooms(storedRooms);
   const currentRooms: StoredTriadRoom[] = [];
   for (const snapshot of aliveRooms) {
-    await withRoomMutationLock(snapshot.code, async () => {
-      const room = await getStoredRoom(snapshot.code);
-      if (!room) return;
+    const room = await refreshTriadRoom(snapshot.code);
+    if (room) currentRooms.push(room);
+  }
+  return currentRooms.map(publicRoom);
+}
+
+async function refreshTriadRoom(code: string, participantId?: string) {
+  return withRoomMutationLock(code, async () => {
+      const room = await getStoredRoom(code);
+      if (!room || (participantId && !participantInStoredRoom(room, participantId))) return null;
+      if (roomExpired(room)) {
+        await deleteStoredRoom(code);
+        return null;
+      }
+      if (isTriadBotParticipant(room.seats.challenger)) await warmBotMemory();
       const selectionPoolsChanged = repairSelectionPools(room);
       const deckGateChanged = enforceDeckGate(room);
       const choicesExpired = markExpiredSkillChoices(room);
@@ -1164,10 +1179,14 @@ export async function listTriadRooms() {
       if (selectionPoolsChanged || deckGateChanged || choicesExpired || resolvedAfterChoiceTimeout || botChanged || stateHealed) {
         await upsertStoredRoom(room);
       }
-      currentRooms.push(room);
-    });
-  }
-  return currentRooms.map(publicRoom);
+      return room;
+  });
+}
+
+export async function getTriadRoomForParticipant(code: string, participantId: string) {
+  if (!participantId) return null;
+  const room = await refreshTriadRoom(code, participantId);
+  return room ? publicRoom(room) : null;
 }
 
 export async function createTriadRoom(input: {
@@ -1177,7 +1196,7 @@ export async function createTriadRoom(input: {
   deckMode?: TriadDeckMode;
   playWithBot?: boolean;
 }) {
-  await warmBotMemory();
+  if (input.playWithBot) await warmBotMemory();
   const existingRooms = await withRoomStore("list", dbListRooms, memoryListRooms);
   const code = roomCode(existingRooms);
   const deckMode = normalizeDeckMode(input.deckMode);
@@ -3190,13 +3209,15 @@ export async function setTriadRoomDeckMode(code: string, participantId: string, 
 }
 
 export async function startTriadRoom(code: string, participantId: string) {
-  await warmBotMemory();
+  return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   if (!canControlStoredRoom(room, participantId)) return { ok: false as const, reason: "not_host" as const, room: publicRoom(room) };
+  if (room.status === "playing") return { ok: true as const, room: publicRoom(room) };
   if (!room.seats.host || !room.seats.challenger) {
     return { ok: false as const, reason: "need_two_players" as const, room: publicRoom(room) };
   }
+  if (isTriadBotParticipant(room.seats.challenger)) await warmBotMemory();
 
   room.status = "playing";
   room.game = freshGameForRoom(room);
@@ -3205,6 +3226,7 @@ export async function startTriadRoom(code: string, participantId: string) {
   }
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room) };
+  });
 }
 
 export async function runTriadRoomBot(code: string, participantId: string) {

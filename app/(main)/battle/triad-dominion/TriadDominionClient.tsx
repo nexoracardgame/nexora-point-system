@@ -1165,6 +1165,10 @@ function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextR
   const currentDeckStart = Number(currentRoom.game.deckStartedAt || 0);
   const nextDeckStart = Number(nextRoom.game.deckStartedAt || 0);
   if (currentDeckStart !== nextDeckStart) return currentDeckStart > nextDeckStart;
+  if (currentRoom.status === "playing" && nextRoom.status === "playing" && (
+    (currentRoom.game.deckReady.host && !nextRoom.game.deckReady.host) ||
+    (currentRoom.game.deckReady.challenger && !nextRoom.game.deckReady.challenger)
+  )) return true;
   if (Number(nextRoom.updatedAt || 0) < Number(currentRoom.updatedAt || 0)) return true;
   if (Number(nextRoom.updatedAt || 0) > Number(currentRoom.updatedAt || 0)) return false;
   if (currentRoom.status === "playing" && nextRoom.status === "waiting") {
@@ -1185,6 +1189,7 @@ function shouldKeepCurrentRoomSnapshot(currentRoom: TriadRoom | undefined, nextR
 function mergeRoomByCode(rooms: TriadRoom[], room?: TriadRoom | null) {
   if (!room?.code) return rooms;
   const existing = rooms.find((item) => item.code === room.code);
+  if (existing && JSON.stringify(existing) === JSON.stringify(room)) return rooms;
   if (shouldKeepCurrentRoomSnapshot(existing, room)) return rooms;
   return existing ? rooms.map((item) => (item.code === room.code ? mergeRoomWithStableChat(item, room) : item)) : [room, ...rooms];
 }
@@ -4634,11 +4639,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
   const [roomPassword, setRoomPassword] = useState("");
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [botChanging, setBotChanging] = useState(false);
+  const botChangingRef = useRef(false);
+  const creatingRoomRef = useRef(false);
+  const startingRoomCodeRef = useRef("");
+  const roomResponseRevisionRef = useRef(0);
   const [createRoomMode, setCreateRoomMode] = useState<DeckMode>("all");
   const [createRoomWithBot, setCreateRoomWithBot] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
   const [joiningRoomCode, setJoiningRoomCode] = useState("");
+  const joiningRoomCodeRef = useRef("");
   const [passwordRoom, setPasswordRoom] = useState<TriadRoom | null>(null);
   const [activeRoomSnapshot, setActiveRoomSnapshot] = useState<TriadRoom | null>(null);
   const [gmPanelOpen, setGmPanelOpen] = useState(false);
@@ -4655,6 +4667,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
   const lastSyncAtRef = useRef(0);
+  const lastRankSyncAtRef = useRef(0);
   const deckSyncTimerRef = useRef<number | null>(null);
   const deckSyncQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const localDeckSessionRef = useRef("");
@@ -5171,9 +5184,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     };
   };
 
-  const mergeIncomingRooms = (current: TriadRoom[], nextRooms: TriadRoom[]) =>
-    mergeRoomListsWithStableChat(current, nextRooms).map((room) => {
+  const mergeIncomingRooms = (current: TriadRoom[], nextRooms: TriadRoom[]) => {
+    const merged = mergeRoomListsWithStableChat(current, nextRooms).map((room) => {
       const existing = current.find((item) => item.code === room.code);
+      if (existing && JSON.stringify(existing) === JSON.stringify(room)) return existing;
       if (shouldKeepCurrentRoomSnapshot(existing, room)) return existing!;
       const optimisticRoom = activeRoomSnapshotRef.current;
       if (
@@ -5187,6 +5201,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (!optimisticRoom || Date.now() >= optimisticRoomLockUntilRef.current) return [];
       return nextRooms.some((room) => room.code === optimisticRoom.code) ? [] : [keepPendingOpeningTieBreakChoice(optimisticRoom)];
     })());
+    return merged.length === current.length && merged.every((room, index) => room === current[index]) ? current : merged;
+  };
 
   const mergeIncomingRoom = (current: TriadRoom[], room: TriadRoom) => {
     const optimisticRoom = activeRoomSnapshotRef.current;
@@ -5207,10 +5223,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     syncInFlightRef.current = true;
     lastSyncAtRef.current = now;
+    const requestRevision = roomResponseRevisionRef.current;
+    const requestedCode = activeRoomCodeRef.current;
+    const includeRanks = !lastRankSyncAtRef.current || now - lastRankSyncAtRef.current >= 30000;
     try {
-      const response = await fetch(`${ROOM_API_PATH}?ts=${now}`, { cache: "no-store" });
+      const params = new URLSearchParams({ ts: String(now), ranks: includeRanks ? "1" : "0" });
+      if (requestedCode) params.set("room", requestedCode);
+      const response = await fetch(`${ROOM_API_PATH}?${params}`, { cache: "no-store", signal: AbortSignal.timeout(10000) });
       const payload = await response.json().catch(() => ({}));
+      if (!response.ok || requestRevision !== roomResponseRevisionRef.current || requestedCode !== activeRoomCodeRef.current) return [];
       if (!Array.isArray(payload.rooms)) return [];
+    const roomOnly = payload.scope === "room";
+    const startPending = requestedCode && startingRoomCodeRef.current === requestedCode;
+    if (startPending && payload.rooms.some((room: { code?: string; status?: string }) => room.code === requestedCode && room.status === "waiting")) return [];
     const nextRooms = normalizeApiRooms(payload.rooms);
     const nextProfiles: TriadRankProfile[] = Array.isArray(payload.rankProfiles)
       ? payload.rankProfiles.map(normalizeRankProfile).filter((profile: TriadRankProfile | null): profile is TriadRankProfile => Boolean(profile))
@@ -5219,6 +5244,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       ? payload.leaderboard.map(normalizeRankProfile).filter((profile: TriadRankProfile | null): profile is TriadRankProfile => Boolean(profile))
       : nextProfiles.filter((profile: TriadRankProfile) => profile.wins > 0);
     if (nextProfiles.length > 0 || Array.isArray(payload.rankProfiles)) {
+      lastRankSyncAtRef.current = now;
       setRankProfiles(Object.fromEntries(nextProfiles.map((profile) => [profile.userId, profile])));
     }
     if (nextLeaderboard.length > 0 || Array.isArray(payload.leaderboard)) {
@@ -5227,7 +5253,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const activeCode = activeRoomCodeRef.current;
     const snapshotCode = activeRoomSnapshotRef.current?.code || "";
     const knownActiveCode = activeCode || snapshotCode;
-    const reconnectRoom = !activeCode ? nextRooms.find((room) => participantInRoom(room, participant.id)) : null;
+    const reconnectRoom = !roomOnly && !creatingRoomRef.current && !activeCode ? nextRooms.find((room) => participantInRoom(room, participant.id)) : null;
     if (reconnectRoom) {
       activeRoomCodeRef.current = reconnectRoom.code;
       setActiveRoomCode(reconnectRoom.code);
@@ -5238,6 +5264,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     if (
       knownActiveCode &&
+      !creatingRoomRef.current &&
+      !startPending &&
+      joiningRoomCodeRef.current !== knownActiveCode &&
       !nextRooms.some((room) => room.code === knownActiveCode) &&
       !(activeRoomSnapshotRef.current?.code === knownActiveCode && Date.now() < optimisticRoomLockUntilRef.current)
     ) {
@@ -5249,7 +5278,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setPhase("lobby");
       setLobbyMessage("ห้องถูกปิดแล้ว");
     }
-    setRooms((current) => mergeIncomingRooms(current, nextRooms));
+    setRooms((current) => roomOnly
+      ? nextRooms.reduce((merged, room) => mergeIncomingRoom(merged, room), current)
+      : mergeIncomingRooms(current, nextRooms));
     return nextRooms;
     } finally {
       setResumeChecking(false);
@@ -5277,6 +5308,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const setStableActiveRoomSnapshot = (room: TriadRoom) => {
     const currentSnapshot = activeRoomSnapshotRef.current || undefined;
     const stableRoom = currentSnapshot && shouldKeepCurrentRoomSnapshot(currentSnapshot, room) ? currentSnapshot : room;
+    if (currentSnapshot && JSON.stringify(currentSnapshot) === JSON.stringify(stableRoom)) return currentSnapshot;
     activeRoomSnapshotRef.current = stableRoom;
     setActiveRoomSnapshot(stableRoom);
     writeCachedTriadRoom(participant.id, stableRoom);
@@ -5380,11 +5412,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const postRoomAction = async (body: Record<string, unknown>) => {
+    roomResponseRevisionRef.current += 1;
+    try {
     const response = await fetch(ROOM_API_PATH, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      signal: body.action === "choose-skill-target" || body.action === "advance-turn" ? AbortSignal.timeout(10000) : undefined,
+      signal: AbortSignal.timeout(12000),
       body: JSON.stringify({ ...body, participant }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -5398,24 +5432,28 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
     const isGmRescueAction =
       body.action === "gm-reset-decks" || body.action === "gm-refresh-app" || body.action === "gm-restart-turn";
-    if (actionRoom) {
+    const appliesToActiveRoom = body.action !== "create" && body.code === activeRoomCodeRef.current;
+    if (actionRoom && appliesToActiveRoom) {
       optimisticRoomLockUntilRef.current =
         body.action === "lock-card" && !payload.resolved
           ? Math.max(optimisticRoomLockUntilRef.current, Date.now() + 1400)
           : 0;
     }
-    let nextRooms = Array.isArray(payload.rooms) ? normalizeApiRooms(payload.rooms) : rooms;
-    if ((body.action === "disband" || (body.action === "leave" && !actionRoom)) && activeRoomCodeRef.current) {
-      nextRooms = nextRooms.filter((room) => room.code !== activeRoomCodeRef.current);
-    }
-    setRooms((current) =>
+    const responseRooms = Array.isArray(payload.rooms) ? normalizeApiRooms(payload.rooms) : null;
+    setRooms((current) => {
+      let nextRooms = responseRooms || current;
+      if (body.action === "disband" || (body.action === "leave" && !actionRoom)) {
+        nextRooms = nextRooms.filter((room) => room.code !== body.code);
+      }
+      return (
       actionRoom
         ? isGmRescueAction
           ? forceReplaceRoomByCode(mergeIncomingRooms(current, nextRooms), actionRoom)
           : mergeIncomingRoom(mergeIncomingRooms(current, nextRooms), actionRoom)
         : mergeIncomingRooms(current, nextRooms)
-    );
-    if (actionRoom) {
+      );
+    });
+    if (actionRoom && appliesToActiveRoom) {
       const activeStableRoom = isGmRescueAction
         ? forceApplyServerRoom(actionRoom)
         : setStableActiveRoomSnapshot(
@@ -5437,7 +5475,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           );
         }
       }
-    } else if (body.action === "disband" || (activeRoomCodeRef.current && !nextRooms.some((room) => room.code === activeRoomCodeRef.current))) {
+    } else if ((body.action === "disband" && appliesToActiveRoom) || (responseRooms && activeRoomCodeRef.current && !responseRooms.some((room) => room.code === activeRoomCodeRef.current))) {
       activeRoomCodeRef.current = "";
       activeRoomSnapshotRef.current = null;
       setActiveRoomCode("");
@@ -5445,19 +5483,22 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       writeCachedTriadRoom(participant.id, null);
       setPhase("lobby");
     }
-    const syncAfterAction = () => void syncRooms({ force: true }).catch(() => null);
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(syncAfterAction, { timeout: 180 });
-    } else {
-      globalThis.setTimeout(syncAfterAction, 60);
+    if (!actionRoom || !response.ok) {
+      globalThis.setTimeout(() => void syncRooms({ force: true }).catch(() => null), 60);
     }
     return { ok: response.ok, status: response.status, payload };
+    } catch {
+      return { ok: false, status: 0, payload: { reason: "network_error" } };
+    } finally {
+      roomResponseRevisionRef.current += 1;
+    }
   };
 
   const scheduleDeckSync = (deck: string[]) => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
     const code = currentRoom.code;
     const deckStartedAt = currentRoom.game.deckStartedAt;
+    const side = roomPlayerSide;
     if (deckSyncTimerRef.current) {
       window.clearTimeout(deckSyncTimerRef.current);
     }
@@ -5465,7 +5506,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       deckSyncTimerRef.current = null;
       deckSyncQueueRef.current = deckSyncQueueRef.current.catch(() => null).then(() => {
         const active = activeRoomSnapshotRef.current;
-        if (!active || active.code !== code || active.game.deckStartedAt !== deckStartedAt) return;
+        if (!active || active.code !== code || active.game.deckStartedAt !== deckStartedAt || active.game.deckReady[side]) return;
         return postRoomAction({ action: "set-deck", code, deck, deckStartedAt });
       }).catch(() => null);
     }, 120);
@@ -5626,6 +5667,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       : null;
 
   const createRoom = async (deckMode: DeckMode) => {
+    if (creatingRoomRef.current) return;
     const access = roomAccess;
     const password = access === "private" ? roomPassword.trim() : "";
     if (access === "private" && password.length < 4) {
@@ -5633,6 +5675,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
 
+    creatingRoomRef.current = true;
+    setCreatingRoom(true);
+    setLobbyMessage("");
+    try {
     const result = await postRoomAction({
       action: "create",
       access,
@@ -5650,9 +5696,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     activeRoomSnapshotRef.current = room;
     activeRoomCodeRef.current = room.code;
     setActiveRoomCode(room.code);
+    setCreateModeDialogOpen(false);
     setLobbyMessage("");
     if (roomDecksReadyForBattle(room)) markBattleStartedForRoom(room);
     setPhase(room.status === "playing" ? phaseForRoomWithBattleLock(room, "deck") || "deck" : "room");
+    } finally {
+      creatingRoomRef.current = false;
+      setCreatingRoom(false);
+    }
   };
 
   const enterRoom = async (codeInput = joinCode, forceSpectator = false, passwordInput = joinPassword) => {
@@ -5662,7 +5713,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       setLobbyMessage("ไม่พบห้องนี้");
       return;
     }
-    if (joiningRoomCode === code) return;
+    if (joiningRoomCodeRef.current) return;
     if (room?.access === "private" && !passwordInput.trim() && room.hostId !== participant.id) {
       setPasswordRoom(room);
       setLobbyMessage("");
@@ -5678,6 +5729,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     let usedOptimisticRoom = false;
 
     setJoiningRoomCode(code);
+    joiningRoomCodeRef.current = code;
     setLobbyMessage("");
     if (canOptimisticallyEnter && optimisticRoom) {
       usedOptimisticRoom = true;
@@ -5708,6 +5760,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       forceSpectator: shouldEnterAsSpectator,
     }).catch(() => null);
 
+    if (joiningRoomCodeRef.current !== code) return;
+    joiningRoomCodeRef.current = "";
     if (!result?.ok) {
       const lockedRoom = normalizeApiRooms(result?.payload?.room ? [result.payload.room] : [])[0] || null;
       restoreBeforeOptimisticJoin();
@@ -5753,7 +5807,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const toggleBotOpponent = async () => {
-    if (!currentRoom || !isRoomController) return;
+    if (!currentRoom || !isRoomController || botChangingRef.current) return;
+    botChangingRef.current = true;
+    setBotChanging(true);
+    try {
     const result = await postRoomAction({
       action: "set-bot",
       code: currentRoom.code,
@@ -5764,6 +5821,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
     setLobbyMessage(!hasBotOpponent ? "BOT Level.99 ลงฝั่งผู้ท้าชิงแล้ว" : "เอา BOT Level.99 ออกจากห้องแล้ว");
+    } finally {
+      botChangingRef.current = false;
+      setBotChanging(false);
+    }
   };
 
   const changeRoomDeckMode = async (deckMode: DeckMode) => {
@@ -5790,17 +5851,26 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const startRoomGame = async () => {
     if (!currentRoom || !isRoomController || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    if (startingRoomCodeRef.current) return;
     const code = currentRoom.code;
     const startedAsFieldPlayer = Boolean(
       currentRoom.seats.host?.id === participant.id || currentRoom.seats.challenger?.id === participant.id
     );
-    startRoomLockRef.current = { code, until: Date.now() + 5000 };
+    startingRoomCodeRef.current = code;
+    startRoomLockRef.current = { code, until: Number.POSITIVE_INFINITY };
     resetBattle();
     setPhase(startedAsFieldPlayer ? "deck" : "battle");
     const result = await postRoomAction({ action: "start", code });
+    startingRoomCodeRef.current = "";
+    startRoomLockRef.current = { code: "", until: 0 };
+    if (activeRoomCodeRef.current !== code) return;
     if (!result.ok) {
-      startRoomLockRef.current = { code: "", until: 0 };
-      setLobbyMessage("เจ้าของห้องเริ่มเกมได้เมื่อมีผู้เล่นครบ 2 ฝั่ง");
+      const confirmedRoom = activeRoomSnapshotRef.current;
+      if (confirmedRoom?.code === code && confirmedRoom.status === "playing" && confirmedRoom.game.deckStartedAt !== currentRoom.game.deckStartedAt) {
+        setPhase(phaseForRoomWithBattleLock(confirmedRoom, "deck") || "deck");
+        return;
+      }
+      setLobbyMessage(result.status === 0 ? "เชื่อมต่อไม่สำเร็จ กดเริ่มเกมอีกครั้งได้" : "เจ้าของห้องเริ่มเกมได้เมื่อมีผู้เล่นครบ 2 ฝั่ง");
       setPhase("room");
       void syncRooms({ force: true }).catch(() => null);
       return;
@@ -5810,14 +5880,11 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       startedRoom?.seats.host?.id === participant.id || startedRoom?.seats.challenger?.id === participant.id
     );
     setPhase(serverStartedAsFieldPlayer ? "deck" : "battle");
-    window.setTimeout(() => {
-      if (startRoomLockRef.current.code === code) {
-        startRoomLockRef.current = { code: "", until: 0 };
-      }
-    }, 5200);
   };
 
   const leaveRoom = async () => {
+    joiningRoomCodeRef.current = "";
+    setJoiningRoomCode("");
     const code = currentRoom?.code || "";
     activeRoomCodeRef.current = "";
     activeRoomSnapshotRef.current = null;
@@ -5951,6 +6018,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const event = (payload || {}) as TriadRoomRealtimePayload;
       const room = normalizeApiRooms(event.room ? [event.room] : [])[0] || null;
       const code = safeText(event.code || room?.code);
+      if (room?.status === "waiting" && startingRoomCodeRef.current === code) return;
+      if (room && joiningRoomCodeRef.current === code && !participantInRoom(room, participant.id)) return;
       if (room && shouldKeepCurrentRoomSnapshot(activeRoomSnapshotRef.current || undefined, room)) return;
 
       if (event.refresh) {
@@ -6430,7 +6499,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       if (deckSyncTimerRef.current) window.clearTimeout(deckSyncTimerRef.current);
       deckSyncTimerRef.current = null;
       setBattleLog(["กำลังยืนยันเด็คกับสนาม"]);
-      await deckSyncQueueRef.current.catch(() => null);
       const result = await postRoomAction({
         action: "ready-deck",
         code: currentRoom.code,
@@ -7415,6 +7483,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   if (phase === "lobby") {
     const visibleRooms = rooms
+      .slice()
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 8);
     const searchedRoom = joinCode.length === 6 ? rooms.find((room) => room.code === joinCode) : null;
@@ -7537,16 +7606,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <button
                 type="button"
                 onClick={() => {
-                  setCreateModeDialogOpen(false);
                   void createRoom(createRoomMode);
                 }}
+                disabled={creatingRoom}
+                aria-busy={creatingRoom}
                 className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_26px_rgba(251,191,36,0.18)] transition hover:from-amber-200 hover:to-yellow-100"
               >
-                ยืนยันสร้างห้อง
+                {creatingRoom ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />กำลังสร้างห้อง</span> : "ยืนยันสร้างห้อง"}
               </button>
               <button
                 type="button"
                 onClick={() => setCreateModeDialogOpen(false)}
+                disabled={creatingRoom}
                 className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-amber-200/30 hover:text-white"
               >
                 ยกเลิก
@@ -7774,7 +7845,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       );
     }
 
-    const canStart = isRoomController && Boolean(currentRoom.seats.host && currentRoom.seats.challenger);
+    const canStart = isRoomController && !botChanging && Boolean(currentRoom.seats.host && currentRoom.seats.challenger);
     const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
 
     return (
@@ -7816,15 +7887,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               <button
                 type="button"
                 onClick={toggleBotOpponent}
-                disabled={!isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)}
+                disabled={botChanging || !isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)}
+                aria-busy={botChanging}
                 className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/8 disabled:text-white/28 ${
                   hasBotOpponent
                     ? "border-cyan-100/55 bg-cyan-200 text-black shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:bg-cyan-100"
                     : "border-cyan-200/28 bg-cyan-300/10 text-cyan-50 hover:border-cyan-100/60 hover:bg-cyan-300/16"
                 }`}
               >
-                <Bot className="h-4 w-4" />
-                {hasBotOpponent ? "เอาบอทออก" : "สู้กับบอท"}
+                {botChanging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                {botChanging ? "กำลังอัปเดต" : hasBotOpponent ? "เอาบอทออก" : "สู้กับบอท"}
               </button>
               <button
                 type="button"
