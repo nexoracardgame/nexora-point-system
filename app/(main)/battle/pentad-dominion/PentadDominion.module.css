@@ -9,6 +9,7 @@
 .brand { font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#fff5df; }
 .brand small { display:block; font:10px Arial,sans-serif; color:#bfeae1; }
 .roomCode { color:#edd7a5; font-size:14px; }
+.backLobby { color:#a6f5e4; font-size:14px; padding:8px 12px; border-bottom:1px solid #a6f5e4; }
 .headerActions { margin-left:auto; display:flex; align-items:center; gap:16px; }
 .headerActions span { display:flex; align-items:center; gap:8px; font-weight:bold; font-variant-numeric:tabular-nums; font-size:22px; }
 .headerActions button { padding:6px; color:#fff; }
@@ -172,7 +173,7 @@
 .historyPanel details { padding:12px 0; border-top:1px solid #6c9ca54d; }
 .historyPanel summary { cursor:pointer; color:#a2f1dd; font-weight:700; }
 .historyPanel p { font-size:14px; line-height:1.55; margin:10px 0; }
-.historyToggle { position:absolute; top:85px; right:12px; width:38px; height:38px; pointer-events:auto; display:grid; place-items:center; background:#050b13ed; color:#a2f1dd; border:1px solid #76d9d4; border-radius:4px; }
+.historyToggle { position:absolute; top:155px; right:12px; width:38px; height:38px; pointer-events:auto; display:grid; place-items:center; background:#050b13ed; color:#a2f1dd; border:1px solid #76d9d4; border-radius:4px; }
 .historyPanel { pointer-events:auto; }
 @media (max-width:1000px) and (orientation:portrait) { .historyPanel { width:80dvh; height:80dvw; inset:auto; top:50%; left:50%; transform:translate(-50%,-50%) rotate(90deg); } }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .historyToggle { top:112px; width:30px; height:30px; } }
@@ -181,7 +182,7 @@
 .chat { width:420px; max-height:250px; font-size:15px; background:#030809b8; }
 .messages { height:168px; line-height:1.5; }
 .chat input { font-size:15px; padding:9px; }
-.hand { padding-left:450px; }
+.hand { padding-left:20px; }
 .deckTray { padding-bottom:250px; }
 .choiceCards { flex-wrap:wrap; }
 .choiceCards .card { height:min(28vh,235px); }
@@ -194,7 +195,7 @@
 .hudPlane[data-cinematic-chat="true"] .messages { height:168px; }
 .error { top:auto; bottom:175px; }
 .waitingActions { align-self:flex-end; margin-left:450px; margin-right:24px; }
-@media (min-width:2000px) { .chat { width:500px; font-size:18px; max-height:290px; } .messages { height:205px; } .hand { padding-left:530px; } .deckTray { padding-bottom:290px; } .hudPlane:not([data-pentad-phase="waiting"]):not([data-pentad-phase="deck"]) .messages { height:112px; } .hudPlane[data-cinematic-chat="true"] .chat { width:500px; } .hudPlane[data-cinematic-chat="true"] .messages { height:205px; } }
+@media (min-width:2000px) { .chat { width:500px; font-size:18px; max-height:290px; } .messages { height:205px; } .deckTray { padding-bottom:290px; } .hudPlane:not([data-pentad-phase="waiting"]):not([data-pentad-phase="deck"]) .messages { height:112px; } .hudPlane[data-cinematic-chat="true"] .chat { width:500px; } .hudPlane[data-cinematic-chat="true"] .messages { height:205px; } }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) {
   .chat { width:240px; max-height:134px; font-size:12px; }
   .messages { height:76px; padding:4px 7px; }
@@ -203,7 +204,7 @@
   .hudPlane:not([data-pentad-phase="waiting"]):not([data-pentad-phase="deck"]) .messages { height:28px; }
   .hudPlane[data-cinematic-chat="true"] .chat { width:240px; }
   .hudPlane[data-cinematic-chat="true"] .messages { height:28px; }
-  .hand { padding-left:260px; }
+  .hand { padding-left:8px; }
   .deckTray { padding-bottom:140px; }
   .choiceCards .card { height:min(28vw,28vh); }
   .error { bottom:105px; top:auto; }

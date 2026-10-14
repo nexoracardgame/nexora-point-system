@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import BattleArenaChat from "@/components/BattleArenaChat";
 import {
   Bot,
   Check,
@@ -1757,8 +1758,8 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
     ].filter((target): target is SkillTargetId => Boolean(target)));
   }
   if (card?.cardNo === "255") {
-    const ownCard = side === "player" ? playerTop : botTop;
-    return monsterHasHydroburst255Stat(ownCard) ? withElementCondition([ownTarget]) : [];
+    const opposingCard = side === "player" ? botTop : playerTop;
+    return opposingCard?.kind === "monster" && opposingCard.element === "water" ? withElementCondition([opponentTarget]) : [];
   }
   if (card?.cardNo === "018") {
     const ownCard = side === "player" ? playerTop : botTop;
@@ -1798,9 +1799,7 @@ function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playe
     return Boolean(monster?.kind === "monster" && monster.attack <= 3000);
   });
   if (card?.cardNo === "227") {
-    const value = (monster?: CardView) => !monster ? 0 : turn === 2 ? monster.attack : turn === 3 ? monster.support : Math.max(monster.attack, monster.support);
-    const highest = Math.max(value(playerTop), value(botTop));
-    return selectable.filter(target => highest > 7000 && value(target === "player-top" ? playerTop : botTop) === highest);
+    return selectable.filter(target => { const monster = target === "player-top" ? playerTop : botTop; return Boolean(monster && Math.max(monster.attack, monster.support) > 7000); });
   }
   if (selectable.length > 0 || card?.cardNo === "254") return selectable;
   const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
@@ -3303,23 +3302,7 @@ function BattleRoomChatPanel({
   };
 
   if (compact) return (
-    <section className="triad-battle-chat-hud" aria-label="แชตสนาม">
-      <div ref={messagesRef} className="triad-chat-hud-messages" role="log" aria-live="polite" aria-relevant="additions">
-        {messages.slice(-40).map((message) => (
-          <div key={message.id} className="triad-chat-hud-line">
-            <span className={message.senderId === currentUserId ? "triad-chat-hud-own" : "triad-chat-hud-name"}>{message.senderName}: </span>
-            <span>{message.text}</span>
-          </div>
-        ))}
-      </div>
-      <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <input aria-label="ข้อความแชตสนาม" value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} disabled={!room?.code} placeholder="แชตสนาม..." maxLength={240} />
-        <button type="submit" aria-label="ส่งข้อความ" title="ส่งข้อความ" disabled={!draft.trim() || !room?.code}>
-          <SendHorizontal className="h-4 w-4" />
-        </button>
-      </form>
-    </section>
+    <BattleArenaChat messages={messages} currentUserId={currentUserId} draft={draft} onDraftChange={setDraft} onSubmit={() => void submit()} disabled={!room?.code} />
   );
 
   return (
@@ -3721,8 +3704,13 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   useEffect(() => {
     if (panel !== "join" || format !== "pentad") return;
     const controller = new AbortController();
-    void fetch("/api/pentad-rooms", { cache: "no-store", signal: controller.signal }).then(response => response.json()).then(data => setPentadRooms(data.rooms || [])).catch(() => {});
-    return () => controller.abort();
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try { const response=await fetch("/api/pentad-rooms",{cache:"no-store",signal:controller.signal});const data=await response.json();if(!controller.signal.aborted && response.ok)setPentadRooms(data.rooms || []); } catch {}
+      if (!controller.signal.aborted) timer=setTimeout(refresh,1500);
+    };
+    void refresh();
+    return () => {controller.abort();clearTimeout(timer);};
   }, [panel, format]);
   const createRoom = async () => {
     if (format === "triad") { onCreate(); return; }
@@ -3775,7 +3763,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
-            {format === "pentad" ? <div className="nexora-command-segment" role="group" aria-label="แหล่งการ์ด">{(["all", "random"] as const).map(value => <button key={value} aria-pressed={deckSource === value} onClick={() => setDeckSource(value)}>{value === "all" ? "ALL IN ONE" : "สุ่มเด็คเท่ากัน"}</button>)}</div> : <>
+            {format === "pentad" ? <div className="nexora-command-segment" role="group" aria-label="แหล่งการ์ด">{(["all", "random"] as const).map(value => <button key={value} aria-pressed={deckSource === value} onClick={() => setDeckSource(value)}>{value === "all" ? "ALL IN ONE" : "สุ่มพูล"}</button>)}</div> : <>
               <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
               {roomAccess === "private" ? <label>รหัสผ่านห้อง<input value={roomPassword} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label> : null}
             </>}

@@ -2,6 +2,7 @@
   width:min(440px,28cqw,calc((100cqw - 560px)/2 - 24px));
   background:rgba(0,0,0,.42);
 }
+.triad-battle-chat-hud-frame > div > .triad-battle-chat-hud { max-width:inherit; }
 .triad-chat-hud-messages { max-height:min(190px,26cqh); font-size:15px; padding:8px 10px; }
 .triad-battle-chat-hud input { font-size:15px; padding:9px 0; }
 .triad-battle-chat-hud button { width:34px; height:34px; }

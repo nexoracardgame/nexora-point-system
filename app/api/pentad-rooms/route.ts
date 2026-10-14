@@ -8,6 +8,7 @@ function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store, max-age=0" } });
 }
 function errorJson(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message === "ไม่พบห้อง") return json({error:"ห้องถูกปิดแล้ว",closed:true},404);
   const databaseError = error && typeof error === "object" && ("code" in error || "clientVersion" in error);
   return json({ error: databaseError ? "เซิร์ฟเวอร์ยังไม่พร้อม กรุณาลองอีกครั้ง" : error instanceof Error ? error.message : fallback }, databaseError ? 503 : 409);
 }

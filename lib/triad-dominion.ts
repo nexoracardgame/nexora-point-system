@@ -115,6 +115,11 @@ export type TriadTurnInput = {
 };
 
 export type TriadTurnResult = {
+  pointsAwarded?: number;
+  decisionReason?: string;
+  pointScore?: { player: number; opponent: number };
+  originalPlayer?: TriadTriangle;
+  originalOpponent?: TriadTriangle;
   skillEligibilityTurn?: "combined";
   turn: TriadTurn;
   prioritySide: "player" | "opponent";
@@ -454,6 +459,8 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     card.cardNo !== "259" &&
     card.cardNo !== "227" &&
     card.cardNo !== "226" &&
+    card.cardNo !== "265" &&
+    card.cardNo !== "229" &&
     card.cardNo !== "245" &&
     card.cardNo !== "249" &&
     (shape === "unparsed" ||
@@ -464,12 +471,12 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     cardNo: card.cardNo,
     name: card.name,
     shape,
-    effects: card.cardNo === "226" ? [{ metric: "support", delta: 0 }] : card.cardNo === "227" ? [{ metric: "attack", delta: 0 }, { metric: "support", delta: 0 }] : effects,
-    target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "018" || card.cardNo === "225" ? "own-one" : card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
+    effects: card.cardNo === "255" ? [{ metric: "attack", delta: 0 }] : card.cardNo === "226" ? [{ metric: "support", delta: 0 }] : card.cardNo === "227" ? [{ metric: "attack", delta: 0 }, { metric: "support", delta: 0 }] : effects,
+    target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "018" || card.cardNo === "225" ? "own-one" : card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" || card.cardNo === "255" || card.cardNo === "265" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
-    allowedTurns: card.cardNo === "226" ? [1, 3] : card.cardNo === "227" ? [1, 2, 3] : inferAllowedTurns(card.skillText, shape),
+    allowedTurns: card.cardNo === "255" ? [1, 2] : card.cardNo === "265" ? [2, 3] : card.cardNo === "226" ? [1, 3] : card.cardNo === "227" ? [1, 2, 3] : inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : card.cardNo === "272" ? { mode: "include", elements: ["fire"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "229" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : card.cardNo === "272" ? { mode: "include", elements: ["fire"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -817,10 +824,10 @@ function applyGravityField(
   }
 
   const targetSide = normalizedTarget === ownTarget ? side : side === "player" ? "opponent" : "player";
-  const metrics: TriadMetric[] = combined || targetScore.metric === "total" ? ["attack", "support"] : [targetScore.metric];
-  const mains = [ownScore, opponentScore].flatMap(score => score.contributions.filter(item => item.lane === "top").map(item => item.card));
-  const highest = Math.max(0, ...mains.flatMap(card => metrics.map(metric => card[metric])));
-  const qualifyingMetrics = metrics.filter(metric => highest > 7000 && targetContribution.card[metric] === highest);
+  const metrics: TriadMetric[] = ["attack", "support"];
+  const power = (metric: TriadMetric) => targetScore.metric === metric ? targetContribution.value : targetContribution.card[metric];
+  const highest = Math.max(...metrics.map(power));
+  const qualifyingMetrics = metrics.filter(metric => highest > 7000 && power(metric) === highest);
 
   if (qualifyingMetrics.length === 0) {
     return {
@@ -830,7 +837,7 @@ function applyGravityField(
         side,
         type: rule.shape,
         text: rule.text,
-        summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} ไม่ใช่ค่าพลังสูงที่สุดบนสนาม หรือค่าไม่เกิน 7,000 สกิลไม่เกิดผล`,
+        summary: `No.${targetContribution.card.cardNo} ATK และ SUP ไม่เกิน 7,000 สกิลไม่เกิดผล`,
         targetLabel,
         blocked: true,
       } satisfies TriadSkillEvent,
@@ -841,7 +848,7 @@ function applyGravityField(
   const blocked: string[] = [];
 
   for (const metric of qualifyingMetrics) {
-    const originalValue = targetContribution.card[metric];
+    const originalValue = power(metric);
     const effect = { metric, delta: -originalValue };
     const blocker = blockers.find((item) =>
       item.targetSide === targetSide &&
@@ -861,6 +868,7 @@ function applyGravityField(
       targetScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} ${originalValue.toLocaleString()} -> 0`);
     }
     applied.push(`${label} ${originalValue.toLocaleString()} -> 0`);
+    blockers.push({ sourceSide: side, targetSide, targetLane: "top", metric, rule });
   }
 
   if (applied.length === 0) {
@@ -1152,11 +1160,11 @@ function applyTidebomb(
 function applyHydroburst255(
   rule: TriadSkillRule,
   side: "player" | "opponent",
-  ownScore: TriadScoreState,
+  opponentScore: TriadScoreState,
   blockers: StatGainBlocker[] = []
 ) {
-  const targetContribution = ownScore.contributions.find((item) => item.lane === "top");
-  const targetLabel = "มอนสเตอร์หลักฝั่งผู้ใช้สกิล";
+  const targetContribution = opponentScore.contributions.find((item) => item.lane === "top");
+  const targetLabel = "มอนสเตอร์หลักฝ่ายตรงข้าม";
   if (!targetContribution) {
     return {
       cardNo: rule.cardNo,
@@ -1164,35 +1172,32 @@ function applyHydroburst255(
       side,
       type: rule.shape,
       text: rule.text,
-      summary: "ไม่พบมอนสเตอร์หลักฝั่งตัวเอง สกิลจึงไม่ทำงาน",
+      summary: "ไม่พบมอนสเตอร์หลักฝ่ายตรงข้าม สกิลจึงไม่ทำงาน",
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
   }
 
-  if (targetContribution.value > 5000) {
+  if (targetContribution.card.element !== "water") {
     return {
       cardNo: rule.cardNo,
       name: rule.name,
       side,
       type: rule.shape,
       text: rule.text,
-      summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} มีแต้ม ${targetContribution.value.toLocaleString()} เกิน 5,000 จึงไม่เข้าเงื่อนไขบัฟ`,
+      summary: `No.${targetContribution.card.cardNo} ไม่ใช่มอนสเตอร์ธาตุน้ำ สกิล 255 ไม่เกิดผล`,
       targetLabel,
       blocked: true,
     } satisfies TriadSkillEvent;
   }
 
-  const effects: TriadSkillEffect[] = [
-    { metric: "attack", delta: 2500 },
-    { metric: "support", delta: 2500 },
-  ];
+  const effects: TriadSkillEffect[] = [{ metric: "attack", delta: -targetContribution.value }];
   const applied: string[] = [];
   const blocked: string[] = [];
   for (const effect of effects) {
-    if (ownScore.metric !== "total" && ownScore.metric !== effect.metric) continue;
+    if (opponentScore.metric !== "total" && opponentScore.metric !== effect.metric) continue;
     const blocker = blockers.find((item) =>
-      item.targetSide === side &&
+      item.targetSide === (side === "player" ? "opponent" : "player") &&
       statGainBlockerApplies(item, effect, { lane: "top" })
     );
     const label = effect.metric === "attack" ? "ATK" : "SUP";
@@ -1200,10 +1205,13 @@ function applyHydroburst255(
       blocked.push(`${label} ถูกบล็อกโดย No.${blocker.rule.cardNo}`);
       continue;
     }
-    ownScore.total += effect.delta;
+    opponentScore.total += effect.delta;
     targetContribution.value += effect.delta;
-    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} +${effect.delta.toLocaleString()}`);
-    applied.push(`${label} +${effect.delta.toLocaleString()}`);
+    opponentScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: ${targetLabel} ${label} ใช้ไม่ได้ -> 0`);
+    applied.push(`${label} ใช้ไม่ได้ -> 0`);
+    const field = opponentScore.fieldContributions.find(item => item.lane === "top");
+    if (field) field.value = targetContribution.value;
+    blockers.push({ sourceSide: side, targetSide: side === "player" ? "opponent" : "player", targetLane: "top", metric: "attack", rule });
   }
 
   if (applied.length === 0) {
@@ -1225,7 +1233,7 @@ function applyHydroburst255(
     side,
     type: rule.shape,
     text: rule.text,
-    summary: `No.${targetContribution.card.cardNo} ${targetContribution.card.name} แต้มไม่เกิน 5,000 ได้รับบัฟ ${applied.join(", ")}${blocked.length > 0 ? `; ${blocked.join(", ")}` : ""}`,
+    summary: `No.${targetContribution.card.cardNo} ธาตุน้ำ ${applied.join(", ")} จนจบตา${blocked.length > 0 ? `; ${blocked.join(", ")}` : ""}`,
     targetLabel,
   } satisfies TriadSkillEvent;
 }
@@ -1963,6 +1971,7 @@ function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, 
   );
 
   for (const item of items) {
+    if (item.rule.cardNo === "255") continue;
     const metric = item.rule.blockedUseMetric;
     if (!metric) continue;
     const targetSide =
@@ -2086,7 +2095,7 @@ function applySkill(
     }
     const summary = !valid ? "เป้าหมายต้องมี ATK ไม่เกิน 3,000 สกิลไม่เกิดผล" : blocked ? "การลด SUPPORT ถูกสกิลป้องกันไว้" : `No.${contribution!.card.cardNo} SUPPORT กลายเป็น 0 จนจบตา`;
     score.breakdown.push(`No.226: ${summary}`);
-    events.push({ cardNo: rule.cardNo, name: rule.name, side, type: rule.shape, text: rule.text, summary, blocked: !valid || blocked });
+    events.push({ cardNo: rule.cardNo, name: rule.name, side, type: rule.shape, text: rule.text, summary, targetLabel: score === ownScore ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝ่ายตรงข้าม", blocked: !valid || blocked });
     return { unresolved, events };
   }
 
@@ -2234,7 +2243,7 @@ function applySkill(
   }
 
   if (rule.cardNo === "255") {
-    events.push(applyHydroburst255(rule, side, ownScore, blockers));
+    events.push(applyHydroburst255(rule, side, opponentScore, blockers));
     return { unresolved, events };
   }
 
@@ -2278,7 +2287,9 @@ function applySkill(
   }
 
   const targetIsOpponent =
-    rule.target.startsWith("opponent") || (rule.target === "any-one" && rule.effects.some((effect) => effect.delta < 0));
+    rule.target === "any-one" && (selectedTarget === "player-top" || selectedTarget === "bot-top")
+      ? selectedTarget !== (side === "player" ? "player-top" : "bot-top")
+      : rule.target.startsWith("opponent") || (rule.target === "any-one" && rule.effects.some((effect) => effect.delta < 0));
   const targetScore =
     targetIsOpponent
       ? opponentScore
@@ -2286,7 +2297,7 @@ function applySkill(
 
   for (const effect of rule.effects) {
     if (targetScore.metric !== "total" && effect.metric === targetScore.metric) {
-      const eligibleContributions = targetScore.contributions.filter((item) => triadSkillElementConditionMatches(rule, item.card));
+      const eligibleContributions = targetScore.contributions.filter((item) => (rule.target !== "any-one" || item.lane === "top") && triadSkillElementConditionMatches(rule, item.card));
       const affectsAll = rule.target === "all" || rule.target.endsWith("-all");
       const intendedContributions = affectsAll ? eligibleContributions : eligibleContributions.slice(0, 1);
       const affectedCount = intendedContributions.length;
@@ -2347,6 +2358,7 @@ function applySkill(
         type: rule.shape,
         text: rule.text,
         summary: `${targetLabel} ${directionLabel}${metricLabel} ${Math.abs(totalDelta).toLocaleString()} แต้ม${affectedCount > 1 ? ` (${affectedCount} ใบเข้าเงื่อนไข)` : ""}`,
+        targetLabel: targetIsOpponent ? "มอนสเตอร์หลักฝ่ายตรงข้าม" : "มอนสเตอร์หลักฝั่งผู้ใช้สกิล",
       });
     }
   }
@@ -2444,7 +2456,7 @@ function applyEnergyReversal(
       replaceTopContribution(opponentScore, next);
       opponentScore.fieldContributions = opponentScore.fieldContributions.map(item => item.lane === "top" ? next : item);
       boardState[targetSide].top = replacement.cardNo;
-      events.push({ cardNo: "265", name: copiedRule.name, side, type: copiedRule.shape, text: copiedRule.text, summary: `ใช้สกิลที่คัดลอก เปลี่ยนมอนสเตอร์หลักฝ่ายตรงข้าม No.${oldTop.card.cardNo} เป็น No.${replacement.cardNo} เฉพาะตานี้`, targetLabel: "มอนสเตอร์หลักฝ่ายตรงข้าม" });
+      events.push({ cardNo: "265", name: copiedRule.name, side, type: copiedRule.shape, text: copiedRule.text, summary: `ใช้สกิลที่คัดลอก ทำลายมอนสเตอร์หลักฝ่ายตรงข้าม No.${oldTop.card.cardNo} แล้วสุ่ม No.${replacement.cardNo} มาแทน`, targetLabel: "มอนสเตอร์หลักฝ่ายตรงข้าม" });
     }
     return { unresolved, events };
   }
@@ -2619,7 +2631,7 @@ function applyPreScoreSkills(player: TriadTriangle, opponent: TriadTriangle, tur
       side: item.side,
       type: item.rule.shape,
       text: item.rule.text,
-      summary: `ทำลายมอนสเตอร์หลักฝ่ายตรงข้าม No.${originalTop} ชั่วคราว แล้วสุ่ม No.${replacement.cardNo} ${replacement.name} ขึ้นมาแทนเฉพาะตานี้ จบตาแล้วมอนสเตอร์เดิมกลับมา`,
+      summary: `ทำลายมอนสเตอร์หลักฝ่ายตรงข้าม No.${originalTop} แล้วสุ่ม No.${replacement.cardNo} ${replacement.name} ขึ้นมาแทน`,
       targetLabel: item.targetLabel,
     });
   }
@@ -2762,6 +2774,16 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     prioritySide === "player"
       ? [applySideWithEnergyReversal("player"), applySideWithEnergyReversal("opponent")]
       : [applySideWithEnergyReversal("opponent"), applySideWithEnergyReversal("player")];
+  for (const blocker of statGainBlockers) {
+    if (!["255", "226", "227"].includes(blocker.rule.cardNo)) continue;
+    const score = blocker.targetSide === "player" ? playerScore : opponentScore;
+    if (score.metric !== blocker.metric) continue;
+    const contribution = score.contributions.find(item => item.lane === "top");
+    if (!contribution) continue;
+    score.total -= contribution.value; contribution.value = 0;
+    const field = score.fieldContributions.find(item => item.lane === "top");
+    if (field) field.value = 0;
+  }
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
 
@@ -2774,6 +2796,8 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     winner: playerTotal > opponentTotal ? "player" : opponentTotal > playerTotal ? "opponent" : "draw",
     effectivePlayer: boardState.player,
     effectiveOpponent: boardState.opponent,
+    originalPlayer: { ...input.player },
+    originalOpponent: { ...input.opponent },
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: orderedApplied.flatMap((item) => item.unresolved),

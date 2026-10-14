@@ -84,9 +84,9 @@ assert.throws(()=>action(room,{id:'intruder',name:'X'},'pick',{cardNo:'021'}),/�
 room=roomStart();room.phase='select';room.deadline=now+100;room.decks.host={monsters:['021','022'],hand:[],reserve:[]};room.decks.challenger={monsters:['021','023'],hand:[],reserve:[]};
 action(room,host,'pick',{cardNo:'021'});action(room,rival,'pick',{cardNo:'021'});tick(room);
 assert.equal(room.phase,'result');assert.equal(room.rounds.at(-1).winner,'draw');assert.deepEqual(room.score,{host:0,challenger:0});now=room.deadline+1;tick(room);assert.equal(room.phase,'select');assert.equal(room.turn,1);assert.ok(!store.pentadAvailable(room,'host','monster').includes('021'));
-// Reserve and hand copies are distinct physical cards.
-room=roomStart();room.phase='select';room.decks.host={monsters:['099'],hand:['005'],reserve:[]};room.decks.challenger={monsters:['177'],hand:['004'],reserve:['004']};room.deadline=now+100;
-action(room,host,'pick',{cardNo:'099'});action(room,rival,'pick',{cardNo:'177'});tick(room);assert.equal(room.boost.challenger,'004');assert.equal(room.decks.challenger.reserve.length,0);assert.deepEqual(store.pentadAvailable(room,'challenger','skill'),['004']);assert.equal(room.rounds.at(-1).totals.challenger,triad.triadCardByNo.get('177').attack+triad.triadCardByNo.get('177').support+3000);
+// Reserve draw consumes its card without consuming a different hand skill.
+room=roomStart();room.phase='select';room.decks.host={monsters:['099'],hand:['005'],reserve:[]};room.decks.challenger={monsters:['177'],hand:['005'],reserve:['004']};room.deadline=now+100;
+action(room,host,'pick',{cardNo:'099'});action(room,rival,'pick',{cardNo:'177'});tick(room);assert.equal(room.boost.challenger,'004');assert.equal(room.decks.challenger.reserve.length,0);assert.deepEqual(store.pentadAvailable(room,'challenger','skill'),['005']);assert.equal(room.rounds.at(-1).totals.challenger,triad.triadCardByNo.get('177').attack+triad.triadCardByNo.get('177').support+3000);
 const baseline=rules.resolvePentadTurn({fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host'});
 assert.equal(baseline.events.length,0,'Non-stat boost skills never activate on turn one');
 for(const no of triad.triadCards.filter(card=>card.kind==='skill'&&card.cardNo!=='265').map(card=>card.cardNo))for(const turn of [2,3,4,5]) {
@@ -127,29 +127,66 @@ const fail226=triad.resolveTriadTurn({turn:3,player:{top:low.cardNo,right:'226'}
 assert.equal(fail226.opponentTotal,invalid.support,'226 does not activate above 3000 ATK');
 const zero227=triad.resolveTriadTurn({turn:2,player:{top:high.cardNo,left:'004'},opponent:{top:low.cardNo,left:'227'},prioritySide:'player',skillTargets:{opponent:{'227':'player-top'}}});
 assert.equal(zero227.playerTotal,0,'227 removes the buffed contribution, not only printed ATK');
+for(const metric of ['attack','support']) {
+  const otherMetric=metric==='attack'?'support':'attack',turn=metric==='attack'?2:3,lane=metric==='attack'?'left':'right';
+  const eligible=triad.triadCards.filter(card=>card.kind==='monster'&&card[metric]>7000&&card[metric]>=card[otherMetric]).sort((a,b)=>a[metric]-b[metric]);
+  const selected=eligible[0],stronger=eligible.at(-1);
+  assert.ok(selected&&stronger&&stronger[metric]>selected[metric],'227 fixture covers a lower-stat selected monster');
+  const result=triad.resolveTriadTurn({turn,player:{top:selected.cardNo},opponent:{top:stronger.cardNo,[lane]:'227'},skillTargets:{opponent:{'227':'player-top'}}});
+  assert.equal(result.playerTotal,0,'227 uses the selected monster highest stat, not the highest field stat');
+  assert.equal(result.opponentTotal,stronger[metric],'227 does not zero the unselected stronger monster');
+}
 room=store.newPentadRoom('333333',host,now);room.deckSource='random';action(room,rival,'join');action(room,host,'start');
-assert.deepEqual(room.decks.host,room.decks.challenger,'Random mode deals exactly equal decks');
-assert.throws(()=>action(room,host,'deck',{deck:rules.emptyPentadDeck()}),/ไม่สามารถเปลี่ยน/);
+assert.deepEqual(room.decks.host,room.decks.challenger,'Random mode starts with empty selectable decks for both players');
+for(const group of ['monsters','hand','reserve'])assert.equal(room.pools[group].length,20,'Random mode offers twenty options per group');
+assert.equal(new Set([...room.pools.monsters,...room.pools.hand,...room.pools.reserve]).size,60);
+const poolDeck=rules.completePentadDeck(rules.emptyPentadDeck(),Math.random,room.pools);assert.equal(new Set([...poolDeck.monsters,...poolDeck.hand,...poolDeck.reserve]).size,30);action(room,host,'deck',{deck:poolDeck});
+assert.ok(rules.validatePentadDeck({...poolDeck,hand:[poolDeck.hand[0],poolDeck.hand[0]]},true).length>0,'Only one copy per skill is permitted');
 room=roomStart();room.phase='target';room.board={host:[low.cardNo],challenger:[invalid.cardNo]};room.turn=4;room.picks={host:'226',challenger:'004'};room.choices=[{side:'host',cardNo:'226',options:['player-top'],value:'',deadline:now+30000}];
 const identity={action:'target',epoch:room.epoch,choiceIndex:0,cardNo:'226',sourceCardNo:'',target:'player-top'};
 store.applyPentadAction(room,host,identity,now);store.applyPentadAction(room,host,identity,now);tick(room);store.applyPentadAction(room,host,identity,now);
 assert.equal(room.rounds.length,1,'Duplicate confirmation cannot resolve twice or bounce after result');
 assert.ok(rules.resolvePentadTurn({fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host'}).stages.some(stage=>stage.detail.includes('ไม่ใช่การเพิ่ม')),'Boost explanation says why non-stat skill is ignored');
-console.log('226/227 conditions, boosted stat zero, equal random decks, idempotent target and elemental trace passed');
+console.log('226/227 conditions, chosen-monster stat zero, equal random pools, idempotent target and elemental trace passed');
 const clientSource=fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
 const clientAst=ts.createSourceFile('client.tsx',clientSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
 const targetFunction=clientAst.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='getPlayableSkillTargetIds');
 const ui=vm.createContext({getSelectableSkillTargetIds:()=>['player-top','bot-top'],triadSkillRuleByNo:triad.triadSkillRuleByNo});
 vm.runInContext(ts.transpileModule(targetFunction.getText(clientAst),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,ui);
 const a={kind:'monster',attack:8000,support:1000},b={kind:'monster',attack:7000,support:9000};
-assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,2).join(','),'player-top');
-assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,3).join(','),'bot-top');
-assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,1).join(','),'bot-top');
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,2).join(','),'player-top,bot-top');
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,3).join(','),'player-top,bot-top');
+assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,1).join(','),'player-top,bot-top');
 assert.equal(ui.getPlayableSkillTargetIds({cardNo:'226'},'player',{...a,attack:3000},b,3).join(','),'player-top');
-console.log('Legacy target UI: exact 3000 boundary and highest relevant ATK/SUP filters passed');
+console.log('Legacy target UI: exact 3000 boundary and selected-monster ATK/SUP filters passed');
 for(const fight of [1,2,3])for(const turn of [2,3,4,5]) {
   const result=rules.resolvePentadTurn({fight,turn,mains:{host:'021',challenger:'099'},skills:{host:'',challenger:''},opener:'host'});
   const metric=turn<4?'attack':'support';
   assert.equal(result.totals.host,triad.triadCardByNo.get('021')[metric]);assert.equal(result.totals.challenger,triad.triadCardByNo.get('099')[metric]);
 }
 console.log('All three fights: turns 2/3 ATTACK and turns 4/5 SUPPORT passed');
+const water=triad.triadCards.find(card=>card.kind==='monster'&&card.element==='water'&&card.attack>0),earth=triad.triadCards.find(card=>card.kind==='monster'&&card.element==='earth'),nonEarth=triad.triadCards.find(card=>card.kind==='monster'&&card.element!=='earth');
+for(const owner of ['player','opponent'])for(const priority of ['player','opponent']) {
+  const user=owner==='player'?{top:earth.cardNo,left:'255'}:{top:earth.cardNo,left:'255'};
+  const target={top:water.cardNo,left:'004'};
+  const result=triad.resolveTriadTurn({turn:2,player:owner==='player'?user:target,opponent:owner==='player'?target:user,prioritySide:priority});
+  assert.equal(owner==='player'?result.opponentTotal:result.playerTotal,0,'255 blocks opposing WATER ATTACK even if buffed');
+  assert.equal(owner==='player'?result.playerTotal:result.opponentTotal,earth.attack,'255 never buffs its user');
+}
+const wrong255=triad.resolveTriadTurn({turn:2,player:{top:water.cardNo,left:'255'},opponent:{top:earth.cardNo}});assert.equal(wrong255.opponentTotal,earth.attack);assert.equal(wrong255.playerTotal,water.attack);
+for(const turn of [2,3])for(const owner of ['player','opponent']) {
+  const lane=turn===2?'left':'right',skill={top:earth.cardNo,[lane]:'229'},target={top:nonEarth.cardNo};
+  const result=triad.resolveTriadTurn({turn,player:owner==='player'?skill:target,opponent:owner==='player'?target:skill,skillTargets:{[owner]:{'229':owner==='player'?'bot-top':'player-top'}}});
+  assert.equal(owner==='player'?result.opponentTotal:result.playerTotal,nonEarth[turn===2?'attack':'support']-(turn===2?2000:3000),'229 debuffs exactly the chosen non-earth monster');
+}
+for(const turn of [2,3,4,5])for(const owner of sides) {
+  const result=rules.resolvePentadTurn({fight:1,turn,mains:{host:water.cardNo,challenger:earth.cardNo},skills:{host:owner==='host'?'265':'',challenger:owner==='challenger'?'265':''},opener:owner});
+  const target=owner==='host'?'challenger':'host';assert.notEqual(result.effective[target],target==='host'?water.cardNo:earth.cardNo);assert.equal(result.totals[target],triad.triadCardByNo.get(result.effective[target])[turn<4?'attack':'support']);
+}
+room=roomStart();room.phase='select';room.turn=2;room.board={host:[water.cardNo],challenger:[earth.cardNo]};room.decks.host={monsters:[],hand:['265','004'],reserve:[]};room.decks.challenger={monsters:[],hand:['004','005'],reserve:[]};room.deadline=now+120000;action(room,host,'pick',{cardNo:'265'});action(room,rival,'pick',{cardNo:'004'});tick(room);const replaced=room.board.challenger[0];assert.notEqual(replaced,earth.cardNo);assert.equal(replaced,room.rounds.at(-1).effective.challenger);assert.equal(room.rounds.at(-1).scoreAfter.host-room.rounds.at(-1).scoreBefore.host,room.rounds.at(-1).winner==='host'?1:0);now=room.deadline+1;tick(room);assert.equal(room.board.challenger[0],replaced,'265 replacement remains after the animation');
+room.phase='select';room.turn=1;room.board.challenger[0]='099';room.picks.challenger='099';const hidden=store.publicPentadRoom(room,host.id);assert.equal(hidden.board.challenger[0],'');assert.equal(hidden.picks.challenger,'hidden');
+console.log('255 water attack lock, 229 chosen non-earth target, 265 replacement/persistence, score snapshots and concealed first turn passed');
+const self229=triad.resolveTriadTurn({turn:2,player:{top:nonEarth.cardNo,left:'229'},opponent:{top:earth.cardNo},skillTargets:{player:{'229':'player-top'}}});assert.equal(self229.playerTotal,nonEarth.attack-2000);assert.equal(self229.opponentTotal,earth.attack,'229 obeys selecting own non-earth monster too');
+const safeEarth=triad.resolveTriadTurn({turn:2,player:{top:nonEarth.cardNo,left:'229'},opponent:{top:earth.cardNo},skillTargets:{player:{'229':'bot-top'}}});assert.equal(safeEarth.opponentTotal,earth.attack);
+for(let i=0;i<100;i++){const pools=rules.makePentadPools();const full=rules.completePentadDeck(rules.emptyPentadDeck(),Math.random,pools);const partial={monsters:full.monsters.slice(0,2),hand:full.hand.slice(0,8),reserve:full.reserve.slice(0,4)};const filled=rules.completePentadDeck(partial,Math.random,pools);assert.deepEqual(rules.validatePentadDeck(filled),[]);for(const group of ['monsters','hand','reserve'])assert.deepEqual(filled[group].slice(0,partial[group].length),partial[group]);}
+console.log('229 own/opposing target and 100 unique random-pool deck completions passed');

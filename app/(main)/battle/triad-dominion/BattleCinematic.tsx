@@ -28,7 +28,7 @@ export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard
     inactive,
     recipient,
     field: !inactive && ["all", "own-all", "opponent-all"].includes(rule?.target || ""),
-    effect: event.type === "element-transform" ? "transform" : event.type === "swap-control" ? "swap" : positive && negative ? "shift" : negative ? "debuff" : positive ? "buff" : undefined,
+    effect: ["226","227","255","229"].includes(event.cardNo) ? "debuff" : event.cardNo === "265" || event.type === "element-transform" ? "transform" : event.type === "swap-control" ? "swap" : positive && negative ? "shift" : negative ? "debuff" : positive ? "buff" : undefined,
   }; });
   const order: Side[] = result.prioritySide === "opponent" ? ["opponent", "player"] : ["player", "opponent"];
   const strikes = order.flatMap((side): Step[] => {
@@ -138,8 +138,9 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   const attacker = cardsByNo.get(step.cardNo) || (step.side === "player" ? playerCard : opponentCard);
   const playerFighter = playerCard?.kind === "monster" ? playerCard : playerMainCard || playerCard;
   const opponentFighter = opponentCard?.kind === "monster" ? opponentCard : opponentMainCard || opponentCard;
-  const activePlayer = playerFighter;
-  const activeOpponent = opponentFighter;
+  const replacementVisible = (side: Side) => !steps.some(item => item.cardNo === "265" && !item.blocked && item.recipient === side) || steps.slice(0,index).some(item => item.cardNo === "265" && !item.blocked && item.recipient === side);
+  const activePlayer = replacementVisible("player") ? playerFighter : cardsByNo.get(result.originalPlayer?.top || "") || playerFighter;
+  const activeOpponent = replacementVisible("opponent") ? opponentFighter : cardsByNo.get(result.originalOpponent?.top || "") || opponentFighter;
   const actorName = step.side === "player" ? playerName : opponentName;
   const powerForAttacker = battleEmpowermentAtStep(steps, index, step.side);
   const infusedCard = step.kind === "strike" && powerForAttacker ? cardsByNo.get(powerForAttacker.cardNo) : undefined;
@@ -190,7 +191,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
       </div>
       <div className={styles.heading} aria-live="polite">
         <span>{arena ? `${arena.name} · ` : ""}{final ? "ผลการปะทะ" : intro ? "เตรียมปะทะ" : `${index} / ${steps.length - 2}`}</span>
-        <strong>{final ? result.winner === "draw" ? "เสมอ" : `${actorName} ได้แต้ม` : intro ? "พลังทั้งสองฝ่าย" : `${actorName} ${step.kind === "skill" ? "ใช้สกิล" : "โจมตี"}`}</strong>
+        <strong>{final ? result.winner === "draw" ? "เสมอ · ไม่ได้รับคะแนน" : `${actorName} ชนะ${(result.pointsAwarded ?? 1) ? ` +${result.pointsAwarded ?? 1} คะแนน` : ""}` : intro ? "พลังทั้งสองฝ่าย" : `${actorName} ${step.kind === "skill" ? "ใช้สกิล" : "โจมตี"}`}</strong>
         {!final && !intro && attacker ? <small>No.{attacker.cardNo} · {attacker.name}</small> : <small>{result.metric === "total" ? "ATK + SUP" : result.metric === "attack" ? "ATK" : "SUP"}</small>}
       </div>
       <div className={styles.hpRow}>
@@ -239,7 +240,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
           <div className={styles.scores}><strong>{result.playerTotal.toLocaleString()}</strong><span>VS</span><strong>{result.opponentTotal.toLocaleString()}</strong></div>
         </> : null}
       </div>
-      <div className={styles.caption}>{step.summary || (final ? `${playerName} HP ${hp.player.toLocaleString()} · ${opponentName} HP ${hp.opponent.toLocaleString()}` : intro ? `${playerName} ${Math.max(0, result.playerTotal).toLocaleString()} · ${opponentName} ${Math.max(0, result.opponentTotal).toLocaleString()}` : step.kind === "strike" ? `${actorName} โจมตี ${step.value?.toLocaleString()} → ${step.side === "player" ? opponentName : playerName} HP ${(step.side === "player" ? hp.opponent : hp.player).toLocaleString()}` : "เปิดใช้ผลสกิล")}</div>
+      <div className={styles.caption}>{step.summary || (final ? `${result.decisionReason || (result.metric === "total" ? "ATK + SUP" : result.metric === "attack" ? "ATK" : "SUP")} · ${result.playerTotal.toLocaleString()} : ${result.opponentTotal.toLocaleString()}${result.pointScore ? ` · คะแนนสะสม ${result.pointScore.player} : ${result.pointScore.opponent}` : ""}` : intro ? `${playerName} ${Math.max(0, result.playerTotal).toLocaleString()} · ${opponentName} ${Math.max(0, result.opponentTotal).toLocaleString()}` : step.kind === "strike" ? `${actorName} โจมตี ${step.value?.toLocaleString()} → ${step.side === "player" ? opponentName : playerName} HP ${(step.side === "player" ? hp.opponent : hp.player).toLocaleString()}` : "เปิดใช้ผลสกิล")}</div>
       <div className={styles.progress}>{steps.map((_, i) => <i key={i} className={i <= index ? styles.passed : ""} />)}</div>
     </div>,
     document.body

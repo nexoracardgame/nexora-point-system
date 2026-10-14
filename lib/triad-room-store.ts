@@ -2174,15 +2174,10 @@ function monsterHasGravityFieldStat(cardNo: string, turn?: TriadTurn) {
 }
 
 function gravityFieldTargets(room: StoredTriadRoom) {
-  const value = (side: TriadRoomSlot) => {
-    const card = triadCardByNo.get(room.game.triangles[side].top);
-    return !card ? 0 : room.game.activeTurn === 2 ? card.attack : room.game.activeTurn === 3 ? card.support : Math.max(card.attack, card.support);
-  };
-  const highest = Math.max(value("host"), value("challenger"));
   return [
-    monsterHasGravityFieldStat(room.game.triangles.host.top, room.game.activeTurn) ? ("host" as const) : null,
-    monsterHasGravityFieldStat(room.game.triangles.challenger.top, room.game.activeTurn) ? ("challenger" as const) : null,
-  ].filter((side): side is TriadRoomSlot => Boolean(side && highest > 7000 && value(side) === highest));
+    monsterHasGravityFieldStat(room.game.triangles.host.top) ? ("host" as const) : null,
+    monsterHasGravityFieldStat(room.game.triangles.challenger.top) ? ("challenger" as const) : null,
+  ].filter((side): side is TriadRoomSlot => Boolean(side));
 }
 
 function parseBoardTargetSequence(value = "") {
@@ -2531,6 +2526,8 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     prioritySide: "player",
     skippedSkillCardNos,
     skillTargets: selectedSkillTargets(room, opener),
+    excludedRandomMonsterNos: [...room.game.usedCards.host, ...room.game.usedCards.challenger],
+    randomMonsterSeed: `${room.code}:${room.game.deckStartedAt}:${room.game.fightNo}:${turn}`,
   });
   const result = opener === "host" ? rawResult : flipResultToHostPerspective(rawResult);
   const blessingEvents = blessingState.events.map(({ choice, summary }) => ({
@@ -2541,7 +2538,16 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     text: triadCards.find((card) => card.cardNo === choice.cardNo)?.skillText || "",
     summary,
   }));
-  const nextResult = { ...result, skillEvents: [...blessingEvents, ...result.skillEvents] };
+  const nextResult: TriadTurnResult = { ...result, skillEvents: [...blessingEvents, ...result.skillEvents] };
+  for (const event of nextResult.skillEvents) {
+    if (event.cardNo !== "265" || event.blocked) continue;
+    const target = event.side === "player" ? "challenger" : "host";
+    const replacement = target === "host" ? nextResult.effectivePlayer.top : nextResult.effectiveOpponent.top;
+    if (replacement && replacement !== room.game.triangles[target].top) {
+      room.game.triangles[target].top = replacement;
+      room.game.usedCards[target] = [...new Set([...room.game.usedCards[target], replacement])];
+    }
+  }
   room.game.turns = [...room.game.turns.filter((item) => item.turn !== turn), nextResult].sort((a, b) => a.turn - b.turn);
   recordResolvedTurnScore(room, nextResult);
   updateOpeningTieBreakAfterResult(room, nextResult);
@@ -2642,6 +2648,8 @@ function flipResultToHostPerspective(result: TriadTurnResult): TriadTurnResult {
     prioritySide: result.prioritySide === "player" ? "opponent" : "player",
     effectivePlayer: result.effectiveOpponent,
     effectiveOpponent: result.effectivePlayer,
+    originalPlayer: result.originalOpponent,
+    originalOpponent: result.originalPlayer,
     playerBreakdown: result.opponentBreakdown,
     opponentBreakdown: result.playerBreakdown,
     skillEvents: result.skillEvents.map((event) => ({

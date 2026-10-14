@@ -3634,7 +3634,7 @@
       "reviewed": true,
       "sourceImage": "/cards/227.jpg",
       "scannedAt": "2026-05-07T04:20:35.467Z",
-      "notes": "Verified against card artwork: earth skill. Select a monster on either field whose relevant ATTACK or SUPPORT is highest and greater than 7000; that stat becomes 0 until end of turn. Exactly 7000 does not qualify. No base ATK/SUP."
+      "notes": "Verified against artwork and owner clarification: select any monster on either field. Compare that monster's ATTACK and SUPPORT; its higher stat becomes 0 until end of turn if greater than 7000. Do not require the highest monster on the entire field. Exactly 7000 does not qualify."
     },
     {
       "cardNo": "228",
@@ -3663,10 +3663,10 @@
       "type": "",
       "rawText": "EARTHSWALLOW\nCard No. 229\nดินกลืนศัตรู\nแรงดึงจากผืนปฐพีปะทุขึ้นราวกับอ้าปากยักษ์\nกลืนทุกสรรพสิ่ง เลือกมอนสเตอร์ที่ไม่ใช่\nบนสนามใครก็ได้ 1 ใบ มอนสเตอร์นั้น ATTACK -2000\nและ SUPPORT -3000 จนจบตา",
       "confidence": "high",
-      "reviewed": false,
+      "reviewed": true,
       "sourceImage": "/cards/229.jpg",
       "scannedAt": "2026-05-07T04:20:53.862Z",
-      "notes": "Rarity and type are not visible on the card."
+      "notes": "Verified against card artwork: choose one non-earth monster on either field. Only that target receives ATTACK -2000 and SUPPORT -3000 until end of turn. The earth icon is an exclusion condition, not an inclusion."
     },
     {
       "cardNo": "230",
@@ -4079,10 +4079,10 @@
       "type": "",
       "rawText": "HYDROBURST\nCard No. 255\nระเบิดน้ำแรงดันสูง\nคลื่นอัดแรงดันพุ่งเข้าปะทะหยุดศัตรูธาตุน้ำได้ชั่วขณะ\nเลือกมอนสเตอร์หลักบนสนามของฝ่ายตรงข้าม\nที่เป็นธาตุน้ำ 1 ใบ มอนสเตอร์นั้น\nไม่สามารถใช้ค่า ATTACK จนจบตา",
       "confidence": "high",
-      "reviewed": false,
+      "reviewed": true,
       "sourceImage": "/cards/255.jpg",
       "scannedAt": "2026-05-07T04:25:34.543Z",
-      "notes": ""
+      "notes": "Verified against card artwork: select the opponent's water-element main monster. That monster cannot use ATTACK until end of turn. This card does not buff the user's monster and has no 5000-point condition."
     },
     {
       "cardNo": "256",
@@ -4239,10 +4239,10 @@
       "type": "Skill",
       "rawText": "FLASH ZOOM Card No. 265 แสงวาบแห่งพิโรธ ประกายแสงชั่วพริบตา เผาผลาญทุกสิ่งจนไม่เหลือเงา เลือกมอนสเตอร์หลักบนสนามของฝ่ายตรงข้าม 1 ใบ ทำลายมันทันที และบังคับให้ฝ่ายตรงข้าม สุ่มเปิดมอนสเตอร์ใหม่ขึ้นมาแทน",
       "confidence": "high",
-      "reviewed": false,
+      "reviewed": true,
       "sourceImage": "/cards/265.jpg",
       "scannedAt": "2026-05-07T04:27:35.865Z",
-      "notes": "ATK, SUP, and Rarity are not visible on the card."
+      "notes": "Verified against card artwork: destroy the opponent's main monster and randomly reveal a new monster to replace it. The replacement remains on the field; the destroyed monster does not return at end of turn. No base ATK/SUP values."
     },
     {
       "cardNo": "266",

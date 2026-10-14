@@ -36,36 +36,60 @@ export function validatePentadDeck(deck: PentadDeck, partial = false): string[] 
     const card = triadCardByNo.get(no);
     if (!card || card.element === "unknown") { errors.push(`ไม่พบข้อมูลการ์ด ${no}`); continue; }
     elements.set(card.element, (elements.get(card.element) || 0) + 1);
-    if (counts.get(no)! > (card.kind === "skill" ? 2 : 1)) errors.push(`No.${no} เกินจำนวนซ้ำที่อนุญาต`);
+    if (counts.get(no)! > 1) errors.push(`No.${no} ใช้ได้เพียง 1 ใบทั้งเด็ค`);
     if (elements.get(card.element)! > 6) errors.push(`ธาตุ${pentadElementNames[card.element]}เกิน 6 ใบ`);
   }
   return [...new Set(errors)];
 }
 
-export function completePentadDeck(partial: PentadDeck, random: () => number = Math.random): PentadDeck {
+export function makePentadPools(random: () => number = Math.random): PentadDeck {
+  const pools = emptyPentadDeck();
+  for (const element of pentadElements) {
+    const shuffled = triadCards.filter(card => card.element === element).map(card => ({card,order:random()})).sort((a,b)=>a.order-b.order).map(item=>item.card);
+    pools.monsters.push(...shuffled.filter(card=>card.kind === "monster").slice(0,4).map(card=>card.cardNo));
+    const skills = shuffled.filter(card=>card.kind === "skill").slice(0,8).map(card=>card.cardNo);
+    pools.hand.push(...skills.slice(0,4)); pools.reserve.push(...skills.slice(4,8));
+  }
+  return pools;
+}
+
+export function completePentadDeck(partial: PentadDeck, random: () => number = Math.random, pools?: PentadDeck): PentadDeck {
   const deck = emptyPentadDeck();
   const add = (group: keyof PentadDeck, no: string) => {
     const trial = { ...deck, [group]: [...deck[group], no] };
     if (validatePentadDeck(trial, true).length) return false;
     deck[group].push(no); return true;
   };
-  for (const group of ["monsters", "hand", "reserve"] as const) for (const no of partial[group]) add(group, no);
+  for (const group of ["monsters", "hand", "reserve"] as const) for (const no of partial[group]) {
+    if (pools && !pools[group].includes(no)) throw new Error("การ์ดไม่ได้อยู่ในพูลของกองนี้");
+    if (!add(group, no)) throw new Error("เด็คมีการ์ดซ้ำหรือผิดกติกา");
+  }
   const shuffled = triadCards.map(card => ({ card, order: random() })).sort((a, b) => a.order - b.order).map(item => item.card);
-  // Fill missing monster elements first so skill-heavy partial decks remain completable.
-  for (const group of ["monsters", "reserve", "hand"] as const) {
-    const limit = group === "monsters" ? 5 : group === "hand" ? 15 : 10;
-    for (const card of shuffled) {
-      if (deck[group].length === limit) break;
-      if (card.kind !== (group === "monsters" ? "monster" : "skill")) continue;
-      add(group, card.cardNo);
-      if (group !== "monsters" && deck[group].length < limit) add(group, card.cardNo);
+  const groups = ["monsters", "reserve", "hand"] as const;
+  const failed = new Set<string>();
+  const limits = { monsters:5, hand:15, reserve:10 };
+  const domains = Object.fromEntries(groups.map(group => [group,shuffled.filter(card => card.kind === (group === "monsters" ? "monster" : "skill") && (!pools || pools[group].includes(card.cardNo)))])) as Record<keyof PentadDeck, typeof shuffled>;
+  const search = (index: number): boolean => {
+    if (index === groups.length) return validatePentadDeck(deck).length === 0;
+    const group = groups[index];
+    if (deck[group].length === limits[group]) return search(index+1);
+    const all = [...deck.monsters,...deck.hand,...deck.reserve];
+    const key = `${index}:${groups.map(group=>pentadElements.map(element=>deck[group].filter(no=>triadCardByNo.get(no)?.element===element).length).join(",")).join(";")}`;
+    if (failed.has(key)) return false;
+    for (const remaining of groups.slice(index)) {
+      const available = domains[remaining].filter(card => !all.includes(card.cardNo));
+      const capacity = pentadElements.reduce((sum,element) => sum+Math.min(6-all.filter(no=>triadCardByNo.get(no)?.element===element).length,available.filter(card=>card.element===element).length),0);
+      if (capacity < limits[remaining]-deck[remaining].length) return false;
     }
-  }
-  if (validatePentadDeck(deck).length) {
-    // A partial allocation can consume every slot of an element before its monster is picked.
-    if ([...partial.monsters, ...partial.hand, ...partial.reserve].length) return completePentadDeck(emptyPentadDeck(), random);
-    throw new Error("ไม่สามารถเติมเด็คตามกติกาได้");
-  }
+    const tried = new Set<TriadElement>();
+    for (const card of domains[group]) {
+      if (tried.has(card.element) || !add(group,card.cardNo)) continue;
+      if (search(index)) return true;
+      deck[group].pop(); tried.add(card.element);
+    }
+    failed.add(key); return false;
+  };
+  if (!search(0)) throw new Error("ชุดนี้เติมเด็คให้ครบตามกติกาไม่ได้ กรุณาปรับการ์ดหรือธาตุในกอง");
   return deck;
 }
 
@@ -127,8 +151,8 @@ export function resolvePentadTurn(input: {
   const totals = metric === "total" ? { host: attack.host + support.host, challenger: attack.challenger + support.challenger } : metric === "attack" ? attack : support;
   const winner = input.turn === 1 ? comparePentadPower(attack, support, input.finalDuel) : totals.host === totals.challenger ? "draw" : totals.host > totals.challenger ? "host" : "challenger";
   const metricEvents = [
-    ...(atk?.skillEvents || []).filter(event => triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(2) !== false),
-    ...(sup?.skillEvents || []).filter(event => triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(3) !== false),
+    ...(atk?.skillEvents || []).filter(event => metric !== "total" || triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(2) !== false),
+    ...(sup?.skillEvents || []).filter(event => metric !== "total" || triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(3) !== false),
   ];
   const events = metricEvents.filter((event, index, all) => all.findIndex(other => other.side === event.side && other.cardNo === event.cardNo && other.summary === event.summary) === index);
   const effective = atk || sup;
@@ -147,5 +171,6 @@ export function resolvePentadTurn(input: {
     if (totals.host === totals.challenger && attack.host === attack.challenger) stages.push({ title: "ATK เสมอ · วัด SUP", detail: `${support.host.toLocaleString()} / ${support.challenger.toLocaleString()}` });
     if (winner === "draw") stages.push({ title: "เสมอทุกค่า", detail: "ทิ้งมอนสเตอร์ทั้งสองฝ่าย เลือกตัวใหม่ ไม่มีเป่ายิงฉุบ" });
   }
-  return { winner, stages, reason: metric === "total" ? "พลังรวม ATK + SUP" : metric === "attack" ? "พลัง ATTACK" : "พลัง SUPPORT", attack, support, totals, events, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
+  const reason = metric === "total" ? totals.host !== totals.challenger || input.finalDuel ? "พลังรวม ATK + SUP" : attack.host !== attack.challenger ? "ATK + SUP เท่ากัน ตัดสินด้วย ATK" : support.host !== support.challenger ? "ATK เท่ากัน ตัดสินด้วย SUP" : "ATK และ SUP เท่ากัน ต้องเลือกมอนสเตอร์ใหม่" : metric === "attack" ? "พลัง ATTACK" : "พลัง SUPPORT";
+  return { winner, stages, reason, attack, support, totals, events, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
 }
