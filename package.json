@@ -9,7 +9,7 @@
     "build:card-set-images": "node scripts/optimize-card-set-images.mjs",
     "cards:skill-db:init": "node scripts/scan-card-skills.mjs --init",
     "cards:skill-db": "node scripts/scan-card-skills.mjs",
-    "prebuild": "npm run build:card-index",
+    "prebuild": "node scripts/check-mc-release.cjs && npm run build:card-index",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
