@@ -91,16 +91,20 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
     const previous = roomRef.current;
     if (previous && previous.code === next.code && previous.version > next.version) return;
     const pending = pendingPickRef.current;
-    if (pending && (next.code !== pending.code || next.epoch !== pending.epoch || next.picks[pending.side] === pending.cardNo)) { pendingPickRef.current = null; setPendingPick(null); }
+    if (pending && (next.code !== pending.code || next.epoch !== pending.epoch || Boolean(next.picks[pending.side]))) { pendingPickRef.current = null; setPendingPick(null); }
     const round = next.rounds.at(-1);
     if (next.phase === "result" && round && round.fight === next.fight && round.turn === next.turn && round.endsAt > Date.now() + 500) {
       const key = `nexora:pentad:scene:${next.code}:${next.createdAt}:${round.id}`;
-      if (!seenRounds.current.has(key) && sessionStorage.getItem(key) !== "1") {
-        seenRounds.current.add(key); sessionStorage.setItem(key, "1");
+      let storedSeen = false;
+      try { storedSeen = sessionStorage.getItem(key) === "1"; } catch { /* In-memory scene history still prevents replay. */ }
+      if (!seenRounds.current.has(key) && !storedSeen) {
+        seenRounds.current.add(key);
+        try { sessionStorage.setItem(key, "1"); } catch { /* Storage must not block the arena. */ }
         setPresentation({ room: next, round });
       }
     }
-    roomRef.current = next; setRoom(next); setNow(Date.now()); localStorage.setItem("nexora:pentad:room", next.code);
+    roomRef.current = next; setRoom(next); setNow(Date.now());
+    try { localStorage.setItem("nexora:pentad:room", next.code); } catch { /* The room is already held in memory. */ }
   };
   const load = async (selectedCode?: string) => {
     const generation = loadGeneration.current;
@@ -124,17 +128,18 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
       const data = await response.json();
       if (generation !== loadGeneration.current) return false;
       if (!response.ok) throw new Error(data.error || "คำสั่งไม่สำเร็จ");
-      if (action === "leave") { loadGeneration.current++; roomRef.current = null; setRoom(null); setPresentation(null); localStorage.removeItem("nexora:pentad:room"); void load(); }
+      if (action === "leave") { loadGeneration.current++; roomRef.current = null; setRoom(null); setPresentation(null); try { localStorage.removeItem("nexora:pentad:room"); } catch { /* Storage may be unavailable. */ } void load(); }
       else if (data.room) accept(data.room);
       return true;
     } catch (err) { if (generation === loadGeneration.current) { setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); if (current) void load(current.code); } return false; }
     finally { if (action === "join") setEntering(false); if (!background) { busyRef.current = false; setBusy(false); } }
   };
   useLayoutEffect(() => {
-    setMounted(true); const saved = localStorage.getItem("nexora:pentad:room");
+    setMounted(true); let saved: string | null = null;
+    try { saved = localStorage.getItem("nexora:pentad:room"); } catch { /* Start from the lobby without storage. */ }
     const restoring = saved && /^\d{6}$/.test(saved);
     if (restoring) setEntering(true);
-    void load(restoring ? saved : undefined).finally(() => setEntering(false));
+    void load(restoring ? saved || undefined : undefined).finally(() => setEntering(false));
     const clock = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(clock);
     // Initial restoration runs once; mutable room state lives in roomRef.
@@ -166,7 +171,7 @@ export default function PentadDominionClient({ userId }: { userId: string }) {
   }, [room?.code, room?.epoch, room?.phase, side]);
   useEffect(() => {
     if (!room || room.phase !== "deck" || !side || room.ready[side] || !dirtyDeck.current) return;
-    localStorage.setItem(deckKey(room, userId), JSON.stringify(deck));
+    try { localStorage.setItem(deckKey(room, userId), JSON.stringify(deck)); } catch { /* Server draft synchronization remains available. */ }
     const timer = setTimeout(async () => {
       const snapshot = deckRef.current;
       if (await act("deck", { deck: snapshot }, true) && deckRef.current === snapshot) dirtyDeck.current = false;
