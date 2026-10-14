@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import BattleCinematic from "./BattleCinematic";
+import "./NexoraCommand.css";
 import { primeBattleAudio } from "./BattleAudio";
 import { battleArenaForSeed, type TriadArena } from "@/lib/triad-arena";
 import {
@@ -3694,6 +3695,64 @@ function SpectatorDeckStrip({
   );
 }
 
+function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roomAccess, setRoomAccess, roomPassword, setRoomPassword, joinCode, setJoinCode, joiningRoomCode, lobbyMessage, onCreate, onEnter, onNavigate }: {
+  participant: RoomParticipant; rankProfiles: Record<string, TriadRankProfile>; leaderboard: TriadRankProfile[]; rooms: TriadRoom[];
+  roomAccess: RoomAccess; setRoomAccess: (value: RoomAccess) => void; roomPassword: string; setRoomPassword: (value: string) => void;
+  joinCode: string; setJoinCode: (value: string) => void; joiningRoomCode: string; lobbyMessage: string;
+  onCreate: () => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
+}) {
+  const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
+  const artRef = useRef<HTMLDivElement>(null);
+  const pointerFrame = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(pointerFrame.current), []);
+  const profile = profileForParticipant(participant, rankProfiles);
+  return (
+    <div className="nexora-command-lobby" onPointerMove={(event) => {
+      if (event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width - .5) * 14;
+      const y = ((event.clientY - rect.top) / rect.height - .5) * 8;
+      cancelAnimationFrame(pointerFrame.current);
+      pointerFrame.current = requestAnimationFrame(() => { artRef.current?.style.setProperty("--command-x", `${x}px`); artRef.current?.style.setProperty("--command-y", `${y}px`); });
+    }} onPointerLeave={() => { cancelAnimationFrame(pointerFrame.current); artRef.current?.style.setProperty("--command-x", "0px"); artRef.current?.style.setProperty("--command-y", "0px"); }}>
+      <div ref={artRef} className="nexora-command-art" /><div className="nexora-command-shade" />
+      <header className="nexora-command-brand"><h1>NEXORA</h1><span>CARD GAME · TRIAD DOMINION</span>
+        <div className="nexora-command-profile"><img src={participant.image || "/avatar.png"} alt="" /><div><strong>{participant.name}</strong><small>{profile?.rankName || "BRONZE"} · {profile?.wins || 0} ชัยชนะ</small></div></div>
+      </header>
+      <div className="nexora-command-status"><span><Users />{rooms.length} ห้อง</span><span><Swords />{rooms.filter(room => room.status === "playing").length} กำลังต่อสู้</span></div>
+      <nav className="nexora-command-nav" aria-label="เมนูเกม">
+        <button onClick={() => onNavigate("/collections")}><Layers3 />การ์ดของฉัน</button>
+        <button onClick={() => onNavigate("/community")}><Users />เพื่อน</button>
+        <button onClick={() => setPanel("rank")} aria-pressed={panel === "rank"}><Trophy />อันดับนักดวล</button>
+        <button onClick={() => onNavigate("/")}><House />เว็บหลัก</button>
+      </nav>
+      <section className="nexora-command-actions" aria-label="เลือกการเล่น">
+        <button className="nexora-command-mode" onClick={() => setPanel("create")}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
+        <button className="nexora-command-mode" onClick={() => setPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
+        <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
+      </section>
+      <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span><button onClick={() => setPanel("join")}><Eye className="h-4 w-4" />สนามสด {rooms.filter(room => room.status === "playing").length}</button></footer>
+      {panel ? <section className="nexora-command-sheet" role="dialog" aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
+        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? "สร้างสนามประลอง" : panel === "join" ? "เข้าร่วมสนาม" : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
+        <div className="nexora-command-sheet-body">
+          {panel === "create" ? <>
+            <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
+            {roomAccess === "private" ? <label>รหัสผ่านห้อง<input value={roomPassword} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label> : null}
+            <button className="nexora-command-primary" onClick={onCreate} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />เลือกโหมดและสร้างห้อง</button>
+          </> : panel === "join" ? <>
+            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) onEnter(joinCode); }}>
+              <label>หมายเลขห้อง<input value={joinCode} onChange={event => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} maxLength={6} inputMode="numeric" placeholder="000000" /></label>
+              <button className="nexora-command-primary" disabled={joinCode.length !== 6 || joiningRoomCode === joinCode}>{joiningRoomCode === joinCode && joinCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}เข้าห้อง</button>
+            </form>
+            <div className="nexora-command-room-list">{rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : <div className="nexora-command-alert">ยังไม่มีห้องเปิดอยู่</div>}</div>
+          </> : <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />}
+          {lobbyMessage ? <div role="status" className="nexora-command-alert">{lobbyMessage}</div> : null}
+        </div>
+      </section> : null}
+    </div>
+  );
+}
+
 function RoomSeatCard({
   label,
   participant,
@@ -3721,7 +3780,7 @@ function RoomSeatCard({
       : "border-amber-200/28 from-[#2a1112]/82 via-[#120608]/88 to-black";
   const botSeat = isBotParticipant(participant);
   return (
-    <div className={`relative min-h-[320px] rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
+    <div className={`nexora-command-seat relative min-h-[320px] rounded-[18px] border bg-gradient-to-b p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)] ${toneClass}`}>
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.1),transparent)] opacity-30" />
       <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/60 to-transparent" />
       <div className="relative mb-4 flex items-center justify-between gap-3">
@@ -7530,13 +7589,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   if (phase === "lobby") {
     const visibleRooms = rooms
       .slice()
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 8);
-    const searchedRoom = joinCode.length === 6 ? rooms.find((room) => room.code === joinCode) : null;
-    const isJoiningSearchedRoom = Boolean(joinCode.length === 6 && joiningRoomCode === joinCode);
+      .sort((a, b) => b.createdAt - a.createdAt);
 
     return (
-      <main className="triad-lobby-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
+      <main className="nexora-command triad-lobby-screen">
         {passwordRoom ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
             <div className="w-[min(420px,94vw)] rounded-2xl border border-amber-200/28 bg-[#090b12] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
@@ -7671,186 +7727,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             </div>
           </div>
         ) : null}
-        <section className="triad-lobby-hero relative min-h-[320px] overflow-hidden border-b border-amber-200/12 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="absolute inset-0">
-            <Image
-              src="/images/triad/battle-header-banner.webp"
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-center"
-            />
-          </div>
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.18)_0%,rgba(0,0,0,0.36)_42%,rgba(0,0,0,0.68)_100%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.34)_0%,rgba(0,0,0,0.1)_38%,rgba(0,0,0,0.22)_100%)]" />
-          <div className="relative z-10 flex min-h-[280px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="relative z-20 max-w-3xl lg:max-w-[44%]">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/16 bg-black/35 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/85 backdrop-blur-sm">
-                <Swords className="h-3.5 w-3.5" />
-                ห้องแบทเทิลการ์ด
-              </div>
-              <h1 className="text-[clamp(2.4rem,9vw,6.4rem)] font-black uppercase leading-[0.86] tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.75)]">
-                ล็อบบี้ต่อสู้
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/78 sm:text-base drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
-                สร้างห้อง เข้าห้องด้วยเลข 6 ตัว หรือเลือกนั่งชมก่อนเริ่มสู้ได้เลย
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/")}
-                className="triad-lobby-home-button mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-amber-100/60 bg-[linear-gradient(135deg,#fde68a,#facc15_42%,#d97706)] px-5 text-sm font-black text-black shadow-[0_0_36px_rgba(251,191,36,0.38),inset_0_0_0_1px_rgba(255,255,255,0.38)] transition hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] sm:w-auto"
-              >
-                <House className="h-4 w-4" />
-                กลับหน้าหลัก
-              </button>
-            </div>
-            <div className="relative z-20 grid grid-cols-3 gap-2 sm:min-w-[420px]">
-              {[
-                ["ห้อง", rooms.length],
-                ["ล็อก", rooms.filter((room) => room.access === "private").length],
-                ["กำลังสู้", rooms.filter((room) => room.status === "playing").length],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-white/12 bg-black/36 p-3 backdrop-blur-sm shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
-                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">{label}</div>
-                  <div className="mt-1 text-2xl font-black text-white">{value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="triad-lobby-content grid gap-4 p-4 sm:p-6 lg:grid-cols-[380px_1fr] lg:p-8">
-          <div className="space-y-4">
-            <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
-              <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
-                <Plus className="h-4 w-4 text-amber-300" />
-                สร้างห้อง
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {(["public", "private"] as RoomAccess[]).map((access) => (
-                  <button
-                    key={access}
-                    type="button"
-                    onClick={() => setRoomAccess(access)}
-                    className={`h-11 rounded-xl border text-xs font-black uppercase tracking-[0.12em] transition ${
-                      roomAccess === access
-                        ? "border-red-300 bg-red-500 text-white shadow-[0_0_28px_rgba(239,68,68,0.28)]"
-                        : "border-white/10 bg-black/28 text-white/58 hover:border-amber-300/40"
-                    }`}
-                  >
-                    {access === "public" ? "สาธารณะ" : "ส่วนตัว"}
-                  </button>
-                ))}
-              </div>
-              {roomAccess === "private" ? (
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">รหัสห้อง</span>
-                  <input
-                    value={roomPassword}
-                    onChange={(event) => setRoomPassword(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-amber-200/12 bg-black/50 px-3 text-sm font-bold text-white outline-none transition focus:border-red-300/70"
-                    placeholder="อย่างน้อย 4 ตัว"
-                  />
-                </label>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setCreateRoomMode("all");
-                  setCreateModeDialogOpen(true);
-                }}
-                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.32)] transition hover:bg-red-400"
-              >
-                <Plus className="h-4 w-4" />
-                สร้าง
-              </button>
-            </div>
-
-            <div className="rounded-[18px] border border-amber-200/16 bg-black/40 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
-              <div className="mb-4 flex items-center gap-2 text-sm font-black text-white">
-                <Search className="h-4 w-4 text-cyan-200" />
-                ค้นหาห้อง
-              </div>
-              <input
-                value={joinCode}
-                onChange={(event) => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="h-12 w-full rounded-xl border border-amber-200/12 bg-black/50 px-3 text-center font-mono text-xl font-black tracking-[0.2em] text-white outline-none transition focus:border-red-300/70"
-                placeholder="000000"
-                inputMode="numeric"
-              />
-              <button
-                type="button"
-                onClick={() => enterRoom(joinCode, searchedRoom?.status === "playing")}
-                disabled={joinCode.length !== 6 || isJoiningSearchedRoom}
-                className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_0_32px_rgba(239,68,68,0.26)] transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/28"
-              >
-                {isJoiningSearchedRoom ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                {isJoiningSearchedRoom ? "กำลังเข้า..." : searchedRoom?.status === "playing" ? "เข้าชม" : "เข้าห้อง"}
-              </button>
-            </div>
-            {lobbyMessage ? (
-              <div className="rounded-xl border border-rose-300/20 bg-rose-300/10 p-3 text-sm font-bold text-rose-100">
-                {lobbyMessage}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-4">
-          <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />
-          <div className="rounded-[18px] border border-amber-200/16 bg-black/36 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-black text-white">
-                <Users className="h-4 w-4 text-emerald-200" />
-                ห้องทั้งหมด
-              </div>
-              <div className="text-xs font-bold text-white/38">เห็นทั้งห้องสาธารณะและห้องล็อกรหัส</div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {visibleRooms.length > 0 ? visibleRooms.map((room) => (
-                <div key={room.code} className="relative overflow-hidden rounded-[18px] border border-amber-200/14 bg-[linear-gradient(135deg,rgba(255,255,255,0.055),rgba(0,0,0,0.4))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-200/70 to-transparent" />
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <RankAvatar participant={room.seats.host} profile={profileForParticipant(room.seats.host, rankProfiles)} size="md" />
-                      <div className="min-w-0">
-                      <div className="font-mono text-2xl font-black tracking-[0.18em] text-white">{room.code}</div>
-                      <div className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/38">
-                        {room.status === "playing" ? "กำลังสู้" : "รอเริ่ม"} • {room.seats.challenger ? "ผู้เล่น 2 คน" : "ผู้เล่น 1 คน"}
-                      </div>
-                      <div className="mt-1 truncate text-xs font-bold text-amber-100/55">
-                        หัวห้อง: {room.seats.host?.name || "ไม่มี"}
-                      </div>
-                      </div>
-                    </div>
-                    <div className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black uppercase ${
-                      room.access === "private"
-                        ? "border-amber-200/24 bg-amber-200/10 text-amber-100"
-                        : "border-emerald-200/20 bg-emerald-200/10 text-emerald-100"
-                    }`}>
-                      {room.access === "private" ? <Lock className="h-3 w-3" /> : null}
-                      {room.access === "private" ? "ล็อกรหัส" : "สาธารณะ"}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => (room.access === "private" && room.hostId !== participant.id ? setPasswordRoom(room) : enterRoom(room.code, room.status === "playing"))}
-                    disabled={joiningRoomCode === room.code}
-                    className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-red-500 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_0_28px_rgba(239,68,68,0.26)] transition hover:bg-red-400 disabled:cursor-wait disabled:bg-red-500/70"
-                  >
-                    {joiningRoomCode === room.code ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    {joiningRoomCode === room.code ? "กำลังเข้า..." : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}
-                  </button>
-                </div>
-              )) : (
-                <div className="rounded-xl border border-white/8 bg-black/24 p-6 text-sm font-semibold text-white/42">
-                  ยังไม่มีห้อง
-                </div>
-              )}
-            </div>
-          </div>
-          </div>
-        </section>
+        <NexoraCommandLobby participant={participant} rankProfiles={rankProfiles} leaderboard={leaderboard} rooms={visibleRooms} roomAccess={roomAccess} setRoomAccess={setRoomAccess} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joiningRoomCode={joiningRoomCode} lobbyMessage={lobbyMessage}
+          onCreate={() => { setCreateRoomMode("all"); setCreateModeDialogOpen(true); }}
+          onEnter={(target) => {
+            const room = typeof target === "string" ? rooms.find(room => room.code === target) : target;
+            const code = typeof target === "string" ? target : target.code;
+            if (room?.access === "private" && room.hostId !== participant.id) setPasswordRoom(room);
+            else void enterRoom(code, room?.status === "playing");
+          }} onNavigate={path => router.push(path)} />
       </main>
     );
   }
@@ -7895,7 +7779,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
 
     return (
-      <main className="triad-room-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-amber-200/12 bg-[#050507] text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
+      <main className="nexora-command nexora-command-room triad-room-screen">
+        <div className="nexora-command-art" /><div className="nexora-command-shade" />
         <section className="triad-room-hero relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0">
             <Image
@@ -7964,7 +7849,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         </div>
 
         <section className="triad-room-content grid gap-4 p-4 sm:p-6 xl:grid-cols-[1fr_320px] xl:p-8">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="nexora-command-duel grid gap-4 md:grid-cols-2">
             <RoomSeatCard
               label="ฝั่งเจ้าของห้อง"
               participant={currentRoom.seats.host}
@@ -7987,7 +7872,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               onTake={() => takeFieldSlot("challenger")}
               currentParticipantId={participant.id}
             />
-            <div className="md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
+            <div className="nexora-command-settings md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
               <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">กติกาห้อง</div>
               <div className="mb-4 rounded-2xl border border-amber-200/14 bg-black/28 p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -8047,8 +7932,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 </button>
               ) : null}
             </div>
-            <div className="md:col-span-2">
-              <BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} />
+            <div className="nexora-command-viewers md:col-span-2">
+              <span><Eye className="inline h-3 w-3" /> ผู้ชม {currentRoom.spectators.length}/{SPECTATOR_LIMIT}</span>
+              <SpectatorAvatarRail spectators={currentRoom.spectators} rankProfiles={rankProfiles} currentParticipantId={participant.id} />
+              {currentIsSpectator ? <span>คุณกำลังนั่งชม</span> : null}
             </div>
           </div>
 
@@ -8062,6 +7949,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
             />
           </aside>
         </section>
+        <div className="nexora-command-room-chat"><BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} compact /></div>
       </main>
     );
   }
@@ -8072,7 +7960,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const deckReadyLabel = deckSessionOpening ? "กำลังเปิดสนาม" : deckReadySubmitting ? "กำลังยืนยัน" : ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
-      <main className="triad-deck-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
+      <main className="nexora-command-deck triad-deck-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
         <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(160,120,35,0.22),transparent_28%),linear-gradient(180deg,#090909,#050507_58%,#120d08)]" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

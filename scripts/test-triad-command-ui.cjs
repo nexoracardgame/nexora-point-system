@@ -1,0 +1,49 @@
+const fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),assert=require('node:assert/strict');
+const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const source=fs.readFileSync(process.env.TRIAD_CLIENT_SOURCE||'app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
+const ast=ts.createSourceFile('client.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const names=new Set(['NexoraCommandLobby','RoomSeatCard','BattleRoomChatPanel','SpectatorAvatarRail']);
+const extracted=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)).map(n=>n.getText(ast)).join('\n');
+const transpile=code=>ts.transpileModule(code,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+const modules={};
+for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
+modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
+const start=source.indexOf('<main className="nexora-command nexora-command-room');
+const roomMarkup=source.slice(start,source.indexOf('</main>',start)+7);
+modules.test=transpile(`import {useState,useEffect,useLayoutEffect,useRef,Fragment} from 'react';import {Bot,Check,Clock3,ChevronRight,Crown,Eye,House,KeyRound,Layers3,Lock,Loader2,MessageCircle,Plus,SendHorizontal,Search,Smile,Swords,Trophy,UserPlus,Users,X} from 'lucide-react';
+const Image=({fill,priority,sizes,...p})=><img {...p} style={fill?{position:'absolute',inset:0,width:'100%',height:'100%'}:{}}/>;
+const profileForParticipant=()=>({rankName:'BRONZE',wins:18}),rankFrames=[{name:'BRONZE'}],rankIndexForParticipant=()=>0,isBotParticipant=p=>p?.id==='bot';
+const MiniProfileHover=({participant,size})=><button className={size==='xl'?'h-32 w-32':'h-9 w-9'}><img src={participant.image} alt={participant.name} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/></button>;
+const RankLeaderboardPanel=()=> <div>อันดับนักดวลทดสอบ</div>,SpectatorPanel=()=>null;
+const participant={id:'user',name:'ผู้เล่นทดสอบ',image:'/avatar.png',joinedAt:0},rankProfiles={},leaderboard=[];
+const currentRoom={code:'123456',hostId:'user',status:'waiting',spectators:[],seats:{host:participant,challenger:{...participant,id:'rival',name:'ผู้ท้าชิง'}},game:{chat:[]}};
+const rooms=[currentRoom,{...currentRoom,code:'654321',access:'private',status:'playing'}];
+const isRoomController=true,currentIsSpectator=false,hasBotOpponent=false,botChanging=false,SPECTATOR_LIMIT=10,isFieldPlayer=true;
+const leaveRoom=()=>window.action='leave',toggleBotOpponent=()=>window.action='bot',startRoomGame=()=>window.action='start',takeFieldSlot=()=>window.action='seat',moveToSpectator=()=>window.action='watch',sendRoomChat=async()=>true;
+${extracted}
+export function TestLobby(){const [roomAccess,setRoomAccess]=useState('public'),[roomPassword,setRoomPassword]=useState(''),[joinCode,setJoinCode]=useState('');return <main className="nexora-command triad-lobby-screen"><NexoraCommandLobby participant={participant} rankProfiles={rankProfiles} leaderboard={leaderboard} rooms={rooms} roomAccess={roomAccess} setRoomAccess={setRoomAccess} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joiningRoomCode="" lobbyMessage="" onCreate={()=>window.action='create'} onEnter={target=>window.action=typeof target==='string'?target:target.code} onNavigate={target=>window.action=target}/></main>}
+export function TestRoom(){const [currentDeckMode,setMode]=useState('all'),roomModeSubmitting='',currentDeckModeTitle='โหมดรวม',canStart=true,changeRoomDeckMode=mode=>{window.mode=mode;setMode(mode)};return ${roomMarkup}}
+`);
+const bundle=Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
+const css=fs.readdirSync('.next/static/chunks').filter(f=>f.endsWith('.css')).map(f=>fs.readFileSync('.next/static/chunks/'+f,'utf8')).join('\n')+'\n'+fs.readFileSync('app/globals.css','utf8')+'\n'+fs.readFileSync('app/(main)/battle/triad-dominion/NexoraCommand.css','utf8');
+const html=`<!doctype html><html><head><meta charset="utf-8"><style>${css}body{margin:0;background:#080b0e}#root{position:relative!important;inset:auto!important;width:100%!important;height:100dvh!important;max-height:none!important;max-width:none!important;margin:0!important;padding:0!important;box-sizing:border-box}@media(max-width:900px) and (orientation:portrait){#root{width:100dvh!important;height:100dvw!important;min-height:0!important}}</style></head><body><div id="root" class="nexora-battle-shell"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const React=require('react'),root=require('react-dom/client').createRoot(document.getElementById('root'));window.mount=room=>root.render(React.createElement(room?require('test').TestRoom:require('test').TestLobby));mount(false);</script></body></html>`;
+(async()=>{fs.mkdirSync('artifacts/triad-command',{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});
+try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('https://command.test/**',route=>{const url=new URL(route.request().url());if(url.pathname==='/')return route.fulfill({body:html,contentType:'text/html'});const asset=path.resolve('public','.'+url.pathname);if(!asset.startsWith(path.resolve('public')+path.sep))return route.abort();return route.fulfill({body:fs.readFileSync(asset),contentType:asset.endsWith('.webp')?'image/webp':'image/jpeg'});});
+for(const [width,height] of [[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]){
+await page.setViewportSize({width,height});await page.goto('https://command.test/');await page.waitForSelector('.nexora-command-mode');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
+await page.evaluate(()=>new Promise((resolve,reject)=>{const i=new window.Image();i.onload=resolve;i.onerror=reject;i.src='/images/triad/nexora-command.webp'}));
+for(const button of await page.locator('.nexora-command-mode,.nexora-command-nav button').all()){const r=await button.boundingBox();assert.ok(r.x>=0&&r.y>=0&&r.x+r.width<=width+1&&r.y+r.height<=height+1,'Every lobby command fits');}
+await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});
+assert.equal(await page.locator('main').evaluate(e=>e.scrollHeight>e.clientHeight+1),false,'No lobby page overflow '+JSON.stringify(await page.locator('main').evaluate(e=>({client:e.clientHeight,scroll:e.scrollHeight,padding:getComputedStyle(e).padding}))));
+await page.getByRole('button',{name:'PLAY สร้างสนามประลอง'}).click();await page.getByRole('button',{name:'ส่วนตัว',exact:true}).click();await page.getByPlaceholder('อย่างน้อย 4 ตัว').fill('nexora');await page.getByRole('button',{name:'เลือกโหมดและสร้างห้อง'}).click();assert.equal(await page.evaluate(()=>action),'create');await page.getByRole('button',{name:'ปิด',exact:true}).click();
+await page.getByRole('button',{name:'JOIN ARENA เข้าร่วม / ชมการต่อสู้'}).click();await page.getByPlaceholder('000000').fill('a12');assert.equal(await page.getByPlaceholder('000000').inputValue(),'12');await page.getByPlaceholder('000000').fill('1234567');assert.equal(await page.getByPlaceholder('000000').inputValue(),'123456');await page.locator('.nexora-command-sheet form button').click();assert.equal(await page.evaluate(()=>action),'123456');await page.getByRole('button',{name:'ปิด',exact:true}).click();
+await page.getByRole('button',{name:'DUELIST RANK อันดับนักดวล NEXORA'}).click();await page.getByText('อันดับนักดวลทดสอบ').waitFor();await page.getByRole('button',{name:'ปิด',exact:true}).click();
+await page.evaluate(()=>mount(true));await page.waitForSelector('.nexora-command-room');
+await page.screenshot({path:'artifacts/triad-command/room-'+width+'.png'});
+for(const button of await page.locator('.triad-room-hero button,.nexora-command-settings button').all()){const r=await button.boundingBox();assert.ok(r&&r.x>=-1&&r.y>=-1&&r.x+r.width<=width+1&&r.y+r.height<=height+1,'Room controls fit '+width+': '+JSON.stringify(r));}
+await page.getByRole('button',{name:'เริ่มเกม',exact:true}).click();assert.equal(await page.evaluate(()=>action),'start');await page.getByRole('button',{name:/SKILL/}).click();assert.equal(await page.evaluate(()=>mode),'skill');
+await page.getByRole('textbox',{name:'ข้อความแชตสนาม'}).fill('พร้อมต่อสู้');
+assert.deepEqual(errors,[]);console.log('Command lobby + room '+width+'x'+height+': controls, join, create, ranks, mode, start and chat passed');
+}
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
