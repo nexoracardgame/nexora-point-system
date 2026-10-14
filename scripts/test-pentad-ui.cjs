@@ -8,6 +8,7 @@ modules['next/link']=`const React=require('react');exports.default=({href,childr
 modules['next/navigation']='exports.useRouter=()=>({replace:path=>{window.navigationTarget=path;}});';
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
 modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));
+modules['@/components/DeckPreparation']=transpile(fs.readFileSync('components/DeckPreparation.tsx','utf8'));
 modules['@/lib/supabase-browser']='exports.getBrowserSupabaseClient=()=>null;';
 modules['@/lib/battle-ui-state']=transpile(fs.readFileSync('lib/battle-ui-state.ts','utf8'),'lib/battle-ui-state.ts');
 modules['../triad-dominion/BattleAudio']=modules['./BattleAudio']='exports.primeBattleAudio=async()=>false;exports.playMenuCue=()=>{};exports.battleAudioReady=()=>false;exports.playBattleSequence=()=>()=>{};';

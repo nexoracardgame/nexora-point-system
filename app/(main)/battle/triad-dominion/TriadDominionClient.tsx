@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import BattleArenaChat from "@/components/BattleArenaChat";
+import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { DeckPreparationHeader, DeckPreparationLayout } from "@/components/DeckPreparation";
 import { BattleArenaScoreplate, BattleArenaPhaseTrack } from "@/components/BattleArenaHud";
 import {
   Bot,
@@ -1891,8 +1892,8 @@ function DeckCard({
         selected ? "border-amber-300 ring-2 ring-amber-300/30" : "border-white/10"
       }`}
     >
-      <div className="relative aspect-[3/4]">
-        <Image src={card.sourceImage} alt={card.name} fill sizes="180px" className="object-cover" />
+      <div className="relative aspect-[815/1110]">
+        <Image src={card.sourceImage} alt={card.name} fill sizes="180px" className="object-contain" />
         {selected ? (
           <div className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-amber-200 to-amber-400 text-black shadow-[0_0_18px_rgba(251,191,36,0.35)]">
             <Check className="h-4 w-4" />
@@ -7953,155 +7954,23 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const deckReadyLabel = deckSessionOpening ? "กำลังเปิดสนาม" : deckReadySubmitting ? "กำลังยืนยัน" : ownDeckReady ? "พร้อมแล้ว" : currentRoom ? "พร้อม" : "เข้าสนาม";
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
-      <main className="nexora-command-deck triad-deck-screen min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] overflow-y-auto rounded-[24px] border border-white/8 bg-[#050710] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)]">
-        <section className="relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_82%_20%,rgba(160,120,35,0.22),transparent_28%),linear-gradient(180deg,#090909,#050507_58%,#120d08)]" />
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-200">
-                <Layers3 className="h-3.5 w-3.5" />
-                จัดเด็ค
-              </div>
-              <h1 className="text-[clamp(2.2rem,8vw,6rem)] font-black uppercase leading-[0.88] tracking-normal text-white">
-                เลือกเด็คของคุณ
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/62 sm:text-base">
-                เลือกการ์ด {DECK_SIZE} ใบสำหรับ 3 รอบสู้ การ์ดแต่ละใบใช้ได้ครั้งเดียวในเกมนี้
-              </p>
-              <div className="mt-4 max-w-2xl rounded-2xl border border-amber-200/16 bg-black/30 px-4 py-3 text-sm font-bold leading-6 text-amber-100/86">
-                {deckSelectionGuide}
-                <div className="mt-1 text-xs font-semibold text-amber-100/62">{deckSelectionNotice}</div>
-              </div>
-            </div>
-
-            <div className="relative z-20 rounded-2xl border border-amber-200/12 bg-black/36 p-4 shadow-[0_0_24px_rgba(251,191,36,0.04)]">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">
-                {currentRoom ? "เวลาเลือกเด็ค" : "เลือกแล้ว"}
-              </div>
-              <div className="mt-1 text-5xl font-black text-white">
-                {currentRoom ? deckTimerText : `${playerDeck.length}/${DECK_SIZE}`}
-              </div>
-              <div className="mt-2 text-xs font-bold text-white/48">
-                เลือกแล้ว {playerDeck.length}/{DECK_SIZE} • {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}
-              </div>
-              <button
-                type="button"
-                onClick={enterBattle}
-                disabled={deckReadyDisabled}
-                className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-4 text-sm font-black text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 disabled:hover:from-white/10"
-              >
-                {deckReadyLabel}
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              {currentRoom ? (
-                <button
-                  type="button"
-                  onClick={leaveRoom}
-                  className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-black/28 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/64 transition hover:border-amber-200/30 hover:text-white"
-                >
-                  ออกห้อง
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        {deckSelectionActive ? (
-          <div className="px-4 pb-2 sm:px-6 lg:px-8">
-            <DeckSelectionStatusBanner
-              title="กำลังเลือกเด็ค"
-              leftName={currentRoom?.seats.host?.name || "ฝั่งบน"}
-              rightName={currentRoom?.seats.challenger?.name || "ฝั่งล่าง"}
-              timerText={deckTimerText}
-              message="ทั้งสองฝั่งกำลังจัดเด็คพร้อมกันจนกว่าจะกดพร้อมครบ ผู้ชมจะเห็นสถานะนี้แบบเดียวกันทั้งห้อง"
-            />
-          </div>
-        ) : null}
-
-        <section className="triad-deck-content grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_280px] lg:p-8">
-          <div className="triad-deck-card-grid grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-            {selectableDeckCatalog.map((card) => {
-              const selected = playerDeck.includes(card.cardNo);
-              const disabled =
-                deckSessionOpening || ownDeckReady || deckReadySubmitting ||
-                (playerDeck.length >= DECK_SIZE && !selected) ||
-                (currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT) ||
-                (currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT);
-              const disabledReason =
-                currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT
-                  ? `โหมด SKILL เลือกมอนสเตอร์ได้ ${SKILL_MODE_MONSTER_LIMIT} ใบเท่านั้น`
-                  : currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT
-                    ? `โหมด SKILL เลือกการ์ดสกิลได้ ${SKILL_MODE_SKILL_LIMIT} ใบเท่านั้น`
-                    : playerDeck.length >= DECK_SIZE && !selected
-                      ? `เลือกได้ ${DECK_SIZE} ใบเท่านั้น`
-                      : undefined;
-              return (
-                <DeckCard
-                  key={card.cardNo}
-                  card={card}
-                  selected={selected}
-                  disabled={disabled}
-                  disabledReason={disabledReason}
-                  onClick={() => toggleDeckCard(card.cardNo)}
-                  onPreview={setDeckPreviewCard}
-                  onPreviewEnd={() => setDeckPreviewCard(null)}
-                />
-              );
-            })}
-          </div>
-
-          <aside className="rounded-2xl border border-amber-200/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] p-4 lg:sticky lg:top-4 lg:self-start">
-            <div className="mb-3 flex items-center gap-2 text-sm font-black text-white">
-              <Sparkles className="h-4 w-4 text-amber-300" />
-              เด็คที่เลือก
-            </div>
-            <div className="space-y-2">
-              {playerDeckCards.map((card, index) => (
-                <button
-                  key={card.cardNo}
-                  type="button"
-                  onClick={() => toggleDeckCard(card.cardNo)}
-                  onMouseEnter={() => setDeckPreviewCard(card)}
-                  onMouseLeave={() => setDeckPreviewCard(null)}
-                  onPointerEnter={() => setDeckPreviewCard(card)}
-                  onPointerMove={() => setDeckPreviewCard(card)}
-                  onPointerLeave={() => setDeckPreviewCard(null)}
-                  onFocus={() => setDeckPreviewCard(card)}
-                  onBlur={() => setDeckPreviewCard(null)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-white/8 bg-black/24 p-2 text-left transition hover:border-amber-300/40 hover:bg-amber-300/6"
-                >
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-300 text-xs font-black text-black">
-                    {index + 1}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-white">เลข {card.cardNo} {card.name}</div>
-                    <div className="truncate text-xs font-semibold text-white/48">{cardLabel(card)}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </aside>
-        </section>
-        {currentRoom ? (
-          <div className="triad-deck-readybar fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-height)+12px)] z-40 mx-auto flex max-w-[560px] items-center gap-3 rounded-2xl border border-amber-200/24 bg-black/78 p-3 shadow-[0_0_44px_rgba(251,191,36,0.12)] backdrop-blur-md xl:bottom-5">
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/62">
-                เวลาเลือกเด็ค {deckTimerText}
-              </div>
-              <div className="mt-1 truncate text-sm font-bold text-white/70">
-                {ownDeckReady ? "เด็คคุณล็อกแล้ว รออีกฝ่าย" : `เลือกไว้ ${playerDeck.length}/${DECK_SIZE} ใบ กดพร้อมแล้วจะแก้ไม่ได้`}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={enterBattle}
-              disabled={deckSessionOpening || ownDeckReady || deckReadySubmitting || !deckValidation.valid}
-              className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-6 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.22)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35 disabled:hover:from-white/10"
-            >
-              {ownDeckReady ? "พร้อมแล้ว" : "พร้อม"}
-            </button>
-          </div>
-        ) : null}
+      <main className="nexora-command-deck triad-deck-screen nexora-deck-screen">
+        <DeckPreparationHeader title={currentDeckModeTitle} time={deckTimerText} onExit={leaveRoom} />
+        <DeckPreparationLayout tray={<>
+          <h2>เตรียมเด็ค <b>{playerDeck.length}/{DECK_SIZE}</b></h2>
+          <div className="nexora-deck-guide">{deckSelectionGuide}<br />{deckSelectionNotice}</div>
+          <div className="nexora-deck-chosen">{playerDeckCards.map(card => <button key={card.cardNo} type="button" aria-label={`นำ No.${card.cardNo} ออกจากเด็ค`} disabled={ownDeckReady || deckReadySubmitting} onClick={() => toggleDeckCard(card.cardNo)} onMouseEnter={() => setDeckPreviewCard(card)} onMouseLeave={() => setDeckPreviewCard(null)}><img src={card.sourceImage} alt={card.name} /><span>−</span></button>)}</div>
+          <button type="button" className="nexora-deck-ready" onClick={enterBattle} disabled={deckReadyDisabled}><Check size={18} />{deckReadyLabel}</button>
+          <div className="nexora-deck-readiness">{ownDeckReady ? "คุณพร้อมแล้ว" : "กำลังจัดเด็ค"} · {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}</div>
+        </>} catalog={<div className="nexora-deck-grid">{selectableDeckCatalog.map(card => {
+          const selected = playerDeck.includes(card.cardNo);
+          const disabled = deckSessionOpening || ownDeckReady || deckReadySubmitting ||
+            (playerDeck.length >= DECK_SIZE && !selected) ||
+            (currentDeckMode === "skill" && !selected && card.kind === "monster" && deckSelectionCounts.monsters >= SKILL_MODE_MONSTER_LIMIT) ||
+            (currentDeckMode === "skill" && !selected && card.kind === "skill" && deckSelectionCounts.skills >= SKILL_MODE_SKILL_LIMIT);
+          return <DeckCard key={card.cardNo} card={card} selected={selected} disabled={disabled} onClick={() => { if (!deckSessionOpening && !ownDeckReady && !deckReadySubmitting) toggleDeckCard(card.cardNo); }} onPreview={setDeckPreviewCard} onPreviewEnd={() => setDeckPreviewCard(null)} />;
+        })}</div>} />
+        {currentRoom && <BattleArenaChatFrame arenaSelector=".triad-deck-screen" cinematicActive={false}><BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} compact /></BattleArenaChatFrame>}
         <CardHoverPreview card={deckPreviewCard} onClose={() => setDeckPreviewCard(null)} passive variant="deck" />
       </main>
     );
