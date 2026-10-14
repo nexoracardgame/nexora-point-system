@@ -46,9 +46,9 @@ export function makePentadPools(random: () => number = Math.random): PentadDeck 
   const pools = emptyPentadDeck();
   for (const element of pentadElements) {
     const shuffled = triadCards.filter(card => card.element === element).map(card => ({card,order:random()})).sort((a,b)=>a.order-b.order).map(item=>item.card);
-    pools.monsters.push(...shuffled.filter(card=>card.kind === "monster").slice(0,4).map(card=>card.cardNo));
-    const skills = shuffled.filter(card=>card.kind === "skill").slice(0,8).map(card=>card.cardNo);
-    pools.hand.push(...skills.slice(0,4)); pools.reserve.push(...skills.slice(4,8));
+    pools.monsters.push(...shuffled.filter(card=>card.kind === "monster").slice(0,6).map(card=>card.cardNo));
+    const skills = shuffled.filter(card=>card.kind === "skill").slice(0,12).map(card=>card.cardNo);
+    pools.hand.push(...skills.slice(0,6)); pools.reserve.push(...skills.slice(6,12));
   }
   return pools;
 }

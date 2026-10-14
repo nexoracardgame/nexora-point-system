@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma";
 import { triadCardByNo, triadCards, triadSkillRuleByNo, triadSkillElementConditionMatches } from "./triad-dominion";
 import { completePentadDeck, makePentadPools, emptyPentadDeck, otherPentadSide, pentadElementRelation, resolvePentadTurn, validatePentadDeck, PENTAD_DECK_MS, PENTAD_TARGET_MS, PENTAD_TURN_MS, type PentadDeck, type PentadResolution, type PentadSide, type PentadTurn } from "./pentad-dominion";
@@ -9,6 +9,8 @@ export type PentadRound = PentadResolution & { id: number; fight: number; turn: 
 export type PentadRoom = {
   code: string; version: number; epoch: number; createdAt: number; updatedAt: number;
   deckSource?: "all" | "random";
+  access?: "public" | "private";
+  passwordHash?: string;
   pools?: PentadDeck;
   seats: Record<PentadSide, PentadParticipant | null>; spectators: PentadParticipant[];
   phase: "waiting" | "deck" | "select" | "target" | "result" | "finished";
@@ -221,6 +223,11 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
   const requireSeat = () => { if (!side) throw new Error("เฉพาะผู้เล่นเท่านั้น"); return side; };
   if (action === "join") {
     if (side || room.spectators.some(p => p.id === actor.id)) return;
+    if (room.access === "private") {
+      const [salt,hash]=String(room.passwordHash || "").split(":");
+      const expected=Buffer.from(hash || "","hex"),actual=scryptSync(String(body.password || ""),salt || "",32);
+      if (expected.length !== actual.length || !timingSafeEqual(expected,actual)) throw new Error("รหัสผ่านห้องไม่ถูกต้อง");
+    }
     if (room.phase === "waiting" && !room.seats.challenger && !body.spectate) room.seats.challenger = actor;
     else { if (room.spectators.length >= 10) throw new Error("ผู้ชมเต็มแล้ว"); room.spectators.push(actor); }
     return;
@@ -299,6 +306,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
 
 export function publicPentadRoom(room: PentadRoom, id: string) {
   const copy = structuredClone(room);
+  delete copy.passwordHash;
   const side = pentadSeat(room, id);
   // Opposing deck order and concealed picks never cross the API boundary.
   for (const seat of sides) if (seat !== side) {
@@ -309,13 +317,19 @@ export function publicPentadRoom(room: PentadRoom, id: string) {
   return copy;
 }
 
-export async function createPentadRoom(actor: PentadParticipant, deckSource: "all" | "random" = "all") {
+export async function createPentadRoom(actor: PentadParticipant, deckSource: "all" | "random" = "all", options: {access?:string;password?:string;playWithBot?:boolean} = {}) {
   await ensureSchema();
+  const access=options.access === "private" ? "private" : "public";
+  const password=String(options.password || "").trim();
+  if (access === "private" && (password.length < 4 || password.length > 128)) throw new Error("รหัสห้องส่วนตัวต้องมี 4–128 ตัว");
   for (let attempt = 0; attempt < 8; attempt++) {
     const room = newPentadRoom(String(randomInt(100000, 1000000)), actor);
     room.deckSource = deckSource;
+    room.access=access;
+    if (access === "private") { const salt=randomBytes(16).toString("hex");room.passwordHash=`${salt}:${scryptSync(password,salt,32).toString("hex")}`; }
+    if (options.playWithBot) { applyPentadAction(room,actor,{action:"bot"});applyPentadAction(room,actor,{action:"start"}); }
     const inserted = await prisma.$executeRawUnsafe(`INSERT INTO "PentadRoom" ("code", "data") VALUES ($1, $2::jsonb) ON CONFLICT DO NOTHING`, room.code, JSON.stringify(room));
-    if (inserted) return room;
+    if (inserted) return publicPentadRoom(room,actor.id);
   }
   throw new Error("สร้างห้องไม่สำเร็จ กรุณาลองอีกครั้ง");
 }
@@ -363,5 +377,5 @@ export async function listPentadRooms() {
   await ensureSchema();
   await prisma.$executeRawUnsafe(`DELETE FROM "PentadRoom" WHERE COALESCE("data"->'seats'->'host'->>'id','') IN ('','pentad-bot') AND COALESCE("data"->'seats'->'challenger'->>'id','') IN ('','pentad-bot')`);
   const rows = await prisma.$queryRawUnsafe<{ data: PentadRoom }[]>(`SELECT "data" FROM "PentadRoom" WHERE "updatedAt" > NOW() - INTERVAL '2 hours' ORDER BY "updatedAt" DESC LIMIT 80`);
-  return rows.map(({ data }) => ({ code: data.code, phase: data.phase, host: data.seats.host?.name || "PLAYER", challenger: data.seats.challenger?.name || "", spectators: data.spectators.length }));
+  return rows.filter(({data})=>data.access !== "private").map(({ data }) => ({ code: data.code, phase: data.phase, host: data.seats.host?.name || "PLAYER", challenger: data.seats.challenger?.name || "", spectators: data.spectators.length }));
 }

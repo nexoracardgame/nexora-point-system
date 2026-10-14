@@ -96,6 +96,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const busyRef = useRef(false);
   const loadGeneration = useRef(0);
   const [error, setError] = useState("");
+  const [joinPassword,setJoinPassword]=useState("");
   const [now, setNow] = useState(Date.now());
   const [mounted, setMounted] = useState(false);
   const [deck, setDeck] = useState<PentadDeck>(emptyPentadDeck);
@@ -245,16 +246,17 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const pendingChoice = room?.choices.find(choice => !choice.value);
   const choiceKey = pendingChoice ? `${room?.code}:${room?.epoch}:${room?.choices.indexOf(pendingChoice)}:${pendingChoice.sourceCardNo || pendingChoice.cardNo}` : "";
   useEffect(() => setSelectedTarget(pendingChoice?.options.length === 1 ? pendingChoice.options[0] : ""), [choiceKey]);
-  const panelStyle = { "--pentad-arena": `url('${arena.image}')` } as CSSProperties;
+  const panelStyle = { "--pentad-arena": `url('${room?.phase === "waiting" || !room ? "/images/triad/nexora-command-original.webp" : arena.image}')` } as CSSProperties;
 
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><main className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
     <header className={styles.header}>
-      <Link href="/battle/triad-dominion" className={styles.brand}><small><Swords size={12} /> BATTLE ROOM</small>อำนาจห้าผนึก</Link>
+      <div className={styles.brand}><img className={styles.logo} src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div><small><Swords size={12} /> BATTLE ROOM</small>อำนาจห้าผนึก</div></div>
       {!room && <Link href="/battle/triad-dominion" className={styles.backLobby}>กลับหน้า PLAY</Link>}
       {room && <span className={styles.roomCode}>ห้อง {room.code}</span>}
       <div className={styles.headerActions}>{busy && <Loader2 className={styles.spin} aria-label="กำลังส่งคำสั่ง" />}{room && <><span><Clock3 size={16} /> {countdown(room.deadline - now)}</span><button title="ออกจากห้อง" aria-label="ออกจากห้อง" onClick={() => { busyRef.current=false;setBusy(false);void act("leave",{},true); }}><LogOut /></button></>}</div>
     </header>
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
+    {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}
     {!room ? <section className={styles.entering}>{entering ? <><Loader2 className={styles.spin} /><strong>กำลังเข้าสนาม</strong></> : <Link href="/battle/triad-dominion" className={styles.backLobby}>กลับหน้า PLAY</Link>}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
       <h1>อำนาจห้าผนึก</h1><div className={styles.versus}>{(["host", "challenger"] as const).map(player => <div key={player} className={styles.seat}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={room.seats[player]?.image || "/avatar.png"} alt="" /><strong>{room.seats[player]?.name || "รอผู้ท้าชิง"}</strong></div>)}</div>
       <span className={styles.vs}>VS</span><div className={styles.waitingActions}>{side === "host" && <><button disabled={busy || Boolean(room.seats.challenger)} onClick={() => void act("bot")}><Bot /> เพิ่มบอท</button><button className={styles.primary} disabled={busy || !room.seats.challenger} onClick={() => void act("start")}><Swords /> เริ่มเกม</button></>}<span><Eye size={18} /> ผู้ชม {room.spectators.length}/10</span></div>

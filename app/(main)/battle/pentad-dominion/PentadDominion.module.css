@@ -218,7 +218,25 @@
 .phaseHud { width:min(560px,88%); margin:0 auto 12px; flex-shrink:0; display:grid; gap:6px; }
 .phaseMeta { padding:6px 12px; border:1px solid #fef3c724; border-radius:6px; background:#16333c66; color:#edf5f8; text-shadow:0 1px 3px #000b; text-align:center; font-size:12px; font-weight:700; }
 .header { background:#06090980; }
+.brand { display:flex; align-items:center; gap:12px; }
+.logo { width:100px; height:42px; object-fit:contain; }
+.passwordPanel { position:absolute; z-index:40; top:50%; left:50%; transform:translate(-50%,-50%); background:#0c1319; border:1px solid #84acb94d; border-radius:8px; padding:24px; display:grid; gap:16px; }
+.passwordPanel input { display:block; width:100%; padding:10px; background:#ffffff0c; border:1px solid #ffffff30; }
+.passwordPanel button { padding:12px; }
+.choicePanel { width:min(94%,780px); padding:24px; border:1px solid #84acb94d; border-radius:8px; background:#0c1319; box-shadow:0 24px 90px #0009; }
+.choicePanel h2 { font-size:24px; line-height:1.3; }
+.choicePanel p { font-size:14px; line-height:1.6; max-height:88px; overflow:auto; }
+.choicePanel > strong { display:inline-flex; align-items:center; gap:8px; font-size:18px; font-variant-numeric:tabular-nums; color:#f8d36e; }
+.choiceCards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:20px; }
+.choiceCards:has(> div:only-child) { grid-template-columns:minmax(0,360px); justify-content:center; }
+.choiceCards > div { border:1px solid #ffffff22; border-radius:8px; padding:14px; background:#ffffff04; }
+.choiceCards > div[data-selected="true"] { border-color:#79e6c8; background:#79e6c80d; box-shadow:inset 0 0 0 1px #79e6c8,0 0 20px #79e6c815; filter:none; }
+.choiceCards > div span { text-align:center; font-size:15px; font-weight:700; }
+.choiceCards .card { width:min(190px,28vh); height:auto; }
+.choicePanel > .primary { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; height:48px; margin-top:16px; border:0 !important; border-radius:6px; background:#7ee4d7 !important; color:#071513 !important; }
+.choicePanel > .primary:disabled { background:#ffffff12 !important; color:#a3b3bc !important; }
 .brand { font-family:inherit; font-size:24px; }
 .brand small { display:flex; align-items:center; gap:6px; font-size:10px; font-weight:900; color:#edd7a5; margin-bottom:4px; }
 .elementClash h2,.elementClash p,.elementClash strong,.elementClash span,.stageDetail { background:transparent; border:0; text-shadow:0 2px 4px #000,0 0 12px #000; }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .brand { font-size:16px; } .brand small { font-size:8px; margin-bottom:1px; } .phaseHud { width:52%; margin-bottom:4px; gap:3px; } .phaseMeta { font-size:10px; padding:3px 6px; } }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .logo { width:66px; height:28px; } .brand { gap:6px; } .choicePanel { padding:12px; } .choicePanel h2 { font-size:18px; } .choicePanel p { max-height:36px; font-size:12px; } .choiceCards { gap:10px; margin-top:8px; } .choiceCards > div { padding:10px; } .choiceCards .card { width:80px; height:auto; } .choicePanel > .primary { height:38px; margin-top:8px; } }

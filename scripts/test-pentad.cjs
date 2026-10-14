@@ -138,8 +138,8 @@ for(const metric of ['attack','support']) {
 }
 room=store.newPentadRoom('333333',host,now);room.deckSource='random';action(room,rival,'join');action(room,host,'start');
 assert.deepEqual(room.decks.host,room.decks.challenger,'Random mode starts with empty selectable decks for both players');
-for(const group of ['monsters','hand','reserve'])assert.equal(room.pools[group].length,20,'Random mode offers twenty options per group');
-assert.equal(new Set([...room.pools.monsters,...room.pools.hand,...room.pools.reserve]).size,60);
+for(const group of ['monsters','hand','reserve'])assert.equal(room.pools[group].length,30,'Random mode offers thirty options per group');
+assert.equal(new Set([...room.pools.monsters,...room.pools.hand,...room.pools.reserve]).size,90);
 const poolDeck=rules.completePentadDeck(rules.emptyPentadDeck(),Math.random,room.pools);assert.equal(new Set([...poolDeck.monsters,...poolDeck.hand,...poolDeck.reserve]).size,30);action(room,host,'deck',{deck:poolDeck});
 assert.ok(rules.validatePentadDeck({...poolDeck,hand:[poolDeck.hand[0],poolDeck.hand[0]]},true).length>0,'Only one copy per skill is permitted');
 room=roomStart();room.phase='target';room.board={host:[low.cardNo],challenger:[invalid.cardNo]};room.turn=4;room.picks={host:'226',challenger:'004'};room.choices=[{side:'host',cardNo:'226',options:['player-top'],value:'',deadline:now+30000}];
@@ -190,3 +190,9 @@ const self229=triad.resolveTriadTurn({turn:2,player:{top:nonEarth.cardNo,left:'2
 const safeEarth=triad.resolveTriadTurn({turn:2,player:{top:nonEarth.cardNo,left:'229'},opponent:{top:earth.cardNo},skillTargets:{player:{'229':'bot-top'}}});assert.equal(safeEarth.opponentTotal,earth.attack);
 for(let i=0;i<100;i++){const pools=rules.makePentadPools();const full=rules.completePentadDeck(rules.emptyPentadDeck(),Math.random,pools);const partial={monsters:full.monsters.slice(0,2),hand:full.hand.slice(0,8),reserve:full.reserve.slice(0,4)};const filled=rules.completePentadDeck(partial,Math.random,pools);assert.deepEqual(rules.validatePentadDeck(filled),[]);for(const group of ['monsters','hand','reserve'])assert.deepEqual(filled[group].slice(0,partial[group].length),partial[group]);}
 console.log('229 own/opposing target and 100 unique random-pool deck completions passed');
+const crypto=require('node:crypto');
+const privateRoom=store.newPentadRoom('444444',host);privateRoom.access='private';privateRoom.passwordHash='qa:'+crypto.scryptSync('nexora','qa',32).toString('hex');
+assert.throws(()=>store.applyPentadAction(privateRoom,rival,{action:'join',password:'wrong'}),/รหัสผ่าน/);
+store.applyPentadAction(privateRoom,rival,{action:'join',password:'nexora'});assert.equal(privateRoom.seats.challenger.id,rival.id);
+assert.equal(store.publicPentadRoom(privateRoom,rival.id).passwordHash,undefined,'Password hash never crosses the API boundary');
+console.log('Pentad private-room password validation and secret redaction passed');

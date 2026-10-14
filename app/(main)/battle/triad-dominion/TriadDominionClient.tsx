@@ -3670,13 +3670,10 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   participant: RoomParticipant; rankProfiles: Record<string, TriadRankProfile>; leaderboard: TriadRankProfile[]; rooms: TriadRoom[];
   roomAccess: RoomAccess; setRoomAccess: (value: RoomAccess) => void; roomPassword: string; setRoomPassword: (value: string) => void;
   joinCode: string; setJoinCode: (value: string) => void; joiningRoomCode: string; lobbyMessage: string;
-  onCreate: () => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
+  onCreate: (format: "triad" | "pentad") => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
   const [format, setFormat] = useState<"triad" | "pentad">("triad");
-  const [deckSource, setDeckSource] = useState<"all" | "random">("all");
-  const [creatingPentad, setCreatingPentad] = useState(false);
-  const [createError, setCreateError] = useState("");
   const [pentadRooms, setPentadRooms] = useState<{ code: string; host: string; phase: string }[]>([]);
   useEffect(() => {
     if (panel !== "join" || format !== "pentad") return;
@@ -3690,16 +3687,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
     return () => {controller.abort();clearTimeout(timer);};
   }, [panel, format]);
   const createRoom = async () => {
-    if (format === "triad") { onCreate(); return; }
-    if (creatingPentad) return;
-    setCreatingPentad(true); setCreateError("");
-    try {
-      const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", deckSource }) });
-      const data = await response.json();
-      if (!response.ok || !data.room?.code) throw new Error(data.error || "สร้างสนามไม่สำเร็จ");
-      onNavigate(`/battle/pentad-dominion?room=${data.room.code}`);
-    } catch (error) { setCreateError(error instanceof Error ? error.message : "เชื่อมต่อไม่สำเร็จ"); }
-    finally { setCreatingPentad(false); }
+    onCreate(format);
   };
   const artRef = useRef<HTMLDivElement>(null);
   const pointerFrame = useRef(0);
@@ -3719,7 +3707,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       pointerFrame.current = requestAnimationFrame(() => { artRef.current?.style.setProperty("--command-x", `${x}px`); artRef.current?.style.setProperty("--command-y", `${y}px`); });
     }} onPointerLeave={() => { cancelAnimationFrame(pointerFrame.current); artRef.current?.style.setProperty("--command-x", "0px"); artRef.current?.style.setProperty("--command-y", "0px"); }}>
       <NexoraCommandScene /><div className="nexora-command-shade" />
-      <header className="nexora-command-brand"><h1>NEXORA</h1><span>CARD GAME · TRIAD DOMINION</span>
+      <header className="nexora-command-brand"><img className="nexora-official-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
         <div className="nexora-command-profile"><img src={participant.image || "/avatar.png"} alt="" /><div><strong>{participant.name}</strong><small>{profile?.rankName || "BRONZE"} · {profile?.wins || 0} ชัยชนะ</small></div></div>
       </header>
       <div className="nexora-command-status"><span><Users />{rooms.length} ห้อง</span><span><Swords />{rooms.filter(room => room.status === "playing").length} กำลังต่อสู้</span></div>
@@ -3740,12 +3728,11 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
-            {format === "pentad" ? <div className="nexora-command-segment" role="group" aria-label="แหล่งการ์ด">{(["all", "random"] as const).map(value => <button key={value} aria-pressed={deckSource === value} onClick={() => setDeckSource(value)}>{value === "all" ? "ALL IN ONE" : "สุ่มพูล"}</button>)}</div> : <>
+            <>
               <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
               {roomAccess === "private" ? <label>รหัสผ่านห้อง<input value={roomPassword} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label> : null}
-            </>}
-            <button className="nexora-command-primary" onClick={() => void createRoom()} disabled={creatingPentad || (format === "triad" && roomAccess === "private" && roomPassword.trim().length < 4)}>{creatingPentad ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}สร้างสนามประลอง</button>
-            {createError && <div role="alert" className="nexora-command-alert">{createError}</div>}
+            </>
+            <button className="nexora-command-primary" onClick={() => void createRoom()} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้างสนามประลอง</button>
           </> : panel === "join" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
             <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/battle/pentad-dominion?room=${joinCode}`); else onEnter(joinCode); } }}>
@@ -4737,6 +4724,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [roomAccess, setRoomAccess] = useState<RoomAccess>("public");
   const [roomPassword, setRoomPassword] = useState("");
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
+  const [createFormat, setCreateFormat] = useState<"triad" | "pentad">("triad");
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [botChanging, setBotChanging] = useState(false);
   const botChangingRef = useRef(false);
@@ -5779,6 +5767,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setCreatingRoom(true);
     setLobbyMessage("");
     try {
+    if (createFormat === "pentad") {
+      const response=await fetch("/api/pentad-rooms",{method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({action:"create",access,password,deckSource:deckMode === "all" ? "all" : "random",playWithBot:createRoomWithBot})});
+      const data=await response.json();
+      if (!response.ok || !data.room?.code) { setLobbyMessage(data.error || "สร้างห้องไม่สำเร็จ");return; }
+      setCreateModeDialogOpen(false);router.push(`/battle/pentad-dominion?room=${data.room.code}`);return;
+    }
     const result = await postRoomAction({
       action: "create",
       access,
@@ -7640,11 +7634,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 <div className="mt-1 text-3xl font-black text-white">ตั้งกองเลือกก่อนสร้าง</div>
               </div>
               <div className="mt-5 grid gap-3 md:grid-cols-3">
-                {[
+                {(createFormat === "pentad" ? [
+                  {id:"all" as DeckMode,title:"ALL IN ONE",detail:"เลือกมอนสเตอร์ 5 ใบ สกิลบนมือ 15 ใบ และกองเสริม 10 ใบ จากการ์ดทั้งหมด"},
+                  {id:"monster" as DeckMode,title:"สุ่มพูล",detail:"ตัวเลือกมอนสเตอร์ 30 ใบ สกิลบนมือ 30 ใบ และกองเสริม 30 ใบ ใช้พูลเดียวกันทั้งสองฝ่าย"},
+                ] : [
                   { id: "all" as DeckMode, title: "ALL IN ONE", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
                   { id: "monster" as DeckMode, title: "MONSTER", detail: "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้" },
                   { id: "skill" as DeckMode, title: "SKILL", detail: `บังคับเด็ค ${SKILL_MODE_MONSTER_LIMIT} มอนสเตอร์ + ${SKILL_MODE_SKILL_LIMIT} สกิล และให้กติกาตรงตามโหมดสกิล` },
-                ].map((mode) => {
+                ]).map((mode) => {
                   const selected = createRoomMode === mode.id;
                   return (
                     <button
@@ -7724,7 +7721,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         ) : null}
         <NexoraCommandLobby participant={participant} rankProfiles={rankProfiles} leaderboard={leaderboard} rooms={visibleRooms} roomAccess={roomAccess} setRoomAccess={setRoomAccess} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joiningRoomCode={joiningRoomCode} lobbyMessage={lobbyMessage}
-          onCreate={() => { setCreateRoomMode("all"); setCreateModeDialogOpen(true); }}
+          onCreate={(format) => { setCreateFormat(format);setCreateRoomMode("all"); setCreateModeDialogOpen(true); }}
           onEnter={(target) => {
             const room = typeof target === "string" ? rooms.find(room => room.code === target) : target;
             const code = typeof target === "string" ? target : target.code;
@@ -8111,7 +8108,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   }
 
   return (
-    <main className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
+    <main style={{backgroundImage:`linear-gradient(#05070865,#05070865),url('${arena.image}')`,backgroundSize:"cover",backgroundPosition:"center"}} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
       {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
@@ -8183,6 +8180,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       <section className="triad-game-roombar relative z-20 mx-2 mt-2 rounded-2xl border border-white/8 bg-black/30 px-3 py-2.5 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-md sm:mx-3 sm:px-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(230px,0.85fr)_minmax(260px,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-2">
+            <img className="h-10 w-24 shrink-0 object-contain" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
             {currentRoom && isFieldPlayer && !matchDone ? (
               <button
                 type="button"
