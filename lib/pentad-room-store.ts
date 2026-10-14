@@ -4,7 +4,7 @@ import { triadCardByNo, triadCards, triadSkillRuleByNo, triadSkillElementConditi
 import { completePentadDeck, emptyPentadDeck, otherPentadSide, pentadElementRelation, resolvePentadTurn, validatePentadDeck, PENTAD_DECK_MS, PENTAD_TARGET_MS, PENTAD_TURN_MS, type PentadDeck, type PentadResolution, type PentadSide, type PentadTurn } from "./pentad-dominion";
 
 export type PentadParticipant = { id: string; name: string; image: string };
-export type PentadChoice = { side: PentadSide; cardNo: string; options: string[]; value: string; deadline: number };
+export type PentadChoice = { side: PentadSide; cardNo: string; sourceCardNo?: string; kind?: "copy"; options: string[]; value: string; deadline: number };
 export type PentadRound = PentadResolution & { id: number; fight: number; turn: PentadTurn; mains: Record<PentadSide, string>; skills: Record<PentadSide, string>; opener: PentadSide; endsAt: number; finalDuel: boolean };
 export type PentadRoom = {
   code: string; version: number; epoch: number; createdAt: number; updatedAt: number;
@@ -14,6 +14,8 @@ export type PentadRoom = {
   used: Record<PentadSide, string[]>; spent: string[]; board: Record<PentadSide, string[]>;
   picks: Record<PentadSide, string>; boost: Record<PentadSide, string>;
   choices: PentadChoice[]; targets: Record<PentadSide, string>;
+  copiedSkills?: Record<PentadSide, string>;
+  completedBy?: string[];
   score: Record<PentadSide, number>; fight: number; turn: PentadTurn; opener: PentadSide;
   deadline: number; rounds: PentadRound[]; winner: PentadSide | "draw" | ""; finalDuel: boolean;
   notice: string; chat: { id: string; name: string; text: string; at: number }[];
@@ -47,6 +49,7 @@ function finish(room: PentadRoom, winner: PentadRoom["winner"], notice: string) 
 }
 function startSelection(room: PentadRoom, now: number) {
   room.phase = "select"; room.picks = pair(() => ""); room.boost = pair(() => ""); room.targets = pair(() => ""); room.choices = []; room.deadline = now + PENTAD_TURN_MS; room.epoch++;
+  room.copiedSkills = pair(() => ""); room.completedBy = [];
   const empty = sides.filter(side => !pentadAvailable(room, side, room.turn === 1 ? "monster" : "skill").length);
   if (empty.length) finish(room, empty.length === 2 ? "draw" : otherPentadSide(empty[0]), empty.length === 2 ? "ทั้งสองฝ่ายไม่มีการ์ดเหลือ จบเสมอ" : "อีกฝ่ายไม่มีการ์ดเหลือ");
 }
@@ -55,6 +58,12 @@ function targetOptions(room: PentadRoom, side: PentadSide, no: string) {
   if (!rule || no === "265") return [];
   const combined = room.turn === 1 || (room.fight === 3 && room.turn === 4);
   if (!combined && !rule.allowedTurns.includes(room.turn < 4 ? 2 : 3)) return [];
+  if (no === "245") {
+    const opposing = otherPentadSide(side);
+    const field = [...room.board[opposing]];
+    if (room.turn > 1 && room.picks[opposing]) field[room.turn - 1] = room.picks[opposing];
+    return field.flatMap((cardNo, lane) => triadCardByNo.get(cardNo)?.kind === "skill" && cardNo !== "245" ? [`skill:${lane}:${cardNo}`] : []);
+  }
   if (no === "254") return ["draw-skill", "reroll-own", "reroll-opponent"];
   if (no === "232") return ["player-top>bot-top", "bot-top>player-top"];
   if (!/เลือก|choose|target/i.test(rule.text) && !["own-one", "opponent-one", "any-one"].includes(rule.target)) return [];
@@ -74,45 +83,61 @@ function prepareChoices(room: PentadRoom, now: number) {
     const rule = triadSkillRuleByNo.get(skills[side]);
     if (room.turn === 1 && (room.finalDuel || rule?.shape !== "stat" || !rule.effects.length)) return [];
     const options = targetOptions(room, side, skills[side]);
-    return options.length ? [{ side, cardNo: skills[side], options, value: "", deadline: 0 }] : [];
+    return options.length ? [{ side, cardNo: skills[side], ...(skills[side] === "245" ? { kind: "copy" as const } : {}), options, value: "", deadline: 0 }] : [];
   });
   room.phase = "target";
   tickChoices(room, now);
 }
 function tickChoices(room: PentadRoom, now: number) {
-  for (const choice of room.choices) {
+  for (let index = 0; index < room.choices.length; index++) {
+    const choice = room.choices[index];
     if (choice.value) continue;
     if (!choice.deadline) choice.deadline = now + PENTAD_TARGET_MS;
     if (room.seats[choice.side]?.id === PENTAD_BOT_ID || now >= choice.deadline) choice.value = choice.options[0];
     if (!choice.value) { room.deadline = choice.deadline; return; }
-    room.targets[choice.side] = choice.value;
+    settleChoice(room, choice, index);
   }
   resolveRound(room, now);
+}
+function settleChoice(room: PentadRoom, choice: PentadChoice, index: number) {
+  if (choice.kind === "copy") {
+    const cardNo = choice.value.split(":")[2];
+    room.copiedSkills ??= pair(() => ""); room.copiedSkills[choice.side] = cardNo;
+    const options = targetOptions(room, choice.side, cardNo);
+    if (options.length && !room.choices.some(item => item.side === choice.side && item.sourceCardNo === cardNo)) {
+      room.choices.splice(index + 1, 0, { side: choice.side, cardNo: "245", sourceCardNo: cardNo, options, value: "", deadline: 0 });
+    }
+  } else room.targets[choice.side] = choice.value;
 }
 function resolveRound(room: PentadRoom, now: number) {
   const mains = { host: room.board.host[0], challenger: room.board.challenger[0] };
   const skills = activeSkills(room);
   const blessingEvents: PentadResolution["events"] = [];
   for (const side of [room.opener, otherPentadSide(room.opener)]) {
-    if (skills[side] !== "254" || room.turn === 1) continue;
+    const blessingCopy = skills[side] === "245" && room.copiedSkills?.[side] === "254";
+    if ((skills[side] !== "254" && !blessingCopy) || room.turn === 1) continue;
     const action = room.targets[side];
     const kind = action === "draw-skill" ? "skill" : "monster";
     const excluded = new Set([...room.used.host, ...room.used.challenger, ...room.spent, mains.host, mains.challenger, "254"]);
     const no = choose(triadCards.filter(card => card.kind === kind && !excluded.has(card.cardNo)).map(card => card.cardNo));
     if (no) {
-      if (kind === "skill") skills[side] = no;
+      if (kind === "skill") {
+        if (blessingCopy) room.copiedSkills![side] = no;
+        else skills[side] = no;
+      }
       else mains[action === "reroll-opponent" ? otherPentadSide(side) : side] = no;
       room.spent.push(no);
       blessingEvents.push({ side: side === "host" ? "player" : "opponent", cardNo: "254", name: "ขอพรศักดิ์สิทธิ์", type: "stat", text: "", summary: `ขอพรศักดิ์สิทธิ์ สุ่ม No.${no} เฉพาะตานี้` });
     }
   }
-  const result = resolvePentadTurn({ fight: room.fight, turn: room.turn, mains, skills, opener: room.opener, targets: room.targets, finalDuel: room.finalDuel, spent: [...room.used.host, ...room.used.challenger, ...room.spent] });
+  const result = resolvePentadTurn({ fight: room.fight, turn: room.turn, mains, skills, opener: room.opener, targets: room.targets, copiedSkills: room.copiedSkills, finalDuel: room.finalDuel, spent: [...room.used.host, ...room.used.challenger, ...room.spent] });
   for (const no of Object.values(result.effective)) if (!Object.values(mains).includes(no)) room.spent.push(no);
   result.events.unshift(...blessingEvents);
   if (result.winner !== "draw" && !room.finalDuel) room.score[result.winner]++;
-  const duration = result.reason.startsWith("ธาตุ") ? 6000 : 14_000 + result.events.reduce((time, event) => time + Math.max(3500, Math.min(7000, event.summary.length * 35)), 0);
+  const duration = result.reason.startsWith("ธาตุ") ? 5500 : 12_000 + result.events.reduce((time, event) => time + Math.max(3500, Math.min(7000, event.summary.length * 35)), 0);
   const round: PentadRound = { ...result, id: room.rounds.length + 1, fight: room.fight, turn: room.turn, mains, skills, opener: room.opener, endsAt: now + duration, finalDuel: room.finalDuel };
   room.rounds.push(round); room.phase = "result"; room.deadline = round.endsAt; room.epoch++;
+  room.completedBy = [];
 }
 function revealPicks(room: PentadRoom, now: number) {
   for (const side of sides) {
@@ -205,6 +230,12 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     return;
   }
   if (action === "refresh") return;
+  if (action === "complete") {
+    if (room.phase !== "result" || Number(body.roundId) !== room.rounds.at(-1)?.id || !side) return;
+    room.completedBy = [...new Set([...(room.completedBy || []), actor.id])];
+    if (sides.every(player => room.seats[player]?.id === PENTAD_BOT_ID || room.completedBy!.includes(room.seats[player]?.id || ""))) room.deadline = now;
+    return;
+  }
   const player = requireSeat();
   if (Number(body.epoch) !== room.epoch) throw new Error("คำสั่งนี้เป็นของตาก่อนหน้า");
   if (action === "deck" || action === "ready") {
@@ -232,7 +263,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     if (!choice || choice.side !== player) throw new Error("ยังไม่ถึงลำดับเลือกเป้าหมาย");
     const value = String(body.target || "");
     if (!choice.options.includes(value)) throw new Error("เป้าหมายไม่เข้าเงื่อนไข");
-    choice.value = value; room.targets[player] = value; return;
+    choice.value = value; settleChoice(room, choice, room.choices.indexOf(choice)); return;
   }
   throw new Error("ไม่พบคำสั่ง");
 }
@@ -260,6 +291,21 @@ export async function createPentadRoom(actor: PentadParticipant) {
 
 export async function mutatePentadRoom(code: string, actor: PentadParticipant, body?: Record<string, unknown>) {
   await ensureSchema();
+  if (!body) {
+    const rows = await prisma.$queryRawUnsafe<{ data: PentadRoom }[]>(`SELECT "data" FROM "PentadRoom" WHERE "code" = $1`, code);
+    const room = rows[0]?.data;
+    if (!room) throw new Error("ไม่พบห้อง");
+    if (!pentadSeat(room, actor.id) && !room.spectators.some(p => p.id === actor.id)) throw new Error("กรุณาเข้าร่วมห้องก่อน");
+    const now = Date.now();
+    const pending = room.choices.find(choice => !choice.value);
+    const botCanPick = sides.some(side => room.seats[side]?.id === PENTAD_BOT_ID && !room.picks[side] && (room.turn === 1 || side === room.opener || Boolean(room.picks[room.opener])));
+    const needsTick = (room.deadline > 0 && now >= room.deadline) ||
+      (room.phase === "deck" && sides.every(side => room.ready[side])) ||
+      (room.phase === "select" && (botCanPick || sides.every(side => room.picks[side]))) ||
+      (room.phase === "target" && (!pending || !pending.deadline || now >= pending.deadline || room.seats[pending.side]?.id === PENTAD_BOT_ID));
+    // Idle spectator reads never contend with a player's card mutation lock.
+    if (!needsTick) return publicPentadRoom(room, actor.id);
+  }
   // PostgreSQL row locks protect simultaneous commands across separate server instances.
   return prisma.$transaction(async tx => {
     const rows = await tx.$queryRawUnsafe<{ data: PentadRoom }[]>(`SELECT "data" FROM "PentadRoom" WHERE "code" = $1 FOR UPDATE`, code);

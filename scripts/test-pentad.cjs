@@ -96,3 +96,22 @@ for(const no of triad.triadCards.filter(card=>card.kind==='skill'&&card.cardNo!=
   assert.equal(pentad.totals.host,original.playerTotal,'Shared skill '+no+' turn '+turn);assert.equal(pentad.totals.challenger,original.opponentTotal);
 }
 console.log('Pentad: 150 deck completions, all elemental relations, 40 complete games, privacy, stale actions, scores and tie replacement passed');
+// No.245 must offer every opposing skill on this fight's board, not a monster target.
+room=roomStart();room.phase='select';room.turn=3;room.board={host:['021','001'],challenger:['099','005']};room.decks.host={monsters:['021'],hand:['245'],reserve:[]};room.decks.challenger={monsters:['099'],hand:['004'],reserve:[]};room.picks={host:'',challenger:''};room.opener='host';room.deadline=now+120000;
+action(room,host,'pick',{cardNo:'245'});action(room,rival,'pick',{cardNo:'004'});tick(room);
+assert.equal(room.phase,'target');const copyChoice=room.choices.find(choice=>choice.kind==='copy');assert.deepEqual(copyChoice.options,['skill:1:005','skill:2:004']);
+assert.throws(()=>action(room,host,'target',{target:'skill:1:001'}),/เป้าหมาย/);
+action(room,host,'target',{target:'skill:2:004'});tick(room);assert.equal(room.phase,'result');assert.equal(room.copiedSkills.host,'004');
+assert.ok(room.rounds.at(-1).events.some(event=>event.cardNo==='245'&&event.summary.includes('004')));
+const explicit=rules.resolvePentadTurn({fight:1,turn:3,mains:{host:'177',challenger:'099'},skills:{host:'245',challenger:'002'},opener:'host',copiedSkills:{host:'004',challenger:''}});
+assert.equal(explicit.totals.host,triad.triadCardByNo.get('177').attack+3000,'Copying an older skill uses that skill, not the current opponent skill');
+// A copied targeting skill asks for its own legal target after the copy choice.
+room=roomStart();room.phase='select';room.turn=3;room.board={host:['021','001'],challenger:['099','225']};room.decks.host={monsters:['021'],hand:['245'],reserve:[]};room.decks.challenger={monsters:['099'],hand:['004'],reserve:[]};room.deadline=now+120000;
+action(room,host,'pick',{cardNo:'245'});action(room,rival,'pick',{cardNo:'004'});tick(room);action(room,host,'target',{target:'skill:1:225'});tick(room);
+assert.equal(room.phase,'target');assert.equal(room.choices.find(choice=>!choice.value).sourceCardNo,'225');
+const target=room.choices.find(choice=>!choice.value).options[0];action(room,host,'target',{target});tick(room);assert.equal(room.phase,'result');
+room.decks.host.hand.push('003');room.decks.challenger.hand.push('005');
+const last=room.rounds.at(-1);action(room,host,'complete',{roundId:last.id});tick(room);assert.equal(room.phase,'result','One PVP player completing does not cut off their opponent');action(room,rival,'complete',{roundId:last.id});tick(room);assert.equal(room.phase,'select');assert.equal(room.turn,4);assert.equal(room.board.challenger[0],'099','Opponent main remains visible in the next turn');
+console.log('Pentad No.245: all field skills, invalid choices, historical copy, follow-up target, scene completion and persistent main cards passed');
+const flash=rules.resolvePentadTurn({fight:3,turn:4,mains:{host:'177',challenger:'099'},skills:{host:'245',challenger:''},opener:'host',copiedSkills:{host:'265',challenger:''},spent:['021','022']});
+assert.notEqual(flash.effective.challenger,'099');assert.ok(!['021','022'].includes(flash.effective.challenger));assert.equal(flash.attack.challenger,triad.triadCardByNo.get(flash.effective.challenger).attack);assert.equal(flash.support.challenger,triad.triadCardByNo.get(flash.effective.challenger).support,'Copying No.265 uses one consistent replacement for ATK and SUP');

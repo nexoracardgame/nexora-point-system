@@ -10,6 +10,8 @@ import PrefetchLink from "@/components/PrefetchLink";
 import NotificationBell from "@/components/NotificationBell";
 import LiveFloatingPlayer from "@/components/LiveFloatingPlayer";
 import FloatingChatDock from "@/components/FloatingChatDock";
+import { useBattleArenaActive } from "@/lib/battle-ui-state";
+import "@/components/BattleHud.css";
 import { requestGameViewport } from "@/components/BattleAppLauncher";
 import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useLanguage } from "@/lib/i18n";
@@ -265,7 +267,8 @@ export default function MainLayout({
     pathname.startsWith("/market/deals/chat/") ||
     pathname.startsWith("/buy-market/deals/chat/");
   const isBattleRoute = pathname.startsWith("/battle");
-  const isBattleArenaPage = pathname.startsWith("/battle/triad-dominion");
+  const isBattleArenaPage = pathname.startsWith("/battle/triad-dominion") || pathname.startsWith("/battle/pentad-dominion");
+  const battleArenaActive = useBattleArenaActive();
   const hideFloatingChatOnMobile = pathname === "/dm" || isChatRoomPage || isBattleRoute;
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1813,7 +1816,7 @@ export default function MainLayout({
             }`}
           >
             <div
-              className={`${isBattleArenaPage ? "nexora-battle-shell" : ""} ${
+              className={`${isBattleArenaPage ? pathname.startsWith("/battle/pentad-dominion") ? "nexora-pentad-shell" : "nexora-battle-shell" : ""} ${
                 isChatRoomPage
                   ? "h-[var(--app-shell-height)] min-h-0 overflow-hidden border-0 bg-transparent p-0 shadow-none xl:h-[calc(var(--app-shell-height)-var(--app-header-height))]"
                   : isBattleRoute
@@ -1828,9 +1831,9 @@ export default function MainLayout({
       </div>
 
       {!isBattleRoute ? <LiveFloatingPlayer /> : null}
-      <div className={hideFloatingChatOnMobile ? "hidden xl:block" : undefined}>
+      {!battleArenaActive && <div className={hideFloatingChatOnMobile ? "hidden xl:block" : undefined}>
         <FloatingChatDock unreadCount={chatUnreadCount} />
-      </div>
+      </div>}
 
       {/* MOBILE DRAWER */}
       <div

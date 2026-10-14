@@ -1,0 +1,27 @@
+.triad-battle-chat-hud {
+  width:min(440px,28cqw,calc((100cqw - 560px)/2 - 24px));
+  background:rgba(0,0,0,.42);
+}
+.triad-chat-hud-messages { max-height:min(190px,26cqh); font-size:15px; padding:8px 10px; }
+.triad-battle-chat-hud input { font-size:15px; padding:9px 0; }
+.triad-battle-chat-hud button { width:34px; height:34px; }
+.nexora-pentad-shell { height:100dvh; overflow:hidden; overscroll-behavior:none; }
+html:has(.nexora-pentad-shell),body:has(.nexora-pentad-shell) { overflow:hidden; overscroll-behavior:none; }
+.nexora-battle-shell .triad-spectator-waiting-overlay {
+  top:84px !important; inset-inline:0 !important; margin-inline:auto; width:68%;
+  display:grid !important; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:12px;
+}
+@media (max-height:599px), (max-width:900px) and (orientation:portrait) {
+  .triad-battle-chat-hud { width:min(240px,24cqw); bottom:max(1px,env(safe-area-inset-bottom)); }
+  .triad-chat-hud-messages { max-height:72px; font-size:12px; line-height:1.4; padding:4px 6px; }
+  .triad-battle-chat-hud input { font-size:13px; padding:6px 0; }
+  .triad-battle-chat-hud button { width:30px; height:30px; }
+  .nexora-battle-shell .triad-spectator-waiting-overlay { top:76px !important; width:66%; gap:6px; }
+  .triad-spectator-waiting-overlay > div { padding:6px 8px !important; border-radius:4px !important; }
+  .triad-spectator-waiting-overlay > div:first-child > div:nth-child(2) { font-size:12px !important; line-height:1.3; }
+  .triad-spectator-waiting-overlay > div:first-child > div:nth-child(3) { display:none; }
+  .triad-spectator-waiting-overlay > div:last-child > div:last-child { font-size:22px !important; }
+}
+@media (max-width:700px) and (orientation:landscape), (max-width:900px) and (orientation:portrait) {
+  .triad-battle-chat-hud { width:min(220px,20cqw); }
+}

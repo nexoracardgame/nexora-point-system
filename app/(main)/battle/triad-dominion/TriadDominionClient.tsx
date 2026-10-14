@@ -56,6 +56,7 @@ import {
   type TriadTurnResult,
 } from "@/lib/triad-dominion";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { useBattleArenaActivity } from "@/lib/battle-ui-state";
 import {
   TRIAD_ROOM_REALTIME_CHANNEL,
   TRIAD_ROOM_REALTIME_EVENT,
@@ -4874,6 +4875,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (!room) return;
     startedBattleRoomKeysRef.current.add(roomBattleStartKey(room));
   };
+  useBattleArenaActivity(Boolean(currentRoom) || phase !== "lobby");
   const hasBattleStartedForRoom = (room: TriadRoom | null | undefined) =>
     Boolean(room && startedBattleRoomKeysRef.current.has(roomBattleStartKey(room)));
   const deckBattleStartKeyForRoom = (room: TriadRoom) =>

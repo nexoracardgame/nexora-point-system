@@ -109,6 +109,7 @@ export type TriadTurnInput = {
   skippedSkillCardNos?: string[];
   excludedRandomMonsterNos?: string[];
   randomMonsterSeed?: string;
+  copiedSkillCardNos?: Partial<Record<"player" | "opponent", string>>;
   skillTargets?: Partial<Record<"player" | "opponent", Partial<Record<string, "player-top" | "bot-top" | string>>>>;
 };
 
@@ -2345,9 +2346,12 @@ function getEnergyReversalRule(triangle: TriadTriangle, turn: TriadTurn, skipped
 function getOpposingSkillRuleForEnergyReversal(
   triangle: TriadTriangle,
   turn: TriadTurn,
-  skippedSkillCardNos: Set<string> = new Set()
+  skippedSkillCardNos: Set<string> = new Set(),
+  selectedCardNo?: string
 ) {
-  const rule = getLaneSkillRule(triangle, turn, skippedSkillCardNos);
+  const rule = selectedCardNo !== undefined
+    ? triadSkillRuleByNo.get(normalizeCardNo(selectedCardNo))
+    : getLaneSkillRule(triangle, turn, skippedSkillCardNos);
   if (!rule || rule.cardNo === "245") return undefined;
   return rule;
 }
@@ -2363,7 +2367,9 @@ function applyEnergyReversal(
   skippedSkillCardNos: Set<string>,
   cancelledSkillCardNos: Set<string>,
   selectedTarget = "",
-  boardState?: TriadEffectiveBoardState
+  boardState?: TriadEffectiveBoardState,
+  selectedCopyCardNo?: string,
+  randomMonsterOptions?: { excluded: string[]; seed?: string }
 ) {
   const unresolved: TriadSkillRule[] = [];
   const events: TriadSkillEvent[] = [];
@@ -2371,7 +2377,7 @@ function applyEnergyReversal(
   if (!reversalRule) return { unresolved, events };
   if (cancelledSkillCardNos.has(reversalRule.cardNo)) return { unresolved, events };
 
-  const copiedRule = getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn);
+  const copiedRule = getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn, new Set(), selectedCopyCardNo);
   if (!copiedRule) {
     events.push({
       cardNo: reversalRule.cardNo,
@@ -2396,6 +2402,25 @@ function applyEnergyReversal(
     targetLabel: `No.${copiedRule.cardNo}`,
   });
   ownScore.breakdown.push(`No.${reversalRule.cardNo} ${reversalRule.name}: คัดลอก No.${copiedRule.cardNo} ${copiedRule.name}`);
+
+  if (copiedRule.cardNo === "265" && boardState) {
+    const targetSide = side === "player" ? "opponent" : "player";
+    const oldTop = cloneTopContribution(opponentScore);
+    const replacement = pickFlashZoomMonster(
+      `${randomMonsterOptions?.seed || "energy-reversal"}:${side}:${boardState.player.top}:${boardState.opponent.top}`,
+      [boardState.player.top, boardState.opponent.top, ...(randomMonsterOptions?.excluded || [])]
+    );
+    if (oldTop && replacement) {
+      const value = opponentScore.metric === "total" ? replacement.attack + replacement.support : replacement[opponentScore.metric];
+      const next = { card: replacement, lane: "top" as TriadLane, value };
+      opponentScore.total += value - oldTop.value;
+      replaceTopContribution(opponentScore, next);
+      opponentScore.fieldContributions = opponentScore.fieldContributions.map(item => item.lane === "top" ? next : item);
+      boardState[targetSide].top = replacement.cardNo;
+      events.push({ cardNo: "265", name: copiedRule.name, side, type: copiedRule.shape, text: copiedRule.text, summary: `ใช้สกิลที่คัดลอก เปลี่ยนมอนสเตอร์หลักฝ่ายตรงข้าม No.${oldTop.card.cardNo} เป็น No.${replacement.cardNo} เฉพาะตานี้`, targetLabel: "มอนสเตอร์หลักฝ่ายตรงข้าม" });
+    }
+    return { unresolved, events };
+  }
 
   const copied = applySkill(
     opposingTriangle,
@@ -2605,13 +2630,14 @@ function collectEnergyReversalLocks(
   opponent: TriadTriangle,
   turn: TriadTurn,
   prioritySide: "player" | "opponent",
-  skippedSkillCardNos: Set<string> = new Set()
+  skippedSkillCardNos: Set<string> = new Set(),
+  copiedSkillCardNos?: Partial<Record<"player" | "opponent", string>>
 ) {
   const lockedSkillCardNos = new Set<string>();
   const priorityTriangle = prioritySide === "player" ? player : opponent;
   const opposingTriangle = prioritySide === "player" ? opponent : player;
   const reversalRule = getEnergyReversalRule(priorityTriangle, turn, skippedSkillCardNos);
-  const copiedRule = reversalRule ? getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn) : undefined;
+  const copiedRule = reversalRule ? getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn, new Set(), copiedSkillCardNos?.[prioritySide]) : undefined;
   if (copiedRule) lockedSkillCardNos.add(copiedRule.cardNo);
   return { lockedSkillCardNos };
 }
@@ -2620,7 +2646,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const prioritySide = input.prioritySide || "player";
   const skippedSkillCardNos = new Set((input.skippedSkillCardNos || []).map((cardNo) => normalizeCardNo(cardNo)));
   const skillCancels = collectSkillCancels(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos);
-  const energyReversalLocks = collectEnergyReversalLocks(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos);
+  const energyReversalLocks = collectEnergyReversalLocks(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos, input.copiedSkillCardNos);
   const cancelledOrLockedSkillCardNos = new Set([
     ...skillCancels.cancelledSkillCardNos,
     ...energyReversalLocks.lockedSkillCardNos,
@@ -2695,7 +2721,9 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
       skippedSkillCardNos,
       cancelledOrLockedSkillCardNos,
       selectedTarget,
-      boardState
+      boardState,
+      input.copiedSkillCardNos?.[side],
+      { excluded: input.excludedRandomMonsterNos || [], seed: input.randomMonsterSeed }
     );
     return {
       unresolved: [...base.unresolved, ...copied.unresolved],

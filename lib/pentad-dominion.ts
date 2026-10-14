@@ -87,7 +87,7 @@ export function comparePentadPower(attack: Record<PentadSide, number>, support: 
 
 export function resolvePentadTurn(input: {
   fight: number; turn: PentadTurn; mains: Record<PentadSide, string>; skills: Record<PentadSide, string>;
-  opener: PentadSide; targets?: Record<PentadSide, string>; finalDuel?: boolean; spent?: string[];
+  opener: PentadSide; targets?: Record<PentadSide, string>; copiedSkills?: Record<PentadSide, string>; finalDuel?: boolean; spent?: string[];
 }): PentadResolution {
   const host = triadCardByNo.get(input.mains.host);
   const challenger = triadCardByNo.get(input.mains.challenger);
@@ -112,6 +112,7 @@ export function resolvePentadTurn(input: {
     player: { top: host.cardNo, [turn === 2 ? "left" : "right"]: skills.host },
     opponent: { top: challenger.cardNo, [turn === 2 ? "left" : "right"]: skills.challenger },
     skillTargets: targets,
+    copiedSkillCardNos: input.copiedSkills ? { player: input.copiedSkills.host, opponent: input.copiedSkills.challenger } : undefined,
     excludedRandomMonsterNos: input.spent,
     randomMonsterSeed: `pentad:${input.fight}:${input.turn}:${host.cardNo}:${challenger.cardNo}:${skills.host}:${skills.challenger}:${(input.spent || []).join(",")}`,
   });

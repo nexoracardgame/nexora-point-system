@@ -42,7 +42,16 @@ try{
     room=await store.mutatePentadRoom(code,host);
   }
   assert.equal(room.phase,'finished','Online match advances through all phases');assert.ok(room.score.host+room.score.challenger<=15);
+  const fixture=store.newPentadRoom(code,host);fixture.seats.challenger=challenger;fixture.spectators=[spectator];fixture.phase='select';fixture.turn=3;fixture.epoch=100;fixture.version=room.version+1;fixture.board={host:['177','001'],challenger:['099','225']};fixture.decks.host={monsters:['177'],hand:['245','003'],reserve:[]};fixture.decks.challenger={monsters:['099'],hand:['004','005'],reserve:[]};fixture.deadline=Date.now()+120000;
+  await prisma.$executeRawUnsafe('UPDATE "PentadRoom" SET "data"=$2::jsonb WHERE "code"=$1 AND "data"->\'seats\'->\'host\'->>\'id\'=$3',code,JSON.stringify(fixture),host.id);
+  await store.mutatePentadRoom(code,host,{action:'pick',epoch:100,cardNo:'245'});await store.mutatePentadRoom(code,challenger,{action:'pick',epoch:100,cardNo:'004'});
+  room=await store.mutatePentadRoom(code,host);assert.equal(room.phase,'target');assert.deepEqual(room.choices.find(choice=>choice.kind==='copy').options,['skill:1:225','skill:2:004']);
+  await assert.rejects(()=>store.mutatePentadRoom(code,host,{action:'target',epoch:100,target:'skill:1:001'}),/เป้าหมาย/);
+  room=await store.mutatePentadRoom(code,host,{action:'target',epoch:100,target:'skill:1:225'});assert.equal(room.phase,'target');assert.equal(room.choices.find(choice=>!choice.value).sourceCardNo,'225');
+  room=await store.mutatePentadRoom(code,host,{action:'target',epoch:100,target:'player-top'});assert.equal(room.phase,'result');assert.equal(room.copiedSkills.host,'225');
+  const roundId=room.rounds.at(-1).id;await store.mutatePentadRoom(code,host,{action:'complete',roundId});room=await store.mutatePentadRoom(code,challenger,{action:'complete',roundId});assert.equal(room.phase,'select');assert.equal(room.turn,4);assert.equal(room.board.challenger[0],'099');
   console.log('Live PostgreSQL Pentad: create, simultaneous ready/picks, row-lock safety, reconnect, viewer privacy, authorization and idle reads passed');
+  console.log('Live PostgreSQL No.245: field-skill choice, invalid choice rollback, follow-up target, both-player completion and preserved main cards passed');
 }finally{
   if(code)await prisma.$executeRawUnsafe('DELETE FROM "PentadRoom" WHERE "code"=$1 AND "data"->\'seats\'->\'host\'->>\'id\'=$2',code,host.id);
   await prisma.$disconnect();

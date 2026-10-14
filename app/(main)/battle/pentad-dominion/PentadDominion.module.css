@@ -144,4 +144,42 @@
 @media (max-width:700px) and (orientation:landscape), (max-height:700px) and (orientation:portrait) { .waitingActions { align-self:flex-end; margin-right:12px; margin-left:200px; gap:6px; font-size:11px; } .waitingActions button { font-size:11px; padding:6px 8px; gap:5px; } .waitingActions svg { width:15px; height:15px; } }
 @media (max-height:600px) and (orientation:landscape) { .formation { --card-height:17vh; } }
 @media (max-width:1000px) and (orientation:portrait) { .formation { --card-height:17vw; } }
+.entering { flex:1; display:flex; align-items:center; justify-content:center; gap:12px; background:#060b0d url('/images/triad/nexora-command-original.webp') center/cover; }
+.entering strong { padding:10px 20px; background:#03080dda; border-radius:4px; }
+.placed img { filter:drop-shadow(0 0 8px #85eacb); }
+.chat { width:420px; max-height:250px; font-size:15px; background:#030809b8; }
+.messages { height:168px; line-height:1.5; }
+.chat input { font-size:15px; padding:9px; }
+.hand { padding-left:450px; }
+.deckTray { padding-bottom:250px; }
+.choiceCards { flex-wrap:wrap; }
+.choiceCards .card { height:min(28vh,235px); }
+.battleStatus { width:24%; max-width:320px; }
+.scoreboard > span { width:30%; max-width:30%; white-space:nowrap; overflow:hidden; }
+.scoreboard b { margin-left:auto; }
+.playerName { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hudPlane:not([data-pentad-phase="waiting"]):not([data-pentad-phase="deck"]) .messages { height:64px; }
+.hudPlane[data-cinematic-chat="true"] .chat { width:min(420px,calc((100vw - 1000px)/2 + 140px)); }
+.hudPlane[data-cinematic-chat="true"] .messages { height:168px; }
+.error { top:auto; bottom:175px; }
+.waitingActions { align-self:flex-end; margin-left:450px; margin-right:24px; }
+@media (min-width:2000px) { .chat { width:500px; font-size:18px; max-height:290px; } .messages { height:205px; } .hand { padding-left:530px; } .deckTray { padding-bottom:290px; } .hudPlane:not([data-pentad-phase="waiting"]):not([data-pentad-phase="deck"]) .messages { height:112px; } .hudPlane[data-cinematic-chat="true"] .chat { width:500px; } .hudPlane[data-cinematic-chat="true"] .messages { height:205px; } }
+@media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) {
+  .chat { width:240px; max-height:134px; font-size:12px; }
+  .messages { height:76px; padding:4px 7px; }
+  .chat input { font-size:12px; padding:5px; }
+  .chatToggle { font-size:12px; padding:4px 7px; }
+  .hudPlane:not([data-pentad-phase="waiting"]):not([data-pentad-phase="deck"]) .messages { height:28px; }
+  .hudPlane[data-cinematic-chat="true"] .chat { width:240px; }
+  .hudPlane[data-cinematic-chat="true"] .messages { height:28px; }
+  .hand { padding-left:260px; }
+  .deckTray { padding-bottom:140px; }
+  .choiceCards .card { height:min(28vw,28vh); }
+  .error { bottom:105px; top:auto; }
+  .battleStatus { width:26%; padding-inline:5px; }
+  .waitingActions { align-self:flex-end; margin-left:260px; margin-right:10px; gap:6px; font-size:11px; }
+  .waitingActions button { font-size:11px; padding:6px 8px; gap:5px; }
+  .waitingActions svg { width:15px; height:15px; }
+}
+@media (orientation:portrait) and (max-width:1000px) { .choiceCards .card { height:28vw; } }
 @media (prefers-reduced-motion:reduce) { .card { transition:none; } .spin,.elementClash .card { animation:none; } }
