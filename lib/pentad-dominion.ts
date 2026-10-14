@@ -111,7 +111,7 @@ export function resolvePentadTurn(input: {
   };
   const run = (turn: 2 | 3) => resolveTriadTurn({
     turn, prioritySide: input.opener === "host" ? "player" : "opponent",
-    combinedStatConditions: input.turn === 1 || (input.fight === 3 && input.turn === 4),
+    combinedStatConditions: input.turn === 1,
     player: { top: host.cardNo, [turn === 2 ? "left" : "right"]: skills.host },
     opponent: { top: challenger.cardNo, [turn === 2 ? "left" : "right"]: skills.challenger },
     skillTargets: targets,
@@ -119,7 +119,7 @@ export function resolvePentadTurn(input: {
     excludedRandomMonsterNos: input.spent,
     randomMonsterSeed: `pentad:${input.fight}:${input.turn}:${host.cardNo}:${challenger.cardNo}:${skills.host}:${skills.challenger}:${(input.spent || []).join(",")}`,
   });
-  const metric = input.turn === 2 || input.turn === 3 ? "attack" : input.turn === 1 || (input.fight === 3 && input.turn === 4) ? "total" : "support";
+  const metric = input.turn === 2 || input.turn === 3 ? "attack" : input.turn === 1 ? "total" : "support";
   const atk = metric !== "support" ? run(2) : null;
   const sup = metric !== "attack" ? run(3) : null;
   const attack = atk ? { host: atk.playerTotal, challenger: atk.opponentTotal } : basic.attack;

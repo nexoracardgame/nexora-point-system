@@ -57,7 +57,7 @@ function startSelection(room: PentadRoom, now: number) {
 function targetOptions(room: PentadRoom, side: PentadSide, no: string) {
   const rule = triadSkillRuleByNo.get(no);
   if (!rule || no === "265") return [];
-  const combined = room.turn === 1 || (room.fight === 3 && room.turn === 4);
+  const combined = room.turn === 1;
   if (!combined && !rule.allowedTurns.includes(room.turn < 4 ? 2 : 3)) return [];
   if (no === "245") {
     const opposing = otherPentadSide(side);

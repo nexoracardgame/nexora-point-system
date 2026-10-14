@@ -114,7 +114,7 @@ room.decks.host.hand.push('003');room.decks.challenger.hand.push('005');
 const last=room.rounds.at(-1);action(room,host,'complete',{roundId:last.id});tick(room);assert.equal(room.phase,'result','One PVP player completing does not cut off their opponent');action(room,rival,'complete',{roundId:last.id});tick(room);assert.equal(room.phase,'select');assert.equal(room.turn,4);assert.equal(room.board.challenger[0],'099','Opponent main remains visible in the next turn');
 console.log('Pentad No.245: all field skills, invalid choices, historical copy, follow-up target, scene completion and persistent main cards passed');
 const flash=rules.resolvePentadTurn({fight:3,turn:4,mains:{host:'177',challenger:'099'},skills:{host:'245',challenger:''},opener:'host',copiedSkills:{host:'265',challenger:''},spent:['021','022']});
-assert.notEqual(flash.effective.challenger,'099');assert.ok(!['021','022'].includes(flash.effective.challenger));assert.equal(flash.attack.challenger,triad.triadCardByNo.get(flash.effective.challenger).attack);assert.equal(flash.support.challenger,triad.triadCardByNo.get(flash.effective.challenger).support,'Copying No.265 uses one consistent replacement for ATK and SUP');
+assert.notEqual(flash.effective.challenger,'099');assert.ok(!['021','022'].includes(flash.effective.challenger));assert.equal(flash.support.challenger,triad.triadCardByNo.get(flash.effective.challenger).support,'Copying No.265 applies the replacement SUPPORT on turn four');assert.equal(flash.totals.challenger,flash.support.challenger,'Fight three turn four is SUPPORT, never combined');
 const low=triad.triadCards.find(card=>card.kind==='monster'&&card.attack<=3000&&card.support>0);
 const high=triad.triadCards.find(card=>card.kind==='monster'&&card.attack>7000);
 const invalid=triad.triadCards.find(card=>card.kind==='monster'&&card.attack>3000);
@@ -147,3 +147,9 @@ assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,3).join(',
 assert.equal(ui.getPlayableSkillTargetIds({cardNo:'227'},'player',a,b,1).join(','),'bot-top');
 assert.equal(ui.getPlayableSkillTargetIds({cardNo:'226'},'player',{...a,attack:3000},b,3).join(','),'player-top');
 console.log('Legacy target UI: exact 3000 boundary and highest relevant ATK/SUP filters passed');
+for(const fight of [1,2,3])for(const turn of [2,3,4,5]) {
+  const result=rules.resolvePentadTurn({fight,turn,mains:{host:'021',challenger:'099'},skills:{host:'',challenger:''},opener:'host'});
+  const metric=turn<4?'attack':'support';
+  assert.equal(result.totals.host,triad.triadCardByNo.get('021')[metric]);assert.equal(result.totals.challenger,triad.triadCardByNo.get('099')[metric]);
+}
+console.log('All three fights: turns 2/3 ATTACK and turns 4/5 SUPPORT passed');
