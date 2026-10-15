@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { playDrawerSound } from "@/lib/play-drawer-audio";
 import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import BattleCardInspector from "@/components/BattleCardInspector";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
@@ -3596,7 +3597,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <button onClick={() => onNavigate("/")}><House />เว็บหลัก</button>
       </nav>
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
-        <button className="nexora-command-mode" onClick={() => setPanel("create")}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
+        <button className="nexora-command-mode" onClick={() => { playDrawerSound(); setPanel("create"); }}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
@@ -3604,7 +3605,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       {panel === "create" && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true" />}
       <img className="nexora-play-drawer-character" data-open={panel === "create"} src="/images/triad/play-drawer-duo.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
       {panel ? <section className={`nexora-command-sheet ${panel === "create" ? "nexora-play-drawer" : ""}`} role="dialog" aria-modal={panel === "create"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
-        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? "สร้างสนามประลอง" : panel === "join" ? "เข้าร่วมสนาม" : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
+        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : panel === "join" ? "เข้าร่วมสนาม" : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
@@ -3612,7 +3613,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
               <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
               {roomAccess === "private" ? <label>รหัสผ่านห้อง<input value={roomPassword} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label> : null}
             </>
-            <button className="nexora-command-primary" onClick={() => void createRoom()} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้างสนามประลอง</button>
+            <button className="nexora-command-primary" aria-label="สร้างสนามประลอง" onClick={() => void createRoom()} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้าง</button>
           </> : panel === "join" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
             <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/battle/pentad-dominion?room=${joinCode}`); else onEnter(joinCode); } }}>
