@@ -220,7 +220,7 @@
 /* PLAY reference: narrow angular panel with character overlapping its edge. */
 .nexora-join-drawer .nexora-command-segment[aria-label="รูปแบบห้อง"] { flex-direction:column; margin:0 0 18px 26%; gap:20px; }
 .nexora-join-drawer form { margin-left:26%; }
-.nexora-join-drawer form label { margin:0 0 10px; }
+.nexora-join-drawer form label { margin:0 0 10px auto; width:78%; text-align:right; }
 .nexora-join-drawer form input { clip-path:polygon(8% 0,90% 0,100% 100%,0 100%); }
 .nexora-join-drawer form .nexora-command-primary { width:100%; margin:8px 0 14px; font-size:26px; min-height:58px; }
 .nexora-join-drawer .nexora-command-room-list { margin-left:26%; flex:1; min-height:90px; overflow:auto; }
