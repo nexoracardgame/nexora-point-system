@@ -1,0 +1,28 @@
+.nexora-result-plane { position:fixed; inset:0; z-index:99000; display:grid; place-items:center; overflow:hidden; padding:20px; background:#020407b8; backdrop-filter:blur(8px); color:#fff7e7; }
+.nexora-result-window { position:relative; isolation:isolate; width:min(620px,94%); max-height:100%; overflow:auto; padding:28px 40px 24px; border:14px solid transparent; border-image:url('/images/target-ui/main_window_4k.png') 180 stretch; background:linear-gradient(130deg,#17202aee,#06090df5 48%,#17120ced); text-align:center; box-shadow:0 28px 90px #000b; animation:nexora-result-enter 600ms cubic-bezier(.16,1,.3,1) both; scrollbar-width:thin; }
+.nexora-result-window * { box-sizing:border-box; letter-spacing:0; }
+.nexora-result-ornament { display:block; width:260px; max-width:65%; height:70px; object-fit:contain; margin:-18px auto -12px; pointer-events:none; }
+.nexora-result-emblem { position:relative; display:grid; place-items:center; width:92px; height:92px; margin:0 auto 12px; color:#ffe4a0; border:2px solid #e9c37c; background:linear-gradient(145deg,#51402b,#111b25 52%,#322310); clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%); }
+.nexora-result-emblem svg { width:46px; height:46px; filter:drop-shadow(0 0 8px #edc66c80); }
+.nexora-result-season { color:#b8cbd6; font-size:11px; font-weight:700; margin:0 0 8px; }
+.nexora-result-window h2 { font-size:32px; line-height:1.3; margin:0; color:#ffe3a0; text-shadow:0 2px 7px #000; overflow-wrap:anywhere; }
+.nexora-result-score { display:flex; align-items:center; justify-content:center; gap:24px; margin:14px 0; font-size:56px; line-height:1; font-variant-numeric:tabular-nums; }
+.nexora-result-score strong { min-width:64px; color:#fff5dc; }
+.nexora-result-score span { color:#b4c4d1; font-size:28px; }
+.nexora-result-detail { color:#bdc9d2; font-size:15px; line-height:1.6; margin:10px 0 18px; }
+.nexora-result-rank { margin:10px 0; padding:8px; border-block:1px solid #d6bc7655; color:#f5d893; font-size:13px; }
+.nexora-result-exit { display:inline-flex; align-items:center; justify-content:center; gap:10px; width:260px; max-width:100%; min-height:48px; border:1px solid #fff0af; border-radius:2px; color:#17140c; background:linear-gradient(165deg,#fff1b8,#d6ad61 65%,#f2d48d); box-shadow:inset 0 2px 0 #fff8,0 6px 20px #0008; font-size:17px; font-weight:800; cursor:pointer; transition:filter 160ms,transform 160ms; }
+.nexora-result-exit:hover { filter:brightness(1.14); transform:translateY(-2px); }
+.nexora-result-exit:focus-visible { outline:2px solid white; outline-offset:4px; }
+.nexora-result-exit:disabled { opacity:.6; cursor:wait; }
+.nexora-result-countdown { display:flex; justify-content:center; align-items:center; gap:6px; margin:16px 0 8px; color:#b9c9d6; font-size:12px; }
+.nexora-result-countdown b { min-width:18px; color:#ffe5a2; font-size:16px; font-variant-numeric:tabular-nums; }
+.nexora-result-timer { height:3px; width:260px; max-width:100%; margin:auto; background:#c1d8ed20; overflow:hidden; }
+.nexora-result-timer span { display:block; height:100%; background:#e9c681; transform-origin:left; transition:transform 200ms linear; }
+.nexora-result-rays { position:absolute; z-index:-1; inset:0; pointer-events:none; background:linear-gradient(115deg,transparent 25%,#ffe6a217 48%,transparent 65%); background-size:250% 100%; animation:nexora-result-shine 5s ease-in-out infinite; }
+@keyframes nexora-result-enter { from { opacity:0; transform:translateY(24px) scale(.94); } to { opacity:1; transform:none; } }
+@keyframes nexora-result-shine { from { background-position:150% 0; } to { background-position:-100% 0; } }
+@media (max-height:550px), (max-width:900px) and (orientation:portrait) { .nexora-result-plane { padding:10px; } .nexora-result-window { width:min(560px,90%); padding:12px 28px; border-width:10px; } .nexora-result-ornament { display:none; } .nexora-result-emblem { width:48px; height:48px; margin-bottom:6px; } .nexora-result-emblem svg { width:26px; height:26px; } .nexora-result-window h2 { font-size:24px; } .nexora-result-score { font-size:36px; margin:8px 0; } .nexora-result-detail { font-size:12px; margin:6px 0 10px; } .nexora-result-countdown { margin-top:10px; } }
+@media (max-width:1000px),(hover:none) and (pointer:coarse) { .nexora-result-plane { inset:auto; left:calc(var(--game-visual-left,0px) + env(safe-area-inset-left,0px)); top:calc(var(--game-visual-top,0px) + var(--app-safe-top,0px)); width:calc(var(--game-visual-width,100dvw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)); height:calc(var(--game-visual-height,100dvh) - var(--app-safe-top,0px) - env(safe-area-inset-bottom,0px)); } }
+@media (max-width:900px) and (orientation:portrait) { .nexora-result-plane { width:calc(var(--game-visual-height,100dvh) - var(--app-safe-top,0px) - env(safe-area-inset-bottom,0px)); height:calc(var(--game-visual-width,100dvw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)); transform:rotate(90deg) translateY(-100%); transform-origin:top left; } }
+@media (prefers-reduced-motion:reduce) { .nexora-result-window,.nexora-result-rays { animation:none; } .nexora-result-window * { transition:none; } }

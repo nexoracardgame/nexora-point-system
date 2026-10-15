@@ -10,6 +10,9 @@ modules['@/lib/pentad-target-view']=transpile(fs.readFileSync('lib/pentad-target
 modules['./TargetSelectionModal.css']='';
 modules['@/lib/battle-surrender-dialog']='exports.confirmBattleSurrender=async()=>true;exports.confirmBattleLeave=async()=>window.confirmLeave!==false;';
 modules['@/components/BattleForfeitVictory']=transpile(fs.readFileSync('components/BattleForfeitVictory.tsx','utf8'));
+modules['@/components/BattleMatchResult']=modules['./BattleMatchResult']=transpile(fs.readFileSync('components/BattleMatchResult.tsx','utf8'));
+modules['./BattleMatchResult.css']='';
+modules['@/components/BattleVersusIntro']='exports.__esModule=true;exports.default=()=>null;';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
 modules['./BattleSurrenderDialog.css']='';
 modules['next/link']=`const React=require('react');exports.default=({href,children,...props})=>React.createElement('a',{href,...props},children);exports.__esModule=true;`;
@@ -33,7 +36,7 @@ for(const [id,file,prefix] of [['./PentadDominion.module.css','app/(main)/battle
   css+=fs.readFileSync(file,'utf8').replace(/\.([a-zA-Z_][\w-]*)/g,(_,name)=>'.'+prefix+name)+'\n';
   modules[id]=`exports.__esModule=true;exports.default=new Proxy({},{get:(_,name)=>${JSON.stringify(prefix)}+name});`;
 }
-css+=fs.readFileSync('app/globals.css','utf8')+'\n'+fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSync('components/TargetSelectionModal.css','utf8');
+css+=fs.readFileSync('app/globals.css','utf8')+'\n'+fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSync('components/TargetSelectionModal.css','utf8')+'\n'+fs.readFileSync('components/BattleMatchResult.css','utf8');
 const bundle=Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const html=`<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif}button,input,select{font:inherit;color:inherit}button{border:0;background:none}a{color:inherit;text-decoration:none}${css}</style></head><body><div id="root" class="nexora-pentad-shell"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};if(!modules[id])throw Error('Missing module '+id);modules[id](require,m,m.exports);return m.exports;}const React=require('react');function Frame(){const active=require('@/lib/battle-ui-state').useBattleArenaActive();return React.createElement(React.Fragment,null,React.createElement(require('client').default,{userId:'a',initialRoomCode:'123456'}),!active&&React.createElement('div',{'data-global-chat':true},'Chat + Blaze'));}require('react-dom/client').createRoot(document.getElementById('root')).render(React.createElement(Frame));</script></body></html>`;
 const nodeCache={};function load(file){if(nodeCache[file])return nodeCache[file].exports;const module=nodeCache[file]={exports:{}};const localRequire=id=>id==='./prisma'?{prisma:{}}:id==='@/public/cards/card-skill-db.json'?require('../public/cards/card-skill-db.json'):id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id);vm.runInThisContext(`(function(require,module,exports){${transpile(fs.readFileSync(file,'utf8'),file)}\n})`,{filename:file})(localRequire,module,module.exports);return module.exports;}
@@ -45,7 +48,7 @@ function battle(){preparation();room.phase='select';room.epoch=2;room.decks.host
 const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&rect.y+rect.height<=h+1;
 (async()=>{
   fs.mkdirSync('artifacts/pentad-ui',{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});
-  try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('Browser:',e.message);});
   await page.route('https://pentad.test/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname.startsWith('/api/')) {
@@ -127,7 +130,7 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
   assert.deepEqual(errors,[]);console.log('Pentad UI: ordered transfer choice, live chat through shared cinematic, no browser errors passed');
   await page.getByRole('button',{name:'ข้ามอนิเมชั่น'}).click();battle();room.createdAt=Date.now()+100;room.turn=1;const opening=rules.resolvePentadTurn({fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host'});room.phase='result';room.rounds=[{...opening,id:1,fight:1,turn:1,mains:{host:'099',challenger:'177'},skills:{host:'',challenger:'254'},opener:'host',endsAt:Date.now()+40000,finalDuel:false}];room.deadline=room.rounds[0].endsAt;await sync();await page.getByText('ตรวจความสัมพันธ์ธาตุ',{exact:true}).waitFor();await page.getByText('ธาตุเสริมพลัง',{exact:true}).waitFor({timeout:5000});await page.screenshot({path:'artifacts/pentad-ui/element-boost.png'});await page.getByText(/สกิลนี้ไม่ใช่การเพิ่มหรือลดค่าพลัง/).waitFor({timeout:5000});console.log('Pentad UI: select/confirm, failed-request retry, history and staged elemental boost explanations passed');
   battle();room.phase='finished';room.winner='host';await page.reload();await page.waitForSelector('[data-pentad-phase="finished"]');assert.equal(await page.evaluate(()=>window.navigationTarget),undefined,'Players retain their result screen');
-  room.seats.host={...actor,id:'other-host'};room.seats.challenger={...rival,id:'other-rival'};room.spectators=[actor];await page.reload();await page.waitForFunction(()=>window.navigationTarget==='/battle/triad-dominion');assert.equal(await page.locator('.penta_endgame').count(),0,'Spectators never need a return button');
+  room.seats.host={...actor,id:'other-host'};room.seats.challenger={...rival,id:'other-rival'};room.spectators=[actor];await page.reload();await page.getByRole('dialog',{name:'ผลการแข่งขัน'}).waitFor();assert.equal(await page.evaluate(()=>window.navigationTarget),undefined,'Spectators can see the same result and countdown');await page.getByRole('button',{name:'กลับหน้าหลัก',exact:true}).click();await page.waitForFunction(()=>window.navigationTarget==='/battle/triad-dominion');
   forceClosed=true;await page.reload();await page.waitForFunction(()=>window.navigationTarget==='/battle/triad-dominion');assert.equal(await page.getByText('กลับหน้า PLAY',{exact:true}).count(),0,'Closed room redirects without a manual return page');assert.equal(await page.evaluate(()=>localStorage.getItem('nexora:pentad:room')),null);console.log('Pentad spectator finished and closed-room automatic exits passed');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { getApiActor, requireAdminActor, type ApiActor } from "@/lib/admin-auth";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
+import { triadResponseForViewer } from "@/lib/triad-room-privacy";
 import {
   createTriadRoom,
   advanceTriadRoomTurn,
@@ -96,10 +97,12 @@ async function roomActionJson(
   realtime?: TriadRoomRealtimePayload | null
 ) {
   if (realtime) {
-    const notification = structuredClone(realtime);
+    // Broadcast invalidation only; personalized secret state is fetched with authentication.
+    const { room: _room, ...notification } = realtime;
     after(() => publishTriadRoomRealtime(notification));
   }
-  return noStoreJson(body, init);
+  const actor = await getApiActor();
+  return noStoreJson(triadResponseForViewer(body, actor?.id || ""), init);
 }
 
 function participantFromActor(body: Record<string, unknown>, actor: ApiActor): TriadRoomParticipant {
@@ -124,12 +127,12 @@ export async function GET(request: Request) {
     code ? getTriadRoomForParticipant(code, actor.id).then(room => room ? [room] : []) : listTriadRooms(),
     includeRanks ? listTriadRankProfiles() : Promise.resolve(null),
   ]);
-  return noStoreJson({
+  return noStoreJson(triadResponseForViewer({
     rooms,
     scope: code ? "room" : "lobby",
     code: code || undefined,
     ...(rankProfiles ? { rankProfiles, leaderboard: rankProfiles.filter((profile) => profile.wins > 0) } : {}),
-  });
+  }, actor.id));
 }
 
 export async function POST(request: Request) {

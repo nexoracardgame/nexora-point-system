@@ -2,6 +2,8 @@
 
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
+import BattleMatchResult from "@/components/BattleMatchResult";
+import BattleVersusIntro from "@/components/BattleVersusIntro";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
 import TargetSelectionModal from "@/components/TargetSelectionModal";
@@ -22,6 +24,7 @@ import BattleCardInspector from "@/components/BattleCardInspector";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from "@/components/DeckPreparation";
 import { freshDeck, randomTriadDeck } from "@/lib/deck-reroll";
+import { bestTriadBotPlay } from "@/lib/battle-bot-search";
 import { BattleArenaScoreplate, BattleArenaPhaseTrack, BattleArenaProgress, BattleArenaSurface, BattleArenaCardFrame } from "@/components/BattleArenaHud";
 import {
   Bot,
@@ -84,6 +87,33 @@ import {
 } from "@/lib/triad-room-realtime";
 
 const TRIAD_CARD_BACK_SRC = "/cards/card-backs/card-backs.png";
+
+function resolveTriadTurn(input: Parameters<typeof resolveTriadTurnRules>[0]) {
+  const lane = input.turn === 1 ? "top" : input.turn === 2 ? "left" : "right";
+  const blessings = (["player", "opponent"] as const).filter(side => input.skillTargets?.[side]?.["245"]?.startsWith("copy:254>"));
+  if (blessings.length) {
+    const next = {...input,player:{...input.player},opponent:{...input.opponent},skillTargets:{...input.skillTargets},skippedSkillCardNos:[...(input.skippedSkillCardNos || []),"245"]};
+    for (const side of blessings) {
+      const action=input.skillTargets?.[side]?.["245"]?.split(">")[1];
+      const kind=action==="draw-skill"?"skill":"monster";
+      const pool=Array.from(triadCardByNo.values()).filter(card=>card.kind===kind&&!["245","254",input.player.top,input.opponent.top,...(input.excludedRandomMonsterNos || [])].includes(card.cardNo));
+      const seed=`${input.randomMonsterSeed || "copy-blessing"}:${side}:${input.player.top}:${input.opponent.top}`;
+      const index=Array.from(seed).reduce((hash,char)=>(hash*31+char.charCodeAt(0))>>>0,0)%Math.max(1,pool.length);
+      const drawn=pool[index];if(!drawn)continue;
+      if(action==="draw-skill")next[side][lane]=drawn.cardNo;
+      else next[action==="reroll-own"?side:side==="player"?"opponent":"player"].top=drawn.cardNo;
+      next.skillTargets[side]={...next.skillTargets[side],"245":""};
+    }
+    return resolveTriadTurn(next);
+  }
+  const no = input.opponent[lane] || "";
+  const target = input.skillTargets?.opponent?.[no];
+  if (no && target === undefined && triadCardByNo.get(no)?.kind === "skill") {
+    const best = bestTriadBotPlay(input.turn,input.player,input.opponent,[no],input.prioritySide);
+    return resolveTriadTurnRules({...input,skillTargets:{...input.skillTargets,opponent:{...input.skillTargets?.opponent,[no]:best.target}}});
+  }
+  return resolveTriadTurnRules(input);
+}
 
 type CardView = {
   cardNo: string;
@@ -297,8 +327,8 @@ const rankFrames = [
   { key: "god-of-legends", name: "God Of Legends", aura: "from-yellow-100/80 via-rose-300/42 to-violet-400/32", ring: "border-yellow-100 shadow-[0_0_82px_rgba(250,204,21,0.72)]", badge: "bg-gradient-to-r from-yellow-100 via-rose-200 to-violet-200 text-black" },
 ] as const;
 
-type SkillTargetId = "player-top" | "bot-top";
-type SkillTargetSelection = SkillTargetId | `${SkillTargetId}>${SkillTargetId}` | "";
+type SkillTargetId = "player-top" | "bot-top" | `copy:${string}` | "draw-skill" | "reroll-own" | "reroll-opponent";
+type SkillTargetSelection = SkillTargetId | `${SkillTargetId}>${SkillTargetId}` | `copy:${string}>${SkillTargetId}>${SkillTargetId}` | "";
 
 type PendingSkillChoice = {
   side: Side;
@@ -1591,6 +1621,8 @@ function chooseBotCardForTurn({
     return localBotCanUseElementSkill(turn, player, candidateBot, card);
   });
   const scoringCards = smartPlayableCards.length > 0 ? smartPlayableCards : playableCards;
+  const searched = bestTriadBotPlay(turn, player, bot, scoringCards.map(card => card.cardNo));
+  if (searched.cardNo) return searched.cardNo;
   let best: { cardNo: string; margin: number; total: number } | null = null;
 
   for (const card of scoringCards) {
@@ -1717,7 +1749,7 @@ function parseSkillTargetSelection(value: SkillTargetSelection | string = ""): S
   return value
     .split(">")
     .map((item) => item.trim())
-    .filter((item): item is SkillTargetId => item === "player-top" || item === "bot-top");
+    .filter((item): item is SkillTargetId => item === "player-top" || item === "bot-top" || /^copy:\d{3}$/.test(item) || ["draw-skill", "reroll-own", "reroll-opponent"].includes(item));
 }
 
 function targetMatchesSkillElementCondition(
@@ -1758,25 +1790,25 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
     return withElementCondition([
       playerTop?.kind === "monster" ? "player-top" as const : null,
       botTop?.kind === "monster" ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target)));
+    ].filter((target): target is "player-top" | "bot-top" => Boolean(target)));
   }
   if (card?.cardNo === "231") {
     return withElementCondition([
       monsterHasUnequalStats(playerTop) ? "player-top" as const : null,
       monsterHasUnequalStats(botTop) ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target)));
+    ].filter((target): target is "player-top" | "bot-top" => Boolean(target)));
   }
   if (card?.cardNo === "227") {
     return withElementCondition([
       monsterHasGravityFieldStat(playerTop) ? "player-top" as const : null,
       monsterHasGravityFieldStat(botTop) ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target)));
+    ].filter((target): target is "player-top" | "bot-top" => Boolean(target)));
   }
   if (card?.cardNo === "259") {
     return withElementCondition([
       monsterHasTidebombStat(playerTop) ? "player-top" as const : null,
       monsterHasTidebombStat(botTop) ? "bot-top" as const : null,
-    ].filter((target): target is SkillTargetId => Boolean(target)));
+    ].filter((target): target is "player-top" | "bot-top" => Boolean(target)));
   }
   if (card?.cardNo === "255") {
     const opposingCard = side === "player" ? botTop : playerTop;
@@ -1813,7 +1845,12 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
   return withElementCondition([ownTarget]);
 }
 
-function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView, turn: TriadTurn = 1): SkillTargetId[] {
+function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView, turn: TriadTurn = 1, copyField?: TriadTriangle): SkillTargetId[] {
+  if (card?.cardNo === "254") return ["draw-skill", "reroll-own", "reroll-opponent"];
+  if (card?.cardNo === "245") return (["top", "left", "right"] as const).slice(0, turn).flatMap(lane => {
+    const no = copyField?.[lane] || "";
+    return no !== "245" && triadCardByNo.get(no)?.kind === "skill" ? [`copy:${no}` as SkillTargetId] : [];
+  });
   const selectable = getSelectableSkillTargetIds(card, side, playerTop, botTop);
   if (card?.cardNo === "225") return selectable.filter(target => {
     const monster = target === "player-top" ? playerTop : botTop;
@@ -3980,24 +4017,40 @@ function MatchFinalOverlay({
 }
 
 function SkillTargetOverlay({
-  card, side, playerTop, botTop, targetPlayerTop, targetBotTop, selectedTarget, timeLeft, turn = 1, onSelect, onConfirm,
+  card, side, playerTop, botTop, targetPlayerTop, targetBotTop, selectedTarget, timeLeft, turn = 1, onSelect, onConfirm, copyField,
 }: {
-  card?: CardView; turn?: TriadTurn; side: Side; playerTop?: CardView; botTop?: CardView; targetPlayerTop?: CardView; targetBotTop?: CardView;
+  card?: CardView; turn?: TriadTurn; side: Side; playerTop?: CardView; botTop?: CardView; targetPlayerTop?: CardView; targetBotTop?: CardView; copyField?: TriadTriangle;
   selectedTarget: PendingSkillChoice["selectedTarget"]; timeLeft: number; onSelect: (target: SkillTargetSelection) => void; onConfirm: () => void | Promise<void>;
 }) {
+  const [copyTargetStep, setCopyTargetStep] = useState(false);
   if (!card) return null;
+  const [rawCopyId, ...copiedTargets] = selectedTarget.split(">");
+  const sourceOptions = card.cardNo === "245" ? getPlayableSkillTargetIds(card, side, playerTop, botTop, turn, copyField) : [];
+  const copyId = rawCopyId || (sourceOptions.length === 1 ? sourceOptions[0] : "");
+  const copiedCard = card.cardNo === "245" ? triadCardByNo.get(copyId?.slice(5)) : undefined;
+  const targetCard = copyTargetStep && copiedCard ? copiedCard : card;
   const ownId = side === "player" ? "player-top" : "bot-top";
-  const eligible = getPlayableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn);
-  const options: TargetOptionView[] = eligible.filter(id => Boolean(id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop)).map(id => ({
+  const eligible = getPlayableSkillTargetIds(targetCard, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn, copyField);
+  const options: TargetOptionView[] = targetCard.cardNo === "254" ? eligible.map(id => ({ id, faction: id === "reroll-opponent" ? "enemy" : "ally", action: true, label: id === "draw-skill" ? "สุ่มสกิลเข้ามือ" : id === "reroll-own" ? "สุ่มมอนสเตอร์เรา" : "สุ่มมอนสเตอร์อีกฝ่าย" })) : targetCard.cardNo === "245" ? eligible.map(id => ({ id, faction: "enemy", label: "สกิลบนสนามฝ่ายตรงข้าม", card: triadCardByNo.get(id.slice(5)) })) : eligible.filter(id => Boolean(id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop)).map(id => ({
     id, faction: id === ownId ? "ally" : "enemy",
     label: id === ownId ? "มอนสเตอร์หลักฝั่งเรา" : "มอนสเตอร์หลักฝั่งศัตรู",
     card: id === "player-top" ? playerTop : botTop,
   }));
-  const two = isTwoStepTargetSkill(card);
-  const selected = selectedTarget ? parseSkillTargetSelection(selectedTarget) : !two && options.length === 1 ? [options[0].id] : [];
-  return <TargetSelectionModal contextKey={`${card.cardNo}:${side}:${turn}`} skillName={card.name} description={card.skillText} options={options} selected={selected} min={two ? 2 : 1} max={two ? 2 : 1} timeLeft={timeLeft}
+  const two = isTwoStepTargetSkill(targetCard);
+  const selection = copyTargetStep ? copiedTargets.join(">") : card.cardNo === "245" ? copyId : selectedTarget;
+  const selected = selection ? parseSkillTargetSelection(selection) : !two && options.length === 1 ? [options[0].id] : [];
+  return <TargetSelectionModal contextKey={`${card.cardNo}:${side}:${turn}:${copyTargetStep ? copyId : "source"}`} skillName={copyTargetStep ? `${card.name} → ${targetCard.name}` : card.name} description={targetCard.skillText} options={options} selected={selected} min={two ? 2 : 1} max={two ? 2 : 1} timeLeft={timeLeft}
     selectionHint={two ? "เลือกตามลำดับ: ตัวที่ 1 ลด ATK 2,000 · ตัวที่ 2 เพิ่ม ATK 2,000" : undefined}
-    onSelect={ids => onSelect(ids.join(">") as SkillTargetSelection)} onConfirm={onConfirm} />;
+    onSelect={ids => onSelect((copyTargetStep ? [copyId, ...ids] : ids).join(">") as SkillTargetSelection)} onConfirm={() => {
+      if (copiedCard && !copyTargetStep && /เลือก|choose|target/i.test(copiedCard.skillText)) {
+        const targets = getPlayableSkillTargetIds(copiedCard, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn);
+        if (targets.length) {
+          if (targets.length === 1) onSelect(`${copyId}>${targets[0]}` as SkillTargetSelection);
+          setCopyTargetStep(true); return;
+        }
+      }
+      return onConfirm();
+    }} />;
 }
 
 function BlessingChoiceOverlay({ card, onChoose }: { card?: CardView; onChoose: (choice: BlessingChoice) => void }) {
@@ -4213,7 +4266,7 @@ function CompactBattleBoard({
   const skillChoiceForAura = pendingSkillChoice || waitingSkillChoice || null;
   const pendingSkillCard = pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined;
   const pendingFallbackTargets = pendingSkillChoice
-    ? getPlayableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top), activeTurn)
+    ? getPlayableSkillTargetIds(pendingSkillCard, pendingSkillChoice.side, cardsByNo.get(playerTriangle.top), cardsByNo.get(botTriangle.top), activeTurn, pendingSkillChoice.side === "player" ? botTriangle : playerTriangle)
     : [];
   const pendingTarget = pendingSkillChoice?.selectedTarget || (pendingFallbackTargets.length === 1 ? pendingFallbackTargets[0] : "");
   const playerAuraByLane: Partial<Record<Lane, TargetAura>> = {};
@@ -4292,6 +4345,7 @@ function CompactBattleBoard({
       <SkillTargetOverlay
         key={`${fightNo}:${activeTurn}:${pendingSkillChoice?.cardNo || "none"}`}
         turn={activeTurn}
+        copyField={pendingSkillChoice?.side === "bot" ? displayPlayerTriangle : displayBotTriangle}
         card={pendingSkillChoice ? cardsByNo.get(pendingSkillChoice.cardNo) : undefined}
         side={pendingSkillChoice?.side || "player"}
         playerTop={displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined}
@@ -4303,8 +4357,14 @@ function CompactBattleBoard({
         onSelect={(target) => {
           if (!pendingSkillChoice) return;
           const skillCard = cardsByNo.get(pendingSkillChoice.cardNo);
-          const selectable = new Set(getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined, activeTurn));
-          if (!parseSkillTargetSelection(target).every((item) => selectable.has(item))) return;
+          const selectable = new Set(getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, displayPlayerTriangle.top ? cardsByNo.get(displayPlayerTriangle.top) : undefined, displayBotTriangle.top ? cardsByNo.get(displayBotTriangle.top) : undefined, activeTurn, pendingSkillChoice.side === "player" ? displayBotTriangle : displayPlayerTriangle));
+          const parts = parseSkillTargetSelection(target);
+          if (skillCard?.cardNo === "245") {
+            if (!selectable.has(parts[0])) return;
+            const copied = triadCardByNo.get(parts[0].slice(5));
+            const legal = getPlayableSkillTargetIds(copied, pendingSkillChoice.side, cardsByNo.get(displayPlayerTriangle.top), cardsByNo.get(displayBotTriangle.top), activeTurn);
+            if (parts.slice(1).some(item => !legal.includes(item))) return;
+          } else if (!parts.every((item) => selectable.has(item))) return;
           onSelectSkillTarget(target);
         }}
         onConfirm={onConfirmSkillTarget}
@@ -4529,7 +4589,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const resultAdvanceKeyRef = useRef("");
   const turnReadyRecoveryKeyRef = useRef("");
   const deckBattleStartKeyRef = useRef("");
-  const matchFinalAutoContinueKeyRef = useRef("");
   const startedBattleRoomKeysRef = useRef<Set<string>>(new Set());
   const optimisticRoomLockUntilRef = useRef(0);
   const startRoomLockRef = useRef<{ code: string; until: number }>({ code: "", until: 0 });
@@ -5782,9 +5841,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     } finally { leavingRoomRef.current = false; }
   };
 
-  useLayoutEffect(() => {
-    if (isSpectator && matchDone && currentRoom) void leaveRoom();
-  }, [isSpectator, matchDone, currentRoom?.code]);
 
   const continueRoomBattle = async () => {
     if (!currentRoom || !participantInRoom(currentRoom, participant.id)) return;
@@ -6154,21 +6210,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
   }, [currentRoom, participant.id, phase]);
 
-  useEffect(() => {
-    if (cinematicActive || !currentRoom?.game.matchEndedAt || !matchFinalVisible || !participantInRoom(currentRoom, participant.id)) {
-      matchFinalAutoContinueKeyRef.current = "";
-      return;
-    }
-    const continueKey = `${currentRoom.code}:${currentRoom.game.matchEndedAt}:${currentRoom.game.matchWinner || "done"}`;
-    if (matchFinalAutoContinueKeyRef.current === continueKey) return;
-    matchFinalAutoContinueKeyRef.current = continueKey;
-    const timer = window.setTimeout(() => {
-      void postRoomAction({ action: "continue", code: currentRoom.code })
-        .then(() => syncRooms({ force: true }))
-        .catch(() => syncRooms({ force: true }).catch(() => null));
-    }, 6500);
-    return () => window.clearTimeout(timer);
-  }, [cinematicActive, currentRoom, currentRoom?.code, currentRoom?.game.matchEndedAt, currentRoom?.game.matchWinner, matchFinalVisible, participant.id]);
 
   useEffect(() => {
     if (!currentRoom || !roomPlayerSide || !opponentSide) return;
@@ -6682,7 +6723,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     if (playerCard && skillNeedsChoice(playerCard)) {
-      const targets = getPlayableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top), activeTurn);
+      const targets = getPlayableSkillTargetIds(playerCard, "player", cardsByNo.get(player.top), cardsByNo.get(bot.top), activeTurn, bot);
       if (targets.length === 0) {
         const result = resolveTriadTurn({
           turn: activeTurn,
@@ -6797,15 +6838,20 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       skillCard,
       pendingSkillChoice.side,
       cardsByNo.get(lockedFight.player.top),
-      cardsByNo.get(lockedFight.bot.top), activeTurn
+      cardsByNo.get(lockedFight.bot.top), activeTurn, lockedFight.bot
     );
     const selectedTarget = pendingSkillChoice.selectedTarget || (fallbackTargets.length === 1 ? fallbackTargets[0] : "");
     if (!selectedTarget) return;
     const selectableTargetIds = new Set(
-      getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top), activeTurn)
+      getPlayableSkillTargetIds(skillCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top), activeTurn, pendingSkillChoice.side === "player" ? lockedFight.bot : lockedFight.player)
     );
     const selectedTargets = parseSkillTargetSelection(selectedTarget);
-    const validTargetSelection = isTwoStepTargetSkill(skillCard)
+    const copyCard = skillCard?.cardNo === "245" ? triadCardByNo.get(selectedTargets[0]?.slice(5)) : undefined;
+    const copyTargets = copyCard ? getPlayableSkillTargetIds(copyCard, pendingSkillChoice.side, cardsByNo.get(lockedFight.player.top), cardsByNo.get(lockedFight.bot.top), activeTurn) : [];
+    const copyNeedsTarget = Boolean(copyCard && /เลือก|choose|target/i.test(copyCard.skillText) && copyTargets.length);
+    const validTargetSelection = skillCard?.cardNo === "245"
+      ? selectableTargetIds.has(selectedTargets[0]) && selectedTargets.slice(1).every(target => copyTargets.includes(target)) && (!copyNeedsTarget || selectedTargets.length === (isTwoStepTargetSkill(copyCard) ? 3 : 2))
+      : isTwoStepTargetSkill(skillCard)
       ? selectedTargets.length === 2 && new Set(selectedTargets).size === 2 && selectedTargets.every((target) => selectableTargetIds.has(target))
       : selectableTargetIds.has(selectedTarget as SkillTargetId);
     if (!validTargetSelection) {
@@ -7693,6 +7739,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   return (
     <BattleArenaSurface image={arena.image} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
+      <BattleVersusIntro sessionKey={battleSessionKey} enabled={bothDecksReady && !matchDone && fightNo === 1 && activeTurn === 1} left={currentRoom?.seats.host || participant} right={currentRoom?.seats.challenger || {name:"BOT Level.99",image:"/avatar.png"}} background={arena.image} />
       <BattleForfeitVictory result={currentRoom?.game.forfeit} userId={participant.id} onExit={() => { void leaveRoom(); }} />
       {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (
@@ -7705,8 +7752,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ยอมแพ้
         </button>
       ) : null}
-      {matchFinalVisible && !isSpectator ? (
-        <MatchFinalOverlay winner={neutralWinnerText} surrendered={surrenderedLabel} score={finalMatchScore} isDraw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} rankUpEvents={currentRoom?.game.rankUpEvents || []} onExitLobby={leaveRoom} />
+      {matchFinalVisible && !currentRoom?.game.forfeit ? (
+        <BattleMatchResult title={neutralWinnerText} detail={surrenderedLabel ? `${surrenderedLabel} ยอมแพ้` : "การแข่งขันสิ้นสุด"} score={[finalMatchScore.player,finalMatchScore.bot]} draw={finalMatchScore.player === finalMatchScore.bot && !forcedWinnerSide} onExit={leaveRoom}>
+          {currentRoom?.game.rankUpEvents?.map(event => <p className="nexora-result-rank" key={`${event.userId}:${event.at}`}>{event.name} เลื่อนสู่ {event.rankName} · {event.wins.toLocaleString()} ชัยชนะ</p>)}
+        </BattleMatchResult>
       ) : null}
       {canUseGmRescuePanel ? (
         <GmRescuePanel

@@ -104,11 +104,86 @@ function tickChoices(room: PentadRoom, now: number) {
     const choice = room.choices[index];
     if (choice.value) continue;
     if (!choice.deadline) choice.deadline = now + PENTAD_TARGET_MS;
-    if (room.seats[choice.side]?.id === PENTAD_BOT_ID || now >= choice.deadline) choice.value = choice.options[0];
+    if (room.seats[choice.side]?.id === PENTAD_BOT_ID) choice.value = bestPentadTarget(room, choice);
+    else if (now >= choice.deadline) choice.value = choice.options[0];
     if (!choice.value) { room.deadline = choice.deadline; return; }
     settleChoice(room, choice, index);
   }
   resolveRound(room, now);
+}
+
+function pentadBotValue(room: PentadRoom, side: PentadSide, skills: Record<PentadSide,string>, targets: Record<PentadSide,string>, copiedSkills = room.copiedSkills) {
+  const result = resolvePentadTurn({fight:room.fight,turn:room.turn,mains:{host:room.board.host[0],challenger:room.board.challenger[0]},skills,opener:room.opener,targets,copiedSkills,spent:[...room.spent,...room.used.host,...room.used.challenger]});
+  return (result.winner === side ? 1_000_000 : result.winner === "draw" ? 0 : -1_000_000) + Math.max(-100_000,Math.min(100_000,result.totals[side]-result.totals[otherPentadSide(side)]));
+}
+
+function bestPentadTarget(room: PentadRoom, choice: PentadChoice) {
+  let best = choice.options[0], score = -Infinity;
+  for (const option of choice.options) {
+    const copies = {...room.copiedSkills} as Record<PentadSide,string>;
+    const no = choice.kind === "copy" ? option.split(":")[2] : choice.sourceCardNo || choice.cardNo;
+    if (choice.kind === "copy") copies[choice.side] = no;
+    const follow = choice.kind === "copy" ? targetOptions(room,choice.side,no) : [option];
+    for (const target of follow.length ? follow : [""]) {
+      const value = pentadBotValue(room,choice.side,activeSkills(room),{...room.targets,[choice.side]:target},copies);
+      if (value > score) {score=value;best=option;}
+    }
+  }
+  return best;
+}
+
+function choosePentadBotCard(room: PentadRoom, side: PentadSide, available: string[]) {
+  const enemy=otherPentadSide(side);
+  if (room.turn === 1) {
+    const rivals=pentadAvailable(room,enemy,"monster");
+    return available.map(no=>{
+      const own=triadCardByNo.get(no)!;
+      const strength=rivals.reduce((sum,other)=>{const card=triadCardByNo.get(other)!;const relation=pentadElementRelation(own.element,card.element);return sum+(relation.winner==="host"?100_000:relation.winner==="challenger"?-100_000:own.attack+own.support-card.attack-card.support);},0)/Math.max(1,rivals.length);
+      const synergy=pentadAvailable(room,side,"skill").reduce((sum,skill)=>{const rule=triadSkillRuleByNo.get(skill);return sum+(rule?.target.startsWith("own")&&triadSkillElementConditionMatches(rule,own)?rule.effects.reduce((n,e)=>n+Math.max(0,e.delta),0):0);},0);
+      return {no,value:strength+synergy*.2};
+    }).sort((a,b)=>b.value-a.value)[0]?.no || "";
+  }
+  const responses=room.picks[enemy]?[room.picks[enemy]]:pentadAvailable(room,enemy,"skill");
+  return available.map(no=>{
+    let worst=Infinity,total=0;
+    for(const response of responses.length?responses:[""]){
+      const skills={...room.picks,[side]:no,[enemy]:response};
+      const options=targetOptions(room,side,no);let best=-Infinity;
+      for(const option of options.length?options:[""]){
+        const copies={...room.copiedSkills} as Record<PentadSide,string>;
+        const copied=no==="245"?option.split(":")[2]:"";
+        if(copied)copies[side]=copied;
+        const follow=copied?targetOptions(room,side,copied):[option];
+        for(const target of follow.length?follow:[""]){
+          const enemyOptions=targetOptions(room,enemy,response);let risk=Infinity;
+          for(const enemyTarget of enemyOptions.length?enemyOptions:[""]){
+            risk=Math.min(risk,pentadBotValue(room,side,skills,{...room.targets,[side]:target,[enemy]:enemyTarget},copies));
+          }
+          best=Math.max(best,risk);
+        }
+      }
+      worst=Math.min(worst,best);total+=best;
+    }
+    const rule=triadSkillRuleByNo.get(no);
+    const future=rule?.allowedTurns.some(turn=>turn===(room.turn<3?2:3))?rule.effects.reduce((n,e)=>n+Math.abs(e.delta),0):0;
+    return {no,value:worst*.7+total/Math.max(1,responses.length)*.3-future*.02};
+  }).sort((a,b)=>b.value-a.value)[0]?.no || "";
+}
+
+function tournamentPentadDeck(room: PentadRoom) {
+  let best: PentadDeck | undefined, value=-Infinity;
+  for (let attempt=0;attempt<8;attempt++) {
+    const deck=completePentadDeck(emptyPentadDeck(),random,room.pools);
+    const monsters=deck.monsters.map(no=>triadCardByNo.get(no)!);
+    const score=monsters.reduce((sum,card)=>sum+card.attack+card.support,0)+deck.hand.reduce((sum,no)=>{
+      const rule=triadSkillRuleByNo.get(no);if(!rule)return sum;
+      const coverage=rule.target.startsWith("own")?monsters.filter(card=>triadSkillElementConditionMatches(rule,card)).length/5:1;
+      const power=rule.effects.reduce((n,e)=>n+Math.abs(e.delta),0);
+      return sum+coverage*(power+(rule.blockedUseMetric?10000:rule.shape==="skill-cancel"?9000:rule.shape==="swap-control"?8000:3000));
+    },0);
+    if(score>value){best=deck;value=score;}
+  }
+  return best!;
 }
 function settleChoice(room: PentadRoom, choice: PentadChoice, index: number) {
   if (choice.kind === "copy") {
@@ -179,7 +254,7 @@ export function tickPentadRoom(room: PentadRoom, now = Date.now()) {
   if (room.phase === "deck") {
     if (room.deckSource === "random" && !room.pools) {
       room.pools=makePentadPools(random);room.decks=pair(emptyPentadDeck);room.ready=pair(()=>false);room.epoch++;room.deadline=now+PENTAD_DECK_MS;
-      if (room.seats.challenger?.id===PENTAD_BOT_ID) {room.decks.challenger=completePentadDeck(emptyPentadDeck(),random,room.pools);room.ready.challenger=true;}
+      if (room.seats.challenger?.id===PENTAD_BOT_ID) {room.decks.challenger=tournamentPentadDeck(room);room.ready.challenger=true;}
       room.notice="อัปเดตเป็นพูลสุ่มกองละ 20 ใบ เลือกเด็คใหม่ได้แล้ว";
     }
     if (now >= room.deadline) for (const side of sides) { room.decks[side] = completePentadDeck(room.decks[side], random,room.pools); room.ready[side] = true; }
@@ -204,15 +279,8 @@ export function tickPentadRoom(room: PentadRoom, now = Date.now()) {
       const shouldPick = room.turn === 1 || side === room.opener || Boolean(room.picks[room.opener]);
       if (!room.picks[side] && shouldPick && (room.seats[side]?.id === PENTAD_BOT_ID || now >= room.deadline)) {
         const available = pentadAvailable(room, side, room.turn === 1 ? "monster" : "skill");
-        if (room.seats[side]?.id === PENTAD_BOT_ID && room.turn > 1) {
-          const ranked = available.map(no => {
-            const skills = { ...room.picks, [side]: no };
-            const targets = { host: targetOptions(room, "host", skills.host)[0] || "", challenger: targetOptions(room, "challenger", skills.challenger)[0] || "" };
-            const result = resolvePentadTurn({ fight: room.fight, turn: room.turn, mains: { host: room.board.host[0], challenger: room.board.challenger[0] }, skills, opener: room.opener, targets, spent: [...room.spent, ...room.used.host, ...room.used.challenger] });
-            return { no, score: result.totals[side] - result.totals[otherPentadSide(side)] };
-          }).sort((a, b) => b.score - a.score);
-          room.picks[side] = ranked[0]?.no || "";
-        } else room.picks[side] = choose(available);
+        if (room.seats[side]?.id === PENTAD_BOT_ID) room.picks[side] = choosePentadBotCard(room,side,available);
+        else room.picks[side] = choose(available);
       }
     }
     if (sides.every(side => room.picks[side])) revealPicks(room, now);
@@ -267,7 +335,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
       room.pools = makePentadPools(random);
       room.decks = pair(emptyPentadDeck);
     }
-    if (room.seats.challenger.id === PENTAD_BOT_ID) { room.decks.challenger = completePentadDeck(emptyPentadDeck(), random,room.pools); room.ready.challenger = true; }
+    if (room.seats.challenger.id === PENTAD_BOT_ID) { room.decks.challenger = tournamentPentadDeck(room); room.ready.challenger = true; }
     return;
   }
   if (action === "refresh") return;
@@ -323,8 +391,16 @@ export function publicPentadRoom(room: PentadRoom, id: string) {
   // Opposing deck order and concealed picks never cross the API boundary.
   for (const seat of sides) if (seat !== side) {
     copy.decks[seat] = { monsters: [], hand: [], reserve: Array(room.decks[seat].reserve.length).fill("") };
-    if (room.phase === "select" && (room.turn === 1 || seat !== room.opener)) copy.picks[seat] = room.picks[seat] ? "hidden" : "";
-    if (room.phase === "select" && (room.turn === 1 || seat !== room.opener)) copy.board[seat][room.turn-1] = "";
+    if (room.phase === "select") {
+      copy.picks[seat] = room.picks[seat] ? "hidden" : "";
+      copy.board[seat][room.turn-1] = "";
+      copy.boost[seat] = "";
+    }
+    if (room.phase !== "result" && room.phase !== "finished") {
+      copy.targets[seat] = "";
+      if (copy.copiedSkills) copy.copiedSkills[seat] = "";
+      copy.choices = copy.choices.map(choice => choice.side === seat ? { ...choice, options: [], value: "" } : choice);
+    }
   }
   return copy;
 }

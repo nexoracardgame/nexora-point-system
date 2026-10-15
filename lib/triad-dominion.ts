@@ -430,7 +430,7 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   const shape: TriadSkillShape =
     card.cardNo === "245" || card.cardNo === "284"
       ? "swap-control"
-      : card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243"
+      : card.cardNo === "268" || card.cardNo === "259" || card.cardNo === "255" || card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243"
         ? "stat"
       : card.cardNo === "227" || card.cardNo === "226"
         ? "stat"
@@ -474,9 +474,9 @@ function makeSkillRule(card: TriadCard): TriadSkillRule | null {
     effects: card.cardNo === "255" ? [{ metric: "attack", delta: 0 }] : card.cardNo === "226" ? [{ metric: "support", delta: 0 }] : card.cardNo === "227" ? [{ metric: "attack", delta: 0 }, { metric: "support", delta: 0 }] : effects,
     target: card.cardNo === "222" || card.cardNo === "242" || card.cardNo === "249" ? "all" : ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) ? "own-all" : card.cardNo === "018" || card.cardNo === "225" ? "own-one" : card.cardNo === "223" || card.cardNo === "238" || card.cardNo === "239" || card.cardNo === "243" ? "own-main" : card.cardNo === "258" || card.cardNo === "255" || card.cardNo === "265" ? "opponent-main" : card.cardNo === "234" ? "own-main" : inferTarget(card.skillText),
     duration: "turn",
-    allowedTurns: card.cardNo === "255" ? [1, 2] : card.cardNo === "265" ? [2, 3] : card.cardNo === "226" ? [1, 3] : card.cardNo === "227" ? [1, 2, 3] : inferAllowedTurns(card.skillText, shape),
+    allowedTurns: card.cardNo === "268" ? [2] : card.cardNo === "255" ? [1, 2] : card.cardNo === "265" ? [2, 3] : card.cardNo === "226" ? [1, 3] : card.cardNo === "227" ? [1, 2, 3] : inferAllowedTurns(card.skillText, shape),
     elementHint: card.element,
-    elementCondition: card.cardNo === "229" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : card.cardNo === "272" ? { mode: "include", elements: ["fire"] } : inferElementCondition(card),
+    elementCondition: card.cardNo === "229" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "016" ? { mode: "include", elements: ["earth"] } : card.cardNo === "018" ? { mode: "include", elements: ["gold"] } : card.cardNo === "019" || card.cardNo === "291" ? { mode: "include", elements: ["wood"] } : card.cardNo === "222" ? { mode: "exclude", elements: ["earth"] } : card.cardNo === "242" ? { mode: "exclude", elements: ["gold"] } : card.cardNo === "249" ? { mode: "exclude", elements: ["water"] } : card.cardNo === "268" || card.cardNo === "272" ? { mode: "include", elements: ["fire"] } : inferElementCondition(card),
     blockedMetric,
     blockedUseMetric,
     transformElement: inferTransformElement(card.skillText),
@@ -1959,12 +1959,13 @@ function applyMechanicalTrap(
   } satisfies TriadSkillEvent;
 }
 
-function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set()) {
+function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, turn: TriadTurn, skippedSkillCardNos: Set<string> = new Set(), copiedRules: { side: "player" | "opponent"; rule: TriadSkillRule }[] = []) {
   const blockers: StatUseBlocker[] = [];
   const events: TriadSkillEvent[] = [];
   const items = [
     { side: "player" as const, rule: getLaneSkillRule(player, turn, skippedSkillCardNos) },
     { side: "opponent" as const, rule: getLaneSkillRule(opponent, turn, skippedSkillCardNos) },
+    ...copiedRules,
   ].filter(
     (item): item is { side: "player" | "opponent"; rule: TriadSkillRule } =>
       Boolean(item.rule?.blockedUseMetric && item.rule.allowedTurns.includes(turn))
@@ -1981,6 +1982,8 @@ function collectStatUseBlockers(player: TriadTriangle, opponent: TriadTriangle, 
           ? "opponent"
           : "player";
     const metricLabel = metric === "attack" ? "ATK" : "SUP";
+    const targetCard = getCard((targetSide === "player" ? player : opponent).top);
+    if (!targetCard || !triadSkillElementConditionMatches(item.rule, targetCard)) continue;
     const targetLabel = targetSide === item.side ? "มอนสเตอร์หลักฝั่งผู้ใช้สกิล" : "มอนสเตอร์หลักฝั่งตรงข้าม";
     blockers.push({ sourceSide: item.side, targetSide, metric, rule: item.rule });
     events.push({
@@ -2061,7 +2064,7 @@ function applySkill(
     return { unresolved, events };
   }
 
-  if (rule.cardNo === "265") {
+  if (rule.cardNo === "265" || (rule.blockedUseMetric && rule.cardNo !== "255")) {
     return { unresolved, events };
   }
 
@@ -2416,7 +2419,7 @@ function applyEnergyReversal(
   if (!reversalRule) return { unresolved, events };
   if (cancelledSkillCardNos.has(reversalRule.cardNo)) return { unresolved, events };
 
-  const copiedRule = getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn, new Set(), selectedCopyCardNo);
+  const copiedRule = getOpposingSkillRuleForEnergyReversal(opposingTriangle, turn, new Set(), selectedCopyCardNo || selectedTarget.match(/^copy:(\d{3})/)?.[1]);
   if (!copiedRule) {
     events.push({
       cardNo: reversalRule.cardNo,
@@ -2462,7 +2465,7 @@ function applyEnergyReversal(
   }
 
   const copied = applySkill(
-    opposingTriangle,
+    ownTriangle,
     ownScore,
     opponentScore,
     turn,
@@ -2471,7 +2474,7 @@ function applyEnergyReversal(
     new Set(),
     new Set(),
     false,
-    selectedTarget,
+    selectedTarget.startsWith("copy:") ? selectedTarget.split(">").slice(1).join(">") : selectedTarget,
     copiedRule,
     boardState
   );
@@ -2685,7 +2688,8 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const prioritySide = input.prioritySide || "player";
   const skippedSkillCardNos = new Set((input.skippedSkillCardNos || []).map((cardNo) => normalizeCardNo(cardNo)));
   const skillCancels = collectSkillCancels(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos);
-  const energyReversalLocks = collectEnergyReversalLocks(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos, input.copiedSkillCardNos);
+  const selectedCopies = { player: input.copiedSkillCardNos?.player || input.skillTargets?.player?.["245"]?.match(/^copy:(\d{3})/)?.[1], opponent: input.copiedSkillCardNos?.opponent || input.skillTargets?.opponent?.["245"]?.match(/^copy:(\d{3})/)?.[1] };
+  const energyReversalLocks = collectEnergyReversalLocks(input.player, input.opponent, input.turn, prioritySide, skippedSkillCardNos, selectedCopies);
   const cancelledOrLockedSkillCardNos = new Set([
     ...skillCancels.cancelledSkillCardNos,
     ...energyReversalLocks.lockedSkillCardNos,
@@ -2695,14 +2699,22 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     ...cancelledOrLockedSkillCardNos,
     ...energyReversalLocks.lockedSkillCardNos,
   ]);
-  const statUseBlocks = collectStatUseBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos);
+  const copiedUseRules = (["player", "opponent"] as const).flatMap(side => {
+    const own = side === "player" ? input.player : input.opponent;
+    const opposing = side === "player" ? input.opponent : input.player;
+    if (!getEnergyReversalRule(own, input.turn, blockedSkillCardNos)) return [];
+    const selected = input.copiedSkillCardNos?.[side] || input.skillTargets?.[side]?.["245"]?.match(/^copy:(\d{3})/)?.[1];
+    const rule = getOpposingSkillRuleForEnergyReversal(opposing, input.turn, new Set(), selected);
+    return rule?.blockedUseMetric ? [{ side, rule }] : [];
+  });
+  const statUseBlocks = collectStatUseBlockers(input.player, input.opponent, input.turn, blockedSkillCardNos, copiedUseRules);
   const preScore = applyPreScoreSkills(input.player, input.opponent, input.turn, blockedSkillCardNos, input.excludedRandomMonsterNos, input.randomMonsterSeed);
   const boardState: TriadEffectiveBoardState = {
     player: preScore.player,
     opponent: preScore.opponent,
     combinedStatConditions: input.combinedStatConditions,
   };
-  const statGainBlockers: StatGainBlocker[] = [];
+  const statGainBlockers: StatGainBlocker[] = statUseBlocks.blockers.map(blocker => ({ ...blocker, targetLane: "top" }));
   const playerScore = baseScore(
     preScore.player,
     input.turn,
@@ -2775,7 +2787,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
       ? [applySideWithEnergyReversal("player"), applySideWithEnergyReversal("opponent")]
       : [applySideWithEnergyReversal("opponent"), applySideWithEnergyReversal("player")];
   for (const blocker of statGainBlockers) {
-    if (!["255", "226", "227"].includes(blocker.rule.cardNo)) continue;
+    if (!blocker.rule.blockedUseMetric && !["255", "226", "227"].includes(blocker.rule.cardNo)) continue;
     const score = blocker.targetSide === "player" ? playerScore : opponentScore;
     if (score.metric !== blocker.metric) continue;
     const contribution = score.contributions.find(item => item.lane === "top");

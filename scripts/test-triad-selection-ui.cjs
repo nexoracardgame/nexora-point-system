@@ -49,7 +49,7 @@ assert.deepEqual(selected, ['010']);
 const names = new Set(['rpsIcon', 'OpeningTieBreakOverlay', 'OpeningTieBreakResultOverlay', 'SkillTargetOverlay', 'parseSkillTargetSelection', 'nextTwoStepTargetSelection', 'isTwoStepTargetSkill']);
 const parts = ast.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text)).map(node => node.getText(ast));
 const labels = ast.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(d => d.name.getText(ast) === 'rpsLabel'));
-const component = compile(`const {createPortal}=require('react-dom'); const {useEffect,useState,useRef}=require('react'); const {Hand,Scissors,Swords,Trophy,Loader2,RotateCcw,Clock3,Shield,Check}=require('lucide-react'); const getPlayableSkillTargetIds=()=>window.twoTargets?['player-top','bot-top']:['player-top'];\n${labels.getText(ast)}\n${parts.join('\n')}\nexports.Choose=OpeningTieBreakOverlay; exports.Result=OpeningTieBreakResultOverlay; exports.Target=SkillTargetOverlay;`);
+const component = compile(`const {createPortal}=require('react-dom'); const {useEffect,useState,useRef}=require('react'); const {Hand,Scissors,Swords,Trophy,Loader2,RotateCcw,Clock3,Shield,Check}=require('lucide-react'); const triadCardByNo=new Map([['225',{cardNo:'225',name:'Earth Rebirth',skillText:'เลือกมอนสเตอร์บนสนามเรา 1 ใบ',sourceImage:'/cards/225.jpg',attack:0,support:0}],['268',{cardNo:'268',name:'Blazecurse',skillText:'มอนสเตอร์ธาตุไฟไม่สามารถใช้ค่า ATTACK',sourceImage:'/cards/268.jpg',attack:0,support:0}]]); const getPlayableSkillTargetIds=card=>card?.cardNo==='245'?['copy:225','copy:268']:window.twoTargets?['player-top','bot-top']:['player-top'];\n${labels.getText(ast)}\n${parts.join('\n')}\nexports.Choose=OpeningTieBreakOverlay; exports.Result=OpeningTieBreakResultOverlay; exports.Target=SkillTargetOverlay;`);
 const modules = {};
 for (const [id, pkg, file] of [
   ['react', 'react', 'react.production.js'], ['react/jsx-runtime', 'react', 'react-jsx-runtime.production.js'],
@@ -72,8 +72,9 @@ const modules={${bundle}},cache={};function require(id){if(cache[id])return cach
 const React=require('react'),R=require('rps'),root=require('react-dom/client').createRoot(document.getElementById('root'));
 window.chosen='';window.mount=(round=1,resolved=false)=>{root.render(React.createElement(React.Fragment,null,React.createElement(R.Choose,{tieBreak:{status:resolved?'resolved':'waiting',round,choices:{},winner:resolved?'host':''},hostName:'ผู้เล่นหนึ่ง',challengerName:'ผู้เล่นสอง',ownSide:'host',isSpectator:false,pendingChoice:null,onChoose:c=>window.chosen=c,onReset:()=>{}}),React.createElement(R.Result,{tieBreak:{status:'resolved',winner:'host',choices:{host:'rock',challenger:'scissors'}},hostName:'ผู้เล่นหนึ่ง',challengerName:'ผู้เล่นสอง',visible:resolved}))) };mount();
 window.twoTargets=false; window.requests=0; window.fail=true; window.targetTime=28;
-function Target(){const [selected,setSelected]=React.useState('');return React.createElement(R.Target,{card:{cardNo:window.twoTargets?'232':'235',name:'ตราผนึกหิน',skillText:'เลือกมอนสเตอร์บนสนามเรา 1 ใบ เพิ่ม ATTACK +2000 และ SUPPORT +2000 จนจบตา'},side:'player',playerTop:{sourceImage:'/cards/007.jpg',name:'มอนสเตอร์หลักเรา',attack:6700,support:3200},botTop:{sourceImage:'/cards/008.jpg',name:'มอนสเตอร์คู่แข่ง',attack:6000,support:2000},selectedTarget:selected,timeLeft:window.targetTime,onSelect:setSelected,onConfirm:async()=>{window.requests++;await new Promise(r=>setTimeout(r,300));if(window.fail)throw Error('network');root.render(null);}})}
-window.mountTarget=(two=false,time=28)=>{window.twoTargets=two;window.targetTime=time;root.render(React.createElement(Target,{key:two+':'+time}));};
+function Target(){const [selected,setSelected]=React.useState('');return React.createElement(R.Target,{card:{cardNo:window.copyMode?'245':window.twoTargets?'232':'235',name:'ตราผนึกหิน',skillText:'เลือกมอนสเตอร์บนสนามเรา 1 ใบ เพิ่ม ATTACK +2000 และ SUPPORT +2000 จนจบตา'},side:'player',playerTop:{sourceImage:'/cards/007.jpg',name:'มอนสเตอร์หลักเรา',attack:6700,support:3200},botTop:{sourceImage:'/cards/008.jpg',name:'มอนสเตอร์คู่แข่ง',attack:6000,support:2000},selectedTarget:selected,timeLeft:window.targetTime,onSelect:setSelected,onConfirm:async()=>{window.requests++;await new Promise(r=>setTimeout(r,300));if(window.fail)throw Error('network');root.render(null);}})}
+window.mountTarget=(two=false,time=28)=>{window.copyMode=false;window.twoTargets=two;window.targetTime=time;root.render(React.createElement(Target,{key:two+':'+time}));};
+window.mountCopy=()=>{window.copyMode=true;window.twoTargets=false;root.render(React.createElement(Target,{key:'copy'}));};
 </script></body></html>`;
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -133,6 +134,10 @@ window.mountTarget=(two=false,time=28)=>{window.twoTargets=two;window.targetTime
       await page.getByRole('button', { name: 'หมดเวลา กำลังดำเนินต่อ' }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'หมดเวลา กำลังดำเนินต่อ' }).isEnabled(), false);
     }
+    await page.evaluate(()=>{window.fail=false;window.requests=0;window.targetTime=28;mountCopy()});
+    await page.locator('.nexora-target-option').first().click();await page.getByRole('button',{name:'ยืนยันเป้าหมาย',exact:true}).click();
+    await page.getByText('มอนสเตอร์หลักเรา',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>requests),0,'245 first confirms a source, not the whole skill');
+    await page.getByRole('button',{name:'ยืนยันเป้าหมาย',exact:true}).click();await page.locator('.nexora-target-overlay').waitFor({state:'detached'});assert.equal(await page.evaluate(()=>requests),1,'245 confirms the copied skill target in a second step');
     assert.deepEqual(errors, []);
     console.log('Selection UI: draft polling/reset/reconnect, RPS layering, target auto-select, two-step, network retry, deadline and visible confirm on desktop/mobile/landscape passed');
   } finally { await browser.close(); }

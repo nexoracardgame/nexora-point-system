@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeBattleForfeit, type BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
+import { bestTriadBotPlay } from "./battle-bot-search";
 import {
   getTriadCardRpsChoice,
   resolveTriadTurn,
@@ -1522,24 +1523,8 @@ function botStrategyScore(room: StoredTriadRoom, cardNo: string, strategy: Triad
   return 0;
 }
 
-function pickBotCardFromRanked(room: StoredTriadRoom, ranked: Array<{ cardNo: string; score: number }>) {
-  if (ranked.length === 0) return "";
-  const strategy = botStrategyForRoom(room);
-  if (strategy !== "surprise" && strategy !== "control" && strategy !== "element") return ranked[0].cardNo;
-  const topScore = ranked[0].score;
-  const windowSize = strategy === "surprise" ? 5 : 3;
-  const candidates = ranked
-    .slice(0, windowSize)
-    .filter((item) => item.score >= topScore - (strategy === "surprise" ? 18000 : 9000));
-  if (candidates.length <= 1) return ranked[0].cardNo;
-  const seed = hashSeed(`${room.code}:${room.game.fightNo}:${room.game.activeTurn}:${strategy}:${room.game.triangles.host[laneForTurn(room.game.activeTurn)]}:${room.game.turns.length}`);
-  const totalWeight = candidates.reduce((sum, item) => sum + Math.max(1, item.score - candidates[candidates.length - 1].score + 1), 0);
-  let roll = seed % Math.max(1, Math.floor(totalWeight));
-  for (const item of candidates) {
-    roll -= Math.max(1, item.score - candidates[candidates.length - 1].score + 1);
-    if (roll <= 0) return item.cardNo;
-  }
-  return candidates[0].cardNo;
+function pickBotCardFromRanked(_room: StoredTriadRoom, ranked: Array<{ cardNo: string; score: number }>) {
+  return ranked[0]?.cardNo || "";
 }
 
 function applyBotLearning(cardNo: string, contexts: string[], outcome: number, weight = 1) {
@@ -1619,7 +1604,9 @@ function chooseBotDeckForMode(mode: TriadDeckMode, pool: string[], seed = "") {
     const controlBonus = strategy === "control" && rule && (rule.shape === "skill-cancel" || rule.shape === "block-stat-gain" || rule.shape === "swap-control") ? 9000 : 0;
     const elementBonus = strategy === "element" && rule?.elementCondition ? 6500 : 0;
     const surpriseBonus = strategy === "surprise" && rule && (rule.shape === "swap-control" || rule.shape === "element-transform" || rule.shape === "unparsed") ? 5500 : 0;
-    return botDeckScore(cardNo) + memory + controlBonus + elementBonus + surpriseBonus;
+    const ownMonsters = uniquePool.flatMap(no => { const card=triadCardByNo.get(no);return card?.kind === "monster" ? [card] : []; }).sort((a,b)=>b.attack+b.support-a.attack-a.support).slice(0,10);
+    const synergy = rule?.target.startsWith("own") && rule.elementCondition ? ownMonsters.filter(card=>triadSkillElementConditionMatches(rule,card)).length / Math.max(1,ownMonsters.length) : 1;
+    return (botDeckScore(cardNo) + memory + controlBonus + elementBonus + surpriseBonus) * synergy;
   };
   const monsters = uniquePool
     .filter((cardNo) => triadCardByNo.get(cardNo)?.kind === "monster")
@@ -1710,7 +1697,20 @@ function botTargetToken(side: TriadRoomSlot, targetSide: TriadRoomSlot) {
   return targetSide === "challenger" ? "player-top" : "bot-top";
 }
 
-function chooseBotSkillTarget(room: StoredTriadRoom, choice: TriadRoomSkillChoice) {
+function chooseBotSkillTarget(room: StoredTriadRoom, choice: TriadRoomSkillChoice): string {
+  if (choice.cardNo !== "254") {
+    const own = room.game.triangles[choice.side];
+    const enemy = room.game.triangles[choice.side === "host" ? "challenger" : "host"];
+    const best = bestTriadBotPlay(room.game.activeTurn, enemy, own, [choice.cardNo], getOpeningSide(room) === choice.side ? "opponent" : "player");
+    const target = best.target.split(">").map(value => value === "player-top" ? "bot-top" : value === "bot-top" ? "player-top" : value).join(">");
+    if (target) return target;
+  }
+  if (choice.cardNo === "245") {
+    const copy = reversalCopyOptions(room, choice.side)[0];
+    if (!copy) return "";
+    const target = chooseBotSkillTarget(room, { ...choice, cardNo: copy.slice(5) });
+    return target ? `${copy}>${target}` : copy;
+  }
   const opponentSide: TriadRoomSlot = choice.side === "host" ? "challenger" : "host";
   const ownSide = choice.side;
   const rule = triadSkillRuleByNo.get(choice.cardNo);
@@ -1791,6 +1791,7 @@ function applyBotSkillChoice(room: StoredTriadRoom) {
     }
   } else {
     choice.selectedTarget = selectedTarget;
+    if (selectedTarget.startsWith("copy:254>")) prepareCopiedBlessing(room, choice, selectedTarget.split(">")[1]);
   }
   resolveIfBothLocked(room);
   return true;
@@ -1947,6 +1948,8 @@ function chooseBotCardForTurn(room: StoredTriadRoom) {
     return botCanUseElementSkill(candidateRoom, "challenger", cardNo);
   });
   const scoringCards = smartPlayable.length > 0 ? smartPlayable : playable;
+  const search = bestTriadBotPlay(turn, room.game.triangles.host, room.game.triangles.challenger, scoringCards, getOpeningSide(room) === "challenger" ? "opponent" : "player");
+  if (search.cardNo && turn > 1) return search.cardNo;
   const ranked = scoringCards
     .map((cardNo) => ({ cardNo, score: botCardScore(room, cardNo) }))
     .sort((a, b) => b.score - a.score);
@@ -2200,12 +2203,21 @@ function parseBoardTargetSequence(value = "") {
 }
 
 function canUseManualSkillChoice(room: StoredTriadRoom, cardNo: string) {
+  if (cleanText(cardNo) === "245") return reversalCopyOptions(room, "host").length > 0 || reversalCopyOptions(room, "challenger").length > 0;
   if (cleanText(cardNo) === "265") return false;
   if (cleanText(cardNo) === "254") return true;
   if (cleanText(cardNo) === "227") return gravityFieldTargets(room).length > 0;
   if (cleanText(cardNo) === "226") return legalManualSkillTargetSlots(room, "host", cardNo).length > 0;
   if (cleanText(cardNo) === "231") return metalSwordTargets(room).length > 0;
   return skillNeedsManualChoice(cardNo);
+}
+
+function reversalCopyOptions(room: StoredTriadRoom, side: TriadRoomSlot) {
+  const field = room.game.triangles[side === "host" ? "challenger" : "host"];
+  return (["top", "left", "right"] as const).slice(0, room.game.activeTurn).flatMap(lane => {
+    const no = field[lane] || "";
+    return no !== "245" && triadCardByNo.get(no)?.kind === "skill" ? [`copy:${no}`] : [];
+  });
 }
 
 function currentTurnChoices(room: StoredTriadRoom) {
@@ -2228,7 +2240,7 @@ function orderedSkillChoiceCandidates(room: StoredTriadRoom) {
       const cardNo = room.game.triangles[side][lane];
       const rule = cardNo ? triadSkillRuleByNo.get(cleanCardNo(cardNo)) : undefined;
       const hasLegalElementTarget = !cardNo || !rule?.elementCondition || legalManualSkillTargetSlots(room, side, cardNo).length > 0;
-      return cardNo && canUseManualSkillChoice(room, cardNo) && hasLegalElementTarget
+      return cardNo && canUseManualSkillChoice(room, cardNo) && hasLegalElementTarget && (cardNo !== "245" || reversalCopyOptions(room, side).length > 0)
         ? {
             side,
             cardNo,
@@ -2239,7 +2251,15 @@ function orderedSkillChoiceCandidates(room: StoredTriadRoom) {
 }
 
 function currentTurnBlessings(room: StoredTriadRoom) {
-  return currentTurnChoices(room).filter((choice) => choice.cardNo === "254" && choice.selectedTarget && !choice.skipped);
+  return currentTurnChoices(room).filter(choice => !choice.skipped && (choice.cardNo === "254" && choice.selectedTarget || choice.cardNo === "245" && choice.selectedTarget.startsWith("copy:254>"))).map(choice => choice.cardNo === "245" ? { ...choice, cardNo: "254", selectedTarget: choice.selectedTarget.split(">")[1] } : choice);
+}
+
+function prepareCopiedBlessing(room: StoredTriadRoom, choice: TriadRoomSkillChoice, action: string) {
+  choice.blessingChoice = action as TriadBlessingChoice;
+  if (action === "draw-skill") {
+    const drawn = randomCardNoByKind("skill", blessingRandomExcludedCards(room, ["254"]));
+    if (drawn) { choice.blessingDrawCardNo = drawn; room.game.usedCards[choice.side] = [...new Set([...room.game.usedCards[choice.side], drawn])]; }
+  } else choice.blessingPreviewTopNo = randomCardNoByKind("monster", blessingRandomExcludedCards(room)) || undefined;
 }
 
 function applyTurnBlessings(room: StoredTriadRoom) {
@@ -2300,6 +2320,10 @@ function targetTokenToHostPerspective(side: TriadRoomSlot, target: "player-top" 
 }
 
 function targetToHostPerspective(choice: TriadRoomSkillChoice): string {
+  if (choice.cardNo === "245" && choice.selectedTarget.startsWith("copy:")) {
+    const [copy, ...rest] = choice.selectedTarget.split(">");
+    return [copy, ...rest.map(target => target === "player-top" || target === "bot-top" ? targetTokenToHostPerspective(choice.side, target) : target)].join(">");
+  }
   const targets = parseBoardTargetSequence(choice.selectedTarget);
   if (targets.length === 0) return "";
   return targets.map((target) => targetTokenToHostPerspective(choice.side, target)).join(">");
@@ -2346,8 +2370,8 @@ function selectedSkillTargets(room: StoredTriadRoom, opener: TriadRoomSlot) {
       const target =
         opener === "host"
           ? hostPerspectiveTarget
-          : parseBoardTargetSequence(hostPerspectiveTarget)
-              .map((item) => (item === "player-top" ? "bot-top" : "player-top"))
+          : hostPerspectiveTarget.split(">")
+              .map((item) => (item === "player-top" ? "bot-top" : item === "bot-top" ? "player-top" : item))
               .join(">");
       targets[side] = {
         ...(targets[side] || {}),
@@ -2815,7 +2839,18 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     return { ok: false as const, reason: "choice_expired" as const, room: publicRoom(room) };
   }
   const cleanTarget = cleanText(selectedTarget);
-  if (choice.cardNo === "254") {
+  if (choice.cardNo === "245") {
+    const [copy, ...targets] = cleanTarget.split(">");
+    if (!reversalCopyOptions(room, side).includes(copy)) return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+    const copiedNo = copy.slice(5);
+    const legal = legalManualSkillTargetSlots(room, side, copiedNo);
+    if (targets.length > (copiedNo === "232" ? 2 : 1) || new Set(targets).size !== targets.length) return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+    if (copiedNo === "254") {
+      if (targets.length !== 1 || !["draw-skill", "reroll-own", "reroll-opponent"].includes(targets[0])) return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+      prepareCopiedBlessing(room, choice, targets[0]);
+    } else if (targets.length && targets.some(target => !legal.includes(selectedTargetSlot(side, target) as TriadRoomSlot))) return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
+    choice.selectedTarget = cleanTarget;
+  } else if (choice.cardNo === "254") {
     if (!["draw-skill", "reroll-own", "reroll-opponent"].includes(cleanTarget)) {
       return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
     }
