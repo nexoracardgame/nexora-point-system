@@ -110,3 +110,8 @@
   .nexora-command-lobby .nexora-join-drawer .nexora-command-room-row button { min-height:26px; padding:4px 7px; font-size:10px; }
 }
 @media (prefers-reduced-motion:reduce) { .nexora-command-lobby .nexora-play-drawer,.nexora-command-lobby .nexora-play-drawer * { animation:none!important; transition:none!important; } }
+@media (max-width:340px) and (orientation:portrait), (max-height:340px) and (orientation:landscape) {
+  .nexora-command-lobby .nexora-command-sheet.nexora-play-drawer { height:84%; bottom:6%; width:70%; }
+  .nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head { min-height:46px!important; margin-bottom:10px; }
+  .nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head h2 b { font-size:30px; }
+}

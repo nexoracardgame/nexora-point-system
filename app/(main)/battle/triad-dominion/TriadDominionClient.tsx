@@ -3574,6 +3574,10 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   };
   useEffect(() => () => clearTimeout(panelTimer.current), []);
   useEffect(() => {
+    if (panel === "rank") {
+      const closeRank = (event: KeyboardEvent) => { if (event.key === "Escape") setPanel(null); };
+      window.addEventListener("keydown", closeRank); return () => window.removeEventListener("keydown", closeRank);
+    }
     if (panel !== "create" && panel !== "join") return;
     const sheet = artRef.current?.querySelector<HTMLElement>(".nexora-play-drawer");
     sheet?.focus();
