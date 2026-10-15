@@ -30,6 +30,7 @@ type LookupOptions = {
 };
 
 type CardSetScanView = {
+  createdByAdminMode?: boolean;
   id: string;
   code: string;
   userId: string;
@@ -73,6 +74,7 @@ type CardSetScanView = {
 };
 
 type CardRareScanView = {
+  createdByAdminMode?: boolean;
   id: string;
   code: string;
   userId: string;
@@ -268,7 +270,7 @@ export default function StaffCouponScanner({
   const confirmCouponUse = useCallback(
     async (targetCode?: string) => {
       if (customerAdminMode) {
-        showForbiddenAccess();
+        setMessage("แสดงคูปองนี้ให้เจ้าหน้าที่สแกนเพื่อยืนยันใช้รางวัล");
         return;
       }
 
@@ -466,10 +468,6 @@ export default function StaffCouponScanner({
           }
 
           setCode(cardRareCode);
-          if (customerAdminMode && !data?.redemption?.createdByAdminMode) {
-            showForbiddenAccess();
-            return;
-          }
           setResult(null);
           setCardSetResult(null);
           setCardRareResult(data?.redemption || null);
@@ -499,21 +497,12 @@ export default function StaffCouponScanner({
           }
 
           setCode(cardSetCode);
-          if (customerAdminMode && !data?.redemption?.createdByAdminMode) {
-            showForbiddenAccess();
-            return;
-          }
           setResult(null);
           setCardRareResult(null);
           setCardSetResult(data?.redemption || null);
           if (options.promptUse) {
             setMessage("สแกน QR CODE CARD SET สำเร็จ");
           }
-          return;
-        }
-
-        if (customerAdminMode) {
-          showForbiddenAccess();
           return;
         }
 
@@ -533,6 +522,12 @@ export default function StaffCouponScanner({
         setCode(nextCode);
         setResult(coupon);
         setCardSetResult(null);
+        setCardRareResult(null);
+
+        if (customerAdminMode) {
+          setMessage("ตรวจสอบคูปองสำเร็จ แสดงคูปองให้เจ้าหน้าที่เพื่อยืนยันใช้รางวัล");
+          return;
+        }
 
         if (options.promptUse && coupon) {
           if (coupon.isReversed) {
@@ -1022,7 +1017,7 @@ export default function StaffCouponScanner({
                   <button
                     type="button"
                     onClick={() => void confirmCardSetAction("approve")}
-                    disabled={loading || cardSetResult.status !== "pending"}
+                    disabled={loading || cardSetResult.status !== "pending" || (customerAdminMode && !cardSetResult.createdByAdminMode)}
                     className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.26)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     {loading ? (
@@ -1030,12 +1025,12 @@ export default function StaffCouponScanner({
                     ) : (
                       <ShieldCheck className="h-4 w-4" />
                     )}
-                    อนุมัติ
+                    {customerAdminMode ? (cardSetResult.createdByAdminMode ? "ยืนยันรับรางวัล" : "รอเจ้าหน้าที่ตรวจสอบ") : "อนุมัติ"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void confirmCardSetAction("cancel")}
-                    disabled={loading || cardSetResult.status !== "pending"}
+                    disabled={loading || cardSetResult.status !== "pending" || (customerAdminMode && !cardSetResult.createdByAdminMode)}
                     className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] border border-red-300/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 transition hover:bg-red-500/16 disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <XCircle className="h-4 w-4" />
@@ -1193,7 +1188,7 @@ export default function StaffCouponScanner({
                   <button
                     type="button"
                     onClick={() => void confirmCardRareAction("approve")}
-                    disabled={loading || cardRareResult.status !== "pending"}
+                    disabled={loading || cardRareResult.status !== "pending" || (customerAdminMode && !cardRareResult.createdByAdminMode)}
                     className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#f5d0fe,#a855f7,#6d28d9)] px-4 py-3 text-sm font-black text-white shadow-[0_0_24px_rgba(168,85,247,0.28)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     {loading ? (
@@ -1201,12 +1196,12 @@ export default function StaffCouponScanner({
                     ) : (
                       <ShieldCheck className="h-4 w-4" />
                     )}
-                    อนุมัติ
+                    {customerAdminMode ? (cardRareResult.createdByAdminMode ? "ยืนยันรับรางวัล" : "รอเจ้าหน้าที่ตรวจสอบ") : "อนุมัติ"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void confirmCardRareAction("cancel")}
-                    disabled={loading || cardRareResult.status !== "pending"}
+                    disabled={loading || cardRareResult.status !== "pending" || (customerAdminMode && !cardRareResult.createdByAdminMode)}
                     className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] border border-red-300/18 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 transition hover:bg-red-500/16 disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <XCircle className="h-4 w-4" />
@@ -1280,7 +1275,7 @@ export default function StaffCouponScanner({
                 <button
                   type="button"
                   onClick={() => void confirmCouponUse()}
-                  disabled={loading || result.used || result.isReversed}
+                  disabled={loading || result.used || result.isReversed || customerAdminMode}
                   className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(250,204,21,0.26)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   {loading ? (
@@ -1292,7 +1287,7 @@ export default function StaffCouponScanner({
                     ? "คูปองถูกใช้งานแล้ว"
                     : result.isReversed
                       ? "คูปองถูกย้อนกลับแล้ว"
-                    : "ยืนยันการใช้งานของจริง"}
+                    : customerAdminMode ? "แสดงคูปองให้เจ้าหน้าที่ยืนยัน" : "ยืนยันการใช้งานของจริง"}
                 </button>
               </div>
             ) : (
@@ -1311,10 +1306,10 @@ export default function StaffCouponScanner({
               <XCircle className="h-9 w-9" />
             </div>
             <h2 className="mt-5 text-2xl font-black text-red-100">
-              คุณไม่มีสิทในการใช้งานฟังชั่นนี้
+              รายการนี้เป็นของสมาชิกท่านอื่น
             </h2>
             <p className="mt-3 text-sm font-bold leading-6 text-red-100/76">
-              เฉพาะเจ้าหน้าที่เท่านั้น หรือสแกนได้เฉพาะ QR ที่แอดมินสร้างจากโหมดแอดมินให้ลูกค้าใช้งาน
+              คุณสแกนดูรายการของตัวเอง หรือสแกนรับรางวัลจาก QR ที่แอดมินออกให้ได้
             </p>
             <button
               type="button"
