@@ -164,3 +164,43 @@
   .nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head { min-height:46px!important; margin-bottom:10px; }
   .nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head h2 b { font-size:30px; }
 }
+/* One reference-sized drawing plane: controls and outline always scale together. */
+.nexora-command-lobby:has(.nexora-play-drawer) .nexora-command-nav { visibility:hidden; pointer-events:none; }
+.nexora-command-lobby .nexora-command-sheet.nexora-play-drawer {
+  width:1040px; height:600px; bottom:9%; padding:40px 28px 28px;
+  zoom:var(--lobby-drawer-scale,1); max-width:none;
+}
+.nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head {
+  min-height:126px!important; height:126px; margin:0 0 30px; width:72%;
+}
+.nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head h2 b { font-size:76px; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head h2 span { font-size:28px; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-head > button { left:240px; top:30px; width:40px; height:40px; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-sheet-body {
+  width:76%; gap:18px 12px; padding:4px 0 0 6px; flex:none; height:360px;
+  grid-template-rows:176px 50px 74px; overflow:hidden;
+}
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"] {
+  width:280px; margin:0 0 4px 50px; max-width:calc(100% - 50px); gap:24px;
+}
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment button { min-height:72px!important; font-size:30px!important; padding:8px 14px; flex:none; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] { margin:0; gap:6px; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button { flex:1; min-height:50px!important; font-size:18px!important; padding:8px 12px; }
+.nexora-command-lobby .nexora-play-drawer label { font-size:18px; margin:0 22px 0 50px; }
+.nexora-command-lobby .nexora-play-drawer input { height:36px; font-size:14px; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-primary { min-height:92px!important; font-size:54px!important; margin:-24px 0 0!important; padding:10px 12px 10px 50px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-sheet-head { height:106px; min-height:106px!important; margin-bottom:18px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-sheet-body { width:77%; height:400px; padding-left:20px; gap:10px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-segment[aria-label="รูปแบบห้อง"] { width:280px; gap:12px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-segment[aria-label="รูปแบบห้อง"] button { min-height:52px!important; font-size:22px!important; }
+.nexora-command-lobby .nexora-join-drawer form { width:70%; gap:16px; }
+.nexora-command-lobby .nexora-join-drawer form label { margin:0; font-size:15px; }
+.nexora-command-lobby .nexora-join-drawer form .nexora-command-primary { width:180px; min-height:52px!important; font-size:24px!important; margin:0!important; padding:8px 12px 8px 30px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-room-list { grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:76px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-room-row { height:76px; padding:7px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-room-row strong { font-size:18px; }
+.nexora-command-lobby .nexora-join-drawer .nexora-command-room-row small { font-size:10px; }
+@container (max-width:1100px) {
+  .nexora-command-lobby .nexora-command-sheet.nexora-play-drawer { bottom:4%; }
+  .nexora-command-lobby:has(.nexora-play-drawer) .nexora-command-profile { visibility:hidden; }
+}

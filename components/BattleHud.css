@@ -1,3 +1,24 @@
+/* Fit the actual visible browser area, including native status/navigation bars. */
+@media (max-width:1000px), (hover:none) and (pointer:coarse) {
+  .nexora-battle-shell {
+    --game-safe-x:calc(env(safe-area-inset-left,0px) + env(safe-area-inset-right,0px));
+    --game-safe-y:calc(var(--app-safe-top,env(safe-area-inset-top,0px)) + env(safe-area-inset-bottom,0px));
+    position:fixed!important; inset:auto!important;
+    left:calc(var(--game-visual-left,0px) + env(safe-area-inset-left,0px))!important;
+    top:calc(var(--game-visual-top,0px) + var(--app-safe-top,env(safe-area-inset-top,0px)))!important;
+    width:calc(var(--game-visual-width,100dvw) - var(--game-safe-x))!important;
+    height:calc(var(--game-visual-height,100dvh) - var(--game-safe-y))!important;
+    max-width:none!important; max-height:none!important; min-height:0!important;
+    transform:none!important; margin:0!important; padding:0!important;
+  }
+}
+@media (max-width:900px) and (orientation:portrait) {
+  .nexora-battle-shell {
+    width:calc(var(--game-visual-height,100dvh) - var(--game-safe-y))!important;
+    height:calc(var(--game-visual-width,100dvw) - var(--game-safe-x))!important;
+    transform:rotate(90deg) translateY(-100%)!important; transform-origin:top left!important;
+  }
+}
 .triad-battle-chat-hud {
   width:min(440px,28cqw,calc((100cqw - 560px)/2 - 24px));
   background:rgba(0,0,0,.42);

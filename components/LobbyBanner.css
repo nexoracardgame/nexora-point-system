@@ -28,3 +28,23 @@
   .nexora-lobby-banner-dots button::before { inset:5px 2px; }
 }
 @media (prefers-reduced-motion:reduce) { .nexora-lobby-banner *,.nexora-lobby-banner *::before { transition:none!important; animation:none!important; } }
+/* Container height follows the usable game stage, not the phone's outer screen. */
+@container (max-height:340px) {
+  .nexora-command-lobby .nexora-lobby-promo-rail { width:min(38%,78cqh); top:14%; bottom:6%; gap:5px; justify-content:center; }
+  .nexora-command-lobby .nexora-lobby-promo-rail .nexora-command-actions { gap:6px; }
+  .nexora-command-lobby .nexora-lobby-art-button strong { font-size:11px; }
+  .nexora-command-lobby .nexora-lobby-art-button small { font-size:8px; margin-top:2px; }
+  .nexora-command-lobby .nexora-command-brand { top:6px; left:12px; }
+  .nexora-command-lobby .nexora-command-brand > .nexora-official-logo { width:120px; height:48px; }
+  .nexora-command-lobby .nexora-command-profile { margin-top:3px; gap:6px; padding:3px 0; }
+  .nexora-command-lobby .nexora-command-profile img { width:30px; height:30px; }
+  .nexora-command-lobby .nexora-command-profile strong { font-size:11px; }
+  .nexora-command-lobby .nexora-command-profile small { font-size:9px; }
+  .nexora-command-lobby .nexora-command-nav { top:96px; left:12px; width:126px; gap:3px; }
+  .nexora-command-lobby .nexora-command-nav button { min-height:27px; font-size:10px; padding:4px 6px; }
+}
+@container (max-height:240px) {
+  .nexora-command-lobby .nexora-command-profile { display:none; }
+  .nexora-command-lobby .nexora-command-nav { top:58px; }
+  .nexora-command-lobby .nexora-command-nav button { min-height:24px; }
+}

@@ -12,6 +12,7 @@
 .nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button:nth-child(2) { margin-left:var(--action-step); }
 .nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button:nth-child(3) { margin-left:calc(var(--action-step) * 2); }
 .nexora-lobby-art-crop { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.nexora-lobby-art-crop::before { content:""; position:absolute; inset:3% 1%; background:linear-gradient(110deg,#060708ed,#16130be8); border:2px solid #e6c377; clip-path:polygon(12% 0,97% 0,100% 15%,100% 88%,97% 100%,0 100%); pointer-events:none; }
 .nexora-lobby-art-crop img { position:absolute; left:0; top:0; width:127.1523%; max-width:none; height:auto; pointer-events:none; user-select:none; }
 .nexora-lobby-art-button[data-artwork=join] .nexora-lobby-art-crop img { top:-100%; }
 .nexora-lobby-art-button[data-artwork=rank] .nexora-lobby-art-crop img { top:-200%; }

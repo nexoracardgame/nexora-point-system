@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { preload } from "react-dom";
+import { LOBBY_ACTION_ART, loadLobbyAssets } from "@/lib/lobby-assets";
 import "./BattleLoadingScreen.css";
 
 const DURATION = 3000;
@@ -26,20 +28,30 @@ export function useBattleLoadingStage(stage: string) {
 }
 
 export default function BattleLoadingScreen() {
+  preload(LOBBY_ACTION_ART, { as: "image", fetchPriority: "high" });
   const pathname = usePathname();
   const [run, setRun] = useState(0);
   const [visible, setVisible] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useLayoutEffect(() => {
+    let active = true;
+    let sequence = 0;
+    const artwork = Promise.race([
+      loadLobbyAssets().catch(() => {}),
+      new Promise<void>(resolve => { setTimeout(resolve, 8000); }),
+    ]);
     const show = () => {
+      const current = ++sequence;
       clearTimeout(timer.current);
       setVisible(until > performance.now());
       setRun(until);
-      timer.current = setTimeout(() => setVisible(false), Math.max(0, until - performance.now()));
+      timer.current = setTimeout(() => {
+        void artwork.then(() => { if (active && current === sequence) setVisible(false); });
+      }, Math.max(0, until - performance.now()));
     };
     window.addEventListener("nexora:battle-loading", show);
     beginBattleLoading("arrival");
-    return () => { clearTimeout(timer.current); window.removeEventListener("nexora:battle-loading", show); };
+    return () => { active = false; clearTimeout(timer.current); window.removeEventListener("nexora:battle-loading", show); };
   }, [pathname]);
   useEffect(() => {
     const click = (event: MouseEvent) => {

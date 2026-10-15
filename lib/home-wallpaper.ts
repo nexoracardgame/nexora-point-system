@@ -1,6 +1,10 @@
+import { loadLobbyAssets } from "./lobby-assets";
+
 let wallpaper: Promise<string> | undefined;
 export function loadHomeWallpaper() {
   wallpaper ??= (async () => {
+    // Interactive artwork must finish before large background downloads compete for bandwidth.
+    await loadLobbyAssets().catch(() => {});
     const base = "/videos/nexora-home-4k/";
     const response = await fetch(base + "manifest.json", { cache: "no-store" });
     if (!response.ok) throw new Error("Wallpaper manifest unavailable");

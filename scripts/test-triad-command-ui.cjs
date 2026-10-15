@@ -9,7 +9,9 @@ const modules={};
 for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
 modules['@/components/LobbyActionButton']=transpile(fs.readFileSync('components/LobbyActionButton.tsx','utf8'));
+modules['@/lib/lobby-assets']=transpile(fs.readFileSync('lib/lobby-assets.ts','utf8'));
 modules['@/components/LobbyBanner']=transpile(fs.readFileSync('components/LobbyBanner.tsx','utf8'));
+modules['@/components/NativeViewportBridge']=transpile(fs.readFileSync('components/NativeViewportBridge.tsx','utf8'));
 modules['./LobbyBanner.css']='';
 modules['./LobbyActionButton.css']='';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{window.artHoverSounds=(window.artHoverSounds||0)+1;};';
@@ -35,7 +37,7 @@ import LobbyActionButton from '@/components/LobbyActionButton';
 import LobbyBanner from '@/components/LobbyBanner';export {LobbyBanner};
 const playDrawerSound=()=>{};const playGameUiSound=()=>{};
 const BattleForfeitVictory=()=>null;
-const DuelistLeaderboard=({onClose})=><div><span>อันดับนักดวลทดสอบ</span><button aria-label="ปิด" onClick={onClose}>ปิด</button></div>;
+const DuelistLeaderboard=({onClose})=><div style={{position:'absolute',inset:0,zIndex:100,background:'#050607'}}><span>อันดับนักดวลทดสอบ</span><button aria-label="ปิด" onClick={onClose}>ปิด</button></div>;
 import BattleArenaChat, { BattleArenaChatFrame } from '@/components/BattleArenaChat';
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from '@/components/DeckPreparation';
 import { freshDeck, randomTriadDeck } from '@/lib/deck-reroll';
@@ -57,7 +59,7 @@ export function TestDialog(){const createModeDialogOpen=true,createFormat='penta
 `);
 const bundle=Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const css=fs.readFileSync('components/GameModeModal.css','utf8')+'\n'+fs.readdirSync('.next/static/chunks').filter(f=>f.endsWith('.css')).map(f=>fs.readFileSync('.next/static/chunks/'+f,'utf8')).join('\n')+'\n'+fs.readFileSync('app/globals.css','utf8')+'\n'+fs.readFileSync('app/(main)/battle/triad-dominion/NexoraCommand.css','utf8')+'\n'+fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSync('app/(main)/battle/triad-dominion/NexoraLobbyDrawer.css','utf8')+'\n'+fs.readFileSync('components/LobbyActionButton.css','utf8')+'\n'+fs.readFileSync('components/LobbyBanner.css','utf8');
-const html=`<!doctype html><html><head><meta charset="utf-8"><style>${css}body{margin:0;background:#080b0e}#root{position:relative!important;inset:auto!important;width:100%!important;height:100dvh!important;max-height:none!important;max-width:none!important;margin:0!important;padding:0!important;box-sizing:border-box}@media(max-width:900px) and (orientation:portrait){#root{width:100dvh!important;height:100dvw!important;min-height:0!important}}</style></head><body><div id="root" class="nexora-battle-shell"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const React=require('react'),root=require('react-dom/client').createRoot(document.getElementById('root'));window.mount=room=>root.render(React.createElement(room?require('test').TestRoom:require('test').TestLobby));mount(false);</script></body></html>`;
+const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>${css}body{margin:0;background:#080b0e}#root{box-sizing:border-box} @media(min-width:1001px){#root{position:relative!important;width:100%!important;height:100dvh!important;max-height:none!important;max-width:none!important;margin:0!important;padding:0!important}}</style></head><body><div id="root" class="nexora-battle-shell"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const React=require('react'),root=require('react-dom/client').createRoot(document.getElementById('root'));window.mount=room=>root.render(React.createElement(React.Fragment,null,React.createElement(require('@/components/NativeViewportBridge').default),React.createElement(room?require('test').TestRoom:require('test').TestLobby)));mount(false);</script></body></html>`;
 (async()=>{fs.mkdirSync('artifacts/triad-command',{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});
 try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
 let createdDeckSource='';const serve=route=>{const url=new URL(route.request().url());if(url.pathname==='/api/pentad-rooms'){if(route.request().method()==='POST'){createdDeckSource=route.request().postDataJSON().deckSource;return route.fulfill({json:{room:{code:'111222'}}});}return route.fulfill({json:{rooms:[{code:'111222',host:'QA Pentad',phase:'select'}]}});}if(url.pathname==='/')return route.fulfill({body:html,contentType:'text/html'});const asset=path.resolve('public','.'+url.pathname);if(!asset.startsWith(path.resolve('public')+path.sep))return route.abort();return route.fulfill({body:fs.readFileSync(asset),contentType:asset.endsWith('.webp')?'image/webp':'image/jpeg'});};
@@ -77,7 +79,7 @@ const auditDrawer=async()=>{
   assert.equal(await mode.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)','Selected mode has a clear gold face');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el,'::after').content),'""','Gold hover reflection exists');
 };
-for(const [width,height] of [[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]){
+for(const [width,height] of (process.env.MOBILE_ONLY==='1'?[]:[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]])){
 await page.setViewportSize({width,height});await page.goto('https://command.test/');await page.waitForSelector('.nexora-command-mode');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
 await page.evaluate(()=>new Promise((resolve,reject)=>{const i=new window.Image();i.onload=resolve;i.onerror=reject;i.src='/images/triad/nexora-command.webp'}));
 await page.waitForSelector('.nexora-command-world');
@@ -121,6 +123,36 @@ assert.deepEqual(errors,[]);console.log('Command lobby + room '+width+'x'+height
 await page.evaluate(()=>root.render(React.createElement(require('test').TestDeck)));await page.locator('.nexora-deck-header').waitFor();await page.getByRole('textbox',{name:'ข้อความแชตสนาม'}).fill('จัดเด็คอยู่');await page.locator('.nexora-deck-grid button').first().click();assert.equal(await page.locator('.nexora-deck-chosen button').count(),1);await page.getByRole('button',{name:'พร้อม',exact:true}).click();assert.equal(await page.evaluate(()=>window.deckReady),true);for(const control of await page.locator('.nexora-deck-header button,.nexora-deck-header-actions span,.nexora-deck-ready,.triad-battle-chat-hud input').all()){const r=await control.boundingBox();assert.ok(r&&r.x>=-1&&r.y>=-1&&r.x+r.width<=width+1&&r.y+r.height<=height+1,'Shared deck controls fit '+width);}await page.screenshot({path:'artifacts/triad-command/deck-'+width+'.png'});
 await page.evaluate(()=>root.render(React.createElement(require('test').TestDialog)));await page.getByRole('heading',{name:'เลือกโหมดการเล่น'}).waitFor();await page.getByRole('button',{name:/สุ่มพูล/}).click();await page.getByRole('switch',{name:'สู้กับบอททันที'}).click();await page.getByRole('button',{name:'ยืนยันสร้างห้อง',exact:true}).click();assert.deepEqual(await page.evaluate(()=>window.dialogChoice),{mode:'monster',bot:true});assert.ok((await page.getByRole('button',{name:/สุ่มพูล/}).innerText()).includes('30 ใบ'));assert.deepEqual(errors,[]);
 }
+for (const viewport of [{width:390,height:844},{width:844,height:390},{width:320,height:568}]) {
+ const mobile=await browser.newPage({viewport,hasTouch:true,isMobile:true});
+ await mobile.addInitScript(()=>{
+   const visual=new EventTarget();Object.defineProperties(visual,{width:{get:()=>innerWidth},height:{get:()=>innerHeight-100},offsetTop:{value:40},offsetLeft:{value:0}});
+   Object.defineProperty(window,'visualViewport',{configurable:true,value:visual});
+   window.Capacitor={isNativePlatform:()=>true,getPlatform:()=> 'android'};
+   window.fullscreenRequests=0;Element.prototype.requestFullscreen=()=>{window.fullscreenRequests++;return Promise.reject(new Error('Unsupported browser'));};
+ });
+ await mobile.route('https://command.test/**',serve);await mobile.goto('https://command.test/');
+ await mobile.waitForFunction(()=>document.documentElement.dataset.nativePlatform==='android');
+ for(const item of await mobile.locator('.nexora-lobby-banner,.nexora-lobby-art-button,.nexora-command-nav button').all()) {
+   const box=await item.boundingBox();assert.ok(box&&box.x>=0&&box.y>=66&&box.x+box.width<=viewport.width+1&&box.y+box.height<=viewport.height-60+1,'Main menu and banner fit the usable mobile area '+JSON.stringify(box));
+ }
+ await mobile.getByRole('button',{name:'PLAY สร้างสนามประลอง'}).tap();
+ await mobile.locator('.nexora-play-drawer').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{})));});
+ const assertTouchControls=async()=>{
+   for(const control of await mobile.locator('.nexora-play-drawer button,.nexora-play-drawer input').all()) {
+     const box=await control.boundingBox();assert.ok(box&&box.x>=0&&box.y>=74&&box.x+box.width<=viewport.width+1&&box.y+box.height<=viewport.height-60+1,'Touch controls stay clear of simulated browser/native bars '+JSON.stringify(box));
+     assert.ok(await control.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width*.5,r.y+r.height*.5));}),'Center of each control is actually tappable, not just visible');
+   }
+ };
+ await assertTouchControls();assert.ok(await mobile.evaluate(()=>fullscreenRequests>0),'A touch gesture requests immersive fullscreen, with a safe unsupported-browser fallback');await mobile.getByRole('button',{name:'PENTAD 5 ใบ',exact:true}).tap();
+ await mobile.getByRole('button',{name:'ปิด',exact:true}).click();
+ await mobile.getByRole('button',{name:'JOIN ARENA เข้าร่วม / ชมการต่อสู้'}).click();
+ await mobile.locator('.nexora-play-drawer').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{})));});
+ await assertTouchControls();await mobile.getByPlaceholder('000000').fill('123456');await mobile.locator('.nexora-command-sheet form button').click();
+ assert.equal(await mobile.evaluate(()=>action),'/battle/pentad-dominion?room=123456');
+ await mobile.screenshot({path:'artifacts/triad-command/mobile-safe-'+viewport.width+'.png'});await mobile.close();
+}
+console.log('Mobile browser/native bars: visible viewport, safe inset, rotated touch hit testing and JOIN input passed');
 await page.setViewportSize({width:1920,height:1080});await page.goto('https://command.test/');await page.clock.install();
 const logo={id:'logo',src:'/images/triad/nexora-official-logo.webp',alt:'NEXORA',fit:'contain'},wall={id:'wall',src:'/images/triad/nexora-command-original.webp',alt:'Wallpaper'},third={id:'third',src:'/images/triad/nexora-command.webp',alt:'Third'};
 const mountBanner=slides=>page.evaluate(slides=>root.render(React.createElement(require('test').LobbyBanner,{slides})),slides);

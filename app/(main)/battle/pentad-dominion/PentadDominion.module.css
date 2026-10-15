@@ -239,6 +239,21 @@
 .choicePanel > .primary:disabled { background:#ffffff12 !important; color:#a3b3bc !important; }
 .brand { font-family:inherit; font-size:24px; }
 .brand small { display:flex; align-items:center; gap:6px; font-size:10px; font-weight:900; color:#edd7a5; margin-bottom:4px; }
+@media (max-width:1000px), (hover:none) and (pointer:coarse) {
+  .shell,.hudPlane,.choiceOverlay,.elementClash,.previewPlane {
+    --safe-width:calc(var(--game-visual-width,100dvw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));
+    --safe-height:calc(var(--game-visual-height,100dvh) - var(--app-safe-top,env(safe-area-inset-top,0px)) - env(safe-area-inset-bottom,0px));
+    inset:auto; left:calc(var(--game-visual-left,0px) + env(safe-area-inset-left,0px));
+    top:calc(var(--game-visual-top,0px) + var(--app-safe-top,env(safe-area-inset-top,0px)));
+    width:var(--safe-width); height:var(--safe-height); transform:none;
+  }
+}
+@media (max-width:1000px) and (orientation:portrait) {
+  .shell,.hudPlane,.choiceOverlay,.elementClash,.previewPlane {
+    width:var(--safe-height); height:var(--safe-width);
+    transform:rotate(90deg) translateY(-100%); transform-origin:top left;
+  }
+}
 .elementClash h2,.elementClash p,.elementClash strong,.elementClash span,.stageDetail { background:transparent; border:0; text-shadow:0 2px 4px #000,0 0 12px #000; }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .brand { font-size:16px; } .brand small { font-size:8px; margin-bottom:1px; } .phaseHud { width:52%; margin-bottom:4px; gap:3px; } .phaseMeta { font-size:10px; padding:3px 6px; } }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .logo { width:66px; height:28px; } .brand { gap:6px; } .choicePanel { padding:12px; } .choicePanel h2 { font-size:18px; } .choicePanel p { max-height:36px; font-size:12px; } .choiceCards { gap:10px; margin-top:8px; } .choiceCards > div { padding:10px; } .choiceCards .card { width:80px; height:auto; } .choicePanel > .primary { height:38px; margin-top:8px; } }

@@ -95,6 +95,10 @@ const nextConfig = {
         headers: reusableAssetHeaders,
       },
       {
+        source: "/images/triad/lobby-action-sprite.webp",
+        headers: reusableAssetHeaders,
+      },
+      {
         source: "/box-products/:path*",
         headers: reusableAssetHeaders,
       },
