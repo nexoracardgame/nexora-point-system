@@ -5941,6 +5941,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   const surrenderBattle = async () => {
     if (!currentRoom || !isFieldPlayer || matchDone) return;
+    if (!await confirmBattleSurrender()) return;
     const result = await postRoomAction({ action: "surrender", code: currentRoom.code });
     if (!result.ok) {
       setBattleLog((current) => ["ยอมแพ้ไม่สำเร็จ ลองกดใหม่อีกครั้ง", ...current]);
@@ -5972,7 +5973,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     loop();
     const syncOnFocus = () => void syncRooms({ force: true }).catch(() => null);
-    if (!await confirmBattleSurrender()) return;
     const syncOnVisibility = () => {
       if (!document.hidden) void syncRooms({ force: true }).catch(() => null);
     };
