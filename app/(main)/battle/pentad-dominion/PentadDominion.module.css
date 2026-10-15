@@ -174,7 +174,6 @@
 .historyPanel summary { cursor:pointer; color:#a2f1dd; font-weight:700; }
 .historyPanel p { font-size:14px; line-height:1.55; margin:10px 0; }
 .historyToggle { position:absolute; top:155px; right:12px; width:38px; height:38px; pointer-events:auto; display:grid; place-items:center; background:#050b13ed; color:#a2f1dd; border:1px solid #76d9d4; border-radius:4px; }
-@media (min-width:1024px) and (min-height:600px) { .historyToggle { right:calc(min(420px,32vw) + 12px); } }
 .historyPanel { pointer-events:auto; }
 @media (max-width:1000px) and (orientation:portrait) { .historyPanel { width:80dvh; height:80dvw; inset:auto; top:50%; left:50%; transform:translate(-50%,-50%) rotate(90deg); } }
 @media (max-height:600px) and (orientation:landscape), (max-width:1000px) and (orientation:portrait) { .historyToggle { top:112px; width:30px; height:30px; } }
