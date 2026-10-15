@@ -7636,6 +7636,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <span data-game-audio-slot />
               <button
                 type="button"
                 onClick={leaveRoom}

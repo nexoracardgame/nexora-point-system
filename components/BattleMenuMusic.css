@@ -3,4 +3,5 @@
 .nexora-menu-audio:focus-visible { outline:2px solid #9ae8df; outline-offset:2px; }
 .nexora-menu-audio-fixed { position:fixed; top:20px; right:24px; z-index:2147483101; }
 [data-game-audio-slot] { display:flex; align-items:center; flex-shrink:0; }
+.nexora-command-room:has([data-game-audio-slot]) [data-command-audio-control] { display:none; }
 @media (max-height:600px) { .nexora-menu-audio { width:26px; height:26px; } .nexora-menu-audio-fixed { top:8px; right:12px; } }
