@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require('typescript');
 const { chromium } = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const source = fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx', 'utf8');
+const source = fs.readFileSync(process.env.TRIAD_CLIENT_SOURCE || 'app/(main)/battle/triad-dominion/TriadDominionClient.tsx', 'utf8');
 const ast = ts.createSourceFile('client.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const compile = code => ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 let deckEffect;
@@ -57,12 +57,16 @@ for (const [id, pkg, file] of [
   ['scheduler', 'scheduler', 'scheduler.production.js'],
 ]) modules[id] = fs.readFileSync(path.join(path.dirname(require.resolve(pkg)), 'cjs', file), 'utf8');
 modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'), 'utf8');
-modules.rps = component;
+modules['@/lib/target-selection-view'] = compile(fs.readFileSync('lib/target-selection-view.ts', 'utf8'));
+modules['target-modal'] = compile(fs.readFileSync('components/TargetSelectionModal.tsx', 'utf8'));
+modules['./TargetSelectionModal.css'] = '';
+modules['rps-shared'] = 'exports.default=require("target-modal").default;';
+modules.rps = "const TargetSelectionModal=require('rps-shared').default;\n" + component;
 const bundle = Object.entries(modules).map(([id, code]) => `${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const cssFiles = [];
 function collect(dir) { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const p = path.join(dir, entry.name); if (entry.isDirectory()) collect(p); else if (p.endsWith('.css')) cssFiles.push(p); } }
 collect('.next/static');
-const css = cssFiles.map(file => fs.readFileSync(file, 'utf8')).join('\n');
+const css = cssFiles.map(file => fs.readFileSync(file, 'utf8')).join('\n') + '\n' + fs.readFileSync('components/TargetSelectionModal.css', 'utf8');
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div style="transform:translateZ(0);height:100px;overflow:hidden" id="root"></div><div class="nexora-battle-preview-portal" style="position:fixed;inset:0;background:red">Card preview</div><script>
 const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}
 const React=require('react'),R=require('rps'),root=require('react-dom/client').createRoot(document.getElementById('root'));
@@ -104,8 +108,9 @@ window.mountTarget=(two=false,time=28)=>{window.twoTargets=two;window.targetTime
       const confirm = page.getByRole('button', { name: 'ยืนยันเป้าหมาย', exact: true });
       await confirm.waitFor();
       await page.waitForFunction(() => [...document.images].every(img => img.complete && img.naturalWidth > 0));
-      assert.equal(await page.locator('.triad-skill-target-choice').count(), 1);
+      assert.equal(await page.locator('.nexora-target-option').count(), 1);
       assert.equal(await confirm.isEnabled(), true);
+      await page.locator('.nexora-target-overlay').evaluate(async el => { await Promise.all(el.getAnimations({subtree:true}).filter(a=>a.effect.getTiming().iterations!==Infinity).map(a=>a.finished)); });
       assert.equal(await confirm.evaluate(el => { const r = el.getBoundingClientRect(); return r.bottom <= innerHeight && r.top >= 0 && el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), true);
       await page.screenshot({ path: `artifacts/triad-selection/target-${width}.png` });
       await confirm.click();
@@ -114,12 +119,12 @@ window.mountTarget=(two=false,time=28)=>{window.twoTargets=two;window.targetTime
       assert.equal(await page.evaluate(() => requests), 1);
       await page.evaluate(() => window.fail = false);
       await confirm.click();
-      await page.locator('.triad-target-v2').waitFor({ state: 'detached' });
+      await page.locator('.nexora-target-overlay').waitFor({ state: 'detached' });
       assert.equal(await page.evaluate(() => requests), 2);
       await page.evaluate(() => mountTarget(true));
       await confirm.waitFor();
       assert.equal(await confirm.isEnabled(), false);
-      const options = page.locator('.triad-skill-target-choice');
+      const options = page.locator('.nexora-target-option');
       await options.nth(0).click();
       assert.equal(await confirm.isEnabled(), false);
       await options.nth(1).click();

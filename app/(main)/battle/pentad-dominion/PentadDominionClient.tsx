@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
+import TargetSelectionModal from "@/components/TargetSelectionModal";
+import { pentadTargetView } from "@/lib/pentad-target-view";
 import { Bot, Check, ChevronRight, Clock3, Eye, Flag, History, Layers3, Loader2, LogOut, Plus, Search, SendHorizontal, Shuffle, Swords, X } from "lucide-react";
 import { triadCardByNo, triadCards, type TriadTurnResult } from "@/lib/triad-dominion";
 import { battleArenaForSeed } from "@/lib/triad-arena";
@@ -71,14 +73,6 @@ function cinematicResult(round: PentadRound): TriadTurnResult {
     originalPlayer: { top: round.mains.host }, originalOpponent: { top: round.mains.challenger },
     playerBreakdown: [round.reason], opponentBreakdown: [round.reason], unresolvedSkills: [], skillEvents: round.events,
   };
-}
-
-function ChoiceOption({ target, room, disabled, onChoose }: { target: string; room: PentadRoom; disabled: boolean; onChoose: () => void }) {
-  if (target.startsWith("skill:")) return <div><Card no={target.split(":")[2]} disabled={disabled} onClick={onChoose} /><span>สกิลตา {Number(target.split(":")[1]) + 1}</span></div>;
-  const targetSide = target.startsWith("player-top") ? "host" : "challenger";
-  if (target.includes(">")) return <button className={styles.sequenceChoice} disabled={disabled} onClick={onChoose}><span>{room.seats[targetSide]?.name}</span><ChevronRight /><span>{room.seats[targetSide === "host" ? "challenger" : "host"]?.name}</span></button>;
-  if (target === "draw-skill" || target.startsWith("reroll")) return <button disabled={disabled} onClick={onChoose}>{target === "draw-skill" ? "สุ่มสกิลเพิ่ม" : target === "reroll-own" ? "เปลี่ยนมอนสเตอร์เรา" : "เปลี่ยนมอนสเตอร์คู่ต่อสู้"}</button>;
-  return <div><Card no={room.board[targetSide][0]} disabled={disabled} onClick={onChoose} /><span>{room.seats[targetSide]?.name}</span></div>;
 }
 
 function ElementClash({ round, room, arenaImage, onComplete }: { round: PentadRound; room: PentadRoom; arenaImage: string; onComplete: () => void }) {
@@ -262,6 +256,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const total = [...deck.monsters, ...deck.hand, ...deck.reserve];
   const fixedDeck = false;
   const pendingChoice = room?.choices.find(choice => !choice.value);
+  const targetView = room && pendingChoice ? pentadTargetView(room, pendingChoice) : null;
   const choiceKey = pendingChoice ? `${room?.code}:${room?.epoch}:${room?.choices.indexOf(pendingChoice)}:${pendingChoice.sourceCardNo || pendingChoice.cardNo}` : "";
   useEffect(() => setSelectedTarget(pendingChoice?.options.length === 1 ? pendingChoice.options[0] : ""), [choiceKey]);
   const panelStyle = { "--pentad-arena": `url('${room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image}')` } as CSSProperties;
@@ -304,7 +299,20 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       {room.phase === "finished" && <div className={styles.endgame}><h1>{room.winner === "draw" ? "เสมอ" : `${room.seats[room.winner as PentadSide]?.name || "ผู้เล่น"} ชนะ`}</h1><strong>{room.score.host} : {room.score.challenger}</strong><p>{room.notice}</p><button className={styles.primary} onClick={() => void act("leave")} disabled={busy}><LogOut /> กลับล็อบบี้</button></div>}
     </section>}
     {mounted && room && <BattleArenaChatFrame arenaSelector={`[data-pentad-phase="${room.phase}"] [data-pentad-chat-arena]`} cinematicActive={Boolean(presentation)} rotateBreakpoint={1000}><BattleArenaChat messages={room.chat.map(item => ({ id:item.id, senderId:item.id.slice(0,item.id.lastIndexOf(":")), senderName:item.name, text:item.text }))} currentUserId={userId} draft={message} onDraftChange={setMessage} onSubmit={() => { const text=message; if (!text.trim()) return; setMessage(""); void act("chat", {text}, true).then(ok => { if (!ok) setMessage(current => current || text); }); }} /></BattleArenaChatFrame>}
-    {mounted && !presentation && room?.phase === "target" && pendingChoice && createPortal(<div className={styles.choiceOverlay}><section className={styles.choicePanel}><small>{pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : "เลือกเป้าหมายสกิล"}</small><h2>{triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name}</h2><p>{triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText}</p><strong>{countdown(pendingChoice.deadline - now)}</strong><div className={styles.choiceCards}>{pendingChoice.options.map(target => <div key={target} data-selected={selectedTarget === target}><ChoiceOption target={target} room={room} disabled={busy || side !== pendingChoice.side} onChoose={() => setSelectedTarget(target)} /></div>)}</div>{side === pendingChoice.side ? <button className={styles.primary} disabled={busy || !pendingChoice.options.includes(selectedTarget)} onClick={() => void act("target", { target: selectedTarget, choiceIndex: room.choices.indexOf(pendingChoice), cardNo: pendingChoice.cardNo, sourceCardNo: pendingChoice.sourceCardNo || "" })}><Check />ยืนยันเป้าหมาย</button> : <p>รอ {room.seats[pendingChoice.side]?.name} เลือกเป้าหมาย</p>}</section></div>, document.body)}
+    {mounted && !presentation && room?.phase === "target" && pendingChoice && targetView && <TargetSelectionModal key={choiceKey} contextKey={choiceKey}
+      skillName={triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name || pendingChoice.cardNo}
+      description={pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText || ""}
+      options={targetView.options} selected={selectedTarget ? selectedTarget.split(">") : []} min={targetView.count} max={targetView.count} sequences={targetView.sequences}
+      timeLeft={Math.max(0, Math.ceil((pendingChoice.deadline - now) / 1000))} busy={busy} readOnly={side !== pendingChoice.side}
+      waitingText={`รอ ${room.seats[pendingChoice.side]?.name || "ผู้เล่น"} เลือกเป้าหมาย`}
+      selectionHint={targetView.count === 2 ? "เลือกตามลำดับ: ตัวที่ 1 ลด ATK 2,000 · ตัวที่ 2 เพิ่ม ATK 2,000" : undefined}
+      onSelect={ids => setSelectedTarget(ids.join(">"))}
+      onConfirm={() => {
+        const current = roomRef.current;
+        const currentChoice = current?.choices.find(choice => !choice.value);
+        if (!current || !currentChoice || current.code !== room.code || current.epoch !== room.epoch || currentChoice.cardNo !== pendingChoice.cardNo || currentChoice.side !== side || !currentChoice.options.includes(selectedTarget)) return false;
+        return act("target", { target: selectedTarget, choiceIndex: current.choices.indexOf(currentChoice), cardNo: currentChoice.cardNo, sourceCardNo: currentChoice.sourceCardNo || "" });
+      }} />}
     {mounted && room && createPortal(<div className={styles.hudPlane}><button className={styles.historyToggle} title="ประวัติการต่อสู้" aria-label="ประวัติการต่อสู้" onClick={() => setHistoryOpen(!historyOpen)}><History size={20} /></button></div>, document.body)}
     {mounted && room && historyOpen && createPortal(<aside className={styles.historyPanel}><header><h2>บันทึกสนาม</h2><button aria-label="ปิดประวัติ" onClick={() => setHistoryOpen(false)}><X /></button></header>{room.rounds.length ? [...room.rounds].reverse().map(round => <details key={round.id} open={round.id === room.rounds.at(-1)?.id}><summary>ไฟต์ {round.fight} · ตา {round.turn} · {round.winner === "draw" ? "เสมอ" : `${room.seats[round.winner]?.name} ชนะ`}</summary><p>{round.reason} · {round.totals.host.toLocaleString()} : {round.totals.challenger.toLocaleString()}</p>{(["host", "challenger"] as const).map(player => <p key={player}><strong>{room.seats[player]?.name}</strong> · No.{round.mains[player]}{round.skills[player] ? ` · สกิล No.${round.skills[player]} ${triadCardByNo.get(round.skills[player])?.name || ""}` : ""}</p>)}{round.stages?.map((stage, index) => <p key={index}><b>{stage.title}</b><br />{stage.detail}</p>)}{round.events.map((event, index) => <p key={index}><b>{room.seats[event.side === "player" ? "host" : "challenger"]?.name} · No.{event.cardNo}</b><br />{event.summary}</p>)}</details>) : <p>ยังไม่มีตาที่ตัดสินผล</p>}</aside>, document.body)}
     {cine && currentRound && presentation && (currentRound.turn === 1 && !currentRound.finalDuel && introDone !== `${presentation.room.code}:${currentRound.id}` ? <ElementClash key={`${presentation.room.code}:${currentRound.id}`} round={currentRound} room={presentation.room} arenaImage={arena.image} onComplete={() => { if (currentRound.reason.startsWith("ธาตุ")) completeScene(); else setIntroDone(`${presentation.room.code}:${currentRound.id}`); }} /> : <BattleCinematic key={`${presentation.room.code}:${currentRound.id}`} result={cine} cardsByNo={triadCardByNo} playerCard={triadCardByNo.get(currentRound.skills.host || currentRound.mains.host)} opponentCard={triadCardByNo.get(currentRound.skills.challenger || currentRound.mains.challenger)} playerMainCard={triadCardByNo.get(currentRound.effective.host)} opponentMainCard={triadCardByNo.get(currentRound.effective.challenger)} playerName={presentation.room.seats.host?.name || "PLAYER"} opponentName={presentation.room.seats.challenger?.name || "PLAYER"} arena={arena} landscape onComplete={completeScene} />)}

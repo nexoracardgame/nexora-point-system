@@ -1,0 +1,58 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require('typescript');
+const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const compile=(code,fileName='file.tsx')=>ts.transpileModule(code,{fileName,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+const cache={};function load(file){if(cache[file])return cache[file].exports;const m=cache[file]={exports:{}};vm.runInThisContext(`(function(require,module,exports){${compile(fs.readFileSync(file,'utf8'),file)}\n})`,{filename:file})(id=>id==='@/public/cards/card-skill-db.json'?require('../public/cards/card-skill-db.json'):id==='./prisma'?{prisma:{}}:id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id),m,m.exports);return m.exports;}
+const cards=load('lib/triad-dominion.ts'),projection=load('lib/target-selection-view.ts'),pentad=load('lib/pentad-target-view.ts'),store=load('lib/pentad-room-store.ts');
+// Exercise the existing Triad resolver against the real card database, not UI-only fixtures.
+const source=fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
+const ast=ts.createSourceFile('client.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const names=new Set(['getSelectableSkillTargetIds','getPlayableSkillTargetIds','targetMatchesSkillElementCondition']);
+const functions=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&(names.has(n.name?.text)||n.name?.text.startsWith('monsterHas'))).map(n=>n.getText(ast)).join('\n');
+const ctx=vm.createContext({...cards,exports:{}});vm.runInContext(compile(functions),ctx);
+const low=cards.triadCards.find(c=>c.kind==='monster'&&c.attack<=3000),high=cards.triadCards.find(c=>c.kind==='monster'&&c.attack>7000);
+assert.ok(low&&high);
+assert.deepEqual(Array.from(ctx.getPlayableSkillTargetIds(cards.triadCardByNo.get('225'),'player',high,high,2)),[]);
+assert.deepEqual(Array.from(ctx.getPlayableSkillTargetIds(cards.triadCardByNo.get('226'),'player',low,high,2)),['player-top']);
+assert.deepEqual(Array.from(ctx.getPlayableSkillTargetIds(cards.triadCardByNo.get('232'),'player',low,high,2)),['player-top','bot-top']);
+const actor={id:'a',name:'A',image:''},rival={id:'b',name:'B',image:''};
+const room=store.newPentadRoom('123456',actor);room.seats.challenger=rival;room.board={host:[low.cardNo],challenger:[high.cardNo]};
+const choice=(side,options,cardNo='235')=>({side,options,cardNo,value:'',deadline:Date.now()+30000});
+const view=(c)=>pentad.pentadTargetView(room,c);
+assert.equal(projection.targetSelectionView(view(choice('host',['player-top'])).options,[],1,1).mode,'ALLY_ONLY');
+assert.equal(projection.targetSelectionView(view(choice('challenger',['player-top'])).options,[],1,1).mode,'ENEMY_ONLY');
+assert.equal(projection.targetSelectionView(view(choice('challenger',['bot-top'])).options,[],1,1).mode,'ALLY_ONLY');
+const ordered=view(choice('host',['player-top>bot-top'],'232'));
+assert.equal(projection.targetSelectionView(ordered.options,['bot-top','player-top'],2,2,ordered.sequences).canConfirm,false);
+assert.equal(projection.targetSelectionView(ordered.options,['player-top','bot-top'],2,2,ordered.sequences).canConfirm,true);
+assert.equal(projection.targetSelectionView(ordered.options,['player-top','player-top'],2,2).canConfirm,false);
+assert.equal(projection.targetSelectionView([],[],1,1).mode,'NONE');
+const modules={};for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
+modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
+modules['@/lib/target-selection-view']=compile(fs.readFileSync('lib/target-selection-view.ts','utf8'));
+modules.modal=compile(fs.readFileSync('components/TargetSelectionModal.tsx','utf8'));modules['./TargetSelectionModal.css']='';
+const bundle=Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
+const ally=view(choice('host',['player-top'])).options[0],enemy=view(choice('host',['bot-top'])).options[0];
+const html=`<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#0b1017;font-family:Arial,sans-serif}button{font:inherit}${fs.readFileSync('components/TargetSelectionModal.css','utf8')}</style></head><body><button id="opener">Open</button><div id="root"></div><script>
+const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}
+const React=require('react'),Modal=require('modal').default,root=require('react-dom/client').createRoot(document.getElementById('root'));
+window.ally=${JSON.stringify(ally)};window.enemy=${JSON.stringify(enemy)};window.calls=0;window.fail=false;window.last=[];
+function App({settings}){const [selected,setSelected]=React.useState([]);return React.createElement(Modal,{contextKey:'test',skillName:'${cards.triadCardByNo.get('232').name}',description:'เลือกมอนสเตอร์ตามเงื่อนไขสกิลจากข้อมูลเกมจริง',options:[ally,enemy],selected,onSelect:setSelected,timeLeft:28,...settings,onConfirm:async()=>{calls++;last=selected;await new Promise(r=>setTimeout(r,200));if(fail)throw Error('network');}});}
+window.mount=(settings={})=>{window.settings=settings;root.render(React.createElement(App,{settings}));};document.getElementById('opener').focus();mount();
+</script></body></html>`;
+const inside=(b,w,h)=>b&&b.x>=0&&b.y>=0&&b.x+b.width<=w+1&&b.y+b.height<=h+1;
+(async()=>{fs.mkdirSync('artifacts/target-selection',{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('https://target.test/**',route=>{const url=new URL(route.request().url());if(url.pathname==='/')return route.fulfill({body:html,contentType:'text/html'});const file=path.resolve('public','.'+url.pathname);if(!file.startsWith(path.resolve('public')+path.sep)||!fs.existsSync(file))return route.abort();return route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.png')?'image/png':'image/jpeg'});});
+const settle=async()=>{await page.locator('.nexora-target-window').waitFor();await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth));await page.locator('.nexora-target-overlay').evaluate(async el=>{await Promise.all(el.getAnimations({subtree:true}).filter(a=>a.effect.getTiming().iterations!==Infinity).map(a=>a.finished));});};
+for(const [width,height] of [[1920,1080],[2560,1440],[3840,2160],[1280,720],[390,844],[844,390],[320,568]]){await page.setViewportSize({width,height});await page.goto('https://target.test/');for(const mode of ['BOTH','ALLY_ONLY','ENEMY_ONLY']){await page.evaluate(mode=>mount({options:mode==='BOTH'?[ally,enemy]:mode==='ALLY_ONLY'?[ally]:[enemy]}),mode);await settle();assert.equal(await page.locator('.nexora-target-overlay').getAttribute('data-target-mode'),mode);assert.ok(inside(await page.locator('.nexora-target-window').boundingBox(),width,height));assert.ok(inside(await page.locator('.nexora-target-confirm').boundingBox(),width,height));const hit=await page.locator('.nexora-target-confirm').evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});assert.equal(hit,true,'Confirm visible and clickable '+width);await page.screenshot({path:`artifacts/target-selection/${mode}-${width}.png`});}console.log('Shared target UI geometry/assets '+width+'x'+height+' passed');}
+await page.setViewportSize({width:1920,height:1080});await page.goto('https://target.test/');await settle();const confirm=page.locator('.nexora-target-confirm'),options=page.locator('.nexora-target-option');assert.equal(await confirm.isDisabled(),true);await options.first().click();assert.equal(await confirm.isEnabled(),true);
+await page.evaluate(()=>mount({options:[enemy]}));await settle();assert.equal(await confirm.isDisabled(),true,'Removed target is pruned');assert.equal(await page.locator('[aria-pressed="true"]').count(),0);
+await page.evaluate(()=>mount({options:[ally,enemy],min:2,max:2,sequences:[['player-top','bot-top']]}));await settle();await options.last().click();await options.first().click();assert.equal(await confirm.isDisabled(),true,'Invalid ordering cannot submit');await options.last().click();await options.last().click();assert.equal(await confirm.isEnabled(),true);await confirm.dblclick({delay:10});await page.waitForTimeout(300);assert.equal(await page.evaluate(()=>calls),1,'No duplicate request');assert.deepEqual(await page.evaluate(()=>last),['player-top','bot-top']);
+await page.evaluate(()=>{fail=true;mount({options:[ally],min:1,max:1});});await settle();await options.first().click();await confirm.click();await page.getByRole('alert').waitFor();assert.equal(await confirm.isEnabled(),true,'Failed action may retry');
+await page.evaluate(()=>mount({options:[ally],timeLeft:0}));assert.equal(await confirm.isDisabled(),true);
+await page.evaluate(()=>mount({options:[ally],busy:true}));assert.equal(await options.first().isDisabled(),true);
+await page.evaluate(()=>mount({options:[ally],readOnly:true}));assert.equal(await confirm.count(),0);assert.equal(await options.first().isDisabled(),true);
+await page.evaluate(()=>mount({options:[]}));await page.locator('.nexora-target-empty').waitFor();assert.equal(await confirm.isDisabled(),true);
+await page.evaluate(()=>mount({options:[ally]}));await settle();await page.locator('.nexora-target-close').focus();await page.keyboard.press('Escape');await page.locator('.nexora-target-reopen').waitFor();await page.locator('.nexora-target-reopen').click();await settle();assert.equal(await options.count(),1);
+await options.first().click();await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.nexora-target-window').evaluate(el=>getComputedStyle(el).animationName),'none');await page.locator('.nexora-target-close').focus();await page.keyboard.press('Shift+Tab');assert.equal(await confirm.evaluate(el=>el===document.activeElement),true,'Focus loops inside dialog');
+assert.deepEqual(errors,[]);console.log('Real-data perspective, ordered targets, stale selection, duplicate guard, retry, deadline, spectator, empty, close/reopen, reduced motion and keyboard passed');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

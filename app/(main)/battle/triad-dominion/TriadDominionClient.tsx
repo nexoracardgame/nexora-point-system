@@ -4,6 +4,8 @@ import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrend
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
+import TargetSelectionModal from "@/components/TargetSelectionModal";
+import type { TargetOptionView } from "@/lib/target-selection-view";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -12,6 +14,7 @@ import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import DuelistLeaderboard from "@/components/DuelistLeaderboard";
 import { playDrawerSound } from "@/lib/play-drawer-audio";
+import { playGameUiSound } from "@/lib/game-ui-audio";
 import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import BattleCardInspector from "@/components/BattleCardInspector";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
@@ -54,6 +57,7 @@ import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import BattleCinematic from "./BattleCinematic";
 import NexoraCommandScene from "./NexoraCommandScene";
 import "./NexoraCommand.css";
+import "./NexoraLobbyDrawer.css";
 import { playMenuCue, primeBattleAudio } from "./BattleAudio";
 import { battleArenaForSeed, type TriadArena } from "@/lib/triad-arena";
 import {
@@ -1809,6 +1813,10 @@ function getSelectableSkillTargetIds(card?: CardView, side: Side = "player", pla
 
 function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playerTop?: CardView, botTop?: CardView, turn: TriadTurn = 1): SkillTargetId[] {
   const selectable = getSelectableSkillTargetIds(card, side, playerTop, botTop);
+  if (card?.cardNo === "225") return selectable.filter(target => {
+    const monster = target === "player-top" ? playerTop : botTop;
+    return Boolean(monster?.kind === "monster" && monster.attack <= 5000);
+  });
   if (card?.cardNo === "226") return selectable.filter(target => {
     const monster = target === "player-top" ? playerTop : botTop;
     return Boolean(monster?.kind === "monster" && monster.attack <= 3000);
@@ -1816,17 +1824,7 @@ function getPlayableSkillTargetIds(card?: CardView, side: Side = "player", playe
   if (card?.cardNo === "227") {
     return selectable.filter(target => { const monster = target === "player-top" ? playerTop : botTop; return Boolean(monster && Math.max(monster.attack, monster.support) > 7000); });
   }
-  if (selectable.length > 0 || card?.cardNo === "254") return selectable;
-  const rule = card ? triadSkillRuleByNo.get(card.cardNo) : undefined;
-  if (rule?.elementCondition) return [];
-  const ownTarget: SkillTargetId = side === "player" ? "player-top" : "bot-top";
-  const opponentTarget: SkillTargetId = side === "player" ? "bot-top" : "player-top";
-  const ownCard = side === "player" ? playerTop : botTop;
-  const opponentCard = side === "player" ? botTop : playerTop;
-  return [
-    ownCard?.kind === "monster" ? ownTarget : null,
-    opponentCard?.kind === "monster" ? opponentTarget : null,
-  ].filter((target): target is SkillTargetId => Boolean(target));
+  return selectable;
 }
 
 function hiddenCard() {
@@ -3559,8 +3557,36 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
   const [format, setFormat] = useState<"triad" | "pentad">("triad");
-  useEffect(() => { for (const src of ["/images/triad/play-drawer-duo.webp", "/images/triad/play-drawer-character.webp"]) { const art=new window.Image();art.src=src;void art.decode().catch(()=>{}); } }, []);
-  useEffect(() => { if (!panel) return; const close=(event:KeyboardEvent)=>{if(event.key === "Escape")setPanel(null);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close); }, [panel]);
+  const [panelClosing, setPanelClosing] = useState(false);
+  const panelTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const panelTrigger = useRef<HTMLElement | null>(null);
+  const hoverSoundAt = useRef(0);
+  const closePanel = () => {
+    clearTimeout(panelTimer.current);
+    if (panel === "rank") { setPanel(null); return; }
+    setPanelClosing(true);
+    playGameUiSound("back");
+    panelTimer.current = setTimeout(() => { setPanel(null); setPanelClosing(false); panelTrigger.current?.focus(); }, 240);
+  };
+  const openPanel = (next: "create" | "join") => {
+    clearTimeout(panelTimer.current); panelTrigger.current = document.activeElement as HTMLElement;
+    setPanelClosing(false); playDrawerSound(); setPanel(next);
+  };
+  useEffect(() => () => clearTimeout(panelTimer.current), []);
+  useEffect(() => {
+    if (panel !== "create" && panel !== "join") return;
+    const sheet = artRef.current?.querySelector<HTMLElement>(".nexora-play-drawer");
+    sheet?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closePanel(); }
+      if (event.key !== "Tab") return;
+      const controls = [...(sheet?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled)') || [])];
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener("keydown", keyboard); return () => window.removeEventListener("keydown", keyboard);
+  }, [panel]);
   const [pentadRooms, setPentadRooms] = useState<{ code: string; host: string; phase: string }[]>([]);
   useEffect(() => {
     if (panel !== "join" || format !== "pentad") return;
@@ -3605,16 +3631,19 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <button onClick={() => onNavigate("/")}><House />เว็บหลัก</button>
       </nav>
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
-        <button className="nexora-command-mode" onClick={() => { playDrawerSound(); setPanel("create"); }}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
-        <button className="nexora-command-mode" onClick={() => { playDrawerSound(); setPanel("join"); }}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
+        <button className="nexora-command-mode" onClick={() => openPanel("create")}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
+        <button className="nexora-command-mode" onClick={() => openPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
-      {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true" />}
-      <img className="nexora-play-drawer-character" data-open={panel === "create"} src="/images/triad/play-drawer-duo.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
-      <img className="nexora-play-drawer-character" data-open={panel === "join"} src="/images/triad/play-drawer-character.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
-      {panel === "rank" ? <DuelistLeaderboard players={leaderboard} userId={participant.id} onClose={()=>setPanel(null)} /> : panel ? <section className={`nexora-command-sheet ${panel === "create" || panel === "join" ? "nexora-play-drawer" : ""} ${panel === "join" ? "nexora-join-drawer" : ""}`} role="dialog" aria-modal={panel === "create" || panel === "join"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
-        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : panel === "join" ? <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></> : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
+      {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" data-closing={panelClosing} onClick={closePanel} aria-hidden="true" />}
+      {panel === "rank" ? <DuelistLeaderboard players={leaderboard} userId={participant.id} onClose={()=>setPanel(null)} /> : panel ? <section className={`nexora-command-sheet nexora-play-drawer ${panel === "join" ? "nexora-join-drawer" : "nexora-create-drawer"}`} data-closing={panelClosing} tabIndex={-1} role="dialog" aria-modal="true" aria-label={panel === "create" ? "สร้างห้อง" : "ค้นหาห้อง"} onPointerOver={event => {
+        const button = (event.target as Element).closest("button");
+        if (!button || button.disabled || button.contains(event.relatedTarget as Node | null) || event.pointerType !== "mouse") return;
+        if (performance.now() - hoverSoundAt.current > 160) { hoverSoundAt.current = performance.now(); playGameUiSound("click"); }
+      }}>
+        <svg className="nexora-lobby-drawer-outline" viewBox="0 0 1040 600" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1H240L335 97H359L265 1H310L581 276H607L656 326H675L626 276H718L1037 598H987L933 544H904L957 598H101L0 496" /><path d="M240 1L335 97H359M607 276H625L675 326" /></svg>
+        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></>}</h2><button onClick={closePanel} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
@@ -3944,190 +3973,35 @@ function MatchFinalOverlay({
 }
 
 function SkillTargetOverlay({
-  card,
-  side,
-  playerTop,
-  botTop,
-  targetPlayerTop,
-  targetBotTop,
-  selectedTarget,
-  timeLeft,
-  turn = 1,
-  onSelect,
-  onConfirm,
+  card, side, playerTop, botTop, targetPlayerTop, targetBotTop, selectedTarget, timeLeft, turn = 1, onSelect, onConfirm,
 }: {
-  card?: CardView;
-  turn?: TriadTurn;
-  side: Side;
-  playerTop?: CardView;
-  botTop?: CardView;
-  targetPlayerTop?: CardView;
-  targetBotTop?: CardView;
-  selectedTarget: PendingSkillChoice["selectedTarget"];
-  timeLeft: number;
-  onSelect: (target: SkillTargetSelection) => void;
-  onConfirm: () => void | Promise<void>;
+  card?: CardView; turn?: TriadTurn; side: Side; playerTop?: CardView; botTop?: CardView; targetPlayerTop?: CardView; targetBotTop?: CardView;
+  selectedTarget: PendingSkillChoice["selectedTarget"]; timeLeft: number; onSelect: (target: SkillTargetSelection) => void; onConfirm: () => void | Promise<void>;
 }) {
-  const [portalReady, setPortalReady] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-  const sendingRef = useRef(false);
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
-
   if (!card) return null;
-
-  const requiresTwoTargets = isTwoStepTargetSkill(card);
-  const selectedTargets = parseSkillTargetSelection(selectedTarget);
-  const selectableTargetIds = new Set(getPlayableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn));
-  const targets = [
-    { id: "player-top" as const, label: "การ์ดหลักเรา", card: playerTop, tone: "border-red-300/60" },
-    { id: "bot-top" as const, label: "การ์ดหลักคู่แข่ง", card: botTop, tone: "border-cyan-300/60" },
-  ].filter((target) => selectableTargetIds.has(target.id));
-  const effectiveSelectedTarget = requiresTwoTargets
-    ? selectedTargets.length === 2 ? selectedTarget : ""
-    : selectedTarget || (targets.length === 1 ? targets[0].id : "");
-
-  if (!portalReady || typeof document === "undefined") return null;
-  const overlay = (
-    <div className="triad-skill-target-overlay nexora-battle-target-portal triad-target-v2 fixed inset-0 grid place-items-center p-3" role="dialog" aria-modal="true" aria-label="เลือกเป้าหมายสกิล" style={{ zIndex: 2147483120 }}>
-      <div className="triad-skill-target-panel max-h-full w-full overflow-auto rounded-2xl border border-violet-200/30 bg-[#08070d]/96 p-4 shadow-[0_0_80px_rgba(168,85,247,0.35)] backdrop-blur-md sm:p-5">
-        <div className="triad-skill-target-header text-center">
-          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-200/70">เลือกเป้าหมายสกิล</div>
-          <div className="mt-1 text-2xl font-black uppercase text-white">{card.name}</div>
-          <div className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/62">{card.skillText}</div>
-          <div className="triad-target-timer mt-3 text-lg font-black text-amber-200" data-urgent={timeLeft <= 10}>
-            <Clock3 className="h-4 w-4" />
-            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
-          </div>
-          {requiresTwoTargets ? (
-            <div className="mx-auto mt-3 grid max-w-xl gap-2 text-left text-xs font-black text-white/68 sm:grid-cols-2">
-              <div className="rounded-xl border border-rose-200/28 bg-rose-400/10 px-3 py-2">
-                ตัวที่ 1: ATK -2,000 {selectedTargets[0] ? `(${selectedTargets[0] === "player-top" ? "การ์ดหลักเรา" : "การ์ดหลักคู่แข่ง"})` : ""}
-              </div>
-              <div className="rounded-xl border border-emerald-200/28 bg-emerald-400/10 px-3 py-2">
-                ตัวที่ 2: ATK +2,000 {selectedTargets[1] ? `(${selectedTargets[1] === "player-top" ? "การ์ดหลักเรา" : "การ์ดหลักคู่แข่ง"})` : ""}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="triad-skill-target-list mt-5 grid gap-3" data-target-count={targets.length}>
-          {targets.length > 0 ? targets.map((target) => (
-            <button
-              key={target.id}
-              type="button"
-              disabled={sending || timeLeft <= 0}
-              aria-pressed={selectedTargets.includes(target.id) || effectiveSelectedTarget === target.id}
-              onClick={() => onSelect(requiresTwoTargets ? nextTwoStepTargetSelection(selectedTarget, target.id) : target.id)}
-              className={`triad-skill-target-choice rounded-2xl border bg-black/42 p-3 text-left transition hover:-translate-y-1 ${
-                selectedTargets.includes(target.id) || effectiveSelectedTarget === target.id ? "border-amber-300 shadow-[0_0_34px_rgba(251,191,36,0.28)]" : target.tone
-              }`}
-            >
-              <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white/56">{target.label}</div>
-              {requiresTwoTargets && selectedTargets.includes(target.id) ? (
-                <div className="mb-2 text-center text-[11px] font-black text-amber-100">
-                  {selectedTargets[0] === target.id ? "ตัวที่ 1: ลด ATK" : "ตัวที่ 2: เพิ่ม ATK"}
-                </div>
-              ) : null}
-              <div className="triad-skill-target-card mx-auto">
-                {target.card ? <img src={target.card.sourceImage} alt={target.card.name} draggable={false} /> : <div className="triad-target-hidden"><Shield className="h-10 w-10" /><span>การ์ดคู่แข่ง</span></div>}
-              </div>
-              <div className="triad-target-name">{target.card?.name || target.label}</div>
-              {target.card ? <div className="triad-target-stats"><span>ATK {target.card.attack.toLocaleString()}</span><span>SUP {target.card.support.toLocaleString()}</span></div> : null}
-            </button>
-          )) : (
-            <div className="triad-skill-target-empty rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-center text-sm font-bold text-white/58">
-              ยังไม่พบมอนสเตอร์หลักที่เลือกได้ในตานี้
-            </div>
-          )}
-        </div>
-
-        <div className="triad-target-footer">
-        {error ? <div role="alert" className="triad-target-error">{error}</div> : null}
-        <button
-          type="button"
-          onClick={async () => {
-            if (sendingRef.current || timeLeft <= 0) return;
-            sendingRef.current = true;
-            setSending(true);
-            setError("");
-            if (!requiresTwoTargets && !selectedTarget && targets.length === 1) onSelect(targets[0].id);
-            try { await onConfirm(); }
-            catch { setError("ส่งเป้าหมายไม่สำเร็จ ลองยืนยันอีกครั้งได้"); }
-            finally { sendingRef.current = false; setSending(false); }
-          }}
-          disabled={!effectiveSelectedTarget || sending || timeLeft <= 0}
-          className="triad-skill-target-confirm mt-5 h-12 w-full rounded-2xl bg-violet-300 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-white/30"
-        >
-          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
-          {sending ? "กำลังยืนยัน" : timeLeft <= 0 ? "หมดเวลา กำลังดำเนินต่อ" : "ยืนยันเป้าหมาย"}
-        </button>
-        </div>
-      </div>
-    </div>
-  );
-  return createPortal(overlay, document.body);
+  const ownId = side === "player" ? "player-top" : "bot-top";
+  const eligible = getPlayableSkillTargetIds(card, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn);
+  const options: TargetOptionView[] = eligible.filter(id => Boolean(id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop)).map(id => ({
+    id, faction: id === ownId ? "ally" : "enemy",
+    label: id === ownId ? "มอนสเตอร์หลักฝั่งเรา" : "มอนสเตอร์หลักฝั่งศัตรู",
+    card: id === "player-top" ? playerTop : botTop,
+  }));
+  const two = isTwoStepTargetSkill(card);
+  const selected = selectedTarget ? parseSkillTargetSelection(selectedTarget) : !two && options.length === 1 ? [options[0].id] : [];
+  return <TargetSelectionModal contextKey={`${card.cardNo}:${side}:${turn}`} skillName={card.name} description={card.skillText} options={options} selected={selected} min={two ? 2 : 1} max={two ? 2 : 1} timeLeft={timeLeft}
+    selectionHint={two ? "เลือกตามลำดับ: ตัวที่ 1 ลด ATK 2,000 · ตัวที่ 2 เพิ่ม ATK 2,000" : undefined}
+    onSelect={ids => onSelect(ids.join(">") as SkillTargetSelection)} onConfirm={onConfirm} />;
 }
 
-function BlessingChoiceOverlay({
-  card,
-  onChoose,
-}: {
-  card?: CardView;
-  onChoose: (choice: BlessingChoice) => void;
-}) {
-  const [portalReady, setPortalReady] = useState(false);
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
-
+function BlessingChoiceOverlay({ card, onChoose }: { card?: CardView; onChoose: (choice: BlessingChoice) => void }) {
+  const [selected, setSelected] = useState<string[]>([]);
   if (!card) return null;
-  const choices: { id: BlessingChoice; title: string; detail: string }[] = [
-    {
-      id: "draw-skill",
-      title: "สุ่มสกิลเข้ามือ",
-      detail: "สุ่มสกิล 1 ใบเพิ่มเข้าแถวล่างทันที ใบนี้จะมีออร่าจนจบตาและใช้ต่อได้ตามปกติทั้งเกม",
-    },
-    {
-      id: "reroll-own",
-      title: "สุ่มมอนสเตอร์เรา",
-      detail: "สุ่มมอนสเตอร์หลักของฝั่งเรา 1 ใบให้แทนตัวบนสุดในตานี้ เฉลยแล้วค่อยคืนค่าปกติ",
-    },
-    {
-      id: "reroll-opponent",
-      title: "สุ่มมอนสเตอร์อีกฝ่าย",
-      detail: "สุ่มมอนสเตอร์หลักของฝั่งตรงข้าม 1 ใบให้คว่ำหน้าไว้จนเฉลย พร้อมแสงออร่าสถานะใช้งาน",
-    },
+  const options: TargetOptionView[] = [
+    { id: "draw-skill", faction: "ally", label: "สุ่มสกิลเข้ามือ", note: "สุ่มสกิล 1 ใบเพิ่มเข้าแถวล่างทันที", action: true },
+    { id: "reroll-own", faction: "ally", label: "สุ่มมอนสเตอร์เรา", note: "เปลี่ยนมอนสเตอร์หลักฝั่งเราในตานี้", action: true },
+    { id: "reroll-opponent", faction: "enemy", label: "สุ่มมอนสเตอร์อีกฝ่าย", note: "เปลี่ยนมอนสเตอร์หลักฝั่งตรงข้ามในตานี้", action: true },
   ];
-
-  if (!portalReady || typeof document === "undefined") return null;
-  const overlay = (
-    <div className="triad-blessing-overlay nexora-battle-blessing-portal fixed inset-0 z-[5000] grid place-items-center bg-black/72 p-4 backdrop-blur-md">
-      <div className="triad-blessing-panel w-[min(720px,94vw)] overflow-hidden rounded-2xl border border-cyan-100/30 bg-[#05070d] shadow-[0_0_70px_rgba(34,211,238,0.25)]">
-        <div className="triad-blessing-header border-b border-white/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.16),rgba(251,191,36,0.08))] p-4 text-center">
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100/70">No.254 สกิลพิเศษ</div>
-          <div className="mt-1 text-2xl font-black text-white">{card.name}</div>
-          <div className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-white/58">{card.skillText}</div>
-        </div>
-        <div className="triad-blessing-choice-grid grid gap-3 p-4 sm:grid-cols-3">
-          {choices.map((choice) => (
-            <button
-              key={choice.id}
-              type="button"
-              onClick={() => onChoose(choice.id)}
-              className="triad-blessing-choice min-h-32 rounded-xl border border-cyan-100/18 bg-white/[0.045] p-4 text-left transition hover:-translate-y-1 hover:border-amber-200/55 hover:bg-amber-200/10"
-            >
-              <div className="text-lg font-black text-white">{choice.title}</div>
-              <div className="mt-2 text-sm font-semibold leading-5 text-white/55">{choice.detail}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-  return createPortal(overlay, document.body);
+  return <TargetSelectionModal contextKey={card.cardNo} skillName={card.name} description={card.skillText} options={options} selected={selected} onSelect={setSelected} onConfirm={() => onChoose(selected[0] as BlessingChoice)} />;
 }
 
 function ReadyAdvanceButton({

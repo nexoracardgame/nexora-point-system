@@ -1,0 +1,12 @@
+NEXORA Target UI asset integration
+
+Source: user-provided NEXORA_Target_UI_Assets.zip.
+The UI is composed of interactive React elements and real text, not the reference screenshot.
+main_window_4k.png is used as a nine-slice border to preserve corners.
+Ally/enemy exports contain fragments of neighboring sprites. CSS clips the outer fragments;
+real card images cover the empty plus placeholders. Emblems use diamond clipping.
+The native ally/enemy art is approximately 550 x 580 pixels, extracted from a 1536-wide
+sprite sheet. A 4K canvas does not restore additional native detail to these crops.
+Decorative assets do not receive pointer events. No HP, life state or team mechanics
+were invented: current live game data supplies ATK/SUP and its existing legal targets.
+The imperfect crystal/divider crops are intentionally not displayed.
