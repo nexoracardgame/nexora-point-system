@@ -1,0 +1,54 @@
+.nexora-ranking { position:absolute; inset:0; z-index:40; display:flex; flex-direction:column; min-height:0; overflow:hidden; color:#f5efdf; background:linear-gradient(#03050744,#03050777),url('/battle-arenas/gold.webp') center/cover; font-family:var(--font-geist-sans),Arial,sans-serif; animation:nexora-rank-open 400ms ease-out; }
+.nexora-ranking * { box-sizing:border-box; letter-spacing:0; }
+.nexora-ranking button { cursor:pointer; font:inherit; color:inherit; }
+.nexora-ranking button:focus-visible,.nexora-ranking input:focus-visible { outline:2px solid #ffe29a; outline-offset:2px; }
+.nexora-ranking-nav { display:flex; justify-content:center; align-items:stretch; gap:8px; min-height:58px; background:#020403b8; border-bottom:1px solid #b99b5d; flex-shrink:0; }
+.nexora-ranking-nav > * { display:flex; align-items:center; justify-content:center; gap:8px; padding:10px 22px; font-size:12px; }
+.nexora-ranking-nav > strong { color:#ffe2a1; border-bottom:3px solid #ffdd85; background:#b08a3230; box-shadow:0 6px 18px #ffc96144; }
+.nexora-ranking-showcase { position:relative; height:47%; min-height:220px; flex-shrink:0; overflow:hidden; }
+.nexora-ranking-title { position:absolute; left:3%; top:14px; width:30%; z-index:2; pointer-events:none; text-shadow:0 3px 6px #000; }
+.nexora-ranking-title img { width:100%; max-width:420px; height:auto; }
+.nexora-ranking-title h1 { margin:0; font:700 36px Georgia,serif; color:#fff4db; }
+.nexora-ranking-title p { font-size:14px; margin:8px 0; }
+.nexora-ranking-total { position:absolute; top:20px; right:3%; display:grid; grid-template-columns:auto auto; align-items:center; gap:6px 12px; padding:14px 24px; border:1px solid #e5c483; background:#030605df; color:#ffe3a3; clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); }
+.nexora-ranking-total span { grid-column:2; font-size:12px; }
+.nexora-ranking-podium { position:absolute; inset:0 4%; display:grid; grid-template-columns:1fr 1.1fr 1.3fr 1.1fr 1fr; align-items:end; gap:10px; }
+.nexora-ranking-podium article { height:70%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; min-width:0; }
+.nexora-ranking-podium article[data-place="1"] { height:90%; }
+.nexora-ranking-podium article[data-place="2"],.nexora-ranking-podium article[data-place="3"] { height:80%; }
+.nexora-ranking-portrait { width:100%; min-height:0; flex:1; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; }
+.nexora-ranking-portrait img { width:85%; height:100%; object-fit:contain; filter:drop-shadow(0 0 18px #ffd07d66); mask-image:linear-gradient(#000 75%,transparent); }
+.nexora-ranking-pedestal { width:100%; position:relative; flex-shrink:0; text-align:center; padding:12px 12px 8px; background:linear-gradient(#10130aeb,#020303f5); border:1px solid #c4a269; clip-path:polygon(12% 0,88% 0,100% 100%,0 100%); box-shadow:inset 0 0 25px #d9a64d22; }
+.nexora-ranking-podium article[data-place="1"] .nexora-ranking-pedestal { border-color:#ffe3a1; background:linear-gradient(#3d2a12ed,#080704f5); }
+.nexora-ranking-position { display:flex; justify-content:center; align-items:center; gap:8px; font:700 42px Georgia,serif; line-height:1; color:#ffe2a0; text-shadow:0 0 18px #f4b93c80; }
+.nexora-ranking-podium article[data-place="1"] .nexora-ranking-position { font-size:64px; }
+.nexora-ranking-podium h2 { margin:4px 0; font-size:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nexora-ranking-podium small { font-size:11px; color:#c8c8bb; }
+.nexora-ranking-podium strong { display:flex; align-items:center; justify-content:center; gap:6px; font-size:18px; color:#ffdc86; }
+.nexora-ranking-board { display:grid; grid-template-columns:160px minmax(0,1fr); gap:12px; min-height:0; flex:1; margin:10px 3% 0; border:1px solid #b99b5d; background:#030605e8; box-shadow:0 0 28px #0008; }
+.nexora-ranking-board aside { border-right:1px solid #9f844d; overflow:auto; padding:6px; }
+.nexora-ranking-board aside button { display:flex; align-items:center; gap:12px; width:100%; min-height:40px; background:transparent; border:1px solid transparent; padding:8px 12px; text-align:left; font-size:12px; }
+.nexora-ranking-board aside button[aria-pressed=true] { background:#b18b3440; color:#ffe7aa; border-color:#e8c678; }
+.nexora-ranking-table-wrap { overflow:auto; min-height:0; }
+.nexora-ranking table { border-collapse:collapse; width:100%; white-space:nowrap; font-size:12px; }
+.nexora-ranking th { position:sticky; top:0; background:#0b0f0e; color:#e5d19e; font-weight:500; padding:10px; text-align:left; z-index:1; }
+.nexora-ranking td { padding:5px 10px; height:34px; border-top:1px solid #ffffff18; color:#eee9df; background:transparent; }
+.nexora-ranking tr[data-own=true] { background:#dfb34e20; }
+.nexora-ranking td:first-child { color:#ffe7ad; font-size:18px; }
+.nexora-ranking td img,.nexora-ranking-own img { width:28px; height:28px; object-fit:cover; border:1px solid #c7ac70; border-radius:50%; vertical-align:middle; margin-right:12px; }
+.nexora-ranking td svg { display:inline; color:#f2d18b; vertical-align:middle; margin-right:8px; }
+.nexora-ranking meter { width:58px; height:10px; margin-right:12px; accent-color:#e5bb60; }
+.nexora-ranking-empty { text-align:center; padding:30px; color:#c9c5b9; }
+.nexora-ranking-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:0 3% 12px; padding:12px; border:1px solid #b99b5d; background:#030605ed; flex-shrink:0; }
+.nexora-ranking-own,.nexora-ranking-footer nav,.nexora-ranking-footer label { display:flex; align-items:center; gap:12px; font-size:12px; }
+.nexora-ranking-own { min-width:0; color:#edd29a; }
+.nexora-ranking-own strong { max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nexora-ranking-footer nav button { display:grid; place-items:center; width:32px; height:32px; border:1px solid #b99b5d; background:#0007; }
+.nexora-ranking-footer nav button:disabled { opacity:.3; cursor:default; }
+.nexora-ranking-footer label { border:1px solid #b99b5d; border-radius:4px; padding:8px 12px; }
+.nexora-ranking-footer input { background:transparent; border:0; outline:none; color:white; width:180px; min-width:0; font:inherit; }
+@keyframes nexora-rank-open { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+@media (max-height:600px), (max-width:900px) { .nexora-ranking-nav { min-height:36px; } .nexora-ranking-nav > * { font-size:10px; padding:4px 10px; } .nexora-ranking-showcase { min-height:138px; height:43%; } .nexora-ranking-title { top:5px; } .nexora-ranking-title img { max-height:70px; object-fit:contain; } .nexora-ranking-title h1 { font-size:20px; } .nexora-ranking-title p { display:none; } .nexora-ranking-total { top:8px; padding:6px 10px; font-size:10px; } .nexora-ranking-position { font-size:24px; } .nexora-ranking-podium article[data-place="1"] .nexora-ranking-position { font-size:34px; } .nexora-ranking-pedestal { padding:5px 8px; } .nexora-ranking-podium h2 { font-size:12px; } .nexora-ranking-podium small { font-size:9px; } .nexora-ranking-podium strong { font-size:12px; } .nexora-ranking-board { grid-template-columns:100px minmax(0,1fr); margin-top:4px; gap:4px; } .nexora-ranking-board aside button { font-size:10px; padding:5px; gap:4px; min-height:30px; } .nexora-ranking table { font-size:10px; } .nexora-ranking td { padding:3px 6px; } .nexora-ranking-footer { gap:6px; padding:5px; margin-bottom:4px; } .nexora-ranking-own { gap:5px; font-size:10px; } .nexora-ranking-own > span:last-child { display:none; } .nexora-ranking-footer input { width:100px; } .nexora-ranking-footer nav { gap:4px; } }
+@media (max-width:500px) and (orientation:portrait) { .nexora-ranking-showcase { height:35%; } .nexora-ranking-title { width:45%; } .nexora-ranking-total { right:2%; } .nexora-ranking-podium { inset:60px 2% 0; gap:2px; } .nexora-ranking-podium article { height:75%; } .nexora-ranking-podium h2 { font-size:10px; } .nexora-ranking-board { grid-template-columns:70px minmax(0,1fr); } .nexora-ranking-board aside button { overflow-wrap:anywhere; } .nexora-ranking-footer { flex-wrap:wrap; } .nexora-ranking-own { flex:1; } .nexora-ranking-footer label { width:100%; } .nexora-ranking-footer input { width:100%; } }
+@media (prefers-reduced-motion:reduce) { .nexora-ranking { animation:none; } }
+@media (max-width:500px) and (orientation:portrait) { .nexora-ranking-nav { gap:0; } .nexora-ranking-nav > span { display:none; } .nexora-ranking-own strong { max-width:70px; } .nexora-ranking-footer label { min-width:0; } }

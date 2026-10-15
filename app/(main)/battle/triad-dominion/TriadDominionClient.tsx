@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import DuelistLeaderboard from "@/components/DuelistLeaderboard";
 import { playDrawerSound } from "@/lib/play-drawer-audio";
 import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import BattleCardInspector from "@/components/BattleCardInspector";
@@ -3605,7 +3606,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true" />}
       <img className="nexora-play-drawer-character" data-open={panel === "create"} src="/images/triad/play-drawer-duo.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
       <img className="nexora-play-drawer-character" data-open={panel === "join"} src="/images/triad/play-drawer-character.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
-      {panel ? <section className={`nexora-command-sheet ${panel === "create" || panel === "join" ? "nexora-play-drawer" : ""} ${panel === "join" ? "nexora-join-drawer" : ""}`} role="dialog" aria-modal={panel === "create" || panel === "join"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
+      {panel === "rank" ? <DuelistLeaderboard players={leaderboard} userId={participant.id} onClose={()=>setPanel(null)} /> : panel ? <section className={`nexora-command-sheet ${panel === "create" || panel === "join" ? "nexora-play-drawer" : ""} ${panel === "join" ? "nexora-join-drawer" : ""}`} role="dialog" aria-modal={panel === "create" || panel === "join"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
         <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : panel === "join" ? <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></> : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>

@@ -23,6 +23,7 @@ const dialogMarkup=source.slice(dialogStart,source.indexOf('<NexoraCommandLobby 
 modules.test=transpile(`import {useState,useEffect,useLayoutEffect,useRef,Fragment} from 'react';import {Bot,Check,Clock3,ChevronRight,Crown,Eye,House,KeyRound,Layers3,Lock,Loader2,MessageCircle,Plus,SendHorizontal,Search,Smile,Swords,Trophy,UserPlus,Users,X} from 'lucide-react';
 import NexoraCommandScene from './NexoraCommandScene';import {playMenuCue} from './BattleAudio';
 const playDrawerSound=()=>{};
+const DuelistLeaderboard=({onClose})=><div><span>อันดับนักดวลทดสอบ</span><button aria-label="ปิด" onClick={onClose}>ปิด</button></div>;
 import BattleArenaChat, { BattleArenaChatFrame } from '@/components/BattleArenaChat';
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from '@/components/DeckPreparation';
 import { freshDeck, randomTriadDeck } from '@/lib/deck-reroll';
