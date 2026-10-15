@@ -3600,7 +3600,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <button className="nexora-command-mode" onClick={() => setPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
-      <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span><button onClick={() => setPanel("join")}><Eye className="h-4 w-4" />สนามสด {rooms.filter(room => room.status === "playing").length}</button></footer>
+      <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
       {panel === "create" && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true" />}
       <img className="nexora-play-drawer-character" data-open={panel === "create"} src="/images/triad/play-drawer-duo.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
       {panel ? <section className={`nexora-command-sheet ${panel === "create" ? "nexora-play-drawer" : ""}`} role="dialog" aria-modal={panel === "create"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
