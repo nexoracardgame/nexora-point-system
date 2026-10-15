@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { playGameUiSound } from "@/lib/game-ui-audio";
+import "./BattleSurrenderDialog.css";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -21,6 +23,7 @@ import type {
 type DialogKind = "alert" | "confirm" | "prompt";
 
 type DialogRequest = {
+  appearance?: "battle-surrender";
   kind: DialogKind;
   title?: string;
   message: string;
@@ -126,6 +129,7 @@ export default function NexoraDialogProvider() {
     currentRef.current = next;
     setCurrent(next);
     setInputValue(next?.defaultValue || "");
+    if (next?.appearance === "battle-surrender") playGameUiSound("back");
   }, []);
 
   const openDialog = useCallback(
@@ -140,6 +144,7 @@ export default function NexoraDialogProvider() {
         const tone = inferTone(message, options.tone);
 
         queueRef.current.push({
+          appearance: options.kind === "confirm" && options.title === "ยืนยันยอมแพ้?" ? "battle-surrender" : undefined,
           kind: options.kind,
           title:
             options.title ||
@@ -171,6 +176,7 @@ export default function NexoraDialogProvider() {
     (value: boolean | string | null | void) => {
       const active = currentRef.current;
       if (!active) return;
+      if (active.appearance === "battle-surrender") playGameUiSound(value === true ? "confirm" : "back");
 
       active.resolve(value);
       currentRef.current = null;
@@ -227,6 +233,7 @@ export default function NexoraDialogProvider() {
     if (!current) return;
 
     const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement;
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -234,7 +241,7 @@ export default function NexoraDialogProvider() {
         closeDialog(current.kind === "alert" ? undefined : current.kind === "confirm" ? false : null);
       }
 
-      if (event.key === "Enter" && current.kind !== "alert") {
+      if (event.key === "Enter" && current.kind !== "alert" && !(event.target instanceof HTMLButtonElement)) {
         event.preventDefault();
         closeDialog(current.kind === "prompt" ? inputValue : true);
       }
@@ -243,6 +250,7 @@ export default function NexoraDialogProvider() {
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      if (current.appearance === "battle-surrender" && previousFocus instanceof HTMLElement) previousFocus.focus();
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeDialog, current, inputValue]);
@@ -253,6 +261,23 @@ export default function NexoraDialogProvider() {
 
   const tone = toneConfig[current.tone];
   const Icon = tone.Icon;
+
+  if (current.appearance === "battle-surrender") {
+    return createPortal(<div className="nexora-surrender-backdrop" onClick={event => { if (event.target === event.currentTarget) closeDialog(false); }}>
+      <section className="nexora-surrender-dialog" role="alertdialog" aria-modal="true" aria-labelledby="surrender-title" aria-describedby="surrender-description" onKeyDown={event => {
+        if (event.key !== "Tab") return;
+        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }}>
+        <div className="nexora-surrender-heading"><ShieldAlert size={32} /><span>NEXORA · BATTLE</span><button type="button" aria-label="ปิดหน้าต่างยอมแพ้" onClick={() => closeDialog(false)}><X size={20} /></button></div>
+        <h2 id="surrender-title">{current.title}</h2>
+        <p id="surrender-description">{current.message}</p>
+        <div className="nexora-surrender-actions"><button type="button" autoFocus onClick={() => closeDialog(false)}>{current.cancelText}</button><button type="button" className="nexora-surrender-confirm" onClick={() => closeDialog(true)}><ShieldAlert size={18} />{current.confirmText}</button></div>
+      </section>
+    </div>, document.body);
+  }
 
   const modal = (
     <div className="fixed inset-0 z-[99999] flex items-end justify-center overflow-hidden bg-black/72 px-3 py-[max(14px,env(safe-area-inset-top))] pb-[max(14px,env(safe-area-inset-bottom))] backdrop-blur-xl sm:items-center sm:p-5">

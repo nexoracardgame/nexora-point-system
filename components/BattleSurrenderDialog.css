@@ -1,0 +1,18 @@
+.nexora-surrender-backdrop { position:fixed; inset:0; z-index:2147483500; display:grid; place-items:center; padding:20px; background:#020405ad; backdrop-filter:blur(12px); animation:surrender-fade 220ms ease-out both; }
+.nexora-surrender-dialog { position:relative; width:min(480px,100%); padding:30px; border:1px solid #e9d398a6; background:linear-gradient(135deg,#171b1cf5,#07090bf5); color:#fff; clip-path:polygon(22px 0,100% 0,100% calc(100% - 22px),calc(100% - 22px) 100%,0 100%,0 22px); box-shadow:inset 0 0 40px #e3c77c0a; animation:surrender-enter 360ms cubic-bezier(.16,1,.3,1) both; font-family:var(--font-geist-sans),Arial,sans-serif; letter-spacing:0; }
+.nexora-surrender-dialog::before { content:""; position:absolute; top:0; left:30px; right:30px; height:3px; background:#efd594; pointer-events:none; }
+.nexora-surrender-backdrop,.nexora-surrender-dialog,.nexora-surrender-dialog * { box-sizing:border-box; }
+.nexora-surrender-heading { display:flex; align-items:center; gap:12px; color:#efd594; }
+.nexora-surrender-heading span { font-size:11px; font-weight:800; flex:1; }
+.nexora-surrender-heading button { display:grid; place-items:center; width:34px; height:34px; border:1px solid #fff3; background:#ffffff08; color:#eee; cursor:pointer; }
+.nexora-surrender-dialog h2 { font-size:28px; line-height:1.4; margin:22px 0 12px; font-weight:800; }
+.nexora-surrender-dialog p { color:#c9ced0; font-size:16px; line-height:1.8; margin:0 0 28px; }
+.nexora-surrender-actions { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.nexora-surrender-actions button { display:flex; align-items:center; justify-content:center; gap:8px; min-height:50px; padding:10px; border:1px solid #e9d39866; background:#ffffff08; color:#fff; font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; transition:background 160ms,filter 160ms; }
+.nexora-surrender-actions .nexora-surrender-confirm { background:#f2d58c; color:#181710; border-color:#f2d58c; }
+.nexora-surrender-actions button:hover { filter:brightness(1.15); }
+.nexora-surrender-dialog button:focus-visible { outline:2px solid #fff; outline-offset:3px; }
+@keyframes surrender-fade { from { opacity:0; } to { opacity:1; } }
+@keyframes surrender-enter { from { opacity:0; transform:translateY(14px) scale(.95); } to { opacity:1; transform:translateY(0) scale(1); } }
+@media (max-width:480px) { .nexora-surrender-dialog { padding:24px; } .nexora-surrender-dialog h2 { font-size:24px; } }
+@media (prefers-reduced-motion:reduce) { .nexora-surrender-backdrop,.nexora-surrender-dialog { animation:none; } }

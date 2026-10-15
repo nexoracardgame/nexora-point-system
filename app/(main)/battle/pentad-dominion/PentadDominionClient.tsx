@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { confirmBattleSurrender } from "@/lib/battle-surrender-dialog";
 import { Bot, Check, ChevronRight, Clock3, Eye, Flag, History, Layers3, Loader2, LogOut, Plus, Search, SendHorizontal, Shuffle, Swords, X } from "lucide-react";
 import { triadCardByNo, triadCards, type TriadTurnResult } from "@/lib/triad-dominion";
 import { battleArenaForSeed } from "@/lib/triad-arena";
@@ -264,7 +265,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const panelStyle = { "--pentad-arena": `url('${room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image}')` } as CSSProperties;
 
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><BattleArenaSurface image={room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image} className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
-    {room && room.phase !== "deck" && <BattleArenaHeader title={PENTAD_TITLE} code={room.code} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} onSurrender={side && room.phase !== "waiting" && room.phase !== "finished" ? ()=>{if(window.confirm("ยืนยันยอมแพ้?"))void act("surrender");} : undefined} />}
+    {room && room.phase !== "deck" && <BattleArenaHeader title={PENTAD_TITLE} code={room.code} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} onSurrender={side && room.phase !== "waiting" && room.phase !== "finished" ? async ()=>{if(await confirmBattleSurrender())void act("surrender");} : undefined} />}
     {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
     {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}

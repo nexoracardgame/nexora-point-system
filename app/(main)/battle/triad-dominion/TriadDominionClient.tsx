@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmBattleSurrender } from "@/lib/battle-surrender-dialog";
+
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -5970,6 +5972,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     loop();
     const syncOnFocus = () => void syncRooms({ force: true }).catch(() => null);
+    if (!await confirmBattleSurrender()) return;
     const syncOnVisibility = () => {
       if (!document.hidden) void syncRooms({ force: true }).catch(() => null);
     };
