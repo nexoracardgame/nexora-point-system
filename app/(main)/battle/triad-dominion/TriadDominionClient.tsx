@@ -66,7 +66,7 @@ import "./NexoraLobbyDrawer.css";
 import { playMenuCue, primeBattleAudio } from "./BattleAudio";
 import { battleArenaForSeed, type TriadArena } from "@/lib/triad-arena";
 import {
-  resolveTriadTurn,
+  resolveTriadTurn as resolveTriadTurnRules,
   triadCardByNo,
   triadSkillElementConditionMatches,
   triadSkillRuleByNo,
