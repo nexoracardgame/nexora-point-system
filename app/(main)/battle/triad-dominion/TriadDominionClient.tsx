@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmBattleSurrender } from "@/lib/battle-surrender-dialog";
+import GameModeModal from "@/components/GameModeModal";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -7518,98 +7519,24 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         ) : null}
         {createModeDialogOpen ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 backdrop-blur-md">
-            <div className="w-[min(620px,94vw)] rounded-[28px] border border-amber-200/28 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.12),transparent_34%),linear-gradient(180deg,#0a0b0f,#050507_62%,#040405)] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.58)]">
-              <div className="text-center">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/58">เลือกโหมดการ์ดของห้อง</div>
-                <div className="mt-1 text-3xl font-black text-white">ตั้งกองเลือกก่อนสร้าง</div>
-              </div>
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
-                {(createFormat === "pentad" ? [
-                  {id:"all" as DeckMode,title:"ALL IN ONE",detail:"เลือกมอนสเตอร์ 5 ใบ สกิลบนมือ 15 ใบ และกองเสริม 10 ใบ จากการ์ดทั้งหมด"},
-                  {id:"monster" as DeckMode,title:"สุ่มพูล",detail:"ตัวเลือกมอนสเตอร์ 30 ใบ สกิลบนมือ 30 ใบ และกองเสริม 30 ใบ ใช้พูลเดียวกันทั้งสองฝ่าย"},
-                ] : [
-                  { id: "all" as DeckMode, title: "ALL IN ONE", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
-                  { id: "monster" as DeckMode, title: "MONSTER", detail: "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้" },
-                  { id: "skill" as DeckMode, title: "SKILL", detail: `บังคับเด็ค ${SKILL_MODE_MONSTER_LIMIT} มอนสเตอร์ + ${SKILL_MODE_SKILL_LIMIT} สกิล และให้กติกาตรงตามโหมดสกิล` },
-                ]).map((mode) => {
-                  const selected = createRoomMode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => setCreateRoomMode(mode.id)}
-                      className={`min-h-40 rounded-2xl border p-4 text-left transition ${
-                        selected
-                          ? "border-amber-200 bg-[radial-gradient(circle_at_top,rgba(255,214,102,0.2),rgba(255,196,0,0.06)_42%,rgba(255,255,255,0.02)_100%)] shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_30px_rgba(251,191,36,0.16)]"
-                          : "border-amber-200/18 bg-white/[0.045] hover:-translate-y-0.5 hover:border-amber-200/55 hover:bg-amber-200/10"
-                      }`}
-                    >
-                      <div className="flex h-full flex-col">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-black uppercase tracking-[0.18em] text-amber-200/80">
-                            {selected ? "เลือกอยู่" : "โหมด"}
-                          </div>
-                          <div
-                            className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] font-black ${
-                              selected
-                                ? "border-amber-200 bg-amber-200 text-black shadow-[0_0_18px_rgba(251,191,36,0.6)]"
-                                : "border-white/16 bg-black/34 text-white/28"
-                            }`}
-                          >
-                            {selected ? "✓" : ""}
-                          </div>
-                        </div>
-                        <div className="mt-4 text-2xl font-black text-white">{mode.title}</div>
-                        <div className="mt-3 text-sm font-semibold leading-6 text-white/58">{mode.detail}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() => setCreateRoomWithBot((value) => !value)}
-                className={`mt-4 flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
-                  createRoomWithBot
-                    ? "border-cyan-200/55 bg-cyan-300/14 shadow-[0_0_30px_rgba(34,211,238,0.16)]"
-                    : "border-white/12 bg-black/34 hover:border-cyan-200/32"
-                }`}
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${createRoomWithBot ? "border-cyan-100/70 bg-cyan-200 text-black" : "border-white/14 bg-white/6 text-cyan-100"}`}>
-                    <Bot className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-black text-white">สู้กับบอททันที</span>
-                    <span className="mt-1 block text-xs font-semibold leading-5 text-white/55">สร้างแล้วเข้าสู่หน้าเลือกการ์ดเลย บอทจะลงฝั่งผู้ท้าชิงเป็น BOT Level.99</span>
-                  </span>
-                </span>
-                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-black ${createRoomWithBot ? "border-cyan-100 bg-cyan-200 text-black" : "border-white/18 bg-black/40 text-white/24"}`}>
-                  {createRoomWithBot ? <Check className="h-4 w-4" /> : null}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void createRoom(createRoomMode);
-                }}
-                disabled={creatingRoom}
-                aria-busy={creatingRoom}
-                className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_26px_rgba(251,191,36,0.18)] transition hover:from-amber-200 hover:to-yellow-100"
-              >
-                {creatingRoom ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />กำลังสร้างห้อง</span> : "ยืนยันสร้างห้อง"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCreateModeDialogOpen(false)}
-                disabled={creatingRoom}
-                className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/34 text-xs font-black uppercase tracking-[0.12em] text-white/62 transition hover:border-amber-200/30 hover:text-white"
-              >
-                ยกเลิก
-              </button>
-            </div>
-          </div>
+          <GameModeModal
+            format={createFormat}
+            modes={createFormat === "pentad" ? [
+              { id: "all", title: "ALL IN ONE", detail: "เลือกมอนสเตอร์ 5 ใบ สกิลบนมือ 15 ใบ และกองเสริม 10 ใบ จากการ์ดทั้งหมด" },
+              { id: "monster", title: "สุ่มพูล", detail: "ตัวเลือกมอนสเตอร์ 30 ใบ สกิลบนมือ 30 ใบ และกองเสริม 30 ใบ ใช้พูลเดียวกันทั้งสองฝ่าย" },
+            ] : [
+              { id: "all", title: "ALL IN ONE", detail: "เปิดการ์ดทั้งหมด 293 ใบให้ทั้งสองฝั่งเลือกจัดเด็คเอง" },
+              { id: "monster", title: "MONSTER", detail: "สุ่ม pool ฝั่งละ 20 ใบ: มอนสเตอร์ล้วนสำหรับโหมดนี้" },
+              { id: "skill", title: "SKILL", detail: `บังคับเด็ค ${SKILL_MODE_MONSTER_LIMIT} มอนสเตอร์ + ${SKILL_MODE_SKILL_LIMIT} สกิล และให้กติกาตรงตามโหมดสกิล` },
+            ]}
+            selected={createRoomMode}
+            withBot={createRoomWithBot}
+            busy={creatingRoom}
+            onSelect={setCreateRoomMode}
+            onBotChange={setCreateRoomWithBot}
+            onConfirm={() => { void createRoom(createRoomMode); }}
+            onClose={() => setCreateModeDialogOpen(false)}
+          />
         ) : null}
         <NexoraCommandLobby participant={participant} rankProfiles={rankProfiles} leaderboard={leaderboard} rooms={visibleRooms} roomAccess={roomAccess} setRoomAccess={setRoomAccess} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joiningRoomCode={joiningRoomCode} lobbyMessage={lobbyMessage}
           onCreate={(format) => { setCreateFormat(format);setCreateRoomMode("all"); setCreateModeDialogOpen(true); }}

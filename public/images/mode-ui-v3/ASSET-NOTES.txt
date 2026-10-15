@@ -1,0 +1,23 @@
+Source: user-provided NEXORA_Codex_Mode_UI_V3_COMPLETE.zip.
+REFERENCE_ONLY.png is not installed or rendered in the game.
+
+All 24 PNG/WebP assets were inspected via metadata, transparency checks and a
+contact sheet (scripts/audit-mode-ui-assets.cjs).
+
+Installed art: all_in_one.webp, monster.webp, skill.webp (840x760 each).
+Displayed with cover/bottom alignment; no nonuniform stretching. Top edge
+cropping removes the baked concept selection marks. Selection is real React UI.
+Header ornament and star have transparent alpha.
+floating_card_far.png is displayed near its native size, not enlarged for 4K.
+crystal_large.png is clipped to its clean center (removes sheet labels).
+background_ring.png is clipped to remove sheet labels and neighboring fragments.
+
+Rejected: gold_frame, selected_card_frame, header_star, gold_light_trail,
+gold_sparkles, crystal_medium/small, close_diamond and several floating-card
+crops contain visible sheet labels, neighboring fragments or cut-off artwork.
+Button textures are not used as buttons. Main frame, selected frames, corners,
+sparkles, buttons, switch and close control are responsive CSS/React components.
+All labels, descriptions and actions are live text, never reference pixels.
+
+Known limitation: supplied art is concept-cropped, not original layered 4K art.
+No claim of pixel-exact reproduction or native 4K illustration quality is made.
