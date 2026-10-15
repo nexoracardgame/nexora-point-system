@@ -3551,7 +3551,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
   const [format, setFormat] = useState<"triad" | "pentad">("triad");
-  useEffect(() => { const art=new window.Image();art.src="/images/triad/play-drawer-duo.webp";void art.decode().catch(()=>{}); }, []);
+  useEffect(() => { for (const src of ["/images/triad/play-drawer-duo.webp", "/images/triad/play-drawer-character.webp"]) { const art=new window.Image();art.src=src;void art.decode().catch(()=>{}); } }, []);
   useEffect(() => { if (!panel) return; const close=(event:KeyboardEvent)=>{if(event.key === "Escape")setPanel(null);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close); }, [panel]);
   const [pentadRooms, setPentadRooms] = useState<{ code: string; host: string; phase: string }[]>([]);
   useEffect(() => {
@@ -3598,14 +3598,15 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       </nav>
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
         <button className="nexora-command-mode" onClick={() => { playDrawerSound(); setPanel("create"); }}><div><strong>PLAY</strong><small>สร้างสนามประลอง</small></div><Swords /></button>
-        <button className="nexora-command-mode" onClick={() => setPanel("join")}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
+        <button className="nexora-command-mode" onClick={() => { playDrawerSound(); setPanel("join"); }}><div><strong>JOIN ARENA</strong><small>เข้าร่วม / ชมการต่อสู้</small></div><ChevronRight /></button>
         <button className="nexora-command-mode" onClick={() => setPanel("rank")}><div><strong>DUELIST RANK</strong><small>อันดับนักดวล NEXORA</small></div><Trophy /></button>
       </section>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
-      {panel === "create" && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true" />}
+      {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" onClick={()=>setPanel(null)} aria-hidden="true" />}
       <img className="nexora-play-drawer-character" data-open={panel === "create"} src="/images/triad/play-drawer-duo.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
-      {panel ? <section className={`nexora-command-sheet ${panel === "create" ? "nexora-play-drawer" : ""}`} role="dialog" aria-modal={panel === "create"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
-        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : panel === "join" ? "เข้าร่วมสนาม" : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
+      <img className="nexora-play-drawer-character" data-open={panel === "join"} src="/images/triad/play-drawer-character.webp" alt="" aria-hidden="true" draggable={false} decoding="async" />
+      {panel ? <section className={`nexora-command-sheet ${panel === "create" || panel === "join" ? "nexora-play-drawer" : ""} ${panel === "join" ? "nexora-join-drawer" : ""}`} role="dialog" aria-modal={panel === "create" || panel === "join"} aria-label={panel === "create" ? "สร้างห้อง" : panel === "join" ? "ค้นหาห้อง" : "อันดับนักดวล"}>
+        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : panel === "join" ? <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></> : "อันดับนักดวล"}</h2><button onClick={() => setPanel(null)} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel === "create" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</button>)}</div>
