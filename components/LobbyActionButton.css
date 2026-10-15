@@ -7,6 +7,10 @@
   transition:filter 180ms ease,transform 180ms ease;
 }
 .nexora-command-lobby .nexora-lobby-art-button::before { display:none; }
+.nexora-command-lobby .nexora-command-actions { --action-step:3%; }
+.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button { width:94%; }
+.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button:nth-child(2) { margin-left:var(--action-step); }
+.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button:nth-child(3) { margin-left:calc(var(--action-step) * 2); }
 .nexora-lobby-art-crop { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
 .nexora-lobby-art-crop img { position:absolute; left:0; top:0; width:127.1523%; max-width:none; height:auto; pointer-events:none; user-select:none; }
 .nexora-lobby-art-button[data-artwork=join] .nexora-lobby-art-crop img { top:-100%; }

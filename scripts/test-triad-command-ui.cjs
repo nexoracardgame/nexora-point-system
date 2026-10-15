@@ -95,6 +95,9 @@ if(width===1440){
 for(const button of await page.locator('.nexora-command-mode,.nexora-command-nav button').all()){const r=await button.boundingBox();assert.ok(r.x>=0&&r.y>=0&&r.x+r.width<=width+1&&r.y+r.height<=height+1,'Every lobby command fits');}
 await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});
 assert.equal(await page.locator('.nexora-lobby-art-button').count(),3);
+const steps=await page.locator('.nexora-lobby-art-button').evaluateAll(els=>els.map(el=>({offset:el.offsetLeft,width:el.offsetWidth})));
+assert.ok(steps[1].offset>steps[0].offset&&steps[2].offset>steps[1].offset,'Actions form a shallow staircase');
+assert.ok(Math.abs(steps[0].width-steps[1].width)<1&&Math.abs(steps[1].width-steps[2].width)<1,'Staggered actions retain equal widths');
 assert.equal(await page.locator('.nexora-lobby-banner-dots button').count(),2,'Only configured banner slides get controls');
 const bannerBox=await page.locator('.nexora-lobby-banner').boundingBox(),actionsBox=await page.locator('.nexora-command-actions').boundingBox();assert.ok(bannerBox.x>=0&&bannerBox.y>=0&&bannerBox.x+bannerBox.width<=width+1&&bannerBox.y+bannerBox.height<=height+1,'Banner fits viewport');
 assert.ok(bannerBox.x+bannerBox.width<=actionsBox.x+1||actionsBox.x+actionsBox.width<=bannerBox.x+1||bannerBox.y+bannerBox.height<=actionsBox.y+1||actionsBox.y+actionsBox.height<=bannerBox.y+1,'Banner never overlaps main actions');
