@@ -1,0 +1,6 @@
+Kenney Interface Sounds (CC0)
+https://kenney.nl/assets/interface-sounds
+Downloaded from the author's OpenGameArt upload:
+https://opengameart.org/content/interface-sounds
+Files: click_003.ogg, confirmation_002.ogg, back_001.ogg
+See License.txt for the original license.

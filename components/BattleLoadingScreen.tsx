@@ -6,16 +6,22 @@ import "./BattleLoadingScreen.css";
 
 const DURATION = 3000;
 let until = 0;
-export function beginBattleLoading() {
+let pendingArrivalUntil = 0;
+let lastArrival = -Infinity;
+export function beginBattleLoading(trigger: "intent" | "arrival" = "intent") {
   if (typeof window === "undefined") return;
-  if (until <= performance.now()) until = performance.now() + DURATION;
+  const now = performance.now();
+  const continuing = trigger === "arrival" && (now < pendingArrivalUntil || now - lastArrival < 1500);
+  if (trigger === "intent") pendingArrivalUntil = now + 15000;
+  else { pendingArrivalUntil = 0; lastArrival = now; }
+  if (!continuing && until <= now) until = now + DURATION;
   window.dispatchEvent(new Event("nexora:battle-loading"));
 }
 
 export function useBattleLoadingStage(stage: string) {
   const previous = useRef(stage);
   useLayoutEffect(() => {
-    if (previous.current !== stage) { previous.current = stage; beginBattleLoading(); }
+    if (previous.current !== stage) { previous.current = stage; beginBattleLoading("arrival"); }
   }, [stage]);
 }
 
@@ -27,12 +33,12 @@ export default function BattleLoadingScreen() {
   useLayoutEffect(() => {
     const show = () => {
       clearTimeout(timer.current);
-      setVisible(true);
+      setVisible(until > performance.now());
       setRun(until);
       timer.current = setTimeout(() => setVisible(false), Math.max(0, until - performance.now()));
     };
     window.addEventListener("nexora:battle-loading", show);
-    beginBattleLoading();
+    beginBattleLoading("arrival");
     return () => { clearTimeout(timer.current); window.removeEventListener("nexora:battle-loading", show); };
   }, [pathname]);
   useEffect(() => {

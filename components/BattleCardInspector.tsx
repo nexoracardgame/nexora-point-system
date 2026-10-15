@@ -1,12 +1,26 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { useLayoutEffect, useState, type CSSProperties } from "react";
 import { Check, X } from "lucide-react";
 
 type InspectorCard = { cardNo: string; name: string; sourceImage: string; attack: number; support: number; kind: string; skillText: string };
 
 export default function BattleCardInspector({ card, element, interactive, onClose, onUseCard }: { card: InspectorCard; element: string; interactive: boolean; onClose?: () => void; onUseCard?: () => void }) {
-  return createPortal(<div className="nexora-card-inspector" data-interactive={interactive} role="dialog" aria-modal={interactive} aria-label={`รายละเอียด No.${card.cardNo}`} onClick={event=>{if(event.currentTarget===event.target)onClose?.();}}>
+  const [bottom, setBottom] = useState(230);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const tops = [...document.querySelectorAll(".nexora-arena-hand,.nexora-arena-hand-filters")]
+        .map(node => node.getBoundingClientRect()).filter(rect => rect.width > 0 && rect.height > 0 && rect.top > window.innerHeight / 2).map(rect => rect.top);
+      setBottom(tops.length ? Math.max(175, window.innerHeight - Math.min(...tops) + 16) : 230);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    document.querySelectorAll(".nexora-arena-hand").forEach(node => observer.observe(node));
+    window.addEventListener("resize", measure);
+    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
+  }, []);
+  return createPortal(<div className="nexora-card-inspector" style={{"--inspector-bottom":`${bottom}px`} as CSSProperties} data-interactive={interactive} role="dialog" aria-modal={interactive} aria-label={`รายละเอียด No.${card.cardNo}`} onClick={event=>{if(event.currentTarget===event.target)onClose?.();}}>
     <section className="nexora-card-inspector-panel" onPointerDown={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()}>
       <header><span>รายละเอียดการ์ด · No.{card.cardNo}</span>{interactive && onClose && <button type="button" aria-label="ปิดหน้าต่างการ์ด" title="ปิดหน้าต่างการ์ด" onClick={onClose}><X size={20} /></button>}</header>
       <div className="nexora-card-inspector-art"><img src={card.sourceImage} alt={card.name} draggable={false} /></div>

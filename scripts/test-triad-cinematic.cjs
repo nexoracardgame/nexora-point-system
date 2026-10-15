@@ -11,6 +11,7 @@ const reactDir = path.dirname(require.resolve('react'));
 const domDir = path.dirname(require.resolve('react-dom'));
 const schedulerDir = path.dirname(require.resolve('scheduler'));
 const modules = {
+  '@/lib/game-ui-audio': ts.transpileModule(fs.readFileSync('lib/game-ui-audio.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText,
   react: fs.readFileSync(path.join(reactDir, 'cjs/react.production.js'), 'utf8'),
   'react/jsx-runtime': fs.readFileSync(path.join(reactDir, 'cjs/react-jsx-runtime.production.js'), 'utf8'),
   'react-dom': fs.readFileSync(path.join(domDir, 'cjs/react-dom.production.js'), 'utf8'),
