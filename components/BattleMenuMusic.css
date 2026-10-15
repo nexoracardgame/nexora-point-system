@@ -1,0 +1,6 @@
+.nexora-menu-audio { display:grid; place-items:center; width:32px; height:32px; flex-shrink:0; border:1px solid #bfcdd233; border-radius:4px; background:#07111c90; color:#dbe6e8; cursor:pointer; }
+.nexora-menu-audio:hover { color:#f7d88d; border-color:#f7d88d88; }
+.nexora-menu-audio:focus-visible { outline:2px solid #9ae8df; outline-offset:2px; }
+.nexora-menu-audio-fixed { position:fixed; top:20px; right:24px; z-index:2147483101; }
+[data-game-audio-slot] { display:flex; align-items:center; flex-shrink:0; }
+@media (max-height:600px) { .nexora-menu-audio { width:26px; height:26px; } .nexora-menu-audio-fixed { top:8px; right:12px; } }

@@ -144,7 +144,7 @@ export default function NexoraDialogProvider() {
         const tone = inferTone(message, options.tone);
 
         queueRef.current.push({
-          appearance: options.kind === "confirm" && options.title === "ยืนยันยอมแพ้?" ? "battle-surrender" : undefined,
+          appearance: options.kind === "confirm" && ["ยืนยันยอมแพ้?", "ยืนยันออกจากห้อง?"].includes(options.title || "") ? "battle-surrender" : undefined,
           kind: options.kind,
           title:
             options.title ||

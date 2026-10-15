@@ -64,6 +64,7 @@ export default function GameModeModal({ format, modes, selected, withBot, busy, 
       <div className="nexora-v3-ring" aria-hidden="true"><img src={asset + "fx/background_ring.png"} alt="" /></div>
       <div className="nexora-v3-sparkles" aria-hidden="true"><i /><i /><i /><i /></div>
       <header className="nexora-v3-header"><img className="nexora-v3-ornament" src={asset + "header_ornament.png"} alt="" aria-hidden="true" /><span className="nexora-v3-emblem" aria-hidden="true"><img src={asset + "nexora_star.png"} alt="" /></span><h2 id="nexora-v3-title">เลือกโหมดการเล่น</h2><p id="nexora-v3-subtitle">GAME MODE SELECTION <span>· {format === "triad" ? "TRIAD · 3 ใบ" : "PENTAD · 5 ใบ"}</span></p></header>
+      <span data-game-audio-slot style={{position:"absolute",right:86,top:30}} />
       <button type="button" className="nexora-v3-close" aria-label="ปิดหน้าต่างเลือกโหมด" title="ปิดหน้าต่าง" disabled={busy} onClick={onClose}><X size={24} /></button>
       <div className="nexora-v3-options" data-count={modes.length}>{modes.map(mode => <ModeCard key={mode.id} mode={mode} selected={selected === mode.id} disabled={busy} onSelect={() => onSelect(mode.id)} />)}</div>
       <BotToggle enabled={withBot} disabled={busy} onChange={onBotChange} />

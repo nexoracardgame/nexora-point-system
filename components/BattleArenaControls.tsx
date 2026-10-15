@@ -14,7 +14,7 @@ export function BattleArenaFormation({ upper, children, className = "", floating
 }
 
 export function BattleArenaHeader({ title, code, time, onExit, onSurrender }: { title: string; code?: string; time: string; onExit: () => void; onSurrender?: () => void }) {
-  return <header className="nexora-arena-header"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div className="nexora-arena-brand"><small><Swords size={12} /> BATTLE ROOM</small><strong>{title}</strong></div>{code && <span className="nexora-arena-room-code">ห้อง {code}</span>}<div className="nexora-arena-header-actions"><span><Clock3 size={16} />{time}</span>{onSurrender && <button type="button" title="ยอมแพ้" aria-label="ยอมแพ้" onClick={onSurrender}><Flag size={20} /></button>}<button type="button" title="ออกจากห้อง" aria-label="ออกจากห้อง" onClick={onExit}><LogOut size={22} /></button></div></header>;
+  return <header className="nexora-arena-header"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div className="nexora-arena-brand"><small><Swords size={12} /> BATTLE ROOM</small><strong>{title}</strong></div>{code && <span className="nexora-arena-room-code">ห้อง {code}</span>}<div className="nexora-arena-header-actions"><span data-game-audio-slot /><span><Clock3 size={16} />{time}</span>{onSurrender && <button type="button" title="ยอมแพ้" aria-label="ยอมแพ้" onClick={onSurrender}><Flag size={20} /></button>}<button type="button" title="ออกจากห้อง" aria-label="ออกจากห้อง" onClick={onExit}><LogOut size={22} /></button></div></header>;
 }
 
 export function BattleArenaHand({ title, filter, onFilterChange, children }: { title: string; filter: ArenaCardFilter; onFilterChange: (filter: ArenaCardFilter) => void; children: ReactNode }) {

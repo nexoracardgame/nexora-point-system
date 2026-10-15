@@ -4,6 +4,10 @@ const transpile=(code,fileName='file.tsx')=>ts.transpileModule(code,{fileName,co
 const modules={};
 for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']]) modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
+modules['@/lib/battle-surrender-dialog']='exports.confirmBattleSurrender=async()=>true;exports.confirmBattleLeave=async()=>window.confirmLeave!==false;';
+modules['@/components/BattleForfeitVictory']=transpile(fs.readFileSync('components/BattleForfeitVictory.tsx','utf8'));
+modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
+modules['./BattleSurrenderDialog.css']='';
 modules['next/link']=`const React=require('react');exports.default=({href,children,...props})=>React.createElement('a',{href,...props},children);exports.__esModule=true;`;
 modules['next/navigation']='exports.useRouter=()=>({prefetch:()=>{},replace:path=>{window.navigationTarget=path;}});';
 modules['@/components/BattleLoadingScreen']='exports.useBattleLoadingStage=()=>{};';

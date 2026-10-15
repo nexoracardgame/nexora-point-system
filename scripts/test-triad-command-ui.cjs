@@ -8,6 +8,7 @@ const transpile=code=>ts.transpileModule(code,{compilerOptions:{module:ts.Module
 const modules={};
 for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
+modules['@/lib/home-wallpaper']='exports.loadHomeWallpaper=()=>Promise.resolve("");';
 modules['./GameModeModal.css']='';
 modules['@/components/GameModeModal']=transpile(fs.readFileSync('components/GameModeModal.tsx','utf8'));
 modules['./BattleAudio']=`exports.primeBattleAudio=()=>Promise.resolve(false);exports.playMenuCue=()=>{if(localStorage.getItem('triad-battle-muted')!=='1')window.uiCues=(window.uiCues||0)+1;};`;
@@ -26,6 +27,7 @@ modules.test=transpile(`import {useState,useEffect,useLayoutEffect,useRef,Fragme
 import NexoraCommandScene from './NexoraCommandScene';import {playMenuCue} from './BattleAudio';
 import GameModeModal from '@/components/GameModeModal';
 const playDrawerSound=()=>{};
+const BattleForfeitVictory=()=>null;
 const DuelistLeaderboard=({onClose})=><div><span>อันดับนักดวลทดสอบ</span><button aria-label="ปิด" onClick={onClose}>ปิด</button></div>;
 import BattleArenaChat, { BattleArenaChatFrame } from '@/components/BattleArenaChat';
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from '@/components/DeckPreparation';
@@ -58,7 +60,7 @@ await page.setViewportSize({width,height});await page.goto('https://command.test
 await page.evaluate(()=>new Promise((resolve,reject)=>{const i=new window.Image();i.onload=resolve;i.onerror=reject;i.src='/images/triad/nexora-command.webp'}));
 await page.waitForSelector('.nexora-command-world');
 assert.equal(await page.locator('.nexora-command-scene img').count(),1,'Original artwork is a single intact image, not repainted layers');
-assert.ok(await page.locator('.nexora-command-world').evaluate(e=>e.complete&&e.naturalWidth===1672&&e.currentSrc.endsWith('/nexora-command-original.webp')),'Exact original artwork renders');
+assert.ok(await page.locator('.nexora-command-world').evaluate(e=>e.complete&&e.naturalWidth===3840&&e.currentSrc.endsWith('/nexora-home-4k/poster.webp')),'Lossless 4K poster renders while the original video loads');
 if(width===1440){
  const before=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);await page.waitForTimeout(750);const after=await page.locator('.nexora-command-camera').evaluate(e=>getComputedStyle(e).transform);assert.equal(before,after,'No automatic enlargement of the original image');
  await page.mouse.move(800,460);await page.waitForTimeout(420);assert.equal(await page.locator('.nexora-command-art').evaluate(e=>getComputedStyle(e).transform),'none','Pointer movement never distorts the artwork');

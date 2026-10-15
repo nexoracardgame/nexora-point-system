@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeBattleForfeit, type BattleForfeit } from "./battle-forfeit";
+import { recordForfeitRank } from "./battle-forfeit-rank";
 import {
   getTriadCardRpsChoice,
   resolveTriadTurn,
@@ -157,6 +159,7 @@ export type TriadRoomGame = {
   matchWinner: TriadRoomSlot | "";
   surrenderedBy: TriadRoomSlot | "";
   matchEndedAt: number;
+  forfeit?: BattleForfeit;
   rankedRecordedAt: number;
   rankUpEvents: TriadRankUpEvent[];
   chat: TriadRoomChatMessage[];
@@ -613,6 +616,7 @@ function normalizeGame(value: unknown): TriadRoomGame {
     matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
     surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
     matchEndedAt: Number(raw.matchEndedAt || 0),
+    forfeit: normalizeBattleForfeit(raw.forfeit),
     rankedRecordedAt: Number(raw.rankedRecordedAt || 0),
     rankUpEvents: normalizeRankUpEvents(raw.rankUpEvents),
     chat: normalizeChatMessages(raw.chat),
@@ -1037,6 +1041,14 @@ async function getStoredRoom(code: string) {
 
 async function persistRankedMatchIfNeeded(room: StoredTriadRoom) {
   if (!room.game.matchEndedAt || room.game.rankedRecordedAt) return;
+  if (room.game.forfeit) {
+    const result = room.game.forfeit;
+    if (![result.winner, result.loser].some(player => isTriadBotParticipant({ ...player, joinedAt: 0 }))) {
+      await prisma.$transaction(tx => recordForfeitRank(tx, `triad:${room.code}:${room.createdAt}:${room.game.deckStartedAt}`, result));
+    }
+    room.game.rankedRecordedAt = Date.now();
+    return;
+  }
   learnFromBotMatch(room);
   room.game.rankedRecordedAt = Date.now();
   room.game.rankUpEvents = [];
@@ -3088,11 +3100,14 @@ export async function timeoutTriadRoomTurn(code: string, participantId: string) 
 }
 
 export async function surrenderTriadRoom(code: string, participantId: string) {
+  return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
   const side = sideForParticipant(room, participantId);
   if (!side) return { ok: false as const, reason: "not_player" as const, room: publicRoom(room) };
   if (room.status !== "playing") return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
+
+  if (room.game.matchEndedAt) return { ok: true as const, room: publicRoom(room) };
 
   const winner: TriadRoomSlot = side === "host" ? "challenger" : "host";
   room.game.surrenderedBy = side;
@@ -3101,6 +3116,7 @@ export async function surrenderTriadRoom(code: string, participantId: string) {
   room.game.fightNo = 4;
   await upsertStoredRoom(room);
   return { ok: true as const, room: publicRoom(room), surrenderedBy: side, winner };
+  });
 }
 
 export async function joinTriadRoom(input: {
@@ -3111,6 +3127,7 @@ export async function joinTriadRoom(input: {
 }) {
   const room = await getStoredRoom(input.code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
+  if (room.game.forfeit?.loser.id === input.participant.id) return { ok: false as const, reason: "not_playing" as const };
   if (room.access === "private" && room.password !== cleanText(input.password) && room.hostId !== input.participant.id) {
     return { ok: false as const, reason: "wrong_password" as const, room: publicRoom(room) };
   }
@@ -3265,6 +3282,7 @@ export async function resetTriadRoomBattle(code: string, participantId: string) 
   return withRoomMutationLock(code, async () => {
     const room = await getStoredRoom(code);
     if (!room) return { ok: false as const, reason: "not_found" as const };
+    if (room.game.forfeit) return { ok: false as const, reason: "not_playing" as const, room: publicRoom(room) };
     if (room.status === "waiting") return { ok: true as const, room: publicRoom(room), alreadyWaiting: true as const };
 
     const matchEnded = Boolean(room.game.matchEndedAt || room.game.matchWinner);
@@ -3407,9 +3425,28 @@ export async function clearTriadRooms() {
 }
 
 export async function leaveTriadRoom(code: string, participantId: string) {
+  return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: true as const };
+  const side = sideForParticipant(room, participantId);
+  if (side && room.status === "playing" && !room.game.matchEndedAt) {
+    const winner = side === "host" ? "challenger" : "host";
+    const loserPlayer = room.seats[side], winnerPlayer = room.seats[winner];
+    if (loserPlayer && winnerPlayer) {
+      room.game.forfeit = { at: Date.now(), winner: winnerPlayer, loser: loserPlayer };
+      room.game.surrenderedBy = side;
+      room.game.matchWinner = winner;
+      room.game.matchEndedAt = Date.now();
+      room.game.fightNo = 4;
+      await upsertStoredRoom(room);
+    }
+  }
   const cleanRoom = removeParticipant(room, participantId);
+  if (room.game.forfeit) {
+    if (![cleanRoom.seats.host, cleanRoom.seats.challenger].some(player => player && !isTriadBotParticipant(player)) && !cleanRoom.spectators.length) await deleteStoredRoom(room.code);
+    else await upsertStoredRoom(cleanRoom);
+    return { ok: true as const, room: publicRoom(cleanRoom) };
+  }
   if (room.hostId === participantId && isTriadBotParticipant(cleanRoom.seats.challenger)) {
     await deleteStoredRoom(room.code);
     return { ok: true as const };
@@ -3443,4 +3480,5 @@ export async function leaveTriadRoom(code: string, participantId: string) {
   }
   await upsertStoredRoom(cleanRoom);
   return { ok: true as const, room: publicRoom(cleanRoom) };
+  });
 }

@@ -1,5 +1,7 @@
 import { randomInt, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma";
+import type { BattleForfeit } from "./battle-forfeit";
+import { recordForfeitRank } from "./battle-forfeit-rank";
 import { triadCardByNo, triadCards, triadSkillRuleByNo, triadSkillElementConditionMatches } from "./triad-dominion";
 import { completePentadDeck, makePentadPools, emptyPentadDeck, otherPentadSide, pentadElementRelation, resolvePentadTurn, validatePentadDeck, PENTAD_DECK_MS, PENTAD_TARGET_MS, PENTAD_TURN_MS, type PentadDeck, type PentadResolution, type PentadSide, type PentadTurn } from "./pentad-dominion";
 
@@ -7,6 +9,8 @@ export type PentadParticipant = { id: string; name: string; image: string };
 export type PentadChoice = { side: PentadSide; cardNo: string; sourceCardNo?: string; kind?: "copy"; options: string[]; value: string; deadline: number };
 export type PentadRound = PentadResolution & { id: number; fight: number; turn: PentadTurn; mains: Record<PentadSide, string>; skills: Record<PentadSide, string>; opener: PentadSide; endsAt: number; finalDuel: boolean; scoreBefore?: Record<PentadSide,number>; scoreAfter?: Record<PentadSide,number> };
 export type PentadRoom = {
+  forfeit?: BattleForfeit;
+  forfeitRankedAt?: number;
   code: string; version: number; epoch: number; createdAt: number; updatedAt: number;
   deckSource?: "all" | "random";
   access?: "public" | "private";
@@ -222,6 +226,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
   const requirePhase = (...phases: PentadRoom["phase"][]) => { if (!phases.includes(room.phase)) throw new Error("สถานะเกมเปลี่ยนแล้ว กรุณาลองอีกครั้ง"); };
   const requireSeat = () => { if (!side) throw new Error("เฉพาะผู้เล่นเท่านั้น"); return side; };
   if (action === "join") {
+    if (room.forfeit?.loser.id === actor.id) throw new Error("ออกจากสนามแล้ว ไม่สามารถกลับเข้าร่วมได้");
     if (side || room.spectators.some(p => p.id === actor.id)) return;
     if (room.access === "private") {
       const [salt,hash]=String(room.passwordHash || "").split(":");
@@ -232,7 +237,10 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     else { if (room.spectators.length >= 10) throw new Error("ผู้ชมเต็มแล้ว"); room.spectators.push(actor); }
     return;
   }
-  if (!side && !room.spectators.some(p => p.id === actor.id)) throw new Error("กรุณาเข้าร่วมห้องก่อน");
+  if (!side && !room.spectators.some(p => p.id === actor.id)) {
+    if (action === "leave") return;
+    throw new Error("กรุณาเข้าร่วมห้องก่อน");
+  }
   if (action === "chat") {
     const text = String(body.text || "").trim().slice(0, 240);
     if (!text) return;
@@ -241,7 +249,11 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
   }
   if (action === "leave") {
     if (side) {
-      if (!["waiting", "finished"].includes(room.phase)) finish(room, otherPentadSide(side), "อีกฝ่ายออกจากเกม");
+      if (!["waiting", "finished"].includes(room.phase)) {
+        const winner = otherPentadSide(side);
+        if (room.seats[winner]) room.forfeit = { at: now, winner: room.seats[winner]!, loser: actor };
+        finish(room, winner, "อีกฝ่ายออกจากเกม");
+      }
       room.seats[side] = null;
       if (side === "host" && room.phase === "waiting" && room.seats.challenger && room.seats.challenger.id !== PENTAD_BOT_ID) { room.seats.host = room.seats.challenger; room.seats.challenger = null; }
     }
@@ -281,7 +293,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     completePentadDeck(valid,random,room.pools);
     room.decks[player] = structuredClone(valid); room.ready[player] = action === "ready"; return;
   }
-  if (action === "surrender") { finish(room, otherPentadSide(player), "ยอมแพ้"); return; }
+  if (action === "surrender") { requirePhase("deck", "select", "target", "result"); finish(room, otherPentadSide(player), "ยอมแพ้"); return; }
   if (action === "pick") {
     requirePhase("select");
     if (room.picks[player]) return;
@@ -362,6 +374,10 @@ export async function mutatePentadRoom(code: string, actor: PentadParticipant, b
     if (body) applyPentadAction(room, actor, body, now);
     else if (!pentadSeat(room, actor.id) && !room.spectators.some(p => p.id === actor.id)) throw new Error("กรุณาเข้าร่วมห้องก่อน");
     tickPentadRoom(room, now);
+    if (room.forfeit && !room.forfeitRankedAt) {
+      if (![room.forfeit.winner.id, room.forfeit.loser.id].includes(PENTAD_BOT_ID)) await recordForfeitRank(tx, `pentad:${room.code}:${room.createdAt}`, room.forfeit);
+      room.forfeitRankedAt = now;
+    }
     if (body?.action === "leave" && !sides.some(side=>room.seats[side] && room.seats[side]!.id !== PENTAD_BOT_ID)) {
       await tx.$executeRawUnsafe(`DELETE FROM "PentadRoom" WHERE "code" = $1`,code);
       return null;

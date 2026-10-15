@@ -1,6 +1,8 @@
 "use client";
 
-import { confirmBattleSurrender } from "@/lib/battle-surrender-dialog";
+import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
+import BattleForfeitVictory from "@/components/BattleForfeitVictory";
+import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
 
 import Image from "next/image";
@@ -68,7 +70,7 @@ import {
   type TriadTurnResult,
 } from "@/lib/triad-dominion";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
-import { useBattleArenaActivity } from "@/lib/battle-ui-state";
+import { useBattleArenaActivity, useBattleCombatActivity } from "@/lib/battle-ui-state";
 import {
   TRIAD_ROOM_REALTIME_CHANNEL,
   TRIAD_ROOM_REALTIME_EVENT,
@@ -214,6 +216,7 @@ type RoomGame = {
   matchWinner: RoomPlayerSide | "";
   surrenderedBy: RoomPlayerSide | "";
   matchEndedAt: number;
+  forfeit?: BattleForfeit;
   rankedRecordedAt: number;
   rankUpEvents: TriadRankUpEvent[];
   chat: RoomChatMessage[];
@@ -1161,6 +1164,7 @@ function normalizeRoomGame(value: unknown): RoomGame {
     matchWinner: raw.matchWinner === "host" || raw.matchWinner === "challenger" ? raw.matchWinner : "",
     surrenderedBy: raw.surrenderedBy === "host" || raw.surrenderedBy === "challenger" ? raw.surrenderedBy : "",
     matchEndedAt: Number(raw.matchEndedAt || 0),
+    forfeit: normalizeBattleForfeit(raw.forfeit),
     rankedRecordedAt: Number(raw.rankedRecordedAt || 0),
     rankUpEvents: cleanRankUpEvents(raw.rankUpEvents),
     chat: cleanChat(raw.chat),
@@ -3589,7 +3593,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       cancelAnimationFrame(pointerFrame.current);
       pointerFrame.current = requestAnimationFrame(() => { artRef.current?.style.setProperty("--command-x", `${x}px`); artRef.current?.style.setProperty("--command-y", `${y}px`); });
     }} onPointerLeave={() => { cancelAnimationFrame(pointerFrame.current); artRef.current?.style.setProperty("--command-x", "0px"); artRef.current?.style.setProperty("--command-y", "0px"); }}>
-      <NexoraCommandScene /><div className="nexora-command-shade" />
+      <NexoraCommandScene homeVideo /><div className="nexora-command-shade" />
       <header className="nexora-command-brand"><img className="nexora-official-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
         <div className="nexora-command-profile"><img src={participant.image || "/avatar.png"} alt="" /><div><strong>{participant.name}</strong><small>{profile?.rankName || "BRONZE"} · {profile?.wins || 0} ชัยชนะ</small></div></div>
       </header>
@@ -4734,6 +4738,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     startedBattleRoomKeysRef.current.add(roomBattleStartKey(room));
   };
   useBattleArenaActivity(Boolean(currentRoom) || phase !== "lobby");
+  useBattleCombatActivity(phase === "battle");
   useBattleLoadingStage(`${currentRoom?.code || ""}:${phase}`);
   const hasBattleStartedForRoom = (room: TriadRoom | null | undefined) =>
     Boolean(room && startedBattleRoomKeysRef.current.has(roomBattleStartKey(room)));
@@ -5861,7 +5866,18 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setPhase(serverStartedAsFieldPlayer ? "deck" : "battle");
   };
 
+  const leavingRoomRef = useRef(false);
   const leaveRoom = async () => {
+    if (leavingRoomRef.current) return;
+    leavingRoomRef.current = true;
+    try {
+    let alreadyLeft = false;
+    if (currentRoom?.status === "playing" && isFieldPlayer && !currentRoom.game.matchEndedAt) {
+      if (!await confirmBattleLeave()) return;
+      const result = await postRoomAction({ action: "leave", code: currentRoom.code }).catch(() => null);
+      if (!result?.ok) { setBattleLog(current => ["ออกจากห้องไม่สำเร็จ กรุณาลองอีกครั้ง", ...current]); return; }
+      alreadyLeft = true;
+    }
     joiningRoomCodeRef.current = "";
     setJoiningRoomCode("");
     const code = currentRoom?.code || "";
@@ -5873,7 +5889,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     writeCachedTriadRoom(participant.id, null);
     setPhase("lobby");
     if (code) {
-      await postRoomAction({ action: "leave", code }).catch(() => null);
+      if (!alreadyLeft) await postRoomAction({ action: "leave", code }).catch(() => null);
       if (activeRoomCodeRef.current && activeRoomCodeRef.current !== code) return;
       activeRoomCodeRef.current = "";
       activeRoomSnapshotRef.current = null;
@@ -5882,6 +5898,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       writeCachedTriadRoom(participant.id, null);
       setPhase("lobby");
     }
+    } finally { leavingRoomRef.current = false; }
   };
 
   useLayoutEffect(() => {
@@ -7772,6 +7789,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     const deckTimerText = `${Math.floor(deckTimeLeft / 60)}:${String(deckTimeLeft % 60).padStart(2, "0")}`;
     return (
       <main className="nexora-command-deck triad-deck-screen nexora-deck-screen">
+        <BattleForfeitVictory result={currentRoom?.game.forfeit} userId={participant.id} onExit={() => { void leaveRoom(); }} />
         <DeckPreparationHeader title={TRIAD_TITLE} time={deckTimerText} onExit={leaveRoom} />
         <DeckPreparationLayout tray={<>
           <h2>เตรียมเด็ค <b>{playerDeck.length}/{DECK_SIZE}</b></h2>
@@ -7793,6 +7811,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   return (
     <BattleArenaSurface image={arena.image} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
+      <BattleForfeitVictory result={currentRoom?.game.forfeit} userId={participant.id} onExit={() => { void leaveRoom(); }} />
       {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button

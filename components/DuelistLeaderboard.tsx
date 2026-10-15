@@ -18,7 +18,7 @@ export default function DuelistLeaderboard({ players, userId, onClose }: { playe
   const own = ranked[ownIndex];
   const top = [3,1,0,2,4].map(index=>({player:ranked[index],position:index+1}));
   return <section className="nexora-ranking" role="dialog" aria-modal="true" aria-label="อันดับนักดวล">
-    <header className="nexora-ranking-nav"><button onClick={onClose}><ArrowLeft size={18}/> กลับ</button></header>
+    <header className="nexora-ranking-nav"><div data-game-audio-slot /><button onClick={onClose}><ArrowLeft size={18}/> กลับ</button></header>
     <div className="nexora-ranking-showcase"><div className="nexora-ranking-title"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/><h1>LEADERBOARD</h1><p>อันดับนักดวล NEXORA</p></div><div className="nexora-ranking-total"><Crown size={22}/><strong>PvP RANKING</strong><span>{ranked.length.toLocaleString()} นักดวล</span></div>
       <div className="nexora-ranking-podium">{top.map(({player,position})=><article key={position} data-place={position} data-rank={player?.rankKey || "bronze"} data-empty={!player}><div className="nexora-ranking-portrait"><div className="nexora-ranking-avatar-frame">{player ? <img src={player.image || "/avatar.png"} alt={player.name}/> : <Shield size={40}/>}<span className="nexora-ranking-frame-crest"><Crown size={20}/></span></div></div><div className="nexora-ranking-pedestal"><div className="nexora-ranking-position">{position === 1 && <Crown/>}{position}</div><h2>{player?.name || "—"}</h2><small>{player?.rankName || "—"}</small><strong><Crown size={18}/>{player ? player.wins.toLocaleString() : "—"}</strong></div></article>)}</div>
     </div>

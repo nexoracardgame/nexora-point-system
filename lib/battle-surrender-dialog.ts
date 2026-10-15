@@ -9,3 +9,7 @@ export function confirmBattleSurrender() {
     cancelText: "สู้ต่อ",
   });
 }
+
+export function confirmBattleLeave() {
+  return nexoraConfirm({ title: "ยืนยันออกจากห้อง?", message: "หากยืนยัน จะไม่สามารถกลับเข้าร่วมสนามนี้ได้ และฝ่ายตรงข้ามจะชนะทันที", tone: "danger", confirmText: "ยืนยัน", cancelText: "ยกเลิก" });
+}

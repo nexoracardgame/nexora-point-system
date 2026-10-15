@@ -47,7 +47,7 @@ export default function BattleLoadingScreen() {
       if (!target || target.hasAttribute("disabled")) return;
       const name = target.getAttribute("aria-label") || target.textContent?.trim() || "";
       const href = target.getAttribute("href");
-      if ((href?.startsWith("/battle") && href !== pathname) || /^(ยืนยันสร้างห้อง|ออกจากห้อง|ออกห้อง|เข้าห้อง|เริ่มเกม|พร้อม|กลับล็อบบี้|กลับหน้า PLAY)$/.test(name)) beginBattleLoading();
+      if ((href?.startsWith("/battle") && href !== pathname) || /^(ยืนยันสร้างห้อง|เข้าห้อง|เริ่มเกม|พร้อม|กลับล็อบบี้|กลับหน้า PLAY)$/.test(name)) beginBattleLoading();
     };
     document.addEventListener("click", click, true);
     return () => document.removeEventListener("click", click, true);

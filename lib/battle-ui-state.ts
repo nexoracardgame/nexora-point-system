@@ -21,3 +21,11 @@ export function useBattleArenaActivity(active: boolean) {
     return () => update(false);
   }, [active]);
 }
+
+export function useBattleCombatActivity(active: boolean) {
+  useLayoutEffect(() => {
+    const update = (value: boolean) => { document.documentElement.dataset.nexoraCombatActive = String(value); window.dispatchEvent(new Event("nexora:combat-activity")); };
+    update(active);
+    return () => update(false);
+  }, [active]);
+}

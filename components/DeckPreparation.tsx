@@ -11,7 +11,7 @@ export function DeckPreparationTools({ disabled, onShuffle, onClear }: { disable
 }
 
 export function DeckPreparationHeader({ title, time, onExit }: { title: string; time: string; onExit: () => void }) {
-  return <header className="nexora-deck-header"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div><small>เตรียมสนาม</small><strong>{title}</strong></div><div className="nexora-deck-header-actions"><span><Clock3 size={16} />{time}</span><button type="button" aria-label="ออกจากห้อง" title="ออกจากห้อง" onClick={onExit}><LogOut /></button></div></header>;
+  return <header className="nexora-deck-header"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div><small>เตรียมสนาม</small><strong>{title}</strong></div><div className="nexora-deck-header-actions"><span data-game-audio-slot /><span><Clock3 size={16} />{time}</span><button type="button" aria-label="ออกจากห้อง" title="ออกจากห้อง" onClick={onExit}><LogOut /></button></div></header>;
 }
 
 export function DeckPreparationLayout({ tray, catalog, actions }: { tray: ReactNode; catalog: ReactNode; actions?: ReactNode }) {
