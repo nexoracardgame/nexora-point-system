@@ -6,6 +6,7 @@ import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit
 import GameModeModal from "@/components/GameModeModal";
 import TargetSelectionModal from "@/components/TargetSelectionModal";
 import LobbyActionButton from "@/components/LobbyActionButton";
+import LobbyBanner from "@/components/LobbyBanner";
 import type { TargetOptionView } from "@/lib/target-selection-view";
 
 import Image from "next/image";
@@ -3635,11 +3636,12 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <button onClick={() => setPanel("rank")} aria-pressed={panel === "rank"}><Trophy />อันดับนักดวล</button>
         <button onClick={() => onNavigate("/")}><House />เว็บหลัก</button>
       </nav>
+      <div className="nexora-lobby-promo-rail"><LobbyBanner />
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
         <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => openPanel("create")} />
         <LobbyActionButton artwork="join" title="JOIN ARENA" subtitle="เข้าร่วม / ชมการต่อสู้" onClick={() => openPanel("join")} />
         <LobbyActionButton artwork="rank" title="DUELIST RANK" subtitle="อันดับนักดวล NEXORA" onClick={() => setPanel("rank")} />
-      </section>
+      </section></div>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
       {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" data-closing={panelClosing} onClick={closePanel} aria-hidden="true" />}
       {panel === "rank" ? <DuelistLeaderboard players={leaderboard} userId={participant.id} onClose={()=>setPanel(null)} /> : panel ? <section className={`nexora-command-sheet nexora-play-drawer ${panel === "join" ? "nexora-join-drawer" : "nexora-create-drawer"}`} data-closing={panelClosing} tabIndex={-1} role="dialog" aria-modal="true" aria-label={panel === "create" ? "สร้างห้อง" : "ค้นหาห้อง"} onPointerOver={event => {
