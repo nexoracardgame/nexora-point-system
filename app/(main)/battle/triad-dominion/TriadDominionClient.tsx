@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import BattleCardInspector from "@/components/BattleCardInspector";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, TRIAD_TITLE } from "@/components/DeckPreparation";
@@ -4727,6 +4728,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     startedBattleRoomKeysRef.current.add(roomBattleStartKey(room));
   };
   useBattleArenaActivity(Boolean(currentRoom) || phase !== "lobby");
+  useBattleLoadingStage(`${currentRoom?.code || ""}:${phase}`);
   const hasBattleStartedForRoom = (room: TriadRoom | null | undefined) =>
     Boolean(room && startedBattleRoomKeysRef.current.has(roomBattleStartKey(room)));
   const deckBattleStartKeyForRoom = (room: TriadRoom) =>

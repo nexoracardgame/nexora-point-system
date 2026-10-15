@@ -6,6 +6,7 @@ for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
 modules['next/link']=`const React=require('react');exports.default=({href,children,...props})=>React.createElement('a',{href,...props},children);exports.__esModule=true;`;
 modules['next/navigation']='exports.useRouter=()=>({prefetch:()=>{},replace:path=>{window.navigationTarget=path;}});';
+modules['@/components/BattleLoadingScreen']='exports.useBattleLoadingStage=()=>{};';
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
 modules['@/components/BattleCardInspector']=transpile(fs.readFileSync('components/BattleCardInspector.tsx','utf8'));
 modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));

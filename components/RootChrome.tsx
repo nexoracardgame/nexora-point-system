@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import FirstOpenSplash from "@/components/FirstOpenSplash";
+import BattleLoadingScreen from "@/components/BattleLoadingScreen";
 import GlobalActivityBar from "@/components/GlobalActivityBar";
 import InstantNavigationFeedback from "@/components/InstantNavigationFeedback";
 import NexoraDialogProvider from "@/components/NexoraDialogProvider";
@@ -26,6 +27,7 @@ export default function RootChrome({
     return (
       <>
         <NexoraDialogProvider />
+        <BattleLoadingScreen />
         <PushNotificationBootstrap />
         {children}
       </>

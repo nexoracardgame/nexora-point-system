@@ -1,0 +1,10 @@
+.nexora-game-loading { position:fixed; inset:0; z-index:2147483600; background:#000; display:grid; place-items:center; overflow:hidden; pointer-events:auto; }
+.nexora-game-loading-wallpaper { position:absolute; inset:0; background:url('/images/triad/nexora-command-original.webp') center/cover; opacity:.2; }
+.nexora-game-loading-content { position:relative; display:flex; flex-direction:column; align-items:center; width:min(800px,72%); gap:28px; }
+.nexora-game-loading-content > img { display:block; width:100%; height:auto; object-fit:contain; animation:nexora-loading-pulse 1500ms ease-in-out infinite alternate; filter:drop-shadow(0 0 20px #f3cb6b55); }
+.nexora-game-loading-track { width:78%; height:28px; padding:4px; background:#ffffff18; border:1px solid #ffffff80; clip-path:polygon(3% 0,94% 0,100% 65%,97% 100%,4% 100%,0 40%); overflow:hidden; }
+.nexora-game-loading-track > div { height:100%; width:100%; background:#fff; transform:scaleX(0); transform-origin:left; animation:nexora-loading-fill 3000ms linear forwards; }
+@keyframes nexora-loading-fill { to { transform:scaleX(1); } }
+@keyframes nexora-loading-pulse { from { transform:scale(.94); } to { transform:scale(1.06); } }
+@media (max-height:500px) { .nexora-game-loading-content { width:min(600px,58%); gap:14px; } .nexora-game-loading-track { height:20px; } }
+@media (prefers-reduced-motion:reduce) { .nexora-game-loading-content > img { animation:none; } }

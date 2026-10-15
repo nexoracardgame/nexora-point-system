@@ -12,6 +12,7 @@ import type { PentadRoom, PentadRound } from "@/lib/pentad-room-store";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { useBattleArenaActivity } from "@/lib/battle-ui-state";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, PENTAD_TITLE } from "@/components/DeckPreparation";
 import { freshDeck } from "@/lib/deck-reroll";
@@ -123,6 +124,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const lowerSide = side || "host";
   const upperSide = otherPentadSide(lowerSide);
   useBattleArenaActivity(Boolean(room) || entering);
+  useBattleLoadingStage(`${room?.code || ""}:${room?.phase === "deck" ? "deck" : room?.phase === "waiting" ? "waiting" : room ? "battle" : "lobby"}`);
   const arena = useMemo(() => battleArenaForSeed(`pentad:${room?.code || "lobby"}:${room?.createdAt || 0}`), [room?.code, room?.createdAt]);
   const accept = (next: PentadRoom) => {
     const previous = roomRef.current;
@@ -266,7 +268,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
     {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}
-    {!room ? <section className={styles.entering}>{entering && <><Loader2 className={styles.spin} /><strong>กำลังเข้าสนาม</strong></>}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
+    {!room ? <section className={styles.entering}>{entering && <><strong>กำลังเชื่อมต่อสนาม</strong><button onClick={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}}>กลับหน้าหลัก</button></>}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
       <h1>อำนาจห้าผนึก</h1><div className={styles.versus}>{(["host", "challenger"] as const).map(player => <div key={player} className={styles.seat}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={room.seats[player]?.image || "/avatar.png"} alt="" /><strong>{room.seats[player]?.name || "รอผู้ท้าชิง"}</strong></div>)}</div>
       <span className={styles.vs}>VS</span><div className={styles.waitingActions}>{side === "host" && <><button disabled={busy || Boolean(room.seats.challenger)} onClick={() => void act("bot")}><Bot /> เพิ่มบอท</button><button className={styles.primary} disabled={busy || !room.seats.challenger} onClick={() => void act("start")}><Swords /> เริ่มเกม</button></>}<span><Eye size={18} /> ผู้ชม {room.spectators.length}/10</span></div>
     </section> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
