@@ -12,6 +12,11 @@ const html=`<html><meta charset="utf-8"><meta name="viewport" content="width=dev
  await page.waitForFunction(()=>Array.from(document.querySelectorAll('.nexora-versus-plane img')).every(image=>image.complete&&image.naturalWidth>0));
  assert.equal(await page.locator('.nexora-versus-character').count(),2);
  assert.equal(await page.locator('.nexora-versus-plate').count(),2);
+ await page.evaluate(()=>document.fonts.ready);
+ assert.equal(await page.evaluate(()=>document.fonts.check('900 20px NexoraOrbitron')),true,'Local gaming font loaded');
+ assert.equal(await page.locator('.nexora-versus-background').evaluate(el=>getComputedStyle(el).opacity),'0.8');
+ const logoClear=await page.evaluate(()=>{const logo=document.querySelector('.nexora-versus-logo').getBoundingClientRect();return [...document.querySelectorAll('.nexora-versus-character')].every(el=>{const r=el.getBoundingClientRect();return logo.right<=r.left||logo.left>=r.right||logo.bottom<=r.top||logo.top>=r.bottom})});
+ assert.equal(logoClear,true,'Logo has clear space from both characters at '+width);
  await page.locator('.nexora-versus-duelist').evaluateAll(els=>els.forEach(el=>el.getAnimations().forEach(animation=>animation.finish())));
  for(const name of await page.locator('.nexora-versus-name h2').all()){const box=await name.boundingBox();assert.ok(box.x>=0&&box.y>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,'Player names fit '+width+' '+JSON.stringify(box));}
  await page.addStyleTag({content:'.nexora-versus-plane{animation:none!important;opacity:1!important}'});

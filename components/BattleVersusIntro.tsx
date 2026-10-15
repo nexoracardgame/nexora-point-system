@@ -13,6 +13,7 @@ const ART = "/images/versus/";
 export default function BattleVersusIntro({ sessionKey, left, right, background, enabled = true }: {
   sessionKey: string; left: Duelist; right: Duelist; background?: string; enabled?: boolean;
 }) {
+  preload('/fonts/orbitron/Orbitron.ttf', { as: 'font', type: 'font/ttf', crossOrigin: 'anonymous' });
   for (const name of ["arena", "duelist-gold", "duelist-silver", "plate-gold", "plate-silver", "footer"]) {
     preload(`${ART}${name}.png`, { as: "image" });
   }
