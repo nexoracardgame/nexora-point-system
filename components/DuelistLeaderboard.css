@@ -52,3 +52,34 @@
 @media (max-width:500px) and (orientation:portrait) { .nexora-ranking-showcase { height:35%; } .nexora-ranking-title { width:45%; } .nexora-ranking-total { right:2%; } .nexora-ranking-podium { inset:60px 2% 0; gap:2px; } .nexora-ranking-podium article { height:75%; } .nexora-ranking-podium h2 { font-size:10px; } .nexora-ranking-board { grid-template-columns:70px minmax(0,1fr); } .nexora-ranking-board aside button { overflow-wrap:anywhere; } .nexora-ranking-footer { flex-wrap:wrap; } .nexora-ranking-own { flex:1; } .nexora-ranking-footer label { width:100%; } .nexora-ranking-footer input { width:100%; } }
 @media (prefers-reduced-motion:reduce) { .nexora-ranking { animation:none; } }
 @media (max-width:500px) and (orientation:portrait) { .nexora-ranking-nav { gap:0; } .nexora-ranking-nav > span { display:none; } .nexora-ranking-own strong { max-width:70px; } .nexora-ranking-footer label { min-width:0; } }
+
+.nexora-ranking { background:linear-gradient(90deg,#040609bb,transparent 24%,transparent 60%,#04060990),linear-gradient(0deg,#020506ac,transparent 40%),url('/images/triad/nexora-command-original.webp') center/cover; }
+.nexora-ranking-nav { justify-content:flex-end; padding-right:3%; background:transparent; border:0; }
+.nexora-ranking-nav > button { border:1px solid #e5c27c80; border-radius:4px; margin:8px 0; background:#0306089c; min-height:36px; padding:6px 18px; }
+.nexora-ranking-showcase { height:45%; }
+.nexora-ranking-title { width:25%; }
+.nexora-ranking-title img { max-height:100px; object-fit:contain; object-position:left center; }
+.nexora-ranking-title h1 { font-size:28px; }
+@media (max-height:600px), (max-width:900px) { .nexora-ranking-title img { max-height:54px; } .nexora-ranking-title h1 { font-size:20px; } }
+.nexora-ranking-podium article { --rank-metal:#d2a16d; --rank-light:#fff0bc; }
+.nexora-ranking-podium article[data-rank="silver"] { --rank-metal:#b9cbd7; --rank-light:#f1fbff; }
+.nexora-ranking-podium article[data-rank="gold"] { --rank-metal:#edc762; --rank-light:#fff0ae; }
+.nexora-ranking-podium article[data-rank="platinum"] { --rank-metal:#86e4d4; --rank-light:#d9fff6; }
+.nexora-ranking-podium article[data-rank="diamond"] { --rank-metal:#8ecbf9; --rank-light:#e3f6ff; }
+.nexora-ranking-podium article[data-rank="master"] { --rank-metal:#d297e8; --rank-light:#ffe0fc; }
+.nexora-ranking-podium article[data-rank="god-of-legends"] { --rank-metal:#ffd767; --rank-light:#fff9dc; }
+.nexora-ranking-portrait { overflow:visible; align-items:center; padding:10px 0 18px; }
+.nexora-ranking-avatar-frame { position:relative; height:min(21vh,210px); aspect-ratio:1; max-width:84%; padding:9px; border:3px solid var(--rank-metal); border-radius:50%; background:linear-gradient(135deg,var(--rank-light),#8c6526 32%,#201a12 48%,var(--rank-metal) 72%,#fff0ba); box-shadow:0 0 0 3px #080b0e,0 0 0 5px #d6b76b99,0 0 25px #e3be4e50,inset 0 0 12px #000; }
+.nexora-ranking-avatar-frame::before { content:""; position:absolute; inset:-12px; border:1px solid var(--rank-metal); border-radius:50%; border-inline-color:transparent; transform:rotate(-30deg); pointer-events:none; }
+.nexora-ranking-avatar-frame > img { display:block; width:100%; height:100%; object-fit:cover; border-radius:50%; mask-image:none; filter:none; border:2px solid #161510; }
+.nexora-ranking-frame-crest { position:absolute; bottom:-13px; left:50%; transform:translateX(-50%); display:grid; place-items:center; width:34px; height:30px; background:#10120e; border:1px solid var(--rank-metal); color:var(--rank-light); clip-path:polygon(50% 0,100% 20%,85% 80%,50% 100%,15% 80%,0 20%); }
+.nexora-ranking-podium article[data-place="1"] .nexora-ranking-avatar-frame { height:min(25vh,250px); box-shadow:0 0 0 3px #080b0e,0 0 0 6px #f5d575,0 0 42px #ffd76780; }
+.nexora-ranking-pedestal { overflow:hidden; border:1px solid var(--rank-metal); border-top:3px solid var(--rank-light); background:linear-gradient(115deg,#020405f5,#252014e8 48%,#050708f5); box-shadow:inset 0 -4px 0 #b28d4550,inset 0 0 30px #d9ac4930; }
+.nexora-ranking-pedestal::before { content:""; position:absolute; top:0; left:20%; right:20%; height:1px; background:#fff6ce; box-shadow:0 0 16px 3px #ffd267aa; }
+.nexora-ranking-pedestal::after { content:""; position:absolute; inset:8px 16%; border-inline:1px solid #d2b36745; pointer-events:none; transform:skewX(-14deg); }
+.nexora-ranking-footer { display:grid; grid-template-columns:minmax(180px,1fr) auto minmax(340px,.9fr); }
+.nexora-ranking-footer label { grid-row:1; grid-column:1; width:min(320px,100%); }
+.nexora-ranking-own { grid-row:1; grid-column:2; }
+.nexora-ranking-footer nav { grid-row:1; grid-column:3; justify-self:start; }
+@media (max-height:600px), (max-width:900px) { .nexora-ranking-avatar-frame { height:70px; padding:4px; border-width:2px; } .nexora-ranking-podium article[data-place="1"] .nexora-ranking-avatar-frame { height:88px; } .nexora-ranking-portrait { padding:8px 0 14px; } .nexora-ranking-frame-crest { width:24px; height:22px; bottom:-9px; } .nexora-ranking-frame-crest svg { width:14px; } .nexora-ranking-footer { grid-template-columns:1fr auto; } .nexora-ranking-footer label { grid-column:1; } .nexora-ranking-footer nav { grid-column:2; } .nexora-ranking-own { display:none; } }
+@media (max-width:500px) and (orientation:portrait) { .nexora-ranking-avatar-frame { height:52px; } .nexora-ranking-podium article[data-place="1"] .nexora-ranking-avatar-frame { height:65px; } .nexora-ranking-footer { margin-bottom:100px; } }
