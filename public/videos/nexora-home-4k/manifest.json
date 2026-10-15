@@ -1,13 +1,11 @@
 {
   "width": 3840,
   "height": 2160,
-  "duration": 18.785011,
-  "bytes": 113807036,
-  "sha256": "a3dfb4a7eee49980360e0c4d9183301cf8e8d6ce42cda93b58041252155a0532",
+  "duration": 11.795011,
+  "bytes": 59191974,
+  "sha256": "bf52ec1373f9a9a4b880d598555a7db01da6ab069d2548e4189ef37062120aeb",
   "parts": [
     "part-0.bin",
-    "part-1.bin",
-    "part-2.bin",
-    "part-3.bin"
+    "part-1.bin"
   ]
 }

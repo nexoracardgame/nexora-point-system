@@ -133,7 +133,9 @@
 .nexora-command-lobby .nexora-play-drawer .nexora-command-segment button::after,
 .nexora-command-lobby .nexora-play-drawer .nexora-command-primary::after,
 .nexora-command-lobby .nexora-join-drawer .nexora-command-room-row button::after {
-  content:none;
+  content:""; position:absolute; inset:0; width:auto; height:auto; pointer-events:none;
+  background:linear-gradient(110deg,transparent 28%,#ffe7a6b3 50%,transparent 72%);
+  transform:translateX(-120%); opacity:0;
 }
 .nexora-command-lobby .nexora-play-drawer button:hover:not(:disabled) { filter:brightness(1.08); transform:none; }
 .nexora-command-lobby .nexora-play-drawer .nexora-command-segment button:hover::after,
@@ -152,6 +154,10 @@
 .nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button { background:#fffaff!important; clip-path:polygon(14% 0,81% 0,81% 19%,87% 0,92% 0,70% 100%,0 100%); }
 .nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button + button { clip-path:polygon(27% 0,87% 0,100% 40%,88% 100%,15% 100%,22% 76%,17% 76%,10% 100%,0 100%); }
 .nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"]::before { inset:0 -3px -4px -22px; clip-path:polygon(0 0,100% 5%,7% 6%,7% 100%); background:#fffaff; border:0; transform:none; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment:is([aria-label="รูปแบบการต่อสู้"],[aria-label="รูปแบบห้อง"]) button { clip-path:var(--mode-cut); }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment:is([aria-label="รูปแบบการต่อสู้"],[aria-label="รูปแบบห้อง"]) button[aria-pressed=true] { background:#f0cb88!important; color:#080808; text-shadow:none; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment:is([aria-label="รูปแบบการต่อสู้"],[aria-label="รูปแบบห้อง"]) button[aria-pressed=true]::before { background:none; }
+.nexora-command-lobby .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed=true] { background:#f0cb88!important; }
 @media (prefers-reduced-motion:reduce) { .nexora-command-lobby .nexora-play-drawer,.nexora-command-lobby .nexora-play-drawer *,.nexora-command-lobby .nexora-play-drawer *::after { animation:none!important; transition:none!important; } }
 @media (max-width:340px) and (orientation:portrait), (max-height:340px) and (orientation:landscape) {
   .nexora-command-lobby .nexora-command-sheet.nexora-play-drawer { height:84%; bottom:6%; width:70%; }

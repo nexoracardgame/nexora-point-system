@@ -74,7 +74,8 @@ const auditDrawer=async()=>{
   assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none','Reference primary remains flat gold');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)');
   const mode=page.locator('.nexora-play-drawer .nexora-command-segment button').first();
-  assert.ok((await mode.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).includes('svg'),'Mode face uses the continuous black/gold reference outline');
+  assert.equal(await mode.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)','Selected mode has a clear gold face');
+  assert.equal(await primary.evaluate(el=>getComputedStyle(el,'::after').content),'""','Gold hover reflection exists');
 };
 for(const [width,height] of [[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]){
 await page.setViewportSize({width,height});await page.goto('https://command.test/');await page.waitForSelector('.nexora-command-mode');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
