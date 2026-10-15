@@ -1,0 +1,34 @@
+/* Each viewport exposes one 1510 x 273 region of the original lossless sprite. */
+.nexora-command-lobby .nexora-command-actions { width:38%; max-width:740px; gap:18px; }
+.nexora-command-lobby .nexora-lobby-art-button {
+  display:block; position:relative; flex:none; width:100%; height:auto; aspect-ratio:1510/273;
+  min-height:0; max-height:none; padding:0; border:0; border-radius:0; background:none;
+  clip-path:none; overflow:visible; box-shadow:none; isolation:isolate;
+  transition:filter 180ms ease,transform 180ms ease;
+}
+.nexora-command-lobby .nexora-lobby-art-button::before { display:none; }
+.nexora-lobby-art-crop { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.nexora-lobby-art-crop img { position:absolute; left:0; top:0; width:127.1523%; max-width:none; height:auto; pointer-events:none; user-select:none; }
+.nexora-lobby-art-button[data-artwork=join] .nexora-lobby-art-crop img { top:-100%; }
+.nexora-lobby-art-button[data-artwork=rank] .nexora-lobby-art-crop img { top:-200%; }
+.nexora-command-lobby .nexora-lobby-art-button .nexora-lobby-art-copy { position:absolute; left:22%; right:38%; top:50%; transform:translateY(-50%); text-align:left; pointer-events:none; }
+.nexora-command-lobby .nexora-lobby-art-button strong { font-family:Georgia,'Times New Roman',serif; font-size:25px; line-height:1.1; color:#fff3d5; text-shadow:0 2px 4px #000,0 0 8px #000; overflow-wrap:normal; white-space:nowrap; }
+.nexora-command-lobby .nexora-lobby-art-button small { font-size:12px; line-height:1.4; margin-top:7px; color:#f2cf83; text-shadow:0 1px 3px #000; }
+.nexora-command-lobby .nexora-lobby-art-button::after { content:""; position:absolute; left:12%; top:5%; bottom:5%; width:18%; background:linear-gradient(90deg,transparent,#fff4c980,transparent); transform:translateX(-160%) skewX(-20deg); opacity:0; pointer-events:none; }
+.nexora-command-lobby .nexora-lobby-art-button:hover,.nexora-command-lobby .nexora-lobby-art-button:focus-visible { transform:translateX(-7px); background:none; filter:brightness(1.18) drop-shadow(0 0 9px #ffd16d99); outline:none; }
+.nexora-command-lobby .nexora-lobby-art-button:hover::after,.nexora-command-lobby .nexora-lobby-art-button:focus-visible::after { animation:nexora-lobby-art-sheen 700ms ease-out; }
+.nexora-command-lobby .nexora-lobby-art-button:active { transform:translateX(-4px) scale(.98); filter:brightness(1.4) drop-shadow(0 0 14px #ffdc80aa); }
+.nexora-lobby-art-flash { position:absolute; inset:3% 1% 4% 2%; clip-path:polygon(11% 0,97% 0,100% 13%,100% 87%,97% 100%,0 100%); pointer-events:none; background:linear-gradient(110deg,transparent 25%,#fff8dbd9 49%,transparent 73%); background-size:300% 100%; animation:nexora-lobby-art-click 550ms ease-out both; }
+@keyframes nexora-lobby-art-sheen { 0% { left:12%; opacity:0; } 25% { opacity:.65; } 100% { left:82%; opacity:0; } }
+@keyframes nexora-lobby-art-click { from { background-position:100% 0; opacity:.9; } to { background-position:0 0; opacity:0; } }
+@media (min-width:2400px) { .nexora-command-lobby .nexora-command-actions { max-width:1060px; } .nexora-command-lobby .nexora-lobby-art-button strong { font-size:36px; } .nexora-command-lobby .nexora-lobby-art-button small { font-size:18px; } }
+@media (max-width:1500px) { .nexora-command-lobby .nexora-command-actions { width:42%; gap:14px; } .nexora-command-lobby .nexora-lobby-art-button strong { font-size:21px; } .nexora-command-lobby .nexora-lobby-art-button small { font-size:11px; margin-top:4px; } }
+@media (max-width:1100px) { .nexora-command-lobby .nexora-lobby-art-button strong { font-size:18px; } }
+@media (max-height:600px), (max-width:900px) and (orientation:portrait) {
+  .nexora-command-lobby .nexora-command-actions { width:44%; gap:10px; }
+  .nexora-command-lobby .nexora-lobby-art-button strong { font-size:14px; }
+  .nexora-command-lobby .nexora-lobby-art-button small { font-size:9px; margin-top:3px; }
+  .nexora-command-lobby .nexora-lobby-art-button .nexora-lobby-art-copy { left:21%; right:28%; }
+}
+@media (max-height:340px), (max-width:340px) and (orientation:portrait) { .nexora-command-lobby .nexora-lobby-art-button strong { font-size:12px; } .nexora-command-lobby .nexora-lobby-art-button small { font-size:8px; } }
+@media (prefers-reduced-motion:reduce) { .nexora-command-lobby .nexora-lobby-art-button,.nexora-command-lobby .nexora-lobby-art-button::after,.nexora-lobby-art-flash { animation:none!important; transition:none!important; } .nexora-lobby-art-flash { display:none; } }
