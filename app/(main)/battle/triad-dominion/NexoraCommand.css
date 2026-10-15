@@ -231,7 +231,7 @@
 .nexora-play-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"] { display:flex; flex-direction:column; margin:0 0 20px 26%; gap:22px; position:relative; }
 .nexora-play-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"]::before { content:""; position:absolute; inset:-12px -10px 0 12px; border-top:5px solid white; border-right:5px solid white; transform:skewY(-4deg); pointer-events:none; }
 .nexora-play-drawer .nexora-command-segment button { background:#fff; color:#080808; border:0; box-shadow:none; text-shadow:none; border-radius:0; clip-path:polygon(12% 0,92% 0,100% 28%,100% 100%,0 100%,14% 23%,11% 17%); min-height:72px; font-size:26px; padding:8px 12px; flex-shrink:0; }
-.nexora-play-drawer .nexora-command-segment button[aria-pressed=true] { background:#fff; color:#080808; box-shadow:inset 0 -4px #efd38b; }
+.nexora-play-drawer .nexora-command-segment button[aria-pressed=true] { background:#f2d58c; color:#080808; box-shadow:none; }
 .nexora-play-drawer .nexora-command-segment button::after { background:#c8a24c; }
 .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] { gap:8px; margin:8px -8px 16px 0; }
 .nexora-play-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button { min-height:48px; font-size:17px; clip-path:polygon(22% 0,100% 0,78% 100%,0 100%); }
