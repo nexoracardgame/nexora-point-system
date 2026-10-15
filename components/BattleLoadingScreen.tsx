@@ -30,6 +30,11 @@ export function useBattleLoadingStage(stage: string) {
 export default function BattleLoadingScreen() {
   preload(LOBBY_ACTION_ART, { as: "image", fetchPriority: "high" });
   const pathname = usePathname();
+  if (pathname.includes("dominion")) {
+    for (const name of ["arena", "duelist-gold", "duelist-silver", "plate-gold", "plate-silver", "footer"]) {
+      preload(`/images/versus/${name}.png`, { as: "image" });
+    }
+  }
   const [run, setRun] = useState(0);
   const [visible, setVisible] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

@@ -986,9 +986,7 @@ function phaseForPlayingRoom(room: TriadRoom, participantId: string): BattlePhas
 function roomDecksReadyForBattle(room: TriadRoom | null | undefined) {
   return Boolean(
     room?.game.deckReady.host &&
-      room.game.deckReady.challenger &&
-      room.game.decks.host.length >= DECK_SIZE &&
-      room.game.decks.challenger.length >= DECK_SIZE
+      room.game.deckReady.challenger
   );
 }
 
@@ -7739,7 +7737,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   return (
     <BattleArenaSurface image={arena.image} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
-      <BattleVersusIntro sessionKey={battleSessionKey} enabled={bothDecksReady && !matchDone && fightNo === 1 && activeTurn === 1} left={currentRoom?.seats.host || participant} right={currentRoom?.seats.challenger || {name:"BOT Level.99",image:"/avatar.png"}} background={arena.image} />
+      <BattleVersusIntro sessionKey={battleSessionKey} enabled={(currentRoom ? bothDecksReady : phase === "battle") && !matchDone && (currentRoom?.game.fightNo || fightNo) === 1 && (currentRoom?.game.activeTurn || activeTurn) === 1} left={currentRoom?.seats.host || participant} right={currentRoom?.seats.challenger || {name:"BOT Level.99",image:"/avatar.png"}} />
       <BattleForfeitVictory result={currentRoom?.game.forfeit} userId={participant.id} onExit={() => { void leaveRoom(); }} />
       {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (

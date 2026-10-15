@@ -7,6 +7,17 @@ const { chromium } = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-
 const source = fs.readFileSync(process.env.TRIAD_CLIENT_SOURCE || 'app/(main)/battle/triad-dominion/TriadDominionClient.tsx', 'utf8');
 const ast = ts.createSourceFile('client.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const compile = code => ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const readiness = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'roomDecksReadyForBattle');
+assert.ok(readiness);
+const readinessContext = vm.createContext({});
+vm.runInContext(compile(readiness.getText(ast)), readinessContext);
+for (const deckMode of ['all', 'monster', 'skill']) {
+  readinessContext.room = {game:{deckMode,deckReady:{host:true,challenger:true},decks:{host:['001'],challenger:[]}}};
+  assert.equal(vm.runInContext('roomDecksReadyForBattle(room)',readinessContext),true,'Server-ready concealed deck starts '+deckMode);
+  readinessContext.room.game.deckReady.challenger=false;
+  assert.equal(vm.runInContext('roomDecksReadyForBattle(room)',readinessContext),false,'Never start before both ready');
+}
+assert.ok(source.includes('currentRoom ? bothDecksReady : phase === "battle"'),'Solo Triad also opens the shared VS scene');
 let deckEffect;
 function visit(node) {
   if (ts.isCallExpression(node) && node.expression.getText(ast) === 'useEffect' && node.arguments[0]?.getText(ast).includes('const sessionKey =')) deckEffect = node.arguments[0].getText(ast);
