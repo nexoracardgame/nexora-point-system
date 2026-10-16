@@ -3,7 +3,10 @@
 .nexora-window-controls button:hover,.nexora-window-controls button:focus-visible { background:#b48a323d; border-color:#d6b66b; outline:none; }
 .nexora-window-controls .nexora-window-close:hover { background:#a32232; border-color:#ea7682; color:#fff; }
 html[data-game-window-controls=desktop] .nexora-menu-audio-fixed { right:176px; }
-html[data-game-window-controls=web] .nexora-menu-audio-fixed { right:62px; }
-html:is([data-game-window-controls=desktop],[data-game-window-controls=web]) .nexora-game-platform .nexora-command-status { top:56px; }
+html[data-game-window-controls=desktop] .nexora-game-platform .nexora-command-status { top:56px; }
 html[data-game-window-controls=desktop] .nexora-game-platform [data-room-actions] { padding-top:46px; }
 @media (prefers-reduced-motion:reduce) { .nexora-window-controls button { transition:none; } }
+.nexora-command-nav .nexora-menu-logout { color:#f4dfb0; border-left-color:#d7b47088; }
+.nexora-command-nav .nexora-menu-logout:disabled { opacity:.5; cursor:wait; }
+.nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 250px); overflow-y:auto; scrollbar-width:thin; }
+@media (max-height:600px),(max-width:1000px) and (orientation:portrait) { .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 155px); } }

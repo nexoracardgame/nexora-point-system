@@ -111,7 +111,7 @@ async function loadAppUrl() {
 }
 
 function createWindow() {
-  const windowIconPath = path.join(__dirname, "assets", "icon.ico");
+  const windowIconPath = path.join(__dirname, "assets", GAME_ONLY ? "game-icon.ico" : "icon.ico");
 
   mainWindow = new BrowserWindow({
     width: 1280,

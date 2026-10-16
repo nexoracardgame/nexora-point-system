@@ -11,6 +11,6 @@ const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runt
  assert.equal(await page.locator('.nexora-game-patch').count(),0);
  const pointer=await page.evaluate(async()=>Boolean(await (await caches.open('nexora-game-release')).match('/game/release-pointer')));assert.equal(pointer,false);
  await page.reload();await page.getByRole('button',{name:/เข้าสู่ระบบด้วย LINE/}).waitFor();assert.equal(downloads,0);
- const installer=await fetch('http://localhost:3013/downloads/game-windows/latest.yml');assert.equal(installer.status,200);assert.match(await installer.text(),/version: 1.0.1/);
+ const installer=await fetch('http://localhost:3013/downloads/game-windows/latest.yml');assert.equal(installer.status,200);assert.match(await installer.text(),/version: 1.0.2/);
  console.log('Live desktop bridge: anonymous login never starts patch download or writes release cache; updater feed passed');
 }finally{await browser.close()}})().catch(error=>{console.error(error);process.exitCode=1});

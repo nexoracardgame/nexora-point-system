@@ -3,9 +3,10 @@ import path from "node:path";
 import sharp from "sharp";
 
 const rootDir = process.cwd();
-const sourceIcon = path.join(rootDir, "public", "icon-512.png");
+const game = process.argv.includes('--game');
+const sourceIcon = path.join(rootDir, "public", game ? "game-icons/icon-512.png" : "icon-512.png");
 const assetsDir = path.join(rootDir, "desktop", "assets");
-const iconPath = path.join(assetsDir, "icon.ico");
+const iconPath = path.join(assetsDir, game ? "game-icon.ico" : "icon.ico");
 const iconSizes = [16, 24, 32, 48, 64, 128, 256];
 
 function createIcoBuffer(images) {
@@ -53,4 +54,5 @@ const images = await Promise.all(
 );
 
 await writeFile(iconPath, createIcoBuffer(images));
+if(game)await writeFile(path.join(rootDir,'public/game-icons/favicon.ico'),createIcoBuffer(images));
 console.log(`Generated ${path.relative(rootDir, iconPath)}`);

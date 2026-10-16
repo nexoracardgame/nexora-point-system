@@ -287,7 +287,7 @@ export default function LoginClient({
         <button type="button" aria-label="เข้าสู่ระบบด้วย LINE" disabled={isRedirecting} onClick={()=>void startLogin("line")}><span className="nexora-login-line" aria-hidden="true">LINE</span>เข้าสู่ระบบด้วย LINE</button>
         <button type="button" aria-label="เข้าสู่ระบบด้วย Google" disabled={isRedirecting} onClick={()=>void startLogin("google")}><span className="nexora-login-google" aria-hidden="true">G</span>เข้าสู่ระบบด้วย Google</button>
       </div>
-      <a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.1.exe" download>ดาวน์โหลดเกม Windows PC<span>Windows 10/11 · 64-bit · v1.0.1</span></a>
+      <a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.2.exe" download>ดาวน์โหลดเกม Windows PC<span>Windows 10/11 · 64-bit · v1.0.2</span></a>
       {(loginError || authErrorMessage) && <p role="alert">{loginError || authErrorMessage}</p>}
       {isRedirecting && <p role="status">{sessionChecking ? "กำลังตรวจสอบบัญชี" : "กำลังเข้าสู่สนาม"}</p>}
     </section>

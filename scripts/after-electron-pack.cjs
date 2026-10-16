@@ -9,7 +9,8 @@ exports.default = async function afterElectronPack(context) {
   const rootDir = context.packager.projectDir;
   const exeName = `${context.packager.appInfo.productFilename}.exe`;
   const exePath = path.join(context.appOutDir, exeName);
-  const iconPath = path.join(rootDir, "desktop", "assets", "icon.ico");
+  const game = context.packager.appInfo.productName === 'NEXORA CARD GAME';
+  const iconPath = path.join(rootDir, "desktop", "assets", game ? "game-icon.ico" : "icon.ico");
   const rceditPath = path.join(
     rootDir,
     "node_modules",
