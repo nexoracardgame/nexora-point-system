@@ -76,10 +76,10 @@ const auditDrawer=async()=>{
   assert.deepEqual(await body.evaluate(el=>({width:el.clientWidth,height:el.clientHeight})),before,'Hover never inserts a scrollbar or resizes controls');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el).overflow),'hidden','Reflection is clipped by its own button');
   const artwork=await page.locator('.nexora-create-drawer').count();
-  if(artwork)assert.ok((await primary.evaluate(el=>getComputedStyle(el).backgroundImage)).includes('/images/lobby-play/create.webp'),'Primary uses supplied artwork crop');
+  if(artwork){assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none','No rectangular crop overlays the continuous artwork');assert.notEqual(await primary.evaluate(el=>getComputedStyle(el).clipPath),'none','Lighting follows the button silhouette');}
   else {assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none');assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)');}
   const mode=page.locator('.nexora-play-drawer .nexora-command-segment button').first();
-  if(artwork)assert.ok((await mode.evaluate(el=>getComputedStyle(el).filter)).includes('brightness'),'Selected artwork has a gold aura');
+  if(artwork)assert.ok((await mode.evaluate(el=>getComputedStyle(el).backdropFilter)).includes('brightness'),'Selected artwork has a gold aura');
   else assert.equal(await mode.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)','Selected mode has a clear gold face');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el,'::after').content),'""','Gold hover reflection exists');
 };

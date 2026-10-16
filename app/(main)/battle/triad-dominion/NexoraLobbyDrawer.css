@@ -222,8 +222,9 @@
   position:absolute; display:block; min-height:0!important; padding:0; margin:0!important;
   font-size:0!important; border:0; clip-path:none; border-radius:0; background-color:transparent!important;
   background-position:center!important; background-size:100% 100%!important; background-repeat:no-repeat!important;
-  background-image:var(--play-piece)!important;
-  overflow:hidden; transition:filter 180ms ease,scale 140ms ease;
+  background-image:none!important;
+  clip-path:polygon(2% 5%,85% 5%,98% 52%,86% 96%,10% 96%,2% 65%);
+  overflow:hidden; transition:backdrop-filter 180ms ease,box-shadow 180ms ease;
 }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment button::before { display:none; }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"] button:first-child { left:10.287%; top:38.788%; width:31.4%; height:13.284%; --play-piece:url('/images/lobby-play/triad.webp'); }
@@ -232,17 +233,19 @@
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button:nth-child(2) { left:26.256%; top:68.225%; width:20.215%; height:8.927%; --play-piece:url('/images/lobby-play/private.webp'); }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-primary { left:40.789%; top:64.612%; width:40.072%; height:19.554%; --play-piece:url('/images/lobby-play/create.webp'); }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-primary > svg { display:none; }
-.nexora-command-lobby .nexora-create-drawer label { position:absolute; left:17.8%; top:79.5%; width:16.4%; height:7.7%; margin:0; font-size:0; }
-.nexora-command-lobby .nexora-create-drawer input { width:100%; height:100%; margin:0; padding:2px 6px; border:1px solid #b8975670; border-radius:3px; font-size:18px; background:#090b0eee; color:#fff0cb; }
+.nexora-command-lobby .nexora-create-drawer label { position:absolute; left:17.2%; top:79.6%; width:17.5%; height:7.8%; margin:0; font-size:0; }
+.nexora-command-lobby .nexora-create-drawer label input { position:absolute; inset:0; width:100%; height:100%; margin:0; padding:2px 6px; border:0; border-bottom:1px solid #b89756; border-radius:0; font-size:16px; background:#080a0d; color:#fff0cb; }
 .nexora-command-lobby .nexora-create-drawer input:disabled { opacity:0; }
 .nexora-command-lobby .nexora-create-drawer input::placeholder { color:#ddd0b8; }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-alert { position:absolute; left:13%; top:91%; width:45%; margin:0; font-size:14px; background:#050607ed; }
-.nexora-command-lobby .nexora-create-drawer .nexora-command-segment button[aria-pressed=true] { background-color:transparent!important; filter:brightness(1.22) drop-shadow(0 0 9px #ffcf6388); }
-.nexora-command-lobby .nexora-create-drawer button:hover:not(:disabled) { filter:brightness(1.35) drop-shadow(0 0 14px #ffe49a99); }
-.nexora-command-lobby .nexora-create-drawer button:active:not(:disabled) { scale:.98; filter:brightness(1.65) drop-shadow(0 0 22px #fff0c7); }
+.nexora-command-lobby .nexora-create-drawer .nexora-command-segment button[aria-pressed=true] { background-color:transparent!important; filter:none; backdrop-filter:brightness(1.18); box-shadow:inset 0 0 18px #ffd47a55; }
+.nexora-command-lobby .nexora-create-drawer button:hover:not(:disabled) { filter:none; backdrop-filter:brightness(1.35); }
+.nexora-command-lobby .nexora-create-drawer button:active:not(:disabled) { scale:1; filter:none; backdrop-filter:brightness(1.65); box-shadow:inset 0 0 30px #fff0c799; }
 .nexora-command-lobby .nexora-create-drawer button:focus-visible { outline:2px solid #fff1c3; outline-offset:2px; }
-.nexora-command-lobby .nexora-create-drawer .nexora-command-primary:disabled { filter:brightness(.6); cursor:not-allowed; }
+.nexora-command-lobby .nexora-create-drawer .nexora-command-primary:disabled { filter:none; backdrop-filter:brightness(.7); cursor:not-allowed; }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label] button[aria-pressed] {
-  background:var(--play-piece) center/100% 100% no-repeat!important;
-  clip-path:none; font-size:0!important; padding:0;
+  background:transparent!important;
+  clip-path:polygon(2% 5%,85% 5%,98% 52%,86% 96%,10% 96%,2% 65%); font-size:0!important; padding:0;
 }
+.nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { clip-path:polygon(23% 9%,95% 9%,76% 91%,4% 91%); }
+.nexora-command-lobby .nexora-create-drawer .nexora-command-primary { clip-path:polygon(23% 12%,80% 12%,93% 53%,80% 88%,6% 88%); }
