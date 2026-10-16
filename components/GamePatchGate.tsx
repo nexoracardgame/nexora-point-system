@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import { useBattleArenaActive } from '@/lib/battle-ui-state';
 import { installGameResources,type GameRelease,type PatchProgress } from '@/lib/game-patcher';
 import './GamePatchGate.css';
 
 export default function GamePatchGate({children}:{children:React.ReactNode}){
+  const {status}=useSession();
+  const pathname=usePathname();
+  const canPatch=status==='authenticated'&&pathname!=='/game/login';
   const [blocking,setBlocking]=useState(true),[progress,setProgress]=useState<PatchProgress|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
   const active=useBattleArenaActive(),activeRef=useRef(active);activeRef.current=active;
   useEffect(()=>{
+    if(!canPatch)return;
     const desktop=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean;getVersion:()=>Promise<string>}}).nexoraDesktop;
     if(!desktop?.isGameDesktop){setBlocking(false);return;}
     document.documentElement.dataset.gameDesktop='true';
@@ -34,8 +39,8 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     };
     void check();const timer=setInterval(()=>void check(),60000);const visible=()=>{if(!document.hidden)void check()};document.addEventListener('visibilitychange',visible);
     return()=>{disposed=true;controller.abort();clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
-  },[retry]);
-  if(!blocking)return children;
+  },[retry,canPatch]);
+  if(!canPatch||!blocking)return children;
   const percent=progress?Math.min(progress.completed===progress.count?100:99,Math.floor(progress.downloaded/progress.total*100)):0;
   return <div className="nexora-game-patch" role="status"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><h1>{error?'อัปเดตไม่สำเร็จ':'กำลังอัปเดตทรัพยากรเกม'}</h1><p>{error||progress?.file||'ตรวจสอบแพตช์'}</p><progress max={100} value={percent} aria-label="ดาวน์โหลดแพตช์" /><strong>{percent}%</strong>{progress&&<small>{(progress.downloaded/1048576).toFixed(1)} / {(progress.total/1048576).toFixed(1)} MB · {progress.completed}/{progress.count} ไฟล์</small>}{error&&<button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button>}</div>;
 }

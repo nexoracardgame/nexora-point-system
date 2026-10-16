@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 import BattleLoadingScreen from "@/components/BattleLoadingScreen";
 import BattleUiAudio from "@/components/BattleUiAudio";
@@ -17,6 +18,7 @@ export default function RootChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() || "";
+  const { status } = useSession();
   const isEmbedRoute =
     pathname.startsWith("/blaze-embed") || pathname.startsWith("/market-embed");
   const isBattleRoute = isGameRoute(pathname);
@@ -29,7 +31,7 @@ export default function RootChrome({
     return (
       <>
         <NexoraDialogProvider />
-        <BattleLoadingScreen />
+        {status === "authenticated" && pathname !== "/game/login" && <BattleLoadingScreen />}
         <BattleUiAudio />
         <BattleMenuMusic />
         <PushNotificationBootstrap />
