@@ -1,0 +1,74 @@
+/* Portalled game screens share the same safe landscape canvas as the arena. */
+@media (max-width:1000px),(hover:none) and (pointer:coarse) {
+  :is(.nexora-target-overlay,.nexora-v3-overlay,.nexora-game-loading,.nexora-card-inspector) {
+    position:fixed!important; inset:auto!important; box-sizing:border-box!important;
+    left:calc(var(--game-visual-left,0px) + env(safe-area-inset-left,0px))!important;
+    top:calc(var(--game-visual-top,0px) + var(--app-safe-top,0px))!important;
+    width:calc(var(--game-visual-width,100dvw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))!important;
+    height:calc(var(--game-visual-height,100dvh) - var(--app-safe-top,0px) - env(safe-area-inset-bottom,0px))!important;
+    max-width:none!important; max-height:none!important; margin:0!important; transform:none!important; container-type:size;
+  }
+  .nexora-target-overlay { padding:8px!important; }
+  .nexora-target-window,.nexora-target-window[data-groups] { width:min(960px,96cqw)!important; max-height:96cqh!important; padding:4px 12px 6px!important; border-width:8px!important; }
+  .nexora-target-header { min-height:36px!important; padding:0!important; }
+  .nexora-target-header > img { height:55px!important; opacity:.25; }
+  .nexora-target-header h2 { font-size:18px!important; }
+  .nexora-target-header p { display:none!important; }
+  .nexora-target-skill { margin:2px auto!important; }
+  .nexora-target-skill > strong { font-size:13px!important; }
+  .nexora-target-skill > p { max-height:28px!important; font-size:11px!important; line-height:1.3!important; margin:2px!important; overflow:auto; }
+  .nexora-target-timer { font-size:12px!important; }
+  .nexora-target-groups { display:flex!important; gap:10px!important; min-height:70px; }
+  .nexora-target-side { flex:1; min-width:0; }
+  .nexora-target-side h3 { font-size:13px!important; margin:2px!important; }
+  .nexora-target-side h3 > img { width:18px!important; height:18px!important; }
+  .nexora-target-option,.nexora-target-options:has(> :nth-child(2)) .nexora-target-option,.nexora-target-window[data-groups="1"] .nexora-target-option { width:min(150px,29cqh)!important; flex-basis:min(150px,29cqh)!important; padding:0!important; }
+  .nexora-target-option > strong { font-size:11px!important; margin:0!important; }
+  .nexora-target-stats { font-size:9px!important; gap:2px!important; }
+  .nexora-target-stats span { padding:1px 3px!important; }
+  .nexora-target-footer { margin:3px 0 0!important; }
+  .nexora-target-confirm { width:320px!important; min-height:34px!important; padding:5px 10px 5px 36px!important; font-size:13px!important; background-size:contain!important; }
+  .nexora-target-close { top:4px!important; right:4px!important; width:26px!important; height:26px!important; }
+  .nexora-target-audio { top:4px!important; right:38px!important; }
+  .nexora-v3-modal { width:96cqw!important; max-height:96cqh!important; }
+  .nexora-v3-modal { padding:12px 22px!important; }
+  .nexora-v3-header { margin-bottom:6px!important; padding-top:0!important; }
+  .nexora-v3-header h2 { font-size:20px!important; }
+  .nexora-v3-header p { font-size:10px!important; margin:2px!important; }
+  .nexora-v3-emblem,.nexora-v3-ornament,.nexora-v3-fx { display:none!important; }
+  .nexora-v3-options { display:grid!important; grid-template-columns:repeat(3,minmax(0,1fr))!important; gap:8px!important; }
+  .nexora-v3-options[data-count="2"] { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+  .nexora-v3-mode { display:block!important; text-align:center!important; }
+  .nexora-v3-mode-art { height:20cqh!important; min-height:40px!important; aspect-ratio:auto!important; mask-image:none!important; }
+  .nexora-v3-mode-info { padding:4px 8px!important; margin:0!important; }
+  .nexora-v3-mode-info strong { font-size:16px!important; }
+  .nexora-v3-mode-info p { font-size:10px!important; line-height:1.3!important; max-height:26px; overflow:auto; }
+  .nexora-v3-divider { margin:2px!important; }
+  .nexora-v3-bot { min-height:38px!important; margin-top:6px!important; padding:4px 10px!important; }
+  .nexora-v3-bot strong { font-size:12px!important; }
+  .nexora-v3-bot small { font-size:10px!important; }
+  .nexora-v3-bot-icon { width:28px!important; height:28px!important; }
+  .nexora-v3-actions { margin-top:6px!important; gap:4px!important; }
+  .nexora-v3-confirm { min-height:32px!important; padding:4px 16px!important; font-size:15px!important; }
+  .nexora-v3-cancel { min-height:24px!important; padding:2px 12px!important; font-size:12px!important; }
+  .nexora-game-loading-content { width:min(600px,62cqw,150cqh)!important; gap:14px!important; }
+  .nexora-card-inspector,.nexora-card-inspector[data-interactive=true] { display:flex!important; justify-content:flex-end!important; align-items:stretch!important; padding:44px 6px 6px!important; background:transparent!important; pointer-events:none!important; }
+  .nexora-card-inspector-panel { position:relative!important; width:min(340px,38cqw)!important; height:100%!important; max-height:100%!important; flex-direction:column!important; gap:6px!important; padding:10px!important; background:#030405df!important; pointer-events:auto; animation:nexora-mobile-inspector .35s ease-out both; }
+  .nexora-card-inspector-panel header { position:static!important; font-size:10px; }
+  .nexora-card-inspector-panel header > span { display:block!important; }
+  .nexora-card-inspector-art { width:100%!important; height:34%!important; flex-shrink:0!important; }
+  .nexora-card-inspector-info { padding:0!important; flex:1; overflow:auto; }
+  .nexora-card-inspector-info h2 { font-size:15px!important; margin-bottom:4px!important; }
+  .nexora-card-inspector-info p { font-size:12px!important; line-height:1.45!important; margin-top:6px!important; }
+  .nexora-card-inspector-stats { font-size:9px!important; gap:3px!important; }
+  .nexora-card-inspector-use { position:static!important; width:100%!important; min-height:32px!important; font-size:11px!important; }
+  .triad-battle-chat-hud-frame input { pointer-events:auto!important; touch-action:manipulation; font-size:16px!important; }
+  .triad-battle-chat-hud-frame > div { pointer-events:none; }
+  .triad-battle-chat-hud-frame .triad-battle-chat-hud { pointer-events:auto; min-width:135px; }
+}
+@media (max-width:1000px) and (orientation:portrait) {
+  :is(.nexora-target-overlay,.nexora-v3-overlay,.nexora-game-loading,.nexora-card-inspector) { width:calc(var(--game-visual-height,100dvh) - var(--app-safe-top,0px) - env(safe-area-inset-bottom,0px))!important; height:calc(var(--game-visual-width,100dvw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))!important; transform:rotate(90deg) translateY(-100%)!important; transform-origin:top left!important; }
+}
+html[data-game-portrait=true] :is(.nexora-battle-shell,.nexora-pentad-shell .nexora-arena-surface,.nexora-target-overlay,.nexora-v3-overlay,.nexora-game-loading,.nexora-card-inspector) { width:calc(var(--game-visual-height,100dvh) - var(--app-safe-top,0px) - env(safe-area-inset-bottom,0px))!important; height:calc(var(--game-visual-width,100dvw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))!important; transform:rotate(90deg) translateY(-100%)!important; transform-origin:top left!important; }
+@keyframes nexora-mobile-inspector { from { opacity:0; translate:100% 0; } to { opacity:1; translate:0 0; } }
+@media (prefers-reduced-motion:reduce) { .nexora-card-inspector-panel { animation:none!important; } }

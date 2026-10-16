@@ -9,6 +9,7 @@ import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
 import BattleRoomActions from "@/components/BattleRoomActions";
+import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import TargetSelectionModal from "@/components/TargetSelectionModal";
 import { pentadTargetView } from "@/lib/pentad-target-view";
 import { Bot, Check, ChevronRight, Clock3, Eye, Flag, History, Layers3, Loader2, LogOut, Plus, Search, SendHorizontal, Shuffle, Swords, X } from "lucide-react";
@@ -274,7 +275,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={leaveRoom} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
     {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}
-    {!room ? <section className={styles.entering}>{entering && <><strong>กำลังเชื่อมต่อสนาม</strong><button onClick={()=>{busyRef.current=false;setBusy(false);void act("leave",{},true);}}>กลับหน้าหลัก</button></>}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
+    {!room ? <section className={styles.entering}>{entering && !error && <BattleConnectingScreen />}</section> : room.phase === "waiting" ? <section className={styles.waiting}>
       <h1>อำนาจห้าผนึก</h1><div className={styles.versus}>{(["host", "challenger"] as const).map(player => <div key={player} className={styles.seat}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={room.seats[player]?.image || "/avatar.png"} alt="" /><strong>{room.seats[player]?.name || "รอผู้ท้าชิง"}</strong></div>)}</div>
       <span className={styles.vs}>VS</span><div className={styles.waitingActions}><span><Eye size={18} /> ผู้ชม {room.spectators.length}/10</span></div>
     </section> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>

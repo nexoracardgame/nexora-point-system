@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { useLayoutEffect, useState, type CSSProperties } from "react";
 import { Check, X } from "lucide-react";
+import "./BattleMobileOverlays.css";
 
 type InspectorCard = { cardNo: string; name: string; sourceImage: string; attack: number; support: number; kind: string; skillText: string };
 

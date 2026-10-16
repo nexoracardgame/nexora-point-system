@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Bot, Check, ChevronRight, Loader2, X } from "lucide-react";
 import "./GameModeModal.css";
+import "./BattleMobileOverlays.css";
 
 export type GameModeOption = { id: "all" | "monster" | "skill"; title: string; detail: string };
 type Props = {

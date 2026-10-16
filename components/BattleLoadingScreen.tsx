@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { preload } from "react-dom";
 import { LOBBY_ACTION_ART, loadLobbyAssets } from "@/lib/lobby-assets";
 import "./BattleLoadingScreen.css";
+import "./BattleMobileOverlays.css";
 
 const DURATION = 3000;
 let until = 0;

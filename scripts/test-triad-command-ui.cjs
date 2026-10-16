@@ -17,6 +17,7 @@ modules['./LobbyActionButton.css']='';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{window.artHoverSounds=(window.artHoverSounds||0)+1;};';
 modules['@/lib/home-wallpaper']='exports.loadHomeWallpaper=()=>Promise.resolve("");';
 modules['./GameModeModal.css']='';
+modules['./BattleMobileOverlays.css']='';
 modules['@/components/GameModeModal']=transpile(fs.readFileSync('components/GameModeModal.tsx','utf8'));
 modules['./BattleAudio']=`exports.primeBattleAudio=()=>Promise.resolve(false);exports.playMenuCue=()=>{if(localStorage.getItem('triad-battle-muted')!=='1')window.uiCues=(window.uiCues||0)+1;};`;
 modules['./NexoraCommandScene']=transpile(fs.readFileSync('app/(main)/battle/triad-dominion/NexoraCommandScene.tsx','utf8'));

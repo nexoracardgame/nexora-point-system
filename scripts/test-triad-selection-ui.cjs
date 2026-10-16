@@ -71,6 +71,7 @@ modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'), 'utf8
 modules['@/lib/target-selection-view'] = compile(fs.readFileSync('lib/target-selection-view.ts', 'utf8'));
 modules['target-modal'] = compile(fs.readFileSync('components/TargetSelectionModal.tsx', 'utf8'));
 modules['./TargetSelectionModal.css'] = '';
+modules['./BattleMobileOverlays.css'] = '';
 modules['rps-shared'] = 'exports.default=require("target-modal").default;';
 modules.rps = "const TargetSelectionModal=require('rps-shared').default;\n" + component;
 const bundle = Object.entries(modules).map(([id, code]) => `${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');

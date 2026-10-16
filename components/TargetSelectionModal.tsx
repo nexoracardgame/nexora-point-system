@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, Clock3, Loader2, Shield, Sparkles } from "lucide-react";
 import { targetSelectionView, toggleTargetSelection, type TargetOptionView } from "@/lib/target-selection-view";
 import "./TargetSelectionModal.css";
+import "./BattleMobileOverlays.css";
 
 type Props = { contextKey: string; skillName: string; description: string; options: TargetOptionView[]; selected: string[]; min?: number; max?: number; sequences?: string[][]; timeLeft?: number; busy?: boolean; readOnly?: boolean; waitingText?: string; selectionHint?: string; onSelect: (ids: string[]) => void; onConfirm: () => unknown };
 const assets = "/images/target-ui/";

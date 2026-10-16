@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import "./BattleMobileOverlays.css";
 
 type CapacitorRuntime = {
   getPlatform?: () => string;
@@ -40,6 +41,8 @@ export default function NativeViewportBridge() {
     };
     const applyViewportVars = () => {
       const width = window.innerWidth || 390;
+      const typing = document.activeElement?.matches("input,textarea,[contenteditable=true]");
+      if (!typing) root.dataset.gamePortrait = String(width <= 1000 && window.matchMedia("(orientation:portrait)").matches);
       const viewportHeight = window.visualViewport?.height || window.innerHeight || 0;
       const compactTop = width <= 380 ? 30 : 34;
       const androidTop = width >= 700 ? 26 : compactTop;
@@ -75,12 +78,14 @@ export default function NativeViewportBridge() {
     applyViewportVars();
     window.addEventListener("resize", applyViewportVars);
     window.addEventListener("orientationchange", applyViewportVars);
+    document.addEventListener("focusout", applyViewportVars);
     window.visualViewport?.addEventListener("resize", applyViewportVars);
     window.visualViewport?.addEventListener("scroll", applyViewportVars);
 
     return () => {
       window.removeEventListener("resize", applyViewportVars);
       window.removeEventListener("orientationchange", applyViewportVars);
+      document.removeEventListener("focusout", applyViewportVars);
       window.visualViewport?.removeEventListener("resize", applyViewportVars);
       window.visualViewport?.removeEventListener("scroll", applyViewportVars);
       document.removeEventListener("pointerdown", enterGameFullscreen);

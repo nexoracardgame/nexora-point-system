@@ -5,6 +5,7 @@ import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
 import BattleRoomActions from "@/components/BattleRoomActions";
+import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
 import TargetSelectionModal from "@/components/TargetSelectionModal";
@@ -4033,7 +4034,7 @@ function SkillTargetOverlay({
   const options: TargetOptionView[] = targetCard.cardNo === "254" ? eligible.map(id => ({ id, faction: id === "reroll-opponent" ? "enemy" : "ally", action: true, label: id === "draw-skill" ? "สุ่มสกิลเข้ามือ" : id === "reroll-own" ? "สุ่มมอนสเตอร์เรา" : "สุ่มมอนสเตอร์อีกฝ่าย" })) : targetCard.cardNo === "245" ? eligible.map(id => ({ id, faction: "enemy", label: "สกิลบนสนามฝ่ายตรงข้าม", card: triadCardByNo.get(id.slice(5)) })) : eligible.filter(id => Boolean(id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop)).map(id => ({
     id, faction: id === ownId ? "ally" : "enemy",
     label: id === ownId ? "มอนสเตอร์หลักฝั่งเรา" : "มอนสเตอร์หลักฝั่งศัตรู",
-    card: id === "player-top" ? playerTop : botTop,
+    card: id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop,
   }));
   const two = isTwoStepTargetSkill(targetCard);
   const selection = copyTargetStep ? copiedTargets.join(">") : card.cardNo === "245" ? copyId : selectedTarget;
@@ -7387,28 +7388,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     Boolean(activeRoomCode || activeRoomSnapshot || activeRoomCodeRef.current || activeRoomSnapshotRef.current);
 
   if (shouldShowReconnectSplash) {
-    return (
-      <main className="triad-lobby-screen grid min-h-[calc(var(--app-shell-height)-var(--app-header-height)-var(--app-mobile-nav-height))] place-items-center overflow-hidden rounded-[24px] border border-amber-200/12 bg-[#050507] px-4 text-white shadow-[0_30px_110px_rgba(0,0,0,0.58)]">
-        <div className="w-[min(420px,92vw)] rounded-2xl border border-amber-200/22 bg-black/54 p-5 text-center shadow-[0_0_60px_rgba(251,191,36,0.16)] backdrop-blur-md">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-amber-200/40 bg-amber-200/12 text-amber-100 shadow-[0_0_34px_rgba(251,191,36,0.22)]">
-            <Swords className="h-7 w-7" />
-          </div>
-          <div className="mt-4 text-xl font-black text-white">กำลังกลับเข้าสนาม</div>
-          <div className="mt-2 text-sm font-semibold leading-6 text-white/56">
-            กำลังเชื่อมต่อเกมที่กำลังดำเนินอยู่แบบเรียลไทม์
-          </div>
-          <div className="mx-auto mt-5 h-1.5 w-44 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-1/2 animate-[triad-reconnect_1.05s_ease-in-out_infinite] rounded-full bg-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.65)]" />
-          </div>
-        </div>
-        <style jsx>{`
-          @keyframes triad-reconnect {
-            0% { transform: translateX(-110%); }
-            100% { transform: translateX(230%); }
-          }
-        `}</style>
-      </main>
-    );
+    return <BattleConnectingScreen />;
   }
 
   if (phase === "lobby") {

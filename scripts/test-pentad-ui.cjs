@@ -8,6 +8,10 @@ modules['@/components/TargetSelectionModal']=transpile(fs.readFileSync('componen
 modules['@/lib/target-selection-view']=modules['./target-selection-view']=transpile(fs.readFileSync('lib/target-selection-view.ts','utf8'));
 modules['@/lib/pentad-target-view']=transpile(fs.readFileSync('lib/pentad-target-view.ts','utf8'));
 modules['./TargetSelectionModal.css']='';
+modules['./BattleMobileOverlays.css']='';
+modules.viewport=transpile(fs.readFileSync('components/NativeViewportBridge.tsx','utf8'));
+modules['@/components/BattleConnectingScreen']=transpile(fs.readFileSync('components/BattleConnectingScreen.tsx','utf8'));
+modules['./BattleLoadingScreen.css']='';
 modules['@/lib/battle-surrender-dialog']='exports.confirmBattleSurrender=async()=>true;exports.confirmBattleLeave=async()=>window.confirmLeave!==false;';
 modules['@/components/BattleForfeitVictory']=transpile(fs.readFileSync('components/BattleForfeitVictory.tsx','utf8'));
 modules['@/components/BattleMatchResult']=modules['./BattleMatchResult']=transpile(fs.readFileSync('components/BattleMatchResult.tsx','utf8'));
@@ -39,6 +43,7 @@ for(const [id,file,prefix] of [['./PentadDominion.module.css','app/(main)/battle
   modules[id]=`exports.__esModule=true;exports.default=new Proxy({},{get:(_,name)=>${JSON.stringify(prefix)}+name});`;
 }
 css+=fs.readFileSync('app/globals.css','utf8')+'\n'+fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSync('components/TargetSelectionModal.css','utf8')+'\n'+fs.readFileSync('components/BattleMatchResult.css','utf8');
+css+=fs.readFileSync('components/BattleMobileOverlays.css','utf8');
 const bundle=Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const html=`<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif}button,input,select{font:inherit;color:inherit}button{border:0;background:none}a{color:inherit;text-decoration:none}${css}</style></head><body><div id="root" class="nexora-pentad-shell"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};if(!modules[id])throw Error('Missing module '+id);modules[id](require,m,m.exports);return m.exports;}const React=require('react');function Frame(){const active=require('@/lib/battle-ui-state').useBattleArenaActive();return React.createElement(React.Fragment,null,React.createElement(require('client').default,{userId:'a',initialRoomCode:'123456'}),!active&&React.createElement('div',{'data-global-chat':true},'Chat + Blaze'));}require('react-dom/client').createRoot(document.getElementById('root')).render(React.createElement(Frame));</script></body></html>`;
 const nodeCache={};function load(file){if(nodeCache[file])return nodeCache[file].exports;const module=nodeCache[file]={exports:{}};const localRequire=id=>id==='./prisma'?{prisma:{}}:id==='@/public/cards/card-skill-db.json'?require('../public/cards/card-skill-db.json'):id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id);vm.runInThisContext(`(function(require,module,exports){${transpile(fs.readFileSync(file,'utf8'),file)}\n})`,{filename:file})(localRequire,module,module.exports);return module.exports;}
@@ -74,6 +79,7 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
   const sync=async()=>{room.version+=100;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForTimeout(120);};
   for(const [width,height] of [[3840,2160],[1920,1080],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]) {
     room=store.newPentadRoom('123456',actor);await page.setViewportSize({width,height});await page.goto('https://pentad.test/');
+    await page.evaluate(()=>require('react-dom/client').createRoot(document.body.appendChild(document.createElement('div'))).render(React.createElement(require('viewport').default)));
     await page.waitForSelector('[data-pentad-phase="waiting"]');assert.equal(await page.locator('[data-global-chat]').count(),0,'Global chat and Blaze are absent in the room');
     assert.equal(await page.locator('.penta_brand a').count(),0,'Mode heading cannot navigate out of a live room');assert.equal(await page.locator('a.penta_brand').count(),0);
     assert.ok((await page.locator('.penta_shell').getAttribute('style')).includes('nexora-command-original.webp'),'Waiting header and room use only the lobby wallpaper');
@@ -88,6 +94,7 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
     if(width===1280){await page.getByRole('button',{name:'ล้างเด็ค',exact:true}).click();assert.equal(await page.locator('.penta_chosenCards .penta_card').count(),0);await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();assert.equal(await page.locator('.penta_chosenCards .penta_card').count(),5);}
     await page.getByRole('button',{name:'พร้อม',exact:true}).click();await page.waitForSelector('[data-pentad-phase="select"]');
     for(const button of await page.locator('.nexora-arena-header button,.nexora-arena-hand-filters button,.triad-battle-chat-hud input').all())assert.ok(inside(await button.boundingBox(),width,height),'Controls fit '+width);
+    const chatInput=page.getByRole('textbox',{name:'ข้อความแชตสนาม'});await chatInput.click();await chatInput.fill('mobile chat '+width);assert.equal(await chatInput.evaluate(el=>document.activeElement===el),true,'Chat input receives focus');await page.getByRole('button',{name:'ส่งข้อความ',exact:true}).click();await page.getByText('mobile chat '+width,{exact:false}).waitFor();
     const boxes=await page.locator('.penta_scoreboard > .nexora-arena-scoreplate,.penta_battleStatus,.nexora-arena-header-actions').evaluateAll(elements=>elements.map(element=>{const r=element.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));
     for(let a=0;a<boxes.length;a++)for(let b=a+1;b<boxes.length;b++){const x=boxes[a],y=boxes[b];assert.ok(x.x+x.w<=y.x+1||y.x+y.w<=x.x+1||x.y+x.h<=y.y+1||y.y+y.h<=x.y+1,'Timer and status never cover scores');}
     await page.screenshot({path:`artifacts/pentad-ui/battle-${width}x${height}.png`});
