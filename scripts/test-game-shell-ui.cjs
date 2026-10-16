@@ -15,6 +15,7 @@ modules['@/components/OnlinePresenceProvider']='exports.OnlinePresenceProvider=(
 modules['room-actions']=transpile(fs.readFileSync('components/BattleRoomActions.tsx','utf8'));modules['./BattleRoomActions.css']='';
 `;
 test=test.replace('const bundle=',modules+'\nconst bundle=')
+ .replace('const url=new URL(route.request().url());',"const url=new URL(route.request().url());if(url.pathname==='/api/game-profile')return route.fulfill({json:{avatar:'',frame:'gold',hero:'gold'}});")
  .replace('[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]',process.env.SMALL_ONLY==='1'?'[[320,568]]':'[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]')
  .replace("await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});",`await page.locator('.nexora-command-nav .nexora-menu-logout').waitFor();
  const logout=page.locator('.nexora-menu-logout');const logoutBox=await logout.boundingBox();assert.ok(logoutBox&&logoutBox.x>=0&&logoutBox.y>=0&&logoutBox.x+logoutBox.width<=width+1&&logoutBox.y+logoutBox.height<=height+1,'Logout fits '+width);

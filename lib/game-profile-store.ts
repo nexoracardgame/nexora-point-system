@@ -1,0 +1,6 @@
+import {prisma} from '@/lib/prisma';
+import {defaultGameAppearance,type GameAppearance} from './game-profile-options';
+let schema:Promise<unknown>|undefined;
+export function ensureGameProfile(){return schema??=prisma.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS "GameAppearance" ("userId" TEXT PRIMARY KEY REFERENCES "User"("id") ON DELETE CASCADE,"avatar" TEXT NOT NULL DEFAULT \'\',"frame" TEXT NOT NULL DEFAULT \'gold\',"hero" TEXT NOT NULL DEFAULT \'gold\',"updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())').catch(e=>{schema=undefined;throw e})}
+export async function readGameAppearance(userId:string):Promise<GameAppearance>{await ensureGameProfile();const rows=await prisma.$queryRawUnsafe<GameAppearance[]>('SELECT "avatar","frame","hero" FROM "GameAppearance" WHERE "userId"=$1',userId);return rows[0]||{...defaultGameAppearance}}
+export async function saveGameAppearance(userId:string,value:GameAppearance){await ensureGameProfile();await prisma.$executeRawUnsafe('INSERT INTO "GameAppearance" ("userId","avatar","frame","hero") VALUES ($1,$2,$3,$4) ON CONFLICT ("userId") DO UPDATE SET "avatar"=EXCLUDED."avatar","frame"=EXCLUDED."frame","hero"=EXCLUDED."hero","updatedAt"=NOW()',userId,value.avatar,value.frame,value.hero)}

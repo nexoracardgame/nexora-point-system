@@ -1,5 +1,6 @@
 "use client";
 import GameLobbyNavigation from '@/components/GameLobbyNavigation';
+import GameLobbyProfile from '@/components/GameLobbyProfile';
 
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
@@ -3665,7 +3666,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
     }} onPointerLeave={() => { cancelAnimationFrame(pointerFrame.current); artRef.current?.style.setProperty("--command-x", "0px"); artRef.current?.style.setProperty("--command-y", "0px"); }}>
       <NexoraCommandScene homeVideo /><div className="nexora-command-shade" />
       <header className="nexora-command-brand"><img className="nexora-official-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
-        <div className="nexora-command-profile"><img src={participant.image || "/avatar.png"} alt="" /><div><strong>{participant.name}</strong><small>{profile?.rankName || "BRONZE"} · {profile?.wins || 0} ชัยชนะ</small></div></div>
+        <GameLobbyProfile name={participant.name} image={participant.image || "/avatar.png"} rank={profile?.rankName || "BRONZE"} wins={profile?.wins || 0} />
       </header>
       <div className="nexora-command-status"><span><Users />{rooms.length} ห้อง</span><span><Swords />{rooms.filter(room => room.status === "playing").length} กำลังต่อสู้</span></div>
       <GameLobbyNavigation onRank={() => setPanel("rank")} onHome={() => { setPanel(null); setPanelClosing(false); }} />

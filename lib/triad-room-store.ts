@@ -259,7 +259,7 @@ const TRIAD_RANKS: Array<{ key: TriadRankKey; name: string; wins: number }> = [
   { key: "god-of-legends", name: "God Of Legends", wins: 10000 },
 ];
 
-function rankForWins(wins: number) {
+export function rankForWins(wins: number) {
   const safeWins = Math.max(0, Math.floor(Number(wins) || 0));
   let rankIndex = 0;
   for (let index = 0; index < TRIAD_RANKS.length; index += 1) {

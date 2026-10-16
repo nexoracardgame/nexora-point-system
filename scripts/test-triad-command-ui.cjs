@@ -9,6 +9,9 @@ const modules={};
 for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
 modules['@/components/GameLobbyNavigation']=transpile(fs.readFileSync('components/GameLobbyNavigation.tsx','utf8'));
+modules['@/components/GameLobbyProfile']=transpile(fs.readFileSync('components/GameLobbyProfile.tsx','utf8'));
+modules['@/lib/game-profile-options']=transpile(fs.readFileSync('lib/game-profile-options.ts','utf8'));
+modules['next/link']='exports.__esModule=true;exports.default=props=>require("react").createElement("a",props,props.children);';
 modules['@/components/LobbyActionButton']=transpile(fs.readFileSync('components/LobbyActionButton.tsx','utf8'));
 modules['@/lib/lobby-assets']=transpile(fs.readFileSync('lib/lobby-assets.ts','utf8'));
 modules['@/components/LobbyBanner']=transpile(fs.readFileSync('components/LobbyBanner.tsx','utf8'));
@@ -32,7 +35,7 @@ const start=source.indexOf('<main className="nexora-command nexora-command-room'
 const roomMarkup=source.slice(start,source.indexOf('</main>',start)+7);
 const dialogStart=source.indexOf('{createModeDialogOpen ? (');
 const dialogMarkup=source.slice(dialogStart,source.indexOf('<NexoraCommandLobby participant=',dialogStart)).trim();
-modules.test=transpile(`import GameLobbyNavigation from '@/components/GameLobbyNavigation';import {useState,useEffect,useLayoutEffect,useRef,Fragment} from 'react';import {Bot,Check,Clock3,ChevronRight,Crown,Eye,House,KeyRound,Layers3,Lock,Loader2,MessageCircle,Plus,SendHorizontal,Search,Smile,Swords,Trophy,UserPlus,Users,X} from 'lucide-react';
+modules.test=transpile(`import GameLobbyProfile from '@/components/GameLobbyProfile';import GameLobbyNavigation from '@/components/GameLobbyNavigation';import {useState,useEffect,useLayoutEffect,useRef,Fragment} from 'react';import {Bot,Check,Clock3,ChevronRight,Crown,Eye,House,KeyRound,Layers3,Lock,Loader2,MessageCircle,Plus,SendHorizontal,Search,Smile,Swords,Trophy,UserPlus,Users,X} from 'lucide-react';
 import NexoraCommandScene from './NexoraCommandScene';import {playMenuCue} from './BattleAudio';
 import GameModeModal from '@/components/GameModeModal';
 import LobbyActionButton from '@/components/LobbyActionButton';
