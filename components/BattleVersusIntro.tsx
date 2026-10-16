@@ -5,13 +5,13 @@ import { createPortal, preload } from "react-dom";
 import { Shield, Volume2, VolumeX } from "lucide-react";
 import "./BattleVersusIntro.css";
 
-type Duelist = { id?: string; name: string; image?: string };
+type Duelist = { id?: string; name: string; image?: string; rankName?: string };
 const seen = new Set<string>();
-const DURATION = 5200;
+const DURATION = 10200;
 const ART = "/images/versus/";
 
-export default function BattleVersusIntro({ sessionKey, left, right, background, enabled = true }: {
-  sessionKey: string; left: Duelist; right: Duelist; background?: string; enabled?: boolean;
+export default function BattleVersusIntro({ sessionKey, left, right, background, enabled = true, ranks }: {
+  sessionKey: string; left: Duelist; right: Duelist; background?: string; enabled?: boolean; ranks?: { left?: string; right?: string };
 }) {
   preload('/fonts/orbitron/Orbitron.ttf', { as: 'font', type: 'font/ttf', crossOrigin: 'anonymous' });
   for (const name of ["arena", "duelist-gold", "duelist-silver", "plate-gold", "plate-silver", "footer"]) {
@@ -53,6 +53,26 @@ export default function BattleVersusIntro({ sessionKey, left, right, background,
     return () => { disposed = true; clearInterval(poll); clearTimeout(timer); sound.current?.pause(); };
   }, [sessionKey, enabled]);
   useEffect(() => {
+    if (!visible) return;
+    const fit = () => {
+      document.querySelectorAll<HTMLElement>(".nexora-versus-name h2,.nexora-versus-name span").forEach(node => {
+        node.style.fontSize = "";
+        const row = node.parentElement;
+        if (!row) return;
+        const height = row.clientHeight * (node.tagName === "H2" ? .55 : .45);
+        const size = parseFloat(getComputedStyle(node).fontSize);
+        const ratio = Math.min(1, node.clientWidth / Math.max(1,node.scrollWidth), height / Math.max(1,node.scrollHeight));
+        if (ratio < 1) node.style.fontSize = `${size * ratio}px`;
+      });
+    };
+    const observer = new ResizeObserver(fit);
+    const plane = document.querySelector(".nexora-versus-plane");
+    if (plane) observer.observe(plane);
+    fit();
+    void document.fonts.ready.then(fit);
+    return () => observer.disconnect();
+  }, [visible, left.name, right.name, ranks?.left, ranks?.right]);
+  useEffect(() => {
     const mute = () => {
       if (!sound.current) return;
       try { sound.current.muted = localStorage.getItem("triad-battle-muted") === "1"; } catch {}
@@ -80,7 +100,7 @@ export default function BattleVersusIntro({ sessionKey, left, right, background,
       {[left,right].map((player,index)=><section className="nexora-versus-duelist" data-side={index===0?"left":"right"} key={index}>
         <img className="nexora-versus-plate" src={`${ART}plate-${index===0?"gold":"silver"}.png`} alt="" aria-hidden="true" />
         <div className="nexora-versus-avatar"><img src={player.image || "/avatar.png"} alt="" /><Shield aria-hidden="true" /></div>
-        <div className="nexora-versus-name"><small>DUELIST</small><h2 data-name={player.name}>{player.name}</h2><span>NEXORA CARD GAME</span></div>
+        <div className="nexora-versus-name"><h2 data-name={player.name}>{player.name}</h2><span>{(index === 0 ? ranks?.left : ranks?.right) || player.rankName || (player.name.includes("BOT") ? "AI DUELIST · LEVEL 99" : "NEXORA DUELIST")}</span></div>
       </section>)}
     </div>
     <div className="nexora-versus-impact" aria-hidden="true"><b>VS</b></div>
