@@ -1,11 +1,27 @@
 "use client";
-import {useEffect,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import Link from 'next/link';
-import {gameFrames,type GameAppearance} from '@/lib/game-profile-options';
+import {createPortal} from 'react-dom';
+import {type GameAppearance} from '@/lib/game-profile-options';
+import {Shield} from 'lucide-react';
 import GameLobbyWallet from './GameLobbyWallet';
+import './GameLobbyProfile.css';
 export default function GameLobbyProfile({name,image,rank,wins}:{name:string;image:string;rank:string;wins:number}){
  const [appearance,setAppearance]=useState<GameAppearance|null>(null);
+ const [notice,setNotice]=useState(false);
+ const nameLabel=useRef<HTMLElement>(null);
+ useLayoutEffect(()=>{const label=nameLabel.current;if(!label)return;const fit=()=>{label.style.fontSize='';let size=parseFloat(getComputedStyle(label).fontSize);while(size>8&&label.scrollWidth>label.clientWidth+1){size-=.5;label.style.fontSize=`${size}px`}};const observer=new ResizeObserver(fit);observer.observe(label);fit();return()=>observer.disconnect()},[name]);
  useEffect(()=>{const controller=new AbortController();void fetch('/api/game-profile',{signal:controller.signal,cache:'no-store'}).then(r=>r.ok?r.json():null).then(value=>{if(!controller.signal.aborted)setAppearance(value)}).catch(()=>{});return()=>controller.abort()},[]);
- const color=gameFrames.find(f=>f.id===appearance?.frame)?.color||'#d7b777';
- return <><GameLobbyWallet/><Link href="/game/profile" className="nexora-command-profile" aria-label="เปิดโปรไฟล์ของฉัน" title="เปิดโปรไฟล์ของฉัน" style={{color:'inherit',textDecoration:'none'}}><img src={appearance?.avatar||image||'/avatar.png'} alt="" style={{borderRadius:'50%',borderColor:color,boxShadow:`0 0 12px ${color}33`}}/><div><strong>{name}</strong><small>{rank} · {wins} ชัยชนะ</small></div></Link></>;
+ useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(false),3000);return()=>clearTimeout(timer)},[notice]);
+ return <><GameLobbyWallet/><section className="nexora-lobby-identity" aria-label="โปรไฟล์ผู้เล่น" data-rank={rank.toLowerCase()}>
+  <img className="nli-avatar" src={appearance?.avatar||image||'/avatar.png'} alt=""/>
+  <img className="nli-art" src="/images/lobby-play/profile-frame.png" width={2469} height={724} alt="" draggable={false}/>
+  <span className="nli-plate-light" aria-hidden="true"/>
+  <Link className="nli-profile-link" href="/game/profile" aria-label="เปิดโปรไฟล์ของฉัน" title={name}/>
+  <strong ref={nameLabel} className="nli-name" title={name}>{name}</strong>
+  <span className="nli-rank-badge" title={rank}><Shield aria-hidden="true"/></span>
+  <span className="nli-rank-name" title={`${rank} · ${wins} ชัยชนะ`}>{rank}</span>
+  <button type="button" className="nli-edit" aria-label="แก้ไขชื่อผู้เล่น" title="แก้ไขชื่อผู้เล่น · ยังไม่เปิดให้บริการ" onClick={()=>setNotice(true)}/>
+  {notice&&createPortal(<span className="nli-notice" role="status">แก้ไขชื่อผู้เล่น · ยังไม่เปิดให้บริการ</span>,document.body)}
+ </section></>;
 }
