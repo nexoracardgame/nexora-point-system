@@ -1,23 +1,43 @@
-.nexora-game-login { position:relative; width:100%; height:100%; overflow:hidden; isolation:isolate; background:#040608; color:#fff4d2; font-family:var(--font-geist-sans),Arial,sans-serif; }
-.nexora-game-login-scene { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.5; animation:nexora-login-camera 10s ease-out both; z-index:-2; }
-.nexora-game-login::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,transparent,#030609a6 38% 62%,transparent); z-index:-1; pointer-events:none; }
-.nexora-game-login-warrior { position:absolute; bottom:0; width:32%; height:92%; object-fit:cover; object-position:top center; pointer-events:none; z-index:-1; }
-.nexora-game-login-warrior[data-side=left] { left:0; }
-.nexora-game-login-warrior[data-side=right] { right:0; object-position:top right; }
-.nexora-game-login-content { position:absolute; inset:5% 33%; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:12px; text-align:center; }
-.nexora-game-login-logo { width:100%; max-height:30%; object-fit:contain; filter:drop-shadow(0 4px 15px #000); }
-.nexora-game-login-content h1 { margin:0; font-size:24px; line-height:1.2; }
-.nexora-game-login-content p { margin:0; font-size:16px; line-height:1.4; }
-.nexora-game-login-content [role=alert] { color:#ffb7a3; }
-.nexora-game-login-actions { display:grid; gap:12px; width:100%; max-width:360px; margin-top:12px; }
-.nexora-game-login-actions button { display:flex; gap:12px; align-items:center; justify-content:center; min-height:52px; border:1px solid #e9c77b; border-radius:4px; background:linear-gradient(120deg,#f9e7ae,#cfae65); color:#12100b; font:800 15px var(--font-geist-sans),Arial,sans-serif; cursor:pointer; box-shadow:0 5px 18px #0008; transition:filter .2s,translate .2s; }
-.nexora-game-login-actions button:hover:not(:disabled) { filter:brightness(1.1); translate:0 -2px; }
-.nexora-game-login-actions button:disabled { opacity:.5; cursor:wait; }
-.nexora-login-line { background:#06c755; color:#fff; font-size:10px; padding:5px; border-radius:4px; }
-.nexora-login-google { background:#fff; color:#4285f4; font:bold 20px Arial; padding:1px 7px; border-radius:4px; }
-.nexora-game-download { display:flex; flex-direction:column; gap:4px; color:#ffe1a0; font-size:14px; font-weight:700; text-decoration:none; padding:10px 14px; border:1px solid #d8bd7055; border-radius:4px; background:#03060999; }
-.nexora-game-download span { font-size:10px; color:#b7c4cf; }.nexora-game-download:hover { border-color:#f3d58b; background:#1c1a12; }
+.nexora-game-login { position:relative; width:100%; height:100%; overflow:hidden; isolation:isolate; background:#030405; color:#f9e9c3; font-family:var(--font-geist-sans),Arial,sans-serif; }
+.nexora-game-login-scene { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:36% center; animation:nexora-login-camera 12s ease-out both; z-index:-2; }
+.nexora-game-login::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#0002 0%,#0000 38%,#0009 62%,#000e 100%),linear-gradient(0deg,#0009,transparent 24% 80%,#0004); z-index:-1; pointer-events:none; }
+.nexora-game-login-content { position:absolute; top:10%; bottom:5%; right:5%; width:30%; max-width:620px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; }
+.nexora-game-login-logo { display:block; width:115%; max-width:none; height:26%; object-fit:contain; flex-shrink:0; filter:drop-shadow(0 6px 12px #000c); }
+.nexora-login-rule { display:flex; align-items:center; gap:12px; width:100%; margin-bottom:12px; font:15px Georgia,serif; }
+.nexora-login-rule::before,.nexora-login-rule::after,.nexora-login-divider::before,.nexora-login-divider::after { content:""; height:1px; flex:1; background:linear-gradient(90deg,transparent,#e4c17c); }
+.nexora-login-rule::after,.nexora-login-divider::after { transform:rotate(180deg); }
+.nexora-game-login-actions { display:flex; flex-direction:column; gap:4px; width:100%; }
+.nexora-game-login-actions button { font:inherit; color:inherit; border:0; padding:0; cursor:pointer; background:transparent; position:relative; }
+.nexora-login-art { display:block; width:100%; aspect-ratio:4.4; isolation:isolate; transition:filter .2s,transform .2s; }
+.nexora-login-art img { position:absolute; inset:-20% 0; width:100%; height:140%; object-fit:contain; pointer-events:none; }
+.nexora-login-art:hover:not(:disabled),.nexora-login-art:focus-visible { filter:brightness(1.18) drop-shadow(0 0 12px #e9b75288); transform:translateY(-2px); outline:1px solid #e5c485; outline-offset:3px; }
+.nexora-login-art::after { content:""; position:absolute; inset:12% 7%; clip-path:polygon(8% 0,92% 0,100% 50%,92% 100%,8% 100%,0 50%); background:linear-gradient(110deg,transparent 30%,#fff8 49%,transparent 65%); opacity:0; pointer-events:none; }
+.nexora-login-art[data-flash=true]::after { animation:nexora-login-shine .55s ease-out; }
+.nexora-game-login-actions button:disabled { opacity:.55; cursor:wait; }
+.nexora-login-divider { display:flex; align-items:center; gap:10px; font-size:12px; margin:14px 0 0; }
+.nexora-login-social { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; width:100%; }
+.nexora-login-social button { display:flex; flex-direction:column; align-items:center; min-width:0; transition:filter .2s,transform .2s; }
+.nexora-login-social img { display:block; width:100%; height:auto; aspect-ratio:.6; object-fit:contain; pointer-events:none; }
+.nexora-login-social span { font-size:11px; line-height:1.4; }
+.nexora-login-social button:hover:not(:disabled),.nexora-login-social button:focus-visible { filter:brightness(1.35) drop-shadow(0 0 9px #5fb6faaa); transform:translateY(-3px); outline:none; }
+.nexora-login-social button[data-flash=true] { animation:nexora-login-flash .5s ease-out; }
+.nexora-game-download { display:flex; align-items:center; justify-content:center; gap:8px; color:#e9ce92; font-size:12px; text-decoration:none; padding:8px; border-bottom:1px solid #d8bd7055; margin-top:8px; }
+.nexora-game-download span { font-size:10px; color:#b7c4cf; }.nexora-game-download:hover { color:#fff; border-color:#f3d58b; }
 html[data-game-desktop=true] .nexora-game-download { display:none; }
-@keyframes nexora-login-camera { from { transform:scale(1.1); } to { transform:scale(1); } }
-@media (max-height:600px),(max-width:900px) and (orientation:portrait) { .nexora-game-login-content { gap:6px; inset:3% 30%; } .nexora-game-login-logo { max-height:24%; } .nexora-game-login-content h1 { font-size:18px; } .nexora-game-login-content p { font-size:12px; } .nexora-game-login-actions { gap:8px; margin-top:4px; } .nexora-game-login-actions button { min-height:40px; font-size:12px; } .nexora-game-login-warrior { width:29%; } }
-@media (prefers-reduced-motion:reduce) { .nexora-game-login-scene { animation:none; } }
+.nexora-login-feedback { min-height:36px; width:100%; font-size:12px; line-height:1.5; }.nexora-login-feedback p { margin:0; }.nexora-login-feedback [role=alert] { color:#ffb7a3; }
+.nexora-login-rail { position:absolute; top:15%; left:1%; width:6%; max-width:100px; display:grid; gap:12px; }
+.nexora-login-rail button { border:0; background:#0007; padding:4px; cursor:pointer; border-bottom:1px solid #d7b47055; transition:filter .2s,background .2s; }
+.nexora-login-rail img { display:block; width:100%; height:auto; aspect-ratio:.75; object-fit:contain; pointer-events:none; }
+.nexora-login-rail button:hover,.nexora-login-rail button:focus-visible { filter:brightness(1.25) drop-shadow(0 0 8px #ffce6d88); background:#000b; }
+.nexora-login-utilities { position:absolute; top:18px; right:70px; display:flex; gap:14px; }
+.nexora-login-utilities button { width:34px; height:34px; display:grid; place-items:center; padding:0; color:#e8cca0; border:0; background:transparent; cursor:pointer; }.nexora-login-utilities img { width:32px; height:32px; object-fit:contain; }
+.nexora-login-dialog-backdrop { position:absolute; inset:0; z-index:20; display:grid; place-items:center; background:#000b; padding:16px; }
+.nexora-login-dialog { position:relative; width:min(440px,90%); max-height:85%; overflow:auto; padding:28px; border:1px solid #caa85e; background:#090b10f5; box-shadow:0 16px 60px #000a; border-radius:4px; text-align:center; }.nexora-login-dialog h2 { font-size:22px; }.nexora-login-dialog p { font-size:14px; line-height:1.8; }.nexora-login-dialog-close { position:absolute; right:8px; top:8px; padding:5px; color:#efd7a5; background:transparent; border:0; cursor:pointer; }.nexora-login-sound { display:inline-flex; gap:10px; align-items:center; color:#f0d69a; background:#c99f3422; border:1px solid #ba9a5f; padding:10px 16px; cursor:pointer; }
+.nexora-login-provider-choices { display:flex; justify-content:center; gap:24px; }.nexora-login-provider-choices button { display:flex; flex-direction:column; align-items:center; color:#f3dbac; padding:8px; border:1px solid #d5b87055; background:#0005; cursor:pointer; }.nexora-login-provider-choices img { width:70px; height:96px; object-fit:contain; }
+@keyframes nexora-login-camera { from { transform:scale(1.06); } to { transform:scale(1); } }
+@keyframes nexora-login-shine { 0% {opacity:0;transform:translateX(-25%)} 30% {opacity:1} 100% {opacity:0;transform:translateX(25%)} }
+@keyframes nexora-login-flash { 35% {filter:brightness(1.8) drop-shadow(0 0 18px #81c8ff);transform:scale(.95)} }
+@media (max-height:650px) { .nexora-game-login-content { top:9%; bottom:2%; width:33%; right:5%; gap:3px; }.nexora-game-login-logo { height:23%; }.nexora-login-rule { font-size:11px; margin-bottom:2px; }.nexora-login-social { gap:7px; }.nexora-login-social img { max-height:76px; }.nexora-login-social span { font-size:9px; }.nexora-login-divider { margin-top:7px; font-size:10px; }.nexora-game-download { margin-top:2px; padding:5px; font-size:10px; }.nexora-game-download span { font-size:8px; }.nexora-login-feedback { font-size:10px; min-height:30px; }.nexora-login-rail { top:17%; gap:6px; width:6%; }.nexora-login-rail img { max-height:62px; }.nexora-login-utilities { top:8px; gap:8px; } }
+@media (orientation:portrait) and (max-width:1000px) { .nexora-game-login-content { top:9%; bottom:2%; right:5%; width:33%; max-width:none; gap:3px; }.nexora-game-login-logo { height:23%; }.nexora-login-rail { left:1%; top:17%; width:6%; gap:6px; }.nexora-login-rail img { max-height:62px; }.nexora-login-social { gap:7px; }.nexora-login-social img { max-height:66px; }.nexora-login-social span { font-size:9px; }.nexora-login-rule { font-size:11px; margin-bottom:2px; }.nexora-login-divider { margin-top:7px; font-size:10px; }.nexora-game-download { margin-top:2px; padding:5px; font-size:10px; }.nexora-game-download span { font-size:8px; }.nexora-login-feedback { font-size:10px; min-height:30px; }.nexora-login-utilities { top:8px; gap:8px; } }
+@media (prefers-reduced-motion:reduce) { .nexora-game-login *, .nexora-game-login *::after { animation:none!important; transition:none!important; } }
+@media (max-height:450px),(orientation:portrait) and (max-width:1000px) { .nexora-game-login-content { justify-content:flex-start; top:12%; bottom:2%; gap:3px; }.nexora-game-login-logo { height:17%; width:105%; }.nexora-login-rule { display:none; }.nexora-login-art { aspect-ratio:4.8; }.nexora-game-login-actions { gap:7px; }.nexora-login-divider { margin-top:3px; }.nexora-login-social img { height:48px; max-height:48px; }.nexora-login-social span { font-size:9px; }.nexora-game-download { white-space:nowrap; font-size:9px; padding:4px 0; gap:4px; }.nexora-game-download span { display:none; }.nexora-game-download svg { width:12px; }.nexora-login-feedback { min-height:24px; font-size:9px; } }

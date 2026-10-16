@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto');
 const root=path.resolve('public'),files=new Set();
-for(const dir of ['images/versus','images/target-ui','images/mode-ui-v3','audio/ui','fonts/orbitron']){
- const base=path.join(root,dir);if(fs.existsSync(base))for(const name of fs.readdirSync(base))if(fs.statSync(path.join(base,name)).isFile())files.add('/'+dir+'/'+name);
+for(const dir of ['images/versus','images/target-ui','images/mode-ui-v3','images/game-login','audio/ui','fonts/orbitron']){
+ const base=path.join(root,dir);if(fs.existsSync(base))for(const name of fs.readdirSync(base))if(!name.endsWith('-source.png')&&fs.statSync(path.join(base,name)).isFile())files.add('/'+dir+'/'+name);
 }
 for(const name of ['images/triad/nexora-official-logo.webp','images/triad/lobby-action-sprite.webp','images/triad/nexora-command-original.webp','audio/music/nexora-menu.mp3','cards/card-backs/card-backs.png'])if(fs.existsSync(path.join(root,name)))files.add('/'+name);
 const cards=JSON.parse(fs.readFileSync('public/cards/card-skill-db.json','utf8'));
