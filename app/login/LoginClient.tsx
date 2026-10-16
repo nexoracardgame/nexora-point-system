@@ -5,11 +5,12 @@ import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import "./GameLogin.css";
 
 const DEFAULT_CALLBACK_PATH = "/";
 
 function isUnsafeCallbackPath(pathname: string) {
-  return pathname === "/login" || pathname.startsWith("/api/auth");
+  return pathname === "/login" || pathname === "/game/login" || pathname.startsWith("/api/auth");
 }
 
 function resolveCallbackPath(rawCallbackUrl?: string | null, depth = 0): string {
@@ -122,9 +123,11 @@ function getAuthErrorMessage(error?: string | null) {
 export default function LoginClient({
   rawCallbackUrl,
   authError,
+  game = false,
 }: {
   rawCallbackUrl?: string | null;
   authError?: string | null;
+  game?: boolean;
 }) {
   const router = useRouter();
   const { status } = useSession();
@@ -266,6 +269,22 @@ export default function LoginClient({
 
     void warmLineClient();
   }, []);
+
+  if (game) return <main className="nexora-game-login" aria-busy={isRedirecting}>
+    <img className="nexora-game-login-scene" src="/images/versus/arena.png" alt="" fetchPriority="high" />
+    <img className="nexora-game-login-warrior" data-side="left" src="/images/versus/duelist-gold.png" alt="" />
+    <img className="nexora-game-login-warrior" data-side="right" src="/images/versus/duelist-silver.png" alt="" />
+    <section className="nexora-game-login-content">
+      <img className="nexora-game-login-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA GAME" />
+      <h1>NEXORA GAME</h1><p>เข้าสู่สนามประลอง</p>
+      <div className="nexora-game-login-actions">
+        <button type="button" aria-label="เข้าสู่ระบบด้วย LINE" disabled={isRedirecting} onClick={()=>void startLogin("line")}><span className="nexora-login-line" aria-hidden="true">LINE</span>เข้าสู่ระบบด้วย LINE</button>
+        <button type="button" aria-label="เข้าสู่ระบบด้วย Google" disabled={isRedirecting} onClick={()=>void startLogin("google")}><span className="nexora-login-google" aria-hidden="true">G</span>เข้าสู่ระบบด้วย Google</button>
+      </div>
+      {(loginError || authErrorMessage) && <p role="alert">{loginError || authErrorMessage}</p>}
+      {isRedirecting && <p role="status">{sessionChecking ? "กำลังตรวจสอบบัญชี" : "กำลังเข้าสู่สนาม"}</p>}
+    </section>
+  </main>;
 
   return (
     <main

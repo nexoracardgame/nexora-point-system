@@ -55,6 +55,9 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      { source: "/battle", destination: "/game", permanent: false },
+      { source: "/battle/triad-dominion", destination: "/game", permanent: false },
+      { source: "/battle/pentad-dominion", destination: "/game/pentad", permanent: false },
       {
         source: "/home",
         destination: "/",

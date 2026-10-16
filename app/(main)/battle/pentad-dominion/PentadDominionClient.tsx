@@ -92,7 +92,7 @@ function ElementClash({ round, room, arenaImage, onComplete }: { round: PentadRo
 
 export default function PentadDominionClient({ userId, initialRoomCode = "", initialSpectate = false }: { userId: string; initialRoomCode?: string; initialSpectate?: boolean }) {
   const router = useRouter();
-  useEffect(()=>{router.prefetch("/battle/triad-dominion");},[router]);
+  useEffect(()=>{router.prefetch("/game");},[router]);
   const [room, setRoom] = useState<PentadRoom | null>(null);
   const roomRef = useRef(room); roomRef.current = room;
   const [rooms, setRooms] = useState<Listing[]>([]);
@@ -152,7 +152,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       const response = await fetch(`/api/pentad-rooms${selectedCode ? `?room=${selectedCode}` : ""}`, { cache: "no-store", signal:AbortSignal.timeout(12000) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return;
-      if (data.closed) { loadGeneration.current++;try{localStorage.removeItem("nexora:pentad:room");}catch{}router.replace("/battle/triad-dominion");return; }
+      if (data.closed) { loadGeneration.current++;try{localStorage.removeItem("nexora:pentad:room");}catch{}router.replace("/game");return; }
       if (!response.ok) throw new Error(data.error || "โหลดห้องไม่สำเร็จ");
       if (data.room) accept(data.room); else setRooms(data.rooms || []);
     } catch (err) { if (generation === loadGeneration.current) setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); }
@@ -164,14 +164,14 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     if (["create", "join", "leave"].includes(action)) loadGeneration.current++;
     if (action === "join") setEntering(true);
     const generation = loadGeneration.current;
-    if (action === "leave" && (!side || current?.phase === "waiting" || current?.phase === "finished")) { try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/battle/triad-dominion"); }
+    if (action === "leave" && (!side || current?.phase === "waiting" || current?.phase === "finished")) { try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/game"); }
     try {
       const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, signal:AbortSignal.timeout(12000), body: JSON.stringify({ action, code: current?.code, epoch: current?.epoch, ...extra }) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return false;
-      if (data.closed) { try{localStorage.removeItem("nexora:pentad:room");}catch{} router.replace("/battle/triad-dominion");return false; }
+      if (data.closed) { try{localStorage.removeItem("nexora:pentad:room");}catch{} router.replace("/game");return false; }
       if (!response.ok) throw new Error(data.error || "คำสั่งไม่สำเร็จ");
-      if (action === "leave") { loadGeneration.current++; try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/battle/triad-dominion"); }
+      if (action === "leave") { loadGeneration.current++; try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/game"); }
       else if (data.room) accept(data.room);
       return true;
     } catch (err) { if (generation === loadGeneration.current) { setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); if (current) void load(current.code); } return false; }
@@ -182,7 +182,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     const requested = initialRoomCode || new URLSearchParams(window.location.search).get("room");
     try { saved = requested || localStorage.getItem("nexora:pentad:room"); } catch { saved = requested; }
     const restoring = saved && /^\d{6}$/.test(saved);
-    if (!restoring) { router.replace("/battle/triad-dominion"); return; }
+    if (!restoring) { router.replace("/game"); return; }
     if (restoring) setEntering(true);
     void act("join", { code: saved, spectate: initialSpectate || new URLSearchParams(window.location.search).get("spectate") === "1" });
     const clock = setInterval(() => setNow(Date.now()), 200);

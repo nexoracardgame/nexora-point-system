@@ -181,7 +181,7 @@ export default function BattleAppLauncher({
     if (mode === "page") {
       setBusy(true);
       void requestGameViewport().finally(() => {
-        router.replace("/battle/triad-dominion");
+        router.replace("/game");
       });
     }
   }, [mode, router]);
@@ -189,7 +189,7 @@ export default function BattleAppLauncher({
   useEffect(() => {
     if (mode !== "page" || isMobileDevice !== false) return;
 
-    router.replace("/battle/triad-dominion");
+    router.replace("/game");
   }, [isMobileDevice, mode, router]);
 
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function BattleAppLauncher({
 
     setBusy(true);
     await requestGameViewport();
-    router.push("/battle/triad-dominion");
+    router.push("/game");
   };
 
   const handleButtonClick = async () => {

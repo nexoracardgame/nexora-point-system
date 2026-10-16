@@ -1,0 +1,20 @@
+.nexora-game-login { position:relative; width:100%; height:100%; overflow:hidden; isolation:isolate; background:#040608; color:#fff4d2; font-family:var(--font-geist-sans),Arial,sans-serif; }
+.nexora-game-login-scene { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.5; animation:nexora-login-camera 10s ease-out both; z-index:-2; }
+.nexora-game-login::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,transparent,#030609a6 38% 62%,transparent); z-index:-1; pointer-events:none; }
+.nexora-game-login-warrior { position:absolute; bottom:0; width:32%; height:92%; object-fit:cover; object-position:top center; pointer-events:none; z-index:-1; }
+.nexora-game-login-warrior[data-side=left] { left:0; }
+.nexora-game-login-warrior[data-side=right] { right:0; object-position:top right; }
+.nexora-game-login-content { position:absolute; inset:5% 33%; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:12px; text-align:center; }
+.nexora-game-login-logo { width:100%; max-height:30%; object-fit:contain; filter:drop-shadow(0 4px 15px #000); }
+.nexora-game-login-content h1 { margin:0; font-size:24px; line-height:1.2; }
+.nexora-game-login-content p { margin:0; font-size:16px; line-height:1.4; }
+.nexora-game-login-content [role=alert] { color:#ffb7a3; }
+.nexora-game-login-actions { display:grid; gap:12px; width:100%; max-width:360px; margin-top:12px; }
+.nexora-game-login-actions button { display:flex; gap:12px; align-items:center; justify-content:center; min-height:52px; border:1px solid #e9c77b; border-radius:4px; background:linear-gradient(120deg,#f9e7ae,#cfae65); color:#12100b; font:800 15px var(--font-geist-sans),Arial,sans-serif; cursor:pointer; box-shadow:0 5px 18px #0008; transition:filter .2s,translate .2s; }
+.nexora-game-login-actions button:hover:not(:disabled) { filter:brightness(1.1); translate:0 -2px; }
+.nexora-game-login-actions button:disabled { opacity:.5; cursor:wait; }
+.nexora-login-line { background:#06c755; color:#fff; font-size:10px; padding:5px; border-radius:4px; }
+.nexora-login-google { background:#fff; color:#4285f4; font:bold 20px Arial; padding:1px 7px; border-radius:4px; }
+@keyframes nexora-login-camera { from { transform:scale(1.1); } to { transform:scale(1); } }
+@media (max-height:600px),(max-width:900px) and (orientation:portrait) { .nexora-game-login-content { gap:6px; inset:3% 30%; } .nexora-game-login-logo { max-height:24%; } .nexora-game-login-content h1 { font-size:18px; } .nexora-game-login-content p { font-size:12px; } .nexora-game-login-actions { gap:8px; margin-top:4px; } .nexora-game-login-actions button { min-height:40px; font-size:12px; } .nexora-game-login-warrior { width:29%; } }
+@media (prefers-reduced-motion:reduce) { .nexora-game-login-scene { animation:none; } }

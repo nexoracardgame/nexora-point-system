@@ -3698,11 +3698,11 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
             <button className="nexora-command-primary" aria-label="สร้างสนามประลอง" onClick={() => void createRoom()} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้าง</button>
           </> : panel === "join" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : "PENTAD 5 ใบ"}</button>)}</div>
-            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/battle/pentad-dominion?room=${joinCode}`); else onEnter(joinCode); } }}>
+            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/game/pentad?room=${joinCode}`); else onEnter(joinCode); } }}>
               <label>หมายเลขห้อง<input value={joinCode} onChange={event => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} maxLength={6} inputMode="numeric" placeholder="000000" /></label>
               <button className="nexora-command-primary" disabled={joinCode.length !== 6 || joiningRoomCode === joinCode}>{joiningRoomCode === joinCode && joinCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}เข้าห้อง</button>
             </form>
-            <div className="nexora-command-room-list">{format === "pentad" ? pentadRooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.host} · {room.phase === "waiting" ? "รอผู้ท้าชิง" : "กำลังต่อสู้"}</small></div><button onClick={() => onNavigate(`/battle/pentad-dominion?room=${room.code}${room.phase === "waiting" ? "" : "&spectate=1"}`)}>{room.phase === "waiting" ? "เข้าห้อง" : "เข้าชม"}</button></article>) : rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : null}</div>
+            <div className="nexora-command-room-list">{format === "pentad" ? pentadRooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.host} · {room.phase === "waiting" ? "รอผู้ท้าชิง" : "กำลังต่อสู้"}</small></div><button onClick={() => onNavigate(`/game/pentad?room=${room.code}${room.phase === "waiting" ? "" : "&spectate=1"}`)}>{room.phase === "waiting" ? "เข้าห้อง" : "เข้าชม"}</button></article>) : rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : null}</div>
           </> : <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />}
           {lobbyMessage ? <div role="status" className="nexora-command-alert">{lobbyMessage}</div> : null}
         </div>
@@ -4557,7 +4557,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const botChangingRef = useRef(false);
   const creatingRoomRef = useRef(false);
   const dismissedRoomCodesRef = useRef(new Set<string>());
-  useEffect(() => { router.prefetch("/battle/pentad-dominion"); }, [router]);
+  useEffect(() => { router.prefetch("/game/pentad"); }, [router]);
   const startingRoomCodeRef = useRef("");
   const roomResponseRevisionRef = useRef(0);
   const [createRoomMode, setCreateRoomMode] = useState<DeckMode>("all");
@@ -5601,7 +5601,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const response=await fetch("/api/pentad-rooms",{method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({action:"create",access,password,deckSource:deckMode === "all" ? "all" : "random",playWithBot:createRoomWithBot})});
       const data=await response.json();
       if (!response.ok || !data.room?.code) { setLobbyMessage(data.error || "สร้างห้องไม่สำเร็จ");return; }
-      router.push(`/battle/pentad-dominion?room=${data.room.code}`);return;
+      router.push(`/game/pentad?room=${data.room.code}`);return;
     }
     const result = await postRoomAction({
       action: "create",

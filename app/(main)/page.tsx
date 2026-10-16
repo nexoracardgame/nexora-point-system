@@ -37,7 +37,7 @@ const homeMenuItems = [
   { href: "/market", label: "ตลาด", icon: ShoppingBag },
   { href: "/box-market", label: "ซอง/กล่องแท้", icon: PackageOpen },
   { href: "/card-bank", label: "ธนาคารการ์ด", icon: Landmark },
-  { href: "/battle", label: "Battle", icon: Swords },
+  { href: "/game", label: "Battle", icon: Swords },
   { href: "/rewards", label: "รางวัล", icon: Trophy },
   { href: "/redeem", label: "คูปอง", icon: Gift },
   { href: "/reward-scan", label: "สแกน", icon: ScanLine },

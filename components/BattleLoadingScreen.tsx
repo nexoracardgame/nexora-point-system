@@ -6,6 +6,7 @@ import { preload } from "react-dom";
 import { LOBBY_ACTION_ART, loadLobbyAssets } from "@/lib/lobby-assets";
 import "./BattleLoadingScreen.css";
 import "./BattleMobileOverlays.css";
+import { isGameRoute } from "@/lib/game-routes";
 
 const DURATION = 3000;
 let until = 0;
@@ -31,7 +32,7 @@ export function useBattleLoadingStage(stage: string) {
 export default function BattleLoadingScreen() {
   preload(LOBBY_ACTION_ART, { as: "image", fetchPriority: "high" });
   const pathname = usePathname();
-  if (pathname.includes("dominion")) {
+  if (isGameRoute(pathname)) {
     for (const name of ["arena", "duelist-gold", "duelist-silver", "plate-gold", "plate-silver", "footer"]) {
       preload(`/images/versus/${name}.png`, { as: "image" });
     }
@@ -65,7 +66,7 @@ export default function BattleLoadingScreen() {
       if (!target || target.hasAttribute("disabled")) return;
       const name = target.getAttribute("aria-label") || target.textContent?.trim() || "";
       const href = target.getAttribute("href");
-      if ((href?.startsWith("/battle") && href !== pathname) || /^(ยืนยันสร้างห้อง|เข้าห้อง|เริ่มเกม|พร้อม|กลับล็อบบี้|กลับหน้า PLAY)$/.test(name)) beginBattleLoading();
+      if ((href && isGameRoute(href.split("?")[0]) && href !== pathname) || /^(ยืนยันสร้างห้อง|เข้าห้อง|เริ่มเกม|พร้อม|กลับล็อบบี้|กลับหน้า PLAY)$/.test(name)) beginBattleLoading();
     };
     document.addEventListener("click", click, true);
     return () => document.removeEventListener("click", click, true);

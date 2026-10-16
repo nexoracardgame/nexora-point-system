@@ -8,13 +8,19 @@ import {
   triadSkillRules,
 } from "@/lib/triad-dominion";
 
-export default async function TriadDominionPage() {
+export default async function TriadDominionPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await getServerSession(authOptions);
   const sessionUser = session?.user;
   const userId = String(sessionUser?.id || "").trim();
 
   if (!userId) {
-    redirect("/login?callbackUrl=/battle/triad-dominion");
+    const query = await searchParams;
+    const params = new URLSearchParams();
+    for (const key of ["room", "spectate"]) {
+      const value = query?.[key];
+      if (typeof value === "string") params.set(key, value);
+    }
+    redirect(`/game/login?callbackUrl=${encodeURIComponent(`/game${params.size ? `?${params}` : ""}`)}`);
   }
 
   const summary = getTriadCatalogSummary();

@@ -1,0 +1,18 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path'),ts=require('typescript');
+const compile=source=>ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+function load(file,imports={}) {const m={exports:{}};vm.runInThisContext(`(function(require,module,exports){${compile(fs.readFileSync(file,'utf8'))}\n})`,{filename:file})(id=>{if(id in imports)return imports[id];throw Error('Unexpected dependency '+id)},m,m.exports);return m.exports;}
+(async()=>{
+ const routes=load('lib/game-routes.ts');for(const route of ['/game','/game/pentad','/battle','/battle/triad-dominion'])assert.ok(routes.isGameRoute(route));for(const route of ['/games','/profile/me','/api/pentad-rooms'])assert.equal(routes.isGameRoute(route),false);
+ const config=(await import(require('node:url').pathToFileURL(path.resolve('next.config.mjs')).href)).default;const redirects=await config.redirects();for(const [from,to]of [['/battle','/game'],['/battle/triad-dominion','/game'],['/battle/pentad-dominion','/game/pentad']])assert.ok(redirects.some(r=>r.source===from&&r.destination===to&&!r.permanent));
+ let session=null;const Triad=()=>null,Pentad=()=>null;
+ const shared={'next-auth':{getServerSession:async()=>session},'next/navigation':{redirect:url=>{throw {redirect:url}}},'@/lib/auth':{authOptions:{}},'react/jsx-runtime':{jsx:(type,props)=>({type,props})}};
+ const triad=load('app/(main)/battle/triad-dominion/page.tsx',{...shared,'./TriadDominionClient':{default:Triad},'@/lib/triad-dominion':{getTriadCatalogSummary:()=>({}),triadCards:[],triadSkillRules:[]}}).default;
+ const pentad=load('app/(main)/battle/pentad-dominion/page.tsx',{...shared,'./PentadDominionClient':{default:Pentad}}).default;
+ for(const [page,url]of [[triad,'/game'],[pentad,'/game/pentad']]) {try{await page({searchParams:Promise.resolve({room:'123456',spectate:'1'})});assert.fail('Anonymous game must require the existing login')}catch(error){const target=new URL(error.redirect,'https://game.test');assert.equal(target.pathname,'/game/login');assert.equal(target.searchParams.get('callbackUrl'),url+'?room=123456&spectate=1')}}
+ session={user:{id:'same-account',name:'NEXORA PLAYER',image:'/avatar.png',role:'USER'}};assert.equal((await triad({})).props.currentUser.id,'same-account');assert.equal((await pentad({searchParams:Promise.resolve({room:'123456'})})).props.userId,'same-account');
+ const manifest=await load('app/game/manifest.webmanifest/route.ts').GET();const data=await manifest.json();assert.equal(data.start_url,'/game');assert.equal(data.scope,'/game');assert.equal(data.orientation,'landscape');assert.notEqual(data.id,'/');
+ for(const [file,source]of [['app/game/page.tsx','@/app/(main)/battle/triad-dominion/page'],['app/game/pentad/page.tsx','@/app/(main)/battle/pentad-dominion/page']])assert.ok(fs.readFileSync(file,'utf8').includes(source),'Game routes reuse the exact existing engines');
+ const shell=fs.readFileSync('components/GameShell.tsx','utf8');for(const forbidden of ['NotificationBell','LiveFloatingPlayer','MainLayout','wallet','api/blaze-ai'])assert.equal(shell.includes(forbidden),false);
+ for(const file of ['app/(main)/battle/triad-dominion/TriadDominionClient.tsx','app/(main)/battle/pentad-dominion/PentadDominionClient.tsx']){const source=fs.readFileSync(file,'utf8');assert.equal(source.includes('/battle/pentad-dominion?room='),false);assert.ok(source.includes('/api/'))}
+ console.log('Game platform: isolated shell, same auth/user IDs, room/spectator login callbacks, shared engines/APIs, legacy redirects and separate landscape PWA passed');
+})().catch(error=>{console.error(error);process.exitCode=1});

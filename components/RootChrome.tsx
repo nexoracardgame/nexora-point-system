@@ -1,15 +1,15 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import FirstOpenSplash from "@/components/FirstOpenSplash";
+import dynamic from "next/dynamic";
 import BattleLoadingScreen from "@/components/BattleLoadingScreen";
 import BattleUiAudio from "@/components/BattleUiAudio";
 import BattleMenuMusic from "@/components/BattleMenuMusic";
-import GlobalActivityBar from "@/components/GlobalActivityBar";
-import InstantNavigationFeedback from "@/components/InstantNavigationFeedback";
 import NexoraDialogProvider from "@/components/NexoraDialogProvider";
-import PageTransition from "@/components/PageTransition";
 import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
+import { isGameRoute } from "@/lib/game-routes";
+
+const SiteRootChrome = dynamic(() => import("@/components/SiteRootChrome"));
 
 export default function RootChrome({
   children,
@@ -19,7 +19,7 @@ export default function RootChrome({
   const pathname = usePathname() || "";
   const isEmbedRoute =
     pathname.startsWith("/blaze-embed") || pathname.startsWith("/market-embed");
-  const isBattleRoute = pathname.startsWith("/battle");
+  const isBattleRoute = isGameRoute(pathname);
 
   if (isEmbedRoute) {
     return children;
@@ -42,12 +42,7 @@ export default function RootChrome({
     <>
       <NexoraDialogProvider />
       <PushNotificationBootstrap />
-      <FirstOpenSplash />
-      <GlobalActivityBar />
-      <InstantNavigationFeedback />
-      <PageTransition>
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-      </PageTransition>
+      <SiteRootChrome>{children}</SiteRootChrome>
     </>
   );
 }

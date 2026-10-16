@@ -1066,7 +1066,7 @@ export default function MainLayout({
   };
 
   const prepareBattleViewport = (href: string) => {
-    if (href !== "/battle" && href !== "/battle/triad-dominion") return;
+    if (href !== "/game" && href !== "/battle" && href !== "/battle/triad-dominion") return;
     void requestGameViewport();
   };
 
@@ -1207,7 +1207,7 @@ export default function MainLayout({
     const importantRoutes = [
       "/",
       "/market",
-      "/battle",
+      "/game",
       "/battle/triad-dominion",
       "/box-market",
       "/card-bank",
@@ -1392,7 +1392,7 @@ export default function MainLayout({
         active: pathname.startsWith("/card-bank"),
       },
       {
-        href: "/battle",
+        href: "/game",
         label: "Battle Card",
         icon: Swords,
         active: pathname.startsWith("/battle"),
@@ -1465,7 +1465,7 @@ export default function MainLayout({
         active: pathname.startsWith("/community"),
       },
       {
-        href: "/battle",
+        href: "/game",
         label: "Battle",
         icon: Swords,
         active: pathname.startsWith("/battle"),
