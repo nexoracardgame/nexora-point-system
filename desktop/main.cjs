@@ -118,7 +118,7 @@ function createWindow() {
     height: 820,
     minWidth: 1024,
     minHeight: 680,
-    ...(GAME_ONLY ? {minWidth:800,minHeight:450,fullscreen:true} : {}),
+    ...(GAME_ONLY ? {minWidth:800,minHeight:450,frame:false,fullscreen:false} : {}),
     title: APP_NAME,
     backgroundColor: "#050507",
     ...(windowIconPath ? { icon: windowIconPath } : {}),
@@ -135,6 +135,7 @@ function createWindow() {
   mainWindow.once("ready-to-show", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.setTitle(APP_NAME);
+    if (GAME_ONLY) mainWindow.maximize();
     mainWindow.show();
   });
 
@@ -231,6 +232,15 @@ function configureAutoUpdates() {
 }
 
 function registerIpcHandlers() {
+  ipcMain.handle('nexora:window-control',(event,action)=>{
+    if(!GAME_ONLY||!mainWindow||mainWindow.isDestroyed()||event.sender!==mainWindow.webContents)return false;
+    try{if(new URL(event.senderFrame?.url||'').origin!==new URL(resolveAppUrl()).origin)return false}catch{return false}
+    if(action==='minimize')mainWindow.minimize();
+    else if(action==='resize'){if(mainWindow.isFullScreen())mainWindow.setFullScreen(false);else if(mainWindow.isMaximized())mainWindow.unmaximize();else mainWindow.maximize();}
+    else if(action==='close')mainWindow.close();
+    else return false;
+    return true;
+  });
   ipcMain.handle('nexora:game-login', async (event, provider) => {
     if (!GAME_ONLY || !['line','google'].includes(provider) || event.senderFrame?.url && new URL(event.senderFrame.url).origin !== new URL(resolveAppUrl()).origin) return false;
     const url = new URL('/api/auth/native/start',resolveAppUrl());

@@ -4,6 +4,8 @@ let test=fs.readFileSync('scripts/test-triad-command-ui.cjs','utf8');
 const modules=`
 modules['game-shell']=transpile(fs.readFileSync('components/GameShell.tsx','utf8'));
 modules['./BattleHud.css']='';modules['./GameShell.css']='';
+modules['./GamePatchGate']='exports.__esModule=true;exports.default=({children})=>children;';
+modules['./GameWindowControls']='exports.__esModule=true;exports.default=()=>null;';
 modules['next/dynamic']='exports.__esModule=true;exports.default=()=>()=>null;';
 modules['next/navigation']='exports.usePathname=()=>"/game";';
 modules['@/lib/battle-ui-state']='exports.useBattleArenaActive=()=>false;';

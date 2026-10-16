@@ -16,5 +16,8 @@ const release=(version,resources)=>({version,resources,totalBytes:resources.redu
  const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');assert.equal((await pointer.json()).version,'two','Failed patch must not replace active release');
  await assert.rejects(installGameResources(release('invalid',[{...a,url:'/api/private'}]),()=>{}));
  const controller=new AbortController();controller.abort();await assert.rejects(installGameResources(release('aborted',[a]),()=>{},controller.signal));
+ let inFlight=0,peak=0;const files=Array.from({length:9},(_,i)=>resource('/images/concurrent-'+i+'.bin','parallel'));
+ global.fetch=async()=>{inFlight++;peak=Math.max(peak,inFlight);await new Promise(resolve=>setTimeout(resolve,20));inFlight--;return new Response('parallel')};
+ const concurrentProgress=[];await installGameResources(release('parallel',files),p=>concurrentProgress.push(p));assert.equal(peak,4);assert.equal(concurrentProgress.at(-1).completed,9);assert.equal(concurrentProgress.at(-1).downloaded,72);
  console.log('Game patcher passed: real bytes/hash, cache reuse, corrupt rejection, atomic release, path validation, cancellation');
 })().catch(error=>{console.error(error);process.exitCode=1});
