@@ -27,3 +27,27 @@ html[data-game-window-controls=desktop] .gpp-header { padding-right:190px; }
 @media (max-width:620px) and (orientation:portrait) { .gpp-header { padding-top:50px; height:108px; gap:12px; }.gpp-header>span { display:none; }.gpp-layout { display:flex; flex-direction:column-reverse; }.gpp-hero { min-height:360px; height:360px; flex:none; }.gpp-hero-art { object-position:50% 20%; }.gpp-hero-caption { left:15px; right:15px; bottom:0; padding:14px; }.gpp-details { padding:26px 22px; }.gpp-identity h1 { font-size:24px; }.gpp-frame-options { gap:6px; }.gpp-frame-sample { width:70px; height:70px; }.gpp-avatar-options { grid-template-columns:repeat(3,minmax(0,1fr)); }.gpp-dialog { max-height:calc(100dvh - 75px); }.gpp-hero-options img { height:180px; } }
 @media (prefers-reduced-motion:reduce) { .gpp-hero-art { animation:none; } }
 @media (max-width:620px) and (orientation:portrait) { html[data-game-window-controls=desktop] .gpp-header { padding-right:20px; } }
+.game-player-profile { display:flex;flex-direction:column;overflow:hidden;container-type:size;box-sizing:border-box; }
+.game-player-profile * { box-sizing:border-box; }
+.gpp-header { flex:none; }
+.gpp-layout { flex:1;min-height:0;height:0;width:100%;grid-template-columns:minmax(0,46%) minmax(0,1fr);overflow:hidden; }
+.gpp-details { min-height:0;padding:16px 24px;display:flex;flex-direction:column; }
+.gpp-hero { min-height:0;height:100%; }
+.gpp-customize { margin:8px 0;flex:none; }
+.gpp-tabs { flex:none; }
+.gpp-current-rank { padding:12px 0;gap:12px; }
+.gpp-stats { margin:12px 0 6px;gap:12px; }
+.gpp-id { margin-top:auto;padding-top:6px;font-size:9px; }
+.gpp-hero-caption { bottom:12px;padding:12px; }
+.gpp-framed-identity { position:relative;width:100%;aspect-ratio:3.3;flex:none;filter:drop-shadow(0 0 5px #e7c16e22); }
+.gpp-framed-avatar { position:absolute;left:0;top:0;width:28%;height:100%;padding:0;border:0;background:none; }
+.gpp-framed-photo { position:absolute;left:20%;top:22%;width:62%;height:56%;object-fit:cover;border-radius:50%; }
+.gpp-framed-ring { position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none; }
+.gpp-framed-name { position:absolute;left:29%;top:0;width:71%;height:62%; }
+.gpp-framed-name>img,.gpp-framed-rank>img,.gpp-framed-badge>img { width:100%;height:100%;object-fit:fill;pointer-events:none; }
+.gpp-framed-name h1 { position:absolute;left:15%;right:19%;top:34%;height:25%;margin:0;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.gpp-framed-badge { position:absolute;left:28%;top:60%;width:13%;height:40%; }.gpp-framed-badge>svg { position:absolute;left:31%;top:29%;width:36%;height:40%;color:#d6b375; }
+.gpp-framed-rank { position:absolute;left:42%;top:67%;width:45%;height:29%; }.gpp-framed-rank>span { position:absolute;inset:0;display:grid;place-items:center;font-size:13px;color:#e8cc8c; }
+@container (max-height:700px) { .gpp-details { padding:10px 16px; }.gpp-current-rank { padding:8px 0; }.gpp-current-rank h2 { font-size:20px; }.gpp-stats { grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:8px 0; }.gpp-stats div { padding-left:6px; }.gpp-stats dd { font-size:22px; }.gpp-customize button { padding:6px 10px; }.gpp-tabs button { padding:7px 2px; }.gpp-hero-caption h2 { font-size:16px; }.gpp-note { margin:4px 0; } }
+@container (max-height:400px) { .gpp-header { height:48px;min-height:48px!important; }.gpp-layout { grid-template-columns:minmax(0,52%) minmax(0,1fr); }.gpp-details { padding:4px 12px; }.gpp-framed-identity { max-width:290px; }.gpp-framed-name h1 { font-size:11px; }.gpp-framed-rank>span { font-size:10px; }.gpp-customize { margin:3px 0;gap:6px; }.gpp-customize button { padding:3px 7px;font-size:10px!important; }.gpp-customize svg { width:12px;height:12px; }.gpp-tabs button { padding:4px 2px;font-size:11px; }.gpp-current-rank { padding:4px 0;gap:8px; }.gpp-current-rank>svg { width:24px;height:24px; }.gpp-current-rank h2 { font-size:15px;margin:2px 0; }.gpp-current-rank small,.gpp-current-rank p { font-size:9px; }.gpp-stats { margin:4px 0; }.gpp-stats dd { font-size:17px;margin:2px 0; }.gpp-stats dt { font-size:9px; }.gpp-note { display:none; }.gpp-id { padding-top:3px;font-size:8px; }.gpp-id span { display:inline;margin-left:5px; }.gpp-hero-caption { left:6px;right:6px;bottom:6px;padding:6px;gap:5px; }.gpp-hero-caption button { font-size:10px!important;padding:5px; }.gpp-hero-caption h2 { font-size:13px; }.gpp-hero-caption small { font-size:9px; } }
+@media (max-width:620px) and (orientation:portrait) { .gpp-layout { display:grid;flex-direction:initial;grid-template-columns:minmax(0,52%) minmax(0,1fr); }.gpp-hero { min-height:0;height:100%; }.gpp-details { padding:4px 12px; }.gpp-header { padding-top:4px;height:48px; } }
