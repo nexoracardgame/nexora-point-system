@@ -15,16 +15,20 @@ modules['@/components/OnlinePresenceProvider']='exports.OnlinePresenceProvider=(
 modules['room-actions']=transpile(fs.readFileSync('components/BattleRoomActions.tsx','utf8'));modules['./BattleRoomActions.css']='';
 `;
 test=test.replace('const bundle=',modules+'\nconst bundle=')
+ .replace('[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]',process.env.SMALL_ONLY==='1'?'[[320,568]]':'[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]')
  .replace("await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});",`await page.locator('.nexora-command-nav .nexora-menu-logout').waitFor();
  const logout=page.locator('.nexora-menu-logout');const logoutBox=await logout.boundingBox();assert.ok(logoutBox&&logoutBox.x>=0&&logoutBox.y>=0&&logoutBox.x+logoutBox.width<=width+1&&logoutBox.y+logoutBox.height<=height+1,'Logout fits '+width);
- assert.equal(await logout.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true,'Logout is not covered '+width);
+ assert.equal(await logout.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true,'Logout is not covered '+width+' '+JSON.stringify(await logout.evaluate(el=>{const r=el.getBoundingClientRect(),p=el.parentElement;return {rect:r.toJSON(),parent:p.getBoundingClientRect().toJSON(),max:getComputedStyle(p).maxHeight,hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML.slice(0,200)}})));
  assert.equal(await page.locator('.nexora-window-controls [aria-label="ออกจากระบบ"]').count(),0);
  const beforeMenu=page.url();await page.getByRole('button',{name:'การ์ดของฉัน',exact:true}).click();await page.getByRole('status').filter({hasText:'การ์ดของฉัน · ยังไม่เปิดให้บริการ'}).waitFor();assert.equal(page.url(),beforeMenu);
  await page.getByRole('button',{name:'เพื่อน',exact:true}).click();await page.getByRole('status').filter({hasText:'เพื่อน · ยังไม่เปิดให้บริการ'}).waitFor();assert.equal(page.url(),beforeMenu);
- await page.getByRole('button',{name:'หน้าหลักเกม',exact:true}).click();assert.equal(page.url(),beforeMenu);assert.equal(await page.getByRole('button',{name:'เว็บหลัก',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'หน้าหลักเกม',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'อันดับนักดวล',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'เว็บหลัก',exact:true}).count(),0);
+ for(const button of await page.locator('.nexora-command-nav > button').all()){await button.hover();await page.waitForTimeout(160);assert.equal(await button.evaluate(el=>getComputedStyle(el).transform),'none','Menu hover stays in place');}
+ const menuMetrics=await page.locator('.nexora-command-nav').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,bar:getComputedStyle(el).scrollbarWidth}));assert.ok(menuMetrics.scroll<=menuMetrics.width,'No horizontal overflow');assert.equal(menuMetrics.bar,'none','No visible scrollbar');
  await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});`)
  .replace('modules.test=transpile(`','modules.test=transpile(`import BattleRoomActions from "room-actions";')
- .replace("const css=fs.readFileSync(","const css=fs.readFileSync('components/GameWindowControls.css','utf8')+'\\n'+fs.readFileSync('components/GameShell.css','utf8')+'\\n'+fs.readFileSync(")
+ .replace("const css=fs.readFileSync(","const css=fs.readFileSync('components/GameShell.css','utf8')+'\\n'+fs.readFileSync(")
+ .replace("fs.readFileSync('components/LobbyBanner.css','utf8');","fs.readFileSync('components/LobbyBanner.css','utf8')+'\\n'+fs.readFileSync('components/GameWindowControls.css','utf8');")
  .replace('id="root" class="nexora-battle-shell"','id="root"')
  .replace('root.render(React.createElement(React.Fragment,null,','root.render(React.createElement(require(\'game-shell\').default,null,')
  .replaceAll("root.render(React.createElement(require('test').TestDeck))","root.render(React.createElement(require('game-shell').default,null,React.createElement(require('test').TestDeck)))")

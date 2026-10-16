@@ -9,5 +9,10 @@ html[data-game-window-controls=desktop] .nexora-game-platform [data-room-actions
 .nexora-command-nav .nexora-menu-logout { color:#f4dfb0; border-left-color:#d7b47088; }
 .nexora-command-nav .nexora-menu-logout:disabled { opacity:.5; cursor:wait; }
 .nexora-game-menu-pending { display:block; padding:6px 10px; color:#e3cd9f; background:#06090dbb; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
-.nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 250px); overflow-y:auto; scrollbar-width:thin; }
-@media (max-height:600px),(max-width:1000px) and (orientation:portrait) { .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 155px); } }
+.nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 250px); padding-right:6px; overflow-x:hidden; overflow-y:auto; scrollbar-width:none; }
+.nexora-command-nav:has(.nexora-menu-logout)::-webkit-scrollbar { display:none; width:0; height:0; }
+.nexora-command-nav:has(.nexora-menu-logout) > button { min-width:0; max-width:100%; }
+.nexora-command-nav:has(.nexora-menu-logout) > button:hover,.nexora-command-nav:has(.nexora-menu-logout) > button[aria-pressed=true] { transform:none; }
+@media (max-height:600px),(max-width:1000px) and (orientation:portrait) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 155px); } }
+@container (max-height:340px) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 110px); } }
+@container (max-height:240px) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 70px); } }
