@@ -13,3 +13,10 @@ for(const [name,labels]of [['social',['google','line','facebook','discord','appl
  }
 }
 console.log('Game login artwork and individual social/navigation sprites generated');
+if(process.argv.includes('--new-form')){
+ await copyFile('C:/Users/USER/Downloads/c9f4fd8a-9eb3-4976-ba9a-c0fa59002b0b.png',`${destination}/form-source.png`);
+ await copyFile('C:/Users/USER/Downloads/d0e4c328-ee0c-4858-8108-5efb49fec58b.png',`${destination}/plain-social-source.png`);
+ await sharp(`${destination}/form-source.png`).webp({quality:96,alphaQuality:100}).toFile(`${destination}/form.webp`);
+ const edges=[0,435,950,1280,1776],labels=['google','line','facebook','discord'];
+ for(const [index,label]of labels.entries())await sharp(`${destination}/plain-social-source.png`).extract({left:edges[index],top:60,width:edges[index+1]-edges[index],height:510}).resize({height:150}).webp({quality:96,alphaQuality:100}).toFile(`${destination}/plain-${label}.webp`);
+}

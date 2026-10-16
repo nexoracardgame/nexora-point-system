@@ -4,6 +4,7 @@ const base=process.env.GAME_TEST_URL||'http://localhost:3013';
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{
  for(const [width,height]of [[1920,1080],[844,390],[390,844],[320,568]]){
   const page=await browser.newPage({viewport:{width,height}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/videos/nexora-login-4k/**',route=>route.abort());
   await page.addInitScript(()=>{window.__anonymousLoadingSeen=false;new MutationObserver(()=>{if(document.querySelector('.nexora-game-loading,.nexora-game-patch'))window.__anonymousLoadingSeen=true}).observe(document,{childList:true,subtree:true})});
   await page.goto(base+'/game?room=123456&spectate=1');await page.waitForURL('**/game/login?**');
   assert.equal(new URL(page.url()).searchParams.get('callbackUrl'),'/game?room=123456&spectate=1');

@@ -134,7 +134,7 @@ export default function LoginClient({
   const { status } = useSession();
   const loginInFlightRef = useRef(false);
   const [pendingProvider, setPendingProvider] = useState<
-    "line" | "google" | "session" | null
+    "line" | "google" | "session" | "credentials" | null
   >(null);
   const [loginError, setLoginError] = useState("");
   const BG_IMAGE =
@@ -201,6 +201,19 @@ export default function LoginClient({
   const handleLineLogin = () => startLogin("line");
 
   const handleGoogleLogin = () => startLogin("google");
+  const startCredentials = async (username:string,password:string,confirmPassword?:string) => {
+    if(loginInFlightRef.current||isRedirecting)return;
+    loginInFlightRef.current=true;setPendingProvider('credentials');setLoginError('');
+    try{
+      if(confirmPassword!==undefined){
+        const response=await fetch('/api/game-account/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,confirmPassword})});
+        const result=await response.json();if(!response.ok)throw Error(result.error||'สมัครสมาชิกไม่สำเร็จ');
+      }
+      const result=await signIn('credentials',{username,password,redirect:false,callbackUrl});
+      if(!result?.ok||result.error)throw Error('Username หรือ Password ไม่ถูกต้อง หรือทดลองเข้าสู่ระบบเกินกำหนด');
+      window.location.assign(callbackUrl);
+    }catch(error){setLoginError(error instanceof Error?error.message:'เข้าสู่ระบบไม่สำเร็จ');setPendingProvider(null);loginInFlightRef.current=false;}
+  };
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -277,7 +290,7 @@ export default function LoginClient({
     void warmLineClient();
   }, []);
 
-  if (game) return <GameLoginView busy={isRedirecting} checking={sessionChecking} error={loginError||authErrorMessage} onLogin={provider=>void startLogin(provider)}/>;
+  if (game) return <GameLoginView busy={isRedirecting} checking={sessionChecking} error={loginError||authErrorMessage} onLogin={provider=>void startLogin(provider)} onCredentials={startCredentials}/>;
 
   return (
     <main

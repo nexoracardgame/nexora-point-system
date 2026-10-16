@@ -1,8 +1,8 @@
-version: 1.0.2
+version: 1.0.3
 files:
-  - url: NEXORA-CARD-GAME-Setup-1.0.2.exe
-    sha512: PgoViksBN04WLlGcDFXEng5kTR/RwfYvMgVPr1LbfcIdP/jePnJxl/cs942b4y46PzTjEHxyNsgIjzK1lNrmXw==
-    size: 100345582
-path: NEXORA-CARD-GAME-Setup-1.0.2.exe
-sha512: PgoViksBN04WLlGcDFXEng5kTR/RwfYvMgVPr1LbfcIdP/jePnJxl/cs942b4y46PzTjEHxyNsgIjzK1lNrmXw==
-releaseDate: '2026-10-16T06:57:48.563Z'
+  - url: NEXORA-CARD-GAME-Setup-1.0.3.exe
+    sha512: QxB+as/PB/JqASaz2cskZj/X9PtS3IVb3AsTtywfjkNUbn8AWiqxZ7dnXQMrejM7tDRkrJgQvVGg/hjRgV7w/g==
+    size: 100719973
+path: NEXORA-CARD-GAME-Setup-1.0.3.exe
+sha512: QxB+as/PB/JqASaz2cskZj/X9PtS3IVb3AsTtywfjkNUbn8AWiqxZ7dnXQMrejM7tDRkrJgQvVGg/hjRgV7w/g==
+releaseDate: '2026-10-16T07:54:46.347Z'

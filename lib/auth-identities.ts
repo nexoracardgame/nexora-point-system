@@ -45,7 +45,7 @@ export function getProviderIdentity(
 export function inferLegacyProviderFromLineId(lineId?: string | null) {
   const safeLineId = String(lineId || "").trim();
 
-  if (!safeLineId) {
+  if (!safeLineId || safeLineId.startsWith('credentials:')) {
     return null;
   }
 
@@ -249,6 +249,9 @@ export async function mergeUserAccounts(primaryUserId: string, secondaryUserId: 
     return primaryUser || null;
   }
 
+  const {ensureGameCredentialsSchema}=await import('./game-credentials');
+  await ensureGameCredentialsSchema();
+
   const secondaryAliases = uniqueStrings([secondaryUser.id, secondaryUser.lineId]);
 
   const updatedUser = await prisma.$transaction(async (tx) => {
@@ -312,6 +315,7 @@ export async function mergeUserAccounts(primaryUserId: string, secondaryUserId: 
       where: { userId: secondaryUser.id },
       data: { userId: primaryUser.id },
     });
+    await tx.$executeRawUnsafe('UPDATE "GameCredential" SET "userId"=$1 WHERE "userId"=$2',primaryUser.id,secondaryUser.id);
 
     const updatedPrimaryUser = await tx.user.update({
       where: { id: primaryUser.id },

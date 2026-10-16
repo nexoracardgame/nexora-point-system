@@ -33,9 +33,26 @@ model User {
   sellerReviews  SellerReview[]  @relation("SellerReviews")
   buyerReviews   SellerReview[]  @relation("BuyerReviews")
   authIdentities AuthIdentity[]
+  gameCredentials GameCredential[]
 
   dealRequestsSent     DealRequest[] @relation("DealBuyer")
   dealRequestsReceived DealRequest[] @relation("DealSeller")
+}
+
+model GameCredential {
+  username String @id
+  userId String
+  passwordHash String
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  @@index([userId])
+}
+
+model GameAuthAttempt {
+  key String @id
+  count Int
+  expiresAt DateTime
+  @@index([expiresAt])
 }
 
 model AuthIdentity {

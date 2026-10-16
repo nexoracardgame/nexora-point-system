@@ -2,6 +2,8 @@ import { NextAuthOptions } from "next-auth";
 import { cookies } from "next/headers";
 import GoogleProvider from "next-auth/providers/google";
 import LineProvider from "next-auth/providers/line";
+import CredentialsProvider from 'next-auth/providers/credentials';
+import {authenticateGameCredential,gameAuthAddress} from './game-credentials';
 import { JWT } from "next-auth/jwt";
 import { getLocalProfileByUserId } from "@/lib/local-profile-store";
 import { prisma } from "@/lib/prisma";
@@ -43,7 +45,7 @@ type SessionUpdatePayload = {
 type AppToken = JWT & {
   id?: string;
   lineId?: string;
-  authProvider?: AuthProvider;
+  authProvider?: AuthProvider | 'credentials';
   role?: string;
   nexPoint?: number;
   coin?: number;
@@ -542,6 +544,9 @@ async function ensureDbUser(
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    CredentialsProvider({name:'NEXORA',credentials:{username:{label:'Username',type:'text'},password:{label:'Password',type:'password'}},async authorize(credentials,request){
+      try{return await authenticateGameCredential(credentials?.username,credentials?.password,gameAuthAddress(request.headers||{}))}catch{return null}
+    }}),
     LineProvider({
       clientId: process.env.LINE_CLIENT_ID!,
       clientSecret: process.env.LINE_CLIENT_SECRET!,
@@ -568,7 +573,8 @@ export const authOptions: NextAuthOptions = {
       return resolveAuthRedirectUrl(url, baseUrl);
     },
 
-    async signIn({ account, profile }) {
+    async signIn({ account, profile, user }) {
+      if(account?.provider==='credentials')return Boolean(user?.id);
       const provider = getAuthProvider(account?.provider);
       const oauthProfile = (profile || {}) as OAuthProfile;
       const providerSubject = getProviderSubject(
@@ -582,8 +588,17 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    async jwt({ token, account, profile, trigger, session }) {
+    async jwt({ token, account, profile, trigger, session, user }) {
       const appToken = token as AppToken;
+      if(account?.provider==='credentials'||(!account&&appToken.authProvider==='credentials')){
+        const initial=account?.provider==='credentials';
+        const current=await findDbUserById(initial?user?.id:appToken.id);
+        if(!current)return markTokenRevoked(appToken);
+        const snapshot=toDbUserSnapshot(current);
+        if(!initial&&isTokenSessionRevoked(appToken,snapshot))return markTokenRevoked(appToken);
+        if(initial){appToken.sessionIssuedAt=Date.now();appToken.authProvider='credentials';}
+        return hydrateTokenFromDbUser(appToken,snapshot);
+      }
 
       if (trigger === "update") {
         const updatePayload = (session || {}) as SessionUpdatePayload;

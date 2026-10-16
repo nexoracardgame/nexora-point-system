@@ -7,7 +7,7 @@ declare module "next-auth" {
       id: string;
       role: string;
       lineId: string;
-      authProvider?: "line" | "google";
+      authProvider?: "line" | "google" | "credentials";
       sessionRevoked?: boolean;
       nexPoint?: number;
       coin?: number;
@@ -21,7 +21,7 @@ declare module "next-auth" {
     id: string;
     role: string;
     lineId: string;
-    authProvider?: "line" | "google";
+    authProvider?: "line" | "google" | "credentials";
     sessionRevoked?: boolean;
     nexPoint?: number;
     coin?: number;
@@ -33,7 +33,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: string;
     lineId: string;
-    authProvider?: "line" | "google";
+    authProvider?: "line" | "google" | "credentials";
     sessionRevoked?: boolean;
     sessionVersion?: number;
     sessionIssuedAt?: number;
