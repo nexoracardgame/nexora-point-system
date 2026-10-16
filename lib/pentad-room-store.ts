@@ -327,7 +327,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     }
     room.spectators = room.spectators.filter(p => p.id !== actor.id); return;
   }
-  if (action === "bot") { requirePhase("waiting"); if (requireSeat() !== "host" || room.seats.challenger) throw new Error("เพิ่มบอทไม่ได้"); room.seats.challenger = { id: PENTAD_BOT_ID, name: "BOT Level.99", image: "/avatar.png" }; return; }
+  if (action === "bot") { requirePhase("waiting"); if (requireSeat() !== "host" || (room.seats.challenger && room.seats.challenger.id !== PENTAD_BOT_ID)) throw new Error("เพิ่มบอทไม่ได้"); room.seats.challenger = room.seats.challenger ? null : { id: PENTAD_BOT_ID, name: "BOT Level.99", image: "/avatar.png" }; return; }
   if (action === "start") {
     requirePhase("waiting"); if (requireSeat() !== "host" || !room.seats.challenger) throw new Error("รอผู้ท้าชิงก่อน");
     room.phase = "deck"; room.deadline = now + PENTAD_DECK_MS; room.epoch++;

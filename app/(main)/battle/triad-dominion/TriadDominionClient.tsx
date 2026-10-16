@@ -4,6 +4,7 @@ import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrend
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
+import BattleRoomActions from "@/components/BattleRoomActions";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
 import TargetSelectionModal from "@/components/TargetSelectionModal";
@@ -7560,39 +7561,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                 เจ้าของห้องเป็นคนกดเริ่มเกม คนที่เข้ามาหลังเกมเริ่มจะถูกนั่งเป็นผู้ชมอัตโนมัติ
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span data-game-audio-slot />
-              <button
-                type="button"
-                onClick={leaveRoom}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/14 bg-black/45 px-4 text-xs font-black uppercase tracking-[0.12em] text-white/78 transition hover:border-white/30 hover:bg-black/55"
-              >
-                ออกห้อง
-              </button>
-              <button
-                type="button"
-                onClick={toggleBotOpponent}
-                disabled={botChanging || !isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)}
-                aria-busy={botChanging}
-                className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/8 disabled:text-white/28 ${
-                  hasBotOpponent
-                    ? "border-cyan-100/55 bg-cyan-200 text-black shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:bg-cyan-100"
-                    : "border-cyan-200/28 bg-cyan-300/10 text-cyan-50 hover:border-cyan-100/60 hover:bg-cyan-300/16"
-                }`}
-              >
-                {botChanging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                {botChanging ? "กำลังอัปเดต" : hasBotOpponent ? "เอาบอทออก" : "สู้กับบอท"}
-              </button>
-              <button
-                type="button"
-                onClick={startRoomGame}
-                disabled={!canStart}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 px-5 text-xs font-black uppercase tracking-[0.12em] text-black shadow-[0_0_32px_rgba(251,191,36,0.26)] transition hover:from-amber-200 hover:to-yellow-100 disabled:cursor-not-allowed disabled:bg-white/12 disabled:text-black/35"
-              >
-                <Swords className="h-4 w-4" />
-                เริ่มเกม
-              </button>
-            </div>
+            <BattleRoomActions onExit={()=>void leaveRoom()} onBot={()=>void toggleBotOpponent()} onStart={()=>void startRoomGame()} botBusy={botChanging} hasBot={hasBotOpponent} botDisabled={!isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)} startDisabled={!canStart} />
           </div>
         </section>
 

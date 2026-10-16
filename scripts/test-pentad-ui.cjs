@@ -13,6 +13,8 @@ modules['@/components/BattleForfeitVictory']=transpile(fs.readFileSync('componen
 modules['@/components/BattleMatchResult']=modules['./BattleMatchResult']=transpile(fs.readFileSync('components/BattleMatchResult.tsx','utf8'));
 modules['./BattleMatchResult.css']='';
 modules['@/components/BattleVersusIntro']='exports.__esModule=true;exports.default=()=>null;';
+modules['@/components/BattleRoomActions']=transpile(fs.readFileSync('components/BattleRoomActions.tsx','utf8'));
+modules['./BattleRoomActions.css']='';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
 modules['./BattleSurrenderDialog.css']='';
 modules['next/link']=`const React=require('react');exports.default=({href,children,...props})=>React.createElement('a',{href,...props},children);exports.__esModule=true;`;
@@ -31,7 +33,7 @@ modules['@/public/cards/card-skill-db.json']='module.exports='+JSON.stringify(re
 for(const [id,file] of [ ['@/lib/triad-dominion','lib/triad-dominion.ts'],['@/lib/pentad-dominion','lib/pentad-dominion.ts'],['@/lib/triad-arena','lib/triad-arena.ts'],['./BattleTiming','app/(main)/battle/triad-dominion/BattleTiming.ts'],['./BattleParticles','app/(main)/battle/triad-dominion/BattleParticles.tsx'],['../triad-dominion/BattleCinematic','app/(main)/battle/triad-dominion/BattleCinematic.tsx'],['client','app/(main)/battle/pentad-dominion/PentadDominionClient.tsx']])modules[id]=transpile(fs.readFileSync(id==='../triad-dominion/BattleCinematic'&&process.env.PENTAD_CINEMATIC_SOURCE?process.env.PENTAD_CINEMATIC_SOURCE:file,'utf8'),file);
 modules['./triad-dominion']=modules['@/lib/triad-dominion'];
 modules['./PentadCardPreview']=transpile(fs.readFileSync('app/(main)/battle/pentad-dominion/PentadCardPreview.tsx','utf8'));
-let css='';
+let css=fs.readFileSync('components/BattleRoomActions.css','utf8');
 for(const [id,file,prefix] of [['./PentadDominion.module.css','app/(main)/battle/pentad-dominion/PentadDominion.module.css','penta_'],['./BattleCinematic.module.css','app/(main)/battle/triad-dominion/BattleCinematic.module.css','cine_']]) {
   css+=fs.readFileSync(file,'utf8').replace(/\.([a-zA-Z_][\w-]*)/g,(_,name)=>'.'+prefix+name)+'\n';
   modules[id]=`exports.__esModule=true;exports.default=new Proxy({},{get:(_,name)=>${JSON.stringify(prefix)}+name});`;
@@ -75,7 +77,13 @@ const inside=(rect,w,h)=>rect&&rect.x>=-1&&rect.y>=-1&&rect.x+rect.width<=w+1&&r
     await page.waitForSelector('[data-pentad-phase="waiting"]');assert.equal(await page.locator('[data-global-chat]').count(),0,'Global chat and Blaze are absent in the room');
     assert.equal(await page.locator('.penta_brand a').count(),0,'Mode heading cannot navigate out of a live room');assert.equal(await page.locator('a.penta_brand').count(),0);
     assert.ok((await page.locator('.penta_shell').getAttribute('style')).includes('nexora-command-original.webp'),'Waiting header and room use only the lobby wallpaper');
-    await page.getByRole('button',{name:'เพิ่มบอท'}).click();await page.getByRole('button',{name:'เริ่มเกม'}).click();await page.waitForSelector('[data-pentad-phase="deck"]');
+    assert.equal(await page.locator('.penta_waiting [data-room-actions]').count(),0,'Room controls are no longer below the players');
+    await page.getByRole('button',{name:'สู้กับบอท',exact:true}).click();await page.getByRole('button',{name:'เอาบอทออก',exact:true}).waitFor();
+    await page.getByRole('button',{name:'เอาบอทออก',exact:true}).click();await page.getByRole('button',{name:'สู้กับบอท',exact:true}).waitFor();
+    await page.getByRole('button',{name:'สู้กับบอท',exact:true}).click();await page.getByRole('button',{name:'เอาบอทออก',exact:true}).waitFor();
+    for(const button of await page.locator('[data-room-actions] button').all())assert.ok(inside(await button.boundingBox(),width,height),'Waiting toolbar fits '+width);
+    await page.screenshot({path:`artifacts/pentad-ui/waiting-${width}x${height}.png`});
+    await page.getByRole('button',{name:'เริ่มเกม'}).click();await page.waitForSelector('[data-pentad-phase="deck"]');
     await page.getByRole('button',{name:'เติมเด็ค'}).click();await page.getByRole('button',{name:'พร้อม',exact:true}).waitFor();
     if(width===1280){await page.getByRole('button',{name:'ล้างเด็ค',exact:true}).click();assert.equal(await page.locator('.penta_chosenCards .penta_card').count(),0);await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();assert.equal(await page.locator('.penta_chosenCards .penta_card').count(),5);}
     await page.getByRole('button',{name:'พร้อม',exact:true}).click();await page.waitForSelector('[data-pentad-phase="select"]');

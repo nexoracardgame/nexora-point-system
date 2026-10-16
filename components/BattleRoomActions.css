@@ -1,0 +1,9 @@
+[data-room-actions] { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; }
+[data-room-actions] button { display:inline-flex; height:44px; align-items:center; justify-content:center; gap:8px; padding:0 16px; border:1px solid #ffffff24; border-radius:12px; background:#0007; color:#ffffffc7; font-size:12px; font-weight:900; white-space:nowrap; cursor:pointer; transition:background .18s,border-color .18s; }
+[data-room-actions] button:nth-of-type(2) { border-color:#a5f3fc47; background:#67e8f91a; color:#ecfeff; }
+[data-room-actions] button[aria-pressed=true] { background:#a5f3fc; color:#000; border-color:#cffafe; }
+[data-room-actions] button:nth-of-type(3) { border:0; background:linear-gradient(90deg,#fcd34d,#fef08a,#fbbf24); color:#000; padding-inline:20px; box-shadow:0 0 32px #fbbf2442; }
+[data-room-actions] button:hover:not(:disabled) { border-color:#fff8; filter:brightness(1.12); }
+[data-room-actions] button:disabled { cursor:not-allowed; opacity:.45; }
+[data-room-actions] button svg { width:16px; height:16px; flex:none; }
+@media (max-height:600px),(max-width:900px) and (orientation:portrait) { [data-room-actions] button { height:30px; padding:4px 8px; border-radius:4px; } }
