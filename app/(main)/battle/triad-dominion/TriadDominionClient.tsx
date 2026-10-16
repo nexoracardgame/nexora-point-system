@@ -3250,27 +3250,7 @@ function BattleRoomChatPanel({
 }
 
 function BattleRoomChatHud({ cinematicActive, ...props }: Parameters<typeof BattleRoomChatPanel>[0] & { cinematicActive: boolean }) {
-  const [frame, setFrame] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
-  useLayoutEffect(() => {
-    const board = document.querySelector<HTMLElement>(".nexora-battle-shell .triad-arena-board");
-    const measure = () => {
-      const rotated = window.matchMedia("(max-width:900px) and (orientation:portrait)").matches;
-      const rect = !cinematicActive ? board?.getBoundingClientRect() : null;
-      const next = { left: rect?.left || 0, top: rect?.top || 0, width: rotated ? (rect?.height ?? window.innerHeight) : (rect?.width ?? window.innerWidth), height: rotated ? (rect?.width ?? window.innerWidth) : (rect?.height ?? window.innerHeight) };
-      setFrame((current) => current && Object.keys(next).every((key) => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (board) observer.observe(board);
-    window.addEventListener("resize", measure);
-    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
-  }, [cinematicActive]);
-  if (!frame) return null;
-  return createPortal(
-    <div className="triad-battle-chat-hud-frame" style={frame} data-cinematic-chat={cinematicActive}>
-      <BattleRoomChatPanel {...props} compact />
-    </div>, document.body
-  );
+  return <BattleArenaChatFrame arenaSelector=".nexora-battle-shell .triad-arena-board" cinematicActive={cinematicActive}><BattleRoomChatPanel {...props} compact /></BattleArenaChatFrame>;
 }
 
 const gmRescueCopy: Record<GmRescueAction, { title: string; body: string; button: string; tone: string }> = {

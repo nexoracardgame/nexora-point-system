@@ -1,7 +1,7 @@
 @font-face { font-family:NexoraOrbitron; src:url('/fonts/orbitron/Orbitron.ttf') format('truetype'); font-style:normal; font-weight:400 900; font-display:swap; }
 .nexora-versus-plane { position:fixed; inset:0; z-index:98000; isolation:isolate; container-type:size; overflow:hidden; color:#fff9e8; background:#040609; animation:nexora-versus-scene 5200ms linear both; }
 .nexora-versus-plane * { box-sizing:border-box; letter-spacing:0; }
-.nexora-versus-mute { position:absolute; z-index:5; top:max(16px,env(safe-area-inset-top)); right:max(16px,env(safe-area-inset-right)); width:40px; height:40px; display:grid; place-items:center; background:#070b11bd; border:1px solid #d5bd7b66; border-radius:4px; color:#fff0bf; cursor:pointer; }
+body:has(.nexora-versus-plane) [aria-label="ประวัติการต่อสู้"] { display:none!important; }
 .nexora-versus-background { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.8; animation:nexora-versus-camera 5200ms cubic-bezier(.15,.5,.2,1) both; }
 .nexora-versus-shade { position:absolute; inset:0; background:linear-gradient(0deg,#02040580,transparent 40%,#02040526); }
 .nexora-versus-logo { position:absolute; top:12%; left:50%; transform:translateX(-50%); width:22%; height:22%; object-fit:contain; pointer-events:none; filter:drop-shadow(0 4px 16px #000c); animation:nexora-versus-logo-breathe 4200ms ease-in-out infinite; }

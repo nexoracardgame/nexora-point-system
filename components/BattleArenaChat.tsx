@@ -27,8 +27,7 @@ export function BattleArenaChatFrame({ children, arenaSelector, cinematicActive,
       const cards = rect ? Array.from(board?.querySelectorAll<HTMLElement>("[data-pentad-side] > button") || []) : [];
       const clearWidth = cards.length ? Math.max(80,Math.min(...cards.map(card => { const r=card.getBoundingClientRect(); return rotated ? r.top-rect!.top : r.left-rect!.left; }))-24) : undefined;
       const hand=[...document.querySelectorAll<HTMLElement>('.nexora-arena-hand')].map(el=>el.getBoundingClientRect()).find(r=>r.width>0&&r.height>0);
-      const mobile=window.matchMedia('(max-width:1000px),(hover:none) and (pointer:coarse)').matches;
-      const handInset=mobile&&hand&&rect&&!cinematicActive?Math.max(0,rotated?hand.right-rect.left:rect.bottom-hand.top)+8:0;
+      const handInset=hand&&rect&&!cinematicActive?Math.max(0,rotated?hand.right-rect.left:rect.bottom-hand.top)+8:12;
       const next = { left: rect?.left || 0, top: rect?.top || 0, width: rotated ? rect?.height ?? window.innerHeight : rect?.width ?? window.innerWidth, height: rotated ? rect?.width ?? window.innerWidth : rect?.height ?? window.innerHeight, rotated, clearWidth,handInset };
       setFrame(current => current && Object.keys(next).every(key => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
     };
