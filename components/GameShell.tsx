@@ -11,6 +11,7 @@ import GamePatchGate from './GamePatchGate';
 import GameWindowControls from './GameWindowControls';
 import GameBackButton from './GameBackButton';
 import GameSettings from './GameSettings';
+import GameRoomResume from './GameRoomResume';
 
 const FloatingChatDock = dynamic(() => import("@/components/FloatingChatDock"), { ssr: false });
 
@@ -25,6 +26,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       <GameWindowControls />
       <GameBackButton />
       <GameSettings />
+      <GameRoomResume />
       <GamePatchGate><div className={pathname === "/game/pentad" ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}</div></GamePatchGate>
       {pathname === "/game" && !active && <FloatingChatDock />}
     </div>

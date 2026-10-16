@@ -8,7 +8,7 @@ import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrend
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
-import BattleRoomActions from "@/components/BattleRoomActions";
+import BattleWaitingHeader from "@/components/BattleWaitingHeader";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import TargetSelectionModal from "@/components/TargetSelectionModal";
 import { pentadTargetView } from "@/lib/pentad-target-view";
@@ -162,7 +162,6 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     if (["create", "join", "leave"].includes(action)) loadGeneration.current++;
     if (action === "join") setEntering(true);
     const generation = loadGeneration.current;
-    if (action === "leave" && (!side || current?.phase === "waiting" || current?.phase === "finished")) { try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/game"); }
     try {
       const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, signal:AbortSignal.timeout(12000), body: JSON.stringify({ action, code: current?.code, epoch: current?.epoch, ...extra }) });
       const data = await response.json();
@@ -268,7 +267,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><BattleArenaSurface image={room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image} className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
     <BattleVersusIntro sessionKey={room ? `pentad:${room.code}:${room.createdAt}:${room.deadline && room.phase === "deck" ? room.deadline : "match"}` : ""} enabled={Boolean(room && room.ready.host && room.ready.challenger && room.phase === "select" && room.fight === 1 && room.turn === 1)} left={room?.seats.host || {name:"PLAYER"}} right={room?.seats.challenger || {name:"PLAYER"}} background={arena.image} />
     <BattleForfeitVictory result={room?.forfeit} userId={userId} onExit={() => { void leaveRoom(); }} />
-    {room?.phase === "waiting" && <header className={styles.waitingHeader}><div><strong>{PENTAD_TITLE}</strong><span>ห้อง {room.code}</span></div><BattleRoomActions onExit={()=>void leaveRoom()} onBot={()=>void act("bot")} onStart={()=>void act("start")} botBusy={busy} hasBot={room.seats.challenger?.id === "pentad-bot"} botDisabled={side !== "host" || Boolean(room.seats.challenger && room.seats.challenger.id !== "pentad-bot")} startDisabled={busy || side !== "host" || !room.seats.challenger} /></header>}
+    {room?.phase === "waiting" && <BattleWaitingHeader code={room.code} onExit={()=>void leaveRoom()} onBot={()=>void act("bot")} onStart={()=>void act("start")} botBusy={busy} hasBot={room.seats.challenger?.id === "pentad-bot"} botDisabled={side !== "host" || Boolean(room.seats.challenger && room.seats.challenger.id !== "pentad-bot")} startDisabled={busy || side !== "host" || !room.seats.challenger} />}
     {room && room.phase !== "deck" && room.phase !== "waiting" && <BattleArenaHeader title={PENTAD_TITLE} code={room.code} time={countdown(room.deadline-now)} onExit={leaveRoom} onSurrender={side && room.phase !== "finished" ? async ()=>{if(await confirmBattleSurrender())void act("surrender");} : undefined} />}
     {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={leaveRoom} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}

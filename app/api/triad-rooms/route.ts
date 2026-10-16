@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { getApiActor, requireAdminActor, type ApiActor } from "@/lib/admin-auth";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 import { triadResponseForViewer } from "@/lib/triad-room-privacy";
+import {findActiveGameRoom} from '@/lib/active-game-room';
 import {
   createTriadRoom,
   advanceTriadRoomTurn,
@@ -141,6 +142,10 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const action = cleanText(body.action);
+  if(action==='create'||action==='join'){
+    const active=await findActiveGameRoom(actor.id);
+    if(active&&(action==='create'||active.mode!=='triad'||active.code!==cleanText(body.code)))return noStoreJson({error:'กรุณาออกจากห้องเดิมหรือยอมแพ้ก่อนเข้าห้องใหม่',resume:active},{status:409});
+  }
 
   if (action === "clear-all") {
     const { error } = await requireAdminActor();

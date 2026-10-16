@@ -7,7 +7,7 @@ import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrend
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
-import BattleRoomActions from "@/components/BattleRoomActions";
+import BattleWaitingHeader from "@/components/BattleWaitingHeader";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
@@ -7458,35 +7458,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return (
       <main className="nexora-command nexora-command-room triad-room-screen">
         <NexoraCommandScene /><div className="nexora-command-shade" />
-        <section className="triad-room-hero relative overflow-hidden border-b border-amber-200/12 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="absolute inset-0">
-            <Image
-              src="/images/triad/battle-header-banner.webp"
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-center"
-            />
-          </div>
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.6)_100%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.22)_0%,rgba(0,0,0,0.1)_40%,rgba(0,0,0,0.16)_100%)]" />
-          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/16 bg-black/35 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white/85 backdrop-blur-sm">
-                <KeyRound className="h-3.5 w-3.5" />
-                ห้อง {currentRoom.code}
-              </div>
-              <h1 className="font-mono text-[clamp(2.4rem,9vw,6rem)] font-black leading-none tracking-[0.14em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.75)]">
-                {currentRoom.code}
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-white/78 drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">
-                เจ้าของห้องเป็นคนกดเริ่มเกม คนที่เข้ามาหลังเกมเริ่มจะถูกนั่งเป็นผู้ชมอัตโนมัติ
-              </p>
-            </div>
-            <BattleRoomActions onExit={()=>void leaveRoom()} onBot={()=>void toggleBotOpponent()} onStart={()=>void startRoomGame()} botBusy={botChanging} hasBot={hasBotOpponent} botDisabled={!isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)} startDisabled={!canStart} />
-          </div>
-        </section>
+        <BattleWaitingHeader code={currentRoom.code} onExit={()=>void leaveRoom()} onBot={()=>void toggleBotOpponent()} onStart={()=>void startRoomGame()} botBusy={botChanging} hasBot={hasBotOpponent} botDisabled={!isRoomController || (Boolean(currentRoom.seats.challenger) && !hasBotOpponent)} startDisabled={!canStart} />
 
         <div className="triad-room-notice px-4 pb-2 sm:px-6 xl:px-8">
           <div className="rounded-2xl border border-cyan-200/14 bg-cyan-300/8 px-4 py-3 text-sm font-semibold leading-6 text-cyan-50/78">

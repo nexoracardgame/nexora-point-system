@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { getApiActor } from "@/lib/admin-auth";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 import { createPentadRoom, listPentadRooms, mutatePentadRoom } from "@/lib/pentad-room-store";
+import {findActiveGameRoom} from '@/lib/active-game-room';
 
 export const dynamic = "force-dynamic";
 function json(body: unknown, status = 200) {
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
   if (!body) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
   const participant = { id: actor.id, name: actor.name || "PLAYER", image: actor.image || "/avatar.png" };
   try {
+    if(body.action==='create'||body.action==='join'){
+      const active=await findActiveGameRoom(actor.id);
+      if(active&&(body.action==='create'||active.mode!=='pentad'||active.code!==String(body.code||'')))return json({error:'กรุณาออกจากห้องเดิมหรือยอมแพ้ก่อนเข้าห้องใหม่',resume:active},409);
+    }
     if (body.action === "create") { const room = await createPentadRoom(participant, body.deckSource === "random" ? "random" : "all",{access:String(body.access || "public"),password:String(body.password || ""),playWithBot:body.playWithBot === true}); return json({ room }); }
     const code = String(body.code || "");
     if (!/^\d{6}$/.test(code)) return json({ error: "รหัสห้องไม่ถูกต้อง" }, 400);
