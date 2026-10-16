@@ -10,6 +10,9 @@ for(const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx-
 modules['lucide-react']=fs.readFileSync(require.resolve('lucide-react'),'utf8');
 modules['@/components/GameLobbyNavigation']=transpile(fs.readFileSync('components/GameLobbyNavigation.tsx','utf8'));
 modules['@/components/GameLobbyProfile']=transpile(fs.readFileSync('components/GameLobbyProfile.tsx','utf8'));
+modules['./GameLobbyWallet']=transpile(fs.readFileSync('components/GameLobbyWallet.tsx','utf8'));
+modules['./GameLobbyWallet.css']='';
+modules['@/lib/game-patcher']=transpile(fs.readFileSync('lib/game-patcher.ts','utf8'));
 modules['@/lib/game-profile-options']=transpile(fs.readFileSync('lib/game-profile-options.ts','utf8'));
 modules['next/link']='exports.__esModule=true;exports.default=props=>require("react").createElement("a",props,props.children);';
 modules['@/components/LobbyActionButton']=transpile(fs.readFileSync('components/LobbyActionButton.tsx','utf8'));
