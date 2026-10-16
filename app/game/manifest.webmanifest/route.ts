@@ -1,6 +1,6 @@
 export function GET() {
   return Response.json({
-    id: "/game", name: "NEXORA GAME", short_name: "NEXORA GAME",
+    id: "/game", name: "NEXORA CARD GAME", short_name: "NEXORA CARD GAME",
     description: "NEXORA online card game", start_url: "/game", scope: "/game",
     display: "fullscreen", display_override: ["fullscreen", "standalone"], orientation: "landscape",
     background_color: "#050507", theme_color: "#050507", categories: ["games", "entertainment"],

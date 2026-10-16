@@ -275,8 +275,8 @@ export default function LoginClient({
     <img className="nexora-game-login-warrior" data-side="left" src="/images/versus/duelist-gold.png" alt="" />
     <img className="nexora-game-login-warrior" data-side="right" src="/images/versus/duelist-silver.png" alt="" />
     <section className="nexora-game-login-content">
-      <img className="nexora-game-login-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA GAME" />
-      <h1>NEXORA GAME</h1><p>เข้าสู่สนามประลอง</p>
+      <img className="nexora-game-login-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
+      <h1>NEXORA CARD GAME</h1><p>เข้าสู่สนามประลอง</p>
       <div className="nexora-game-login-actions">
         <button type="button" aria-label="เข้าสู่ระบบด้วย LINE" disabled={isRedirecting} onClick={()=>void startLogin("line")}><span className="nexora-login-line" aria-hidden="true">LINE</span>เข้าสู่ระบบด้วย LINE</button>
         <button type="button" aria-label="เข้าสู่ระบบด้วย Google" disabled={isRedirecting} onClick={()=>void startLogin("google")}><span className="nexora-login-google" aria-hidden="true">G</span>เข้าสู่ระบบด้วย Google</button>
