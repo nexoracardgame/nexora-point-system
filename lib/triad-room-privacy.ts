@@ -24,7 +24,7 @@ export function triadRoomForViewer(room: PublicTriadRoom, userId: string): Publi
     copy.game.usedCards[side] = room.game.usedCards[side].filter(no => !concealed.has(no));
   }
   copy.game.skillChoices = copy.game.skillChoices.map(choice => choice.side === own || room.game.turns.some(turn => turn.turn === choice.turn)
-    ? choice : { ...choice, cardNo: choice.turn === room.game.activeTurn && !bothLocked ? "hidden" : choice.cardNo, selectedTarget: "", blessingDrawCardNo: undefined, blessingPreviewTopNo: undefined });
+    ? choice : { ...choice, cardNo: choice.turn === room.game.activeTurn && !bothLocked ? "hidden" : choice.cardNo, selectedTarget: choice.selectedTarget ? "confirmed" : "", blessingDrawCardNo: undefined, blessingPreviewTopNo: undefined });
   if (copy.game.openerTieBreak.status === "waiting") {
     for (const side of ["host", "challenger"] as const) if (side !== own) delete copy.game.openerTieBreak.choices[side];
   }

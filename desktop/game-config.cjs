@@ -2,7 +2,7 @@ const base = require('../package.json').build;
 module.exports = {
   ...base, appId:'com.nexora.cardgame', productName:'NEXORA CARD GAME',
   directories:{...base.directories,output:'dist/game-desktop'},
-  extraMetadata:{name:'nexora-card-game',version:'1.0.3',gameOnly:true},
+  extraMetadata:{name:'nexora-card-game',version:'1.0.4',gameOnly:true},
   win:{...base.win,icon:'desktop/assets/game-icon.ico'},
   artifactName:'NEXORA-CARD-GAME-Setup-${version}.${ext}',
   protocols:[{name:'NEXORA Game Login',schemes:['nexoragame']}],

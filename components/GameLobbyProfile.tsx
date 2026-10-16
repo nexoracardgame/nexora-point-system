@@ -24,8 +24,7 @@ export default function GameLobbyProfile({name,image,rank,wins}:{name:string;ima
   <span className="nli-art nli-pieces" aria-hidden="true"><img className="nli-piece-avatar" src="/images/lobby-play/profile-avatar-frame.png" alt=""/><img className="nli-piece-name" src="/images/lobby-play/profile-name-frame.png" alt=""/><img className="nli-piece-rank" src="/images/lobby-play/profile-rank-frame.png" alt=""/><img className="nli-piece-label" src="/images/lobby-play/profile-rank-label.png" alt=""/><img className="nli-piece-edit" src="/images/lobby-play/profile-edit.png" alt=""/></span>
   <Link className="nli-profile-link" href="/game/profile" aria-label="เปิดโปรไฟล์ของฉัน" title={name}/>
   <strong ref={nameLabel} className="nli-name" title={name}>{name}</strong>
-  <span className="nli-rank-badge" title={rank}><Shield aria-hidden="true"/></span>
-  <span className="nli-rank-name" title={`${rank} · ${wins} ชัยชนะ`}>{rank}</span>
+  <span className="nli-rank-name" title={`${rank} · ${wins} ชัยชนะ`}><Shield aria-hidden="true"/>{rank}</span>
   <button type="button" className="nli-edit" aria-label="แก้ไขชื่อผู้เล่น" title="แก้ไขชื่อผู้เล่น · ยังไม่เปิดให้บริการ" onClick={()=>setNotice(true)}/>
   {notice&&createPortal(<span className="nli-notice" role="status">แก้ไขชื่อผู้เล่น · ยังไม่เปิดให้บริการ</span>,document.body)}
  </section></>;

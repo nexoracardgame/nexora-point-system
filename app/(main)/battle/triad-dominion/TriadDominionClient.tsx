@@ -9,6 +9,7 @@ import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
 import BattleWaitingHeader from "@/components/BattleWaitingHeader";
+import BattleWaitingRoom from "@/components/BattleWaitingRoom";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
 import GameModeModal from "@/components/GameModeModal";
@@ -3592,7 +3593,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       <GameLobbyNavigation onRank={() => setPanel("rank")} onJoin={() => openPanel("join")} onHome={() => { setPanel(null); setPanelClosing(false); }} />
       <div className="nexora-lobby-promo-rail"><LobbyBanner />
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
-        <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => openPanel("create")} />
+        <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => {if(panel==="create")closePanel();else openPanel("create");}} />
       </section></div>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
       {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" data-closing={panelClosing} onClick={closePanel} aria-hidden="true" />}
@@ -7438,107 +7439,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </div>
 
-        <section className="triad-room-content grid gap-4 p-4 sm:p-6 xl:grid-cols-[1fr_320px] xl:p-8">
-          <div className="nexora-command-duel grid gap-4 md:grid-cols-2">
-            <RoomSeatCard
-              label="ฝั่งเจ้าของห้อง"
-              participant={currentRoom.seats.host}
-              profile={profileForParticipant(currentRoom.seats.host, rankProfiles)}
-              isLeader={currentRoom.seats.host?.id === currentRoom.hostId}
-              tone="host"
-              emptyText="ช่องเจ้าของห้องว่าง"
-              canTake={currentIsSpectator && !currentRoom.seats.host}
-              onTake={() => takeFieldSlot("host")}
-              currentParticipantId={participant.id}
-            />
-            <RoomSeatCard
-              label="ฝั่งผู้ท้าชิง"
-              participant={currentRoom.seats.challenger}
-              profile={profileForParticipant(currentRoom.seats.challenger, rankProfiles)}
-              isLeader={currentRoom.seats.challenger?.id === currentRoom.hostId}
-              tone="challenger"
-              emptyText="รอผู้ท้าชิง"
-              canTake={currentIsSpectator && !currentRoom.seats.challenger}
-              onTake={() => takeFieldSlot("challenger")}
-              currentParticipantId={participant.id}
-            />
-            <div className="nexora-command-settings md:col-span-2 rounded-xl border border-white/8 bg-black/24 p-4">
-              <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/42">กติกาห้อง</div>
-              <div className="mb-4 rounded-2xl border border-amber-200/14 bg-black/28 p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/54">โหมดห้อง</div>
-                    <div className="mt-1 text-sm font-black text-white">{currentDeckModeTitle}</div>
-                  </div>
-                  {isRoomController && currentRoom.status === "waiting" ? (
-                    <div className="text-[10px] font-bold text-white/42">หัวห้องเปลี่ยนได้ก่อนเริ่มเกม</div>
-                  ) : null}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {([
-                    ["all", "ALL IN ONE", "มอนสเตอร์ + สกิล"],
-                    ["monster", "MONSTER", "มอนสเตอร์ล้วน"],
-                    ["skill", "SKILL", "10 มอนสเตอร์ + 10 สกิล"],
-                  ] as Array<[DeckMode, string, string]>).map(([mode, title, description]) => {
-                    const active = currentDeckMode === mode;
-                    const submitting = roomModeSubmitting === mode;
-                    const disabled = !isRoomController || currentRoom.status !== "waiting" || active || Boolean(roomModeSubmitting);
-                    return (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => changeRoomDeckMode(mode)}
-                        disabled={disabled}
-                        className={`relative min-h-16 rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed ${
-                          active
-                            ? "border-amber-100/70 bg-amber-300 text-black shadow-[0_0_34px_rgba(251,191,36,0.22)]"
-                            : "border-white/10 bg-white/[0.045] text-white hover:border-amber-200/40 hover:bg-amber-200/10 disabled:opacity-45"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-black uppercase tracking-[0.12em]">{title}</span>
-                          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : active ? <Check className="h-4 w-4" /> : null}
-                        </div>
-                        <div className={`mt-1 text-[11px] font-bold ${active ? "text-black/60" : "text-white/46"}`}>{description}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid gap-2 text-sm font-semibold leading-6 text-white/58 sm:grid-cols-2">
-                <div>คนที่ 2 จะลงช่องผู้ท้าชิงให้อัตโนมัติ</div>
-                <div>ก่อนเริ่มเกม ผู้เล่นย้ายไปเป็นผู้ชมได้</div>
-                <div>ผู้ชมลงสนามได้เมื่อช่องผู้เล่นว่าง</div>
-                <div>หลังเริ่มเกม คนที่เข้ามาใหม่จะเป็นผู้ชม</div>
-              </div>
-              {isFieldPlayer && currentRoom.status === "waiting" ? (
-                <button
-                  type="button"
-                  onClick={moveToSpectator}
-                  className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-violet-200/30 bg-violet-200/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-violet-100 transition hover:border-violet-100/60"
-                >
-                  <Eye className="h-4 w-4" />
-                  ไปนั่งชม
-                </button>
-              ) : null}
-            </div>
-            <div className="nexora-command-viewers md:col-span-2">
-              <span><Eye className="inline h-3 w-3" /> ผู้ชม {currentRoom.spectators.length}/{SPECTATOR_LIMIT}</span>
-              <SpectatorAvatarRail spectators={currentRoom.spectators} rankProfiles={rankProfiles} currentParticipantId={participant.id} />
-              {currentIsSpectator ? <span>คุณกำลังนั่งชม</span> : null}
-            </div>
-          </div>
-
-          <aside className="space-y-4">
-            <SpectatorPanel
-              spectators={currentRoom.spectators}
-              currentId={participant.id}
-              rankProfiles={rankProfiles}
-              canWatch={!currentIsSpectator && currentRoom.status === "waiting"}
-              onWatch={moveToSpectator}
-            />
-          </aside>
-        </section>
+        <BattleWaitingRoom seats={currentRoom.seats} spectators={currentRoom.spectators} userId={participant.id} leaderId={currentRoom.hostId} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'},{id:'monster',title:'MONSTER',description:'มอนสเตอร์ล้วน'},{id:'skill',title:'SKILL',description:'10 มอนสเตอร์ + 10 สกิล'}]} mode={currentDeckMode} canChange={isRoomController} busy={Boolean(roomModeSubmitting)} onMode={mode=>void changeRoomDeckMode(mode as DeckMode)} onWatch={()=>void moveToSpectator()} onTake={side=>void takeFieldSlot(side)} />
         <div className="nexora-command-room-chat"><BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} compact /></div>
       </main>
     );

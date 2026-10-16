@@ -48,5 +48,5 @@
   .nexora-command-lobby .nexora-command-nav { top:58px; }
   .nexora-command-lobby .nexora-command-nav button { min-height:24px; }
 }
-.nexora-command-lobby .nexora-lobby-promo-rail { top:64px!important; right:24px!important; bottom:auto!important; justify-content:flex-start!important; }
-@container (max-height:600px) { .nexora-command-lobby .nexora-lobby-promo-rail { top:54px!important; right:12px!important; } }
+.nexora-command-lobby .nexora-lobby-promo-rail { top:max(82px,var(--banner-safe-top,82px))!important; right:24px!important; bottom:auto!important; justify-content:flex-start!important; }
+@container (max-height:600px) { .nexora-command-lobby .nexora-lobby-promo-rail { top:max(62px,var(--banner-safe-top,62px))!important; right:12px!important; } }

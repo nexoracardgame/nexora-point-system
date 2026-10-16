@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { playGameUiSound } from "@/lib/game-ui-audio";
 import "./LobbyBanner.css";
 
@@ -19,6 +19,7 @@ export default function LobbyBanner({ slides = lobbyBannerSlides }: { slides?: L
   const index = Math.max(0, available.findIndex(slide => slide.id === activeId));
   const active = available[index];
   const ids = available.map(slide => slide.id).join("|");
+  useLayoutEffect(()=>{const status=document.querySelector<HTMLElement>('.nexora-command-status'),lobby=status?.closest<HTMLElement>('.nexora-command-lobby');if(!status||!lobby)return;const fit=()=>lobby.style.setProperty('--banner-safe-top',`${status.offsetTop+status.offsetHeight+16}px`);fit();const observer=new ResizeObserver(fit);observer.observe(status);window.addEventListener('resize',fit);return()=>{observer.disconnect();window.removeEventListener('resize',fit)}},[]);
   useEffect(() => {
     const sync = () => setVisible(!document.hidden);
     sync(); document.addEventListener("visibilitychange", sync);

@@ -1186,6 +1186,7 @@ async function refreshTriadRoom(code: string, participantId?: string) {
       const choicesExpired = markExpiredSkillChoices(room);
       const hadResult = room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
       resolveIfBothLocked(room);
+      if(room.status==='playing'&&battleDecksReady(room)&&Date.now()-room.game.turnStartedAt>=TURN_TIMEOUT_MS)resolveTimeout(room);
       const botChanged = runBotBrain(room);
       const stateHealed = healTriadRoomState(room);
       const resolvedAfterChoiceTimeout = !hadResult && room.game.turns.some((turn) => turn.turn === room.game.activeTurn);
@@ -2540,11 +2541,11 @@ function updateOpeningTieBreakAfterResult(room: StoredTriadRoom, result: TriadTu
   };
 }
 
-function resolveIfBothLocked(room: StoredTriadRoom) {
+function resolveIfBothLocked(room: StoredTriadRoom, allowMissingSkill = false) {
   const turn = room.game.activeTurn;
   if (room.game.turns.some((item) => item.turn === turn)) return;
   const lane = laneForTurn(turn);
-  if (!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) return;
+  if ((!room.game.triangles.host[lane] || !room.game.triangles.challenger[lane]) && !(allowMissingSkill && turn>1)) return;
   if (!skillChoicesResolved(room)) return;
   const opener = getOpeningSide(room);
   if (!opener) return;
@@ -2553,8 +2554,9 @@ function resolveIfBothLocked(room: StoredTriadRoom) {
     .map((choice) => choice.cardNo);
   skippedSkillCardNos.push(...currentTurnBlessings(room).map(() => "254"));
   const blessingState = applyTurnBlessings(room);
-  const playerTriangles = blessingState.player;
-  const opponentTriangles = blessingState.opponent;
+  const playerTriangles = {...blessingState.player};
+  const opponentTriangles = {...blessingState.opponent};
+  for(const choice of currentTurnChoices(room))if(choice.skipped&&!choice.selectedTarget){if(choice.side==='host')playerTriangles[lane]='';else opponentTriangles[lane]='';}
   const rawResult = resolveTriadTurn({
     turn,
     player: opener === "host" ? playerTriangles : opponentTriangles,
@@ -2595,6 +2597,7 @@ function resolveTimeout(room: StoredTriadRoom) {
   const hostLocked = Boolean(room.game.triangles.host[lane]);
   const challengerLocked = Boolean(room.game.triangles.challenger[lane]);
   if (room.game.turns.some((item) => item.turn === turn)) return;
+  if(turn>1){resolveIfBothLocked(room,true);return;}
   if (hostLocked && challengerLocked) {
     resolveIfBothLocked(room);
     return;

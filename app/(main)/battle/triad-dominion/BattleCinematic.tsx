@@ -118,7 +118,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
     setMounted(true);
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     let saved = false;
-    try { saved = localStorage.getItem("triad-reduced-motion") === "1"; } catch { /* Storage may be disabled. */ }
+    try { saved = localStorage.getItem("triad-command-motion-off") === "1"; } catch { /* Storage may be disabled. */ }
     setReduced(query.matches || saved);
     try { setMuted(localStorage.getItem("triad-battle-muted") === "1"); } catch { /* Storage may be disabled. */ }
     const syncAudio = () => setSoundReady(battleAudioReady());
@@ -185,7 +185,6 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
     <div className={`${styles.overlay} ${landscape ? styles.landscape : ""} ${reduced ? styles.reduced : ""}`} data-battle-cinematic data-step={index} data-kind={step.kind} data-element={element} data-effect={step.blocked ? "blocked" : step.effect || step.kind} style={{ "--impact": color, "--motion-duration": `${BATTLE_MOTION_MS}ms`, "--contact-delay": `${BATTLE_CONTACT_MS}ms` } as CSSProperties}>
       {arena ? <div className={styles.environment}><img src={arena.image} alt="" draggable={false} /><div /></div> : null}
       <div className={styles.toolbar}>
-        <label className={styles.motion} title="ลดการเคลื่อนไหว"><input type="checkbox" aria-label="ลดการเคลื่อนไหว" checked={reduced} onChange={toggleReduced} /><span>ลดการเคลื่อนไหว</span></label>
         <button type="button" onClick={toggleSound} title={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-label={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-pressed={!muted && soundReady}>{muted || !soundReady ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>
         <button type="button" onClick={finish} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
       </div>

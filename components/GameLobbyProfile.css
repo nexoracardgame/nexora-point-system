@@ -7,6 +7,8 @@
 .nli-pieces .nli-piece-avatar { left:0; top:0; width:26%; height:100%; }
 .nli-pieces .nli-piece-name { left:27%; top:0; width:61%; height:64%; }
 .nli-pieces .nli-piece-rank { left:25%; top:57%; width:11%; height:43%; }
+.nli-pieces .nli-piece-rank { display:none; }
+.nli-rank-name { gap:6px; }.nli-rank-name svg { width:13px;height:13px;flex:none; }
 .nli-pieces .nli-piece-label { left:37%; top:65%; width:34%; height:31%; }
 .nli-pieces .nli-piece-edit { left:72%; top:65%; width:15%; height:31%; }
 .nli-plate-light { position:absolute; inset:0; z-index:3; pointer-events:none; mask:url('/images/lobby-play/profile-plate.png') center/100% 100% no-repeat; background:linear-gradient(110deg,transparent 20%,#e4b55f22 42%,#fff1cb44 50%,transparent 70%); background-size:300% 100%; mix-blend-mode:screen; animation:nli-shine 8s ease-in-out infinite; }

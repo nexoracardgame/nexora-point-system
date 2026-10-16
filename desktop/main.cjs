@@ -235,7 +235,9 @@ function registerIpcHandlers() {
   ipcMain.handle('nexora:window-control',(event,action)=>{
     if(!GAME_ONLY||!mainWindow||mainWindow.isDestroyed()||event.sender!==mainWindow.webContents)return false;
     try{if(new URL(event.senderFrame?.url||'').origin!==new URL(resolveAppUrl()).origin)return false}catch{return false}
-    if(action==='minimize')mainWindow.minimize();
+    if(action==='fullscreen'){mainWindow.setFullScreen(true);mainWindow.setResizable(false);}
+    else if(action==='windowed'){mainWindow.setFullScreen(false);mainWindow.setResizable(true);}
+    else if(action==='minimize'){if(mainWindow.isFullScreen())return false;mainWindow.minimize();}
     else if(action==='resize'){if(mainWindow.isFullScreen())mainWindow.setFullScreen(false);else if(mainWindow.isMaximized())mainWindow.unmaximize();else mainWindow.maximize();}
     else if(action==='close')mainWindow.close();
     else return false;

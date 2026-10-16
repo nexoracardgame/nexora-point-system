@@ -44,7 +44,8 @@
 .nexora-command-lobby.nexora-play-viewport-control { bottom:calc(max(24px,var(--app-floating-button-bottom,24px)) + 64px); translate:0 0; }
 .nexora-play-viewport-control .nexora-command-actions { position:static; display:block; width:100%; max-width:none; }
 .nexora-command-lobby.nexora-play-viewport-control .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:100%; min-width:0; max-width:none; pointer-events:auto; }
-body:has(.nexora-command-sheet,.nexora-ranking) .nexora-play-viewport-control { display:none; }
+body:has(.nexora-ranking) .nexora-play-viewport-control { display:none; }
+.nexora-command-lobby.nexora-play-viewport-control { z-index:120; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop { inset:0; overflow:visible; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop::before { display:none; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop img { position:static; display:block; width:100%; height:100%; object-fit:contain; }

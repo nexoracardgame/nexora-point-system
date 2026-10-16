@@ -28,3 +28,6 @@ html[data-game-window-controls=desktop] .nexora-deck-header-actions { margin-rig
 @container (max-height:340px) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 110px); } }
 @container (max-height:240px) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 70px); } }
 @container (max-height:240px) { .nexora-game-platform .nexora-command-lobby .nexora-command-nav { gap:2px; }.nexora-game-platform .nexora-command-lobby .nexora-command-nav > button { min-height:18px; padding:2px 5px; font-size:8px; gap:5px; }.nexora-game-platform .nexora-command-nav > button svg { width:12px; height:12px; flex-shrink:0; } }
+.nexora-window-drag { position:fixed;left:0;right:136px;top:0;height:28px;z-index:1140;-webkit-app-region:drag;app-region:drag; }
+.nexora-window-controls,.nexora-settings-open { -webkit-app-region:no-drag;app-region:no-drag; }
+.nexora-exit-actions { display:flex;justify-content:flex-end;gap:12px;margin-top:24px; }.nexora-exit-actions button { width:auto;min-width:90px;padding:10px 18px;background:#e1c17c;color:#121416;border-radius:4px; }

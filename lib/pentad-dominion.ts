@@ -116,7 +116,11 @@ export function resolvePentadTurn(input: {
 }): PentadResolution {
   const host = triadCardByNo.get(input.mains.host);
   const challenger = triadCardByNo.get(input.mains.challenger);
-  if (host?.kind !== "monster" || challenger?.kind !== "monster") throw new Error("ต้องมีมอนสเตอร์หลักทั้งสองฝั่ง");
+  if (host?.kind !== "monster" || challenger?.kind !== "monster") {
+    const attack={host:host?.kind==='monster'?host.attack:0,challenger:challenger?.kind==='monster'?challenger.attack:0},support={host:host?.kind==='monster'?host.support:0,challenger:challenger?.kind==='monster'?challenger.support:0};
+    const totals=input.turn===1?{host:attack.host+support.host,challenger:attack.challenger+support.challenger}:input.turn<=3?attack:support;
+    return {attack,support,totals,winner:totals.host===totals.challenger?'draw':totals.host>totals.challenger?'host':'challenger',reason:'หมดเวลาไม่ลงมอนสเตอร์ ใช้พลังที่มีอยู่จริงเท่านั้น',events:[],effective:{...input.mains},stages:[]};
+  }
   const relation = pentadElementRelation(host.element, challenger.element);
   const basic = { attack: { host: host.attack, challenger: challenger.attack }, support: { host: host.support, challenger: challenger.support } };
   if (input.turn === 1 && relation.winner && !input.finalDuel) return {

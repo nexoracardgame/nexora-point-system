@@ -105,7 +105,7 @@ function tickChoices(room: PentadRoom, now: number) {
     if (choice.value) continue;
     if (!choice.deadline) choice.deadline = now + PENTAD_TARGET_MS;
     if (room.seats[choice.side]?.id === PENTAD_BOT_ID) choice.value = bestPentadTarget(room, choice);
-    else if (now >= choice.deadline) choice.value = choice.options[0];
+    else if (now >= choice.deadline) { choice.value = '__expired__';room.targets[choice.side]='';continue; }
     if (!choice.value) { room.deadline = choice.deadline; return; }
     settleChoice(room, choice, index);
   }
@@ -199,6 +199,8 @@ function resolveRound(room: PentadRoom, now: number) {
   const mains = { host: room.board.host[0], challenger: room.board.challenger[0] };
   const skills = activeSkills(room);
   const blessingEvents: PentadResolution["events"] = [];
+  for(const choice of room.choices)if(choice.value==='__expired__')skills[choice.side]='';
+  for(const side of sides)if(skills[side]==='__pass__')skills[side]='';
   for (const side of [room.opener, otherPentadSide(room.opener)]) {
     const blessingCopy = skills[side] === "245" && room.copiedSkills?.[side] === "254";
     if ((skills[side] !== "254" && !blessingCopy) || room.turn === 1) continue;
@@ -235,10 +237,10 @@ function resolveRound(room: PentadRoom, now: number) {
 }
 function revealPicks(room: PentadRoom, now: number) {
   for (const side of sides) {
-    room.used[side].push(room.picks[side]);
-    room.board[side][room.turn - 1] = room.picks[side];
+    if(room.picks[side]!=='__pass__')room.used[side].push(room.picks[side]);
+    room.board[side][room.turn - 1] = room.picks[side]==='__pass__'?'':room.picks[side];
   }
-  if (room.turn === 1 && !room.finalDuel) {
+  if (room.turn === 1 && !room.finalDuel && triadCardByNo.get(room.picks.host)?.kind==='monster' && triadCardByNo.get(room.picks.challenger)?.kind==='monster') {
     const relation = pentadElementRelation(triadCardByNo.get(room.picks.host)!.element, triadCardByNo.get(room.picks.challenger)!.element);
     if (!relation.winner && relation.boosted) {
       const reserve = room.decks[relation.boosted].reserve;
@@ -262,7 +264,7 @@ export function tickPentadRoom(room: PentadRoom, now = Date.now()) {
   }
   if (room.phase === "result" && now >= room.deadline) {
     const last = room.rounds.at(-1)!;
-    if ((room.turn === 1 || room.finalDuel) && last.winner === "draw") {
+    if ((room.turn === 1 || room.finalDuel) && last.winner === "draw" && triadCardByNo.get(last.mains.host)?.kind==='monster' && triadCardByNo.get(last.mains.challenger)?.kind==='monster') {
       room.board = pair(() => []); room.notice = "มอนสเตอร์เสมอทั้งพลังรวม ATK และ SUP ทิ้งทั้งสองใบแล้วเลือกใหม่"; startSelection(room, now);
     } else if (room.finalDuel) finish(room, last.winner, "จบการตัดสินมอนสเตอร์ที่เหลือ");
     else {
@@ -280,7 +282,7 @@ export function tickPentadRoom(room: PentadRoom, now = Date.now()) {
       if (!room.picks[side] && shouldPick && (room.seats[side]?.id === PENTAD_BOT_ID || now >= room.deadline)) {
         const available = pentadAvailable(room, side, room.turn === 1 ? "monster" : "skill");
         if (room.seats[side]?.id === PENTAD_BOT_ID) room.picks[side] = choosePentadBotCard(room,side,available);
-        else room.picks[side] = choose(available);
+        else room.picks[side] = '__pass__';
       }
     }
     if (sides.every(side => room.picks[side])) revealPicks(room, now);
@@ -338,6 +340,9 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     if (room.seats.challenger.id === PENTAD_BOT_ID) { room.decks.challenger = tournamentPentadDeck(room); room.ready.challenger = true; }
     return;
   }
+  if(action==='mode'){requirePhase('waiting');if(requireSeat()!=='host')throw Error('เฉพาะหัวห้อง');room.deckSource=body.deckSource==='random'?'random':'all';return;}
+  if(action==='watch'){requirePhase('waiting');if(!side)return;if(room.spectators.length>=10)throw Error('ผู้ชมเต็มแล้ว');room.seats[side]=null;room.spectators.push(actor);if(side==='host'&&room.seats.challenger){if(room.seats.challenger.id!==PENTAD_BOT_ID)room.seats.host=room.seats.challenger;room.seats.challenger=null;}return;}
+  if(action==='seat'){requirePhase('waiting');if(side)return;const seat=body.seat==='host'?'host':'challenger';if(room.seats[seat])throw Error('ที่นั่งไม่ว่าง');room.seats[seat]=actor;room.spectators=room.spectators.filter(p=>p.id!==actor.id);return;}
   if (action === "refresh") return;
   if (action === "complete") {
     if (room.phase !== "result" || Number(body.roundId) !== room.rounds.at(-1)?.id || !side) return;
@@ -399,7 +404,7 @@ export function publicPentadRoom(room: PentadRoom, id: string) {
     if (room.phase !== "result" && room.phase !== "finished") {
       copy.targets[seat] = "";
       if (copy.copiedSkills) copy.copiedSkills[seat] = "";
-      copy.choices = copy.choices.map(choice => choice.side === seat ? { ...choice, options: [], value: "" } : choice);
+      copy.choices = copy.choices.map(choice => choice.side === seat ? { ...choice, options: [], value: choice.value ? 'confirmed' : '' } : choice);
     }
   }
   return copy;

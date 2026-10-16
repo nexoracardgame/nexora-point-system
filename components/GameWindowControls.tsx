@@ -13,6 +13,9 @@ export default function GameWindowControls(){
   const [desktop,setDesktop]=useState<WindowBridge|null>(null);
   const [leaving,setLeaving]=useState(false);
   const [menu,setMenu]=useState<Element|null>(null);
+  const [confirmClose,setConfirmClose]=useState(false),[fullscreen,setFullscreen]=useState(false);
+  useEffect(()=>{if(!confirmClose)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setConfirmClose(false)};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[confirmClose]);
+  useEffect(()=>{const sync=()=>setFullscreen(document.fullscreenElement!==null||document.documentElement.dataset.gameWindowMode==='fullscreen');sync();window.addEventListener('nexora:window-mode',sync);document.addEventListener('fullscreenchange',sync);return()=>{window.removeEventListener('nexora:window-mode',sync);document.removeEventListener('fullscreenchange',sync)}},[]);
   const {status}=useSession();const pathname=usePathname();const active=useBattleArenaActive();
   useEffect(()=>{const bridge=(window as typeof window&{nexoraDesktop?:WindowBridge}).nexoraDesktop;if(bridge?.isGameDesktop&&bridge.windowControl)setDesktop(bridge)},[]);
   const lobby=status==='authenticated'&&!active&&(pathname==='/game'||pathname==='/game/pentad');
@@ -27,9 +30,11 @@ export default function GameWindowControls(){
   if(!desktop&&!lobby)return null;
   return <>
     {lobby&&menu&&createPortal(<button type="button" className="nexora-menu-logout" title="ออกจากระบบ" aria-label="ออกจากระบบ" disabled={leaving} onClick={()=>void logout()}><LogOut size={18}/><span>ออกจากระบบ</span></button>,menu)}
-    {desktop&&<div className="nexora-window-controls" role="toolbar" aria-label="ตัวควบคุมเกม">
+    {desktop&&!fullscreen&&<div className="nexora-window-drag" aria-hidden="true"/>}
+    {confirmClose&&createPortal(<div className="nexora-settings-backdrop"><section className="nexora-settings-dialog" role="dialog" aria-modal="true" aria-label="ออกจากเกม"><h2>ต้องการออกจากเกมหรือไม่?</h2><div className="nexora-exit-actions"><button autoFocus onClick={()=>setConfirmClose(false)}>ยกเลิก</button><button onClick={()=>{setConfirmClose(false);void desktop?.windowControl?.('close')}}>ยืนยัน</button></div></section></div>,document.body)}
+    {desktop&&<div className="nexora-window-controls" role="toolbar" aria-label="ตัวควบคุมเกม" data-fullscreen={fullscreen}>
     <div data-game-utilities-slot />
-    {desktop&&<><button type="button" title="ย่อหน้าต่าง" aria-label="ย่อหน้าต่าง" onClick={()=>void desktop.windowControl?.('minimize')}><Minus size={18}/></button><button type="button" title="สลับขนาดหน้าต่าง" aria-label="สลับขนาดหน้าต่าง" onClick={()=>void desktop.windowControl?.('resize')}><Maximize2 size={17}/></button><button type="button" className="nexora-window-close" title="ปิดเกม" aria-label="ปิดเกม" onClick={()=>void desktop.windowControl?.('close')}><X size={19}/></button></>}
+    {!fullscreen&&<><button type="button" title="ย่อหน้าต่าง" aria-label="ย่อหน้าต่าง" onClick={()=>void desktop.windowControl?.('minimize')}><Minus size={18}/></button><button type="button" title="สลับขนาดหน้าต่าง" aria-label="สลับขนาดหน้าต่าง" onClick={()=>void desktop.windowControl?.('resize')}><Maximize2 size={17}/></button></>}<button type="button" className="nexora-window-close" title="ปิดเกม" aria-label="ปิดเกม" onClick={()=>setConfirmClose(true)}><X size={19}/></button>
     </div>}
   </>;
 }

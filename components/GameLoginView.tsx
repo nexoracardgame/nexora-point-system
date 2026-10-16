@@ -64,7 +64,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
     </form>
     <button type="button" className="nexora-register-link" disabled={busy} onClick={()=>open('register')}>สมัครสมาชิกใหม่</button>
    </div>
-   {browserDownload&&<a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.3.exe" download><Download size={16}/>ดาวน์โหลด Windows PC<span>64-bit · v1.0.3</span></a>}
+   {browserDownload&&<a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.4.exe" download><Download size={16}/>ดาวน์โหลด Windows PC<span>64-bit · v1.0.4</span></a>}
    <div className="nexora-login-feedback" aria-live="polite">{error?<p role="alert">{error}</p>:<p role="status">{busy?(checking?'กำลังตรวจสอบบัญชี':'กำลังเข้าสู่สนาม'):notice}</p>}</div>
   </section>
   {panel&&<div className="nexora-login-dialog-backdrop" onClick={()=>{if(!busy)setPanel('')}}><section ref={dialog} className="nexora-login-dialog" role="dialog" aria-modal="true" aria-label={panel==='register'?'สมัครสมาชิก':panel==='forgot'?'ลืมรหัสผ่าน':panel==='settings'?'ตั้งค่า':sections.find(item=>item[0]===panel)?.[2]} onClick={event=>event.stopPropagation()}>
