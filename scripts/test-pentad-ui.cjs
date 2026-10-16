@@ -26,6 +26,7 @@ modules['next/navigation']='exports.useRouter=()=>({prefetch:()=>{},replace:path
 modules['@/components/BattleLoadingScreen']='exports.useBattleLoadingStage=()=>{};';
 modules['@/components/BattleArenaChat']=transpile(fs.readFileSync('components/BattleArenaChat.tsx','utf8'));
 modules['@/components/BattleCardInspector']=transpile(fs.readFileSync('components/BattleCardInspector.tsx','utf8'));
+modules['./BattleCardInspector.css']='';
 modules['@/components/BattleArenaHud']=transpile(fs.readFileSync('components/BattleArenaHud.tsx','utf8'));
 modules['@/components/BattleArenaControls']=transpile(fs.readFileSync('components/BattleArenaControls.tsx','utf8'));
 modules['@/components/DeckPreparation']=transpile(fs.readFileSync('components/DeckPreparation.tsx','utf8'));

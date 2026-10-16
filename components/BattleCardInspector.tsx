@@ -1,14 +1,17 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useLayoutEffect, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Check, X } from "lucide-react";
 import "./BattleMobileOverlays.css";
+import './BattleCardInspector.css';
 
 type InspectorCard = { cardNo: string; name: string; sourceImage: string; attack: number; support: number; kind: string; skillText: string };
 
 export default function BattleCardInspector({ card, element, interactive, onClose, onUseCard }: { card: InspectorCard; element: string; interactive: boolean; onClose?: () => void; onUseCard?: () => void }) {
   const [bottom, setBottom] = useState(230);
+  const panel=useRef<HTMLElement>(null);
+  useLayoutEffect(()=>{const element=panel.current;if(!element)return;let frame=0;const fit=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{const info=element.querySelector<HTMLElement>('.nexora-card-inspector-info');if(!info)return;let size=16;info.style.setProperty('--inspector-text-size',`${size}px`);while(size>10&&(info.scrollHeight>info.clientHeight+1||info.scrollWidth>info.clientWidth+1)){size-=.5;info.style.setProperty('--inspector-text-size',`${size}px`)}})};const observer=new ResizeObserver(fit);observer.observe(element);fit();return()=>{observer.disconnect();cancelAnimationFrame(frame)}},[card.cardNo,card.skillText]);
   useLayoutEffect(() => {
     const measure = () => {
       const tops = [...document.querySelectorAll(".nexora-arena-hand,.nexora-arena-hand-filters")]
@@ -22,7 +25,7 @@ export default function BattleCardInspector({ card, element, interactive, onClos
     return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
   }, []);
   return createPortal(<div className="nexora-card-inspector" style={{"--inspector-bottom":`${bottom}px`} as CSSProperties} data-interactive={interactive} role="dialog" aria-modal={interactive} aria-label={`รายละเอียด No.${card.cardNo}`} onClick={event=>{if(event.currentTarget===event.target)onClose?.();}}>
-    <section className="nexora-card-inspector-panel" onPointerDown={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()}>
+    <section ref={panel} className="nexora-card-inspector-panel" onPointerDown={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()}>
       <header><span>รายละเอียดการ์ด · No.{card.cardNo}</span>{interactive && onClose && <button type="button" aria-label="ปิดหน้าต่างการ์ด" title="ปิดหน้าต่างการ์ด" onClick={onClose}><X size={20} /></button>}</header>
       <div className="nexora-card-inspector-art"><img src={card.sourceImage} alt={card.name} draggable={false} /></div>
       <div className="nexora-card-inspector-info"><h2>{card.name}</h2><div className="nexora-card-inspector-stats"><span>ATK {card.attack.toLocaleString()}</span><span>SUP {card.support.toLocaleString()}</span><span>{card.kind === "skill" ? "สกิล" : "มอนสเตอร์"} · {element}</span></div><p>{card.skillText || "มอนสเตอร์ใช้ค่าพลังและธาตุในการปะทะ"}</p></div>

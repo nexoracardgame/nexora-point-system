@@ -37,8 +37,13 @@
 }
 @media (max-height:340px), (max-width:340px) and (orientation:portrait) { .nexora-command-lobby .nexora-lobby-art-button strong { font-size:12px; } .nexora-command-lobby .nexora-lobby-art-button small { font-size:8px; } }
 @media (prefers-reduced-motion:reduce) { .nexora-command-lobby .nexora-lobby-art-button,.nexora-command-lobby .nexora-lobby-art-button::after,.nexora-lobby-art-flash { animation:none!important; transition:none!important; } .nexora-lobby-art-flash { display:none; } }
-.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:100%; aspect-ratio:1672/941; }
+.nexora-command-lobby .nexora-lobby-promo-rail { justify-content:flex-start; }
+.nexora-command-lobby .nexora-lobby-promo-rail .nexora-command-actions { position:absolute; right:0; bottom:0; width:100%; align-items:flex-end; }
+.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:25%; min-width:84px; max-width:240px; aspect-ratio:1672/941; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop { inset:0; overflow:visible; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop::before { display:none; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop img { position:static; display:block; width:100%; height:100%; object-fit:contain; }
 .nexora-command-lobby .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-copy { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.nexora-command-lobby .nexora-lobby-art-button[data-artwork=play]::after,.nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-flash { inset:0; width:100%; height:100%; clip-path:none; mask:url('/images/lobby-play/play-button.webp') center/100% 100% no-repeat; background:linear-gradient(110deg,transparent 30%,#fff1ce99 50%,transparent 70%); background-size:300% 100%; transform:none; }
+.nexora-command-lobby .nexora-lobby-art-button[data-artwork=play]:hover::after,.nexora-command-lobby .nexora-lobby-art-button[data-artwork=play]:focus-visible::after { animation:nexora-play-masked-shine 700ms ease-out both; }
+@keyframes nexora-play-masked-shine { from { background-position:100% 0; opacity:0; } 25% { opacity:.8; } to { background-position:0 0; opacity:0; } }

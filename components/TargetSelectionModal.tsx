@@ -42,7 +42,7 @@ export default function TargetSelectionModal(props: Props) {
   };
   if (!mounted) return null;
   if (hidden) return createPortal(<button type="button" className="nexora-target-reopen" onClick={() => setHidden(false)}><Sparkles size={18} />เลือกเป้าหมายสกิล</button>, document.body);
-  return createPortal(<div className="nexora-target-overlay" data-target-mode={view.mode} data-closing={closing} role="dialog" aria-modal="true" aria-labelledby="nexora-target-title" onKeyDown={event => {
+  return createPortal(<div className="nexora-target-overlay" data-target-mode={view.mode} data-closing={closing} role="dialog" aria-modal="true" aria-labelledby="nexora-target-title" onPointerDown={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()} onKeyDown={event => {
     if (event.key === "Escape" && !sending && !busy) hide();
     if (event.key !== "Tab") return;
     const buttons = [...(panel.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || [])];
