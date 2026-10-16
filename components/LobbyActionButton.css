@@ -39,7 +39,11 @@
 @media (prefers-reduced-motion:reduce) { .nexora-command-lobby .nexora-lobby-art-button,.nexora-command-lobby .nexora-lobby-art-button::after,.nexora-lobby-art-flash { animation:none!important; transition:none!important; } .nexora-lobby-art-flash { display:none; } }
 .nexora-command-lobby .nexora-lobby-promo-rail { justify-content:flex-start; }
 .nexora-command-lobby .nexora-lobby-promo-rail .nexora-command-actions { position:absolute; right:0; bottom:0; width:100%; align-items:flex-end; }
-.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:25%; min-width:84px; max-width:240px; aspect-ratio:1672/941; }
+.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:37.5%; min-width:126px; max-width:360px; aspect-ratio:1672/941; }
+.nexora-command-lobby.nexora-play-viewport-control { position:fixed; inset:auto max(16px,env(safe-area-inset-right)) calc(max(24px,var(--app-floating-button-bottom,24px)) + 72px) auto; width:clamp(126px,14.25vw,360px); height:auto; overflow:visible; z-index:100; pointer-events:none; }
+.nexora-play-viewport-control .nexora-command-actions { position:static; display:block; width:100%; max-width:none; }
+.nexora-command-lobby.nexora-play-viewport-control .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:100%; min-width:0; max-width:none; pointer-events:auto; }
+body:has(.nexora-command-sheet,.nexora-ranking) .nexora-play-viewport-control { display:none; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop { inset:0; overflow:visible; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop::before { display:none; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop img { position:static; display:block; width:100%; height:100%; object-fit:contain; }

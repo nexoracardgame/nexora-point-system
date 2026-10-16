@@ -3539,6 +3539,12 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   onCreate: (format: "triad" | "pentad") => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
+  useEffect(() => {
+    if (!panel) return;
+    const back = (event: Event) => { event.preventDefault(); clearTimeout(panelTimer.current); setPanel(null); setPanelClosing(false); };
+    window.addEventListener("nexora:navigate-back", back);
+    return () => window.removeEventListener("nexora:navigate-back", back);
+  }, [panel]);
   const [format, setFormat] = useState<"triad" | "pentad">("triad");
   const [panelClosing, setPanelClosing] = useState(false);
   const panelTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
