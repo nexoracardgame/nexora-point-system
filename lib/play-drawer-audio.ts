@@ -1,3 +1,4 @@
+import {gameVolume} from './game-settings';
 let context: AudioContext | null = null;
 
 export function playDrawerSound() {
@@ -19,7 +20,8 @@ export function playDrawerSound() {
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(.055, now + .07);
     gain.gain.exponentialRampToValueAtTime(.001, now + .38);
-    source.connect(filter).connect(gain).connect(context.destination);
+    const master=context.createGain();master.gain.value=gameVolume('effects');master.connect(context.destination);
+    source.connect(filter).connect(gain).connect(master);
     source.start(now);
     source.stop(now + .4);
     const tone = context.createOscillator();
@@ -28,7 +30,7 @@ export function playDrawerSound() {
     tone.frequency.exponentialRampToValueAtTime(1110, now + .32);
     toneGain.gain.setValueAtTime(.012, now + .15);
     toneGain.gain.exponentialRampToValueAtTime(.001, now + .45);
-    tone.connect(toneGain).connect(context.destination);
+    tone.connect(toneGain).connect(master);
     tone.start(now + .15);
     tone.stop(now + .45);
   } catch { /* Audio must never block opening PLAY. */ }

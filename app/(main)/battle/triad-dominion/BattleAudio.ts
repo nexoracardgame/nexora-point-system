@@ -2,6 +2,8 @@ import type { TriadElement } from "@/lib/triad-dominion";
 import { BATTLE_CONTACT_MS } from "./BattleTiming";
 import { playGameUiSound } from "@/lib/game-ui-audio";
 
+import {gameVolume} from '@/lib/game-settings';
+
 const clips = {
   fire: "impactPunch_heavy_000", water: "impactGlass_medium_000", wood: "impactPlank_medium_000",
   earth: "impactMining_000", gold: "impactMetal_heavy_000", unknown: "impactGeneric_light_000", guard: "impactBell_heavy_000",
@@ -44,7 +46,7 @@ export function playBattleSequence({ element, kind, side, blocked, draw, reduced
   element: TriadElement; kind: "skill" | "strike" | "result"; side: "player" | "opponent"; blocked: boolean; draw: boolean; reduced: boolean;
 }) {
   const context = audio;
-  if (!context || context.state !== "running") return () => {};
+  if (!context || context.state !== "running" || gameVolume('effects')===0) return () => {};
   const start = context.currentTime;
   const sources: Array<AudioBufferSourceNode | OscillatorNode> = [];
   const gains: GainNode[] = [];
@@ -52,7 +54,8 @@ export function playBattleSequence({ element, kind, side, blocked, draw, reduced
   const connect = (source: AudioBufferSourceNode | OscillatorNode, volume: number, pan: number) => {
     const gain = context.createGain(); gain.gain.value = volume;
     const panner = context.createStereoPanner(); panner.pan.value = pan;
-    source.connect(gain).connect(panner).connect(context.destination);
+    const master=context.createGain();master.gain.value=gameVolume('effects');gains.push(master);
+    source.connect(gain).connect(panner).connect(master).connect(context.destination);
     sources.push(source); gains.push(gain); panners.push(panner);
     return gain;
   };

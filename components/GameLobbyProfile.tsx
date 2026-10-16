@@ -15,8 +15,7 @@ export default function GameLobbyProfile({name,image,rank,wins}:{name:string;ima
  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(false),3000);return()=>clearTimeout(timer)},[notice]);
  return <><GameLobbyWallet/><section className="nexora-lobby-identity" aria-label="โปรไฟล์ผู้เล่น" data-rank={rank.toLowerCase()}>
   <img className="nli-avatar" src={appearance?.avatar||image||'/avatar.png'} alt=""/>
-  <img className="nli-art" src="/images/lobby-play/profile-frame.png" width={2469} height={724} alt="" draggable={false}/>
-  <span className="nli-plate-light" aria-hidden="true"/>
+  <span className="nli-art nli-pieces" aria-hidden="true"><img className="nli-piece-avatar" src="/images/lobby-play/profile-avatar-frame.png" alt=""/><img className="nli-piece-name" src="/images/lobby-play/profile-name-frame.png" alt=""/><img className="nli-piece-rank" src="/images/lobby-play/profile-rank-frame.png" alt=""/><img className="nli-piece-label" src="/images/lobby-play/profile-rank-label.png" alt=""/><img className="nli-piece-edit" src="/images/lobby-play/profile-edit.png" alt=""/></span>
   <Link className="nli-profile-link" href="/game/profile" aria-label="เปิดโปรไฟล์ของฉัน" title={name}/>
   <strong ref={nameLabel} className="nli-name" title={name}>{name}</strong>
   <span className="nli-rank-badge" title={rank}><Shield aria-hidden="true"/></span>

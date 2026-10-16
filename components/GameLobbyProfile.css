@@ -3,6 +3,12 @@
 .nexora-game-platform:not(:has(.nexora-game-back)) .nexora-lobby-identity { left:0; }
 .nexora-lobby-identity .nli-art { position:absolute; inset:0; width:100%; height:100%; max-width:none; border:0; border-radius:0; pointer-events:none; user-select:none; object-fit:fill; z-index:2; animation:nli-breathe 6s ease-in-out infinite; }
 .nexora-lobby-identity .nli-avatar { position:absolute; left:5.7%; top:23%; width:15.6%; height:auto; aspect-ratio:1; border:0; border-radius:50%; object-fit:cover; z-index:1; }
+.nli-pieces img { position:absolute; border:0!important; border-radius:0!important; object-fit:fill!important; max-width:none; }
+.nli-pieces .nli-piece-avatar { left:0; top:0; width:26%; height:100%; }
+.nli-pieces .nli-piece-name { left:27%; top:0; width:61%; height:64%; }
+.nli-pieces .nli-piece-rank { left:25%; top:57%; width:11%; height:43%; }
+.nli-pieces .nli-piece-label { left:37%; top:65%; width:34%; height:31%; }
+.nli-pieces .nli-piece-edit { left:72%; top:65%; width:15%; height:31%; }
 .nli-plate-light { position:absolute; inset:0; z-index:3; pointer-events:none; mask:url('/images/lobby-play/profile-plate.png') center/100% 100% no-repeat; background:linear-gradient(110deg,transparent 20%,#e4b55f22 42%,#fff1cb44 50%,transparent 70%); background-size:300% 100%; mix-blend-mode:screen; animation:nli-shine 8s ease-in-out infinite; }
 .nli-profile-link { position:absolute; inset:0 15% 0 0; z-index:4; clip-path:polygon(0 0,100% 0,100% 100%,0 100%); }
 .nli-profile-link:focus-visible { outline:2px solid #ffe4a0; outline-offset:3px; }

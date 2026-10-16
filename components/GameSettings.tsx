@@ -1,0 +1,17 @@
+"use client";
+import {useEffect,useRef,useState} from 'react';
+import {usePathname} from 'next/navigation';
+import {createPortal} from 'react-dom';
+import {Settings,X,Music,Volume2} from 'lucide-react';
+import {useBattleArenaActive} from '@/lib/battle-ui-state';
+import {gameVolume,saveGameSetting} from '@/lib/game-settings';
+import './GameSettings.css';
+export default function GameSettings(){
+ const path=usePathname(),active=useBattleArenaActive(),[open,setOpen]=useState(false),[music,setMusic]=useState(1),[effects,setEffects]=useState(1),[motion,setMotion]=useState(false);const dialog=useRef<HTMLElement>(null),trigger=useRef<HTMLButtonElement>(null);
+ const available=path==='/game'&&!active;
+ useEffect(()=>{if(!available)setOpen(false)},[available]);
+ useEffect(()=>{const sync=()=>{try{document.documentElement.dataset.gameMotionOff=localStorage.getItem('triad-command-motion-off')==='1'?'true':'false'}catch{}};sync();window.addEventListener('nexora:motion-preference',sync);return()=>window.removeEventListener('nexora:motion-preference',sync)},[]);
+ useEffect(()=>{if(!open)return;dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){setOpen(false);trigger.current?.focus()}if(e.key==='Tab'){const items=[...dialog.current?.querySelectorAll<HTMLElement>('button,input')||[]],first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[open]);
+ if(!available)return null;
+ return <><button ref={trigger} className="nexora-settings-open" aria-label="ตั้งค่าเกม" title="ตั้งค่าเกม" onClick={()=>{setMusic(gameVolume('music'));setEffects(gameVolume('effects'));try{setMotion(localStorage.getItem('triad-command-motion-off')==='1')}catch{}setOpen(true)}}><Settings/></button>{open&&createPortal(<div className="nexora-settings-backdrop" onClick={e=>{if(e.target===e.currentTarget)setOpen(false)}}><section ref={dialog} className="nexora-settings-dialog" role="dialog" aria-modal="true" aria-label="ตั้งค่าเกม"><header><h2>ตั้งค่าเกม</h2><button aria-label="ปิดตั้งค่า" onClick={()=>{setOpen(false);trigger.current?.focus()}}><X/></button></header><label><span><Music size={20}/>เสียงเพลงพื้นหลัง<output>{Math.round(music*100)}%</output></span><input aria-label="เสียงเพลงพื้นหลัง" type="range" min="0" max="1" step="0.01" value={music} onChange={e=>{const v=Number(e.target.value);setMusic(v);saveGameSetting('music',v)}}/></label><label><span><Volume2 size={20}/>เสียงเอฟเฟ็กต์<output>{Math.round(effects*100)}%</output></span><input aria-label="เสียงเอฟเฟ็กต์" type="range" min="0" max="1" step="0.01" value={effects} onChange={e=>{const v=Number(e.target.value);setEffects(v);saveGameSetting('effects',v)}}/></label><label className="nexora-settings-motion"><input type="checkbox" checked={motion} onChange={e=>{setMotion(e.target.checked);saveGameSetting('motion',e.target.checked)}}/>ปิดการเคลื่อนไหว</label></section></div>,document.body)}</>;
+}

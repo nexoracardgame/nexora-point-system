@@ -41,6 +41,7 @@
 .nexora-command-lobby .nexora-lobby-promo-rail .nexora-command-actions { position:absolute; right:0; bottom:0; width:100%; align-items:flex-end; }
 .nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:37.5%; min-width:126px; max-width:360px; aspect-ratio:1672/941; }
 .nexora-command-lobby.nexora-play-viewport-control { position:fixed; inset:auto max(16px,env(safe-area-inset-right)) calc(max(24px,var(--app-floating-button-bottom,24px)) + 72px) auto; width:clamp(126px,14.25vw,360px); height:auto; overflow:visible; z-index:100; pointer-events:none; }
+.nexora-command-lobby.nexora-play-viewport-control { bottom:calc(max(24px,var(--app-floating-button-bottom,24px)) + 64px); translate:0 0; }
 .nexora-play-viewport-control .nexora-command-actions { position:static; display:block; width:100%; max-width:none; }
 .nexora-command-lobby.nexora-play-viewport-control .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:100%; min-width:0; max-width:none; pointer-events:auto; }
 body:has(.nexora-command-sheet,.nexora-ranking) .nexora-play-viewport-control { display:none; }

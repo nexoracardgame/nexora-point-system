@@ -41,7 +41,7 @@ export default function BattleVersusIntro({ sessionKey, left, right, background,
       setVisible(true);
       startedAt.current=Date.now();
       const audio = new Audio("/audio/ui/battle-versus.mp3");
-      audio.volume = .28;
+      audio.volume = .28 * Number(localStorage.getItem('nexora-volume-effects') ?? 1);
       try { audio.muted = localStorage.getItem("triad-battle-muted") === "1"; } catch {}
       setMuted(audio.muted);
       sound.current = audio;

@@ -1,3 +1,4 @@
+import {gameVolume} from './game-settings';
 let lastPlayed = -Infinity;
 const sounds = new Map<string, HTMLAudioElement>();
 
@@ -10,7 +11,7 @@ export function playGameUiSound(kind: "click" | "confirm" | "back" = "click") {
   const file = { click: "click_003", confirm: "confirmation_002", back: "back_001" }[kind];
   let sound = sounds.get(file);
   if (!sound) { sound = new Audio(`/audio/ui/${file}.ogg`); sound.preload = "auto"; sounds.set(file, sound); }
-  sound.volume = .16;
+  sound.volume = .16 * gameVolume('effects');
   sound.currentTime = 0;
   void sound.play().catch(() => { /* Browsers may deny audio until interaction. */ });
 }
