@@ -1,5 +1,13 @@
 export type GameRelease = {version:string;authEpoch:number;minimumDesktopVersion:string;totalBytes:number;resources:{url:string;bytes:number;sha256:string}[]};
 export type PatchProgress = {file:string;downloaded:number;total:number;completed:number;count:number};
+export async function hasPendingGameResources(release:GameRelease){
+ const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');
+ if(!pointer)return true;
+ const installed=await pointer.json();if(installed.version!==release.version||!installed.cacheName)return true;
+ const cache=await caches.open(installed.cacheName);
+ for(const resource of release.resources)if(installed.hashes?.[resource.url]!==resource.sha256||!await cache.match(resource.url))return true;
+ return false;
+}
 export async function installGameResources(release:GameRelease,onProgress:(progress:PatchProgress)=>void,signal?:AbortSignal) {
   if(!/^[a-zA-Z0-9-]+$/.test(release.version)||release.totalBytes!==release.resources.reduce((sum,r)=>sum+r.bytes,0)||!release.resources.length)throw Error('Invalid game release');
   const cacheName=`nexora-game-resources-${release.version}`;

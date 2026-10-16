@@ -4,14 +4,17 @@ global.caches={open:async name=>{if(!stores.has(name))stores.set(name,new Map())
 const moduleObject={exports:{}};
 const source=ts.transpileModule(fs.readFileSync('lib/game-patcher.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 vm.runInThisContext(`(function(exports){${source}\n})`)(moduleObject.exports);
-const {installGameResources}=moduleObject.exports;
+const {installGameResources,hasPendingGameResources}=moduleObject.exports;
 const resource=(url,text)=>({url,bytes:Buffer.byteLength(text),sha256:crypto.createHash('sha256').update(text).digest('hex')});
 const a=resource('/images/a.webp','first'),b=resource('/cards/b.webp','second');
 const release=(version,resources)=>({version,resources,totalBytes:resources.reduce((n,r)=>n+r.bytes,0),authEpoch:1,minimumDesktopVersion:'1.0.0'});
 (async()=>{
  let requests=0;global.fetch=async url=>{requests++;return new Response(url.startsWith(a.url)?'first':'second')};
+ assert.equal(await hasPendingGameResources(release('one',[a,b])),true,'First install has pending resources');
  const progress=[];await installGameResources(release('one',[a,b]),p=>progress.push(p));assert.equal(requests,2);assert.equal(progress.at(-1).completed,2);assert.equal(progress.at(-1).downloaded,11);
  requests=0;await installGameResources(release('two',[a,b]),()=>{});assert.equal(requests,0,'Unchanged files must be reused');assert.equal(stores.has('nexora-game-resources-one'),false);
+ assert.equal(await hasPendingGameResources(release('two',[a,b])),false,'Complete current cache hides download button');
+ assert.equal(await hasPendingGameResources(release('three',[a,b])),true,'New release shows download button');
  const bad=resource('/images/bad.webp','expected');global.fetch=async()=>new Response('corrupt!');await assert.rejects(installGameResources(release('bad',[bad]),()=>{}));
  const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');assert.equal((await pointer.json()).version,'two','Failed patch must not replace active release');
  await assert.rejects(installGameResources(release('invalid',[{...a,url:'/api/private'}]),()=>{}));

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
+import {useEffect,useState} from 'react';
 import BattleLoadingScreen from "@/components/BattleLoadingScreen";
 import BattleUiAudio from "@/components/BattleUiAudio";
 import BattleMenuMusic from "@/components/BattleMenuMusic";
@@ -22,6 +23,8 @@ export default function RootChrome({
   const isEmbedRoute =
     pathname.startsWith("/blaze-embed") || pathname.startsWith("/market-embed");
   const isBattleRoute = isGameRoute(pathname);
+  const [runtime,setRuntime]=useState<'checking'|'game'|'site'>('checking');
+  useEffect(()=>{const bridge=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop;setRuntime(bridge?.isGameDesktop?'game':'site');if(bridge?.isGameDesktop&&!isGameRoute(pathname))window.location.replace('/game')},[pathname]);
 
   if (isEmbedRoute) {
     return children;
@@ -40,6 +43,7 @@ export default function RootChrome({
     );
   }
 
+  if(runtime!=='site')return null;
   return (
     <>
       <NexoraDialogProvider />

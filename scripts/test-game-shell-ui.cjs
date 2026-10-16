@@ -10,12 +10,13 @@ modules['./GameWindowControls.css']='';
 modules['next-auth/react']='exports.useSession=()=>({status:"authenticated"});exports.signOut=async()=>{};';
 modules['next/dynamic']='exports.__esModule=true;exports.default=()=>()=>null;';
 modules['next/navigation']='exports.usePathname=()=>"/game";';
+modules['@/lib/game-patcher']+=';exports.hasPendingGameResources=async()=>true;';
 modules['@/lib/battle-ui-state']='exports.useBattleArenaActive=()=>false;';
 modules['@/components/OnlinePresenceProvider']='exports.OnlinePresenceProvider=({children})=>children;';
 modules['room-actions']=transpile(fs.readFileSync('components/BattleRoomActions.tsx','utf8'));modules['./BattleRoomActions.css']='';
 `;
 test=test.replace('const bundle=',modules+'\nconst bundle=')
- .replace("const url=new URL(route.request().url());","const url=new URL(route.request().url());if(url.pathname==='/api/game-wallet')return route.fulfill({json:{coin:167476,nexPoint:867}});")
+ .replace("const url=new URL(route.request().url());","const url=new URL(route.request().url());if(url.pathname==='/game-release.json')return route.fulfill({json:{version:'test',resources:[]}});if(url.pathname==='/api/game-wallet')return route.fulfill({json:{coin:167476,nexPoint:867}});")
  .replace("const css=fs.readFileSync(","const css=fs.readFileSync('components/GameLobbyWallet.css','utf8')+'\\n'+fs.readFileSync(")
  .replace('const url=new URL(route.request().url());',"const url=new URL(route.request().url());if(url.pathname==='/api/game-profile')return route.fulfill({json:{avatar:'',frame:'gold',hero:'gold'}});")
  .replace('[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]',process.env.SMALL_ONLY==='1'?'[[320,568]]':'[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]]')
