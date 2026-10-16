@@ -9,6 +9,7 @@
 .nexora-window-controls [data-game-utilities-slot] img { width:24px; height:24px; object-fit:contain; }
 .nexora-window-controls [data-game-utilities-slot] button,.nexora-window-controls [data-game-audio-slot] button { position:static; width:34px; height:30px; margin:0; padding:0; }
 html[data-game-window-controls=desktop] .nexora-menu-audio-fixed { right:176px; }
+html[data-game-window-controls=desktop] .nexora-command-scene-controls { display:none!important; }
 @media (max-width:600px) and (orientation:portrait) { html[data-game-window-controls=desktop] .nexora-login-rail { left:70px; } }
 html[data-game-window-controls=desktop] .nexora-game-platform .nexora-command-status { top:56px; }
 html[data-game-window-controls=desktop] .nexora-game-platform [data-room-actions] { padding-top:46px; }

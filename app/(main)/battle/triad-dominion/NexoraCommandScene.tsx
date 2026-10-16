@@ -18,6 +18,7 @@ export default function NexoraCommandScene({ homeVideo = false }: { homeVideo?: 
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const syncMotion = () => setReduced(media.matches);
     const syncVisibility = () => setVisible(!document.hidden);
+    const syncPreference=()=>{try{setMoving(localStorage.getItem('triad-command-motion-off')!=='1')}catch{}};
     const syncAudio = () => { try { setMuted(localStorage.getItem("triad-battle-muted") === "1"); } catch {} };
     syncMotion(); syncVisibility();
     try {
@@ -27,7 +28,8 @@ export default function NexoraCommandScene({ homeVideo = false }: { homeVideo?: 
     media.addEventListener("change", syncMotion);
     document.addEventListener("visibilitychange", syncVisibility);
     window.addEventListener("nexora:audio-preference", syncAudio);
-    return () => { media.removeEventListener("change", syncMotion); document.removeEventListener("visibilitychange", syncVisibility); window.removeEventListener("nexora:audio-preference", syncAudio); };
+    window.addEventListener('nexora:motion-preference',syncPreference);
+    return () => { media.removeEventListener("change", syncMotion); document.removeEventListener("visibilitychange", syncVisibility); window.removeEventListener("nexora:audio-preference", syncAudio); window.removeEventListener('nexora:motion-preference',syncPreference); };
   }, []);
   const running = moving && visible && !reduced;
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function NexoraCommandScene({ homeVideo = false }: { homeVideo?: 
       <button type="button" aria-label={moving ? "หยุดการเคลื่อนไหว" : "เปิดการเคลื่อนไหว"} title={moving ? "หยุดการเคลื่อนไหว" : "เปิดการเคลื่อนไหว"} aria-pressed={!moving} onClick={() => {
         const next = !moving; setMoving(next);
         try { localStorage.setItem("triad-command-motion-off", next ? "0" : "1"); } catch { /* Optional preference. */ }
+        window.dispatchEvent(new Event('nexora:motion-preference'));
       }}>{moving ? <Pause /> : <Play />}</button>
       <button type="button" data-command-audio-control aria-label={muted ? "เปิดเสียงเมนู" : "ปิดเสียงเมนู"} title={muted ? "เปิดเสียงเมนู" : "ปิดเสียงเมนู"} aria-pressed={muted} onClick={() => {
         const next = !muted; setMuted(next);

@@ -27,7 +27,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
   void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
   return()=>{active=false;controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
  },[]);
- useEffect(()=>{const sync=()=>{if(!video.current)return;if(document.hidden)video.current.pause();else void video.current.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync)},[videoUrl]);
+ useEffect(()=>{const sync=()=>{if(!video.current)return;let paused=false;try{paused=localStorage.getItem('triad-command-motion-off')==='1'}catch{}if(document.hidden||paused)video.current.pause();else void video.current.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);window.addEventListener('nexora:motion-preference',sync);return()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('nexora:motion-preference',sync)}},[videoUrl]);
  useEffect(()=>{
   if(!panel)return;
   const previous=document.activeElement as HTMLElement|null;
