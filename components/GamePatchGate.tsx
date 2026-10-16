@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useBattleArenaActive } from '@/lib/battle-ui-state';
 import { installGameResources,type GameRelease,type PatchProgress } from '@/lib/game-patcher';
 import './GamePatchGate.css';
+import './BattleLoadingScreen.css';
 import {loadLobbyAssets} from '@/lib/lobby-assets';
 
 export default function GamePatchGate({children}:{children:React.ReactNode}){
@@ -43,7 +44,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     return()=>{disposed=true;controller.abort()};
   },[retry,canPatch]);
   if(pathname==='/game/login'||status==='unauthenticated'||(!blocking&&status==='authenticated'))return children;
-  if(!updating)return <div className="nexora-game-entry" role="status" aria-label="กำลังเตรียมเกม"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />{error&&<><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button></>}</div>;
+  if(!updating)return <div className="nexora-game-entry nexora-game-loading" role="status" aria-label="กำลังเตรียมเกม"><div className="nexora-game-loading-wallpaper" /><div className="nexora-game-loading-content"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div className="nexora-game-loading-track" role="progressbar" aria-label="กำลังโหลดเกม"><div /></div>{error&&<><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button></>}</div></div>;
   const percent=progress?Math.min(progress.completed===progress.count?100:99,Math.floor(progress.downloaded/progress.total*100)):0;
   return <div className="nexora-game-patch" role="status"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><h1>{error?'อัปเดตไม่สำเร็จ':'กำลังอัปเดตทรัพยากรเกม'}</h1><p>{error||progress?.file||'ตรวจสอบแพตช์'}</p><progress max={100} value={percent} aria-label="ดาวน์โหลดแพตช์" /><strong>{percent}%</strong>{progress&&<small>{(progress.downloaded/1048576).toFixed(1)} / {(progress.total/1048576).toFixed(1)} MB · {progress.completed}/{progress.count} ไฟล์</small>}{error&&<button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button>}</div>;
 }

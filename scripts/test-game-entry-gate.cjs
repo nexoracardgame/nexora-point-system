@@ -8,6 +8,7 @@ modules['@/lib/battle-ui-state']='exports.useBattleArenaActive=()=>false;';
 modules['@/lib/game-patcher']='exports.installGameResources=async()=>{};';
 modules['@/lib/lobby-assets']='exports.loadLobbyAssets=()=>new Promise(resolve=>window.finishAssets=resolve);';
 modules['./GamePatchGate.css']='';
+modules['./BattleLoadingScreen.css']='';
 modules.gate=ts.transpileModule(fs.readFileSync('components/GamePatchGate.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020}}).outputText;
 // Browser entry must never render desktop patch UI, including during hydration.
 const bundle=`const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}window.statusValue='loading';window.pathValue='/game';const root=require('react-dom/client').createRoot(document.getElementById('root'));window.render=()=>root.render(require('react').createElement(require('gate').default,null,require('react').createElement('main',{id:'lobby'},'Lobby')));render();`;
