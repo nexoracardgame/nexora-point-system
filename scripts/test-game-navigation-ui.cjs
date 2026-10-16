@@ -2,7 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),a
 const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const modules={};
 for(const [id,pkg,file]of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']])modules[id]=fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
-modules['next/navigation']='exports.useRouter=()=>({back:()=>window.backCount++,replace:()=>window.backCount++});';
+modules['next/navigation']='exports.usePathname=()=>window.testPath||"/game/profile";exports.useRouter=()=>({back:()=>window.backCount++,replace:()=>window.backCount++});';
 modules['@/lib/battle-ui-state']='exports.useBattleArenaActive=()=>window.active;';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';modules['@/lib/lobby-assets']='exports.LOBBY_ACTION_ART="";';modules['./LobbyActionButton.css']='';
 for(const [id,file]of [['back','components/GameBackButton.tsx'],['play','components/LobbyActionButton.tsx']])modules[id]=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;

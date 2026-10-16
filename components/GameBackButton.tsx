@@ -1,13 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useBattleArenaActive } from "@/lib/battle-ui-state";
 import { playGameUiSound } from "@/lib/game-ui-audio";
 
 export default function GameBackButton() {
   const router = useRouter();
+  const pathname = usePathname();
   const active = useBattleArenaActive();
-  if (active) return null;
+  if (active || pathname === "/game") return null;
   const back = () => {
     playGameUiSound("back");
     const event = new Event("nexora:navigate-back", { cancelable: true });

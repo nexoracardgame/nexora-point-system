@@ -1,5 +1,6 @@
 .nexora-command-lobby { --identity-width:min(36cqw,600px); --identity-top:138px; --identity-left:24px; }
 .nexora-command-lobby .nexora-lobby-identity { position:absolute; left:calc(-1 * var(--game-back-width,0px)); top:110px; width:var(--identity-width); aspect-ratio:2469/724; isolation:isolate; color:#fff0ce; filter:drop-shadow(0 5px 8px #0009); }
+.nexora-game-platform:not(:has(.nexora-game-back)) .nexora-lobby-identity { left:0; }
 .nexora-lobby-identity .nli-art { position:absolute; inset:0; width:100%; height:100%; max-width:none; border:0; border-radius:0; pointer-events:none; user-select:none; object-fit:fill; z-index:2; animation:nli-breathe 6s ease-in-out infinite; }
 .nexora-lobby-identity .nli-avatar { position:absolute; left:5.7%; top:23%; width:15.6%; height:auto; aspect-ratio:1; border:0; border-radius:50%; object-fit:cover; z-index:1; }
 .nli-plate-light { position:absolute; inset:0; z-index:3; pointer-events:none; mask:url('/images/lobby-play/profile-plate.png') center/100% 100% no-repeat; background:linear-gradient(110deg,transparent 20%,#e4b55f22 42%,#fff1cb44 50%,transparent 70%); background-size:300% 100%; mix-blend-mode:screen; animation:nli-shine 8s ease-in-out infinite; }
