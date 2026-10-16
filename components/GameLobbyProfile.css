@@ -4,8 +4,8 @@
 .nexora-lobby-identity .nli-art { position:absolute; inset:0; width:100%; height:100%; max-width:none; border:0; border-radius:0; pointer-events:none; user-select:none; object-fit:fill; z-index:2; animation:nli-breathe 6s ease-in-out infinite; }
 .nexora-lobby-identity .nli-avatar { position:absolute; left:5.7%; top:23%; width:15.6%; height:auto; aspect-ratio:1; border:0; border-radius:50%; object-fit:cover; z-index:1; }
 .nli-pieces img { position:absolute; border:0!important; border-radius:0!important; object-fit:fill!important; max-width:none; }
-.nli-pieces .nli-piece-avatar { left:0; top:0; width:26%; height:100%; }
-.nli-pieces .nli-piece-name { left:27%; top:0; width:61%; height:64%; }
+.nli-pieces .nli-piece-avatar { left:0; top:0; width:26%; height:100%; clip-path:polygon(0 0,100% 0,100% 59%,94% 59%,94% 100%,0 100%); }
+.nli-pieces .nli-piece-name { left:27%; top:0; width:61%; height:64%; clip-path:polygon(0 0,100% 0,100% 100%,16% 100%,16% 89%,0 89%); }
 .nli-pieces .nli-piece-rank { left:25%; top:57%; width:11%; height:43%; }
 .nli-pieces .nli-piece-rank { display:none; }
 .nli-rank-name { gap:6px; }.nli-rank-name svg { width:13px;height:13px;flex:none; }
