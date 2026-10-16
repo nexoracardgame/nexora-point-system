@@ -8,6 +8,8 @@ import { primeBattleAudio } from "./BattleAudio";
 export default function NexoraCommandScene({ homeVideo = false }: { homeVideo?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const [source, setSource] = useState("");
+  const [videoReady,setVideoReady]=useState(false);
+  const [videoFailed,setVideoFailed]=useState(false);
   const [moving, setMoving] = useState(true);
   const [visible, setVisible] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -31,7 +33,7 @@ export default function NexoraCommandScene({ homeVideo = false }: { homeVideo?: 
   useEffect(() => {
     if (!homeVideo) return;
     let active = true;
-    void loadHomeWallpaper().then(url => { if (active) setSource(url); }).catch(() => { /* The lossless 4K poster remains visible. */ });
+    void loadHomeWallpaper().then(url => { if (active) setSource(url); }).catch(() => { if(active)setVideoFailed(true); });
     return () => { active = false; };
   }, [homeVideo]);
   useEffect(() => {
@@ -43,8 +45,8 @@ export default function NexoraCommandScene({ homeVideo = false }: { homeVideo?: 
     <div className="nexora-command-scene" data-motion={running ? "running" : "paused"} aria-hidden="true">
       <div className="nexora-command-camera">
         <div className="nexora-command-art">
-          <img className="nexora-command-world" src={homeVideo ? "/videos/nexora-home-4k/poster.webp" : "/images/triad/nexora-command-original.webp"} alt="" decoding="async" fetchPriority="high" />
-          {homeVideo && <video ref={video} className="nexora-command-world-video" src={source || undefined} poster="/videos/nexora-home-4k/poster.webp" muted loop playsInline preload="auto" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}} />}
+          <img className="nexora-command-world" src={homeVideo ? "/videos/nexora-home-4k/poster.webp" : "/images/triad/nexora-command-original.webp"} alt="" decoding="async" fetchPriority="high" style={{visibility:homeVideo&&!videoFailed?'hidden':'visible'}} />
+          {homeVideo&&!videoFailed && <video ref={video} className="nexora-command-world-video" src={source || undefined} muted loop playsInline preload="auto" onLoadedData={()=>{const element=video.current;if(element?.requestVideoFrameCallback&&running)element.requestVideoFrameCallback(()=>setVideoReady(true));else setVideoReady(true)}} onError={()=>setVideoFailed(true)} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none",opacity:videoReady?1:0,transition:'opacity 500ms ease'}} />}
         </div>
         <div className="nexora-command-shards">{Array.from({ length: 16 }, (_, index) => <i key={index} style={{ left: `${22 + (index * 37 % 54)}%`, top: `${12 + (index * 23 % 72)}%`, animationDelay: `${-index * .7}s`, animationDuration: `${7 + index % 5}s` }} />)}</div>
       </div>

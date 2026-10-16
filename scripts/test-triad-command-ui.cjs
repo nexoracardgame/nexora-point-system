@@ -86,7 +86,9 @@ const auditDrawer=async()=>{
 for(const [width,height] of (process.env.MOBILE_ONLY==='1'?[]:[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]])){
 await page.setViewportSize({width,height});await page.goto('https://command.test/');await page.waitForSelector('.nexora-command-mode');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
 await page.evaluate(()=>new Promise((resolve,reject)=>{const i=new window.Image();i.onload=resolve;i.onerror=reject;i.src='/images/triad/nexora-command.webp'}));
-await page.waitForSelector('.nexora-command-world');
+await page.waitForSelector('.nexora-command-world',{state:'attached'});
+assert.equal(await page.locator('.nexora-command-world').evaluate(el=>getComputedStyle(el).visibility),'hidden','Home poster never flashes before video is ready');
+assert.equal(await page.locator('.nexora-command-world-video').getAttribute('poster'),null,'No native video poster flash');
 assert.equal(await page.locator('.nexora-command-scene img').count(),1,'Original artwork is a single intact image, not repainted layers');
 assert.ok(await page.locator('.nexora-command-world').evaluate(e=>e.complete&&e.naturalWidth===3840&&e.currentSrc.endsWith('/nexora-home-4k/poster.webp')),'Lossless 4K poster renders while the original video loads');
 if(width===1440){
