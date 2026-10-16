@@ -5,7 +5,7 @@ import { triadCardByNo } from "@/lib/triad-dominion";
 import { pentadElementNames } from "@/lib/pentad-dominion";
 import BattleCardInspector from "@/components/BattleCardInspector";
 
-const PreviewContext = createContext({ show: (_no: string, _modal = false) => {}, hide: (_no: string) => {} });
+const PreviewContext = createContext({ show: (_no: string, _modal = false) => {}, hide: (_no: string,_force=false) => {} });
 export const usePentadCardPreview = () => useContext(PreviewContext);
 
 export default function PentadCardPreview({ children, contextKey }: { children: ReactNode; contextKey: string }) {
@@ -14,7 +14,7 @@ export default function PentadCardPreview({ children, contextKey }: { children: 
   useLayoutEffect(() => { setMounted(true); setPreview(null); }, [contextKey]);
   const actions = useMemo(() => ({
     show: (no: string, modal = false) => { if (triadCardByNo.has(no)) setPreview(current => current?.no === no && current.modal === modal ? current : { no, modal }); },
-    hide: (no: string) => setPreview(current => current?.no === no && !current.modal ? null : current),
+    hide: (no: string,force=false) => setPreview(current => current?.no === no && (force||!current.modal) ? null : current),
   }), []);
   useEffect(() => {
     if (!preview) return;

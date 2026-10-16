@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode,type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, SendHorizontal } from "lucide-react";
 
@@ -17,7 +17,7 @@ export default function BattleArenaChat({ messages, currentUserId, draft, onDraf
 }
 
 export function BattleArenaChatFrame({ children, arenaSelector, cinematicActive, rotateBreakpoint = 900 }: { children: ReactNode; arenaSelector: string; cinematicActive: boolean; rotateBreakpoint?: number }) {
-  const [frame, setFrame] = useState<{ left: number; top: number; width: number; height: number; rotated: boolean; clearWidth?: number } | null>(null);
+  const [frame, setFrame] = useState<{ left: number; top: number; width: number; height: number; rotated: boolean; clearWidth?: number;handInset:number } | null>(null);
   useLayoutEffect(() => {
     const board = document.querySelector<HTMLElement>(arenaSelector);
     const measure = () => {
@@ -26,13 +26,16 @@ export function BattleArenaChatFrame({ children, arenaSelector, cinematicActive,
       const rect = !cinematicActive ? canvas?.getBoundingClientRect() : null;
       const cards = rect ? Array.from(board?.querySelectorAll<HTMLElement>("[data-pentad-side] > button") || []) : [];
       const clearWidth = cards.length ? Math.max(80,Math.min(...cards.map(card => { const r=card.getBoundingClientRect(); return rotated ? r.top-rect!.top : r.left-rect!.left; }))-24) : undefined;
-      const next = { left: rect?.left || 0, top: rect?.top || 0, width: rotated ? rect?.height ?? window.innerHeight : rect?.width ?? window.innerWidth, height: rotated ? rect?.width ?? window.innerWidth : rect?.height ?? window.innerHeight, rotated, clearWidth };
+      const hand=[...document.querySelectorAll<HTMLElement>('.nexora-arena-hand')].map(el=>el.getBoundingClientRect()).find(r=>r.width>0&&r.height>0);
+      const mobile=window.matchMedia('(max-width:1000px),(hover:none) and (pointer:coarse)').matches;
+      const handInset=mobile&&hand&&rect&&!cinematicActive?Math.max(0,rotated?hand.right-rect.left:rect.bottom-hand.top)+8:0;
+      const next = { left: rect?.left || 0, top: rect?.top || 0, width: rotated ? rect?.height ?? window.innerHeight : rect?.width ?? window.innerWidth, height: rotated ? rect?.width ?? window.innerWidth : rect?.height ?? window.innerHeight, rotated, clearWidth,handInset };
       setFrame(current => current && Object.keys(next).every(key => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
     };
-    measure(); const observer = new ResizeObserver(measure); if (board) observer.observe(board);
+    measure(); const observer = new ResizeObserver(measure); if (board) observer.observe(board);document.querySelectorAll('.nexora-arena-hand').forEach(el=>observer.observe(el));
     window.addEventListener("resize", measure);
     window.visualViewport?.addEventListener("resize", measure);
     return () => { observer.disconnect(); window.removeEventListener("resize", measure); window.visualViewport?.removeEventListener("resize", measure); };
   }, [arenaSelector, cinematicActive, rotateBreakpoint]);
-  return frame ? createPortal(<div className="triad-battle-chat-hud-frame" style={{ left:frame.left,top:frame.top,width:frame.width,height:frame.height,transform:frame.rotated ? "rotate(90deg) translateY(-100%)" : "none", transformOrigin:"top left" }} data-cinematic-chat={cinematicActive}><div style={{maxWidth:frame.clearWidth}}>{children}</div></div>, document.body) : null;
+  return frame ? createPortal(<div className="triad-battle-chat-hud-frame" style={{ left:frame.left,top:frame.top,width:frame.width,height:frame.height,transform:frame.rotated ? "rotate(90deg) translateY(-100%)" : "none", transformOrigin:"top left",'--chat-hand-inset':`${frame.handInset}px` } as CSSProperties} data-cinematic-chat={cinematicActive}><div style={{maxWidth:frame.clearWidth}}>{children}</div></div>, document.body) : null;
 }

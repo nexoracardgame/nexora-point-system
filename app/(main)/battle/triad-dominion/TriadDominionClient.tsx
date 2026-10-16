@@ -1,4 +1,5 @@
 "use client";
+import {useCardGesture} from '@/lib/use-card-gesture';
 import GameLobbyNavigation from '@/components/GameLobbyNavigation';
 import GameLobbyProfile from '@/components/GameLobbyProfile';
 
@@ -2538,6 +2539,7 @@ function HandCard({
   onPreview: (card: CardView) => void;
   onPreviewEnd: () => void;
 }) {
+  const gesture=useCardGesture({onChoose:onClick,onPreview:()=>onPreview(card),onPreviewEnd,disabled:disabled||used});
   const holdPreviewPointerRef = useRef<number | null>(null);
   const playStampRef = useRef(0);
   const playCardOnce = () => {
@@ -2559,18 +2561,7 @@ function HandCard({
   return (
     <button
       type="button"
-      onClick={(event) => {
-        if (isPreviewOnlyInput()) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        if (disabled) {
-          onPreview(card);
-          return;
-        }
-        playCardOnce();
-      }}
+      
       onMouseEnter={() => {
         if (isPreviewOnlyInput()) return;
         onPreview(card);
@@ -2587,14 +2578,8 @@ function HandCard({
         if (isPreviewOnlyInput()) return;
         onPreviewEnd();
       }}
-      onPointerDown={(event) => {
-        if (!isPreviewOnlyInput()) return;
-        event.preventDefault();
-        event.stopPropagation();
-        holdPreviewPointerRef.current = event.pointerId;
-        onPreview(card);
-      }}
-      draggable={!previewOnly && !disabled && !used}
+      
+      
       onDragStart={(event) => {
         if (isPreviewOnlyInput()) {
           event.preventDefault();
@@ -2603,54 +2588,11 @@ function HandCard({
         event.dataTransfer.setData("text/plain", card.cardNo);
         event.dataTransfer.effectAllowed = "move";
       }}
-      onPointerUp={(event) => {
-        if (isPreviewOnlyInput()) {
-          event.preventDefault();
-          event.stopPropagation();
-          if (disabled) {
-            onPreview(card);
-            return;
-          }
-          closeHoldPreview();
-          playCardOnce();
-          return;
-        }
-        if (disabled) return;
-        onPreview(card);
-        const target = document
-          .elementFromPoint(event.clientX, event.clientY)
-          ?.closest<HTMLElement>("[data-triad-lane]");
-        const lane = target?.dataset.triadLane as Lane | undefined;
-        if (lane) onDropToLane(lane, card.cardNo);
-      }}
-      onTouchEnd={(event) => {
-        if (isPreviewOnlyInput()) {
-          event.preventDefault();
-          event.stopPropagation();
-          if (disabled) {
-            onPreview(card);
-            return;
-          }
-          closeHoldPreview();
-          playCardOnce();
-          return;
-        }
-      }}
-      onPointerCancel={(event) => {
-        if (!isPreviewOnlyInput()) return;
-        event.preventDefault();
-        event.stopPropagation();
-        closeHoldPreview();
-      }}
-      onPointerLeave={(event) => {
-        if (!isPreviewOnlyInput()) return;
-        event.stopPropagation();
-        closeHoldPreview();
-      }}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      }}
+      
+      
+      
+      
+      
       aria-disabled={disabled || used}
       className={`group relative z-[2] min-w-0 touch-manipulation select-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [-webkit-touch-callout:none] [pointer-events:auto] ${
         used
@@ -2660,7 +2602,7 @@ function HandCard({
             : highlighted
               ? "border-cyan-200/80 shadow-[0_0_24px_rgba(34,211,238,0.45)] hover:-translate-y-2"
               : "border-white/14 hover:-translate-y-2 hover:border-amber-200/70"
-      }`}
+      }`} {...gesture}
     >
       <div className="relative aspect-[815/1110]">
         <BattleArenaCardFrame><Image src={card.sourceImage} alt={card.name} fill sizes="110px" draggable={false} className="select-none object-contain [-webkit-touch-callout:none]" /></BattleArenaCardFrame>

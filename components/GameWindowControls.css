@@ -13,6 +13,8 @@ html[data-game-window-controls=desktop] .nexora-command-scene-controls { display
 @media (max-width:600px) and (orientation:portrait) { html[data-game-window-controls=desktop] .nexora-login-rail { left:70px; } }
 html[data-game-window-controls=desktop] .nexora-game-platform .nexora-command-status { top:56px; }
 html[data-game-window-controls=desktop] .nexora-game-platform [data-room-actions] { padding-top:46px; }
+html[data-game-window-controls=desktop] .nexora-arena-header-actions { margin-top:48px; }
+html[data-game-window-controls=desktop] .nexora-arena-header { min-height:106px; align-items:flex-start; }
 @media (prefers-reduced-motion:reduce) { .nexora-window-controls button { transition:none; } }
 .nexora-command-nav .nexora-menu-logout { color:#f4dfb0; border-left-color:#d7b47088; }
 .nexora-command-nav .nexora-menu-logout:disabled { opacity:.5; cursor:wait; }

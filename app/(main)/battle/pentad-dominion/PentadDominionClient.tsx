@@ -29,6 +29,7 @@ import BattleCinematic from "../triad-dominion/BattleCinematic";
 import { playMenuCue, primeBattleAudio } from "../triad-dominion/BattleAudio";
 import styles from "./PentadDominion.module.css";
 import PentadCardPreview, { usePentadCardPreview } from "./PentadCardPreview";
+import {useCardGesture} from '@/lib/use-card-gesture';
 
 type Listing = { code: string; host: string; challenger: string; phase: string; spectators: number };
 const BACK = "/cards/card-backs/card-backs.png";
@@ -39,23 +40,20 @@ const phaseNames: Record<PentadRoom["phase"], string> = { waiting: "รอผู
 function Card({ no, onClick, disabled, badge, className = "" }: { no?: string; onClick?: () => void; disabled?: boolean; badge?: string; className?: string }) {
   const card = no ? triadCardByNo.get(no) : undefined;
   const preview = usePentadCardPreview();
+  const gesture=useCardGesture({onChoose:onClick||(()=>{if(no)preview.show(no,true)}),onPreview:()=>{if(no)preview.show(no,true)},onPreviewEnd:()=>{if(no)preview.hide(no,true)},disabled});
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const origin = useRef({ x: 0, y: 0 });
   const cancelHold = () => { if (hold.current) clearTimeout(hold.current); hold.current = null; };
   useEffect(() => () => cancelHold(), []);
-  return <button type="button" className={`${styles.card} ${className}`} data-card-no={card?.cardNo} onClick={event => {
-    cancelHold(); if (held.current) { event.preventDefault(); held.current = false; return; }
-    if (onClick) { if (!disabled) { if (no) preview.hide(no); onClick(); } }
-    else if (no) preview.show(no, true);
-  }} disabled={Boolean(disabled && onClick)} aria-label={card ? `No.${no} ${card.name}` : "การ์ดคว่ำ"}
+  return <button type="button" className={`${styles.card} ${className}`} data-card-no={card?.cardNo}  disabled={Boolean(disabled && onClick)} aria-label={card ? `No.${no} ${card.name}` : "การ์ดคว่ำ"}
     onPointerEnter={event => { if (card && event.pointerType === "mouse") preview.show(card.cardNo); }}
-    onPointerLeave={() => { cancelHold(); if (no) preview.hide(no); }}
-    onFocus={() => { if (no) preview.show(no); }} onBlur={() => { if (no) preview.hide(no); }}
-    onContextMenu={event => { if (card) { event.preventDefault(); preview.show(card.cardNo, true); } }}
-    onPointerDown={event => { if (!card || event.pointerType === "mouse") return; held.current = false; origin.current = { x: event.clientX, y: event.clientY }; cancelHold(); hold.current = setTimeout(() => { held.current = true; preview.show(card.cardNo, true); }, 450); }}
-    onPointerMove={event => { if (Math.hypot(event.clientX - origin.current.x, event.clientY - origin.current.y) > 8) cancelHold(); }}
-    onPointerUp={cancelHold} onPointerCancel={cancelHold}>
+    
+    onFocus={() => { if (no&&window.matchMedia('(hover:hover) and (pointer:fine)').matches) preview.show(no); }} onBlur={() => { if (no) preview.hide(no); }}
+    
+    
+    
+      {...gesture}>
     {/* Native card artwork contains its own border. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <BattleArenaCardFrame><img className={card ? "" : "nexora-card-back-art"} src={card?.sourceImage || BACK} alt={card?.name || "การ์ดคว่ำ"} draggable={false} /></BattleArenaCardFrame>
