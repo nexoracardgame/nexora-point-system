@@ -11,7 +11,8 @@ const base=process.env.GAME_TEST_URL||'http://localhost:3013';
   assert.equal(await page.locator('.nexora-game-download').count(),0,'Installed game never renders a PC download link');
   await page.locator('.nexora-window-controls .nexora-login-utilities').waitFor();
   const toolbar=await page.locator('.nexora-window-controls button').evaluateAll(buttons=>buttons.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,hit:el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}}));
-  assert.ok(toolbar.length>=5,'Native toolbar contains utilities and window controls');
+  assert.ok(toolbar.length>=4,'Native toolbar contains settings and window controls');
+  assert.equal(await page.getByRole('button',{name:'ติดต่อฝ่ายสนับสนุน',exact:true}).count(),0,'Top-right support icon is removed');
   for(let i=0;i<toolbar.length;i++){const r=toolbar[i];assert.ok(r.x>=0&&r.y>=0&&r.right<=width&&r.bottom<=height&&r.hit,'Toolbar button is visible and clickable');for(let j=0;j<i;j++){const a=toolbar[j];assert.ok(r.x>=a.right||r.right<=a.x||r.y>=a.bottom||r.bottom<=a.y,'Toolbar buttons never overlap')}}
   assert.ok((await page.locator('.nexora-credential-frame-art').getAttribute('src')).includes('form-v2.webp'));
   const slots=await page.locator('.nexora-credential-field').evaluateAll(fields=>fields.map(el=>({top:el.offsetTop/el.offsetParent.clientHeight,bottom:(el.offsetTop+el.offsetHeight)/el.offsetParent.clientHeight,left:el.offsetLeft/el.offsetParent.clientWidth,right:(el.offsetLeft+el.offsetWidth)/el.offsetParent.clientWidth})));

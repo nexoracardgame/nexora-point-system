@@ -43,7 +43,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
   await onCredentials(username,password,register?confirmation:undefined);setPassword('');setConfirmation('');
  };
  const social=<div className="nexora-login-social">{providers.map(([id,label])=><button type="button" data-provider={id} key={id} title={id==='line'||id==='google'?`เข้าสู่ระบบด้วย ${label}`:`${label} · ยังไม่เปิดให้บริการ`} aria-label={`เข้าสู่ระบบด้วย ${label}`} disabled={busy} data-flash={flash===id} onAnimationEnd={()=>setFlash('')} onClick={()=>{cue(id);if(id==='line'||id==='google')onLogin(id);else setNotice(`${label} ยังไม่เปิดให้บริการ กรุณาใช้ LINE หรือ Google`)}}><img src={`/images/game-login/plain-${id}.webp`} alt=""/><span>{label}</span></button>)}</div>;
- const utilities=<div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button><button type="button" title="ติดต่อเรา" aria-label="ติดต่อฝ่ายสนับสนุน" onClick={()=>open('support')}><img src="/images/game-login/support.webp" alt=""/></button></div>;
+ const utilities=<div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button></div>;
  return <main className="nexora-game-login" aria-busy={busy}>
   <img className="nexora-game-login-scene" src="/images/triad/nexora-command-original.webp" alt="" fetchPriority="high" loading="eager"/>
   {videoUrl&&<video ref={video} className="nexora-game-login-video" src={videoUrl} autoPlay loop muted playsInline aria-hidden="true"/>}
