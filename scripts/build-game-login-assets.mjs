@@ -1,7 +1,13 @@
 import sharp from 'sharp';
+import {existsSync} from 'node:fs';
 import {mkdir,copyFile} from 'node:fs/promises';
 const destination='public/images/game-login';
 await mkdir(destination,{recursive:true});
+if(process.argv.includes('--frame-v2')){
+ await copyFile('C:/Users/USER/Downloads/e9d34451-f5ec-4b3f-a3fc-bf65b94f6e06.png',`${destination}/form-v2-source.png`);
+ const clean=`${destination}/form-v2-clean-source.png`;
+ await sharp(existsSync(clean)?clean:`${destination}/form-v2-source.png`).webp({quality:96,alphaQuality:100}).toFile(`${destination}/form-v2.webp`);
+}
 const sources={login:'9df60acc-bf85-427c-b8f9-e4d4cd7c5187.png',register:'264a19e8-7f6e-4f70-a8c3-ec08e43a8f19.png',navigation:'dac6adf9-63af-4fff-a2f6-5df85c250582.png',social:'d69e9c00-4d14-4ed1-93f6-3983ecfef72b.png'};
 if(process.argv.includes('--import'))for(const [name,file]of Object.entries(sources))await copyFile(`C:/Users/USER/Downloads/${file}`,`${destination}/${name}-source.png`);
 for(const name of ['login','register'])await sharp(`${destination}/${name}-source.png`).resize({width:1200,withoutEnlargement:true}).webp({quality:94,alphaQuality:100}).toFile(`${destination}/${name}.webp`);

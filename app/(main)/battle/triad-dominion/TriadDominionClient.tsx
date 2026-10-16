@@ -1,4 +1,5 @@
 "use client";
+import GameLobbyNavigation from '@/components/GameLobbyNavigation';
 
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
@@ -3667,12 +3668,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <div className="nexora-command-profile"><img src={participant.image || "/avatar.png"} alt="" /><div><strong>{participant.name}</strong><small>{profile?.rankName || "BRONZE"} · {profile?.wins || 0} ชัยชนะ</small></div></div>
       </header>
       <div className="nexora-command-status"><span><Users />{rooms.length} ห้อง</span><span><Swords />{rooms.filter(room => room.status === "playing").length} กำลังต่อสู้</span></div>
-      <nav className="nexora-command-nav" aria-label="เมนูเกม">
-        <button onClick={() => onNavigate("/collections")}><Layers3 />การ์ดของฉัน</button>
-        <button onClick={() => onNavigate("/community")}><Users />เพื่อน</button>
-        <button onClick={() => setPanel("rank")} aria-pressed={panel === "rank"}><Trophy />อันดับนักดวล</button>
-        <button onClick={() => onNavigate("/")}><House />เว็บหลัก</button>
-      </nav>
+      <GameLobbyNavigation onRank={() => setPanel("rank")} onHome={() => { setPanel(null); setPanelClosing(false); }} />
       <div className="nexora-lobby-promo-rail"><LobbyBanner />
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
         <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => openPanel("create")} />

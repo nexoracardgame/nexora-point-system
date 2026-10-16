@@ -13,8 +13,12 @@ const sections=[['news','NEWS','ข่าวสาร'],['event','EVENT','กิ
 export default function GameLoginView({busy,checking,error,onLogin,onCredentials}:Props){
  const [panel,setPanel]=useState(''),[flash,setFlash]=useState(''),[notice,setNotice]=useState(''),[muted,setMuted]=useState(false);
  const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[remember,setRemember]=useState(false),[showPassword,setShowPassword]=useState(false),[videoUrl,setVideoUrl]=useState('');
+ const [browserDownload,setBrowserDownload]=useState(false);
  const dialog=useRef<HTMLElement|null>(null),video=useRef<HTMLVideoElement|null>(null);
  useEffect(()=>{
+  const bridge=(window as typeof window&{nexoraDesktop?:{isDesktop?:boolean;isGameDesktop?:boolean}}).nexoraDesktop;
+  const installed=Boolean(bridge?.isDesktop||bridge?.isGameDesktop||navigator.userAgent.includes('Electron/'));
+  setBrowserDownload(!installed);document.documentElement.dataset.gameDesktop=String(installed);
   let active=true,objectUrl='';const controller=new AbortController();try{const name=localStorage.getItem('nexora-game-username');if(name){setUsername(name);setRemember(true)}}catch{}
   void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{});
   return()=>{active=false;controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
@@ -45,7 +49,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
    <img className="nexora-game-login-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" fetchPriority="high"/>
    <div className="nexora-game-login-actions">
     <form className="nexora-credential-frame" onSubmit={event=>{event.preventDefault();void submit()}}>
-     <img className="nexora-credential-frame-art" src="/images/game-login/form.webp" alt=""/>
+     <img className="nexora-credential-frame-art" src="/images/game-login/form-v2.webp" alt=""/>
      <label className="nexora-credential-field" data-field="username"><UserRound aria-hidden="true"/><input aria-label="Username" name="username" placeholder="Username" autoComplete="username" autoCapitalize="none" spellCheck={false} required minLength={3} maxLength={24} pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}" value={username} onChange={event=>setUsername(event.target.value)} disabled={busy}/></label>
      <label className="nexora-credential-field" data-field="password"><LockKeyhole aria-hidden="true"/><input aria-label="Password" name="password" placeholder="Password" autoComplete="current-password" type={showPassword?'text':'password'} required minLength={12} maxLength={128} value={password} onChange={event=>setPassword(event.target.value)} disabled={busy}/><button type="button" className="nexora-password-eye" aria-label={showPassword?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน'} title={showPassword?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน'} onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff/>:<Eye/>}</button></label>
      <label className="nexora-credential-remember"><input type="checkbox" checked={remember} onChange={event=>setRemember(event.target.checked)}/><span>จำชื่อผู้ใช้</span></label>
@@ -55,7 +59,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
     </form>
     <button type="button" className="nexora-register-link" disabled={busy} onClick={()=>open('register')}>สมัครสมาชิกใหม่</button>
    </div>
-   <a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.3.exe" download><Download size={16}/>ดาวน์โหลด Windows PC<span>64-bit · v1.0.3</span></a>
+   {browserDownload&&<a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.3.exe" download><Download size={16}/>ดาวน์โหลด Windows PC<span>64-bit · v1.0.3</span></a>}
    <div className="nexora-login-feedback" aria-live="polite">{error?<p role="alert">{error}</p>:<p role="status">{busy?(checking?'กำลังตรวจสอบบัญชี':'กำลังเข้าสู่สนาม'):notice}</p>}</div>
   </section>
   {panel&&<div className="nexora-login-dialog-backdrop" onClick={()=>{if(!busy)setPanel('')}}><section ref={dialog} className="nexora-login-dialog" role="dialog" aria-modal="true" aria-label={panel==='register'?'สมัครสมาชิก':panel==='forgot'?'ลืมรหัสผ่าน':panel==='settings'?'ตั้งค่า':sections.find(item=>item[0]===panel)?.[2]} onClick={event=>event.stopPropagation()}>

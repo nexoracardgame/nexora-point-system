@@ -49,16 +49,16 @@ html[data-game-desktop=true] .nexora-game-download { display:none; }
 .nexora-credential-frame { position:relative; width:min(100%,calc((100cqh - 140px)*1.118)); aspect-ratio:1326/1186; flex:none; margin:0; }
 .nexora-credential-frame-art { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
 .nexora-credential-field { position:absolute; left:13%; width:74%; height:9.5%; display:flex; align-items:center; gap:8px; padding:0 8px; box-sizing:border-box; color:#e7e2d8; }
-.nexora-credential-field[data-field=username] { top:25%; }.nexora-credential-field[data-field=password] { top:39%; }
+.nexora-credential-field[data-field=username] { top:23.3%; height:8.5%; }.nexora-credential-field[data-field=password] { top:36.9%; height:8.4%; }
 .nexora-credential-field > svg { width:19px; height:19px; flex:none; }
 .nexora-credential-field input { width:100%; min-width:0; height:100%; border:0; outline:0; background:transparent; color:#fff; font-size:16px; }
 .nexora-credential-field:focus-within { box-shadow:inset 0 -1px #f8d989; }
 .nexora-credential-field input::placeholder { color:#bcb9b2; }
 .nexora-credential-field .nexora-password-eye { display:grid; place-items:center; width:26px; height:100%; flex:none; }.nexora-password-eye svg { width:17px; height:17px; }
-.nexora-credential-remember { position:absolute; left:11%; top:51%; height:6%; display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; }
+.nexora-credential-remember { position:absolute; left:12.4%; top:50.6%; height:4%; display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; white-space:nowrap; }
 .nexora-credential-remember input { appearance:none; width:16px; height:16px; margin:0; display:grid; place-items:center; background:transparent; cursor:pointer; }
 .nexora-credential-remember input:checked::after { content:"\2713"; color:#ffdf92; font-size:16px; line-height:1; }.nexora-credential-remember input:focus-visible { outline:1px solid #fff; }
-.nexora-game-login-actions .nexora-credential-forgot { position:absolute; right:12%; top:51%; height:6%; font-size:12px; }
+.nexora-game-login-actions .nexora-credential-forgot { position:absolute; right:12%; top:50.6%; height:4%; font-size:12px; white-space:nowrap; }
 .nexora-game-login-actions .nexora-credential-submit { position:absolute; top:59%; left:12%; width:76%; height:13%; color:#17120b; font:700 29px Georgia,serif; text-shadow:0 1px #fff8; clip-path:polygon(5% 0,95% 0,100% 50%,95% 100%,5% 100%,0 50%); overflow:hidden; }
 .nexora-credential-submit::after { content:""; position:absolute; inset:0; background:linear-gradient(110deg,transparent 25%,#fff9 50%,transparent 75%); transform:translateX(-100%); pointer-events:none; }
 .nexora-credential-submit:hover::after,.nexora-credential-submit[data-flash=true]::after { animation:nexora-login-shine .6s ease-out; }

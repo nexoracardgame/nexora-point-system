@@ -8,5 +8,6 @@ html[data-game-window-controls=desktop] .nexora-game-platform [data-room-actions
 @media (prefers-reduced-motion:reduce) { .nexora-window-controls button { transition:none; } }
 .nexora-command-nav .nexora-menu-logout { color:#f4dfb0; border-left-color:#d7b47088; }
 .nexora-command-nav .nexora-menu-logout:disabled { opacity:.5; cursor:wait; }
+.nexora-game-menu-pending { display:block; padding:6px 10px; color:#e3cd9f; background:#06090dbb; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
 .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 250px); overflow-y:auto; scrollbar-width:thin; }
 @media (max-height:600px),(max-width:1000px) and (orientation:portrait) { .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 155px); } }

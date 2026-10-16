@@ -19,6 +19,9 @@ test=test.replace('const bundle=',modules+'\nconst bundle=')
  const logout=page.locator('.nexora-menu-logout');const logoutBox=await logout.boundingBox();assert.ok(logoutBox&&logoutBox.x>=0&&logoutBox.y>=0&&logoutBox.x+logoutBox.width<=width+1&&logoutBox.y+logoutBox.height<=height+1,'Logout fits '+width);
  assert.equal(await logout.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true,'Logout is not covered '+width);
  assert.equal(await page.locator('.nexora-window-controls [aria-label="ออกจากระบบ"]').count(),0);
+ const beforeMenu=page.url();await page.getByRole('button',{name:'การ์ดของฉัน',exact:true}).click();await page.getByRole('status').filter({hasText:'การ์ดของฉัน · ยังไม่เปิดให้บริการ'}).waitFor();assert.equal(page.url(),beforeMenu);
+ await page.getByRole('button',{name:'เพื่อน',exact:true}).click();await page.getByRole('status').filter({hasText:'เพื่อน · ยังไม่เปิดให้บริการ'}).waitFor();assert.equal(page.url(),beforeMenu);
+ await page.getByRole('button',{name:'หน้าหลักเกม',exact:true}).click();assert.equal(page.url(),beforeMenu);assert.equal(await page.getByRole('button',{name:'เว็บหลัก',exact:true}).count(),0);
  await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});`)
  .replace('modules.test=transpile(`','modules.test=transpile(`import BattleRoomActions from "room-actions";')
  .replace("const css=fs.readFileSync(","const css=fs.readFileSync('components/GameWindowControls.css','utf8')+'\\n'+fs.readFileSync('components/GameShell.css','utf8')+'\\n'+fs.readFileSync(")
