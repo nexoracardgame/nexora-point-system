@@ -40,16 +40,16 @@ const phaseNames: Record<PentadRoom["phase"], string> = { waiting: "รอผู
 function Card({ no, onClick, disabled, badge, className = "" }: { no?: string; onClick?: () => void; disabled?: boolean; badge?: string; className?: string }) {
   const card = no ? triadCardByNo.get(no) : undefined;
   const preview = usePentadCardPreview();
-  const gesture=useCardGesture({onChoose:onClick||(()=>{if(no)preview.show(no,true)}),onPreview:()=>{if(no)preview.show(no,true)},onPreviewEnd:()=>{if(no)preview.hide(no,true)},disabled});
+  const gesture=useCardGesture({onChoose:onClick,onPreview:()=>{if(no)preview.show(no,true)},onPreviewEnd:()=>{if(no)preview.hide(no,true)},disabled});
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const origin = useRef({ x: 0, y: 0 });
   const cancelHold = () => { if (hold.current) clearTimeout(hold.current); hold.current = null; };
   useEffect(() => () => cancelHold(), []);
-  return <button type="button" className={`${styles.card} ${className}`} data-card-no={card?.cardNo}  disabled={Boolean(disabled && onClick)} aria-label={card ? `No.${no} ${card.name}` : "การ์ดคว่ำ"}
-    onPointerEnter={event => { if (card && event.pointerType === "mouse") preview.show(card.cardNo); }}
+  return <button type="button" className={`${styles.card} ${className}`} data-card-no={card?.cardNo}  aria-disabled={Boolean(disabled && onClick)} aria-label={card ? `No.${no} ${card.name}` : "การ์ดคว่ำ"}
     
-    onFocus={() => { if (no&&window.matchMedia('(hover:hover) and (pointer:fine)').matches) preview.show(no); }} onBlur={() => { if (no) preview.hide(no); }}
+    
+     
     
     
     

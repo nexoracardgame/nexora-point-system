@@ -1,4 +1,5 @@
 "use client";
+import HoldCardButton from "@/components/HoldCardButton";
 import {useCardGesture} from '@/lib/use-card-gesture';
 import GameLobbyNavigation from '@/components/GameLobbyNavigation';
 import GameLobbyProfile from '@/components/GameLobbyProfile';
@@ -1924,26 +1925,26 @@ function DeckCard({
   onPreviewEnd?: () => void;
 }) {
   return (
-    <button
+    <HoldCardButton
       type="button"
       onClick={() => {
         if (disabled && !selected) return;
         onClick();
       }}
-      onMouseEnter={() => onPreview?.(card)}
-      onMouseLeave={onPreviewEnd}
-      onPointerEnter={() => onPreview?.(card)}
-      onPointerMove={() => onPreview?.(card)}
-      onPointerLeave={onPreviewEnd}
-      onFocus={() => onPreview?.(card)}
-      onBlur={onPreviewEnd}
+      
+      
+      
+      
+      
+      
+      
       aria-disabled={disabled && !selected}
       title={disabled && !selected ? disabledReason : selected ? "คลิกอีกครั้งเพื่อลบการ์ดใบนี้" : undefined}
       className={`group relative min-w-0 overflow-hidden rounded-xl border bg-black/52 text-left shadow-[0_18px_48px_rgba(0,0,0,0.32)] transition hover:-translate-y-1 hover:border-amber-300/60 ${
         disabled && !selected ? "cursor-not-allowed opacity-45" : ""
       } ${
         selected ? "border-amber-300 ring-2 ring-amber-300/30" : "border-white/10"
-      }`}
+      }`} onPreview={()=>onPreview?.(card)} onPreviewEnd={()=>onPreviewEnd?.()}
     >
       <div className="relative aspect-[815/1110]">
         <Image src={card.sourceImage} alt={card.name} fill sizes="180px" className="object-contain" />
@@ -1960,7 +1961,7 @@ function DeckCard({
           {card.kind === "skill" ? "สกิล" : elementLabel[card.element]}
         </div>
       </div>
-    </button>
+    </HoldCardButton>
   );
 }
 
@@ -2443,37 +2444,20 @@ function BoardTriangle({
         const canPreview = Boolean(card && visible);
         return (
           <Fragment key={lane}>
-            <button
+            <HoldCardButton
               type="button"
               data-triad-lane={lane}
               data-arena-slot={lane === "top" ? 0 : lane === "left" ? 1 : 3}
-              onClick={() => {
-                if (card && canPreview) onPreview?.(card, "modal");
-                onSlotClick?.(lane);
-              }}
-              onMouseEnter={() => {
-                if (card && canPreview) onPreview?.(card, "hover");
-              }}
-              onMouseLeave={onPreviewEnd}
-              onPointerEnter={() => {
-                if (card && canPreview) onPreview?.(card, "hover");
-              }}
-              onPointerMove={() => {
-                if (card && canPreview) onPreview?.(card, "hover");
-              }}
-              onPointerDown={(event) => {
-                if (!card || !canPreview) return;
-                if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-                onPreview?.(card, "modal");
-              }}
-              onTouchStart={() => {
-                if (card && canPreview) onPreview?.(card, "modal");
-              }}
-              onPointerLeave={onPreviewEnd}
-              onFocus={() => {
-                if (card && canPreview) onPreview?.(card, "modal");
-              }}
-              onBlur={onPreviewEnd}
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
               onDragOver={(event) => {
                 if (onDropCard) event.preventDefault();
               }}
@@ -2491,7 +2475,7 @@ function BoardTriangle({
                 selectedLane === lane ? "ring-2 ring-amber-300/80" : "ring-0"
               } ${swapActive && lane === "top" ? "animate-[triad-swap-land_700ms_ease-out]" : ""} ${
                 onSlotClick ? "hover:-translate-y-1 disabled:hover:translate-y-0" : ""
-              }`}
+              }`} onPreview={()=>{if(card&&canPreview)onPreview?.(card,"hover")}} onPreviewEnd={()=>onPreviewEnd?.()} onClick={()=>onSlotClick?.(lane)}
             >
               <BoardCardSlot
                 card={card}
@@ -2501,7 +2485,7 @@ function BoardTriangle({
                 label={label}
                 tone={tone}
               />
-            </button>
+            </HoldCardButton>
           </Fragment>
         );
       })}
@@ -2562,22 +2546,10 @@ function HandCard({
     <button
       type="button"
       
-      onMouseEnter={() => {
-        if (isPreviewOnlyInput()) return;
-        onPreview(card);
-      }}
-      onMouseLeave={() => {
-        if (isPreviewOnlyInput()) return;
-        onPreviewEnd();
-      }}
-      onFocus={() => {
-        if (isPreviewOnlyInput()) return;
-        onPreview(card);
-      }}
-      onBlur={() => {
-        if (isPreviewOnlyInput()) return;
-        onPreviewEnd();
-      }}
+      
+      
+      
+      
       
       
       onDragStart={(event) => {
@@ -2753,15 +2725,15 @@ function SpectatorDeckRail({
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fit,minmax(3.6rem,1fr))]">
         {cards.map((card) => (
-          <button
+          <HoldCardButton
             key={card.cardNo}
             type="button"
-            onMouseEnter={() => onPreview(card)}
-            onMouseLeave={() => onPreview(null)}
-            onFocus={() => onPreview(card)}
-            onBlur={() => onPreview(null)}
-            onClick={() => onPreview(card)}
-            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_12px_22px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/60 hover:shadow-[0_0_34px_rgba(251,191,36,0.24)] focus:outline-none focus:ring-2 focus:ring-amber-200/70"
+            
+            
+            
+            
+            
+            className="group relative aspect-[3/4] min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_12px_22px_rgba(0,0,0,0.24)] transition duration-200 hover:-translate-y-1 hover:scale-[1.03] hover:border-amber-200/60 hover:shadow-[0_0_34px_rgba(251,191,36,0.24)] focus:outline-none focus:ring-2 focus:ring-amber-200/70" onPreview={()=>onPreview?.(card)} onPreviewEnd={()=>onPreview?.(null)} onClick={()=>{}}
           >
             <Image
               src={card.sourceImage}
@@ -2776,7 +2748,7 @@ function SpectatorDeckRail({
             <div className="absolute left-1 top-1 rounded bg-black/72 px-1.5 py-0.5 text-[8px] font-black text-white">
               {card.cardNo}
             </div>
-          </button>
+          </HoldCardButton>
         ))}
       </div>
     </div>
@@ -3501,18 +3473,18 @@ function SpectatorDeckStrip({
       </div>
       <div className="triad-spectator-deck-cards grid grid-cols-10 gap-1 md:grid-cols-[repeat(20,minmax(0,1fr))]">
         {cards.map((card) => (
-          <button
+          <HoldCardButton
             key={card.cardNo}
             type="button"
-            onMouseEnter={() => onPreview?.(card)}
-            onMouseLeave={onPreviewEnd}
-            onPointerEnter={() => onPreview?.(card)}
-            onPointerMove={() => onPreview?.(card)}
-            onPointerLeave={onPreviewEnd}
-            onFocus={() => onPreview?.(card)}
-            onBlur={onPreviewEnd}
-            onClick={() => onPreview?.(card)}
-            className="group relative aspect-[815/1110] min-w-0 overflow-hidden rounded-md bg-transparent transition duration-200 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-amber-200/70"
+            
+            
+            
+            
+            
+            
+            
+            
+            className="group relative aspect-[815/1110] min-w-0 overflow-hidden rounded-md bg-transparent transition duration-200 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-amber-200/70" onPreview={()=>onPreview?.(card)} onPreviewEnd={()=>onPreview?.(null)} onClick={()=>{}}
           >
             <Image
               src={card.sourceImage}
@@ -3525,7 +3497,7 @@ function SpectatorDeckStrip({
               className="object-contain"
             />
             <div className="absolute left-1 top-1 rounded bg-black/72 px-1 py-0.5 text-[8px] font-black text-white">{card.cardNo}</div>
-          </button>
+          </HoldCardButton>
         ))}
       </div>
     </div>
@@ -7584,7 +7556,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         <DeckPreparationLayout tray={<>
           <h2>เตรียมเด็ค <b>{playerDeck.length}/{DECK_SIZE}</b></h2>
           <div className="nexora-deck-guide">{deckSelectionGuide}<br />{deckSelectionNotice}</div>
-          <div className="nexora-deck-chosen">{playerDeckCards.map(card => <button key={card.cardNo} type="button" aria-label={`นำ No.${card.cardNo} ออกจากเด็ค`} disabled={ownDeckReady || deckReadySubmitting} onClick={() => toggleDeckCard(card.cardNo)} onMouseEnter={() => setDeckPreviewCard(card)} onMouseLeave={() => setDeckPreviewCard(null)}><img src={card.sourceImage} alt={card.name} /><span>−</span></button>)}</div>
+          <div className="nexora-deck-chosen">{playerDeckCards.map(card => <HoldCardButton key={card.cardNo} type="button" aria-label={`นำ No.${card.cardNo} ออกจากเด็ค`} disabled={ownDeckReady || deckReadySubmitting} onClick={() => toggleDeckCard(card.cardNo)}   onPreview={()=>setDeckPreviewCard(card)} onPreviewEnd={()=>setDeckPreviewCard(null)}><img src={card.sourceImage} alt={card.name} /><span>−</span></HoldCardButton>)}</div>
         </>} actions={<><DeckPreparationTools disabled={deckSessionOpening || ownDeckReady || deckReadySubmitting} onShuffle={() => { const next=freshDeck(()=>randomTriadDeck(selectableDeckCatalog,currentDeckMode),playerDeck,value=>value);setPlayerDeck(next);if(currentRoom && roomPlayerSide)scheduleDeckSync(next); }} onClear={()=>{setPlayerDeck([]);if(currentRoom && roomPlayerSide)scheduleDeckSync([]);}} /><button type="button" className="nexora-deck-ready" onClick={enterBattle} disabled={deckReadyDisabled}><Check size={18} />{deckReadyLabel}</button><div className="nexora-deck-readiness">{ownDeckReady ? "คุณพร้อมแล้ว" : "กำลังจัดเด็ค"} · {opponentDeckReady ? "อีกฝ่ายพร้อมแล้ว" : "รออีกฝ่าย"}</div></>} catalog={<div className="nexora-deck-grid">{selectableDeckCatalog.map(card => {
           const selected = playerDeck.includes(card.cardNo);
           const disabled = deckSessionOpening || ownDeckReady || deckReadySubmitting ||
