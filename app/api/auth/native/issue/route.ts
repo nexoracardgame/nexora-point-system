@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     userId,
     callbackPath,
   });
-  const nativeUrl = new URL(`${NATIVE_AUTH_SCHEME}://${NATIVE_AUTH_HOST}/callback`);
+  const nativeUrl = new URL(`${request.nextUrl.searchParams.get('game') === '1' ? 'nexoragame' : NATIVE_AUTH_SCHEME}://${NATIVE_AUTH_HOST}/callback`);
   nativeUrl.searchParams.set("token", token);
 
   return NextResponse.redirect(nativeUrl, { status: 302 });

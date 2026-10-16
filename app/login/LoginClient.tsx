@@ -170,6 +170,12 @@ export default function LoginClient({
       setLoginError("");
 
       try {
+        const desktop = (window as typeof window & {nexoraDesktop?: {isGameDesktop?:boolean;gameLogin?:(provider:string)=>Promise<boolean>}}).nexoraDesktop;
+        if (game && desktop?.isGameDesktop && desktop.gameLogin) {
+          await desktop.gameLogin(provider);
+          setPendingProvider(null);loginInFlightRef.current=false;
+          return;
+        }
         if (isNativeAppRuntime()) {
           window.location.assign(resolveNativeSignInStartUrl(provider, rawCallbackUrl));
           return;
@@ -188,7 +194,7 @@ export default function LoginClient({
         );
       }
     },
-    [callbackUrl, isRedirecting, rawCallbackUrl]
+    [callbackUrl, game, isRedirecting, rawCallbackUrl]
   );
 
   const handleLineLogin = () => startLogin("line");
@@ -281,6 +287,7 @@ export default function LoginClient({
         <button type="button" aria-label="เข้าสู่ระบบด้วย LINE" disabled={isRedirecting} onClick={()=>void startLogin("line")}><span className="nexora-login-line" aria-hidden="true">LINE</span>เข้าสู่ระบบด้วย LINE</button>
         <button type="button" aria-label="เข้าสู่ระบบด้วย Google" disabled={isRedirecting} onClick={()=>void startLogin("google")}><span className="nexora-login-google" aria-hidden="true">G</span>เข้าสู่ระบบด้วย Google</button>
       </div>
+      <a className="nexora-game-download" href="/downloads/game-windows/NEXORA-CARD-GAME-Setup-1.0.0.exe" download>ดาวน์โหลดเกม Windows PC<span>Windows 10/11 · 64-bit · v1.0.0</span></a>
       {(loginError || authErrorMessage) && <p role="alert">{loginError || authErrorMessage}</p>}
       {isRedirecting && <p role="status">{sessionChecking ? "กำลังตรวจสอบบัญชี" : "กำลังเข้าสู่สนาม"}</p>}
     </section>

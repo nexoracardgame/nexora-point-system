@@ -2,6 +2,16 @@ self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
+self.addEventListener('fetch',event=>{
+  const url=new URL(event.request.url);
+  if(event.request.method!=='GET'||url.origin!==self.location.origin||!/^\/(images|cards|videos|audio|fonts)\//.test(url.pathname)||url.searchParams.has('patch'))return;
+  event.respondWith((async()=>{
+    const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');
+    if(pointer){const {cacheName}=await pointer.json();const cached=await (await caches.open(cacheName)).match(url.pathname);if(cached)return cached;}
+    return fetch(event.request);
+  })());
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });

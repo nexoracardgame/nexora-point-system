@@ -7,7 +7,7 @@ const base=process.env.GAME_TEST_URL||'http://localhost:3013';
   await page.goto(base+'/game?room=123456&spectate=1');await page.waitForURL('**/game/login?**');
   assert.equal(new URL(page.url()).searchParams.get('callbackUrl'),'/game?room=123456&spectate=1');
   await page.getByRole('button',{name:/เข้าสู่ระบบด้วย LINE/}).waitFor();await page.waitForFunction(()=>!document.querySelector('.nexora-game-loading'));
-  assert.equal(await page.title(),'NEXORA CARD GAME');assert.ok((await page.locator('link[rel=manifest]').getAttribute('href')).includes('/game/manifest.webmanifest'));
+  assert.equal(await page.title(),'NEXORA CARD GAME');for(const href of await page.locator('link[rel=manifest]').evaluateAll(links=>links.map(link=>link.getAttribute('href'))))assert.equal(href,'/game/manifest.webmanifest');
   assert.equal(await page.locator('nav').count(),0);assert.equal(await page.locator('.nexora-game-login').count(),1);
   for(const button of await page.locator('.nexora-game-login-actions button').all()){const b=await button.boundingBox();assert.ok(b&&b.x>=0&&b.y>=0&&b.x+b.width<=width+1&&b.y+b.height<=height+1,'Login buttons fit '+width);assert.equal(await button.isEnabled(),true);}
   fs.mkdirSync('artifacts/game-platform',{recursive:true});await page.screenshot({path:`artifacts/game-platform/login-${width}.png`});assert.deepEqual(errors,[]);await page.close();

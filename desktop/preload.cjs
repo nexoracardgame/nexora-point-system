@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("nexoraDesktop", {
   platform: process.platform,
   isDesktop: true,
+  isGameDesktop: process.argv.includes('--nexora-game-only'),
+  gameLogin: provider => ipcRenderer.invoke('nexora:game-login',provider),
   getVersion: () => ipcRenderer.invoke("nexora:get-version"),
   reloadApp: () => ipcRenderer.invoke("nexora:reload-app"),
   checkForUpdates: () => ipcRenderer.invoke("nexora:check-for-updates"),

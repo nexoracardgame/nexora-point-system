@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
   );
   const nativeIssueUrl = new URL("/api/auth/native/issue", request.nextUrl.origin);
   nativeIssueUrl.searchParams.set("callbackUrl", callbackPath);
+  if (request.nextUrl.searchParams.get('game') === '1') nativeIssueUrl.searchParams.set('game','1');
 
   const csrfUrl = new URL("/api/auth/csrf", request.nextUrl.origin);
   const signInUrl = new URL(`/api/auth/signin/${provider}`, request.nextUrl.origin);

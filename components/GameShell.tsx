@@ -7,6 +7,7 @@ import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useBattleArenaActive } from "@/lib/battle-ui-state";
 import "./BattleHud.css";
 import "./GameShell.css";
+import GamePatchGate from './GamePatchGate';
 
 const FloatingChatDock = dynamic(() => import("@/components/FloatingChatDock"), { ssr: false });
 
@@ -18,7 +19,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   }, []);
   return <OnlinePresenceProvider>
     <div className="nexora-game-platform" data-game-platform>
-      <div className={pathname === "/game/pentad" ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}</div>
+      <GamePatchGate><div className={pathname === "/game/pentad" ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}</div></GamePatchGate>
       {pathname === "/game" && !active && <FloatingChatDock />}
     </div>
   </OnlinePresenceProvider>;

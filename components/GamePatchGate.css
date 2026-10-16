@@ -1,0 +1,6 @@
+.nexora-game-patch { position:fixed; inset:0; z-index:2147483601; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:14px; padding:24px; box-sizing:border-box; color:#ffe9b5; background:#040609 url('/images/versus/arena.png') center/cover; text-align:center; }
+.nexora-game-patch::before { content:''; position:absolute; inset:0; background:#020407d9; z-index:-1; }
+.nexora-game-patch img { width:min(420px,55%); max-height:28%; object-fit:contain; }
+.nexora-game-patch h1 { font-size:22px; margin:0; }.nexora-game-patch p { font-size:13px; max-width:90%; overflow-wrap:anywhere; }
+.nexora-game-patch progress { width:min(800px,85%); height:24px; accent-color:#efce7b; }.nexora-game-patch strong { font-size:26px; }
+.nexora-game-patch button { border:1px solid #e3c475; padding:12px 24px; background:#edce8a; color:#111; border-radius:4px; cursor:pointer; }

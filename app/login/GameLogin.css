@@ -15,6 +15,9 @@
 .nexora-game-login-actions button:disabled { opacity:.5; cursor:wait; }
 .nexora-login-line { background:#06c755; color:#fff; font-size:10px; padding:5px; border-radius:4px; }
 .nexora-login-google { background:#fff; color:#4285f4; font:bold 20px Arial; padding:1px 7px; border-radius:4px; }
+.nexora-game-download { display:flex; flex-direction:column; gap:4px; color:#ffe1a0; font-size:14px; font-weight:700; text-decoration:none; padding:10px 14px; border:1px solid #d8bd7055; border-radius:4px; background:#03060999; }
+.nexora-game-download span { font-size:10px; color:#b7c4cf; }.nexora-game-download:hover { border-color:#f3d58b; background:#1c1a12; }
+html[data-game-desktop=true] .nexora-game-download { display:none; }
 @keyframes nexora-login-camera { from { transform:scale(1.1); } to { transform:scale(1); } }
 @media (max-height:600px),(max-width:900px) and (orientation:portrait) { .nexora-game-login-content { gap:6px; inset:3% 30%; } .nexora-game-login-logo { max-height:24%; } .nexora-game-login-content h1 { font-size:18px; } .nexora-game-login-content p { font-size:12px; } .nexora-game-login-actions { gap:8px; margin-top:4px; } .nexora-game-login-actions button { min-height:40px; font-size:12px; } .nexora-game-login-warrior { width:29%; } }
 @media (prefers-reduced-motion:reduce) { .nexora-game-login-scene { animation:none; } }

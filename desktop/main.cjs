@@ -3,7 +3,8 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session } = require("e
 const { autoUpdater } = require("electron-updater");
 
 const DEFAULT_APP_URL = "https://nexora-point-system.vercel.app";
-const APP_NAME = "NEXORA TCG";
+const GAME_ONLY = require('./package.json').gameOnly === true || process.env.NEXORA_GAME_ONLY === '1';
+const APP_NAME = GAME_ONLY ? "NEXORA CARD GAME" : "NEXORA TCG";
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 4;
 
 let mainWindow = null;
@@ -15,9 +16,9 @@ function resolveAppUrl() {
     : process.env.NEXORA_DEV_URL || "http://localhost:3000";
 
   try {
-    return new URL(rawUrl).toString();
+    return new URL(GAME_ONLY ? '/game' : '', rawUrl).toString();
   } catch {
-    return DEFAULT_APP_URL;
+    return DEFAULT_APP_URL + (GAME_ONLY ? '/game' : '');
   }
 }
 
@@ -101,7 +102,8 @@ async function loadAppUrl() {
 
   try {
     await mainWindow.loadURL(appUrl);
-  } catch {
+  } catch (error) {
+    if (error?.code === 'ERR_ABORTED' || error?.errno === -3) return;
     await mainWindow.loadURL(
       `data:text/html;charset=utf-8,${encodeURIComponent(buildOfflineHtml(appUrl))}`
     );
@@ -116,6 +118,7 @@ function createWindow() {
     height: 820,
     minWidth: 1024,
     minHeight: 680,
+    ...(GAME_ONLY ? {minWidth:800,minHeight:450,fullscreen:true} : {}),
     title: APP_NAME,
     backgroundColor: "#050507",
     ...(windowIconPath ? { icon: windowIconPath } : {}),
@@ -124,7 +127,8 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: GAME_ONLY,
+      additionalArguments: GAME_ONLY ? ['--nexora-game-only'] : [],
     },
   });
 
@@ -141,11 +145,21 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
 
   mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (GAME_ONLY) {
+      try {
+        const target = new URL(url);
+        if (target.origin === new URL(resolveAppUrl()).origin && (target.pathname === '/game' || target.pathname.startsWith('/game/') || target.pathname.startsWith('/api/auth/'))) return;
+        event.preventDefault();
+        if (target.origin === new URL(resolveAppUrl()).origin && target.pathname === '/login') void mainWindow.loadURL(new URL('/game/login',resolveAppUrl()).href);
+        else if (target.protocol === 'https:') void shell.openExternal(url);
+      } catch { event.preventDefault(); }
+      return;
+    }
     try {
       const protocol = new URL(url).protocol;
       if (protocol === "http:" || protocol === "https:") return;
@@ -159,7 +173,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
-    if (!isMainFrame) return;
+    if (!isMainFrame || _code === -3) return;
 
     const appUrl = resolveAppUrl();
     void mainWindow?.loadURL(
@@ -217,6 +231,12 @@ function configureAutoUpdates() {
 }
 
 function registerIpcHandlers() {
+  ipcMain.handle('nexora:game-login', async (event, provider) => {
+    if (!GAME_ONLY || !['line','google'].includes(provider) || event.senderFrame?.url && new URL(event.senderFrame.url).origin !== new URL(resolveAppUrl()).origin) return false;
+    const url = new URL('/api/auth/native/start',resolveAppUrl());
+    url.searchParams.set('provider',provider);url.searchParams.set('callbackUrl','/game');url.searchParams.set('game','1');
+    await shell.openExternal(url.href);return true;
+  });
   ipcMain.handle("nexora:get-version", () => app.getVersion());
   ipcMain.handle("nexora:reload-app", async () => {
     await loadAppUrl();
@@ -240,13 +260,34 @@ function registerIpcHandlers() {
 }
 
 app.setName(APP_NAME);
-app.setAppUserModelId("com.nexora.tcg");
+app.setAppUserModelId(GAME_ONLY ? 'com.nexora.cardgame' : "com.nexora.tcg");
+if (GAME_ONLY) app.setPath('userData',path.join(app.getPath('appData'),'NexoraCardGame'));
+
+function handleGameLogin(raw) {
+  if (!GAME_ONLY || !mainWindow) return;
+  try {
+    const url=new URL(raw);
+    if(url.protocol!=='nexoragame:' || url.hostname!=='auth' || url.pathname!=='/callback')return;
+    const token=url.searchParams.get('token');if(!token || token.length>10000)return;
+    const target=new URL('/api/auth/native/consume',resolveAppUrl());target.searchParams.set('token',token);
+    void mainWindow.loadURL(target.href);mainWindow.show();mainWindow.focus();
+  } catch {}
+}
+if (GAME_ONLY) {
+  if(!app.requestSingleInstanceLock())app.quit();
+  app.on('second-instance',(_event,argv)=>{const url=argv.find(arg=>arg.startsWith('nexoragame://'));if(url)handleGameLogin(url);else mainWindow?.focus();});
+  app.on('open-url',(event,url)=>{event.preventDefault();handleGameLogin(url);});
+}
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   configurePermissions();
   registerIpcHandlers();
   createWindow();
+  if (GAME_ONLY) {
+    app.setAsDefaultProtocolClient('nexoragame');
+    const callback=process.argv.find(arg=>arg.startsWith('nexoragame://'));if(callback)handleGameLogin(callback);
+  }
   configureAutoUpdates();
 
   app.on("activate", () => {
