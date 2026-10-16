@@ -79,7 +79,7 @@ const auditDrawer=async()=>{
   if(artwork){assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none','No rectangular crop overlays the continuous artwork');assert.notEqual(await primary.evaluate(el=>getComputedStyle(el).clipPath),'none','Lighting follows the button silhouette');}
   else {assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none');assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)');}
   const mode=page.locator('.nexora-play-drawer .nexora-command-segment button').first();
-  if(artwork)assert.ok((await mode.evaluate(el=>getComputedStyle(el).backdropFilter)).includes('brightness'),'Selected artwork has a gold aura');
+  if(artwork)assert.equal(await mode.evaluate(el=>getComputedStyle(el,'::before').display),'block','Selected artwork has a persistent gold aura');
   else assert.equal(await mode.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)','Selected mode has a clear gold face');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el,'::after').content),'""','Gold hover reflection exists');
 };
