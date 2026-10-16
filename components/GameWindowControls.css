@@ -24,3 +24,4 @@ html[data-game-window-controls=desktop] .nexora-game-platform [data-room-actions
 @media (max-height:600px),(max-width:1000px) and (orientation:portrait) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 155px); } }
 @container (max-height:340px) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 110px); } }
 @container (max-height:240px) { .nexora-game-platform .nexora-command-nav:has(.nexora-menu-logout) { max-height:calc(100% - 70px); } }
+@container (max-height:240px) { .nexora-game-platform .nexora-command-lobby .nexora-command-nav { gap:2px; }.nexora-game-platform .nexora-command-lobby .nexora-command-nav > button { min-height:18px; padding:2px 5px; font-size:8px; gap:5px; }.nexora-game-platform .nexora-command-nav > button svg { width:12px; height:12px; flex-shrink:0; } }

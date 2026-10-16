@@ -16,6 +16,11 @@ modules['@/components/OnlinePresenceProvider']='exports.OnlinePresenceProvider=(
 modules['room-actions']=transpile(fs.readFileSync('components/BattleRoomActions.tsx','utf8'));modules['./BattleRoomActions.css']='';
 `;
 test=test.replace('const bundle=',modules+'\nconst bundle=')
+ .replaceAll('JOIN ARENA เข้าร่วม / ชมการต่อสู้','เข้าร่วม/ชมการต่อสู้')
+ .replaceAll('DUELIST RANK อันดับนักดวล NEXORA','อันดับแรงค์')
+ .replace("['play','join','rank']","['play']")
+ .replace("page.locator('.nexora-lobby-art-button').count(),3","page.locator('.nexora-lobby-art-button').count(),1")
+ .replace("page.locator('.nexora-lobby-art-copy strong')","page.locator('.nexora-lobby-art-button:not([data-artwork=play]) .nexora-lobby-art-copy strong')")
  .replace("const url=new URL(route.request().url());","const url=new URL(route.request().url());if(url.pathname==='/game-release.json')return route.fulfill({json:{version:'test',resources:[]}});if(url.pathname==='/api/game-wallet')return route.fulfill({json:{coin:167476,nexPoint:867}});")
  .replace("const css=fs.readFileSync(","const css=fs.readFileSync('components/GameLobbyWallet.css','utf8')+'\\n'+fs.readFileSync(")
  .replace('const url=new URL(route.request().url());',"const url=new URL(route.request().url());if(url.pathname==='/api/game-profile')return route.fulfill({json:{avatar:'',frame:'gold',hero:'gold'}});")

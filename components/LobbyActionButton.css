@@ -37,3 +37,8 @@
 }
 @media (max-height:340px), (max-width:340px) and (orientation:portrait) { .nexora-command-lobby .nexora-lobby-art-button strong { font-size:12px; } .nexora-command-lobby .nexora-lobby-art-button small { font-size:8px; } }
 @media (prefers-reduced-motion:reduce) { .nexora-command-lobby .nexora-lobby-art-button,.nexora-command-lobby .nexora-lobby-art-button::after,.nexora-lobby-art-flash { animation:none!important; transition:none!important; } .nexora-lobby-art-flash { display:none; } }
+.nexora-command-lobby .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:100%; aspect-ratio:1672/941; }
+.nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop { inset:0; overflow:visible; }
+.nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop::before { display:none; }
+.nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop img { position:static; display:block; width:100%; height:100%; object-fit:contain; }
+.nexora-command-lobby .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-copy { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }

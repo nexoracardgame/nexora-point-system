@@ -12,7 +12,7 @@ export default function LobbyActionButton({ artwork, title, subtitle, onClick }:
   return <button type="button" className="nexora-command-mode nexora-lobby-art-button" data-artwork={artwork}
     onPointerEnter={event => { if (event.pointerType === "mouse") playGameUiSound("click"); }}
     onClick={() => { setFlash(value => value + 1); onClick(); }}>
-    <span className="nexora-lobby-art-crop" aria-hidden="true"><img src={LOBBY_ACTION_ART} alt="" width={1920} height={819} loading="eager" fetchPriority="high" decoding="sync" draggable={false} /></span>
+    <span className="nexora-lobby-art-crop" aria-hidden="true"><img src={artwork==='play'?'/images/lobby-play/play-button.webp':LOBBY_ACTION_ART} alt="" width={1920} height={819} loading="eager" fetchPriority="high" decoding="sync" draggable={false} /></span>
     <span className="nexora-lobby-art-copy"><strong>{title}</strong><small>{subtitle}</small></span>
     {flash > 0 && <span key={flash} className="nexora-lobby-art-flash" aria-hidden="true" />}
   </button>;

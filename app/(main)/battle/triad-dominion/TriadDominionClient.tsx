@@ -3669,12 +3669,10 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <GameLobbyProfile name={participant.name} image={participant.image || "/avatar.png"} rank={profile?.rankName || "BRONZE"} wins={profile?.wins || 0} />
       </header>
       <div className="nexora-command-status"><span><Users />{rooms.length} ห้อง</span><span><Swords />{rooms.filter(room => room.status === "playing").length} กำลังต่อสู้</span></div>
-      <GameLobbyNavigation onRank={() => setPanel("rank")} onHome={() => { setPanel(null); setPanelClosing(false); }} />
+      <GameLobbyNavigation onRank={() => setPanel("rank")} onJoin={() => openPanel("join")} onHome={() => { setPanel(null); setPanelClosing(false); }} />
       <div className="nexora-lobby-promo-rail"><LobbyBanner />
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
         <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => openPanel("create")} />
-        <LobbyActionButton artwork="join" title="JOIN ARENA" subtitle="เข้าร่วม / ชมการต่อสู้" onClick={() => openPanel("join")} />
-        <LobbyActionButton artwork="rank" title="DUELIST RANK" subtitle="อันดับนักดวล NEXORA" onClick={() => setPanel("rank")} />
       </section></div>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
       {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" data-closing={panelClosing} onClick={closePanel} aria-hidden="true" />}
