@@ -75,10 +75,12 @@ const auditDrawer=async()=>{
   assert.equal(await body.evaluate(el=>el.scrollLeft),0,'Hover reflection and horizontal wheel never scroll the drawer');
   assert.deepEqual(await body.evaluate(el=>({width:el.clientWidth,height:el.clientHeight})),before,'Hover never inserts a scrollbar or resizes controls');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el).overflow),'hidden','Reflection is clipped by its own button');
-  assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none','Reference primary remains flat gold');
-  assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)');
+  const artwork=await page.locator('.nexora-create-drawer').count();
+  if(artwork)assert.ok((await primary.evaluate(el=>getComputedStyle(el).backgroundImage)).includes('/images/lobby-play/create.webp'),'Primary uses supplied artwork crop');
+  else {assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundImage),'none');assert.equal(await primary.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)');}
   const mode=page.locator('.nexora-play-drawer .nexora-command-segment button').first();
-  assert.equal(await mode.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)','Selected mode has a clear gold face');
+  if(artwork)assert.ok((await mode.evaluate(el=>getComputedStyle(el).filter)).includes('brightness'),'Selected artwork has a gold aura');
+  else assert.equal(await mode.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(240, 203, 136)','Selected mode has a clear gold face');
   assert.equal(await primary.evaluate(el=>getComputedStyle(el,'::after').content),'""','Gold hover reflection exists');
 };
 for(const [width,height] of (process.env.MOBILE_ONLY==='1'?[]:[[3840,2160],[2560,1440],[1920,1080],[1440,900],[1280,720],[1024,768],[844,390],[667,375],[390,844],[320,568]])){

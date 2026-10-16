@@ -28,6 +28,8 @@ export default function GameWindowControls(){
   return <>
     {lobby&&menu&&createPortal(<button type="button" className="nexora-menu-logout" title="ออกจากระบบ" aria-label="ออกจากระบบ" disabled={leaving} onClick={()=>void logout()}><LogOut size={18}/><span>ออกจากระบบ</span></button>,menu)}
     {desktop&&<div className="nexora-window-controls" role="toolbar" aria-label="ตัวควบคุมเกม">
+    <div data-game-audio-slot />
+    <div data-game-utilities-slot />
     {desktop&&<><button type="button" title="ย่อหน้าต่าง" aria-label="ย่อหน้าต่าง" onClick={()=>void desktop.windowControl?.('minimize')}><Minus size={18}/></button><button type="button" title="สลับขนาดหน้าต่าง" aria-label="สลับขนาดหน้าต่าง" onClick={()=>void desktop.windowControl?.('resize')}><Maximize2 size={17}/></button><button type="button" className="nexora-window-close" title="ปิดเกม" aria-label="ปิดเกม" onClick={()=>void desktop.windowControl?.('close')}><X size={19}/></button></>}
     </div>}
   </>;

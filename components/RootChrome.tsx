@@ -31,7 +31,7 @@ export default function RootChrome({
     return (
       <>
         <NexoraDialogProvider />
-        {status === "authenticated" && pathname !== "/game/login" && <BattleLoadingScreen />}
+        {status === "authenticated" && !pathname.startsWith("/game") && <BattleLoadingScreen />}
         <BattleUiAudio />
         <BattleMenuMusic />
         <PushNotificationBootstrap />

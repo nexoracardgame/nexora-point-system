@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useBattleArenaActive } from '@/lib/battle-ui-state';
 import { installGameResources,type GameRelease,type PatchProgress } from '@/lib/game-patcher';
 import './GamePatchGate.css';
+import {loadLobbyAssets} from '@/lib/lobby-assets';
 
 export default function GamePatchGate({children}:{children:React.ReactNode}){
   const {status}=useSession();
@@ -16,7 +17,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
   useEffect(()=>{
     if(!canPatch)return;
     const desktop=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean;getVersion:()=>Promise<string>}}).nexoraDesktop;
-    if(!desktop?.isGameDesktop){setBlocking(false);return;}
+    if(!desktop?.isGameDesktop){let disposed=false;setError('');void loadLobbyAssets().then(()=>{if(!disposed)setBlocking(false)}).catch(()=>{if(!disposed)setError('โหลดทรัพยากรเกมไม่สำเร็จ')});return()=>{disposed=true};}
     document.documentElement.dataset.gameDesktop='true';
     let disposed=false,running=false;const controller=new AbortController();
     const check=async()=>{
@@ -28,19 +29,19 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
         const version=await desktop.getVersion();
         const numbers=(v:string)=>v.split('.').map(Number);const v=numbers(version),minimum=numbers(release.minimumDesktopVersion);
         if(v.some((n,i)=>n<minimum[i]&&v.slice(0,i).every((p,j)=>p===minimum[j])))throw Error('กรุณาอัปเดตตัวเกม Windows เป็นเวอร์ชันล่าสุด');
-        if(previous?.version===release.version){setBlocking(false);return;}
+        if(previous?.version===release.version){await loadLobbyAssets();if(!disposed)setBlocking(false);return;}
         if(disposed||activeRef.current)return;
         setBlocking(true);setError('');
         await installGameResources(release,p=>{if(!disposed)setProgress(p)},controller.signal);
         if(disposed)return;
         if(previous && previous.authEpoch!==release.authEpoch){await signOut({callbackUrl:'/game/login'});return;}
-        window.location.reload();
+        await loadLobbyAssets();if(!disposed)setBlocking(false);
       }catch(err){if(!disposed){setBlocking(true);setError(err instanceof Error?err.message:'โหลดแพตช์ไม่สำเร็จ')}}finally{running=false}
     };
     void check();const timer=setInterval(()=>void check(),60000);const visible=()=>{if(!document.hidden)void check()};document.addEventListener('visibilitychange',visible);
     return()=>{disposed=true;controller.abort();clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
   },[retry,canPatch]);
-  if(!canPatch||!blocking)return children;
+  if(pathname==='/game/login'||status==='unauthenticated'||(!blocking&&status==='authenticated'))return children;
   const percent=progress?Math.min(progress.completed===progress.count?100:99,Math.floor(progress.downloaded/progress.total*100)):0;
   return <div className="nexora-game-patch" role="status"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><h1>{error?'อัปเดตไม่สำเร็จ':'กำลังอัปเดตทรัพยากรเกม'}</h1><p>{error||progress?.file||'ตรวจสอบแพตช์'}</p><progress max={100} value={percent} aria-label="ดาวน์โหลดแพตช์" /><strong>{percent}%</strong>{progress&&<small>{(progress.downloaded/1048576).toFixed(1)} / {(progress.total/1048576).toFixed(1)} MB · {progress.completed}/{progress.count} ไฟล์</small>}{error&&<button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button>}</div>;
 }

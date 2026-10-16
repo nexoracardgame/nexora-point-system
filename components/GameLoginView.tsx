@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {Download,Settings,X,Volume2,VolumeX,UserRound,LockKeyhole,Eye,EyeOff} from 'lucide-react';
 import {playGameUiSound} from '@/lib/game-ui-audio';
 import {loadLoginWallpaper} from '@/lib/login-wallpaper';
@@ -14,6 +15,8 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
  const [panel,setPanel]=useState(''),[flash,setFlash]=useState(''),[notice,setNotice]=useState(''),[muted,setMuted]=useState(false);
  const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[remember,setRemember]=useState(false),[showPassword,setShowPassword]=useState(false),[videoUrl,setVideoUrl]=useState('');
  const [browserDownload,setBrowserDownload]=useState(false);
+ const [utilitySlot,setUtilitySlot]=useState<Element|null>(null);
+ useEffect(()=>{const locate=()=>setUtilitySlot(document.querySelector('[data-game-utilities-slot]'));locate();const observer=new MutationObserver(locate);observer.observe(document.body,{childList:true,subtree:true});return()=>observer.disconnect()},[]);
  const dialog=useRef<HTMLElement|null>(null),video=useRef<HTMLVideoElement|null>(null);
  useEffect(()=>{
   const bridge=(window as typeof window&{nexoraDesktop?:{isDesktop?:boolean;isGameDesktop?:boolean}}).nexoraDesktop;
@@ -40,11 +43,12 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
   await onCredentials(username,password,register?confirmation:undefined);setPassword('');setConfirmation('');
  };
  const social=<div className="nexora-login-social">{providers.map(([id,label])=><button type="button" data-provider={id} key={id} title={id==='line'||id==='google'?`เข้าสู่ระบบด้วย ${label}`:`${label} · ยังไม่เปิดให้บริการ`} aria-label={`เข้าสู่ระบบด้วย ${label}`} disabled={busy} data-flash={flash===id} onAnimationEnd={()=>setFlash('')} onClick={()=>{cue(id);if(id==='line'||id==='google')onLogin(id);else setNotice(`${label} ยังไม่เปิดให้บริการ กรุณาใช้ LINE หรือ Google`)}}><img src={`/images/game-login/plain-${id}.webp`} alt=""/><span>{label}</span></button>)}</div>;
+ const utilities=<div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button><button type="button" title="ติดต่อเรา" aria-label="ติดต่อฝ่ายสนับสนุน" onClick={()=>open('support')}><img src="/images/game-login/support.webp" alt=""/></button></div>;
  return <main className="nexora-game-login" aria-busy={busy}>
   <img className="nexora-game-login-scene" src="/images/triad/nexora-command-original.webp" alt="" fetchPriority="high" loading="eager"/>
   {videoUrl&&<video ref={video} className="nexora-game-login-video" src={videoUrl} autoPlay loop muted playsInline aria-hidden="true"/>}
   <nav className="nexora-login-rail" aria-label="ข้อมูลเกม">{sections.map(([id,label,thai])=><button type="button" key={id} title={thai} aria-label={thai} onClick={()=>open(id)}><img src={`/images/game-login/${id}.webp`} alt={label}/></button>)}</nav>
-  <div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button><button type="button" title="ติดต่อเรา" aria-label="ติดต่อฝ่ายสนับสนุน" onClick={()=>open('support')}><img src="/images/game-login/support.webp" alt=""/></button></div>
+  {utilitySlot?createPortal(utilities,utilitySlot):utilities}
   <section className="nexora-game-login-content">
    <img className="nexora-game-login-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" fetchPriority="high"/>
    <div className="nexora-game-login-actions">
