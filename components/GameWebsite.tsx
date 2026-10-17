@@ -12,6 +12,8 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  const [panel,setPanel]=useState<'account'|null>(null);
  const [wallet,setWallet]=useState<{coin:number;nexPoint:number}|null>(null);
  const [walletError,setWalletError]=useState(false);
+ const [failedAvatar,setFailedAvatar]=useState<string|null>(null);
+ const avatar=session?.user?.image||'';
  const dialog=useRef<HTMLDialogElement>(null);
  const login='/game/login?callbackUrl=%2Fgame';
  useEffect(()=>{
@@ -28,6 +30,7 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  },[session?.user?.id]);
  useEffect(()=>{if(panel)dialog.current?.showModal();else dialog.current?.close()},[panel]);
  useEffect(()=>{
+  if(!window.location.hash){window.scrollTo({top:0,left:0,behavior:'instant'});return}
   if(children||window.location.hash!=='#tutorials')return;
   const frame=requestAnimationFrame(()=>document.getElementById('tutorials')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
   return()=>cancelAnimationFrame(frame);
@@ -37,7 +40,7 @@ export default function GameWebsite({children}:{children?:ReactNode}){
   <header className="nx-site-nav">
    <Link href="/game" aria-label="NEXORA หน้าหลัก" className="nx-site-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></Link>
    <nav aria-label="เมนูหลัก"><Link href="/game#world">โลกของ NEXORA</Link><Link href="/game#tutorials" onClick={event=>{const section=document.getElementById('tutorials');if(!section)return;event.preventDefault();section.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});window.history.replaceState(null,'','#tutorials')}}>บทสอนต่อสู้</Link><Link href="/game#download">ดาวน์โหลด</Link><Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
-   {session?.user?<button className="nx-site-account" onClick={account}><UserRound size={18}/>บัญชี</button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
+   {session?.user?<button className="nx-site-account" onClick={account} aria-label="บัญชี" aria-haspopup="dialog" aria-expanded={panel==='account'}><UserRound size={18}/>บัญชี<span className="nx-nav-avatar" aria-hidden="true">{avatar&&failedAvatar!==avatar?<img src={avatar} alt="" referrerPolicy="no-referrer" onError={()=>setFailedAvatar(avatar)}/>:<UserRound size={20}/>}</span></button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
   </header>
   {children||<><section className="nx-site-hero">
    <img className="nx-site-scene" src="/images/triad/nexora-duelists.webp" alt="นักรบแห่ง NEXORA" fetchPriority="high"/>
