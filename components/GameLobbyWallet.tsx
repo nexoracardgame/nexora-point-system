@@ -4,7 +4,9 @@ import {createPortal} from 'react-dom';
 import {Coins,Gem,Download,RefreshCw,X} from 'lucide-react';
 import {installGameResources,hasPendingLobbyDownload,type PatchProgress,type GameRelease} from '@/lib/game-patcher';
 import './GameLobbyWallet.css';
+import GameCoinPreview from './GameCoinPreview';
 export default function GameLobbyWallet(){
+ const [coinPreview,setCoinPreview]=useState(false);
  const [wallet,setWallet]=useState<{coin:number;nexPoint:number}|null>(null),[error,setError]=useState(''),[panel,setPanel]=useState<'wallet'|'resources'|null>(null),[busy,setBusy]=useState(false),[progress,setProgress]=useState<PatchProgress|null>(null),[done,setDone]=useState(false),[message,setMessage]=useState('');
  const controller=useRef<AbortController|null>(null),dialog=useRef<HTMLElement>(null),trigger=useRef<HTMLElement|null>(null);
  const [pending,setPending]=useState(false);
@@ -19,9 +21,9 @@ export default function GameLobbyWallet(){
  const percent=done?100:progress?Math.min(99,Math.floor(progress.downloaded/progress.total*100)):0;
  return <><div className="nexora-lobby-wallet" aria-label="กระเป๋าเงินเกม">
   <button className="game-currency gem" title="ยอด NEX" aria-label="ดูยอด NEX" onClick={()=>open('wallet')}><Gem/><span>{number(wallet?.nexPoint)}</span><small>NEX</small></button>
-  <button className="game-currency coin" title="ยอด COIN" aria-label="ดูยอด COIN" onClick={()=>open('wallet')}><Coins/><span>{number(wallet?.coin)}</span><small>COIN</small></button>
+  <button className="game-currency coin" title="เติม COIN" aria-label="ดูยอด COIN" onClick={()=>setCoinPreview(true)}><Coins/><span>{number(wallet?.coin)}</span><small>COIN</small></button>
   {pending&&!done&&<button className="game-resources" title="มีทรัพยากรใหม่ให้ดาวน์โหลด" aria-label="ดาวน์โหลดทรัพยากรเกม" onClick={()=>open('resources')}><Download/></button>}
- </div>{panel&&createPortal(<div className="game-wallet-backdrop" onClick={close}><section ref={dialog} className="game-wallet-dialog" role="dialog" aria-modal="true" aria-labelledby="game-wallet-title" onClick={e=>e.stopPropagation()}><header><h2 id="game-wallet-title">{panel==='wallet'?'กระเป๋าเงินเกม':'ทรัพยากรเกม'}</h2><button title="ปิด" aria-label="ปิด" disabled={busy} onClick={close}><X/></button></header>
+ </div>{coinPreview&&<GameCoinPreview onClose={()=>setCoinPreview(false)}/>}{panel&&createPortal(<div className="game-wallet-backdrop" onClick={close}><section ref={dialog} className="game-wallet-dialog" role="dialog" aria-modal="true" aria-labelledby="game-wallet-title" onClick={e=>e.stopPropagation()}><header><h2 id="game-wallet-title">{panel==='wallet'?'กระเป๋าเงินเกม':'ทรัพยากรเกม'}</h2><button title="ปิด" aria-label="ปิด" disabled={busy} onClick={close}><X/></button></header>
  {panel==='wallet'?<><dl><div><dt><Gem/> NEX</dt><dd>{number(wallet?.nexPoint)}</dd></div><div><dt><Coins/> COIN</dt><dd>{number(wallet?.coin)}</dd></div></dl>{error&&<p role="alert">{error}</p>}<button className="game-wallet-primary" onClick={()=>void refresh()}><RefreshCw size={17}/>อัปเดตยอดเงิน</button></>:<><p>มีแพตช์สำคัญหรือแพ็กเสริมใหม่พร้อมให้ดาวน์โหลด</p><progress value={percent} max={100} aria-label="ดาวน์โหลดทรัพยากร"/><strong>{percent}%</strong>{progress&&<><small>{(progress.downloaded/1048576).toFixed(1)} / {(progress.total/1048576).toFixed(1)} MB · {progress.completed}/{progress.count} ไฟล์{(progress.bytesPerSecond||0)>0&&<> · {((progress.bytesPerSecond||0)/1048576).toFixed(1)} MB/s</>}</small><small className="game-resource-file">{progress.file}</small></>}<p role="status">{message}</p>{busy?<button className="game-wallet-primary" onClick={()=>controller.current?.abort()}>ยกเลิกดาวน์โหลด</button>:!done?<button className="game-wallet-primary" onClick={()=>void download()}><Download size={18}/>ดาวน์โหลดทรัพยากร</button>:<button className="game-wallet-primary" onClick={close}>เสร็จสิ้น</button>}</>}
  </section></div>,document.body)}</>;
 }
