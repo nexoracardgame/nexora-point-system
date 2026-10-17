@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('components/FloatingChatDock.tsx','utf8');
-const start=source.indexOf('  const profileUserId ='),end=source.indexOf('  const activeOtherOnline',start);
+const start=source.indexOf('  const profileUserId ='),end=source.indexOf('  useEffect(()=>{',start);
 assert.ok(start>0&&end>start);
 for(const pathname of ['/game','/game/pentad','/game/profile','/community']){
  for(const activeRoom of [{other:{id:'friend/123'}},{otherUserId:'friend/123'},null]){
