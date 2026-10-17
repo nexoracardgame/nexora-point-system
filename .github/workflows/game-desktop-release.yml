@@ -2,6 +2,8 @@ name: Game Desktop Release
 on:
   push:
     tags: ['game-v*']
+    branches: [main]
+    paths: ['.github/workflows/game-desktop-release.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -27,7 +29,15 @@ jobs:
           $version = node -p "require('./desktop/game-config.cjs').extraMetadata.version"
           if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -ne "game-v$version") { throw 'Tag/version mismatch' }
       - name: Build installer
-        run: npm run game:desktop:dist
+        shell: pwsh
+        run: |
+          npm run game:desktop:dist 2>&1 | Tee-Object -FilePath build-log.txt
+          if ($LASTEXITCODE -ne 0) {
+            $tail = (Get-Content build-log.txt -Tail 65) -join "`n"
+            $escaped = $tail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Desktop installer build failed::$escaped"
+            exit 1
+          }
       - name: Test native login and resource pack
         run: |
           node scripts/test-game-login-loopback.cjs
