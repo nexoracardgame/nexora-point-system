@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Crown, Search, Shield } from "lucide-react";
 import GameBackControl from './GameBackControl';
+import GamePageLogo from './GamePageLogo';
 import "./DuelistLeaderboard.css";
 
 type Profile = { userId: string; name: string; image: string; wins: number; losses: number; rankName: string; rankKey: string };
@@ -19,8 +20,9 @@ export default function DuelistLeaderboard({ players, userId, onClose }: { playe
   const own = ranked[ownIndex];
   const top = [3,1,0,2,4].map(index=>({player:ranked[index],position:index+1}));
   return <section className="nexora-ranking" role="dialog" aria-modal="true" aria-label="อันดับนักดวล">
+    <GamePageLogo/>
     <header className="nexora-ranking-nav"><GameBackControl onBack={onClose}/></header>
-    <div className="nexora-ranking-showcase"><div className="nexora-ranking-title"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/><h1>LEADERBOARD</h1><p>อันดับนักดวล NEXORA</p></div><div className="nexora-ranking-total"><Crown size={22}/><strong>PvP RANKING</strong><span>{ranked.length.toLocaleString()} นักดวล</span></div>
+    <div className="nexora-ranking-showcase"><div className="nexora-ranking-title"><h1>LEADERBOARD</h1><p>อันดับนักดวล NEXORA</p></div><div className="nexora-ranking-total"><Crown size={22}/><strong>PvP RANKING</strong><span>{ranked.length.toLocaleString()} นักดวล</span></div>
       <div className="nexora-ranking-podium">{top.map(({player,position})=><article key={position} data-place={position} data-rank={player?.rankKey || "bronze"} data-empty={!player}><div className="nexora-ranking-portrait"><div className="nexora-ranking-avatar-frame">{player ? <img src={player.image || "/avatar.png"} alt={player.name}/> : <Shield size={40}/>}<span className="nexora-ranking-frame-crest"><Crown size={20}/></span></div></div><div className="nexora-ranking-pedestal"><div className="nexora-ranking-position">{position === 1 && <Crown/>}{position}</div><h2>{player?.name || "—"}</h2><small>{player?.rankName || "—"}</small><strong><Crown size={18}/>{player ? player.wins.toLocaleString() : "—"}</strong></div></article>)}</div>
     </div>
     <div className="nexora-ranking-board"><aside aria-label="กรองแรงค์"><button aria-pressed={rank === "all"} onClick={()=>{setRank("all");setPage(0);}}><Crown size={18}/> ALL</button>{ranks.map(([key,name])=><button key={key} aria-pressed={rank===key} onClick={()=>{setRank(key);setPage(0);}}><Shield size={18}/>{name}</button>)}</aside><div className="nexora-ranking-table-wrap"><table><thead><tr><th>RANK</th><th>PLAYER</th><th>แรงค์</th><th>ชนะ</th><th>WIN RATE</th><th>TOTAL MATCH</th><th>แพ้</th></tr></thead><tbody>{filtered.slice(currentPage*10,currentPage*10+10).map(player=>{const total=player.wins+player.losses;const rate=total?Math.round(player.wins/total*100):0;return <tr key={player.userId} data-own={player.userId===userId}><td>{ranked.indexOf(player)+1}</td><td><img src={player.image || "/avatar.png"} alt=""/><span>{player.name}</span></td><td>{player.rankName}</td><td><Crown size={14}/>{player.wins.toLocaleString()}</td><td><meter min={0} max={100} value={rate}/><span>{rate}%</span></td><td>{total.toLocaleString()}</td><td>{player.losses.toLocaleString()}</td></tr>;})}</tbody></table>{!filtered.length && <div className="nexora-ranking-empty">{query ? "ไม่พบนักดวลที่ค้นหา" : "ยังไม่มีข้อมูลอันดับ"}</div>}</div></div>

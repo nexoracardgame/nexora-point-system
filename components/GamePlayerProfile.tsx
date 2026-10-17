@@ -5,6 +5,7 @@ import {ArrowLeft,Camera,Check,ChevronRight,Shield,Sparkles,Swords,Trophy,Upload
 import {gameAvatars,gameFrames,gameHeroes,type GameAppearance} from '@/lib/game-profile-options';
 import './GamePlayerProfile.css';
 import './GameProfileFrame.css';
+import GamePageLogo from './GamePageLogo';
 import {updateCachedGameAppearance} from '@/lib/game-profile-client';
 
 type Props={user:{id:string;name:string;image:string};initial:GameAppearance;stats:{wins:number;losses:number}|null;rank:{name:string;nextWins:number|null;nextName:string|null};available:boolean;pending?:boolean;readOnly?:boolean};
@@ -23,7 +24,8 @@ export default function GamePlayerProfile({user,initial,stats,rank,available,pen
  const next=rank.nextWins;
  return <main className="game-player-profile" data-read-only={readOnly}>
   <img className="gpp-backdrop" src="/images/versus/arena.png" alt=""/>
-  <header className="gpp-header"><Link href="/game" className="gpp-back"><ArrowLeft size={21}/><span>หน้าหลักเกม</span></Link><span>ข้อมูลผู้เล่น</span><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></header>
+  <GamePageLogo/>
+  <header className="gpp-header"><Link href="/game" className="gpp-back"><ArrowLeft size={21}/><span>หน้าหลักเกม</span></Link><span>ข้อมูลผู้เล่น</span></header>
   <div className="gpp-layout"><section className="gpp-details" aria-label="ข้อมูลโปรไฟล์">
    <div className="gpp-framed-identity"><button className="gpp-framed-avatar" onClick={()=>open('avatar')} aria-label="เปลี่ยนรูปโปรไฟล์" title="เปลี่ยนรูปโปรไฟล์"><img className="gpp-framed-photo" src={appearance.avatar||user.image} alt={user.name}/><img className="gpp-framed-ring" src="/images/lobby-play/profile-avatar-frame.png" alt=""/></button><div className="gpp-framed-name"><img src="/images/lobby-play/profile-name-frame.png" alt=""/><h1 ref={nameLabel} title={user.name}>{user.name}</h1></div><span className="gpp-framed-badge"><img src="/images/lobby-play/profile-rank-frame.png" alt=""/><Shield/></span><span className="gpp-framed-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{rank.name}</span></span></div>
    <div className="gpp-customize"><button onClick={()=>open('avatar')} disabled={!available}><Camera size={16}/>รูปโปรไฟล์</button><button onClick={()=>open('frame')} disabled={!available}><Sparkles size={16}/>เปลี่ยนกรอบ</button></div>

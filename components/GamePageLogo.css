@@ -1,0 +1,32 @@
+:is(.game-player-profile,.nexora-ranking) { --page-logo-width:min(18cqw,210px);--page-logo-top:calc(var(--game-back-width,clamp(84px,10vw,240px)) / 2 + 26px);container-type:size; }
+:is(.game-player-profile,.nexora-ranking) > .nexora-page-logo { position:absolute;left:3%;top:var(--page-logo-top);width:var(--page-logo-width);height:auto;aspect-ratio:2.8;object-fit:contain;pointer-events:none;z-index:3; }
+.game-player-profile .gpp-header { height:calc(var(--page-logo-top) + var(--page-logo-width) / 2.8 + 12px);min-height:calc(var(--page-logo-top) + var(--page-logo-width) / 2.8 + 12px)!important;align-items:flex-start; }
+.game-player-profile .gpp-header>span { margin-left:auto;margin-top:12px; }
+.nexora-ranking .nexora-ranking-title { padding-top:calc(var(--page-logo-width) / 2.8); }
+@container (max-height:900px) {
+ .game-player-profile .gpp-details { padding:8px 16px; }
+ .game-player-profile .gpp-current-rank { padding:6px 0;gap:10px; }
+ .game-player-profile .gpp-current-rank h2 { font-size:20px;margin:3px 0; }
+ .game-player-profile .gpp-stats { grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:6px 0; }
+ .game-player-profile .gpp-stats div { padding-left:6px; }
+ .game-player-profile .gpp-stats dd { font-size:22px; }
+ .game-player-profile .gpp-tabs button { padding:6px 2px; }
+ .game-player-profile .gpp-note { margin:4px 0; }
+}
+@container (max-height:400px) {
+ .game-player-profile .gpp-details { padding:3px 12px; }
+ .game-player-profile .gpp-framed-identity { max-width:220px; }
+ .game-player-profile .gpp-current-rank { padding:3px 0; }
+ .game-player-profile .gpp-current-rank h2 { font-size:14px; }
+ .game-player-profile .gpp-stats { margin:3px 0; }
+ .game-player-profile .gpp-stats dd { font-size:16px; }
+ .game-player-profile .gpp-tabs button { padding:3px 2px; }
+}
+@container (max-height:340px) {
+ .game-player-profile .gpp-framed-identity { max-width:160px; }
+ .game-player-profile .gpp-customize { margin:2px 0; }
+ .game-player-profile .gpp-customize button { padding:2px 5px; }
+ .game-player-profile .gpp-current-rank h2 { margin:1px 0; }
+ .game-player-profile .gpp-stats dd { margin:1px 0;font-size:15px; }
+ .game-player-profile .gpp-id { padding-top:1px;font-size:7px; }
+}

@@ -1,4 +1,7 @@
 html:has([data-game-platform]),body:has([data-game-platform]) { overflow:hidden; overscroll-behavior:none; background:#050507; }
+body:has([data-game-platform]),body:has([data-game-platform]) * { -webkit-user-select:none;user-select:none; }
+body:has([data-game-platform]) :is(input,textarea,[contenteditable=true]),body:has([data-game-platform]) [contenteditable=true] * { -webkit-user-select:text;user-select:text; }
+body:has([data-game-platform]) img { -webkit-user-drag:none; }
 .nexora-game-platform { position:fixed; inset:0; overflow:hidden; background:#050507; --app-header-height:0px; --app-mobile-nav-height:0px; --app-mobile-nav-height-sm:0px; --app-content-bottom-gap:0px; }
 .nexora-game-platform > :is(.nexora-battle-shell,.nexora-pentad-shell) { position:relative; width:100%; height:var(--app-shell-height,100dvh); min-height:0; padding:0; margin:0; overflow:hidden; }
 .nexora-game-platform { --game-back-width:clamp(84px,10vw,240px); }
