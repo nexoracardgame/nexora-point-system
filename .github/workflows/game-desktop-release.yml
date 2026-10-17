@@ -33,6 +33,8 @@ jobs:
         run: |
           npm run game:desktop:dist 2>&1 | Tee-Object -FilePath build-log.txt
           if ($LASTEXITCODE -ne 0) {
+            $sizes = Get-ChildItem dist/game-desktop/win-unpacked/resources -File -Recurse | Group-Object { ($_.FullName -replace [regex]::Escape((Resolve-Path 'dist/game-desktop/win-unpacked/resources').Path + '\'), '').Split('\')[0] } | ForEach-Object { "$($_.Name): $([math]::Round(($_.Group | Measure-Object Length -Sum).Sum / 1MB)) MB" }
+            Write-Output "::error title=Packaged directory sizes::$($sizes -join '; ')"
             $tail = (Get-Content build-log.txt -Tail 65) -join "`n"
             $escaped = $tail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
             Write-Output "::error title=Desktop installer build failed::$escaped"

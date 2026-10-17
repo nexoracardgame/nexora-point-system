@@ -2,6 +2,7 @@ const base = require('../package.json').build;
 const release=require('../public/game-release.json');
 module.exports = {
   ...base, appId:'com.nexora.cardgame', productName:'NEXORA CARD GAME',
+  files:['main.cjs','preload.cjs','game-*.cjs','assets/**','package.json'],
   extraResources:[...(base.extraResources||[]),{from:'public/game-release.json',to:'game-resources/game-release.json'},...release.resources.map(resource=>({from:'public'+resource.url,to:'game-resources'+resource.url}))],
   directories:{...base.directories,output:'dist/game-desktop'},
   extraMetadata:{name:'nexora-card-game',version:'1.0.9',gameOnly:true},
