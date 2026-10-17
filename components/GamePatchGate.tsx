@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import { useBattleArenaActive } from '@/lib/battle-ui-state';
@@ -9,7 +9,9 @@ import './GamePatchGate.css';
 import './BattleLoadingScreen.css';
 import {loadLobbyAssets} from '@/lib/lobby-assets';
 import {prepareGameProfile} from '@/lib/game-profile-client';
+import {prepareGameFriends} from '@/lib/game-friends-client';
 const preparedUsers=new Set<string>();
+function visitedGame(userId:string){try{return Boolean(userId&&sessionStorage.getItem('nexora:game-prepared:'+userId))}catch{return false}}
 
 export default function GamePatchGate({children}:{children:React.ReactNode}){
   const {status,data:session}=useSession();
@@ -17,6 +19,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
   const pathname=usePathname();
   const canPatch=status==='authenticated'&&pathname!=='/game/login';
   const [blocking,setBlocking]=useState(!preparedUsers.has(userId)),[progress,setProgress]=useState<PatchProgress|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+  useLayoutEffect(()=>{if(visitedGame(userId))setBlocking(false)},[userId]);
   const [updating,setUpdating]=useState(false);
   const active=useBattleArenaActive(),activeRef=useRef(active);activeRef.current=active;
   useEffect(()=>{
@@ -24,9 +27,9 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     if(!canPatch||!userId)return;
     if(preparedUsers.has(userId)&&retry===0){setBlocking(false);return;}
     let cancelled=false;
-    const profileReady=prepareGameProfile(userId);
+    const profileReady=Promise.all([prepareGameProfile(userId),prepareGameFriends(userId).catch(()=>undefined)]);
     void profileReady.catch(()=>{});
-    const ready=async()=>{await profileReady;if(!cancelled){preparedUsers.add(userId);setBlocking(false)}};
+    const ready=async()=>{await profileReady;if(!cancelled){preparedUsers.add(userId);try{sessionStorage.setItem('nexora:game-prepared:'+userId,'1')}catch{}setBlocking(false)}};
     const desktop=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean;getVersion:()=>Promise<string>}}).nexoraDesktop;
     if(!desktop?.isGameDesktop){setError('');void loadLobbyAssets().then(()=>ready()).catch(()=>{if(!cancelled)setError('โหลดทรัพยากรเกมไม่สำเร็จ')});return()=>{cancelled=true};}
     document.documentElement.dataset.gameDesktop='true';

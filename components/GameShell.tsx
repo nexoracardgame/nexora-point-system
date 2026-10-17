@@ -30,8 +30,9 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
       <GameBackButton />
       <GameSettings />
       <GameRoomResume />
-      <GamePatchGate><div className={pathname === "/game/pentad" ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}<GameProfileOverlay/></div></GamePatchGate>
+      <GamePatchGate><div className={pathname === "/game/pentad" ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}</div></GamePatchGate>
       {pathname === "/game" && !active && <FloatingChatDock />}
+      <GameProfileOverlay/>
     </div>
   </OnlinePresenceProvider>;
 }

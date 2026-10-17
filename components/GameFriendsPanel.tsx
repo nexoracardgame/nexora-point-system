@@ -7,36 +7,37 @@ import { Check, ChevronRight, Clock3, LoaderCircle, MessageSquare, RefreshCw, Se
 import { useOnlinePresence } from './OnlinePresenceProvider';
 import './GameFriendsPanel.css';
 import {warmGameProfile} from '@/lib/game-profile-client';
+import {cachedGameFriends,loadGameFriends,gameFriendId,type GameFriend as Player} from '@/lib/game-friends-client';
+import {openGameProfile} from '@/lib/game-profile-navigation';
 
-type Player = { id:string; friendId?:string; fromUserId?:string; displayName:string; username:string|null; image:string; bio?:string; relation?:'none'|'incoming'|'outgoing'|'friends'|'self'; requestId?:string|null };
 type Mode = 'friends'|'requests'|'discover';
 
 export default function GameFriendsPanel({onClose}:{onClose:()=>void}) {
   const {data:session,status}=useSession();
   const {isOnline}=useOnlinePresence();
   const [mode,setMode]=useState<Mode>('friends');
-  const [friends,setFriends]=useState<Player[]>([]),[requests,setRequests]=useState<Player[]>([]),[results,setResults]=useState<Player[]>([]);
-  const [query,setQuery]=useState(''),[loading,setLoading]=useState(true),[searching,setSearching]=useState(false);
+  const owner=session?.user?.id||'',cached=cachedGameFriends(owner);
+  const [friends,setFriends]=useState<Player[]>(cached?.friends||[]),[requests,setRequests]=useState<Player[]>(cached?.requests||[]),[results,setResults]=useState<Player[]>([]);
+  const [query,setQuery]=useState(''),[loading,setLoading]=useState(!cached),[searching,setSearching]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(''),[removing,setRemoving]=useState('');
   const dialog=useRef<HTMLDivElement>(null),searchRef=useRef<HTMLInputElement>(null);
   const mounted=useRef(true),searchVersion=useRef(0),actionPending=useRef(false),loadVersion=useRef(0);
-  const idOf=(p:Player)=>p.friendId||p.fromUserId||p.id;
+  const idOf=gameFriendId;
   useEffect(()=>{let stopped=false;const players=mode==='discover'?results:mode==='requests'?requests:friends;let cursor=0;const worker=async()=>{while(!stopped&&cursor<Math.min(players.length,12)){const player=players[cursor++];await warmGameProfile(idOf(player))}};void worker();void worker();return()=>{stopped=true}},[friends,requests,results,mode]);
-  const load=useCallback(async(signal?:AbortSignal)=>{
+  const load=useCallback(async(signal?:AbortSignal,force=signal===undefined)=>{
     const version=++loadVersion.current;
     try {
-      const response=await fetch('/api/community/friends',{cache:'no-store',signal});
-      const data=await response.json();
-      if(!response.ok)throw Error(response.status===401?'กรุณาเข้าสู่ระบบก่อน':'โหลดรายชื่อไม่สำเร็จ');
+      const data=await loadGameFriends(owner,force);
       if(mounted.current&&!signal?.aborted&&version===loadVersion.current){setFriends(data.friends||[]);setRequests(data.requests||[]);setError('');}
     } catch(e) {if(mounted.current&&!signal?.aborted&&version===loadVersion.current)setError(e instanceof Error?e.message:'เชื่อมต่อไม่สำเร็จ');}
     finally {if(mounted.current&&!signal?.aborted&&version===loadVersion.current)setLoading(false);}
-  },[]);
+  },[owner]);
   useEffect(()=>{
     mounted.current=true;
     const previous=document.activeElement as HTMLElement|null;
     dialog.current?.focus();
     const keyboard=(e:KeyboardEvent)=>{
+      if(document.querySelector('.nexora-profile-overlay'))return;
       if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(!actionPending.current)onClose();}
       if(e.key==='Tab'){
         const elements=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input,a[href],[tabindex="0"]')||[]).filter(el=>el.getClientRects().length);
@@ -80,7 +81,7 @@ export default function GameFriendsPanel({onClose}:{onClose:()=>void}) {
       if(!mounted.current)return;
       setResults(items=>items.map(item=>idOf(item)===idOf(player)?{...item,relation:operation==='request'?(data.relation?.status||'outgoing'):operation==='accept'?'friends':'none',requestId:data.relation?.requestId||null}:item));
       setRemoving('');setNotice(operation==='request'?'ส่งคำขอแล้ว':operation==='accept'?'รับเป็นเพื่อนแล้ว':operation==='remove'?'ลบเพื่อนแล้ว':'ปฏิเสธคำขอแล้ว');
-      await load();
+      await load(undefined,true);
       window.dispatchEvent(new Event('focus'));
     }catch(e){if(mounted.current)setError(e instanceof Error?e.message:'ดำเนินการไม่สำเร็จ');}
     finally{actionPending.current=false;if(mounted.current)setBusy('');}
@@ -108,7 +109,7 @@ export default function GameFriendsPanel({onClose}:{onClose:()=>void}) {
         <div className="gf-list" aria-busy={loading||searching}>
           {status==='unauthenticated'?<div className="gf-empty"><Shield size={44}/><h3>เข้าสู่ระบบเพื่อดูเพื่อน</h3></div>:(loading||searching)?<div className="gf-empty" role="status"><LoaderCircle className="gf-spin" size={30}/><span>กำลังเชื่อมต่อ...</span></div>:!sorted.length?<div className="gf-empty"><Users size={46}/><h3>{query?'ไม่พบผู้เล่น':mode==='requests'?'ไม่มีคำขอใหม่':mode==='discover'?'ยังไม่พบผู้เล่น':'ยังไม่มีเพื่อน'}</h3>{mode==='friends'&&!query&&<button className="gf-command" onClick={()=>selectMode('discover')}><UserPlus size={17}/>ค้นหาผู้เล่น</button>}</div>:sorted.map(p=>{
             const id=idOf(p),isBusy=busy===id,relation=mode==='requests'?'incoming':mode==='friends'?'friends':p.relation||'none';
-            return <article className="gf-player" key={id}><div className="gf-avatar"><img src={p.image||'/avatar.png'} alt="" onError={e=>{if(!e.currentTarget.src.endsWith('/avatar.png'))e.currentTarget.src='/avatar.png';}}/><i data-online={isOnline(id)}/></div><div className="gf-player-info"><h3 title={p.displayName}>{p.displayName}</h3><span>{isOnline(id)?'ออนไลน์':'ออฟไลน์'}{p.username?' · @'+p.username:''}</span><small title={id}>ID: {id}</small></div><div className="gf-actions">
+            return <article className="gf-player" key={id}><button type="button" className="gf-avatar" aria-label={'เปิดโปรไฟล์ '+p.displayName} onClick={()=>openGameProfile(id)} onPointerEnter={()=>void warmGameProfile(id)} onFocus={()=>void warmGameProfile(id)}><img src={p.image||'/avatar.png'} alt="" onError={e=>{if(!e.currentTarget.src.endsWith('/avatar.png'))e.currentTarget.src='/avatar.png';}}/><i data-online={isOnline(id)}/></button><div className="gf-player-info"><h3 title={p.displayName}><button type="button" className="gf-name" onClick={()=>openGameProfile(id)} onPointerEnter={()=>void warmGameProfile(id)} onFocus={()=>void warmGameProfile(id)}>{p.displayName}</button></h3><span>{isOnline(id)?'ออนไลน์':'ออฟไลน์'}{p.username?' · @'+p.username:''}</span><small title={id}>ID: {id}</small></div><div className="gf-actions">
               {isBusy?<LoaderCircle size={20} className="gf-spin"/>:relation==='friends'?<><button className="gf-command" title="ส่งข้อความ" onClick={()=>chat(p)}><MessageSquare size={17}/><span>แชท</span></button><button className="gf-icon gf-danger" title="ลบเพื่อน" aria-label={'ลบเพื่อน '+p.displayName} onClick={()=>setRemoving(removing===id?'':id)}><UserMinus size={17}/></button></>:relation==='incoming'?<><button className="gf-command" title="รับเป็นเพื่อน" onClick={()=>void action(p,'accept')}><Check size={17}/><span>ยอมรับ</span></button><button className="gf-icon" title="ปฏิเสธ" aria-label="ปฏิเสธคำขอ" onClick={()=>void action(p,'reject')}><X size={17}/></button></>:relation==='outgoing'?<span className="gf-pending"><Clock3 size={16}/>รอตอบรับ</span>:relation==='self'?<span>คุณ</span>:<button className="gf-command" title="เพิ่มเพื่อน" onClick={()=>void action(p,'request')}><UserPlus size={17}/><span>เพิ่มเพื่อน</span></button>}
               </div>{removing===id&&<div className="gf-remove"><span>ลบ {p.displayName} ออกจากเพื่อน?</span><button onClick={()=>void action(p,'remove')}>ยืนยัน</button><button onClick={()=>setRemoving('')}>ยกเลิก</button></div>}</article>;
           })}

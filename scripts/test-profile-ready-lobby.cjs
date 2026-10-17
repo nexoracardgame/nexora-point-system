@@ -6,6 +6,7 @@ const transpile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.C
 for(const [id,file]of [['gate','components/GamePatchGate.tsx'],['lobby','components/GameLobbyProfile.tsx'],['overlay','components/GameProfileOverlay.tsx'],['@/lib/game-profile-client','lib/game-profile-client.ts'],['./game-profile-options','lib/game-profile-options.ts'],['@/lib/game-profile-options','lib/game-profile-options.ts'],['@/lib/lobby-assets','lib/lobby-assets.ts'],['./GameBackControl','components/GameBackControl.tsx']])modules[id]=transpile(fs.readFileSync(file,'utf8'));
 for(const id of ['./GamePatchGate.css','./BattleLoadingScreen.css','./GameLobbyProfile.css','./GameProfileFrame.css','./GameProfileOverlay.css'])modules[id]='';
 modules['@/lib/game-patcher']='';modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
+modules['@/lib/game-friends-client']='exports.prepareGameFriends=async()=>{};';
 modules['./GameLobbyWallet']='exports.__esModule=true;exports.default=()=>null;';
 modules['next/navigation']='exports.usePathname=()=>"/game";exports.useRouter=()=>({prefetch:()=>{}});';
 modules['next-auth/react']='exports.useSession=()=>({status:"authenticated",data:{user:{id:"self",name:"Actual player",image:"/avatar.png"}}});';

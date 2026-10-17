@@ -1,11 +1,15 @@
 "use client";
 
-import {useCallback,useState} from 'react';
+import {useCallback,useEffect,useState} from 'react';
+import {useSession} from 'next-auth/react';
+import {loadGameFriends,prepareGameFriends} from '@/lib/game-friends-client';
 import {Layers3,Users,Trophy,Swords} from 'lucide-react';
 import {playGameUiSound} from '@/lib/game-ui-audio';
 import GameFriendsPanel from './GameFriendsPanel';
 
 export default function GameLobbyNavigation({onRank,onJoin}:{onRank:()=>void;onHome:()=>void;onJoin:()=>void}){
+ const {data:session}=useSession(),owner=session?.user?.id;
+ useEffect(()=>{if(!owner)return;void prepareGameFriends(owner).catch(()=>{});const refresh=()=>{void loadGameFriends(owner,true).then(()=>prepareGameFriends(owner)).catch(()=>{})};const timer=setInterval(()=>{if(!document.hidden)refresh()},60000);window.addEventListener('nexora:friends-updated',refresh);return()=>{clearInterval(timer);window.removeEventListener('nexora:friends-updated',refresh)}},[owner]);
  const [pending,setPending]=useState('');
  const [friendsOpen,setFriendsOpen]=useState(false);
  const closeFriends=useCallback(()=>setFriendsOpen(false),[]);

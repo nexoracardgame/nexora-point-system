@@ -2,7 +2,6 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {useSession} from 'next-auth/react';
-import {useRouter} from 'next/navigation';
 import {loadGameProfile} from '@/lib/game-profile-client';
 import {gameHeroes} from '@/lib/game-profile-options';
 import {type GameAppearance} from '@/lib/game-profile-options';
@@ -12,8 +11,8 @@ import './GameLobbyProfile.css';
 import './GameProfileFrame.css';
 export default function GameLobbyProfile({name,image,rank,wins}:{name:string;image:string;rank:string;wins:number}){
  const [appearance,setAppearance]=useState<GameAppearance|null>(null);
- const {data:session}=useSession();const router=useRouter();
- useEffect(()=>{router.prefetch('/game/profile');if(session?.user?.id)void loadGameProfile(session.user.id).catch(()=>{});gameHeroes.forEach(hero=>{const img=new Image();img.src=hero.image})},[router,session?.user?.id]);
+ const {data:session}=useSession();
+ useEffect(()=>{if(session?.user?.id)void loadGameProfile(session.user.id).catch(()=>{});gameHeroes.forEach(hero=>{const img=new Image();img.src=hero.image})},[session?.user?.id]);
  const [notice,setNotice]=useState(false);
  const nameLabel=useRef<HTMLElement>(null);
  useLayoutEffect(()=>{const label=nameLabel.current;if(!label)return;const fit=()=>{label.style.fontSize='';let size=parseFloat(getComputedStyle(label).fontSize);while(size>8&&label.scrollWidth>label.clientWidth+1){size-=.5;label.style.fontSize=`${size}px`}};const observer=new ResizeObserver(fit);observer.observe(label);fit();return()=>observer.disconnect()},[name]);

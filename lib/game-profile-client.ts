@@ -10,7 +10,8 @@ export const cachedGameProfile=(id:string)=>{
 };
 const artwork=new Map<string,Promise<void>>();
 export async function prepareGameProfile(id:string){
- const details=await loadGameProfile(id);
+ const cached=cachedGameProfile(id),details=cached||await loadGameProfile(id);
+ if(cached)void loadGameProfile(id).catch(()=>{});
  if(typeof Image==='undefined')return details;
  const sources=['/images/versus/arena.png','/images/triad/nexora-official-logo.webp','/images/lobby-play/profile-avatar-frame.png','/images/lobby-play/profile-name-frame.png','/images/lobby-play/profile-rank-label.png',gameHeroes.find(hero=>hero.id===details.appearance.hero)?.image||gameHeroes[0].image,details.appearance.avatar||details.user?.image].filter((src):src is string=>Boolean(src));
  await Promise.all(sources.map(src=>{let ready=artwork.get(src);if(!ready){ready=new Promise<void>(resolve=>{const image=new Image();image.onload=()=>{void image.decode().catch(()=>{}).then(()=>resolve())};image.onerror=()=>{artwork.delete(src);resolve()};image.src=src});artwork.set(src,ready)}return ready}));

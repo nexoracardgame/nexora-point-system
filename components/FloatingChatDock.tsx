@@ -21,6 +21,7 @@ import { flushSync } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import {warmGameProfile,primeGameIdentity} from '@/lib/game-profile-client';
 import {openGameProfile} from '@/lib/game-profile-navigation';
+import {warmGameProfiles} from '@/lib/game-friends-client';
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
@@ -735,6 +736,7 @@ export default function FloatingChatDock({
   const [filter, setFilter] = useState<RoomFilter>("all");
   const [query, setQuery] = useState("");
   const [rooms, setRooms] = useState<FloatingRoom[]>([]);
+  useEffect(()=>{if(status==='authenticated'&&pathname?.startsWith('/game'))void warmGameProfiles(rooms.map(room=>room.otherUserId||''))},[rooms,status,pathname]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [activeRoom, setActiveRoom] = useState<ActiveFloatingRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -831,7 +833,6 @@ export default function FloatingChatDock({
   useEffect(()=>{
     if(!profileUserId||!pathname?.startsWith('/game'))return;
     primeGameIdentity(profileUserId,activeRoom?.other?.name||activeRoom?.otherName||'PLAYER',activeRoom?.other?.image||'/avatar.png');
-    router.prefetch(activeProfileHref);
     void warmGameProfile(profileUserId);
   },[profileUserId,activeProfileHref,pathname,router,activeRoom?.other?.name,activeRoom?.otherName,activeRoom?.other?.image]);
   const activeOtherOnline = activeRoom
@@ -3415,9 +3416,11 @@ export default function FloatingChatDock({
                       router.push(activeProfileHref);
                     }}
                     onPointerEnter={() => {
+                      if(pathname?.startsWith('/game')&&profileUserId){void warmGameProfile(profileUserId);return;}
                       if (activeProfileHref) router.prefetch(activeProfileHref);
                     }}
                     onTouchStart={() => {
+                      if(pathname?.startsWith('/game')&&profileUserId){void warmGameProfile(profileUserId);return;}
                       if (activeProfileHref) router.prefetch(activeProfileHref);
                     }}
                     disabled={!activeProfileHref}

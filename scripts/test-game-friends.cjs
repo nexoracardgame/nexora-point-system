@@ -10,11 +10,14 @@ for (const [id,pkg,file] of [['react','react','react.production.js'],['react/jsx
   modules[id] = fs.readFileSync(path.join(path.dirname(require.resolve(pkg)),'cjs',file),'utf8');
 }
 modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'),'utf8');
-modules['next-auth/react'] = `exports.useSession=()=>({status:window.guest?'unauthenticated':'authenticated',data:{user:{name:'NOC Official',image:'/avatar.png'}}});`;
+modules['next-auth/react'] = `exports.useSession=()=>({status:window.guest?'unauthenticated':'authenticated',data:{user:{id:'self',name:'NOC Official',image:'/avatar.png'}}});`;
 modules['./OnlinePresenceProvider'] = `exports.useOnlinePresence=()=>({isOnline:id=>id==='player-01'});`;
 modules['@/lib/game-ui-audio'] = 'exports.playGameUiSound=()=>{};';
 modules['./GameFriendsPanel.css'] = '';
 modules['@/lib/game-profile-client']='exports.warmGameProfile=async()=>{};';
+modules['./game-profile-client']=modules['@/lib/game-profile-client'];
+modules['@/lib/game-friends-client']=transpile(fs.readFileSync('lib/game-friends-client.ts','utf8'));
+modules['@/lib/game-profile-navigation']=transpile(fs.readFileSync('lib/game-profile-navigation.ts','utf8'));
 modules['./GameFriendsPanel'] = transpile(fs.readFileSync('components/GameFriendsPanel.tsx','utf8'));
 modules.nav = transpile(fs.readFileSync('components/GameLobbyNavigation.tsx','utf8'));
 const bundle = Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
@@ -102,7 +105,7 @@ assert.match(fs.readFileSync('components/FloatingChatDock.tsx','utf8'),/data-flo
     assert.equal(await page.evaluate(()=>chatEvents[0].userId),'player-03');
     assert.equal(await page.locator('.nexora-play-viewport-control').isVisible(),false,'PLAY stays hidden when shared chat opens');
     await page.evaluate(()=>document.documentElement.removeAttribute('data-floating-chat-open'));
-    failed=true;await page.getByRole('button',{name:'เพื่อน',exact:true}).click();await page.getByRole('alert').waitFor();
+    failed=true;await page.getByRole('button',{name:'เพื่อน',exact:true}).click();await page.getByRole('button',{name:'โหลดรายชื่อใหม่'}).click();await page.getByRole('alert').waitFor();
     failed=false;await page.getByRole('button',{name:'โหลดรายชื่อใหม่'}).click();await page.locator('.gf-player').first().waitFor();
     await page.keyboard.press('Escape');await page.evaluate(()=>window.guest=true);await page.getByRole('button',{name:'เพื่อน',exact:true}).click();
     await page.getByRole('heading',{name:'เข้าสู่ระบบเพื่อดูเพื่อน'}).waitFor();
