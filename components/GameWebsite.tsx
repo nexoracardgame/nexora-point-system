@@ -55,7 +55,7 @@ export default function GameWebsite({children}:{children?:ReactNode}){
    <button className="nx-site-close" title="ปิด" aria-label="ปิด" onClick={()=>setPanel(null)}><X/></button>
    <img className="nx-account-brand" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/>
    <span className="nx-site-eyebrow">NEXORA ACCOUNT</span><h2 id="nx-account-heading">บัญชีของคุณ</h2>
-   <div className="nx-account-identity"><span className="nx-account-avatar"><UserRound size={28}/></span><div><strong>{session?.user?.name}</strong>{session?.user?.email&&<span>{session.user.email}</span>}</div></div>
+   <div className="nx-account-identity"><span className="nx-account-avatar">{avatar&&failedAvatar!==avatar?<img src={avatar} alt="รูปโปรไฟล์" referrerPolicy="no-referrer" onError={()=>setFailedAvatar(avatar)}/>:<UserRound size={28}/>}</span><div><strong>{session?.user?.name}</strong>{session?.user?.email&&<span>{session.user.email}</span>}</div></div>
    <dl><dt>รหัสบัญชี</dt><dd>{session?.user?.id}</dd><dt>COIN</dt><dd>{wallet?wallet.coin.toLocaleString():walletError?'ไม่สามารถโหลดยอดเงินได้':'กำลังตรวจสอบยอดเงิน'}</dd><dt>NEX</dt><dd>{wallet?wallet.nexPoint.toLocaleString():'—'}</dd></dl>
    <div className="nx-account-actions"><Link className="nx-account-edit" href="/game/account" onClick={()=>setPanel(null)}><Settings2 size={19}/>แก้ไขบัญชี<ArrowUpRight size={16}/></Link><Link className="nx-site-primary" href="/game/topup" onClick={()=>setPanel(null)}><Coins size={20}/>เติม COIN</Link></div>
    <div className="nx-account-bottom"><span><ShieldCheck size={16}/>NEXORA ACCOUNT</span><button className="nx-site-signout" onClick={()=>void signOut({callbackUrl:'/game'})}><LogOut size={18}/>ออกจากระบบ</button></div>
