@@ -723,6 +723,11 @@ export default function FloatingChatDock({
   const { isOnline } = useOnlinePresence();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (open) document.documentElement.setAttribute("data-floating-chat-open", "true");
+    else document.documentElement.removeAttribute("data-floating-chat-open");
+    return () => document.documentElement.removeAttribute("data-floating-chat-open");
+  }, [open]);
   const [dockMode, setDockMode] = useState<"chat" | "ai">("chat");
   const [filter, setFilter] = useState<RoomFilter>("all");
   const [query, setQuery] = useState("");

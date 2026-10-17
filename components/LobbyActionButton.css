@@ -45,6 +45,7 @@
 .nexora-play-viewport-control .nexora-command-actions { position:static; display:block; width:100%; max-width:none; }
 .nexora-command-lobby.nexora-play-viewport-control .nexora-command-actions .nexora-lobby-art-button[data-artwork=play] { width:100%; min-width:0; max-width:none; pointer-events:auto; }
 body:has(.nexora-ranking) .nexora-play-viewport-control { display:none; }
+html[data-floating-chat-open=true] .nexora-play-viewport-control,body:has(.game-friends-overlay) .nexora-play-viewport-control { display:none!important; }
 .nexora-command-lobby.nexora-play-viewport-control { z-index:120; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop { inset:0; overflow:visible; }
 .nexora-lobby-art-button[data-artwork=play] .nexora-lobby-art-crop::before { display:none; }

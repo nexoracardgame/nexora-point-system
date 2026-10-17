@@ -963,6 +963,7 @@ function normalizeSearchValue(value: string | null | undefined) {
 
 function scoreCommunityCandidate(
   user: {
+    id?: string;
     displayName: string;
     username: string | null;
     bio: string;
@@ -975,7 +976,10 @@ function scoreCommunityCandidate(
   const displayName = normalizeSearchValue(user.displayName);
   const username = normalizeSearchValue(user.username);
   const bio = normalizeSearchValue(user.bio);
+  const playerId = normalizeSearchValue(user.id);
 
+  if (playerId && playerId === normalizedTerm) return 110;
+  if (normalizedTerm.length >= 4 && playerId.includes(normalizedTerm)) return 72;
   if (username && username === normalizedTerm) return 100;
   if (displayName === normalizedTerm) return 96;
   if (username && username.startsWith(normalizedTerm)) return 84;
