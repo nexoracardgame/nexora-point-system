@@ -24,7 +24,7 @@
 .gpp-framed-name::after { display:none; }
 .gpp-framed-rank { --profile-mask:url('/images/lobby-play/profile-rank-label.png'); }
 .nli-pieces img { animation:none; }
-.nli-pieces .nli-piece-label,.nli-pieces .nli-piece-edit { animation:profile-metal-breathe 5s ease-in-out infinite; }
+.nli-pieces .nli-piece-label,.nli-pieces .nli-piece-edit { animation:none; }
 :is(.nexora-lobby-identity,.gpp-framed-identity):hover :is(.nli-pieces img,.gpp-framed-ring,.gpp-framed-name,.gpp-framed-rank) { filter:brightness(1.1); }
 .nexora-command-lobby .nexora-lobby-identity:is(:hover,:focus-within,:active) { filter:none; }
 @keyframes profile-metal-sweep { 0%,25%{background-position:100% 0;opacity:0} 40%{opacity:.65} 65%,100%{background-position:0 0;opacity:0} }
