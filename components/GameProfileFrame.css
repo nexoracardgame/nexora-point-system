@@ -10,17 +10,21 @@
 .gpp-framed-rank { left:42%;top:65%;width:42%;height:auto;aspect-ratio:835/230;pointer-events:none; }
 .gpp-framed-name>img,.gpp-framed-rank>img { display:block; }
 .nexora-lobby-identity .nli-name { top:29%;height:20%;font-size:22px;font-weight:800; }
-.nexora-lobby-identity .nli-rank-name { left:42%;top:72.3%;width:24%;height:17%;font-size:17px;font-weight:700;line-height:1; }
-.game-player-profile .gpp-framed-rank>span { left:13%;right:13%;top:25%;bottom:26%;font-size:20px;font-weight:700;line-height:1; }
+.nexora-lobby-identity .nli-rank-name { left:42%;top:69.3%;width:24%;height:17%;font-size:17px;font-weight:700;line-height:1; }
+.game-player-profile .gpp-framed-rank>span { left:13%;right:13%;top:15%;bottom:35%;font-size:20px;font-weight:700;line-height:1; }
 :is(.nli-name,.nli-rank-name,.gpp-framed-name h1,.gpp-framed-rank>span) { color:#fff0bf;text-shadow:0 2px 2px #000,0 0 10px #e5ad4c77; }
-:is(.nli-art,.gpp-framed-name,.gpp-framed-rank,.gpp-framed-ring) { filter:drop-shadow(0 1px 2px #000) drop-shadow(0 0 4px #efc46e55); }
+:is(.nli-art,.gpp-framed-name,.gpp-framed-rank,.gpp-framed-ring) { filter:none; }
+.nexora-command-lobby .nexora-lobby-identity,.gpp-framed-identity { filter:none; }
+.nexora-lobby-identity .nli-art { animation:none; }
 .gpp-framed-name,.gpp-framed-rank { isolation:isolate; }
 .gpp-framed-name::after,.gpp-framed-rank::after { content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 36%,#fff4ce99 49%,transparent 62%);background-size:300% 100%;animation:profile-metal-sweep 7s ease-in-out infinite;mix-blend-mode:screen;mask:var(--profile-mask) center/100% 100% no-repeat; }
 .gpp-framed-name { --profile-mask:url('/images/lobby-play/profile-name-frame.png'); }
-.gpp-framed-name::after { clip-path:polygon(0 0,100% 0,100% 100%,16% 100%,16% 89%,0 89%); }
+.gpp-framed-name::after { display:none; }
 .gpp-framed-rank { --profile-mask:url('/images/lobby-play/profile-rank-label.png'); }
-.nli-pieces img { animation:profile-metal-breathe 5s ease-in-out infinite; }
-:is(.nexora-lobby-identity,.gpp-framed-identity):hover :is(.nli-pieces img,.gpp-framed-ring,.gpp-framed-name,.gpp-framed-rank) { filter:brightness(1.15) drop-shadow(0 0 6px #ffdc8c88); }
+.nli-pieces img { animation:none; }
+.nli-pieces .nli-piece-label,.nli-pieces .nli-piece-edit { animation:profile-metal-breathe 5s ease-in-out infinite; }
+:is(.nexora-lobby-identity,.gpp-framed-identity):hover :is(.nli-pieces img,.gpp-framed-ring,.gpp-framed-name,.gpp-framed-rank) { filter:brightness(1.1); }
+.nexora-command-lobby .nexora-lobby-identity:is(:hover,:focus-within,:active) { filter:none; }
 @keyframes profile-metal-sweep { 0%,25%{background-position:100% 0;opacity:0} 40%{opacity:.65} 65%,100%{background-position:0 0;opacity:0} }
 @keyframes profile-metal-breathe { 0%,100%{filter:drop-shadow(0 0 2px #e8b35144)} 50%{filter:brightness(1.08) drop-shadow(0 0 5px #f7d38b77)} }
 @container (max-height:600px) { .nexora-lobby-identity .nli-name { font-size:15px; }.nexora-lobby-identity .nli-rank-name { font-size:12px; } }
