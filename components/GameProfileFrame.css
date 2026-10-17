@@ -1,4 +1,6 @@
 /* Keep the original artwork proportions on both profile surfaces. */
+.game-player-profile[data-read-only=true] :is(.gpp-customize,.gpp-hero-caption>button) { display:none; }
+.game-player-profile[data-read-only=true] .gpp-framed-avatar { pointer-events:none;cursor:default; }
 :is(.nli-piece-avatar,.gpp-framed-avatar) { aspect-ratio:640/724; }
 .nli-pieces .nli-piece-avatar { height:auto; }
 .nli-pieces .nli-piece-name { height:auto;aspect-ratio:1532/465; }

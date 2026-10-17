@@ -7,21 +7,21 @@ import './GamePlayerProfile.css';
 import './GameProfileFrame.css';
 import {updateCachedGameAppearance} from '@/lib/game-profile-client';
 
-type Props={user:{id:string;name:string;image:string};initial:GameAppearance;stats:{wins:number;losses:number}|null;rank:{name:string;nextWins:number|null;nextName:string|null};available:boolean;pending?:boolean};
-export default function GamePlayerProfile({user,initial,stats,rank,available,pending=false}:Props){
+type Props={user:{id:string;name:string;image:string};initial:GameAppearance;stats:{wins:number;losses:number}|null;rank:{name:string;nextWins:number|null;nextName:string|null};available:boolean;pending?:boolean;readOnly?:boolean};
+export default function GamePlayerProfile({user,initial,stats,rank,available,pending=false,readOnly=false}:Props){
  const [appearance,setAppearance]=useState(initial),[draft,setDraft]=useState(initial),[panel,setPanel]=useState<'avatar'|'frame'|'hero'|null>(null),[tab,setTab]=useState('stats'),[busy,setBusy]=useState(false),[notice,setNotice]=useState(available||pending?'':'โหลดการตกแต่งไม่สำเร็จ กรุณารีเฟรชก่อนเปลี่ยน'),[uploading,setUploading]=useState(false);
  const dialog=useRef<HTMLDivElement>(null),trigger=useRef<HTMLElement|null>(null),file=useRef<HTMLInputElement>(null);
  const nameLabel=useRef<HTMLHeadingElement>(null);
  useLayoutEffect(()=>{const label=nameLabel.current;if(!label)return;const fit=()=>{label.style.fontSize='';let size=parseFloat(getComputedStyle(label).fontSize);while(size>8&&label.scrollWidth>label.clientWidth+1){size-=.5;label.style.fontSize=`${size}px`}};fit();const observer=new ResizeObserver(fit);observer.observe(label);return()=>observer.disconnect()},[user.name]);
  const close=()=>{if(!busy&&!uploading){setPanel(null);trigger.current?.focus()}};
- const open=(next:typeof panel)=>{trigger.current=document.activeElement as HTMLElement;setDraft(appearance);setNotice('');setPanel(next)};
+ const open=(next:typeof panel)=>{if(readOnly)return;trigger.current=document.activeElement as HTMLElement;setDraft(appearance);setNotice('');setPanel(next)};
  useEffect(()=>{if(!panel)return;const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();close()}if(e.key==='Tab'){const elements=[...dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled)')||[]],first=elements[0],last=elements.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};document.addEventListener('keydown',key);return()=>{document.body.style.overflow=previousOverflow;document.removeEventListener('keydown',key)}},[panel,busy,uploading]);
  const save=async()=>{setBusy(true);setNotice('');try{const response=await fetch('/api/game-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)});const result=await response.json();if(!response.ok)throw Error(result.error||'บันทึกไม่สำเร็จ');setAppearance(draft);updateCachedGameAppearance(user.id,draft);setPanel(null);setNotice('บันทึกโปรไฟล์แล้ว');trigger.current?.focus()}catch(e){setNotice(e instanceof Error?e.message:'บันทึกไม่สำเร็จ')}finally{setBusy(false)}};
  const upload=async(imageFile?:File)=>{if(!imageFile)return;if(!['image/jpeg','image/png','image/webp'].includes(imageFile.type)||imageFile.size>8*1024*1024){setNotice('เลือกรูป JPG, PNG หรือ WebP ไม่เกิน 8 MB');return}setUploading(true);try{const bitmap=await createImageBitmap(imageFile);const canvas=document.createElement('canvas');canvas.width=canvas.height=384;const context=canvas.getContext('2d');if(!context)throw Error();const size=Math.min(bitmap.width,bitmap.height);context.drawImage(bitmap,(bitmap.width-size)/2,(bitmap.height-size)/2,size,size,0,0,384,384);bitmap.close();setDraft(d=>({...d,avatar:canvas.toDataURL('image/jpeg',.88)}));setNotice('')}catch{setNotice('เปิดรูปนี้ไม่ได้ กรุณาเลือกรูปอื่น')}finally{setUploading(false);if(file.current)file.current.value=''}};
  const hero=gameHeroes.find(h=>h.id===appearance.hero)||gameHeroes[0],frame=gameFrames.find(f=>f.id===appearance.frame)||gameFrames[0];
  const wins=stats?.wins||0,losses=stats?.losses||0,total=wins+losses;
  const next=rank.nextWins;
- return <main className="game-player-profile">
+ return <main className="game-player-profile" data-read-only={readOnly}>
   <img className="gpp-backdrop" src="/images/versus/arena.png" alt=""/>
   <header className="gpp-header"><Link href="/game" className="gpp-back"><ArrowLeft size={21}/><span>หน้าหลักเกม</span></Link><span>ข้อมูลผู้เล่น</span><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></header>
   <div className="gpp-layout"><section className="gpp-details" aria-label="ข้อมูลโปรไฟล์">

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
@@ -722,6 +722,7 @@ export default function FloatingChatDock({
   const { data: session, status } = useSession();
   const { isOnline } = useOnlinePresence();
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (open) document.documentElement.setAttribute("data-floating-chat-open", "true");
@@ -821,11 +822,10 @@ export default function FloatingChatDock({
   const mobileChatFocusMode = Boolean(
     open && dockMode === "chat" && mobileComposerActive
   );
-  const activeProfileHref = activeRoom?.other?.id
-    ? `/profile/${encodeURIComponent(activeRoom.other.id)}`
-    : activeRoom?.otherUserId
-      ? `/profile/${encodeURIComponent(activeRoom.otherUserId)}`
-      : "";
+  const profileUserId = activeRoom?.other?.id || activeRoom?.otherUserId;
+  const activeProfileHref = profileUserId
+    ? `${pathname?.startsWith('/game') ? '/game/profile' : '/profile'}/${encodeURIComponent(profileUserId)}`
+    : "";
   const activeOtherOnline = activeRoom
     ? isOnline(activeRoom.other?.id, activeRoom.otherUserId)
     : false;

@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm');
+let source=fs.readFileSync('scripts/test-player-profile-ui.cjs','utf8');
+source=source.replace("modules['./GamePlayerProfile.css']='';","modules['./GamePlayerProfile.css']='';modules['./GameProfileFrame.css']='';");
+source=source.replace("${fs.readFileSync('components/GamePlayerProfile.css','utf8')}","${fs.readFileSync('components/GamePlayerProfile.css','utf8')}${fs.readFileSync('components/GameProfileFrame.css','utf8')}");
+source=source.replace('available:true,stats:','available:true,readOnly:true,stats:');
+source=source.replace("'.gpp-customize',",'');
+const start=source.indexOf("await page.getByRole('button',{name:'เปลี่ยนกรอบ',exact:true}).click();"),end=source.indexOf("await page.getByRole('tab'",start);
+if(start<0||end<0)throw Error('Missing profile fixture anchors');
+source=source.slice(0,start)+`assert.equal(await page.getByRole('button',{name:'เปลี่ยนกรอบ',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'เปลี่ยนฮีโร่',exact:true}).count(),0);await page.locator('.gpp-framed-avatar').focus();await page.keyboard.press('Enter');assert.equal(await page.getByRole('dialog').count(),0,'Other player appearance cannot be edited');`+source.slice(end);
+source=source.replaceAll('artifacts/player-profile','artifacts/other-player-profile');
+vm.runInThisContext(`(function(require,module,exports){${source}\n})`,{filename:__filename})(require,module,exports);
