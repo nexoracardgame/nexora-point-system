@@ -6,7 +6,7 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync('app/api/noc-foam-discord-
   fetch: async (url, options) => {
     calls.push({ url, ...options });
     if (fail) throw Error('provider error containing credential');
-    return Response.json(status === 200 ? { id: '1560911732455514182', bot: true, unnecessary: 'private-data' } : { code: 40333, message: 'provider error containing credential' }, { status });
+    return Response.json(status === 200 ? { id: '1560911732455514182', bot: true, owner: { id: '555555555555555555' }, interactions_endpoint_url: 'https://nexora-point-system.vercel.app/api/noc-foam-discord', unnecessary: 'private-data' } : { code: 40333, message: 'provider error containing credential' }, { status });
   }
 });
 function signed(body, timestamp = String(Date.now())) {
@@ -26,6 +26,13 @@ function signed(body, timestamp = String(Date.now())) {
   assert.equal(health.status, 200); assert.equal(health.data.reachable, true);
   const identity = await (await output.POST(signed({ path: '/users/@me', botToken: 'a'.repeat(60) }))).json();
   assert.equal(identity.data.bot, true); assert.equal(identity.data.unnecessary, undefined);
+  const app = await (await output.POST(signed({ path: '/applications/@me', botToken: 'a'.repeat(60) }))).json();
+  assert.equal(app.data.owner_id, '555555555555555555');
+  assert.equal(app.data.unnecessary, undefined);
+  assert.equal((await output.POST(signed({ path: '/applications/@me', method: 'PATCH', botToken: 'a'.repeat(60), payload: { interactions_endpoint_url: 'https://other.test' } }))).status, 400);
+  await output.POST(signed({ path: '/applications/@me', method: 'PATCH', botToken: 'a'.repeat(60), payload: { interactions_endpoint_url: 'https://nexora-point-system.vercel.app/api/noc-foam-discord', description: 'do-not-change' } }));
+  assert.equal(calls.at(-1).method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls.at(-1).body), { interactions_endpoint_url: 'https://nexora-point-system.vercel.app/api/noc-foam-discord' });
   await output.POST(signed({ path: '/channels/1171820203508764786/messages', method: 'POST', botToken: 'a'.repeat(60), payload: { content: '@everyone test', allowed_mentions: { parse: ['everyone'] } } }));
   assert.deepEqual(JSON.parse(calls.at(-1).body).allowed_mentions.parse, []);
   assert.match(calls.at(-1).headers['User-Agent'], /^DiscordBot \(/);

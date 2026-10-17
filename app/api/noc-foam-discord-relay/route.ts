@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const CHANNEL = "1171820203508764786";
+const INTERACTIONS = "https://nexora-point-system.vercel.app/api/noc-foam-discord";
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 
 export async function GET() {
-  return json({ ok: true, service: "noc-foam-discord-relay", build: "signed-relay-v1" });
+  return json({ ok: true, service: "noc-foam-discord-relay", build: "signed-relay-v2" });
 }
 
 export async function POST(request: Request) {
@@ -27,16 +28,18 @@ export async function POST(request: Request) {
   const method = String(body.method || "GET");
   const path = String(body.path || "");
   const health = method === "GET" && path === "/gateway";
-  const allowed = health || (method === "GET" && (path === "/users/@me" || path === `/channels/${CHANNEL}`)) || (method === "POST" && path === `/channels/${CHANNEL}/messages`);
+  const application = path === "/applications/@me";
+  const allowed = health || (method === "GET" && (application || path === "/users/@me" || path === `/channels/${CHANNEL}`)) || (method === "PATCH" && application) || (method === "POST" && path === `/channels/${CHANNEL}/messages`);
   if (!allowed) return json({ ok: false, error: "Unsupported operation" }, 400);
   const token = String(body.botToken || "");
   if (!health && !/^[A-Za-z0-9._-]{40,250}$/.test(token)) return json({ ok: false, error: "Invalid token format" }, 400);
   if (method === "POST" && (!body.payload || typeof body.payload !== "object")) return json({ ok: false }, 400);
+  if (method === "PATCH" && body.payload?.interactions_endpoint_url !== INTERACTIONS) return json({ ok: false, error: "Unsupported endpoint" }, 400);
   try {
     const headers: Record<string, string> = { "User-Agent": "DiscordBot (https://nexora-point-system.vercel.app, 1.0)", Accept: "application/json" };
     if (!health) headers.Authorization = "Bot " + token;
-    if (method === "POST") headers["Content-Type"] = "application/json";
-    const payload = method === "POST" ? { ...body.payload, allowed_mentions: { parse: [] } } : undefined;
+    if (method === "POST" || method === "PATCH") headers["Content-Type"] = "application/json";
+    const payload = method === "PATCH" ? { interactions_endpoint_url: INTERACTIONS } : method === "POST" ? { ...body.payload, allowed_mentions: { parse: [] } } : undefined;
     const response = await fetch("https://discord.com/api/v10" + path, {
       method, headers, body: payload ? JSON.stringify(payload) : undefined,
       cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20000)
@@ -45,6 +48,7 @@ export async function POST(request: Request) {
     try { data = await response.json(); } catch { data = { message: "Discord returned a non-JSON response" }; }
     // Only necessary identity/channel fields cross back; never echo credentials or request headers.
     if (health && response.ok) data = { reachable: true };
+    else if (application && response.ok) data = { id: data.id, owner_id: data.owner?.id || data.team?.owner_user_id, interactions_endpoint_url: data.interactions_endpoint_url || "" };
     else if (response.ok && method === "GET" && path === "/users/@me") data = { id: data.id, bot: data.bot };
     else if (response.ok && method === "GET") data = { id: data.id, guild_id: data.guild_id, type: data.type };
     else if (response.ok) data = { id: data.id };
