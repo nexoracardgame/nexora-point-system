@@ -7,11 +7,11 @@ import { useBattleArenaActive } from '@/lib/battle-ui-state';
 import { installGameResources,type GameRelease,type PatchProgress } from '@/lib/game-patcher';
 import './GamePatchGate.css';
 import './BattleLoadingScreen.css';
-import {loadLobbyAssets} from '@/lib/lobby-assets';
+import {loadLobbyAssets,LOBBY_ASSET_VERSION} from '@/lib/lobby-assets';
 import {prepareGameProfile} from '@/lib/game-profile-client';
 import {prepareGameFriends} from '@/lib/game-friends-client';
 const preparedUsers=new Set<string>();
-function visitedGame(userId:string){try{return Boolean(userId&&sessionStorage.getItem('nexora:game-prepared:'+userId))}catch{return false}}
+function visitedGame(userId:string){try{return Boolean(userId&&sessionStorage.getItem('nexora:game-prepared:'+LOBBY_ASSET_VERSION+':'+userId))}catch{return false}}
 
 export default function GamePatchGate({children}:{children:React.ReactNode}){
   const {status,data:session}=useSession();
@@ -29,7 +29,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     let cancelled=false;
     const profileReady=Promise.all([prepareGameProfile(userId),prepareGameFriends(userId).catch(()=>undefined)]);
     void profileReady.catch(()=>{});
-    const ready=async()=>{await profileReady;if(!cancelled){preparedUsers.add(userId);try{sessionStorage.setItem('nexora:game-prepared:'+userId,'1')}catch{}setBlocking(false)}};
+    const ready=async()=>{await profileReady;if(!cancelled){preparedUsers.add(userId);try{sessionStorage.setItem('nexora:game-prepared:'+LOBBY_ASSET_VERSION+':'+userId,'1')}catch{}setBlocking(false)}};
     const desktop=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean;getVersion:()=>Promise<string>}}).nexoraDesktop;
     if(!desktop?.isGameDesktop){setError('');void loadLobbyAssets().then(()=>ready()).catch(()=>{if(!cancelled)setError('โหลดทรัพยากรเกมไม่สำเร็จ')});return()=>{cancelled=true};}
     document.documentElement.dataset.gameDesktop='true';

@@ -3577,15 +3577,15 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       </section></div>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
       {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" data-closing={panelClosing} onClick={closePanel} aria-hidden="true" />}
-      {panel === "rank" ? <DuelistLeaderboard players={leaderboard} userId={participant.id} onClose={()=>setPanel(null)} /> : panel ? <section className={`nexora-command-sheet nexora-play-drawer ${panel === "join" ? "nexora-join-drawer" : "nexora-create-drawer"}`} data-closing={panelClosing} tabIndex={-1} role="dialog" aria-modal="true" aria-label={panel === "create" ? "สร้างห้อง" : "ค้นหาห้อง"} onPointerOver={event => {
+      {panel === "rank" ? <DuelistLeaderboard players={leaderboard} userId={participant.id} onClose={()=>setPanel(null)} /> : <section className={`nexora-command-sheet nexora-play-drawer ${panel === "join" ? "nexora-join-drawer" : "nexora-create-drawer"}`} data-open={Boolean(panel)} aria-hidden={!panel} inert={!panel||panelClosing} data-closing={panelClosing} tabIndex={-1} role="dialog" aria-modal={panel?true:undefined} aria-label={panel !== "join" ? "สร้างห้อง" : "ค้นหาห้อง"} onPointerOver={event => {
         const button = (event.target as Element).closest("button");
         if (!button || button.disabled || button.contains(event.relatedTarget as Node | null) || event.pointerType !== "mouse") return;
         if (performance.now() - hoverSoundAt.current > 160) { hoverSoundAt.current = performance.now(); playGameUiSound("click"); }
       }}>
         <svg className="nexora-lobby-drawer-outline" viewBox="0 0 1040 600" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1H240L335 97H359L265 1H310L581 276H607L656 326H675L626 276H718L1037 598H987L933 544H904L957 598H101L0 496" /><path d="M240 1L335 97H359M607 276H625L675 326" /></svg>
-        <div className="nexora-command-sheet-head"><h2>{panel === "create" ? <><b>PLAY</b><span>สนามประลอง</span></> : <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></>}</h2><button onClick={closePanel} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
+        <div className="nexora-command-sheet-head"><h2>{panel !== "join" ? <><b>PLAY</b><span>สนามประลอง</span></> : <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></>}</h2><button onClick={closePanel} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
-          {panel === "create" ? <>
+          {panel !== "join" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : "PENTAD 5 ใบ"}</button>)}</div>
             <>
               <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
@@ -3602,7 +3602,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
           </> : <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />}
           {lobbyMessage ? <div role="status" className="nexora-command-alert">{lobbyMessage}</div> : null}
         </div>
-      </section> : null}
+      </section>}
     </div>
   );
 }
