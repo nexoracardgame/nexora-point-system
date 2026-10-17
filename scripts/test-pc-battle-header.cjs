@@ -18,6 +18,9 @@ for(const [width,height]of [[3840,2160],[1920,1080],[1366,768],[1024,768],[800,4
  assert.ok(actions.x>=0&&actions.y>=0,'Actions fit');assert.ok(actions.x+actions.width<=controls.x-8,'Actions stay left of native toolbar');assert.ok(Math.abs(actions.y-controls.y)<1,'Top edges align');assert.ok(Math.abs(actions.height-controls.height)<2,'Toolbar heights align');
  assert.equal(await page.locator('[aria-label="ปิดเกม"]').count(),1);
  }
+ await page.evaluate(()=>{const intro=document.createElement('div');intro.className='nexora-versus-plane';document.body.append(intro)});
+ assert.equal(await page.locator(`.nexora-${kind}-header-actions`).isVisible(),false,'Battle actions stay hidden during VS');
+ await page.locator('.nexora-versus-plane').evaluate(el=>el.remove());
  }
  fs.mkdirSync('artifacts/pc-battle-header',{recursive:true});await page.screenshot({path:`artifacts/pc-battle-header/${width}.png`});await page.close();console.log(`PC arena/deck toolbar alignment ${width}x${height}: windowed/fullscreen passed`);
 }

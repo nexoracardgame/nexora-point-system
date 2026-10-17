@@ -20,6 +20,7 @@ html[data-game-window-controls=desktop] .nexora-arena-brand strong { display:blo
 html[data-game-window-controls=desktop] :is(.nexora-arena-header-actions,.nexora-deck-header-actions) button { width:32px;height:32px;padding:5px;display:grid;place-items:center;flex:none; }
 html[data-game-window-controls=desktop] :is(.nexora-arena-header-actions,.nexora-deck-header-actions) span { font-size:20px;white-space:nowrap; }
 html[data-game-window-controls=desktop] :is(.nexora-arena-header-actions,.nexora-deck-header-actions) [data-game-audio-slot]:empty { display:none; }
+html[data-game-window-controls=desktop] body:has(.nexora-versus-plane) :is(.nexora-arena-header-actions,.nexora-deck-header-actions) { visibility:hidden;pointer-events:none; }
 @media (prefers-reduced-motion:reduce) { .nexora-window-controls button { transition:none; } }
 .nexora-command-nav .nexora-menu-logout { color:#f4dfb0; border-left-color:#d7b47088; }
 .nexora-command-nav .nexora-menu-logout:disabled { opacity:.5; cursor:wait; }
