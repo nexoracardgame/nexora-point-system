@@ -27,6 +27,11 @@ export default function GameWebsite({children}:{children?:ReactNode}){
   return()=>controller.abort();
  },[session?.user?.id]);
  useEffect(()=>{if(panel)dialog.current?.showModal();else dialog.current?.close()},[panel]);
+ useEffect(()=>{
+  if(children||window.location.hash!=='#tutorials')return;
+  const frame=requestAnimationFrame(()=>document.getElementById('tutorials')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
+  return()=>cancelAnimationFrame(frame);
+ },[children]);
  const account=()=>{if(session?.user)setPanel('account');else window.location.assign(login)};
  return <main className="nexora-site">
   <header className="nx-site-nav">
