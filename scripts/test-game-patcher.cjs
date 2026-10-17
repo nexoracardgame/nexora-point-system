@@ -5,7 +5,7 @@ const moduleObject={exports:{}};
 const source=ts.transpileModule(fs.readFileSync('lib/game-patcher.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const load=require('./game-collection-test-loader.cjs')();
 vm.runInThisContext(`(function(exports,require){${source}\n})`)(moduleObject.exports,id=>id==='./game-resource-policy'?load('lib/game-resource-policy.ts'):require(id));
-const {installGameResources,hasPendingGameResources}=moduleObject.exports;
+const {installGameResources,hasPendingGameResources,gameDownloadLimits}=moduleObject.exports;
 const resource=(url,text)=>({url,bytes:Buffer.byteLength(text),sha256:crypto.createHash('sha256').update(text).digest('hex')});
 const a=resource('/images/a.webp','first'),b=resource('/cards/b.webp','second');
 const release=(version,resources)=>({version,resources,totalBytes:resources.reduce((n,r)=>n+r.bytes,0),authEpoch:1,minimumDesktopVersion:'1.0.0'});
@@ -23,6 +23,6 @@ const release=(version,resources)=>({version,resources,totalBytes:resources.redu
  const controller=new AbortController();controller.abort();await assert.rejects(installGameResources(release('aborted',[a]),()=>{},controller.signal));
  let inFlight=0,peak=0;const files=Array.from({length:9},(_,i)=>resource('/images/concurrent-'+i+'.bin','parallel'));
  global.fetch=async()=>{inFlight++;peak=Math.max(peak,inFlight);await new Promise(resolve=>setTimeout(resolve,20));inFlight--;return new Response('parallel')};
- const concurrentProgress=[];await installGameResources(release('parallel',files),p=>concurrentProgress.push(p));assert.equal(peak,4);assert.equal(concurrentProgress.at(-1).completed,9);assert.equal(concurrentProgress.at(-1).downloaded,72);
+ const concurrentProgress=[];await installGameResources(release('parallel',files),p=>concurrentProgress.push(p));assert.equal(peak,Math.min(files.length,gameDownloadLimits().concurrency));assert.equal(concurrentProgress.at(-1).completed,9);assert.equal(concurrentProgress.at(-1).downloaded,72);
  console.log('Game patcher passed: real bytes/hash, cache reuse, corrupt rejection, atomic release, path validation, cancellation');
 })().catch(error=>{console.error(error);process.exitCode=1});
