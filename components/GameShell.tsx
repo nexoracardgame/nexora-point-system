@@ -13,6 +13,7 @@ import GameBackButton from './GameBackButton';
 import GameSettings from './GameSettings';
 import GameRoomResume from './GameRoomResume';
 import GameProfileOverlay from './GameProfileOverlay';
+import GameDesktopUpdate from './GameDesktopUpdate';
 
 const FloatingChatDock = dynamic(() => import("@/components/FloatingChatDock"), { ssr: false });
 
@@ -27,6 +28,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   return <OnlinePresenceProvider>
     <div className="nexora-game-platform" data-game-platform>
       <GameWindowControls />
+      <GameDesktopUpdate />
       <GameBackButton />
       <GameSettings />
       <GameRoomResume />

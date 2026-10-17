@@ -1,0 +1,60 @@
+name: Game Desktop Release
+on:
+  push:
+    tags: ['game-v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: game-desktop-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate release version
+        shell: pwsh
+        run: |
+          $version = node -p "require('./desktop/game-config.cjs').extraMetadata.version"
+          if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -ne "game-v$version") { throw 'Tag/version mismatch' }
+      - name: Build installer
+        run: npm run game:desktop:dist
+      - name: Test native login and resource pack
+        run: |
+          node scripts/test-game-login-loopback.cjs
+          node scripts/test-native-login-proof.cjs
+          node scripts/test-game-resource-pack.cjs
+          node scripts/test-game-release-bytes.cjs
+      - name: Publish versioned binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = node -p "require('./desktop/game-config.cjs').extraMetadata.version"
+          $tag = "game-v$version"
+          gh release create $tag --verify-tag --title "NEXORA CARD GAME $version" --notes 'Windows client update with installed resource pack and loopback sign-in. This release is not Windows code-signed.' "dist/game-desktop/NEXORA-CARD-GAME-Setup-$version.exe" "dist/game-desktop/NEXORA-CARD-GAME-Setup-$version.exe.blockmap" --repo '${{ github.repository }}'
+      - name: Verify public binary before publishing feed
+        run: node scripts/publish-game-feed.cjs
+      - name: Publish backward-compatible feed
+        shell: pwsh
+        run: |
+          Copy-Item public/downloads/game-windows/latest.yml $env:RUNNER_TEMP/latest.yml
+          Copy-Item public/downloads/game-windows/current.json $env:RUNNER_TEMP/current.json
+          git fetch origin main
+          git checkout -B release-feed origin/main
+          Copy-Item $env:RUNNER_TEMP/latest.yml public/downloads/game-windows/latest.yml
+          Copy-Item $env:RUNNER_TEMP/current.json public/downloads/game-windows/current.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/downloads/game-windows/latest.yml public/downloads/game-windows/current.json
+          git commit -m 'release(game): publish verified desktop updater feed'
+          git push origin HEAD:main
