@@ -5,6 +5,7 @@ import {useSession,signOut} from 'next-auth/react';
 import Link from 'next/link';
 import {Download,Coins,UserRound,ArrowUpRight,X,LogOut,ShieldCheck,Settings2} from 'lucide-react';
 import './GameWebsite.css';
+import GameBattleTutorials from './GameBattleTutorials';
 
 export default function GameWebsite({children}:{children?:ReactNode}){
  const {data:session}=useSession();
@@ -30,7 +31,7 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  return <main className="nexora-site">
   <header className="nx-site-nav">
    <Link href="/game" aria-label="NEXORA หน้าหลัก" className="nx-site-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></Link>
-   <nav aria-label="เมนูหลัก"><Link href="/game#world">โลกของ NEXORA</Link><Link href="/game#download">ดาวน์โหลด</Link><Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
+   <nav aria-label="เมนูหลัก"><Link href="/game#world">โลกของ NEXORA</Link><Link href="/game#tutorials" onClick={event=>{const section=document.getElementById('tutorials');if(!section)return;event.preventDefault();section.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});window.history.replaceState(null,'','#tutorials')}}>บทสอนต่อสู้</Link><Link href="/game#download">ดาวน์โหลด</Link><Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
    {session?.user?<button className="nx-site-account" onClick={account}><UserRound size={18}/>บัญชี</button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
   </header>
   {children||<><section className="nx-site-hero">
@@ -39,6 +40,7 @@ export default function GameWebsite({children}:{children?:ReactNode}){
    <a className="nx-site-explore" href="#world">เข้าสู่โลก NEXORA <span>↓</span></a>
   </section>
   <section id="world" className="nx-site-world"><div><span className="nx-site-eyebrow">CHOOSE YOUR BATTLE</span><h2>ทุกใบมีจังหวะของมัน</h2><p>การ์ด ธาตุ และทักษะ สู่การประลองที่ตัดสินด้วยแผนของคุณ</p></div><div className="nx-site-modes"><article><span>01 / TRIAD</span><h3>3 ใบ เปลี่ยนเกม</h3><p>สนามประลอง TRIAD</p></article><article><span>02 / PENTAD</span><h3>5 ใบ วางหมาก</h3><p>สนามประลอง PENTAD</p></article></div></section>
+  <GameBattleTutorials/>
   <section id="download" className="nx-site-download"><div><span className="nx-site-eyebrow">NEXORA ON PC</span><h2>พร้อมลงสนาม</h2><p>ดาวน์โหลดตัวเกมสำหรับ Windows และเข้าสู่ระบบด้วยบัญชีเดียวกับเว็บไซต์</p></div><a className="nx-site-primary" href="/downloads/game-windows/current"><Download size={22}/>ดาวน์โหลด Windows PC</a></section></>}
   <footer><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA"/><span>© {new Date().getFullYear()} NEXORA CARD GAME</span><button onClick={account}>บัญชีของคุณ <ArrowUpRight size={16}/></button></footer>
   <dialog ref={dialog} className="nx-site-dialog" aria-labelledby="nx-account-heading" onCancel={()=>setPanel(null)} onClick={event=>{if(event.target===event.currentTarget)setPanel(null)}}><div className="nx-site-dialog-body">

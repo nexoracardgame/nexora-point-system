@@ -4,6 +4,8 @@ const fixture=fs.readFileSync('scripts/test-game-settings-ui.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
 modules.website=ts.transpileModule(fs.readFileSync('components/GameWebsite.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['./GameWebsite.css']='';
+modules['./GameBattleTutorials']=ts.transpileModule(fs.readFileSync('components/GameBattleTutorials.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
+modules['@/lib/game-battle-tutorials']=ts.transpileModule(fs.readFileSync('lib/game-battle-tutorials.ts','utf8'),{compilerOptions:{module:1,target:9}}).outputText;modules['./GameBattleTutorials.css']='';
 modules['next-auth/react']="exports.useSession=()=>window.sessionState;exports.signOut=async()=>{window.signedOut=true}";
 modules['next/link']="module.exports={__esModule:true,default:props=>require('react').createElement('a',props)}";
 const script=`const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}window.sessionState={status:'unauthenticated',data:null};const root=require('react-dom/client').createRoot(document.getElementById('root'));window.render=()=>root.render(require('react').createElement(require('website').default));render();`;
@@ -11,12 +13,17 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
  fs.mkdirSync('artifacts/game-website',{recursive:true});
  for(const [width,height]of [[1920,1080],[1366,768],[844,390],[390,844],[320,568]]){
   const page=await browser.newPage({viewport:{width,height}});
-  await page.route('http://website.test/**',async route=>{const pathname=new URL(route.request().url()).pathname;if(pathname.startsWith('/images/'))return route.fulfill({body:fs.readFileSync('public'+pathname),contentType:'image/webp'});if(pathname==='/api/game-wallet')return route.fulfill({json:{coin:1234,nexPoint:5678}});return route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><style>body{margin:0}${fs.readFileSync('components/GameWebsite.css','utf8')}</style><div id="root"></div><script>${script}</script>`})});
+  await page.route('http://website.test/**',async route=>{const pathname=new URL(route.request().url()).pathname;if(pathname.startsWith('/images/'))return route.fulfill({body:fs.readFileSync('public'+pathname),contentType:'image/webp'});if(pathname==='/api/game-wallet')return route.fulfill({json:{coin:1234,nexPoint:5678}});return route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><style>body{margin:0}${fs.readFileSync('components/GameWebsite.css','utf8')}${fs.readFileSync('components/GameBattleTutorials.css','utf8')}</style><div id="root"></div><script>${script}</script>`})});
   await page.goto('http://website.test/');await page.getByRole('heading',{name:'NEXORA CARD GAME'}).waitFor();
+  await page.evaluate(()=>document.querySelectorAll('img').forEach(image=>{image.loading='eager'}));
   await page.waitForFunction(()=>Array.from(document.images).every(image=>image.complete&&image.naturalWidth>0));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'horizontal overflow');
   await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished)));
   await page.screenshot({path:`artifacts/game-website/${width}.png`,fullPage:true});
+  await page.getByRole('link',{name:'บทสอนต่อสู้',exact:true}).click();await page.waitForFunction(()=>Math.abs(document.getElementById('tutorials').getBoundingClientRect().top)<80);
+  assert.equal(await page.locator('.nx-tutorial').count(),6);assert.equal(await page.locator('.nx-tutorial-pending').count(),6);assert.equal(await page.locator('.nx-tutorial-play').count(),0);
+  await page.locator('#tutorials').screenshot({path:`artifacts/game-website/tutorials-${width}.png`});
+  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
   await page.evaluate(()=>{sessionState={status:'authenticated',data:{user:{id:'test-account',name:'Test Player'}}};render()});
   await page.getByRole('button',{name:'บัญชี',exact:true}).click();
   await page.getByText('1,234',{exact:true}).waitFor();
