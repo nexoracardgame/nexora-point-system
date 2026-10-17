@@ -3,7 +3,7 @@ import { consumeNativeAuthHandoff } from "@/lib/native-auth";
 
 export async function GET(request: NextRequest) {
   const handoff = await consumeNativeAuthHandoff(
-    request.nextUrl.searchParams.get("token")
+    request.nextUrl.searchParams.get("token"),request.nextUrl.searchParams.get('verifier')
   );
 
   if (!handoff) {

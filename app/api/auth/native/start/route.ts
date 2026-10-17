@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sanitizeNativeCallbackPath } from "@/lib/native-auth";
+import {nativeLoopbackTarget} from '@/lib/native-loopback';
 
 const PROVIDERS = new Set(["line", "google"]);
 
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
   const nativeIssueUrl = new URL("/api/auth/native/issue", request.nextUrl.origin);
   nativeIssueUrl.searchParams.set("callbackUrl", callbackPath);
   if (request.nextUrl.searchParams.get('game') === '1') nativeIssueUrl.searchParams.set('game','1');
+  const loopback=nativeLoopbackTarget(request.nextUrl.searchParams.get('loopback')),challenge=request.nextUrl.searchParams.get('challenge')||'';
+  if(loopback&&/^[a-f0-9]{64}$/.test(challenge)&&request.nextUrl.searchParams.get('game')==='1'){nativeIssueUrl.searchParams.set('loopback',loopback);nativeIssueUrl.searchParams.set('challenge',challenge)}
 
   const csrfUrl = new URL("/api/auth/csrf", request.nextUrl.origin);
   const signInUrl = new URL(`/api/auth/signin/${provider}`, request.nextUrl.origin);

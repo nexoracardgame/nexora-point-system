@@ -11,6 +11,7 @@ const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 4;
 let mainWindow = null;
 let gameWindowState = null;
 let updateDownloaded = false;
+let pendingGameLogin=null;
 
 function resolveAppUrl() {
   const rawUrl = app.isPackaged
@@ -249,7 +250,10 @@ function registerIpcHandlers() {
     if (!GAME_ONLY || !['line','google'].includes(provider) || event.senderFrame?.url && new URL(event.senderFrame.url).origin !== new URL(resolveAppUrl()).origin) return false;
     const url = new URL('/api/auth/native/start',resolveAppUrl());
     url.searchParams.set('provider',provider);url.searchParams.set('callbackUrl','/game');url.searchParams.set('game','1');
-    await shell.openExternal(url.href);return true;
+    pendingGameLogin?.close();
+    pendingGameLogin=await require('./game-login-loopback.cjs').startGameLogin({onToken:async(token,verifier)=>{if(!mainWindow||mainWindow.isDestroyed())return;const target=new URL('/api/auth/native/consume',resolveAppUrl());target.searchParams.set('token',token);target.searchParams.set('verifier',verifier);await mainWindow.loadURL(target.href);mainWindow.show();mainWindow.focus()}});
+    url.searchParams.set('loopback',pendingGameLogin.redirect);url.searchParams.set('challenge',pendingGameLogin.challenge);
+    try{await shell.openExternal(url.href)}catch(error){pendingGameLogin.close();throw error}return true;
   });
   ipcMain.handle("nexora:get-version", () => app.getVersion());
   ipcMain.handle("nexora:reload-app", async () => {

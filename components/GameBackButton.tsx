@@ -8,7 +8,7 @@ export default function GameBackButton() {
   const router = useRouter();
   const pathname = usePathname();
   const active = useBattleArenaActive();
-  if (active || pathname === "/game") return null;
+  if (active || pathname === "/game" || pathname === "/game/login") return null;
   const back = () => {
     const event = new Event("nexora:navigate-back", { cancelable: true });
     if (!window.dispatchEvent(event)) return;

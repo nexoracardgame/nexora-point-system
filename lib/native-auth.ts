@@ -1,5 +1,6 @@
 import { decode, encode } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
+import {createHash,timingSafeEqual} from 'node:crypto';
 
 const NATIVE_HANDOFF_SALT = "nexora-native-auth-handoff";
 const NATIVE_HANDOFF_MAX_AGE_SECONDS = 90;
@@ -45,6 +46,7 @@ export function sanitizeNativeCallbackPath(rawCallbackUrl?: string | null) {
 export async function createNativeAuthHandoff(input: {
   userId: string;
   callbackPath: string;
+  challenge?:string;
 }) {
   return encode({
     secret: getAuthSecret(),
@@ -55,11 +57,12 @@ export async function createNativeAuthHandoff(input: {
       sub: input.userId,
       userId: input.userId,
       callbackPath: input.callbackPath,
+      challenge:input.challenge,
     } as any,
   });
 }
 
-export async function consumeNativeAuthHandoff(rawToken?: string | null) {
+export async function consumeNativeAuthHandoff(rawToken?: string | null,verifier?:string|null) {
   const payload = await decode({
     token: String(rawToken || ""),
     secret: getAuthSecret(),
@@ -69,6 +72,7 @@ export async function consumeNativeAuthHandoff(rawToken?: string | null) {
   if (payload?.purpose !== "nexora-native-auth") {
     return null;
   }
+  if(payload.challenge){if(typeof payload.challenge!=='string'||!/^[a-f0-9]{64}$/.test(payload.challenge)||!verifier||!/^[a-f0-9]{64}$/.test(verifier))return null;const actual=createHash('sha256').update(verifier).digest();if(!timingSafeEqual(actual,Buffer.from(payload.challenge,'hex')))return null}
 
   const userId = String(payload.userId || payload.sub || "").trim();
 
