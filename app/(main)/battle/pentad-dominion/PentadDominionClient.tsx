@@ -41,7 +41,7 @@ const phaseNames: Record<PentadRoom["phase"], string> = { waiting: "รอผู
 function Card({ no, onClick, disabled, badge, className = "" }: { no?: string; onClick?: () => void; disabled?: boolean; badge?: string; className?: string }) {
   const card = no ? triadCardByNo.get(no) : undefined;
   const preview = usePentadCardPreview();
-  const gesture=useCardGesture({onChoose:onClick,onPreview:()=>{if(no)preview.show(no,true)},onPreviewEnd:()=>{if(no)preview.hide(no,true)},disabled});
+  const gesture=useCardGesture({onChoose:onClick,onPreview:()=>{if(no)preview.show(no,false)},onPreviewEnd:()=>{if(no)preview.hide(no,true)},disabled});
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const origin = useRef({ x: 0, y: 0 });

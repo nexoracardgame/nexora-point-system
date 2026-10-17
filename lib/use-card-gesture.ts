@@ -12,11 +12,11 @@ export function useCardGesture({onChoose,onPreview,onPreviewEnd,disabled=false}:
  const inspectMouse=()=>{if(mousePreview?.owner!==owner.current)endMousePreview();mousePreview={owner:owner.current,end:release};cancel();held.current=true;lastTap.current=0;onPreview()};
  return {
   onClick:(event:MouseEvent<HTMLButtonElement>)=>{event.stopPropagation();if(held.current){held.current=false;lastTap.current=0;return}if(disabled||!onChoose)return;const now=Date.now();if(event.detail===0||lastTap.current>0&&now-lastTap.current<=450){lastTap.current=0;onPreviewEnd();onChoose()}else lastTap.current=now},
-  onPointerDown:(event:PointerEvent<HTMLButtonElement>)=>{if(event.button!==0)return;if(event.pointerType!=='mouse')try{event.currentTarget.setPointerCapture?.(event.pointerId)}catch{}cancel();held.current=false;origin.current={x:event.clientX,y:event.clientY};if(event.pointerType==='mouse'){endMousePreview();mousePreview={owner:owner.current,end:release}}hold.current=setTimeout(()=>{if(event.pointerType==='mouse')inspectMouse();else{held.current=true;lastTap.current=0;onPreview()}},event.pointerType==='mouse'?250:2500)},
+  onPointerDown:(event:PointerEvent<HTMLButtonElement>)=>{if(event.button!==0)return;if(event.pointerType==='mouse')event.preventDefault();else try{event.currentTarget.setPointerCapture?.(event.pointerId)}catch{}cancel();held.current=false;origin.current={x:event.clientX,y:event.clientY};if(event.pointerType==='mouse'){endMousePreview();mousePreview={owner:owner.current,end:release}}hold.current=setTimeout(()=>{if(event.pointerType==='mouse')inspectMouse();else{held.current=true;lastTap.current=0;onPreview()}},event.pointerType==='mouse'?250:2500)},
   onPointerMove:(event:PointerEvent<HTMLButtonElement>)=>{if(event.pointerType==='mouse'){if((event.buttons&1)&&!held.current)inspectMouse()}else if(Math.hypot(event.clientX-origin.current.x,event.clientY-origin.current.y)>10)release()},
   onPointerUp:release,onPointerCancel:()=>{release();lastTap.current=0},onPointerLeave:()=>{release();onPreviewEnd()},
   onContextMenu:(event:MouseEvent<HTMLButtonElement>)=>event.preventDefault(),
-  onTouchEnd:()=>{},draggable:false,
+  onTouchEnd:()=>{},draggable:false,onDragStartCapture:(event:MouseEvent<HTMLButtonElement>)=>event.preventDefault(),
   onMouseEnter:()=>{},onPointerEnter:(event:PointerEvent<HTMLButtonElement>)=>{if(event.pointerType==='mouse'&&(event.buttons&1))inspectMouse()},onFocus:()=>{},onBlur:()=>{release();onPreviewEnd()},
  };
 }
