@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {Download,Coins,UserRound,ArrowUpRight,X,LogOut,ShieldCheck,Settings2} from 'lucide-react';
 import './GameWebsite.css';
 import GameBattleTutorials from './GameBattleTutorials';
+import {loadLoginWallpaper} from '@/lib/login-wallpaper';
 
 export default function GameWebsite({children}:{children?:ReactNode}){
  const {data:session}=useSession();
@@ -15,6 +16,17 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  const [failedAvatar,setFailedAvatar]=useState<string|null>(null);
  const avatar=session?.user?.image||'';
  const dialog=useRef<HTMLDialogElement>(null);
+ const heroVideo=useRef<HTMLVideoElement>(null);
+ const [heroUrl,setHeroUrl]=useState(''),[heroReady,setHeroReady]=useState(false);
+ const hasPage=Boolean(children);
+ useEffect(()=>{
+  if(hasPage)return;
+  const controller=new AbortController();let active=true,url='';
+  setHeroReady(false);
+  void loadLoginWallpaper(controller.signal).then(value=>{if(!active){URL.revokeObjectURL(value);return}url=value;setHeroUrl(value)}).catch(()=>{});
+  return()=>{active=false;controller.abort();if(url)URL.revokeObjectURL(url);setHeroUrl('')};
+ },[hasPage]);
+ useEffect(()=>{const sync=()=>{const video=heroVideo.current;if(!video)return;if(document.hidden)video.pause();else void video.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync)},[heroUrl]);
  const login='/game/login?callbackUrl=%2Fgame';
  useEffect(()=>{
   setWallet(null);setWalletError(false);
@@ -43,7 +55,8 @@ export default function GameWebsite({children}:{children?:ReactNode}){
    {session?.user?<button className="nx-site-account" onClick={account} aria-label="บัญชี" aria-haspopup="dialog" aria-expanded={panel==='account'}><UserRound size={18}/>บัญชี<span className="nx-nav-avatar" aria-hidden="true">{avatar&&failedAvatar!==avatar?<img src={avatar} alt="" referrerPolicy="no-referrer" onError={()=>setFailedAvatar(avatar)}/>:<UserRound size={20}/>}</span></button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
   </header>
   {children||<><section className="nx-site-hero">
-   <img className="nx-site-scene" src="/game-assets/login/website-home-poster.webp" alt="วอลเปเปอร์หน้าหลัก NEXORA" fetchPriority="high"/>
+   <img className="nx-site-scene" src="/game-assets/login/website-poster.webp" alt="" fetchPriority="high"/>
+   {heroUrl&&<video ref={heroVideo} className="nx-site-scene nx-site-hero-video" src={heroUrl} autoPlay muted loop playsInline aria-hidden="true" onLoadedData={()=>setHeroReady(true)} onError={()=>setHeroReady(false)} style={{opacity:heroReady?1:0}}/>}
    <div className="nx-site-hero-copy"><span className="nx-site-eyebrow">THE NEXT MOVE IS YOURS</span><h1 className="nx-site-hero-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" fetchPriority="high"/></h1><p>เลือกการ์ดของคุณ วางกลยุทธ์ของคุณ<br/>แล้วก้าวสู่สนามประลอง</p><div className="nx-site-actions"><a className="nx-site-primary" href="/downloads/game-windows/current"><Download size={22}/>ดาวน์โหลด Windows PC</a><Link className="nx-site-primary nx-topup-link" href="/game/topup"><Coins size={21}/>เติม COIN<ArrowUpRight size={17}/></Link></div><small>Windows 64-bit<span>มือถือ · พบกันในอนาคต</span></small></div>
    <a className="nx-site-explore" href="#world">เข้าสู่โลก NEXORA <span>↓</span></a>
   </section>

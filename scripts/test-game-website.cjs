@@ -4,6 +4,7 @@ const fixture=fs.readFileSync('scripts/test-game-settings-ui.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
 modules.website=ts.transpileModule(fs.readFileSync('components/GameWebsite.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['./GameWebsite.css']='';
+modules['@/lib/login-wallpaper']='exports.loadLoginWallpaper=async()=>{throw Error("fixture fallback")};';
 modules['./GameBattleTutorials']=ts.transpileModule(fs.readFileSync('components/GameBattleTutorials.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['@/lib/game-battle-tutorials']=ts.transpileModule(fs.readFileSync('lib/game-battle-tutorials.ts','utf8'),{compilerOptions:{module:1,target:9}}).outputText;modules['./GameBattleTutorials.css']='';
 modules['next-auth/react']="exports.useSession=()=>window.sessionState;exports.signOut=async()=>{window.signedOut=true}";
