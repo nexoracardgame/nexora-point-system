@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
-import {loadGameProfile,primeGameIdentity} from '@/lib/game-profile-client';
+import {warmGameProfile,primeGameIdentity} from '@/lib/game-profile-client';
 import {openGameProfile} from '@/lib/game-profile-navigation';
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
@@ -832,7 +832,7 @@ export default function FloatingChatDock({
     if(!profileUserId||!pathname?.startsWith('/game'))return;
     primeGameIdentity(profileUserId,activeRoom?.other?.name||activeRoom?.otherName||'PLAYER',activeRoom?.other?.image||'/avatar.png');
     router.prefetch(activeProfileHref);
-    void loadGameProfile(profileUserId).catch(()=>{});
+    void warmGameProfile(profileUserId);
   },[profileUserId,activeProfileHref,pathname,router,activeRoom?.other?.name,activeRoom?.otherName,activeRoom?.other?.image]);
   const activeOtherOnline = activeRoom
     ? isOnline(activeRoom.other?.id, activeRoom.otherUserId)

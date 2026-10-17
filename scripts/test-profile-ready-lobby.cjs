@@ -1,0 +1,23 @@
+const fs=require('node:fs'),ts=require('typescript'),assert=require('node:assert/strict');
+const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fixture=fs.readFileSync('scripts/test-game-settings-ui.cjs','utf8');
+const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
+const transpile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+for(const [id,file]of [['gate','components/GamePatchGate.tsx'],['lobby','components/GameLobbyProfile.tsx'],['overlay','components/GameProfileOverlay.tsx'],['@/lib/game-profile-client','lib/game-profile-client.ts'],['./game-profile-options','lib/game-profile-options.ts'],['@/lib/game-profile-options','lib/game-profile-options.ts'],['@/lib/lobby-assets','lib/lobby-assets.ts'],['./GameBackControl','components/GameBackControl.tsx']])modules[id]=transpile(fs.readFileSync(file,'utf8'));
+for(const id of ['./GamePatchGate.css','./BattleLoadingScreen.css','./GameLobbyProfile.css','./GameProfileFrame.css','./GameProfileOverlay.css'])modules[id]='';
+modules['@/lib/game-patcher']='';modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
+modules['./GameLobbyWallet']='exports.__esModule=true;exports.default=()=>null;';
+modules['next/navigation']='exports.usePathname=()=>"/game";exports.useRouter=()=>({prefetch:()=>{}});';
+modules['next-auth/react']='exports.useSession=()=>({status:"authenticated",data:{user:{id:"self",name:"Actual player",image:"/avatar.png"}}});';
+modules['./GamePlayerProfile']='exports.__esModule=true;exports.default=p=>require("react").createElement("main",null,p.user.name+" "+p.rank.name);';
+const script=`const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}window.active=false;window.requests=[];window.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));window.complete=()=>requests[0].resolve({ok:true,json:async()=>({user:{id:'self',name:'Actual player',image:'/avatar.png'},appearance:{avatar:'',frame:'gold',hero:'gold'},available:true,stats:{wins:2,losses:1},rank:{name:'Bronze',nextWins:10,nextName:'Silver'}})});const R=require('react');require('react-dom/client').createRoot(document.getElementById('root')).render(R.createElement(require('gate').default,null,R.createElement(require('lobby').default,{name:'Actual player',image:'/avatar.png',rank:'Bronze',wins:2}),R.createElement(require('overlay').default)));`;
+(async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{for(const viewport of [{width:1920,height:1080},{width:844,height:390}]){
+ const page=await browser.newPage({viewport});await page.route('http://ready.test/**',r=>{if(r.request().resourceType()==='image')return r.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhZkAAAAASUVORK5CYII=','base64')});return r.fulfill({contentType:'text/html',body:`<div id="root"></div><script>${script}</script>`})});
+ await page.goto('http://ready.test/');await page.waitForFunction(()=>requests.length===1);assert.equal(await page.getByRole('button',{name:'เปิดโปรไฟล์ของฉัน'}).count(),0,'Initial preparation includes actual profile data');
+ await page.evaluate(()=>complete());const button=page.getByRole('button',{name:'เปิดโปรไฟล์ของฉัน'});await button.waitFor({state:'attached'});
+ const url=page.url();await page.evaluate(()=>{const now=Date.now;Date.now=()=>now()+60000;window.started=performance.now();document.querySelector('.nli-profile-link').click()});
+ const firstFrames=await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve({ready:document.querySelector('main')?.textContent==='Actual player Bronze',ms:performance.now()-window.started})))));
+ assert.equal(firstFrames.ready,true,'Actual profile must be present within two animation frames, without waiting for the refresh');assert.equal(page.url(),url,'Click cannot navigate to an empty route');
+ assert.equal(await page.getByRole('dialog').count(),1);assert.equal(await page.locator('.nexora-game-loading').count(),0);
+ console.log(`Prepared lobby ${viewport.width}: actual profile present in ${Math.round(firstFrames.ms)}ms while refresh is stalled; no route/black screen`);await page.close();
+}}finally{await browser.close()}})().catch(error=>{console.error(error);process.exitCode=1});
