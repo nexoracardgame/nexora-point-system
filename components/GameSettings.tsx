@@ -6,12 +6,12 @@ import {Settings,X,Music,Volume2} from 'lucide-react';
 import {useBattleArenaActive} from '@/lib/battle-ui-state';
 import {gameVolume,saveGameSetting} from '@/lib/game-settings';
 import './GameSettings.css';
-import {setGameWindowMode} from '@/lib/game-window-mode';
+import {setGameWindowMode,currentGameWindowMode} from '@/lib/game-window-mode';
 export default function GameSettings(){
  const path=usePathname(),active=useBattleArenaActive(),[open,setOpen]=useState(false),[music,setMusic]=useState(1),[effects,setEffects]=useState(1),[motion,setMotion]=useState(false);const dialog=useRef<HTMLElement>(null),trigger=useRef<HTMLButtonElement>(null);
  const available=path==='/game'&&!active;
  const [desktop,setDesktop]=useState(false),[windowMode,setWindowMode]=useState<'windowed'|'fullscreen'>('windowed'),[displayError,setDisplayError]=useState('');
- useEffect(()=>{const native=Boolean((window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop?.isGameDesktop);setDesktop(native);const sync=()=>setWindowMode(document.documentElement.dataset.gameWindowMode==='fullscreen'?'fullscreen':'windowed');sync();try{if(native&&localStorage.getItem('nexora-window-mode')==='fullscreen')void setGameWindowMode('fullscreen').catch(()=>{})}catch{}window.addEventListener('nexora:window-mode',sync);return()=>window.removeEventListener('nexora:window-mode',sync)},[]);
+ useEffect(()=>{const native=Boolean((window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop?.isGameDesktop);setDesktop(native);const sync=()=>{setWindowMode(currentGameWindowMode());setDisplayError('')};sync();try{if(native&&localStorage.getItem('nexora-window-mode')==='fullscreen')void setGameWindowMode('fullscreen').catch(()=>{})}catch{}window.addEventListener('nexora:window-mode',sync);document.addEventListener('fullscreenchange',sync);return()=>{window.removeEventListener('nexora:window-mode',sync);document.removeEventListener('fullscreenchange',sync)}},[]);
  useEffect(()=>{if(!available)setOpen(false)},[available]);
  useEffect(()=>{const sync=()=>{try{document.documentElement.dataset.gameMotionOff=localStorage.getItem('triad-command-motion-off')==='1'?'true':'false'}catch{}};sync();window.addEventListener('nexora:motion-preference',sync);return()=>window.removeEventListener('nexora:motion-preference',sync)},[]);
  useEffect(()=>{if(!open)return;dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){setOpen(false);trigger.current?.focus()}if(e.key==='Tab'){const items=[...dialog.current?.querySelectorAll<HTMLElement>('button,input')||[]],first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[open]);

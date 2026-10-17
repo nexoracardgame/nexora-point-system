@@ -2,6 +2,7 @@
 .nexora-window-controls button { display:grid; place-items:center; width:34px; height:30px; padding:0; border:1px solid transparent; border-radius:3px; color:#f2d99c; background:transparent; cursor:pointer; transition:background .15s,border-color .15s; }
 .nexora-window-controls button:hover,.nexora-window-controls button:focus-visible { background:#b48a323d; border-color:#d6b66b; outline:none; }
 .nexora-window-controls .nexora-window-close:hover { background:#a32232; border-color:#ea7682; color:#fff; }
+html[data-game-window-mode=fullscreen] .nexora-window-controls > button:not(.nexora-window-close),html:fullscreen .nexora-window-controls > button:not(.nexora-window-close),html[data-game-window-mode=fullscreen] .nexora-window-drag,html:fullscreen .nexora-window-drag { display:none!important; }
 .nexora-window-controls > [data-game-utilities-slot]:empty { display:none; }
 .nexora-window-controls > [data-game-audio-slot] { min-width:34px; min-height:30px; }
 .nexora-window-controls > [data-game-audio-slot],.nexora-window-controls > [data-game-utilities-slot] { display:flex; align-items:center; }
