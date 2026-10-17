@@ -1,0 +1,10 @@
+.nexora-profile-overlay { position:absolute;inset:0;z-index:1200;overflow:hidden;background:#06090b;outline:none;isolation:isolate;animation:nexora-profile-slide-in 260ms cubic-bezier(.16,1,.3,1) both; }
+.nexora-profile-overlay[data-closing=true] { animation:nexora-profile-slide-out 180ms ease-in both;pointer-events:none; }
+.nexora-profile-overlay>.nexora-game-back { position:absolute; }
+.nexora-profile-overlay .gpp-back { display:none; }
+.nexora-game-platform:has(.nexora-profile-overlay)>.nexora-game-back { display:none; }
+body:has(.nexora-profile-overlay) :is(.nexora-play-viewport-control,.nexora-settings-open) { visibility:hidden;pointer-events:none; }
+@keyframes nexora-profile-slide-in { from{transform:translate3d(100%,0,0)}to{transform:translate3d(0,0,0)} }
+@keyframes nexora-profile-slide-out { from{transform:translate3d(0,0,0)}to{transform:translate3d(100%,0,0)} }
+@media(prefers-reduced-motion:reduce) { .nexora-profile-overlay { animation:none!important; } }
+html[data-game-motion-off=true] .nexora-profile-overlay { animation:none; }

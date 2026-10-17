@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import {loadGameProfile,primeGameIdentity} from '@/lib/game-profile-client';
+import {openGameProfile} from '@/lib/game-profile-navigation';
 import { useSession } from "next-auth/react";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker";
 import ChatMessageText from "@/components/ChatMessageText";
@@ -3408,6 +3409,7 @@ export default function FloatingChatDock({
                     type="button"
                     onClick={() => {
                       if (!activeProfileHref) return;
+                      if(pathname?.startsWith('/game')&&profileUserId){setOpen(false);openGameProfile(profileUserId);return;}
                       router.prefetch(activeProfileHref);
                       setOpen(false);
                       router.push(activeProfileHref);
