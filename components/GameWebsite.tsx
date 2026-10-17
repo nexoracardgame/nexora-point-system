@@ -3,7 +3,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {useSession,signOut} from 'next-auth/react';
 import Link from 'next/link';
-import {Download,Coins,UserRound,ArrowUpRight,X,LogOut,ShieldCheck} from 'lucide-react';
+import {Download,Coins,UserRound,ArrowUpRight,X,LogOut,ShieldCheck,Settings2} from 'lucide-react';
 import './GameWebsite.css';
 
 export default function GameWebsite(){
@@ -42,6 +42,14 @@ export default function GameWebsite(){
   <section id="world" className="nx-site-world"><div><span className="nx-site-eyebrow">CHOOSE YOUR BATTLE</span><h2>ทุกใบมีจังหวะของมัน</h2><p>การ์ด ธาตุ และทักษะ สู่การประลองที่ตัดสินด้วยแผนของคุณ</p></div><div className="nx-site-modes"><article><span>01 / TRIAD</span><h3>3 ใบ เปลี่ยนเกม</h3><p>สนามประลอง TRIAD</p></article><article><span>02 / PENTAD</span><h3>5 ใบ วางหมาก</h3><p>สนามประลอง PENTAD</p></article></div></section>
   <section id="download" className="nx-site-download"><div><span className="nx-site-eyebrow">NEXORA ON PC</span><h2>พร้อมลงสนาม</h2><p>ดาวน์โหลดตัวเกมสำหรับ Windows และเข้าสู่ระบบด้วยบัญชีเดียวกับเว็บไซต์</p></div><a className="nx-site-primary" href="/downloads/game-windows/current"><Download size={22}/>ดาวน์โหลด Windows PC</a></section>
   <footer><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA"/><span>© {new Date().getFullYear()} NEXORA CARD GAME</span><button onClick={account}>บัญชีของคุณ <ArrowUpRight size={16}/></button></footer>
-  <dialog ref={dialog} className="nx-site-dialog" onCancel={()=>setPanel(null)} onClick={event=>{if(event.target===event.currentTarget)setPanel(null)}}><div className="nx-site-dialog-body"><button className="nx-site-close" title="ปิด" aria-label="ปิด" onClick={()=>setPanel(null)}><X/></button><span className="nx-site-eyebrow">NEXORA ACCOUNT</span><h2>{panel==='coin'?'เติม COIN':'บัญชีของคุณ'}</h2><p>{session?.user?.name}</p><dl><dt>รหัสบัญชี</dt><dd>{session?.user?.id}</dd><dt>COIN</dt><dd>{wallet?wallet.coin.toLocaleString():walletError?'ไม่สามารถโหลดยอดเงินได้':'กำลังตรวจสอบยอดเงิน'}</dd><dt>NEX</dt><dd>{wallet?wallet.nexPoint.toLocaleString():'—'}</dd></dl>{panel==='coin'?<p className="nx-site-notice"><ShieldCheck size={22}/>ระบบเติมเงินยังไม่เปิดให้บริการ ไม่มีการรับชำระเงินในขณะนี้</p>:<><button className="nx-site-primary" onClick={()=>setPanel('coin')}><Coins size={20}/>เติม COIN</button><button className="nx-site-signout" onClick={()=>void signOut({callbackUrl:'/game'})}><LogOut size={18}/>ออกจากระบบ</button></>}</div></dialog>
+  <dialog ref={dialog} className="nx-site-dialog" aria-labelledby="nx-account-heading" onCancel={()=>setPanel(null)} onClick={event=>{if(event.target===event.currentTarget)setPanel(null)}}><div className="nx-site-dialog-body">
+   <button className="nx-site-close" title="ปิด" aria-label="ปิด" onClick={()=>setPanel(null)}><X/></button>
+   <img className="nx-account-brand" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/>
+   <span className="nx-site-eyebrow">NEXORA ACCOUNT</span><h2 id="nx-account-heading">{panel==='coin'?'เติม COIN':'บัญชีของคุณ'}</h2>
+   <div className="nx-account-identity"><span className="nx-account-avatar"><UserRound size={28}/></span><div><strong>{session?.user?.name}</strong>{session?.user?.email&&<span>{session.user.email}</span>}</div></div>
+   <dl><dt>รหัสบัญชี</dt><dd>{session?.user?.id}</dd><dt>COIN</dt><dd>{wallet?wallet.coin.toLocaleString():walletError?'ไม่สามารถโหลดยอดเงินได้':'กำลังตรวจสอบยอดเงิน'}</dd><dt>NEX</dt><dd>{wallet?wallet.nexPoint.toLocaleString():'—'}</dd></dl>
+   <div className="nx-account-actions"><Link className="nx-account-edit" href="/settings/profile"><Settings2 size={19}/>แก้ไขบัญชี<ArrowUpRight size={16}/></Link>{panel==='coin'?<p className="nx-site-notice"><ShieldCheck size={22}/>ระบบเติมเงินยังไม่เปิดให้บริการ ไม่มีการรับชำระเงินในขณะนี้</p>:<button className="nx-site-primary" onClick={()=>setPanel('coin')}><Coins size={20}/>เติม COIN</button>}</div>
+   <div className="nx-account-bottom"><span><ShieldCheck size={16}/>NEXORA ACCOUNT</span><button className="nx-site-signout" onClick={()=>void signOut({callbackUrl:'/game'})}><LogOut size={18}/>ออกจากระบบ</button></div>
+  </div></dialog>
  </main>;
 }

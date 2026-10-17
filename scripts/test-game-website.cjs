@@ -20,10 +20,15 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   await page.evaluate(()=>{sessionState={status:'authenticated',data:{user:{id:'test-account',name:'Test Player'}}};render()});
   await page.getByRole('button',{name:'บัญชี',exact:true}).click();
   await page.getByText('1,234',{exact:true}).waitFor();
+  await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished)));
+  const drawer=await page.getByRole('dialog').boundingBox();assert.ok(Math.abs(drawer.x+drawer.width-width)<2&&drawer.y===0&&Math.abs(drawer.height-height)<2,'Account drawer anchored to right viewport edge');
+  assert.equal(await page.getByRole('link',{name:'แก้ไขบัญชี'}).getAttribute('href'),'/settings/profile');
+  await page.screenshot({path:`artifacts/game-website/account-${width}.png`});
   await page.getByRole('dialog').getByRole('button',{name:'เติม COIN'}).click();
   await page.getByText('ระบบเติมเงินยังไม่เปิดให้บริการ ไม่มีการรับชำระเงินในขณะนี้').waitFor();
   const rect=await page.getByRole('dialog').boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width+1);
   await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
+  await page.evaluate(()=>scrollTo(0,0));await page.mouse.move(width/2,height/2);await page.mouse.wheel(0,650);await page.waitForFunction(()=>scrollY>100);await page.mouse.wheel(0,-1500);await page.waitForFunction(()=>scrollY<5);
   await page.close();console.log(`${width}x${height}: images, layout, account, live wallet, COIN readiness and dialog passed`);
  }
  const page=await browser.newPage();await page.goto('http://localhost:3010/game');await page.getByRole('heading',{name:'NEXORA CARD GAME'}).waitFor();assert.equal(await page.locator('[data-game-platform]').count(),0);assert.equal(await page.locator('.nexora-game-back').count(),0);await page.getByRole('link',{name:'เข้าสู่ระบบ',exact:true}).click();await page.waitForURL('**/game/login?callbackUrl=%2Fgame');console.log('Live Next route: website without game patch gate/back button; login callback passed');
