@@ -12,9 +12,20 @@ Web app changes deploy to the server and appear in the desktop app immediately o
 
 The dedicated game installer (1.0.7 onward) also includes every file from
 `public/game-release.json` under `resources/game-resources`. Its HTTPS handler
-serves only matching `?patch=<version>` requests from the installed pack, after
-checking byte length and SHA-256. Other origins, APIs, newer patches, and damaged
-files use the network. This avoids shadowing newer deployed resources.
+serves matching `?patch=<version>` requests from the installed pack, after
+checking byte length and SHA-256. From 1.0.8, normal resource URLs also read the
+installed pack from the first login screen when its version matches the server.
+A newer release check disables that shortcut until the new verified cache is
+ready. Other origins, APIs, newer patches, and damaged files use the network.
+
+`public/game-resource-policy.json` defines recursively scanned legacy roots and
+the universal `public/game-assets/` root for all future formats. The builder
+traces game module imports and static resource references, rejects missing files,
+and emits MIME type, size, SHA-256, and policy hash into the release manifest.
+The service worker uses manifest membership, not a hardcoded folder list. Runtime
+patch validation rejects live routes and unsafe paths. See `AGENTS.md` for the
+permanent authoring standard. Resource metadata belongs in this versioned
+registry, not in player-wallet/inventory database rows or image BLOB columns.
 
 At startup the game activates the shared service worker, checks that every
 manifest file exists, repairs missing files, and publishes the cache pointer only

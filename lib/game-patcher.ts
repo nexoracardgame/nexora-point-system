@@ -1,10 +1,13 @@
-export type GameRelease = {version:string;authEpoch:number;minimumDesktopVersion:string;totalBytes:number;resources:{url:string;bytes:number;sha256:string}[];manualDownload?:{kind:'critical-patch'|'addon';title:string}};
+import {isGameResourceUrl} from './game-resource-policy';
+export type GameRelease = {version:string;authEpoch:number;minimumDesktopVersion:string;totalBytes:number;resources:{url:string;bytes:number;sha256:string;mimeType?:string}[];manualDownload?:{kind:'critical-patch'|'addon';title:string}};
 export type PatchProgress = {file:string;downloaded:number;total:number;completed:number;count:number};
 export async function prepareGameResourceWorker(){
  if(!('serviceWorker' in navigator)||typeof caches==='undefined')throw Error('อุปกรณ์นี้ไม่รองรับการจัดเก็บทรัพยากรเกม');
- await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'});
+ const registration=await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'});
+ const incoming=registration.installing||registration.waiting;
+ if(incoming&&incoming.state!=='activated')await new Promise<void>((resolve,reject)=>{const finish=()=>{if(incoming.state==='activated'||incoming.state==='redundant'){clearTimeout(timer);incoming.removeEventListener('statechange',finish);if(incoming.state==='activated')resolve();else reject(Error('อัปเดตระบบทรัพยากรไม่สำเร็จ'))}};const timer=setTimeout(()=>{incoming.removeEventListener('statechange',finish);reject(Error('เปิดระบบทรัพยากรไม่สำเร็จ กรุณาลองอีกครั้ง'))},10000);incoming.addEventListener('statechange',finish);finish()});
  await navigator.serviceWorker.ready;
- if(!navigator.serviceWorker.controller)await new Promise<void>((resolve,reject)=>{const changed=()=>{if(navigator.serviceWorker.controller){clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',changed);resolve()}};const timer=setTimeout(()=>{navigator.serviceWorker.removeEventListener('controllerchange',changed);reject(Error('เปิดระบบทรัพยากรไม่สำเร็จ กรุณาลองอีกครั้ง'))},10000);navigator.serviceWorker.addEventListener('controllerchange',changed);changed()});
+ if(!navigator.serviceWorker.controller||navigator.serviceWorker.controller.state!=='activated')await new Promise<void>((resolve,reject)=>{const changed=()=>{if(navigator.serviceWorker.controller?.state==='activated'){clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',changed);resolve()}};const timer=setTimeout(()=>{navigator.serviceWorker.removeEventListener('controllerchange',changed);reject(Error('เปิดระบบทรัพยากรไม่สำเร็จ กรุณาลองอีกครั้ง'))},10000);navigator.serviceWorker.addEventListener('controllerchange',changed);changed()});
 }
 export async function hasPendingLobbyDownload(release:GameRelease){
  // Ordinary game assets and an empty browser cache are not downloadable updates.
@@ -29,12 +32,12 @@ export async function installGameResources(release:GameRelease,onProgress:(progr
   const previous=oldPointer?await oldPointer.json():null;
   const previousCache=previous?.cacheName?await caches.open(previous.cacheName):null;
   for(const resource of release.resources){
-    if(!/^\/(images|cards|videos|audio|fonts)\//.test(resource.url)||resource.url.includes('..')||!Number.isSafeInteger(resource.bytes)||resource.bytes<=0||!/^[a-f0-9]{64}$/.test(resource.sha256))throw Error('Invalid game resource');
+    if(!isGameResourceUrl(resource.url)||!Number.isSafeInteger(resource.bytes)||resource.bytes<=0||!/^[a-f0-9]{64}$/.test(resource.sha256))throw Error('Invalid game resource');
   }
   let downloaded=0,completed=0,cursor=0,failed=false;
   const download=async(resource:GameRelease['resources'][number])=>{
     signal?.throwIfAborted();
-    if(!/^\/(images|cards|videos|audio|fonts)\//.test(resource.url)||resource.url.includes('..')||!Number.isSafeInteger(resource.bytes)||resource.bytes<=0||!/^[a-f0-9]{64}$/.test(resource.sha256))throw Error('Invalid game resource');
+    if(!isGameResourceUrl(resource.url)||!Number.isSafeInteger(resource.bytes)||resource.bytes<=0||!/^[a-f0-9]{64}$/.test(resource.sha256))throw Error('Invalid game resource');
     const report=()=>onProgress({file:resource.url,downloaded,total:release.totalBytes,completed,count:release.resources.length});
     report();
     const cached=await cache.match(resource.url);
@@ -48,7 +51,7 @@ export async function installGameResources(release:GameRelease,onProgress:(progr
     if(bytes!==resource.bytes)throw Error(`ไฟล์ไม่ครบ: ${resource.url}`);
     const blob=new Blob(chunks);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(b=>b.toString(16).padStart(2,'0')).join('');
     if(hash!==resource.sha256)throw Error(`ตรวจสอบไฟล์ไม่ผ่าน: ${resource.url}`);
-    await cache.put(resource.url,new Response(blob,{headers:{'Content-Type':response.headers.get('Content-Type')||'application/octet-stream'}}));completed++;report();
+    await cache.put(resource.url,new Response(blob,{headers:{'Content-Type':resource.mimeType||response.headers.get('Content-Type')||'application/octet-stream'}}));completed++;report();
   };
   // Bound concurrency to avoid holding too many large video parts in memory.
   const workers=await Promise.allSettled(Array.from({length:Math.min(4,release.resources.length)},async()=>{

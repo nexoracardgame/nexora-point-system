@@ -7,11 +7,11 @@ self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET'||url.origin!==self.location.origin||url.searchParams.has('patch'))return;
   let asset=url.pathname;
   if(asset==='/_next/image'){try{const source=new URL(url.searchParams.get('url')||'',url.origin);if(source.origin!==url.origin)return;asset=source.pathname}catch{return;}}
-  if(!/^\/(images|cards|videos|audio|fonts)\//.test(asset))return;
+  if(event.request.mode==='navigate'||/^\/(api|admin|auth|uploads|downloads|_next)(\/|$)/.test(asset))return;
   event.respondWith((async()=>{
     const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');
     let cached;
-    if(pointer){const {cacheName}=await pointer.json();if(cacheName)cached=await (await caches.open(cacheName)).match(asset);}
+    if(pointer){const {cacheName,hashes}=await pointer.json();if(cacheName&&hashes?.[asset])cached=await (await caches.open(cacheName)).match(asset);}
     if(!cached&&/^\/cards\/thumbnails\/[0-9]+-[a-f0-9]+\.webp$/.test(asset))cached=await (await caches.open('nexora-card-art-v1')).match(asset);
     if(cached){
       const range=event.request.headers.get('range');
