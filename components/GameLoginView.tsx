@@ -24,7 +24,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
   const installed=Boolean(bridge?.isDesktop||bridge?.isGameDesktop||navigator.userAgent.includes('Electron/'));
   setBrowserDownload(!installed);document.documentElement.dataset.gameDesktop=String(installed);
   let active=true,objectUrl='';const controller=new AbortController();try{const name=localStorage.getItem('nexora-game-username');if(name){setUsername(name);setRemember(true)}}catch{}
-  void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
+  if(installed)void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
   return()=>{active=false;controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
  },[]);
  useEffect(()=>{const sync=()=>{if(!video.current)return;let paused=false;try{paused=localStorage.getItem('triad-command-motion-off')==='1'}catch{}if(document.hidden||paused)video.current.pause();else void video.current.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);window.addEventListener('nexora:motion-preference',sync);return()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('nexora:motion-preference',sync)}},[videoUrl]);
@@ -46,12 +46,14 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
  const social=<div className="nexora-login-social">{providers.map(([id,label])=><button type="button" data-provider={id} key={id} title={id==='line'||id==='google'?`เข้าสู่ระบบด้วย ${label}`:`${label} · ยังไม่เปิดให้บริการ`} aria-label={`เข้าสู่ระบบด้วย ${label}`} disabled={busy} data-flash={flash===id} onAnimationEnd={()=>setFlash('')} onClick={()=>{cue(id);if(id==='line'||id==='google')onLogin(id);else setNotice(`${label} ยังไม่เปิดให้บริการ กรุณาใช้ LINE หรือ Google`)}}><img src={`/images/game-login/plain-${id}.webp`} alt=""/><span>{label}</span></button>)}</div>;
  const utilities=<div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button></div>;
  return <main className="nexora-game-login" aria-busy={busy}>
+  <img className="nexora-web-login-poster" src="/game-assets/login/website-poster.webp" alt="" fetchPriority="high"/>
   {videoFailed&&<img className="nexora-game-login-scene" src="/images/triad/nexora-command-original.webp" alt=""/>}
   {videoUrl&&!videoFailed&&<video ref={video} className="nexora-game-login-video" src={videoUrl} autoPlay loop muted playsInline aria-hidden="true" onLoadedData={()=>{const element=video.current;if(element?.requestVideoFrameCallback)element.requestVideoFrameCallback(()=>setVideoReady(true));else setVideoReady(true)}} onError={()=>setVideoFailed(true)} style={{opacity:videoReady?1:0,transition:'opacity 500ms ease'}}/>}
   <nav className="nexora-login-rail" aria-label="ข้อมูลเกม">{sections.map(([id,label,thai])=><button type="button" key={id} title={thai} aria-label={thai} onClick={()=>open(id)}><img src={`/images/game-login/${id}.webp`} alt={label}/></button>)}</nav>
   {utilitySlot?createPortal(utilities,utilitySlot):utilities}
   <section className="nexora-game-login-content">
    <img className="nexora-game-login-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" fetchPriority="high"/>
+   <h1 className="nexora-web-login-title">เข้าสู่ระบบเว็บไซต์</h1>
    <div className="nexora-game-login-actions">
     <form className="nexora-credential-frame" onSubmit={event=>{event.preventDefault();void submit()}}>
      <img className="nexora-credential-frame-art" src="/images/game-login/form-v2.webp" alt=""/>
@@ -66,6 +68,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
    </div>
    {browserDownload&&<a className="nexora-game-download" href="/downloads/game-windows/current"><Download size={16}/>ดาวน์โหลด Windows PC<span>64-bit · รุ่นล่าสุด</span></a>}
    <div className="nexora-login-feedback" aria-live="polite">{error?<p role="alert">{error}</p>:<p role="status">{busy?(checking?'กำลังตรวจสอบบัญชี':'กำลังเข้าสู่สนาม'):notice}</p>}</div>
+   <a className="nexora-web-login-home" href="/game">กลับเว็บไซต์ NEXORA</a>
   </section>
   {panel&&<div className="nexora-login-dialog-backdrop" onClick={()=>{if(!busy)setPanel('')}}><section ref={dialog} className="nexora-login-dialog" role="dialog" aria-modal="true" aria-label={panel==='register'?'สมัครสมาชิก':panel==='forgot'?'ลืมรหัสผ่าน':panel==='settings'?'ตั้งค่า':sections.find(item=>item[0]===panel)?.[2]} onClick={event=>event.stopPropagation()}>
    <button type="button" className="nexora-login-dialog-close" title="ปิด" aria-label="ปิด" disabled={busy} autoFocus onClick={()=>{playGameUiSound('back');setPanel('');setConfirmation('')}}><X size={20}/></button>

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import GameWebsite from './GameWebsite';
+import './WebGameLogin.css';
 import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useBattleArenaActive } from "@/lib/battle-ui-state";
 import "./BattleHud.css";
@@ -22,7 +23,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname=usePathname();
   const [desktop,setDesktop]=useState(false);
   useEffect(()=>{setDesktop(Boolean((window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop?.isGameDesktop))},[]);
-  if(!desktop)return pathname==='/game/login'?<>{children}</>:<GameWebsite/>;
+  if(!desktop)return pathname==='/game/login'?<div className="nexora-web-login">{children}</div>:<GameWebsite/>;
   return <InstalledGameShell>{children}</InstalledGameShell>;
 }
 

@@ -1,0 +1,31 @@
+.nexora-web-login-poster,.nexora-web-login-title,.nexora-web-login-home{display:none}
+html:has(.nexora-web-login),body:has(.nexora-web-login){overflow:auto!important;background:#030405;overscroll-behavior:none}
+.nexora-web-login{min-height:100dvh;width:100%;background:#030405}
+.nexora-web-login *{box-sizing:border-box;letter-spacing:0}
+.nexora-web-login .nexora-game-login{min-height:100dvh;height:auto;overflow:hidden}
+.nexora-web-login .nexora-web-login-poster{display:block;position:fixed;inset:0;width:100%;height:100%;object-fit:cover;object-position:36% center;z-index:-2;pointer-events:none}
+.nexora-web-login .nexora-game-login::after{position:fixed;background:linear-gradient(90deg,#03040540,#03040577),linear-gradient(0deg,#030405bb,transparent 80%)}
+.nexora-web-login .nexora-game-login-content{position:relative;inset:auto;width:min(620px,100% - 24px);max-width:none;min-height:100dvh;margin:0 auto;padding:36px 0 24px;container-type:normal;gap:0;justify-content:center}
+.nexora-web-login .nexora-game-login-logo{width:86%;height:auto;aspect-ratio:2.75;object-fit:contain;margin:0;flex:none}
+.nexora-web-login .nexora-web-login-title{display:block;font-size:14px;line-height:1.5;font-weight:400;color:#e4d2ad;margin:12px 0 0}
+.nexora-web-login .nexora-credential-frame{width:100%;aspect-ratio:1326/1186}
+.nexora-web-login :is(.nexora-login-rail,.nexora-login-utilities,.nexora-game-download,.nexora-game-login-scene,.nexora-game-login-video){display:none}
+.nexora-web-login .nexora-login-feedback{min-height:30px;font-size:13px;padding:8px 16px 0}
+.nexora-web-login .nexora-web-login-home{display:inline-block;font-size:12px;color:#b6b5b0;text-decoration:none;padding:12px;margin-top:4px}
+.nexora-web-login .nexora-web-login-home:hover{color:#ffdfa3}
+.nexora-web-login .nexora-login-dialog-backdrop{position:fixed}
+.nexora-web-login .nexora-login-dialog{max-height:calc(100dvh - 32px)}
+.nexora-web-login .nexora-credential-field{gap:8px;padding:0 8px}
+.nexora-web-login .nexora-credential-field input{font-size:16px}
+.nexora-web-login .nexora-credential-field>svg{width:19px;height:19px}
+.nexora-web-login .nexora-credential-field .nexora-password-eye{width:26px}
+.nexora-web-login .nexora-password-eye svg{width:17px;height:17px}
+.nexora-web-login .nexora-credential-remember{font-size:12px;gap:6px}
+.nexora-web-login .nexora-credential-remember input{width:16px;height:16px}
+.nexora-web-login .nexora-credential-forgot{font-size:12px}
+.nexora-web-login .nexora-credential-submit{font-size:29px}
+.nexora-web-login .nexora-credential-social .nexora-login-divider{font-size:11px;margin:0 0 6px}
+.nexora-web-login .nexora-credential-social .nexora-login-social img{height:30px;max-height:30px}
+.nexora-web-login .nexora-register-link{font-size:13px;padding:8px}
+@media(min-width:900px) and (min-height:600px){.nexora-web-login .nexora-game-login-content{width:min(620px,calc((100svh - 130px)/1.43));padding:20px 0}.nexora-web-login .nexora-web-login-title{margin-top:4px}}
+@media(max-width:480px){.nexora-web-login .nexora-game-login-content{padding:28px 0 20px}.nexora-web-login .nexora-game-login-logo{width:94%}.nexora-web-login .nexora-credential-field{gap:4px;padding:0 3px}.nexora-web-login .nexora-credential-field>svg{width:14px;height:14px}.nexora-web-login .nexora-credential-remember,.nexora-web-login .nexora-credential-forgot{font-size:10px}.nexora-web-login .nexora-credential-remember{gap:4px}.nexora-web-login .nexora-credential-remember input{width:12px;height:12px}.nexora-web-login .nexora-credential-social .nexora-login-divider{font-size:9px;margin-bottom:4px}.nexora-web-login .nexora-credential-social .nexora-login-social img{height:23px;max-height:23px}.nexora-web-login .nexora-credential-submit{font-size:24px}}
