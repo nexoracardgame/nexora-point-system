@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useBattleArenaActive } from "@/lib/battle-ui-state";
@@ -17,6 +17,8 @@ const FloatingChatDock = dynamic(() => import("@/components/FloatingChatDock"), 
 
 export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router=useRouter();
+  useEffect(()=>{if(pathname!=='/game'&&pathname!=='/game/login')router.prefetch('/game')},[pathname,router]);
   const active = useBattleArenaActive();
   useEffect(() => {
     if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
