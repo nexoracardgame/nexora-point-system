@@ -1,0 +1,4 @@
+const fs=require('node:fs'),vm=require('node:vm');
+let source=fs.readFileSync('scripts/test-fullscreen-settings-sync.cjs','utf8');
+source=source.replace("assert.equal(await page.getByRole('button',{name:'ปิดเกม',exact:true}).count(),1);",`assert.equal(await page.getByRole('button',{name:'ปิดเกม',exact:true}).count(),1);const settings=await page.locator('.nexora-settings-open').boundingBox(),toolbar=await page.locator('.nexora-window-controls').boundingBox();assert.ok(Math.abs(toolbar.x-settings.x-settings.width-4)<1,'Settings remains 4px beside close toolbar');assert.ok(Math.abs(settings.y+settings.height/2-toolbar.y-toolbar.height/2)<1,'Settings aligns vertically');`);
+vm.runInThisContext(`(function(require,module,exports){${source}\n})`,{filename:__filename})(require,module,exports);
