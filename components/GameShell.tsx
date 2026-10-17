@@ -23,7 +23,7 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const pathname=usePathname();
   const [desktop,setDesktop]=useState(false);
   useEffect(()=>{setDesktop(Boolean((window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop?.isGameDesktop))},[]);
-  if(!desktop)return pathname==='/game/login'?<div className="nexora-web-login">{children}</div>:<GameWebsite/>;
+  if(!desktop)return pathname==='/game/login'?<div className="nexora-web-login">{children}</div>:<GameWebsite>{pathname==='/game/topup'?children:null}</GameWebsite>;
   return <InstalledGameShell>{children}</InstalledGameShell>;
 }
 

@@ -24,8 +24,7 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   const drawer=await page.getByRole('dialog').boundingBox();assert.ok(Math.abs(drawer.x+drawer.width-width)<2&&drawer.y===0&&Math.abs(drawer.height-height)<2,'Account drawer anchored to right viewport edge');
   assert.equal(await page.getByRole('link',{name:'แก้ไขบัญชี'}).getAttribute('href'),'/settings/profile');
   await page.screenshot({path:`artifacts/game-website/account-${width}.png`});
-  await page.getByRole('dialog').getByRole('button',{name:'เติม COIN'}).click();
-  await page.getByText('ระบบเติมเงินยังไม่เปิดให้บริการ ไม่มีการรับชำระเงินในขณะนี้').waitFor();
+  assert.equal(await page.getByRole('dialog').getByRole('link',{name:'เติม COIN'}).getAttribute('href'),'/game/topup');
   const rect=await page.getByRole('dialog').boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width+1);
   await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.evaluate(()=>scrollTo(0,0));await page.mouse.move(width/2,height/2);await page.mouse.wheel(0,650);await page.waitForFunction(()=>scrollY>100);await page.mouse.wheel(0,-1500);await page.waitForFunction(()=>scrollY<5);
