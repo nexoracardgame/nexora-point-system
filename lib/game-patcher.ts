@@ -1,5 +1,11 @@
-export type GameRelease = {version:string;authEpoch:number;minimumDesktopVersion:string;totalBytes:number;resources:{url:string;bytes:number;sha256:string}[]};
+export type GameRelease = {version:string;authEpoch:number;minimumDesktopVersion:string;totalBytes:number;resources:{url:string;bytes:number;sha256:string}[];manualDownload?:{kind:'critical-patch'|'addon';title:string}};
 export type PatchProgress = {file:string;downloaded:number;total:number;completed:number;count:number};
+export async function hasPendingLobbyDownload(release:GameRelease){
+ // Ordinary game assets and an empty browser cache are not downloadable updates.
+ const notice=release.manualDownload;
+ if(!notice||!['critical-patch','addon'].includes(notice.kind)||typeof notice.title!=='string'||!notice.title.trim()||!Array.isArray(release.resources)||!release.resources.length||typeof caches==='undefined')return false;
+ return hasPendingGameResources(release);
+}
 export async function hasPendingGameResources(release:GameRelease){
  const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');
  if(!pointer)return true;

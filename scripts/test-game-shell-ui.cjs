@@ -10,7 +10,7 @@ modules['./GameWindowControls.css']='';
 modules['next-auth/react']='exports.useSession=()=>({status:"authenticated"});exports.signOut=async()=>{};';
 modules['next/dynamic']='exports.__esModule=true;exports.default=()=>()=>null;';
 modules['next/navigation']='exports.usePathname=()=>"/game";';
-modules['@/lib/game-patcher']+=';exports.hasPendingGameResources=async()=>true;';
+modules['@/lib/game-patcher']+=';exports.hasPendingLobbyDownload=async()=>false;';
 modules['@/lib/battle-ui-state']='exports.useBattleArenaActive=()=>false;';
 modules['@/components/OnlinePresenceProvider']='exports.OnlinePresenceProvider=({children})=>children;';
 modules['room-actions']=transpile(fs.readFileSync('components/BattleRoomActions.tsx','utf8'));modules['./BattleRoomActions.css']='';
@@ -36,7 +36,7 @@ test=test.replace('const bundle=',modules+'\nconst bundle=')
  const menuMetrics=await page.locator('.nexora-command-nav').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,bar:getComputedStyle(el).scrollbarWidth}));assert.ok(menuMetrics.scroll<=menuMetrics.width,'No horizontal overflow');assert.equal(menuMetrics.bar,'none','No visible scrollbar');
  for(const control of await page.locator('.nexora-lobby-wallet button').all()){const r=await control.boundingBox();assert.ok(r&&r.x>=0&&r.y>=0&&r.x+r.width<=width&&r.y+r.height<=height,'Wallet fits '+width);assert.equal(await control.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true,'Wallet hit target '+width);}
  await page.getByRole('button',{name:'ดูยอด COIN',exact:true}).click();await page.getByRole('dialog',{name:'กระเป๋าเงินเกม',exact:true}).waitFor();await page.getByRole('button',{name:'ปิด',exact:true}).click();
- await page.getByRole('button',{name:'ดาวน์โหลดทรัพยากรเกม',exact:true}).click();await page.getByRole('dialog',{name:'ทรัพยากรเกม',exact:true}).waitFor();await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'detached'});
+ assert.equal(await page.getByRole('button',{name:'ดาวน์โหลดทรัพยากรเกม',exact:true}).count(),0,'Normal web game has no resource download button');
  await page.screenshot({path:'artifacts/triad-command/lobby-'+width+'.png'});`)
  .replace('modules.test=transpile(`','modules.test=transpile(`import BattleRoomActions from "room-actions";')
  .replace("const css=fs.readFileSync(","const css=fs.readFileSync('components/GameShell.css','utf8')+'\\n'+fs.readFileSync(")
