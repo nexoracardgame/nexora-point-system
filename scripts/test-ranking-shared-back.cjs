@@ -1,0 +1,8 @@
+const fs=require('node:fs'),vm=require('node:vm');
+let source=fs.readFileSync('scripts/test-duelist-leaderboard.cjs','utf8');
+const component=require('typescript').transpileModule(fs.readFileSync('components/GameBackControl.tsx','utf8'),{compilerOptions:{module:1,jsx:4,target:7}}).outputText;
+source=source.replace('const bundle=',`modules['./GameBackControl']=${JSON.stringify(component)};modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';const bundle=`);
+source=source.replace("${fs.readFileSync('components/DuelistLeaderboard.css','utf8')}","${fs.readFileSync('components/GameShell.css','utf8')}${fs.readFileSync('components/DuelistLeaderboard.css','utf8')}");
+source=source.replace("getByRole('button',{name:'กลับ'})","getByRole('button',{name:'ย้อนกลับ',exact:true})");
+source=source.replace('await page.screenshot(',`const back=await page.locator('.nexora-game-back').boundingBox();assert.ok(back.x<=9&&back.y<=7,'Back is at top left');assert.equal(await page.locator('.nexora-game-back img').getAttribute('src'),'/images/lobby-play/back-button.png');await page.screenshot(`);
+vm.runInThisContext(`(function(require,module,exports){${source}\n})`,{filename:__filename})(require,module,exports);

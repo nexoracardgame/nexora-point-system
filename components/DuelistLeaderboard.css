@@ -55,7 +55,10 @@
 
 .nexora-ranking { background:linear-gradient(90deg,#040609bb,transparent 24%,transparent 60%,#04060990),linear-gradient(0deg,#020506ac,transparent 40%),url('/images/triad/nexora-command-original.webp') center/cover; }
 .nexora-ranking-nav { justify-content:flex-end; padding-right:3%; background:transparent; border:0; }
-.nexora-ranking-nav > button { border:1px solid #e5c27c80; border-radius:4px; margin:8px 0; background:#0306089c; min-height:36px; padding:6px 18px; }
+.nexora-ranking-nav { min-height:calc(var(--game-back-width,clamp(84px,10vw,240px)) / 2 + 12px); }
+.nexora-ranking-nav > .nexora-game-back { display:block;position:absolute;top:max(6px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));width:var(--game-back-width,clamp(84px,10vw,240px));height:auto;aspect-ratio:2;padding:0;margin:0;border:0;background:none;min-height:0;z-index:1150; }
+.nexora-ranking-nav .nexora-game-back img { display:block;width:100%;height:100%; }
+.nexora-game-platform:has(.nexora-ranking) > .nexora-game-back { display:none; }
 .nexora-ranking-showcase { height:45%; }
 .nexora-ranking-title { width:25%; }
 .nexora-ranking-title img { max-height:100px; object-fit:contain; object-position:left center; }
