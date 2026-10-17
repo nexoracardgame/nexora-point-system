@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {ArrowLeft,Camera,Check,ChevronRight,Shield,Sparkles,Swords,Trophy,Upload,X} from 'lucide-react';
 import {gameAvatars,gameFrames,gameHeroes,type GameAppearance} from '@/lib/game-profile-options';
 import './GamePlayerProfile.css';
+import './GameProfileFrame.css';
 import {updateCachedGameAppearance} from '@/lib/game-profile-client';
 
 type Props={user:{id:string;name:string;image:string};initial:GameAppearance;stats:{wins:number;losses:number}|null;rank:{name:string;nextWins:number|null;nextName:string|null};available:boolean;pending?:boolean};

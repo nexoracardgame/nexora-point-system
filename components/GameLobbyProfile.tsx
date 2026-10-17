@@ -10,6 +10,7 @@ import {type GameAppearance} from '@/lib/game-profile-options';
 import {Shield} from 'lucide-react';
 import GameLobbyWallet from './GameLobbyWallet';
 import './GameLobbyProfile.css';
+import './GameProfileFrame.css';
 export default function GameLobbyProfile({name,image,rank,wins}:{name:string;image:string;rank:string;wins:number}){
  const [appearance,setAppearance]=useState<GameAppearance|null>(null);
  const {data:session}=useSession();const router=useRouter();
