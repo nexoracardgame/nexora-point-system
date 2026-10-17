@@ -12,6 +12,7 @@ import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
 import { isGameRoute } from "@/lib/game-routes";
 
 const SiteRootChrome = dynamic(() => import("@/components/SiteRootChrome"));
+const GameWebsite = dynamic(() => import("@/components/GameWebsite"));
 
 export default function RootChrome({
   children,
@@ -30,13 +31,17 @@ export default function RootChrome({
     return children;
   }
 
+  if (isBattleRoute && !pathname.startsWith('/game') && runtime !== 'game') {
+    return runtime === 'site' ? <GameWebsite /> : null;
+  }
+
   if (isBattleRoute) {
     return (
       <>
         <NexoraDialogProvider />
         {status === "authenticated" && !pathname.startsWith("/game") && <BattleLoadingScreen />}
-        <BattleUiAudio />
-        <BattleMenuMusic />
+        {runtime === 'game' && <BattleUiAudio />}
+        {runtime === 'game' && <BattleMenuMusic />}
         <PushNotificationBootstrap />
         {children}
       </>

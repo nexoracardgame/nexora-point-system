@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import GameWebsite from './GameWebsite';
 import { OnlinePresenceProvider } from "@/components/OnlinePresenceProvider";
 import { useBattleArenaActive } from "@/lib/battle-ui-state";
 import "./BattleHud.css";
@@ -18,6 +19,14 @@ import GameDesktopUpdate from './GameDesktopUpdate';
 const FloatingChatDock = dynamic(() => import("@/components/FloatingChatDock"), { ssr: false });
 
 export default function GameShell({ children }: { children: React.ReactNode }) {
+  const pathname=usePathname();
+  const [desktop,setDesktop]=useState(false);
+  useEffect(()=>{setDesktop(Boolean((window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop?.isGameDesktop))},[]);
+  if(!desktop)return pathname==='/game/login'?<>{children}</>:<GameWebsite/>;
+  return <InstalledGameShell>{children}</InstalledGameShell>;
+}
+
+function InstalledGameShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router=useRouter();
   useEffect(()=>{if(pathname!=='/game'&&pathname!=='/game/login')router.prefetch('/game')},[pathname,router]);
