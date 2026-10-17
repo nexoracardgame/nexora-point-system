@@ -7,7 +7,7 @@ for(const url of registry.files){
  const extension=path.extname(url).slice(1).toLowerCase();
  if(['txt','json','css','js','mjs','svg','wgsl','vert','frag','gltf'].includes(extension)||/\/LICENSE$/i.test(url)){
   const file=path.join(root,url),bytes=fs.readFileSync(file),text=bytes.toString('utf8');
-  if(!text.includes('\u0000')&&Buffer.from(text).equals(bytes)&&text.includes('\r\n'))fs.writeFileSync(file,text.replace(/\r\n/g,'\n'));
+  if(!text.includes('\u0000')&&Buffer.from(text).equals(bytes)&&text.includes('\r'))fs.writeFileSync(file,text.replace(/\r+\n/g,'\n').replace(/\r/g,'\n'));
  }
 }
 const resources=registry.files.map(url=>{const data=fs.readFileSync(path.join(root,url));return{url,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex'),mimeType:policy.mimeTypes[path.extname(url).slice(1).toLowerCase()]||'application/octet-stream'}});
