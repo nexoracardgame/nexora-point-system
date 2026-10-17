@@ -32,7 +32,7 @@ export default function GameWebsite(){
   <header className="nx-site-nav">
    <Link href="/game" aria-label="NEXORA หน้าหลัก" className="nx-site-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></Link>
    <nav aria-label="เมนูหลัก"><a href="#world">โลกของ NEXORA</a><a href="#download">ดาวน์โหลด</a><button onClick={coin}><Coins size={18}/>เติม COIN</button></nav>
-   <button className="nx-site-account" onClick={account}><UserRound size={18}/>{session?.user?'บัญชี':'เข้าสู่ระบบ'}</button>
+   {session?.user?<button className="nx-site-account" onClick={account}><UserRound size={18}/>บัญชี</button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
   </header>
   <section className="nx-site-hero">
    <img className="nx-site-scene" src="/images/triad/nexora-duelists.webp" alt="นักรบแห่ง NEXORA" fetchPriority="high"/>
