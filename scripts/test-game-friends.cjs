@@ -19,6 +19,7 @@ modules['./game-profile-client']=modules['@/lib/game-profile-client'];
 modules['@/lib/game-friends-client']=transpile(fs.readFileSync('lib/game-friends-client.ts','utf8'));
 modules['@/lib/game-profile-navigation']=transpile(fs.readFileSync('lib/game-profile-navigation.ts','utf8'));
 modules['./GameFriendsPanel'] = transpile(fs.readFileSync('components/GameFriendsPanel.tsx','utf8'));
+modules['./GameCardCollection']='exports.__esModule=true;exports.default=()=>null;';
 modules.nav = transpile(fs.readFileSync('components/GameLobbyNavigation.tsx','utf8'));
 const bundle = Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const css = ['components/GameFriendsPanel.css','components/LobbyActionButton.css'].map(p=>fs.readFileSync(p,'utf8')).join('\n');

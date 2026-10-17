@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import {validateTriadDeckMode,countTriadDeck as deckCardCounts} from './triad-deck-rules';
 import { normalizeBattleForfeit, type BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
 import { bestTriadBotPlay } from "./battle-bot-search";
@@ -406,20 +407,6 @@ function normalizeDeckMode(value: unknown): TriadDeckMode {
   return "all";
 }
 
-function deckCardCounts(deck: string[]) {
-  return deck.reduce(
-    (counts, cardNo) => {
-      const card = triadCardByNo.get(cardNo);
-      if (!card || card.kind === "unknown") return counts;
-      counts.total += 1;
-      if (card.kind === "monster") counts.monsters += 1;
-      if (card.kind === "skill") counts.skills += 1;
-      return counts;
-    },
-    { total: 0, monsters: 0, skills: 0 }
-  );
-}
-
 function normalizeDeckForMode(mode: TriadDeckMode, deck: unknown) {
   const cards = normalizeDeck(deck);
   if (mode !== "monster") return cards;
@@ -427,30 +414,7 @@ function normalizeDeckForMode(mode: TriadDeckMode, deck: unknown) {
 }
 
 function validateDeckForMode(mode: TriadDeckMode, deck: string[]) {
-  const counts = deckCardCounts(deck);
-  const errors: string[] = [];
-
-  if (counts.total !== TRIAD_DECK_SIZE) {
-    errors.push(`เด็คต้องมีการ์ดทั้งหมด ${TRIAD_DECK_SIZE} ใบ`);
-  }
-
-  if (mode === "all") {
-    if (counts.monsters < 3) errors.push("โหมด ALL IN ONE ต้องมีการ์ดมอนสเตอร์อย่างน้อย 3 ใบ");
-    return { ok: errors.length === 0, errors };
-  }
-
-  if (mode === "monster") {
-    if (counts.monsters !== TRIAD_MONSTER_DECK_SIZE || counts.skills > 0) {
-      errors.push(`โหมด MONSTER ต้องใช้การ์ดมอนสเตอร์ครบ ${TRIAD_MONSTER_DECK_SIZE} ใบ`);
-    }
-    return { ok: errors.length === 0, errors };
-  }
-
-  if (counts.monsters !== TRIAD_SKILL_MODE_MONSTERS || counts.skills !== TRIAD_SKILL_MODE_SKILLS) {
-    errors.push(`โหมด SKILL ต้องมีการ์ดมอนสเตอร์ ${TRIAD_SKILL_MODE_MONSTERS} ใบ และการ์ดสกิล ${TRIAD_SKILL_MODE_SKILLS} ใบ`);
-  }
-
-  return { ok: errors.length === 0, errors };
+  return validateTriadDeckMode(mode,deck);
 }
 
 function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
