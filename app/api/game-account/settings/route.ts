@@ -5,10 +5,11 @@ import {prisma} from '@/lib/prisma';
 import {ensureGameAccount,nextNameChange,validGameName} from '@/lib/game-account';
 import {getLocalProfileByUserId,upsertLocalProfile} from '@/lib/local-profile-store';
 import {ensureGameProfile} from '@/lib/game-profile-store';
+import {ensureGameEmailSchema} from '@/lib/game-email-registration';
 
 export async function GET(){
  const session=await getServerSession(authOptions);if(!session?.user?.id)return NextResponse.json({error:'Unauthorized'},{status:401});
- try{await ensureGameAccount();const id=session.user.id;const [user,rows,links]=await Promise.all([prisma.user.findUnique({where:{id},select:{name:true,displayName:true,image:true}}),prisma.$queryRawUnsafe<{nameChangedAt:Date|null}[]>('SELECT "nameChangedAt" FROM "GameAccountSettings" WHERE "userId"=$1',id),prisma.authIdentity.findMany({where:{userId:id},select:{provider:true,email:true}})]);if(!user)return NextResponse.json({error:'ไม่พบบัญชี'},{status:404});return NextResponse.json({name:user.displayName||user.name||'',image:user.image||'',email:session.user.email||links.find(link=>link.email)?.email||'',providers:links.map(link=>link.provider),nextNameChangeAt:nextNameChange(rows[0]?.nameChangedAt||null)},{headers:{'Cache-Control':'no-store'}})}catch{return NextResponse.json({error:'โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง'},{status:503})}
+ try{await ensureGameAccount();await ensureGameEmailSchema();const id=session.user.id;const [user,rows,links,emails]=await Promise.all([prisma.user.findUnique({where:{id},select:{name:true,displayName:true,image:true}}),prisma.$queryRawUnsafe<{nameChangedAt:Date|null}[]>('SELECT "nameChangedAt" FROM "GameAccountSettings" WHERE "userId"=$1',id),prisma.authIdentity.findMany({where:{userId:id},select:{provider:true,email:true}}),prisma.$queryRawUnsafe<{email:string}[]>('SELECT "email" FROM "GameAccountEmail" WHERE "userId"=$1',id)]);if(!user)return NextResponse.json({error:'ไม่พบบัญชี'},{status:404});return NextResponse.json({name:user.displayName||user.name||'',image:user.image||'',email:emails[0]?.email||session.user.email||links.find(link=>link.email)?.email||'',providers:links.map(link=>link.provider),nextNameChangeAt:nextNameChange(rows[0]?.nameChangedAt||null)},{headers:{'Cache-Control':'no-store'}})}catch{return NextResponse.json({error:'โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง'},{status:503})}
 }
 export async function POST(req:NextRequest){
  const session=await getServerSession(authOptions);if(!session?.user?.id)return NextResponse.json({error:'Unauthorized'},{status:401});

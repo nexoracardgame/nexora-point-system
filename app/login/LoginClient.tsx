@@ -201,13 +201,14 @@ export default function LoginClient({
   const handleLineLogin = () => startLogin("line");
 
   const handleGoogleLogin = () => startLogin("google");
-  const startCredentials = async (username:string,password:string,confirmPassword?:string) => {
+  const startCredentials = async (username:string,password:string,confirmPassword?:string,email?:string):Promise<{email:string}|void> => {
     if(loginInFlightRef.current||isRedirecting)return;
     loginInFlightRef.current=true;setPendingProvider('credentials');setLoginError('');
     try{
       if(confirmPassword!==undefined){
-        const response=await fetch('/api/game-account/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,confirmPassword})});
+        const response=await fetch('/api/game-account/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,confirmPassword,email})});
         const result=await response.json();if(!response.ok)throw Error(result.error||'สมัครสมาชิกไม่สำเร็จ');
+        if(result.verificationRequired){setPendingProvider(null);loginInFlightRef.current=false;return {email:result.email}}
       }
       const result=await signIn('credentials',{username,password,redirect:false,callbackUrl});
       if(!result?.ok||result.error)throw Error('Username หรือ Password ไม่ถูกต้อง หรือทดลองเข้าสู่ระบบเกินกำหนด');

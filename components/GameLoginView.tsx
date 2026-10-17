@@ -6,8 +6,9 @@ import {Download,Settings,X,Volume2,VolumeX,UserRound,LockKeyhole,Eye,EyeOff} fr
 import {playGameUiSound} from '@/lib/game-ui-audio';
 import {loadLoginWallpaper} from '@/lib/login-wallpaper';
 import '@/app/login/GameLogin.css';
+import './GameEmailVerification.css';
 
-type Props={busy:boolean;checking:boolean;error:string;onLogin:(provider:'line'|'google')=>void;onCredentials:(username:string,password:string,confirmation?:string)=>Promise<void>};
+type Props={busy:boolean;checking:boolean;error:string;onLogin:(provider:'line'|'google')=>void;onCredentials:(username:string,password:string,confirmation?:string,email?:string)=>Promise<{email:string}|void>};
 const providers=[['google','Google'],['line','LINE'],['facebook','Facebook'],['discord','Discord']] as const;
 const sections=[['news','NEWS','ข่าวสาร'],['event','EVENT','กิจกรรม'],['guide','GUIDE','วิธีเล่น'],['support','SUPPORT','ติดต่อเรา']] as const;
 
@@ -15,6 +16,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
  const [panel,setPanel]=useState(''),[flash,setFlash]=useState(''),[notice,setNotice]=useState(''),[muted,setMuted]=useState(false);
  const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[remember,setRemember]=useState(false),[showPassword,setShowPassword]=useState(false),[videoUrl,setVideoUrl]=useState('');
  const [browserDownload,setBrowserDownload]=useState(false);
+ const [email,setEmail]=useState(''),[verificationEmail,setVerificationEmail]=useState('');
  const [videoReady,setVideoReady]=useState(false),[videoFailed,setVideoFailed]=useState(false);
  const [utilitySlot,setUtilitySlot]=useState<Element|null>(null);
  useEffect(()=>{const locate=()=>setUtilitySlot(document.querySelector('[data-game-utilities-slot]'));locate();const observer=new MutationObserver(locate);observer.observe(document.body,{childList:true,subtree:true});return()=>observer.disconnect()},[]);
@@ -41,7 +43,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
  const open=(name:string)=>{cue(name);if(name==='settings')try{setMuted(localStorage.getItem('triad-battle-muted')==='1')}catch{}setPanel(name)};
  const submit=async(register=false)=>{
   cue('login');try{if(remember)localStorage.setItem('nexora-game-username',username);else localStorage.removeItem('nexora-game-username')}catch{}
-  await onCredentials(username,password,register?confirmation:undefined);setPassword('');setConfirmation('');
+  const result=await onCredentials(username,password,register?confirmation:undefined,register?email:undefined);setPassword('');setConfirmation('');if(result?.email){setVerificationEmail(result.email);setPanel('verify')}
  };
  const social=<div className="nexora-login-social">{providers.map(([id,label])=><button type="button" data-provider={id} key={id} title={id==='line'||id==='google'?`เข้าสู่ระบบด้วย ${label}`:`${label} · ยังไม่เปิดให้บริการ`} aria-label={`เข้าสู่ระบบด้วย ${label}`} disabled={busy} data-flash={flash===id} onAnimationEnd={()=>setFlash('')} onClick={()=>{cue(id);if(id==='line'||id==='google')onLogin(id);else setNotice(`${label} ยังไม่เปิดให้บริการ กรุณาใช้ LINE หรือ Google`)}}><img src={`/images/game-login/plain-${id}.webp`} alt=""/><span>{label}</span></button>)}</div>;
  const utilities=<div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button></div>;
@@ -72,15 +74,16 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
   </section>
   {panel&&<div className="nexora-login-dialog-backdrop" onClick={()=>{if(!busy)setPanel('')}}><section ref={dialog} className="nexora-login-dialog" role="dialog" aria-modal="true" aria-label={panel==='register'?'สมัครสมาชิก':panel==='forgot'?'ลืมรหัสผ่าน':panel==='settings'?'ตั้งค่า':sections.find(item=>item[0]===panel)?.[2]} onClick={event=>event.stopPropagation()}>
    <button type="button" className="nexora-login-dialog-close" title="ปิด" aria-label="ปิด" disabled={busy} autoFocus onClick={()=>{playGameUiSound('back');setPanel('');setConfirmation('')}}><X size={20}/></button>
-   <h2>{panel==='register'?'สมัครสมาชิก':panel==='forgot'?'ลืมรหัสผ่าน':panel==='settings'?'ตั้งค่า':sections.find(item=>item[0]===panel)?.[2]}</h2>
+   <h2>{panel==='verify'?'ตรวจสอบอีเมลของคุณ':panel==='register'?'สมัครสมาชิก':panel==='forgot'?'ลืมรหัสผ่าน':panel==='settings'?'ตั้งค่า':sections.find(item=>item[0]===panel)?.[2]}</h2>
    {panel==='register'?<form className="nexora-register-form" onSubmit={event=>{event.preventDefault();void submit(true)}}>
     <label>Username<input aria-label="Username สำหรับสมัคร" name="username" autoComplete="username" autoCapitalize="none" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}" value={username} onChange={event=>setUsername(event.target.value)} disabled={busy}/></label>
     <small>3–24 ตัว: a–z, 0–9, _ หรือ -</small>
+    <label>อีเมล<input aria-label="อีเมลสำหรับสมัคร" name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={event=>setEmail(event.target.value)} disabled={busy}/></label>
     <label>Password<input aria-label="Password สำหรับสมัคร" name="new-password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={event=>setPassword(event.target.value)} disabled={busy}/></label>
     <small>รหัสผ่าน 12–128 ตัว</small>
     <label>ยืนยัน Password<input aria-label="ยืนยัน Password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={confirmation} onChange={event=>setConfirmation(event.target.value)} disabled={busy}/></label>
-    <button type="submit" disabled={busy}>สมัครสมาชิกและเข้าสู่ระบบ</button>{error&&<p role="alert">{error}</p>}
-   </form>:panel==='settings'?<button type="button" className="nexora-login-sound" aria-pressed={muted} onClick={()=>{const next=localStorage.getItem('triad-battle-muted')!=='1';localStorage.setItem('triad-battle-muted',next?'1':'0');setMuted(next);window.dispatchEvent(new Event('nexora:audio-preference'))}}>{muted?<VolumeX/>:<Volume2/>}{muted?'เปิดเสียง':'ปิดเสียง'}</button>:<p>{panel==='forgot'?'ยังไม่มีระบบรีเซ็ตรหัสผ่านอัตโนมัติ บัญชีที่เข้าได้ด้วย LINE หรือ Google ยังใช้ช่องทางเดิมได้':panel==='news'?'ยังไม่มีประกาศใหม่':panel==='event'?'ยังไม่มีกิจกรรมที่เปิดให้เข้าร่วม':panel==='guide'?'เข้าสู่ระบบ เลือก TRIAD 3 ใบ หรือ PENTAD 5 ใบ แล้วสร้างห้องหรือเข้าร่วมสนามประลอง':'ช่องทางติดต่อเพิ่มเติมยังไม่เปิดให้บริการ'}</p>}
+    <button type="submit" disabled={busy}>สมัครสมาชิกและส่งอีเมลยืนยัน</button>{error&&<p role="alert">{error}</p>}
+   </form>:panel==='verify'?<div className="nexora-email-pending"><p>ส่งลิงก์ยืนยันไปที่</p><strong>{verificationEmail}</strong><p>เปิดอีเมลแล้วกดยืนยันเพื่อเปิดใช้งานบัญชี ลิงก์มีอายุ 30 นาที หากไม่พบให้ตรวจในสแปม</p><button type="button" onClick={()=>setPanel('')}>กลับไปเข้าสู่ระบบ</button></div>:panel==='settings'?<button type="button" className="nexora-login-sound" aria-pressed={muted} onClick={()=>{const next=localStorage.getItem('triad-battle-muted')!=='1';localStorage.setItem('triad-battle-muted',next?'1':'0');setMuted(next);window.dispatchEvent(new Event('nexora:audio-preference'))}}>{muted?<VolumeX/>:<Volume2/>}{muted?'เปิดเสียง':'ปิดเสียง'}</button>:<p>{panel==='forgot'?'ยังไม่มีระบบรีเซ็ตรหัสผ่านอัตโนมัติ บัญชีที่เข้าได้ด้วย LINE หรือ Google ยังใช้ช่องทางเดิมได้':panel==='news'?'ยังไม่มีประกาศใหม่':panel==='event'?'ยังไม่มีกิจกรรมที่เปิดให้เข้าร่วม':panel==='guide'?'เข้าสู่ระบบ เลือก TRIAD 3 ใบ หรือ PENTAD 5 ใบ แล้วสร้างห้องหรือเข้าร่วมสนามประลอง':'ช่องทางติดต่อเพิ่มเติมยังไม่เปิดให้บริการ'}</p>}
   </section></div>}
  </main>;
 }
