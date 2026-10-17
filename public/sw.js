@@ -4,10 +4,20 @@ self.addEventListener("install", () => {
 
 self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
-  if(event.request.method!=='GET'||url.origin!==self.location.origin||!/^\/(images|cards|videos|audio|fonts)\//.test(url.pathname)||url.searchParams.has('patch'))return;
+  if(event.request.method!=='GET'||url.origin!==self.location.origin||url.searchParams.has('patch'))return;
+  let asset=url.pathname;
+  if(asset==='/_next/image'){try{const source=new URL(url.searchParams.get('url')||'',url.origin);if(source.origin!==url.origin)return;asset=source.pathname}catch{return;}}
+  if(!/^\/(images|cards|videos|audio|fonts)\//.test(asset))return;
   event.respondWith((async()=>{
     const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');
-    if(pointer){const {cacheName}=await pointer.json();const cached=await (await caches.open(cacheName)).match(url.pathname);if(cached)return cached;}
+    let cached;
+    if(pointer){const {cacheName}=await pointer.json();if(cacheName)cached=await (await caches.open(cacheName)).match(asset);}
+    if(!cached&&/^\/cards\/thumbnails\/[0-9]+-[a-f0-9]+\.webp$/.test(asset))cached=await (await caches.open('nexora-card-art-v1')).match(asset);
+    if(cached){
+      const range=event.request.headers.get('range');
+      if(range){const blob=await cached.blob(),match=/^bytes=(\d*)-(\d*)$/.exec(range);if(!match||(!match[1]&&!match[2]))return new Response(null,{status:416,headers:{'Content-Range':`bytes */${blob.size}`}});const start=match[1]?Number(match[1]):Math.max(0,blob.size-Number(match[2])),end=match[1]?(match[2]?Math.min(Number(match[2]),blob.size-1):blob.size-1):blob.size-1;if(start>=blob.size||start>end)return new Response(null,{status:416,headers:{'Content-Range':`bytes */${blob.size}`}});return new Response(blob.slice(start,end+1),{status:206,headers:{'Content-Type':cached.headers.get('Content-Type')||'application/octet-stream','Content-Range':`bytes ${start}-${end}/${blob.size}`,'Content-Length':String(end-start+1),'Accept-Ranges':'bytes'}})}
+      return cached;
+    }
     return fetch(event.request);
   })());
 });

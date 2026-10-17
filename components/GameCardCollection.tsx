@@ -8,6 +8,7 @@ import {triadCards,triadCardByNo,type TriadCard} from '@/lib/triad-dominion';
 import {deckFormats,emptyDeckCards,deckCardNos,validateCollectionDeck,type GameCollection,type SavedGameDeck,type DeckFormat,type DeckGroup,type DeckCards} from '@/lib/game-collection';
 import {cachedGameCollection,loadGameCollection,mutateGameCollection} from '@/lib/game-collection-client';
 import {useCardGesture} from '@/lib/use-card-gesture';
+import {gameCardThumbnail} from '@/lib/game-card-art';
 import GameBackControl from './GameBackControl';
 import GamePageLogo from './GamePageLogo';
 import './GameCardCollection.css';
@@ -55,7 +56,7 @@ export default function GameCardCollection(){
   {!data?<div className="gcc-empty"><Layers3/><h3>{loading?'กำลังเชื่อมต่อคลังการ์ด':'โหลดคลังการ์ดไม่สำเร็จ'}</h3><button disabled={loading} onClick={()=>void refresh(true)}><RefreshCw size={16}/>ลองใหม่</button></div>:!filtered.length?<div className="gcc-empty"><img src="/cards/card-backs/card-backs.png" alt=""/><h3>{query||favorites||kind!=='all'||element!=='all'?'ไม่พบการ์ดที่ตรงกัน':'ยังไม่มีการ์ดถาวรในคลัง'}</h3>{!data.owned.length&&view==='owned'&&<><p>การ์ดที่ได้รับจากรางวัลหรือกาชาจะเก็บไว้ที่นี่</p><button onClick={()=>{setView('album');setQuery('');setFavorites(false);setKind('all');setElement('all')}}><Search size={16}/>ดูอัลบั้มการ์ด</button></>}</div>:<div className="gcc-card-grid">{visible.map(card=>{
    const owned=stock.get(card.cardNo),addition=draft?validateCollectionDeck(draft.format,{...draft.cards,[group]:[...draft.cards[group],card.cardNo]},data.owned,true):[];
    return <article className="gcc-card" key={card.cardNo} data-owned={Boolean(owned)}>
-    <InspectCard card={card} className="gcc-card-face" onInspect={setPreview} onEnd={()=>setPreview(null)} onChoose={()=>{if(owned&&draft)add(card)}}><Image src={card.sourceImage} alt={card.name} width={163} height={222} sizes="(max-width:600px) 30vw, (max-width:1200px) 18vw, 160px" loading="lazy"/><span className="gcc-card-number">#{card.cardNo}</span></InspectCard>
+    <InspectCard card={card} className="gcc-card-face" onInspect={setPreview} onEnd={()=>setPreview(null)} onChoose={()=>{if(owned&&draft)add(card)}}><Image src={gameCardThumbnail(card.cardNo)||card.sourceImage} unoptimized alt={card.name} width={320} height={436} loading="lazy"/><span className="gcc-card-number">#{card.cardNo}</span></InspectCard>
     <div className="gcc-card-meta"><strong title={card.name}>{card.name}</strong><span>{owned?<><ShieldCheck size={12}/>{owned.quantity} ใบ</>:<><Lock size={12}/>ยังไม่มี</>}</span></div>
     {owned&&<button className="gcc-card-star gcc-icon" title="รายการโปรด" aria-label={'รายการโปรด '+card.cardNo} aria-pressed={owned.favorite} disabled={busy} onClick={()=>void toggleFavorite(card.cardNo)}><Star size={14} fill={owned.favorite?'currentColor':'none'}/></button>}
     {owned&&draft&&<button className="gcc-card-add gcc-icon" title={addition[0]||'เพิ่มเข้าเด็ค'} aria-label={'เพิ่มการ์ด '+card.cardNo} disabled={busy||addition.length>0} onClick={()=>add(card)}><Plus size={16}/></button>}

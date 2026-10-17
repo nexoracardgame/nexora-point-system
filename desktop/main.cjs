@@ -293,10 +293,13 @@ if (GAME_ONLY) {
   app.on('open-url',(event,url)=>{event.preventDefault();handleGameLogin(url);});
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   configurePermissions();
   registerIpcHandlers();
+  if(GAME_ONLY&&app.isPackaged){
+    try{await require('./game-resource-pack.cjs').registerGameResourcePack({session:session.defaultSession,root:path.join(process.resourcesPath,'game-resources'),appUrl:resolveAppUrl()})}catch(error){console.warn('Installed resource pack unavailable; verified download will repair it',error.message)}
+  }
   createWindow();
   if (GAME_ONLY) {
     app.setAsDefaultProtocolClient('nexoragame');

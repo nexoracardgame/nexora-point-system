@@ -1,5 +1,11 @@
 export type GameRelease = {version:string;authEpoch:number;minimumDesktopVersion:string;totalBytes:number;resources:{url:string;bytes:number;sha256:string}[];manualDownload?:{kind:'critical-patch'|'addon';title:string}};
 export type PatchProgress = {file:string;downloaded:number;total:number;completed:number;count:number};
+export async function prepareGameResourceWorker(){
+ if(!('serviceWorker' in navigator)||typeof caches==='undefined')throw Error('อุปกรณ์นี้ไม่รองรับการจัดเก็บทรัพยากรเกม');
+ await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'});
+ await navigator.serviceWorker.ready;
+ if(!navigator.serviceWorker.controller)await new Promise<void>((resolve,reject)=>{const changed=()=>{if(navigator.serviceWorker.controller){clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',changed);resolve()}};const timer=setTimeout(()=>{navigator.serviceWorker.removeEventListener('controllerchange',changed);reject(Error('เปิดระบบทรัพยากรไม่สำเร็จ กรุณาลองอีกครั้ง'))},10000);navigator.serviceWorker.addEventListener('controllerchange',changed);changed()});
+}
 export async function hasPendingLobbyDownload(release:GameRelease){
  // Ordinary game assets and an empty browser cache are not downloadable updates.
  const notice=release.manualDownload;
@@ -32,8 +38,9 @@ export async function installGameResources(release:GameRelease,onProgress:(progr
     const report=()=>onProgress({file:resource.url,downloaded,total:release.totalBytes,completed,count:release.resources.length});
     report();
     const cached=await cache.match(resource.url);
-    if(cached){downloaded+=resource.bytes;completed++;report();return;}
-    if(previous?.hashes?.[resource.url]===resource.sha256&&previousCache){const reusable=await previousCache.match(resource.url);if(reusable){await cache.put(resource.url,reusable);downloaded+=resource.bytes;completed++;report();return;}}
+    const valid=async(response:Response)=>{const bytes=await response.clone().arrayBuffer();if(bytes.byteLength!==resource.bytes)return false;const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');return hash===resource.sha256};
+    if(cached&&await valid(cached)){downloaded+=resource.bytes;completed++;report();return;}
+    if(previous?.hashes?.[resource.url]===resource.sha256&&previousCache){const reusable=await previousCache.match(resource.url);if(reusable&&await valid(reusable)){await cache.put(resource.url,reusable);downloaded+=resource.bytes;completed++;report();return;}}
     const response=await fetch(resource.url+`?patch=${release.version}`,{cache:'no-store',signal});
     if(!response.ok||!response.body)throw Error(`ดาวน์โหลดไม่สำเร็จ: ${resource.url}`);
     const reader=response.body.getReader(),chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;
@@ -50,6 +57,7 @@ export async function installGameResources(release:GameRelease,onProgress:(progr
   const failure=workers.find(result=>result.status==='rejected');
   if(failure?.status==='rejected')throw failure.reason;
   signal?.throwIfAborted();
+  if(typeof navigator!=='undefined')await navigator.storage?.persist?.().catch(()=>false);
   await pointerCache.put('/game/release-pointer',Response.json({cacheName,version:release.version,authEpoch:release.authEpoch,hashes:Object.fromEntries(release.resources.map(r=>[r.url,r.sha256]))}));
   for(const name of await caches.keys())if(name.startsWith('nexora-game-resources-')&&name!==cacheName)await caches.delete(name);
 }

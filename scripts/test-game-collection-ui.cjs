@@ -7,6 +7,9 @@ for(const [id,file]of [['collection','components/GameCardCollection.tsx'],['./Ga
 for(const id of ['./GameCardCollection.css','./GamePageLogo.css'])modules[id]='';
 for(const [id,target]of [['./triad-dominion','@/lib/triad-dominion'],['./game-collection','@/lib/game-collection']])modules[id]=`module.exports=require(${JSON.stringify(target)});`;
 modules['@/public/cards/card-skill-db.json']='module.exports='+fs.readFileSync('public/cards/card-skill-db.json','utf8');
+modules['@/public/cards/card-art.json']='module.exports='+fs.readFileSync('public/cards/card-art.json','utf8');
+modules['@/lib/game-card-art']=compile(fs.readFileSync('lib/game-card-art.ts','utf8'));
+modules['./game-card-art']='module.exports=require("@/lib/game-card-art");';
 modules['next-auth/react']='exports.useSession=()=>({status:"authenticated",data:{user:{id:"qa-owner",name:"QA"}}});';
 modules['next/image']='exports.__esModule=true;exports.default=p=>require("react").createElement("img",p);exports.getImageProps=p=>({props:p});';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';

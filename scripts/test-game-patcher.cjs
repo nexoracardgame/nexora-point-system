@@ -17,6 +17,7 @@ const release=(version,resources)=>({version,resources,totalBytes:resources.redu
  assert.equal(await hasPendingGameResources(release('three',[a,b])),true,'New release shows download button');
  const bad=resource('/images/bad.webp','expected');global.fetch=async()=>new Response('corrupt!');await assert.rejects(installGameResources(release('bad',[bad]),()=>{}));
  const pointer=await (await caches.open('nexora-game-release')).match('/game/release-pointer');assert.equal((await pointer.json()).version,'two','Failed patch must not replace active release');
+ stores.get('nexora-game-resources-two').set(a.url,new Response('BROKE'));requests=0;global.fetch=async url=>{requests++;return new Response(url.startsWith(a.url)?'first':'second')};await installGameResources(release('two',[a,b]),()=>{});assert.equal(requests,1,'Corrupt resumed file is re-downloaded, good file reused');assert.equal(await(await(await caches.open('nexora-game-resources-two')).match(a.url)).text(),'first');
  await assert.rejects(installGameResources(release('invalid',[{...a,url:'/api/private'}]),()=>{}));
  const controller=new AbortController();controller.abort();await assert.rejects(installGameResources(release('aborted',[a]),()=>{},controller.signal));
  let inFlight=0,peak=0;const files=Array.from({length:9},(_,i)=>resource('/images/concurrent-'+i+'.bin','parallel'));

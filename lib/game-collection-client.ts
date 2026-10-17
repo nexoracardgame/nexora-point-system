@@ -1,13 +1,14 @@
 import type {GameCollection,SavedGameDeck} from './game-collection';
 import {getImageProps} from 'next/image';
 import {triadCardByNo,triadCards} from './triad-dominion';
+import {gameCardThumbnail} from './game-card-art';
 const values=new Map<string,{value:GameCollection;at:number}>(),pending=new Map<string,Promise<GameCollection>>();
 const revisions=new Map<string,number>();
 const thumbnails=new Map<string,HTMLImageElement>();
 function warmCollectionImages(value:GameCollection){
  if(typeof Image==='undefined')return;
  const cards=value.owned.length?value.owned.slice(0,24).map(item=>triadCardByNo.get(item.cardNo)):triadCards.slice(0,12);
- for(const card of cards){if(!card)continue;const {props}=getImageProps({src:card.sourceImage,alt:'',width:163,height:222,sizes:'(max-width:600px) 30vw, (max-width:1200px) 18vw, 160px'});if(thumbnails.has(props.src))continue;const image=new Image();image.sizes=props.sizes||'';image.srcset=props.srcSet||'';image.decoding='async';image.onload=()=>{void image.decode().catch(()=>{})};image.onerror=()=>thumbnails.delete(props.src);image.src=props.src;thumbnails.set(props.src,image)}
+ for(const card of cards){if(!card)continue;const {props}=getImageProps({src:gameCardThumbnail(card.cardNo)||card.sourceImage,unoptimized:true,alt:'',width:320,height:436});if(thumbnails.has(props.src))continue;const image=new Image();image.decoding='async';image.onload=()=>{void image.decode().catch(()=>{})};image.onerror=()=>thumbnails.delete(props.src);image.src=props.src;thumbnails.set(props.src,image)}
 }
 export const cachedGameCollection=(owner:string)=>values.get(owner)?.value;
 export function loadGameCollection(owner:string,force=false){

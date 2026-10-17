@@ -4,7 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import { useBattleArenaActive } from '@/lib/battle-ui-state';
-import { installGameResources,type GameRelease,type PatchProgress } from '@/lib/game-patcher';
+import { installGameResources,hasPendingGameResources,prepareGameResourceWorker,type GameRelease,type PatchProgress } from '@/lib/game-patcher';
+import {prepareCardAlbum} from '@/lib/game-card-art';
 import './GamePatchGate.css';
 import './BattleLoadingScreen.css';
 import {loadLobbyAssets,LOBBY_ASSET_VERSION} from '@/lib/lobby-assets';
@@ -31,25 +32,27 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     void profileReady.catch(()=>{});
     const ready=async()=>{await profileReady;if(!cancelled){preparedUsers.add(userId);try{sessionStorage.setItem('nexora:game-prepared:'+LOBBY_ASSET_VERSION+':'+userId,'1')}catch{}setBlocking(false)}};
     const desktop=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean;getVersion:()=>Promise<string>}}).nexoraDesktop;
-    if(!desktop?.isGameDesktop){setError('');void loadLobbyAssets().then(()=>ready()).catch(()=>{if(!cancelled)setError('โหลดทรัพยากรเกมไม่สำเร็จ')});return()=>{cancelled=true};}
-    document.documentElement.dataset.gameDesktop='true';
+    const installed=Boolean(desktop?.isGameDesktop||window.matchMedia('(display-mode: standalone)').matches||(navigator as Navigator&{standalone?:boolean}).standalone);
+    if(!installed){setError('');void prepareGameResourceWorker().then(()=>Promise.all([loadLobbyAssets(),prepareCardAlbum()])).then(()=>ready()).catch(()=>{if(!cancelled)setError('โหลดทรัพยากรเกมไม่สำเร็จ')});return()=>{cancelled=true};}
+    if(desktop?.isGameDesktop)document.documentElement.dataset.gameDesktop='true';
     let disposed=false,running=false;const controller=new AbortController();
     const check=async()=>{
       if(running||activeRef.current)return;running=true;
       try{
+        await prepareGameResourceWorker();
         const response=await fetch('/game-release.json',{cache:'no-store',signal:controller.signal});if(!response.ok)throw Error('ตรวจสอบแพตช์ไม่สำเร็จ');
         const release=await response.json() as GameRelease;
         const current=await (await caches.open('nexora-game-release')).match('/game/release-pointer');const previous=current?await current.json():null;
-        const version=await desktop.getVersion();
+        const version=desktop?.isGameDesktop?await desktop.getVersion():release.minimumDesktopVersion;
         const numbers=(v:string)=>v.split('.').map(Number);const v=numbers(version),minimum=numbers(release.minimumDesktopVersion);
         if(v.some((n,i)=>n<minimum[i]&&v.slice(0,i).every((p,j)=>p===minimum[j])))throw Error('กรุณาอัปเดตตัวเกม Windows เป็นเวอร์ชันล่าสุด');
-        if(previous?.version===release.version){await loadLobbyAssets();if(!disposed)await ready();return;}
+        if(!await hasPendingGameResources(release)){await Promise.all([loadLobbyAssets(),prepareCardAlbum()]);if(!disposed)await ready();return;}
         if(disposed||activeRef.current)return;
         setBlocking(true);setUpdating(true);setError('');
         await installGameResources(release,p=>{if(!disposed)setProgress(p)},controller.signal);
         if(disposed)return;
         if(previous && previous.authEpoch!==release.authEpoch){await signOut({callbackUrl:'/game/login'});return;}
-        await loadLobbyAssets();if(!disposed)await ready();
+        await Promise.all([loadLobbyAssets(),prepareCardAlbum()]);if(!disposed)await ready();
       }catch(err){if(!disposed){setBlocking(true);setError(err instanceof Error?err.message:'โหลดแพตช์ไม่สำเร็จ')}}finally{running=false}
     };
     void check();

@@ -8,6 +8,36 @@ https://nexora-point-system.vercel.app
 
 Web app changes deploy to the server and appear in the desktop app immediately on next load. Electron auto-update is for native shell changes such as icons, permissions, window behavior, installer metadata, and updater logic.
 
+## Game Resource Pack
+
+The dedicated game installer (1.0.7 onward) also includes every file from
+`public/game-release.json` under `resources/game-resources`. Its HTTPS handler
+serves only matching `?patch=<version>` requests from the installed pack, after
+checking byte length and SHA-256. Other origins, APIs, newer patches, and damaged
+files use the network. This avoids shadowing newer deployed resources.
+
+At startup the game activates the shared service worker, checks that every
+manifest file exists, repairs missing files, and publishes the cache pointer only
+after a successful install. Unchanged files are reused after integrity checking.
+Installed PWAs use the same verified cache; ordinary browser play prepares the
+complete immutable card-thumbnail catalog without downloading the 4K video pack.
+
+The shell, authentication, multiplayer state, and user-uploaded avatars still
+require the server. Local artwork is not a promise of offline multiplayer or
+identical frame rates on different hardware. Browser storage may be evicted;
+persistent storage is requested but remains subject to platform policy.
+
+Run `node scripts/test-game-resources-offline.cjs` to verify all 293 thumbnails,
+the Next Image compatibility path, range requests, and missing-file repair with
+the browser offline. Run `node scripts/test-game-resource-pack.cjs` for native
+pack isolation and integrity tests.
+
+The complete installer can exceed GitHub's 100 MiB Git-file limit. Do not copy it
+into `public/downloads` or update the live updater feed until the binary is hosted
+on a release/CDN endpoint that supports its size. `scripts/stage-game-desktop.cjs`
+intentionally rejects oversized binaries. Existing clients can still receive the
+shared web resource-cache upgrade independently of the next native release.
+
 ## Development
 
 Run the Next.js dev server, then start Electron:
