@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("nexoraDesktop", {
   platform: process.platform,
   isDesktop: true,
   isGameDesktop: process.argv.includes('--nexora-game-only'),
+  supportsNativeWindowModes: true,
   gameLogin: provider => ipcRenderer.invoke('nexora:game-login',provider),
   windowControl: action => ipcRenderer.invoke('nexora:window-control',action),
   getVersion: () => ipcRenderer.invoke("nexora:get-version"),

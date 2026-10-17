@@ -7,7 +7,13 @@ export function currentGameWindowMode(){return typeof document!=='undefined'&&(!
 if(typeof document!=='undefined')document.addEventListener('fullscreenchange',()=>{publishMode(document.fullscreenElement?'fullscreen':'windowed')});
 export async function setGameWindowMode(mode:'windowed'|'fullscreen'){
  const id=++changeId;
- const bridge=(window as typeof window&{nexoraDesktop?:{windowControl?:(action:string)=>Promise<boolean>}}).nexoraDesktop;
+ const bridge=(window as typeof window&{nexoraDesktop?:{supportsNativeWindowModes?:boolean;windowControl?:(action:string)=>Promise<boolean>}}).nexoraDesktop;
+ if(bridge?.supportsNativeWindowModes&&bridge.windowControl){
+  if(document.fullscreenElement)await document.exitFullscreen();
+  if(!await bridge.windowControl(mode))throw Error('Native window change failed');
+  if(id===changeId)publishMode(mode);
+  return;
+ }
  // Start within the input event: awaiting IPC first can consume user activation.
  const browserChange=mode==='fullscreen'
   ? document.fullscreenElement ? Promise.resolve() : document.documentElement.requestFullscreen?.() ?? Promise.reject(new Error('Fullscreen unavailable'))

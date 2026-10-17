@@ -1,5 +1,6 @@
 const path = require("node:path");
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session, screen } = require("electron");
+const {manageGameWindow}=require('./game-window-state.cjs');
 const { autoUpdater } = require("electron-updater");
 
 const DEFAULT_APP_URL = "https://nexora-point-system.vercel.app";
@@ -8,6 +9,7 @@ const APP_NAME = GAME_ONLY ? "NEXORA CARD GAME" : "NEXORA TCG";
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 4;
 
 let mainWindow = null;
+let gameWindowState = null;
 let updateDownloaded = false;
 
 function resolveAppUrl() {
@@ -132,6 +134,7 @@ function createWindow() {
     },
   });
 
+  if(GAME_ONLY)gameWindowState=manageGameWindow(mainWindow,screen);
   mainWindow.once("ready-to-show", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.setTitle(APP_NAME);
@@ -235,8 +238,7 @@ function registerIpcHandlers() {
   ipcMain.handle('nexora:window-control',(event,action)=>{
     if(!GAME_ONLY||!mainWindow||mainWindow.isDestroyed()||event.sender!==mainWindow.webContents)return false;
     try{if(new URL(event.senderFrame?.url||'').origin!==new URL(resolveAppUrl()).origin)return false}catch{return false}
-    if(action==='fullscreen'){mainWindow.setFullScreen(true);mainWindow.setResizable(false);}
-    else if(action==='windowed'){mainWindow.setFullScreen(false);mainWindow.setResizable(true);}
+    if(action==='fullscreen'||action==='windowed')return gameWindowState.setMode(action);
     else if(action==='minimize'){if(mainWindow.isFullScreen())return false;mainWindow.minimize();}
     else if(action==='resize'){if(mainWindow.isFullScreen())mainWindow.setFullScreen(false);else if(mainWindow.isMaximized())mainWindow.unmaximize();else mainWindow.maximize();}
     else if(action==='close')mainWindow.close();
