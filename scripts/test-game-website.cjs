@@ -29,7 +29,7 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   await page.getByText('1,234',{exact:true}).waitFor();
   await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished)));
   const drawer=await page.getByRole('dialog').boundingBox();assert.ok(Math.abs(drawer.x+drawer.width-width)<2&&drawer.y===0&&Math.abs(drawer.height-height)<2,'Account drawer anchored to right viewport edge');
-  assert.equal(await page.getByRole('link',{name:'แก้ไขบัญชี'}).getAttribute('href'),'/settings/profile');
+  assert.equal(await page.getByRole('link',{name:'แก้ไขบัญชี'}).getAttribute('href'),'/game/account');
   await page.screenshot({path:`artifacts/game-website/account-${width}.png`});
   assert.equal(await page.getByRole('dialog').getByRole('link',{name:'เติม COIN'}).getAttribute('href'),'/game/topup');
   const rect=await page.getByRole('dialog').boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width+1);
