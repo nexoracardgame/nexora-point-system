@@ -1,0 +1,4 @@
+const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
+const manifest=require('../public/game-release.json');
+for(const resource of manifest.resources){const bytes=fs.readFileSync('public'+resource.url);assert.equal(bytes.length,resource.bytes,resource.url);assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),resource.sha256,resource.url);if(resource.mimeType?.startsWith('text/')||resource.mimeType==='application/json'){assert.equal(bytes.includes(Buffer.from('\r\n')),false,'Canonical LF: '+resource.url)}}
+const again=execFileSync(process.execPath,['scripts/build-game-release.cjs'],{encoding:'utf8'});assert.equal(JSON.parse(fs.readFileSync('public/game-release.json')).version,manifest.version,'Repeated build must not change release');console.log('Release byte parity: '+manifest.resources.length+' hashes, canonical text and deterministic rebuild passed');

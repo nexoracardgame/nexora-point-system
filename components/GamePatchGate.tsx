@@ -26,7 +26,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
   useEffect(()=>{
     if(status==='unauthenticated'){preparedUsers.clear();return;}
     if(!canPatch||!userId)return;
-    if(preparedUsers.has(userId)&&retry===0){setBlocking(false);return;}
+    if(preparedUsers.has(userId)&&retry===0)setBlocking(false);
     let cancelled=false;
     const profileReady=Promise.all([prepareGameProfile(userId),prepareGameFriends(userId).catch(()=>undefined)]);
     void profileReady.catch(()=>{});
@@ -56,8 +56,11 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
       }catch(err){if(!disposed){setBlocking(true);setError(err instanceof Error?err.message:'โหลดแพตช์ไม่สำเร็จ')}}finally{running=false}
     };
     void check();
-    return()=>{cancelled=true;disposed=true;controller.abort()};
-  },[retry,canPatch,userId,status]);
+    const timer=setInterval(()=>{if(!document.hidden)void check()},60000);
+    const resume=()=>{if(!document.hidden)void check()};
+    window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
+    return()=>{cancelled=true;disposed=true;controller.abort();clearInterval(timer);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume)};
+  },[retry,canPatch,userId,status,active]);
   if(pathname==='/game/profile'||pathname?.startsWith('/game/profile/')||pathname==='/game/login'||status==='unauthenticated'||(!blocking&&status==='authenticated'))return children;
   if(!updating)return <div className="nexora-game-entry nexora-game-loading" role="status" aria-label="กำลังเตรียมเกม"><div className="nexora-game-loading-wallpaper" /><div className="nexora-game-loading-content"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div className="nexora-game-loading-track" role="progressbar" aria-label="กำลังโหลดเกม"><div /></div>{error&&<><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button></>}</div></div>;
   const percent=progress?Math.min(progress.completed===progress.count?100:99,Math.floor(progress.downloaded/progress.total*100)):0;

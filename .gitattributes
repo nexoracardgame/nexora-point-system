@@ -1,0 +1,2 @@
+# Resource hashes must describe identical bytes on every build platform.
+public/** -text

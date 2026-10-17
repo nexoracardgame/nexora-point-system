@@ -2,6 +2,14 @@ const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node
 const {collectGameResources,policy}=require('./game-resource-registry.cjs');
 const root=path.resolve('public'),registry=collectGameResources();
 const settings=JSON.parse(fs.readFileSync('data/game-release.json','utf8'));
+// Canonicalize shipped text before hashing so Windows and Linux emit identical bytes.
+for(const url of registry.files){
+ const extension=path.extname(url).slice(1).toLowerCase();
+ if(['txt','json','css','js','mjs','svg','wgsl','vert','frag','gltf'].includes(extension)||/\/LICENSE$/i.test(url)){
+  const file=path.join(root,url),bytes=fs.readFileSync(file),text=bytes.toString('utf8');
+  if(!text.includes('\u0000')&&Buffer.from(text).equals(bytes)&&text.includes('\r\n'))fs.writeFileSync(file,text.replace(/\r\n/g,'\n'));
+ }
+}
 const resources=registry.files.map(url=>{const data=fs.readFileSync(path.join(root,url));return{url,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex'),mimeType:policy.mimeTypes[path.extname(url).slice(1).toLowerCase()]||'application/octet-stream'}});
 const policyHash=createHash('sha256').update(JSON.stringify(policy)).digest('hex');
 const version=createHash('sha256').update(JSON.stringify({settings,policyHash,resources})).digest('hex').slice(0,20);
