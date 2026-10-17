@@ -14,6 +14,7 @@ modules['next-auth/react'] = `exports.useSession=()=>({status:window.guest?'unau
 modules['./OnlinePresenceProvider'] = `exports.useOnlinePresence=()=>({isOnline:id=>id==='player-01'});`;
 modules['@/lib/game-ui-audio'] = 'exports.playGameUiSound=()=>{};';
 modules['./GameFriendsPanel.css'] = '';
+modules['@/lib/game-profile-client']='exports.warmGameProfile=async()=>{};';
 modules['./GameFriendsPanel'] = transpile(fs.readFileSync('components/GameFriendsPanel.tsx','utf8'));
 modules.nav = transpile(fs.readFileSync('components/GameLobbyNavigation.tsx','utf8'));
 const bundle = Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');

@@ -13,6 +13,7 @@ export default function GamePlayerProfile({user,initial,stats,rank,available,pen
  const [appearance,setAppearance]=useState(initial),[draft,setDraft]=useState(initial),[panel,setPanel]=useState<'avatar'|'frame'|'hero'|null>(null),[tab,setTab]=useState('stats'),[busy,setBusy]=useState(false),[notice,setNotice]=useState(available||pending?'':'โหลดการตกแต่งไม่สำเร็จ กรุณารีเฟรชก่อนเปลี่ยน'),[uploading,setUploading]=useState(false);
  const dialog=useRef<HTMLDivElement>(null),trigger=useRef<HTMLElement|null>(null),file=useRef<HTMLInputElement>(null);
  const nameLabel=useRef<HTMLHeadingElement>(null);
+ useEffect(()=>{setAppearance(initial)},[initial]);
  useLayoutEffect(()=>{const label=nameLabel.current;if(!label)return;const fit=()=>{label.style.fontSize='';let size=parseFloat(getComputedStyle(label).fontSize);while(size>8&&label.scrollWidth>label.clientWidth+1){size-=.5;label.style.fontSize=`${size}px`}};fit();const observer=new ResizeObserver(fit);observer.observe(label);return()=>observer.disconnect()},[user.name]);
  const close=()=>{if(!busy&&!uploading){setPanel(null);trigger.current?.focus()}};
  const open=(next:typeof panel)=>{if(readOnly)return;trigger.current=document.activeElement as HTMLElement;setDraft(appearance);setNotice('');setPanel(next)};

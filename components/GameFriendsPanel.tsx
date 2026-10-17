@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { Check, ChevronRight, Clock3, LoaderCircle, MessageSquare, RefreshCw, Search, Shield, UserMinus, UserPlus, Users, X } from 'lucide-react';
 import { useOnlinePresence } from './OnlinePresenceProvider';
 import './GameFriendsPanel.css';
+import {warmGameProfile} from '@/lib/game-profile-client';
 
 type Player = { id:string; friendId?:string; fromUserId?:string; displayName:string; username:string|null; image:string; bio?:string; relation?:'none'|'incoming'|'outgoing'|'friends'|'self'; requestId?:string|null };
 type Mode = 'friends'|'requests'|'discover';
@@ -20,6 +21,7 @@ export default function GameFriendsPanel({onClose}:{onClose:()=>void}) {
   const dialog=useRef<HTMLDivElement>(null),searchRef=useRef<HTMLInputElement>(null);
   const mounted=useRef(true),searchVersion=useRef(0),actionPending=useRef(false),loadVersion=useRef(0);
   const idOf=(p:Player)=>p.friendId||p.fromUserId||p.id;
+  useEffect(()=>{let stopped=false;const players=mode==='discover'?results:mode==='requests'?requests:friends;let cursor=0;const worker=async()=>{while(!stopped&&cursor<Math.min(players.length,12)){const player=players[cursor++];await warmGameProfile(idOf(player))}};void worker();void worker();return()=>{stopped=true}},[friends,requests,results,mode]);
   const load=useCallback(async(signal?:AbortSignal)=>{
     const version=++loadVersion.current;
     try {
