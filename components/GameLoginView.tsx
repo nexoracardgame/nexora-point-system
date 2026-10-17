@@ -26,7 +26,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
   const installed=Boolean(bridge?.isDesktop||bridge?.isGameDesktop||navigator.userAgent.includes('Electron/'));
   setBrowserDownload(!installed);document.documentElement.dataset.gameDesktop=String(installed);
   let active=true,objectUrl='';const controller=new AbortController();try{const name=localStorage.getItem('nexora-game-username');if(name){setUsername(name);setRemember(true)}}catch{}
-  if(installed)void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
+  void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
   return()=>{active=false;controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
  },[]);
  useEffect(()=>{const sync=()=>{if(!video.current)return;let paused=false;try{paused=localStorage.getItem('triad-command-motion-off')==='1'}catch{}if(document.hidden||paused)video.current.pause();else void video.current.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);window.addEventListener('nexora:motion-preference',sync);return()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('nexora:motion-preference',sync)}},[videoUrl]);

@@ -9,7 +9,8 @@ html:has(.nexora-web-login),body:has(.nexora-web-login){overflow:auto!important;
 .nexora-web-login .nexora-game-login-logo{width:86%;height:auto;aspect-ratio:2.75;object-fit:contain;margin:0;flex:none}
 .nexora-web-login .nexora-web-login-title{display:block;font-size:14px;line-height:1.5;font-weight:400;color:#e4d2ad;margin:12px 0 0}
 .nexora-web-login .nexora-credential-frame{width:100%;aspect-ratio:1326/1186}
-.nexora-web-login :is(.nexora-login-rail,.nexora-login-utilities,.nexora-game-download,.nexora-game-login-scene,.nexora-game-login-video){display:none}
+.nexora-web-login :is(.nexora-login-rail,.nexora-login-utilities,.nexora-game-download,.nexora-game-login-scene){display:none}
+.nexora-web-login .nexora-game-login-video{display:block;position:fixed;inset:0;width:100%;height:100%;object-fit:cover;object-position:36% center;z-index:-2}
 .nexora-web-login .nexora-login-feedback{min-height:30px;font-size:13px;padding:8px 16px 0}
 .nexora-web-login .nexora-web-login-home{display:inline-block;font-size:12px;color:#b6b5b0;text-decoration:none;padding:12px;margin-top:4px}
 .nexora-web-login .nexora-web-login-home:hover{color:#ffdfa3}
