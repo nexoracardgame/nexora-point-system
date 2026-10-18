@@ -4,6 +4,7 @@
 .nexora-window-controls .nexora-window-close:hover { background:#a32232; border-color:#ea7682; color:#fff; }
 html[data-game-window-controls=desktop] button.nexora-settings-open { top:calc(env(safe-area-inset-top,0px) + 9px);right:calc(env(safe-area-inset-right,0px) + var(--game-window-controls-width,124px) + 12px);width:38px;height:38px;box-sizing:border-box; }
 html[data-game-window-mode=fullscreen] .nexora-window-drag,html:fullscreen .nexora-window-drag { display:none!important; }
+html[data-game-window-mode=fullscreen] .nexora-window-controls>button:not(.nexora-window-close),html:fullscreen .nexora-window-controls>button:not(.nexora-window-close){display:none!important}
 .nexora-window-controls > [data-game-utilities-slot]:empty { display:none; }
 .nexora-window-controls > [data-game-audio-slot] { min-width:34px; min-height:30px; }
 .nexora-window-controls > [data-game-audio-slot],.nexora-window-controls > [data-game-utilities-slot] { display:flex; align-items:center; }

@@ -38,7 +38,7 @@ export default function GameWindowControls(){
     {confirmClose&&createPortal(<div className="nexora-settings-backdrop nexora-window-exit"><section className="nexora-settings-dialog" role="dialog" aria-modal="true" aria-label="ออกจากเกม"><h2>ต้องการออกจากเกมหรือไม่?</h2><div className="nexora-exit-actions"><button autoFocus onClick={()=>setConfirmClose(false)}>ยกเลิก</button><button onClick={()=>{setConfirmClose(false);void desktop?.windowControl?.('close')}}>ยืนยัน</button></div></section></div>,document.body)}
     {desktop&&createPortal(<div ref={toolbar} className="nexora-window-controls" role="toolbar" aria-label="ตัวควบคุมเกม" data-fullscreen={fullscreen}>
     <div data-game-utilities-slot />
-    {<><button type="button" title="ย่อหน้าต่าง" aria-label="ย่อหน้าต่าง" onClick={()=>void control('minimize')}><Minus size={18}/></button><button type="button" title="สลับขนาดหน้าต่าง" aria-label="สลับขนาดหน้าต่าง" onClick={()=>void control('resize')}><Maximize2 size={17}/></button></>}<button type="button" className="nexora-window-close" title="ปิดเกม" aria-label="ปิดเกม" onClick={()=>setConfirmClose(true)}><X size={19}/></button>
+    {!fullscreen&&<><button type="button" title="ย่อหน้าต่าง" aria-label="ย่อหน้าต่าง" onClick={()=>void control('minimize')}><Minus size={18}/></button><button type="button" title="สลับขนาดหน้าต่าง" aria-label="สลับขนาดหน้าต่าง" onClick={()=>void control('resize')}><Maximize2 size={17}/></button></>}<button type="button" className="nexora-window-close" title="ปิดเกม" aria-label="ปิดเกม" onClick={()=>setConfirmClose(true)}><X size={19}/></button>
     </div>,document.body)}
   </>;
 }
