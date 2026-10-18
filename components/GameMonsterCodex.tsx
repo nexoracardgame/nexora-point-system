@@ -6,6 +6,7 @@ import {gameMonsters,describeMonster,monsterElements,monsterThumbnail,warmMonste
 import type {TriadCard} from '@/lib/triad-dominion';
 import GameBackControl from './GameBackControl';
 import GamePageLogo from './GamePageLogo';
+import GameGachaBackground from './GameGachaBackground';
 import './GameMonsterCodex.css';
 
 function Stars({count}:{count:number}){return <span className="gmc-stars" aria-label={`ระดับพลัง ${count} ดาว`}>{[1,2,3,4,5].map(value=><Star key={value} size={14} fill={value<=count?'currentColor':'none'} data-filled={value<=count}/>)}</span>}
@@ -31,17 +32,18 @@ export default function GameMonsterCodex(){
  useEffect(()=>{
   if(!open)return;
   const key=(event:KeyboardEvent)=>{
-   if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();back()}
+   if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();close()}
    const editing=event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement;
    if(!editing&&selected&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();next(event.key==='ArrowLeft'?-1:1)}
    if(event.key==='Tab'){const controls=[...root.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input,select,[tabindex="0"]')||[]].filter(node=>node.getClientRects().length);const first=controls[0],last=controls.at(-1);if(event.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){event.preventDefault();last?.focus()}else if(!event.shiftKey&&(document.activeElement===last||document.activeElement===root.current)){event.preventDefault();first?.focus()}}
   };
-  const navigateBack=(event:Event)=>{event.preventDefault();back()};document.addEventListener('keydown',key,true);window.addEventListener('nexora:navigate-back',navigateBack);return()=>{document.removeEventListener('keydown',key,true);window.removeEventListener('nexora:navigate-back',navigateBack)};
- },[open,selected,back,index,filtered]);
+  const navigateBack=(event:Event)=>{event.preventDefault();close()};document.addEventListener('keydown',key,true);window.addEventListener('nexora:navigate-back',navigateBack);return()=>{document.removeEventListener('keydown',key,true);window.removeEventListener('nexora:navigate-back',navigateBack)};
+ },[open,selected,close,index,filtered]);
  if(!open)return null;
  const details=selected?describeMonster(selected):null;
  return createPortal(<section className="game-monster-codex" role="dialog" aria-modal="true" aria-label="สารานุกรมมอนสเตอร์" tabIndex={-1} ref={root}>
-  <header className="gmc-header"><GameBackControl onBack={back}/><GamePageLogo/><div><h1>มอนสเตอร์</h1><span>NEXORA / MONSTER ARCHIVE</span></div><span className="gmc-count">{gameMonsters.length} ตัว</span></header>
+  <GameGachaBackground/>
+  <header className="gmc-header"><GameBackControl onBack={close}/><GamePageLogo/><div><h1>มอนสเตอร์</h1><span>NEXORA / MONSTER ARCHIVE</span></div><span className="gmc-count">{gameMonsters.length} ตัว</span></header>
   {!selected?<>
    <div className="gmc-toolbar"><label className="gmc-search"><Search size={18}/><input aria-label="ค้นหามอนสเตอร์" placeholder="ชื่อ / หมายเลข / สกิล" value={query} onChange={event=>setQuery(event.target.value)}/>{query&&<button type="button" aria-label="ล้างคำค้น" title="ล้างคำค้น" onClick={()=>setQuery('')}><X size={17}/></button>}</label><select aria-label="ธาตุมอนสเตอร์" value={element} onChange={event=>setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{Object.entries(monsterElements).map(([id,label])=><option value={id} key={id}>{label}</option>)}</select><select aria-label="ระดับดาว" value={stars} onChange={event=>setStars(event.target.value)}><option value="all">ทุกระดับดาว</option>{[1,2,3,4,5].map(count=><option value={count} key={count}>{count} ดาว</option>)}</select><select aria-label="เรียงมอนสเตอร์" value={sort} onChange={event=>setSort(event.target.value)}><option value="number">หมายเลข</option><option value="attack">พลังโจมตี</option><option value="support">พลังสนับสนุน</option><option value="stars">ระดับดาว</option></select></div>
    <div className="gmc-results"><span>{filtered.length} / {gameMonsters.length} ตัว</span><select aria-label="ระดับหลักมอนสเตอร์" value={tier} onChange={event=>setTier(event.target.value)}><option value="all">ทุกระดับหลัก</option>{Object.entries(monsterTiers).map(([id,label])=><option value={id} key={id}>{label}</option>)}</select><span>พลังรวม = ATK + SUP · ธาตุไม่ส่งผลต่อดาว</span></div>

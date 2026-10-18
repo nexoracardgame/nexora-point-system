@@ -59,3 +59,49 @@ html[data-game-motion-off=true] :is(.gcc-details,.gcc-card-face:after){animation
 @media(prefers-reduced-motion:reduce){.game-card-collection,.gcc-inspect{animation:none}}html[data-game-motion-off=true] :is(.game-card-collection,.gcc-inspect){animation:none}
 .gcc-expiry{display:grid;gap:4px;padding:4px 0 8px;font-size:10px;line-height:1.5;color:#e5c580}.gcc-expiry small{font-size:9px;color:#9fb8c2;overflow-wrap:anywhere}
 .gcc-card-meta>.gcc-card-rating{display:flex;gap:2px;color:#e9c77e;min-height:12px;margin:4px 0}
+/* Collection command surfaces and card lighting stay independent of inventory state. */
+.game-card-collection{--gcc-gold:#e8ca86;--gcc-cyan:#81dce5}
+.gcc-header{background:linear-gradient(100deg,#080c0ff5,#111719e8 55%,#080c0ff5);box-shadow:0 1px 0 #f8d99924,0 8px 28px #0005}
+.gcc-heading h1{color:#fff0cd;text-shadow:0 2px 12px #e6bc6330}.gcc-heading>span{color:#b4b5a6}
+.gcc-sidebar{background:linear-gradient(110deg,#090e11f5,#121b1ce8);border-right-color:#d1b87a40;box-shadow:inset -1px 0 #fff1}
+.gcc-sidebar nav>button{position:relative;background:linear-gradient(110deg,#ffffff06,transparent);border-color:#a4b8b019;transition:background 160ms,border-color 160ms}
+.gcc-sidebar nav>button[aria-current=page]{background:linear-gradient(100deg,#cfad5533,#cfad5508);border-color:#ebca7a80;box-shadow:inset 3px 0 #f1d18e,0 3px 14px #0005}
+.gcc-sidebar nav>button:hover{border-color:#e0c58a80}.gcc-sidebar nav b{color:#e8d49f;font-variant-numeric:tabular-nums}
+.gcc-progress{padding-block:8px;border-block:1px solid #c6b27c20}.gcc-progress progress{height:5px;filter:drop-shadow(0 0 4px #d3bd7550)}
+.gcc-deck-heading{color:#f1dba6}.gcc-deck-item{border-color:#a6c4bf20;background:linear-gradient(115deg,#7caaa90e,#02060870);box-shadow:inset 0 1px #ffffff08}
+.gcc-deck-item[aria-pressed=true]{border-color:#84d9df88;background:linear-gradient(100deg,#62c8d229,#101c22);box-shadow:inset 3px 0 #81dce5}
+.gcc-toolbar{background:linear-gradient(180deg,#080e13e8,#080e1355)}
+.gcc-search,.gcc-toolbar>select{background:linear-gradient(180deg,#1a2428f5,#0b1218f5);border-color:#a6c9cb40;box-shadow:inset 0 1px #ffffff0d,0 3px 8px #0004}
+.gcc-search:focus-within{border-color:#81dce5;box-shadow:0 0 12px #71d8e520}.gcc-search>svg{color:#81dce5}
+.gcc-ownership{border-bottom:1px solid #dcc28026;padding-bottom:12px}
+.gcc-ownership button{position:relative;background:linear-gradient(180deg,#202a2ee8,#0a1117e8);border-color:#b5c8c336;box-shadow:inset 0 1px #fff1;transition:border-color 160ms,background 160ms}
+.gcc-ownership button[aria-pressed=true]{border-color:#ebca80;background:linear-gradient(120deg,#ad87463d,#282719e8);box-shadow:inset 0 -2px #edcf8d,0 0 14px #d8b66318;color:#fff0c5}
+.gcc-ownership button:nth-child(2){color:#f0d598}.gcc-ownership button:nth-child(3){color:#8ddde7}
+.gcc-ownership b{font-variant-numeric:tabular-nums;opacity:.85}
+.gcc-result-bar{padding-top:10px}.gcc-result-bar h2{color:#f3e4bd}.gcc-result-bar>span{color:#b5c7ca}
+.gcc-card{--gcc-card-aura:#91c5cb;transition:opacity 160ms}
+.gcc-card[data-stars="2"]{--gcc-card-aura:#8bd9ae}.gcc-card[data-stars="3"]{--gcc-card-aura:#72d7f3}.gcc-card[data-stars="4"]{--gcc-card-aura:#c6a2fa}.gcc-card[data-stars="5"]{--gcc-card-aura:#ffda80}
+.gcc-card-face{border-radius:4.5% / 3.3%;border-color:color-mix(in srgb,var(--gcc-card-aura) 55%,transparent);box-shadow:0 7px 14px #0007,0 0 8px color-mix(in srgb,var(--gcc-card-aura) 12%,transparent);transition:box-shadow 180ms,border-color 180ms}
+.gcc-card-face:hover,.gcc-card[data-selected=true] .gcc-card-face{border-color:var(--gcc-card-aura);box-shadow:0 8px 20px #0009,0 0 0 1px var(--gcc-card-aura),0 0 20px color-mix(in srgb,var(--gcc-card-aura) 35%,transparent)}
+.gcc-card-face:after{background:linear-gradient(110deg,transparent 25%,#ffffff08 42%,#ffffff38 49%,transparent 60%);opacity:0;animation:none;transform:translateX(-110%)}
+.gcc-card-face:hover:after,.gcc-card[data-selected=true] .gcc-card-face:after{opacity:1;animation:gcc-card-glint 1.2s ease-out both}
+.gcc-card-meta{background:linear-gradient(180deg,#04090d99,transparent);padding-left:4px}.gcc-card-meta>.gcc-card-rating{color:var(--gcc-card-aura);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--gcc-card-aura) 30%,transparent))}
+.gcc-card[data-owned=false]{opacity:.62}.gcc-card[data-owned=false]:hover{opacity:1}
+.gcc-card-star{border-color:#e4d39e66;box-shadow:0 2px 8px #0008;background:#080e13ed}.gcc-card-star[aria-pressed=true]{background:#4d3e20ed;box-shadow:0 0 10px #e7c16a44}
+.gcc-expiry{padding-left:4px;border-left:2px solid #81dce550;margin-top:4px;color:#a8e1e9}
+.gcc-editor{position:relative;background:linear-gradient(130deg,#132125f5,#080d12fa 65%);border-left-color:#83cfd259;box-shadow:inset 1px 0 #d1f6f312,-10px 0 24px #0003}
+.gcc-editor>header{background:linear-gradient(90deg,#7fced51c,transparent);border-bottom-color:#85cdd331}.gcc-editor>header h2{color:#e9d6a4}
+.gcc-editor-empty{position:relative;background:url('/battle-fx/spark_01.png') center/min(90%,240px) no-repeat;background-blend-mode:soft-light;background-color:#0b1419e8}
+.gcc-editor-empty>svg{width:48px;height:48px;color:#e8cd8a;filter:drop-shadow(0 0 12px #e8cd8a55)}.gcc-editor-empty p{color:#bdcecb}
+.gcc-deck-fields>input{color:#f8e9c7!important}.gcc-deck-row{background:linear-gradient(90deg,#77bec509,transparent);border-bottom-color:#9ac8c21c}.gcc-deck-inspect>img{border-radius:3px;box-shadow:0 2px 6px #0008}
+.gcc-save{background:linear-gradient(180deg,#f0d699,#c6a463);box-shadow:inset 0 1px #fff8,0 3px 10px #0005}.gcc-save:hover:not(:disabled){box-shadow:inset 0 1px #fff8,0 0 16px #ebca8040}
+.gcc-pagination{background:#080f14ed;border-top-color:#cbb57833}
+@media(hover:none){.gcc-card-face:hover:after{animation:none;opacity:0}}
+@media(prefers-reduced-motion:reduce){.gcc-card,.gcc-card-face,.gcc-ownership button,.gcc-sidebar nav>button{transition:none}.gcc-card-face:hover:after,.gcc-card[data-selected=true] .gcc-card-face:after{animation:none}}
+html[data-game-motion-off=true] .gcc-card-face:after{animation:none!important}
+.game-card-collection .gcc-search input:focus-visible{outline:none}
+@property --gcc-edge-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes gcc-edge-orbit{to{--gcc-edge-angle:360deg}}
+.gcc-card[data-selected=true] .gcc-card-face:before,.gcc-card[data-stars="5"][data-owned=true] .gcc-card-face:before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;padding:1px;background:conic-gradient(from var(--gcc-edge-angle),transparent 15%,var(--gcc-card-aura) 24%,#fff8dc 27%,transparent 35% 65%,var(--gcc-card-aura) 76%,transparent 84%);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:gcc-edge-orbit 6s linear infinite}
+@media(prefers-reduced-motion:reduce){.gcc-card .gcc-card-face:before{animation:none!important}}
+html[data-game-motion-off=true] .gcc-card .gcc-card-face:before{animation:none!important}

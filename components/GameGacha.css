@@ -120,6 +120,20 @@ html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back):before{animation:non
 @media(max-width:650px){.game-gacha .gg-banner>.gg-wallet{font-size:21px;min-height:44px;min-width:136px;padding:9px 18px;margin-bottom:18px}.game-gacha .gg-header{padding-right:16px}}
 @media(prefers-reduced-motion:reduce){.gg-banner>.gg-wallet:after{animation:none!important}}
 html[data-game-motion-off=true] .gg-banner>.gg-wallet:after{animation:none!important}
+.gg-rates-overlay{position:absolute;inset:0;z-index:8;display:grid;place-items:center;padding:24px;background:#010409a8;backdrop-filter:blur(12px)}
+.gg-rates-overlay>.gg-rates{position:relative;inset:auto;margin:0;width:min(1060px,100%);height:auto;max-width:none;max-height:min(720px,100%);min-height:0;padding:0;overflow:hidden;isolation:isolate;border-radius:8px;border:1px solid #d6b46d90;background:#03080d;box-shadow:0 16px 70px #000a,0 0 24px #edc87520}
+.gg-rates>.gg-background{z-index:-1}.gg-rates>.gg-background:after{background:#02070de8}
+.gg-rates:after{content:"";position:absolute;inset:0;padding:2px;border-radius:inherit;pointer-events:none;background:conic-gradient(from var(--gg-coin-angle),#d5b16e20,#fff0b3 15%,#d5b16e40 26%,#d5b16e20 58%,#ffe2a1 72%,#d5b16e20 88%);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:gg-coin-orbit 7s linear infinite}
+.gg-rates-scroll{position:relative;max-height:min(716px,calc(100dvh - 52px));overflow:auto;overscroll-behavior:contain;padding:26px 30px;scrollbar-width:thin;scrollbar-color:#d3b57450 transparent}
+.gg-rates-scroll>header{display:flex;align-items:center;justify-content:space-between;gap:16px}.gg-rates-scroll>header button{flex:none;width:36px;height:36px;border:1px solid #d6b46d50;border-radius:4px;background:#030b12b3}
+.gg-rates-scroll>p{color:#f0d9a6;margin:8px 0 22px;font-size:13px}
+.gg-rates-columns{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(0,1.15fr);gap:30px;align-items:start}
+.gg-rates-columns table{margin:0}.gg-rates-columns th{font-size:12px}.gg-rates-columns td:last-child{color:#f6d891;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.gg-rates-rules{min-width:0}.gg-rates-rules p{margin:0 0 14px;font-size:12px;line-height:1.85}.gg-rates-rules details{border-top:1px solid #d5b87935;padding-top:14px}.gg-rates-rules summary{font-size:12px}.gg-rates-rules ul{max-height:210px;overflow:auto;scrollbar-width:thin}
+@media(max-width:650px){.gg-rates-overlay{padding:14px}.gg-rates-scroll{padding:18px;max-height:calc(100dvh - 32px)}.gg-rates-columns{grid-template-columns:minmax(0,1fr);gap:20px}.gg-rates-columns :is(td,th){padding:9px}.gg-rates-scroll h2{font-size:20px}.gg-rates-scroll>p{font-size:11px}}
+@media(max-height:520px){.gg-rates-overlay{padding:12px}.gg-rates-scroll{max-height:calc(100dvh - 28px);padding:16px 22px}}
+@media(prefers-reduced-motion:reduce){.gg-rates:after{animation:none!important}}
+html[data-game-motion-off=true] .gg-rates:after{animation:none!important}
 .gg-seal[data-busy=true] .gg-seal-flare{animation-duration:850ms}
 .gg-seal[data-busy=true] .gg-foil:before{animation-duration:700ms}
 html[data-game-motion-off=true] .gg-seal *{animation:none!important;transition:none!important}

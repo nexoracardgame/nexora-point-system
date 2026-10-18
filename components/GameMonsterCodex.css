@@ -1,5 +1,11 @@
 .game-monster-codex{position:fixed;inset:0;z-index:1300;display:flex;flex-direction:column;overflow:hidden;color:#f4f4f2;background:linear-gradient(110deg,rgba(5,9,10,.97),rgba(7,12,14,.9)),url('/images/versus/arena.png') center/cover;container-type:size;--gmc-gold:#edc875;--gmc-edge:rgba(237,200,117,.24);--gmc-back:var(--game-back-width,clamp(84px,10vw,240px));outline:none;letter-spacing:0}
 .game-monster-codex *{box-sizing:border-box}
+@media(max-width:760px){.game-monster-codex .gmc-roster-actions{display:flex;max-width:84px}.game-monster-codex .gmc-roster-actions .gmc-return{height:auto;min-height:36px;padding:6px;font-size:10px;white-space:normal}}
+.game-monster-codex{isolation:isolate;background:#030608}
+.game-monster-codex>.gg-background{position:absolute;inset:0;z-index:-1;pointer-events:none;background:#030608}
+.game-monster-codex>.gg-background video{display:block;width:100%;height:100%;object-fit:cover;object-position:center;transition:opacity 400ms}
+.game-monster-codex>.gg-background:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#03090e99,#03090ec7 65%,#03090ee6)}
+@media(prefers-reduced-motion:reduce){.game-monster-codex>.gg-background video{transition:none}}
 .gmc-header{position:relative;flex-shrink:0;min-height:max(82px,calc(var(--gmc-back)/2 + 16px));display:flex;align-items:center;gap:20px;padding:12px max(24px,env(safe-area-inset-right)) 12px calc(max(8px,env(safe-area-inset-left)) + var(--gmc-back) + 10px + min(18cqw,210px) + 24px);border-bottom:1px solid var(--gmc-edge)}
 .gmc-header>.nexora-page-logo{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + var(--gmc-back) + 10px);top:max(6px,env(safe-area-inset-top));width:clamp(90px,18cqw,210px);height:calc(var(--gmc-back)/2);object-fit:contain;pointer-events:none}
 .gmc-header .nexora-game-back{position:absolute;left:max(8px,env(safe-area-inset-left));top:max(6px,env(safe-area-inset-top));width:var(--gmc-back);height:calc(var(--gmc-back)/2);padding:0;border:0;background:none;cursor:pointer}

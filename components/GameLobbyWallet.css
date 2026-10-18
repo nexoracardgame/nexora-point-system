@@ -1,3 +1,11 @@
+@property --wallet-orbit-angle { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+@keyframes wallet-border-orbit { to { --wallet-orbit-angle:360deg; } }
+.nexora-lobby-wallet .game-currency { position:relative; --wallet-light:#f5d381; }
+.nexora-lobby-wallet .game-currency.gem { --wallet-light:#7cddf0; }
+.nexora-lobby-wallet .game-currency::after { content:''; position:absolute; inset:-1px; border-radius:inherit; padding:1px; pointer-events:none; background:conic-gradient(from var(--wallet-orbit-angle),transparent 0deg 55deg,var(--wallet-light) 80deg,#fff8df 90deg,var(--wallet-light) 100deg,transparent 135deg 235deg,var(--wallet-light) 265deg,transparent 300deg); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; animation:wallet-border-orbit 5s linear infinite; filter:drop-shadow(0 0 3px var(--wallet-light)); }
+.nexora-lobby-wallet .game-currency.gem::after { animation-delay:-2.5s; }
+@media (prefers-reduced-motion:reduce) { .nexora-lobby-wallet .game-currency::after { animation:none; } }
+html[data-game-motion-off=true] .nexora-lobby-wallet .game-currency::after { animation:none; }
 .nexora-lobby-wallet { position:absolute; left:280px; top:12px; display:flex; align-items:center; gap:12px; width:max-content; max-width:calc(100cqw - 560px); }
 .nexora-lobby-wallet button { height:38px; display:flex; align-items:center; justify-content:center; gap:8px; padding:4px 10px; color:#faf4e5; background:#070b10b8; border:1px solid #c9ab6455; border-radius:4px; cursor:pointer; transition:background 160ms,border-color 160ms; }
 .nexora-lobby-wallet button:hover { background:#292719e8; border-color:#f1d18d; }.nexora-lobby-wallet button:focus-visible { outline:2px solid #ffdfa0; outline-offset:3px; }
