@@ -41,3 +41,18 @@
 @keyframes gg-warp{0%{opacity:0;transform:scale(.85);clip-path:inset(45% 0)}25%{opacity:.85;transform:translateX(-3px);clip-path:inset(8% 0 30%)}45%{opacity:.65;transform:translateX(3px);clip-path:inset(35% 0 8%)}65%{opacity:.35;transform:scale(1.08);clip-path:inset(0)}100%{opacity:0;transform:scale(1.18);clip-path:inset(0)}}
 @keyframes gg-unseal{0%{filter:brightness(1)}35%{filter:brightness(1.65) drop-shadow(0 0 12px #efcf8766)}100%{filter:brightness(1)}}
 @media(prefers-reduced-motion:reduce){.gg-reward-info{transition:none}.gg-warp{display:none}}
+/* The source back has a black print bleed outside its silver silhouette. */
+.gg-pack{aspect-ratio:997/1398;max-width:none;width:auto;filter:drop-shadow(0 8px 14px #0008) drop-shadow(0 0 7px #f6cf7b55);transition:filter 300ms,scale 300ms,rotate 500ms}
+.gg-pack-front{max-width:none;filter:drop-shadow(0 10px 18px #0008) drop-shadow(0 0 12px #f5d38b66)}
+.gg-foil{display:block;position:absolute;inset:0;overflow:hidden;border-radius:6% / 4.3%;isolation:isolate;box-shadow:inset 0 0 0 1px #fff8}
+.gg-foil>img,.gg-card-back>img{position:absolute;left:-3.92%;top:-2.29%;width:107.82%;height:104.65%;max-width:none;object-fit:fill;clip-path:none!important;border-radius:0!important}
+.gg-card-back{border-radius:6% / 4.3%}
+.gg-foil:after,.gg-card-back:after,.gg-card-front:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(112deg,transparent 28%,#b3e5ff12 36%,#ffffff50 43%,#f8dfb526 47%,transparent 56%);background-size:300% 100%;mix-blend-mode:screen;animation:gg-glass 6s ease-in-out infinite;opacity:.65}
+.gg-pack-left .gg-foil:after{animation-delay:-2s}.gg-pack-right .gg-foil:after{animation-delay:-4s}
+.gg-flip{filter:drop-shadow(0 0 5px #efcf8730);transition:filter 300ms,scale 300ms}
+.gg-flip:focus-visible,.gg-flip:active{filter:drop-shadow(0 0 14px #a9e5ff88);scale:1.025}
+@media(hover:hover) and (pointer:fine){.gg-pack-stage:hover .gg-pack-front{scale:1.035;rotate:0 1 0 7deg;filter:drop-shadow(0 0 18px #f8d89199) drop-shadow(0 0 6px #b5eaff80)}.gg-pack-stage:hover .gg-foil:after,.gg-flip:hover :is(.gg-card-back,.gg-card-front):after{animation-duration:2.2s;opacity:1}.gg-flip:hover{scale:1.025;filter:drop-shadow(0 0 12px #e8cf8490)}}
+@keyframes gg-glass{0%,15%{background-position:120% 0;opacity:.3}45%{opacity:.8}75%,100%{background-position:-25% 0;opacity:.3}}
+@media(prefers-reduced-motion:reduce){.gg-foil:after,.gg-card-back:after,.gg-card-front:after{animation:none;opacity:.22}.gg-pack-stage:hover .gg-pack-front,.gg-flip:hover,.gg-flip:active{scale:1;rotate:none}}
+html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back,.gg-card-front):after{animation:none!important;opacity:.22}
+@media(max-width:650px){.gg-pack-stage{height:min(260px,52cqw)}}
