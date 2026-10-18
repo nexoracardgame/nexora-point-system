@@ -7,7 +7,7 @@ const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runt
  await page.waitForFunction(()=>document.querySelector('img').naturalWidth>0);
  const crop=await foil.evaluate(node=>{const image=node.querySelector('img'),a=node.getBoundingClientRect(),b=image.getBoundingClientRect();return b.width>a.width&&b.height>a.height&&b.left<a.left&&b.top<a.top});assert.equal(crop,true);
  await page.mouse.move(890,690);const normal=await pack.evaluate(node=>getComputedStyle(node).filter);await foil.hover({force:true});await page.waitForTimeout(400);assert.notEqual(await pack.evaluate(node=>getComputedStyle(node).filter),normal);
- assert.equal(await foil.evaluate(node=>getComputedStyle(node,'::after').animationDuration),'2.2s');
+ assert.equal(await foil.evaluate(node=>getComputedStyle(node,'::after').animationDuration),'1.6s');
  const before=await foil.evaluate(node=>getComputedStyle(node,'::after').backgroundPosition);await page.waitForTimeout(300);assert.notEqual(await foil.evaluate(node=>getComputedStyle(node,'::after').backgroundPosition),before);
  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await foil.evaluate(node=>getComputedStyle(node,'::after').animationName),'none');
  await page.emulateMedia({reducedMotion:'no-preference'});await page.evaluate(()=>document.documentElement.dataset.gameMotionOff='true');assert.equal(await foil.evaluate(node=>getComputedStyle(node,'::after').animationName),'none');

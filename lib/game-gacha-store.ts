@@ -16,7 +16,8 @@ export async function readGameGacha(owner:string):Promise<GachaState>{
  if(!user)throw new CollectionError('ไม่พบบัญชี',404);
  return {coin:user.coin,unlimitedCoin:hasUnlimitedGameCoin(user.role),history:rows.map(row=>row.receipt)};
 }
-export async function openGamePackInTransaction(tx:Prisma.TransactionClient,owner:string,requestId:string,rng=randomInt){
+export async function openGamePackInTransaction(tx:Prisma.TransactionClient,owner:string,requestId:string,rng=randomInt,packIndex=1){
+ if(!Number.isInteger(packIndex)||packIndex<0||packIndex>2)throw new CollectionError('ซองที่เลือกไม่ถูกต้อง');
  await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1,0))','game-collection:'+owner);
  const users=await tx.$queryRawUnsafe<{coin:number;role:string;now:Date}[]>('SELECT "coin","role",CURRENT_TIMESTAMP AS "now" FROM "User" WHERE "id"=$1 FOR UPDATE',owner);
  if(!users[0])throw new CollectionError('ไม่พบบัญชี',404);
@@ -24,7 +25,9 @@ export async function openGamePackInTransaction(tx:Prisma.TransactionClient,owne
  const unlimitedCoin=hasUnlimitedGameCoin(users[0].role);
  if(previous[0])return {receipt:previous[0].receipt,coin:users[0].coin,unlimitedCoin,replayed:true};
  if(!unlimitedCoin&&users[0].coin<gachaPolicy.price)throw new CollectionError('COIN ไม่เพียงพอ ต้องใช้ 79 COIN',422);
- const createdAt=users[0].now,receipt:GachaReceipt={id:requestId,policyVersion:gachaPolicy.version,price:gachaPolicy.price,chargedCoin:unlimitedCoin?0:gachaPolicy.price,testDraw:unlimitedCoin,createdAt:createdAt.toISOString(),...rollGachaPack(max=>rng(max),createdAt)};
+ // Independent sealed candidates; only the selected pack is persisted or delivered.
+ const createdAt=users[0].now,candidates=Array.from({length:3},()=>rollGachaPack(max=>rng(max),createdAt));
+ const receipt:GachaReceipt={id:requestId,policyVersion:gachaPolicy.version,price:gachaPolicy.price,packIndex,chargedCoin:unlimitedCoin?0:gachaPolicy.price,testDraw:unlimitedCoin,createdAt:createdAt.toISOString(),...candidates[packIndex]};
  const updated=unlimitedCoin?[{coin:users[0].coin}]:await tx.$queryRawUnsafe<{coin:number}[]>('UPDATE "User" SET "coin"="coin"-$1 WHERE "id"=$2 AND "coin">=$1 RETURNING "coin"',gachaPolicy.price,owner);
  if(!updated.length)throw new CollectionError('COIN ไม่เพียงพอ',422);
  const permanent=new Map<string,number>(),timed:{id:string;cardNo:string;expiresAt:string}[]=[];
@@ -36,8 +39,8 @@ export async function openGamePackInTransaction(tx:Prisma.TransactionClient,owne
  await tx.$executeRawUnsafe('INSERT INTO "GameGachaDraw"("userId","requestId","receipt","createdAt") VALUES($1,$2,$3::jsonb,$4)',owner,requestId,JSON.stringify(receipt),createdAt);
  return {receipt,coin:updated[0].coin,unlimitedCoin,replayed:false};
 }
-export async function openGamePack(owner:string,requestId:string){
+export async function openGamePack(owner:string,requestId:string,packIndex=1){
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))throw new CollectionError('รหัสคำขอไม่ถูกต้อง');
  await ensureGameGacha();
- return prisma.$transaction(tx=>openGamePackInTransaction(tx,owner,requestId),{maxWait:10000,timeout:20000});
+ return prisma.$transaction(tx=>openGamePackInTransaction(tx,owner,requestId,randomInt,packIndex),{maxWait:10000,timeout:20000});
 }

@@ -57,7 +57,7 @@
 html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back,.gg-card-front):after{animation:none!important;opacity:.22}
 @media(max-width:650px){.gg-pack-stage{height:min(260px,52cqw)}}
 .gg-foil:before,.gg-card-back:before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;background:linear-gradient(transparent 18%,#a9edff70 18.5%,transparent 20%,transparent 62%,#ffe7ac80 62.5%,transparent 64%);opacity:0;animation:gg-idle-glitch 7s linear infinite}
-.game-gacha[data-phase=waiting] .gg-pack-front{animation:gg-charge 850ms ease-in-out infinite}
+.game-gacha[data-phase=waiting] .gg-pack[aria-pressed=true]{animation:gg-charge 850ms ease-in-out infinite}
 .game-gacha[data-phase=waiting] .gg-foil:before{animation:gg-idle-glitch 950ms linear infinite}
 .game-gacha[data-phase=waiting] .gg-beam{animation:gg-charge-beam 1100ms ease-in-out infinite}
 .gg-summoning-pulse{display:block;width:110px;height:2px;overflow:hidden;position:relative;background:#efcf8725}
@@ -68,3 +68,13 @@ html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back,.gg-card-front):after
 @keyframes gg-signal{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 @media(prefers-reduced-motion:reduce){.gg-foil:before,.gg-card-back:before{animation:none;opacity:0}.gg-summoning-pulse:after{animation:none}}
 html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back):before{animation:none!important;opacity:0}
+.gg-pack-stage>.gg-pack{padding:0;border:0;background:none;border-radius:6% / 4.3%;cursor:pointer;touch-action:manipulation;--pack-aura:#efcf87;z-index:1;opacity:.85}
+.gg-pack-stage>.gg-pack-front{z-index:2}
+.gg-pack[data-pack="0"]{--pack-aura:#81dce9}
+.gg-pack[data-pack="2"]{--pack-aura:#c2acf5}
+.gg-pack-stage>.gg-pack[aria-pressed=true]{z-index:3;opacity:1;filter:drop-shadow(0 0 12px var(--pack-aura));scale:1.025}
+.gg-pack-stage>.gg-pack:disabled{cursor:default;opacity:.8}
+.gg-pack-stage>.gg-pack:focus-visible{outline:2px solid var(--pack-aura);outline-offset:6px}
+@media(hover:hover) and (pointer:fine){.gg-pack-stage>.gg-pack:hover{z-index:4;opacity:1;scale:1.06;filter:drop-shadow(0 0 20px var(--pack-aura))}.gg-pack-stage>.gg-pack:hover .gg-foil:after{opacity:1;animation-duration:1.6s}}
+@media(prefers-reduced-motion:reduce){.gg-pack-stage>.gg-pack:hover{scale:1}}
+.gg-pack-stage>.gg-pack-front:not(:hover):not([aria-pressed=true]){scale:1;rotate:none;filter:drop-shadow(0 8px 14px #0008)}

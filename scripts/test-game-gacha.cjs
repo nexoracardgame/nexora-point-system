@@ -26,6 +26,11 @@ function database(get){return {
 const prisma=database(()=>state);prisma.$transaction=fn=>{const job=tail.then(async()=>{const copy=structuredClone(state),result=await fn(database(()=>copy));state=copy;return result});tail=job.catch(()=>{});return job};
 const server=createLoader({'server-only':{},'./prisma':{prisma},'node:crypto':{...crypto,randomInt:rng}}),store=server('lib/game-gacha-store.ts'),collection=server('lib/game-collection-store.ts');
 (async()=>{
+ const makeRng=()=>{let value=37;return max=>{value=(Math.imul(value,1664525)+1013904223)>>>0;return value%max}};
+ const reference=makeRng(),expected=Array.from({length:3},()=>rollGachaPack(reference,now));
+ for(let choice=0;choice<3;choice++){const isolated={coins:{a:79},draws:[],owned:[],timed:[],grants:[]},tx=database(()=>isolated),id=crypto.randomUUID();const result=await store.openGamePackInTransaction(tx,'a',id,makeRng(),choice);assert.equal(result.receipt.packIndex,choice);assert.deepEqual(result.receipt.cards,expected[choice].cards);assert.equal(isolated.owned.reduce((n,c)=>n+c.quantity,0)+isolated.timed.length,7);const retry=await store.openGamePackInTransaction(tx,'a',id,makeRng(),(choice+1)%3);assert.deepEqual(retry.receipt,result.receipt);assert.equal(isolated.coins.a,0)}
+ await assert.rejects(store.openGamePackInTransaction(database(()=>state),'a',crypto.randomUUID(),rng,3),e=>e.status===400);
+ console.log('Three sealed pack candidates: selected rewards only, one debit, replay locked to original choice and invalid choice rejection passed');
  const id=crypto.randomUUID(),results=await Promise.all(Array.from({length:8},()=>store.openGamePack('a',id)));assert.equal(results.filter(item=>!item.replayed).length,1);assert.equal(state.coins.a,711);assert.equal(state.draws.length,1);assert.equal(state.owned.reduce((n,c)=>n+c.quantity,0)+state.timed.length,7);
  const inventory=await collection.readGameCollection('a');assert.equal(inventory.owned.reduce((n,c)=>n+c.quantity,0),7);assert.equal(inventory.owned.reduce((n,c)=>n+(c.temporaryQuantity||0),0),state.timed.length);
  await assert.rejects(store.openGamePack('b',crypto.randomUUID()),e=>e.status===422);assert.equal(state.coins.b,78);assert.equal((await store.readGameGacha('b')).history.length,0);

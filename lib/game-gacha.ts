@@ -5,7 +5,7 @@ import {rateGameSkill} from './game-skill-rating';
 // Bump the policy version when changing price, odds, eligibility or rating rules.
 export const gachaPolicy={version:2,price:79,size:7,starDenominator:6000,starWeights:[5320,300,200,120,60],extraPermanentDenominator:100,temporaryDays:[1,3,7,14],temporaryWeights:[60,25,10,5]} as const;
 export type GachaCard={cardNo:string;kind:'monster'|'skill';stars:number;days:0|1|3|7|14;expiresAt:string|null;guaranteedPermanent:boolean};
-export type GachaReceipt={id:string;policyVersion:number;price:number;chargedCoin?:number;testDraw?:boolean;createdAt:string;maxStars:number;cards:GachaCard[]};
+export type GachaReceipt={id:string;policyVersion:number;price:number;packIndex?:number;chargedCoin?:number;testDraw?:boolean;createdAt:string;maxStars:number;cards:GachaCard[]};
 export type GachaState={coin:number;unlimitedCoin?:boolean;history:GachaReceipt[]};
 export const gachaCatalog=triadCards.filter(card=>card.kind!=='unknown').map(card=>({cardNo:card.cardNo,kind:card.kind as 'monster'|'skill',stars:card.kind==='monster'?rateMonster(card).stars:rateGameSkill(card).stars}));
 const pools=Array.from({length:5},(_,index)=>({monster:gachaCatalog.filter(card=>card.kind==='monster'&&card.stars===index+1),skill:gachaCatalog.filter(card=>card.kind==='skill'&&card.stars===index+1)}));
