@@ -117,3 +117,36 @@ html[data-game-motion-off=true] .gg-seal *{animation:none!important;transition:n
 html[data-game-window-controls=desktop] .game-gacha .gg-wallet{position:fixed;top:calc(env(safe-area-inset-top,0px) + 58px);right:calc(env(safe-area-inset-right,0px) + 8px)}
 html[data-game-window-controls=desktop] .game-gacha .gg-header{min-height:112px}
 @media(max-width:650px){.game-gacha .gg-wallet{min-width:100px;min-height:36px;font-size:18px;padding:7px 10px;gap:6px}.game-gacha .gg-wallet small{font-size:9px}.game-gacha .gg-wallet svg{width:17px}.game-gacha .gg-header{padding-right:124px}}
+/* Staggered flight lanes keep every reveal target separate and readable. */
+.gg-airborne{display:flex;flex-direction:column;position:relative;isolation:isolate}
+.gg-airborne>.gg-rewards{position:relative;flex:none;width:min(1440px,100%);height:660px;min-height:540px;margin:12px auto 20px;display:block;perspective:1400px}
+.gg-airborne .gg-reward{position:absolute;width:18%;max-width:230px;padding:0;border:0;background:none!important;left:var(--lane-x);top:var(--lane-y);--tilt:0deg;--lane-x:0%;--lane-y:0px;--launch-x:0px;--aura:#a4dae9;animation:gg-card-deal 780ms cubic-bezier(.16,1,.3,1) var(--deal-delay) both;transform-origin:center}
+.gg-airborne .gg-reward:nth-child(1){--lane-x:2%;--lane-y:60px;--tilt:-9deg;--launch-x:560px}
+.gg-airborne .gg-reward:nth-child(2){--lane-x:28%;--lane-y:8px;--tilt:-4deg;--launch-x:220px}
+.gg-airborne .gg-reward:nth-child(3){--lane-x:54%;--lane-y:22px;--tilt:5deg;--launch-x:-200px}
+.gg-airborne .gg-reward:nth-child(4){--lane-x:80%;--lane-y:70px;--tilt:10deg;--launch-x:-550px}
+.gg-airborne .gg-reward:nth-child(5){--lane-x:15%;--lane-y:320px;--tilt:-6deg;--launch-x:400px}
+.gg-airborne .gg-reward:nth-child(6){--lane-x:41%;--lane-y:300px;--tilt:3deg}
+.gg-airborne .gg-reward:nth-child(7){--lane-x:67%;--lane-y:325px;--tilt:7deg;--launch-x:-400px}
+.gg-air-card{position:relative;animation:gg-air-drift 5s ease-in-out var(--float-delay) infinite;transform:rotate(var(--tilt));transition:filter 220ms}
+.gg-airborne .gg-flip{filter:drop-shadow(0 10px 14px #000a) drop-shadow(0 0 6px var(--aura));transition:scale 220ms,filter 220ms}
+.gg-airborne .gg-reward[data-stars="4"]{--aura:#c8a5ff}.gg-airborne .gg-reward[data-stars="5"]{--aura:#ffdc83}
+.gg-airborne .gg-reward-info{position:relative;min-height:94px;text-align:center;padding:0 4px;text-shadow:0 2px 5px #000,0 0 9px #000;background:linear-gradient(#03090b00,#03090b99);border-radius:4px}
+.gg-airborne .gg-reward-info>strong{font-size:11px;min-height:28px}.gg-airborne .gg-stars{margin:8px 0 4px}.gg-airborne .gg-duration{margin-top:3px}
+.gg-air-spark{position:absolute;inset:-12%;pointer-events:none;opacity:0;background:url('/battle-fx/spark_01.png') center/contain no-repeat;mix-blend-mode:screen}
+.gg-reward[data-revealed=true] .gg-air-spark{animation:gg-air-burst 850ms ease-out both}
+.gg-airborne .gg-reward:focus-within{z-index:5}.gg-airborne .gg-reward:hover{z-index:4}
+.gg-airborne .gg-result-actions{position:sticky;bottom:0;z-index:6;flex:none;padding:12px 8px;background:linear-gradient(transparent,#030709e8 45%);margin-top:auto}
+.gg-airborne>.gg-rewards:before{content:"";position:absolute;inset:10% 15%;pointer-events:none;opacity:.18;background:url('/battle-fx/magic_01.png') center/contain no-repeat;animation:gg-sigil-turn 45s linear infinite}
+@keyframes gg-card-deal{from{opacity:0;transform:translate(var(--launch-x),180px) rotate(-32deg) scale(.15)}55%{opacity:1}to{opacity:1;transform:none}}
+@keyframes gg-air-drift{0%,100%{transform:translateY(0) rotate(var(--tilt))}50%{transform:translateY(-10px) rotate(calc(var(--tilt) + 2deg))}}
+@keyframes gg-air-burst{0%{opacity:0;transform:scale(.4) rotate(-15deg)}30%{opacity:.85}100%{opacity:0;transform:scale(1.5) rotate(20deg)}}
+@media(hover:hover) and (pointer:fine){.gg-airborne .gg-reward:hover .gg-flip{scale:1.06;filter:drop-shadow(0 10px 14px #000a) drop-shadow(0 0 16px var(--aura))}}
+@media(min-width:1000px){.gg-airborne>.gg-rewards{height:760px}.gg-airborne .gg-reward{max-width:180px}.gg-airborne .gg-reward:nth-child(n+5){--lane-y:380px}}
+@media(max-width:650px){.gg-airborne{padding:18px 12px 0}.gg-airborne h2{font-size:23px}.gg-airborne>.gg-rewards{height:1230px;margin-top:22px}.gg-airborne .gg-reward{width:39%;max-width:185px;--launch-x:0px}.gg-airborne .gg-reward:nth-child(1){--lane-x:5%;--lane-y:8px;--tilt:-5deg}.gg-airborne .gg-reward:nth-child(2){--lane-x:55%;--lane-y:42px;--tilt:5deg}.gg-airborne .gg-reward:nth-child(3){--lane-x:5%;--lane-y:310px;--tilt:-4deg}.gg-airborne .gg-reward:nth-child(4){--lane-x:55%;--lane-y:342px;--tilt:4deg}.gg-airborne .gg-reward:nth-child(5){--lane-x:5%;--lane-y:612px;--tilt:-5deg}.gg-airborne .gg-reward:nth-child(6){--lane-x:55%;--lane-y:644px;--tilt:5deg}.gg-airborne .gg-reward:nth-child(7){--lane-x:30%;--lane-y:950px;--tilt:-2deg}.gg-airborne .gg-reward-info>strong{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.gg-airborne *,.gg-airborne>.gg-rewards:before{animation:none!important;transition:none!important}}
+html[data-game-motion-off=true] .gg-airborne * ,html[data-game-motion-off=true] .gg-airborne>.gg-rewards:before{animation:none!important;transition:none!important}
+.gg-airborne .gg-reward:before{content:"";position:absolute;left:30%;right:30%;top:-45%;height:140%;pointer-events:none;background:linear-gradient(transparent,#aeeaff55,#ffdfa6aa,transparent);transform:rotate(-22deg);opacity:0;animation:gg-card-trail 800ms ease-out var(--deal-delay) both}
+@keyframes gg-card-trail{0%{opacity:0;scale:.3 1.4}30%{opacity:.7}100%{opacity:0;scale:1 .2}}
+html[data-game-motion-off=true] .gg-airborne .gg-reward:before{animation:none!important}
+@media(prefers-reduced-motion:reduce){.gg-airborne .gg-reward:before{animation:none!important}}
