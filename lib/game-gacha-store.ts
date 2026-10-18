@@ -27,8 +27,9 @@ export async function openGamePackInTransaction(tx:Prisma.TransactionClient,owne
  const createdAt=users[0].now,receipt:GachaReceipt={id:requestId,policyVersion:gachaPolicy.version,price:gachaPolicy.price,chargedCoin:unlimitedCoin?0:gachaPolicy.price,testDraw:unlimitedCoin,createdAt:createdAt.toISOString(),...rollGachaPack(max=>rng(max),createdAt)};
  const updated=unlimitedCoin?[{coin:users[0].coin}]:await tx.$queryRawUnsafe<{coin:number}[]>('UPDATE "User" SET "coin"="coin"-$1 WHERE "id"=$2 AND "coin">=$1 RETURNING "coin"',gachaPolicy.price,owner);
  if(!updated.length)throw new CollectionError('COIN ไม่เพียงพอ',422);
- const permanent=new Map<string,number>();
- for(let slot=0;slot<receipt.cards.length;slot++){const card=receipt.cards[slot];if(!card.days)permanent.set(card.cardNo,(permanent.get(card.cardNo)||0)+1);else await tx.$executeRawUnsafe('INSERT INTO "GameTimedCard"("id","userId","cardNo","expiresAt","acquiredAt") VALUES($1,$2,$3,$4,$5)',randomUUID(),owner,card.cardNo,new Date(card.expiresAt!),createdAt)}
+ const permanent=new Map<string,number>(),timed:{id:string;cardNo:string;expiresAt:string}[]=[];
+ for(const card of receipt.cards){if(!card.days)permanent.set(card.cardNo,(permanent.get(card.cardNo)||0)+1);else timed.push({id:randomUUID(),cardNo:card.cardNo,expiresAt:card.expiresAt!})}
+ await tx.$executeRawUnsafe('INSERT INTO "GameTimedCard"("id","userId","cardNo","expiresAt","acquiredAt") SELECT x."id",$1,x."cardNo",x."expiresAt",$3 FROM jsonb_to_recordset($2::jsonb) AS x("id" TEXT,"cardNo" TEXT,"expiresAt" TIMESTAMPTZ)',owner,JSON.stringify(timed),createdAt);
  const payload=[...permanent].map(([cardNo,quantity])=>({cardNo,quantity}));
  await tx.$executeRawUnsafe('INSERT INTO "GameOwnedCard"("userId","cardNo","quantity") SELECT $1,x."cardNo",x."quantity" FROM jsonb_to_recordset($2::jsonb) AS x("cardNo" TEXT,"quantity" INTEGER) ON CONFLICT("userId","cardNo") DO UPDATE SET "quantity"="GameOwnedCard"."quantity"+EXCLUDED."quantity","updatedAt"=NOW()',owner,JSON.stringify(payload));
  await tx.$executeRawUnsafe('INSERT INTO "GameCardGrant"("id","userId","reference","source","payload") VALUES($1,$2,$3,$4,$5::jsonb)',randomUUID(),owner,'gacha:'+requestId,'gacha',JSON.stringify(payload));
