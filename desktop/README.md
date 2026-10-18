@@ -49,6 +49,22 @@ on a release/CDN endpoint that supports its size. `scripts/stage-game-desktop.cj
 intentionally rejects oversized binaries. Existing clients can still receive the
 shared web resource-cache upgrade independently of the next native release.
 
+## Game App Icon
+
+`public/game-assets/branding/app-icon.png` is the shipped game icon source.
+Run `node scripts/build-game-icons.mjs "path/to/official-icon.png"` to replace it,
+or run the script without an argument to regenerate the current icon set.
+This generates all PNG sizes, the browser favicon, the native executable/NSIS ICO,
+legacy game-icon aliases, and `icon-set.json` with a pixel-derived cache version.
+The game layout and PWA manifest use the same versioned URLs. NexPoint icons are
+intentionally separate. New native icons require rebuilding the installer and
+publishing its verified download before changing the live updater feed.
+
+Run `node scripts/test-game-icons.cjs` and `node scripts/test-game-icons-live.cjs`
+to validate the generated files and browser metadata. After a Windows build,
+run `scripts/test-game-native-icons.ps1` to check the icons actually embedded in
+the game and installer executables.
+
 ## Development
 
 Run the Next.js dev server, then start Electron:
