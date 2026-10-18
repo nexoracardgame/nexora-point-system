@@ -18,7 +18,7 @@ export default function GameGachaSeal({dialogRef,selected,free,busy,onOpen}:{dia
    </div>
    <span className="gg-seal-price"><Coins size={21}/>{free?'GM · ไม่หัก COIN':`${gachaPolicy.price} COIN`}</span>
    <p className="gg-seal-guarantee"><ShieldCheck size={16}/>การ์ด {gachaPolicy.size} ใบ · การันตีถาวร 1 ใบ</p>
-   <button type="button" className="gg-seal-cancel" aria-label="ยกเลิก" title="ยกเลิก" disabled={busy} onClick={()=>dialogRef.current?.close()}><X size={21}/></button>
+   <button type="button" className="gg-seal-cancel" aria-label="ยกเลิก" title="ยกเลิก" disabled={busy} onClick={()=>dialogRef.current?.close()}><X size={18}/><span>ยกเลิก</span></button>
   </section>
  </dialog>;
 }
