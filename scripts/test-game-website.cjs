@@ -4,6 +4,8 @@ const fixture=fs.readFileSync('scripts/test-game-settings-ui.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
 modules.website=ts.transpileModule(fs.readFileSync('components/GameWebsite.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['./GameWebsite.css']='';
+for(const name of ['triad-dominion','game-card-art','game-monsters']){modules['@/lib/'+name]=ts.transpileModule(fs.readFileSync('lib/'+name+'.ts','utf8'),{compilerOptions:{module:1,target:9,esModuleInterop:true}}).outputText;modules['./'+name]='module.exports=require("@/lib/'+name+'");'}
+for(const name of ['card-art','card-skill-db'])modules['@/public/cards/'+name+'.json']='module.exports='+fs.readFileSync('public/cards/'+name+'.json','utf8');
 modules['@/lib/login-wallpaper']='exports.loadLoginWallpaper=async()=>{throw Error("fixture fallback")};';
 modules['./GameBattleTutorials']=ts.transpileModule(fs.readFileSync('components/GameBattleTutorials.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['@/lib/game-battle-tutorials']=ts.transpileModule(fs.readFileSync('lib/game-battle-tutorials.ts','utf8'),{compilerOptions:{module:1,target:9}}).outputText;modules['./GameBattleTutorials.css']='';
@@ -14,14 +16,15 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
  fs.mkdirSync('artifacts/game-website',{recursive:true});
  for(const [width,height]of [[1920,1080],[1366,768],[844,390],[390,844],[320,568]]){
   const page=await browser.newPage({viewport:{width,height}});
-  await page.route('http://website.test/**',async route=>{const pathname=new URL(route.request().url()).pathname;if(pathname.startsWith('/images/')||pathname.startsWith('/game-assets/'))return route.fulfill({body:fs.readFileSync('public'+pathname),contentType:'image/webp'});if(pathname==='/api/game-wallet')return route.fulfill({json:{coin:1234,nexPoint:5678}});return route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><style>body{margin:0}${fs.readFileSync('components/GameWebsite.css','utf8')}${fs.readFileSync('components/GameBattleTutorials.css','utf8')}</style><div id="root"></div><script>${script}</script>`})});
+  await page.route('http://website.test/**',async route=>{const pathname=new URL(route.request().url()).pathname;if(pathname.startsWith('/images/')||pathname.startsWith('/game-assets/')||pathname.startsWith('/cards/'))return route.fulfill({body:fs.readFileSync('public'+pathname),contentType:'image/webp'});if(pathname==='/api/game-wallet')return route.fulfill({json:{coin:1234,nexPoint:5678}});return route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><style>body{margin:0}${fs.readFileSync('components/GameWebsite.css','utf8')}${fs.readFileSync('components/GameBattleTutorials.css','utf8')}</style><div id="root"></div><script>${script}</script>`})});
   await page.goto('http://website.test/');await page.getByRole('heading',{name:'NEXORA CARD GAME'}).waitFor();
   await page.evaluate(()=>document.querySelectorAll('img').forEach(image=>{image.loading='eager'}));
   await page.waitForFunction(()=>Array.from(document.images).every(image=>image.complete&&image.naturalWidth>0));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'horizontal overflow');
   await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished)));
   await page.screenshot({path:`artifacts/game-website/${width}.png`,fullPage:true});
-  await page.getByRole('link',{name:'บทสอนต่อสู้',exact:true}).click();await page.waitForFunction(()=>Math.abs(document.getElementById('tutorials').getBoundingClientRect().top)<80);
+  assert.deepEqual(await page.locator('.nx-site-nav nav>a').allTextContents(),['ข่าว','มอนสเตอร์','ข้อมูล','บทสอนต่อสู้','ดาวน์โหลด','เติม COIN']);
+  for(const [label,id]of [['ข่าว','news'],['มอนสเตอร์','monsters'],['ข้อมูล','information'],['บทสอนต่อสู้','tutorials']]){await page.getByRole('link',{name:label,exact:true}).click();await page.waitForFunction(id=>Math.abs(document.getElementById(id).getBoundingClientRect().top)<80,id);assert.equal(await page.evaluate(()=>location.hash),'#'+id)}
   assert.equal(await page.locator('.nx-tutorial').count(),6);assert.equal(await page.locator('.nx-tutorial-pending').count(),6);assert.equal(await page.locator('.nx-tutorial-play').count(),0);
   await page.locator('#tutorials').screenshot({path:`artifacts/game-website/tutorials-${width}.png`});
   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));

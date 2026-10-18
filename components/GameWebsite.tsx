@@ -1,12 +1,13 @@
 "use client";
 
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type ReactNode,type MouseEvent} from 'react';
 import {useSession,signOut} from 'next-auth/react';
 import Link from 'next/link';
 import {Download,Coins,UserRound,ArrowUpRight,X,LogOut,ShieldCheck,Settings2} from 'lucide-react';
 import './GameWebsite.css';
 import GameBattleTutorials from './GameBattleTutorials';
 import {loadLoginWallpaper} from '@/lib/login-wallpaper';
+import {gameMonsters,monsterElements,monsterThumbnail} from '@/lib/game-monsters';
 
 export default function GameWebsite({children}:{children?:ReactNode}){
  const {data:session}=useSession();
@@ -43,24 +44,27 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  useEffect(()=>{if(panel)dialog.current?.showModal();else dialog.current?.close()},[panel]);
  useEffect(()=>{
   if(!window.location.hash){window.scrollTo({top:0,left:0,behavior:'instant'});return}
-  if(children||window.location.hash!=='#tutorials')return;
-  const frame=requestAnimationFrame(()=>document.getElementById('tutorials')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
+  if(children)return;
+  const frame=requestAnimationFrame(()=>document.getElementById(window.location.hash.slice(1))?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
   return()=>cancelAnimationFrame(frame);
  },[children]);
+ const scrollToSection=(id:string)=>(event:MouseEvent<HTMLAnchorElement>)=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const section=document.getElementById(id);if(!section)return;event.preventDefault();section.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});window.history.replaceState(null,'',`#${id}`)};
  const account=()=>{if(session?.user)setPanel('account');else window.location.assign(login)};
  return <main className="nexora-site">
   <header className="nx-site-nav">
    <Link href="/game" aria-label="NEXORA หน้าหลัก" className="nx-site-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></Link>
-   <nav aria-label="เมนูหลัก"><Link href="/game#world">โลกของ NEXORA</Link><Link href="/game#tutorials" onClick={event=>{const section=document.getElementById('tutorials');if(!section)return;event.preventDefault();section.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});window.history.replaceState(null,'','#tutorials')}}>บทสอนต่อสู้</Link><Link href="/game#download">ดาวน์โหลด</Link><Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
+   <nav aria-label="เมนูหลัก">{[['news','ข่าว'],['monsters','มอนสเตอร์'],['information','ข้อมูล'],['tutorials','บทสอนต่อสู้'],['download','ดาวน์โหลด']].map(([id,label])=><Link key={id} href={`/game#${id}`} onClick={scrollToSection(id)}>{label}</Link>)}<Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
    {session?.user?<button className="nx-site-account" onClick={account} aria-label="บัญชี" aria-haspopup="dialog" aria-expanded={panel==='account'}><UserRound size={18}/>บัญชี<span className="nx-nav-avatar" aria-hidden="true">{avatar&&failedAvatar!==avatar?<img src={avatar} alt="" referrerPolicy="no-referrer" onError={()=>setFailedAvatar(avatar)}/>:<UserRound size={20}/>}</span></button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
   </header>
   {children||<><section className="nx-site-hero">
    <img className="nx-site-scene" src="/game-assets/login/website-poster.webp" alt="" fetchPriority="high"/>
    {heroUrl&&<video ref={heroVideo} className="nx-site-scene nx-site-hero-video" src={heroUrl} autoPlay muted loop playsInline aria-hidden="true" onLoadedData={()=>setHeroReady(true)} onError={()=>setHeroReady(false)} style={{opacity:heroReady?1:0}}/>}
    <div className="nx-site-hero-copy"><span className="nx-site-eyebrow">THE NEXT MOVE IS YOURS</span><h1 className="nx-site-hero-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" fetchPriority="high"/></h1><p>เลือกการ์ดของคุณ วางกลยุทธ์ของคุณ<br/>แล้วก้าวสู่สนามประลอง</p><div className="nx-site-actions"><a className="nx-site-primary" href="/downloads/game-windows/current"><Download size={22}/>ดาวน์โหลด Windows PC</a><Link className="nx-site-primary nx-topup-link" href="/game/topup"><Coins size={21}/>เติม COIN<ArrowUpRight size={17}/></Link></div><small>Windows 64-bit<span>มือถือ · พบกันในอนาคต</span></small></div>
-   <a className="nx-site-explore" href="#world">เข้าสู่โลก NEXORA <span>↓</span></a>
+   <a className="nx-site-explore" href="#news" onClick={scrollToSection('news')}>เข้าสู่โลก NEXORA <span>↓</span></a>
   </section>
-  <section id="world" className="nx-site-world"><div><span className="nx-site-eyebrow">CHOOSE YOUR BATTLE</span><h2>ทุกใบมีจังหวะของมัน</h2><p>การ์ด ธาตุ และทักษะ สู่การประลองที่ตัดสินด้วยแผนของคุณ</p></div><div className="nx-site-modes"><article><span>01 / TRIAD</span><h3>3 ใบ เปลี่ยนเกม</h3><p>สนามประลอง TRIAD</p></article><article><span>02 / PENTAD</span><h3>5 ใบ วางหมาก</h3><p>สนามประลอง PENTAD</p></article></div></section>
+  <section id="news" className="nx-site-news"><div><span className="nx-site-eyebrow">NEXORA / NEWS</span><h2>ข่าว</h2></div><article><span className="nx-site-eyebrow">WINDOWS PC</span><h3>NEXORA บน Windows PC</h3><p>ดาวน์โหลดตัวเกม และใช้บัญชี NEXORA เดียวกันกับเว็บไซต์</p><a href="#download" onClick={scrollToSection('download')}>ดาวน์โหลดตัวเกม <ArrowUpRight size={17}/></a></article></section>
+  <section id="monsters" className="nx-site-monsters"><div className="nx-monsters-heading"><div><span className="nx-site-eyebrow">NEXORA / MONSTERS</span><h2>มอนสเตอร์</h2></div><span>{gameMonsters.length} ตัวในโลก NEXORA</span></div><div className="nx-monsters-lineup">{gameMonsters.slice(0,5).map(card=><article key={card.cardNo}><img src={monsterThumbnail(card)} alt={card.name} loading="lazy" decoding="async"/><span>#{card.cardNo} / {monsterElements[card.element]}</span><h3>{card.name}</h3></article>)}</div></section>
+  <section id="information" className="nx-site-world"><div id="world"><span className="nx-site-eyebrow">NEXORA / INFORMATION</span><h2>ข้อมูล</h2><h3>ทุกใบมีจังหวะของมัน</h3><p>การ์ด ธาตุ และทักษะ สู่การประลองที่ตัดสินด้วยแผนของคุณ</p></div><div className="nx-site-modes"><article><span>01 / TRIAD</span><h3>3 ใบ เปลี่ยนเกม</h3><p>สนามประลอง TRIAD</p></article><article><span>02 / PENTAD</span><h3>5 ใบ วางหมาก</h3><p>สนามประลอง PENTAD</p></article></div></section>
   <GameBattleTutorials/>
   <section id="download" className="nx-site-download"><div><span className="nx-site-eyebrow">NEXORA ON PC</span><h2>พร้อมลงสนาม</h2><p>ดาวน์โหลดตัวเกมสำหรับ Windows และเข้าสู่ระบบด้วยบัญชีเดียวกับเว็บไซต์</p></div><a className="nx-site-primary" href="/downloads/game-windows/current"><Download size={22}/>ดาวน์โหลด Windows PC</a></section></>}
   <footer><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA"/><span>© {new Date().getFullYear()} NEXORA CARD GAME</span><button onClick={account}>บัญชีของคุณ <ArrowUpRight size={16}/></button></footer>
