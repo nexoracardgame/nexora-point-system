@@ -12,9 +12,9 @@ for(let draw=0;draw<6000;draw++){
  for(const card of result.cards){assert.ok(gachaCatalog.some(item=>item.cardNo===card.cardNo&&item.stars===card.stars));assert.equal(card.expiresAt,card.days?new Date(now.getTime()+card.days*86400000).toISOString():null)}
 }
 assert.deepEqual(counts,[5320,300,200,120,60]);
-let extraCount=0;for(let extra=0;extra<50;extra++){let index=0;const forced=[0,0,1,extra];const result=rollGachaPack(max=>index<forced.length?forced[index++]:rng(max),now);if(result.cards.filter(card=>!card.days).length===2)extraCount++}assert.equal(extraCount,1);
+let extraCount=0;for(let extra=0;extra<100;extra++){let index=0;const forced=[0,0,1,extra];const result=rollGachaPack(max=>index<forced.length?forced[index++]:rng(max),now);if(result.cards.filter(card=>!card.days).length===2)extraCount++}assert.equal(extraCount,1);
 const lifetime=[0,0,0,0];for(let i=0;i<100;i++)lifetime[weightedIndex(gachaPolicy.temporaryWeights,i)]++;assert.deepEqual(lifetime,[60,25,10,5]);
-console.log('Gacha policy: exact per-pack star odds, 2% second permanent, all 293 cards, 88 reviewed skills and 1/3/7/14 day expiration passed');
+console.log('Gacha policy: exact per-pack star odds, 1% second permanent, all 293 cards, 88 reviewed skills and 1/3/7/14 day expiration passed');
 
 const roles={};
 let state={coins:{a:790,b:78},draws:[],owned:[],timed:[],grants:[]},tail=Promise.resolve(),fail=false;

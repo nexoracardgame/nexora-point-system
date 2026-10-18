@@ -20,7 +20,7 @@ export default function GameGachaResults({receipt,onClose}:{receipt:GachaReceipt
      <span className="gg-flip-inner"><span className="gg-card-back" aria-hidden="true"><img src="/cards/card-backs/card-backs.png" alt="" draggable={false}/></span><span className="gg-card-front" aria-hidden={!shown}><img src={gameCardThumbnail(reward.cardNo)||card?.sourceImage||'/cards/card-backs/card-backs.png'} alt={shown?name:''} draggable={false} decoding="async"/></span></span><span className="gg-warp" aria-hidden="true"/>
     </button>
     <div className="gg-reward-info" aria-hidden={!shown} inert={!shown}>
-     <span className="gg-stars" aria-label={`${reward.stars} ดาว`}>{Array.from({length:reward.stars},(_,i)=><Star key={i} size={13} fill="currentColor"/>)}</span><strong>{name}</strong><span className="gg-duration" data-permanent={!reward.days}>{reward.days?`${reward.days} วัน`:'ถาวร'}{reward.guaranteedPermanent?' · การันตี':''}</span>{reward.expiresAt&&<small>ถึง {new Date(reward.expiresAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</small>}
+     <span className="gg-stars" aria-label={`${reward.stars} ดาว`}>{Array.from({length:reward.stars},(_,i)=><Star key={i} size={13} fill="currentColor"/>)}</span><strong>{name}</strong><span className="gg-duration" data-permanent={!reward.days}>{reward.days?`${reward.days} วัน`:reward.guaranteedPermanent?'ถาวร · การันตี':'ถาวร · โบนัส'}</span>{reward.expiresAt&&<small>ถึง {new Date(reward.expiresAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</small>}
     </div>
    </article>
   })}</div>
