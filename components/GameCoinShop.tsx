@@ -3,7 +3,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {useSession} from 'next-auth/react';
 import Link from 'next/link';
-import {ArrowLeft,ArrowRight,Check,Coins,ShieldCheck,Sparkles,UserRound,X} from 'lucide-react';
+import {ArrowLeft,ArrowRight,Check,ShieldCheck,Sparkles,UserRound,X} from 'lucide-react';
 import {gameCoinPackages} from '@/lib/game-coin-packages';
 import './GameCoinShop.css';
 
@@ -26,8 +26,7 @@ export default function GameCoinShop({preview=false}:{preview?:boolean}){
    <div className="nx-coin-status"><ShieldCheck size={17}/><span>ระบบชำระเงินยังไม่เปิดให้บริการ</span><span>THB · บาทไทย</span></div>
    <fieldset className="nx-coin-packages"><legend>แพ็ก COIN</legend><div className="nx-coin-grid">{gameCoinPackages.map(item=><label className="nx-coin-package" key={item.id} data-selected={selected===item.id}>
     <input type="radio" name="coin-package" value={item.id} checked={selected===item.id} onChange={()=>setSelected(item.id)} aria-label={`${number(item.baht)} บาท รับ ${number(item.total)} COIN`}/>
-    <span className="nx-coin-pack-top"><span>{item.bonusPercent?`โบนัส +${item.bonusPercent}%`:'แพ็กเริ่มต้น'}</span><span className="nx-coin-check">{selected===item.id?<Check size={16}/>:null}</span></span>
-    <Coins className="nx-coin-symbol" size={42} strokeWidth={1.3}/><strong className="nx-coin-total">{number(item.total)} <span>COIN</span></strong>
+    <span className="nx-coin-pack-value"><span className="nx-coin-pack-top"><span>{item.bonusPercent?`โบนัส +${item.bonusPercent}%`:'แพ็กเริ่มต้น'}</span><span className="nx-coin-check">{selected===item.id?<Check size={16}/>:null}</span></span><strong className="nx-coin-total">{number(item.total)} <span>COIN</span></strong></span>
     <span className="nx-coin-breakdown">{number(item.base)} COIN {item.bonus>0&&<span>+ {number(item.bonus)} โบนัส</span>}</span>
     <span className="nx-coin-price">฿{number(item.baht)}<span>THB</span></span>
    </label>)}</div></fieldset>

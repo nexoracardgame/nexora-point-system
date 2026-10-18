@@ -17,6 +17,9 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   await page.getByRole('heading',{name:'เติม COIN',exact:true}).waitFor();
   await page.locator('.nx-coin-account').getByText('NEXORA Player',{exact:true}).waitFor();
   assert.equal(await page.getByRole('radio').count(),6);assert.equal(await page.locator('.nx-coin-checkout').count(),0);
+  assert.equal(await page.locator('.nx-coin-package img,.nx-coin-symbol,.nx-coin-pack-art').count(),0,'Packages use numbers only, without coin artwork');
+  assert.equal(await page.locator('.nx-coin-pack-value').count(),6);
+  for(const value of await page.locator('.nx-coin-package').evaluateAll(nodes=>nodes.map(node=>{const card=node.getBoundingClientRect(),price=node.querySelector('.nx-coin-price').getBoundingClientRect(),total=node.querySelector('.nx-coin-total').getBoundingClientRect();return {inside:total.left>=card.left&&total.right<=card.right,wide:price.width>=card.width*.8,below:price.top>=total.bottom}})))assert.ok(value.inside&&value.wide&&value.below,'Number and full-width price layout');
   for(const [price,total]of expected){
    const format=n=>n.toLocaleString('th-TH');const radio=page.getByRole('radio',{name:`${format(price)} บาท รับ ${format(total)} COIN`,exact:true});await radio.check();
    assert.equal(await page.getByRole('radio',{checked:true}).count(),1);
