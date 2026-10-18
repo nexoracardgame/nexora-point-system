@@ -24,6 +24,7 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished)));
   await page.screenshot({path:`artifacts/game-website/${width}.png`,fullPage:true});
   assert.deepEqual(await page.locator('.nx-site-nav nav>a').allTextContents(),['ข่าว','โลกของ NEXORA','บทสอนต่อสู้','ดาวน์โหลด','เติม COIN']);
+  assert.equal(await page.locator('#monsters,.nx-site-monsters').count(),0,'Monster website section removed');
   for(const [label,id]of [['ข่าว','news'],['โลกของ NEXORA','information'],['บทสอนต่อสู้','tutorials']]){await page.getByRole('link',{name:label,exact:true}).click();await page.waitForFunction(id=>Math.abs(document.getElementById(id).getBoundingClientRect().top)<80,id);assert.equal(await page.evaluate(()=>location.hash),'#'+id)}
   assert.equal(await page.locator('.nx-tutorial').count(),6);assert.equal(await page.locator('.nx-tutorial-pending').count(),6);assert.equal(await page.locator('.nx-tutorial-play').count(),0);
   await page.locator('#tutorials').screenshot({path:`artifacts/game-website/tutorials-${width}.png`});
