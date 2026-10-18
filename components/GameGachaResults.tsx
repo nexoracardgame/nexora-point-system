@@ -25,6 +25,5 @@ export default function GameGachaResults({receipt,onClose}:{receipt:GachaReceipt
    </article>
   })}</div>
   <div className="gg-result-actions"><button type="button" disabled={count===receipt.cards.length} onClick={()=>reveal()}><Layers size={18}/>หงายทั้งหมด</button><button type="button" onClick={onClose}><X size={18}/>ปิด</button></div>
-  <small className="gg-receipt">รหัสผลสุ่ม {receipt.id}</small>
  </main>;
 }

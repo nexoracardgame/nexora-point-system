@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {useSession} from 'next-auth/react';
-import {Coins,History,Info,PackageOpen,ShieldCheck,X} from 'lucide-react';
+import {Coins,Info,PackageOpen,ShieldCheck,X} from 'lucide-react';
 import {gachaPolicy,gachaCatalog,type GachaReceipt,type GachaState} from '@/lib/game-gacha';
 import {triadCardByNo} from '@/lib/triad-dominion';
 import {gameCardThumbnail} from '@/lib/game-card-art';
@@ -11,6 +11,7 @@ import {playGameUiSound} from '@/lib/game-ui-audio';
 import GameBackControl from './GameBackControl';
 import GamePageLogo from './GamePageLogo';
 import GameGachaResults from './GameGachaResults';
+import GameGachaBackground from './GameGachaBackground';
 import './GameGacha.css';
 
 export default function GameGacha(){
@@ -45,11 +46,11 @@ export default function GameGacha(){
  };
  if(!open||!owner)return null;
  return createPortal(<section className="game-gacha" role="dialog" aria-modal="true" aria-label="เปิดสุ่มการ์ด" ref={root} tabIndex={-1} data-phase={phase} data-stars={receipt?.maxStars||1}>
+  <GameGachaBackground/>
   <header className="gg-header"><GameBackControl onBack={back}/><GamePageLogo/><div><h1>เปิดสุ่มการ์ด</h1><span>NEXORA / ASTRAL ARCHIVE</span></div><span className="gg-wallet"><Coins size={19}/>{state?.unlimitedCoin?'∞':state?.coin.toLocaleString()??'—'} <small>COIN</small></span></header>
   {error&&<div className="gg-error" role="alert">{error}<button type="button" aria-label="ปิดข้อความ" title="ปิดข้อความ" onClick={()=>setError('')}><X size={17}/></button></div>}
   {phase==='result'&&receipt?<GameGachaResults key={receipt.id} receipt={receipt} onClose={()=>{setPhase('idle');setReceipt(null)}}/>:
   <main className="gg-main"><section className="gg-banner"><span className="gg-kicker">THE ASTRAL SUMMON</span><h2>ผนึกแห่งดวงดาว</h2><p>มอนสเตอร์และสกิล {gachaCatalog.length} ใบในกล่องเดียว</p><span className="gg-guarantee"><ShieldCheck size={18}/>การันตีการ์ดถาวร 1 ใบทุกซอง</span><div className="gg-pack-stage" aria-label="ซองสุ่มการ์ด NEXORA"><span className="gg-beam"/><img className="gg-pack gg-pack-left" src="/cards/card-backs/card-backs.png" alt=""/><img className="gg-pack gg-pack-right" src="/cards/card-backs/card-backs.png" alt=""/><img className="gg-pack gg-pack-front" src="/cards/card-backs/card-backs.png" alt="ซองการ์ด NEXORA"/><span className="gg-pack-caption">7 CARDS / ONE DESTINY</span></div><div className="gg-open-actions">{phase==='waiting'?<p role="status">กำลังยืนยันผลกับเซิร์ฟเวอร์ กรุณารอสักครู่</p>:phase==='opening'?<button type="button" onClick={()=>setPhase('result')}>ข้ามเอฟเฟกต์</button>:<><button type="button" className="gg-purchase" disabled={!pending&&(!state||(!state.unlimitedCoin&&state.coin<79))} onClick={()=>pending?void purchase():confirm.current?.showModal()}><PackageOpen size={22}/>{pending?'ตรวจผลคำขอเดิม':'เปิด 1 ซอง'}<span><Coins size={18}/>{pending?'ไม่หักซ้ำ':state?.unlimitedCoin?'GM · ไม่หัก COIN':'79 COIN'}</span></button>{state&&!state.unlimitedCoin&&state.coin<79&&!pending&&<button type="button" className="gg-topup" onClick={()=>window.open('https://nexora-point-system.vercel.app/game/topup','_blank','noopener,noreferrer')}>เติม COIN</button>}</>}</div><button type="button" className="gg-rate-toggle" onClick={()=>setRates(!rates)} aria-expanded={rates}><Info size={16}/>อัตราสุ่มและรายชื่อการ์ด</button></section>
-   <aside className="gg-history"><h3><History size={17}/>ประวัติเปิดซอง</h3>{state?.history.map(item=><button type="button" key={item.id} disabled={phase!=='idle'} onClick={()=>{setReceipt(item);setPhase('result')}}><span>{new Date(item.createdAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</span><span>{item.maxStars}★ · {item.cards.filter(card=>!card.days).length} ถาวร</span></button>)}{state&&!state.history.length&&<p>ยังไม่มีประวัติเปิดซอง</p>}<p>การ์ดชั่วคราวมีอายุ 1 / 3 / 7 / 14 วัน เริ่มนับทันทีที่เปิดซอง</p></aside>
   </main>}
   {rates&&<aside className="gg-rates" aria-label="อัตราสุ่ม"><header><h2>อัตราสุ่มต่อซอง</h2><button type="button" aria-label="ปิดอัตราสุ่ม" title="ปิดอัตราสุ่ม" onClick={()=>setRates(false)}><X/></button></header><p>ซองละ {gachaPolicy.price} COIN · 7 ใบ · อาจได้การ์ดซ้ำ</p><table><thead><tr><th>ดาวสูงสุดในซอง</th><th>โอกาสต่อซอง</th></tr></thead><tbody>{['88⅔%','5% · 1/20','3⅓% · 1/30','2% · 1/50','1% · 1/100'].map((text,index)=><tr key={text}><td>{index+1} ดาว</td><td>{text}</td></tr>)}</tbody></table><p>ลุ้นดาวสูงสุด 1 ใบ อีก 6 ใบเป็น 1 ดาว · แต่ละใบมีโอกาสเป็นมอนสเตอร์/สกิลอย่างละ 50% แล้วเลือกเท่ากันในกลุ่มดาวและประเภทนั้น</p><p>ถาวร 1 ใบแน่นอน ตำแหน่งสุ่มเท่ากันทุกใบ · มีโอกาส {100/gachaPolicy.extraPermanentDenominator}% ต่อซองที่จะได้ถาวรเพิ่มอีก 1 ใบ (สูงสุด 2 ถาวรต่อซอง)</p><p>ใบที่ไม่ถาวร: 1 วัน 60% · 3 วัน 25% · 7 วัน 10% · 14 วัน 5% ไม่มีสะสมแต้มการันตีดาวสูง และเปิดครบ 100 ซองไม่ได้รับประกัน 5 ดาว</p><details><summary>รายชื่อการ์ดและระดับดาวทั้งหมด ({gachaCatalog.length})</summary><ul>{gachaCatalog.map(card=><li key={card.cardNo}>#{card.cardNo} {triadCardByNo.get(card.cardNo)?.name} · {card.stars}★ · {card.kind==='skill'?'สกิล':'มอนสเตอร์'}</li>)}</ul></details></aside>}
   <dialog ref={confirm} className="gg-confirm" aria-labelledby="gg-confirm-title"><h2 id="gg-confirm-title">{state?.unlimitedCoin?'ยืนยันเปิดซองทดสอบ':'ยืนยันใช้ 79 COIN'}</h2><p>เปิด 1 ซอง ได้ 7 ใบ การันตีถาวร 1 ใบ ผลสุ่มและอายุการ์ดเป็นไปตามอัตราที่แสดง</p><div><button type="button" onClick={()=>confirm.current?.close()}>ยกเลิก</button><button type="button" onClick={()=>void purchase()}>ยืนยันเปิดซอง</button></div></dialog>
