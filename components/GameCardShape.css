@@ -1,0 +1,6 @@
+/* Percentage clipping keeps the same physical card silhouette at every size. */
+:root{--nexora-card-radius:3.5%}
+img:is([src*="/cards/"],[src*="%2Fcards%2F"],[src*="%2fcards%2f"]){
+ border-radius:var(--nexora-card-radius)!important;
+ clip-path:inset(0 round var(--nexora-card-radius));
+}

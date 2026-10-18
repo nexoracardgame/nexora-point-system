@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import RootChrome from "@/components/RootChrome";
 import { DEFAULT_LOCALE } from "@/lib/i18n-core";
 import "./globals.css";
+import "@/components/GameCardShape.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
