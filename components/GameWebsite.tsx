@@ -3,7 +3,9 @@
 import {useEffect,useRef,useState,type ReactNode,type MouseEvent} from 'react';
 import {useSession,signOut} from 'next-auth/react';
 import Link from 'next/link';
-import {Download,Coins,UserRound,ArrowUpRight,X,LogOut,ShieldCheck,Settings2} from 'lucide-react';
+import {createPortal} from 'react-dom';
+import {Download,Coins,UserRound,ArrowUpRight,ChevronDown,X,LogOut,ShieldCheck,Settings2} from 'lucide-react';
+import {gameWorldSections} from '@/lib/game-world-sections';
 import './GameWebsite.css';
 import GameBattleTutorials from './GameBattleTutorials';
 import {loadLoginWallpaper} from '@/lib/login-wallpaper';
@@ -19,6 +21,13 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  const heroVideo=useRef<HTMLVideoElement>(null);
  const [heroUrl,setHeroUrl]=useState(''),[heroReady,setHeroReady]=useState(false);
  const hasPage=Boolean(children);
+ const [worldOpen,setWorldOpen]=useState(false),[worldPosition,setWorldPosition]=useState({left:0,top:0});
+ const worldButton=useRef<HTMLButtonElement>(null),worldMenu=useRef<HTMLElement>(null),worldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const cancelWorldClose=()=>{if(worldTimer.current)clearTimeout(worldTimer.current)};
+ const openWorld=()=>{cancelWorldClose();const rect=worldButton.current?.getBoundingClientRect();if(rect){setWorldPosition({left:Math.max(12,Math.min(rect.left,window.innerWidth-272)),top:rect.bottom+12});setWorldOpen(true)}};
+ const closeWorldSoon=()=>{cancelWorldClose();worldTimer.current=setTimeout(()=>setWorldOpen(false),150)};
+ useEffect(()=>()=>{if(worldTimer.current)clearTimeout(worldTimer.current)},[]);
+ useEffect(()=>{if(!worldOpen)return;const outside=(event:PointerEvent)=>{if(!worldButton.current?.contains(event.target as Node)&&!worldMenu.current?.contains(event.target as Node))setWorldOpen(false)};const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setWorldOpen(false);worldButton.current?.focus()}};const close=()=>setWorldOpen(false);document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);window.addEventListener('resize',close);window.addEventListener('scroll',close,true);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);window.removeEventListener('resize',close);window.removeEventListener('scroll',close,true)}},[worldOpen]);
  useEffect(()=>{
   if(hasPage)return;
   const controller=new AbortController();let active=true,url='';
@@ -52,9 +61,10 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  return <main className="nexora-site">
   <header className="nx-site-nav">
    <Link href="/game" aria-label="NEXORA หน้าหลัก" className="nx-site-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME"/></Link>
-   <nav aria-label="เมนูหลัก">{[['news','ข่าว'],['information','โลกของ NEXORA'],['tutorials','บทสอนต่อสู้'],['download','ดาวน์โหลด']].map(([id,label])=><Link key={id} href={`/game#${id}`} onClick={scrollToSection(id)}>{label}</Link>)}<Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
+   <nav aria-label="เมนูหลัก"><Link href="/game#news" onClick={scrollToSection('news')}>ข่าว</Link><button type="button" className="nx-world-trigger" ref={worldButton} aria-expanded={worldOpen} aria-controls="nx-world-menu" onPointerEnter={event=>{if(event.pointerType==='mouse')openWorld()}} onPointerLeave={closeWorldSoon} onClick={()=>{if(worldOpen)setWorldOpen(false);else openWorld()}} onKeyDown={event=>{if(event.key==='ArrowDown'){event.preventDefault();openWorld();requestAnimationFrame(()=>worldMenu.current?.querySelector('a')?.focus())}}}>โลกของ NEXORA<ChevronDown size={14}/></button>{[['tutorials','บทสอนต่อสู้'],['download','ดาวน์โหลด']].map(([id,label])=><Link key={id} href={`/game#${id}`} onClick={scrollToSection(id)}>{label}</Link>)}<Link className="nx-topup-nav" href="/game/topup"><Coins size={18}/>เติม COIN</Link></nav>
    {session?.user?<button className="nx-site-account" onClick={account} aria-label="บัญชี" aria-haspopup="dialog" aria-expanded={panel==='account'}><UserRound size={18}/>บัญชี<span className="nx-nav-avatar" aria-hidden="true">{avatar&&failedAvatar!==avatar?<img src={avatar} alt="" referrerPolicy="no-referrer" onError={()=>setFailedAvatar(avatar)}/>:<UserRound size={20}/>}</span></button>:<Link className="nx-site-account" href={login}><UserRound size={18}/>เข้าสู่ระบบ</Link>}
   </header>
+  {worldOpen&&createPortal(<nav id="nx-world-menu" ref={worldMenu} className="nx-world-menu" aria-label="โลกของ NEXORA" style={worldPosition} onPointerEnter={cancelWorldClose} onPointerLeave={closeWorldSoon} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node)&&event.relatedTarget!==worldButton.current)setWorldOpen(false)}}>{gameWorldSections.map(item=><Link key={item.id} href={`/game/world/${item.id}`} onClick={()=>setWorldOpen(false)}>{item.title}</Link>)}</nav>,document.body)}
   {children||<><section className="nx-site-hero">
    <img className="nx-site-scene" src="/game-assets/login/website-poster.webp" alt="" fetchPriority="high"/>
    {heroUrl&&<video ref={heroVideo} className="nx-site-scene nx-site-hero-video" src={heroUrl} autoPlay muted loop playsInline aria-hidden="true" onLoadedData={()=>setHeroReady(true)} onError={()=>setHeroReady(false)} style={{opacity:heroReady?1:0}}/>}

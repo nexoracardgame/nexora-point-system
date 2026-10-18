@@ -4,6 +4,7 @@ const fixture=fs.readFileSync('scripts/test-game-settings-ui.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
 modules.website=ts.transpileModule(fs.readFileSync('components/GameWebsite.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['./GameWebsite.css']='';
+modules['@/lib/game-world-sections']=ts.transpileModule(fs.readFileSync('lib/game-world-sections.ts','utf8'),{compilerOptions:{module:1,target:9}}).outputText;
 for(const name of ['triad-dominion','game-card-art','game-monsters']){modules['@/lib/'+name]=ts.transpileModule(fs.readFileSync('lib/'+name+'.ts','utf8'),{compilerOptions:{module:1,target:9,esModuleInterop:true}}).outputText;modules['./'+name]='module.exports=require("@/lib/'+name+'");'}
 for(const name of ['card-art','card-skill-db'])modules['@/public/cards/'+name+'.json']='module.exports='+fs.readFileSync('public/cards/'+name+'.json','utf8');
 modules['@/lib/login-wallpaper']='exports.loadLoginWallpaper=async()=>{throw Error("fixture fallback")};';
@@ -23,9 +24,10 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'horizontal overflow');
   await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished)));
   await page.screenshot({path:`artifacts/game-website/${width}.png`,fullPage:true});
-  assert.deepEqual(await page.locator('.nx-site-nav nav>a').allTextContents(),['ข่าว','โลกของ NEXORA','บทสอนต่อสู้','ดาวน์โหลด','เติม COIN']);
+  assert.deepEqual(await page.locator('.nx-site-nav nav>:is(a,button)').allTextContents(),['ข่าว','โลกของ NEXORA','บทสอนต่อสู้','ดาวน์โหลด','เติม COIN']);
+  const world=page.getByRole('button',{name:'โลกของ NEXORA',exact:true});await world.hover();await page.locator('#nx-world-menu').waitFor();assert.deepEqual(await page.locator('#nx-world-menu a').allTextContents(),['ธาตุ','ตัวละคร','เนื้อเรื่อง']);assert.deepEqual(await page.locator('#nx-world-menu a').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('href'))),['/game/world/elements','/game/world/characters','/game/world/story']);const menu=await page.locator('#nx-world-menu').boundingBox();assert.ok(menu.x>=0&&menu.x+menu.width<=width);await page.locator('#nx-world-menu a').first().hover();await page.waitForTimeout(200);assert.equal(await world.getAttribute('aria-expanded'),'true');await page.screenshot({path:`artifacts/game-website/world-menu-${width}.png`});await page.keyboard.press('Escape');await page.locator('#nx-world-menu').waitFor({state:'detached'});await world.focus();await page.keyboard.press('ArrowDown');await page.locator('#nx-world-menu a').first().waitFor();await page.waitForFunction(()=>document.activeElement?.textContent==='ธาตุ');await page.keyboard.press('Escape');
   assert.equal(await page.locator('#monsters,.nx-site-monsters').count(),0,'Monster website section removed');
-  for(const [label,id]of [['ข่าว','news'],['โลกของ NEXORA','information'],['บทสอนต่อสู้','tutorials']]){await page.getByRole('link',{name:label,exact:true}).click();await page.waitForFunction(id=>Math.abs(document.getElementById(id).getBoundingClientRect().top)<80,id);assert.equal(await page.evaluate(()=>location.hash),'#'+id)}
+  for(const [label,id]of [['ข่าว','news'],['บทสอนต่อสู้','tutorials']]){await page.getByRole('link',{name:label,exact:true}).click();await page.waitForFunction(id=>Math.abs(document.getElementById(id).getBoundingClientRect().top)<80,id);assert.equal(await page.evaluate(()=>location.hash),'#'+id)}
   assert.equal(await page.locator('.nx-tutorial').count(),6);assert.equal(await page.locator('.nx-tutorial-pending').count(),6);assert.equal(await page.locator('.nx-tutorial-play').count(),0);
   await page.locator('#tutorials').screenshot({path:`artifacts/game-website/tutorials-${width}.png`});
   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
