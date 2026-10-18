@@ -11,11 +11,12 @@ function warmCollectionImages(value:GameCollection){
  for(const card of cards){if(!card)continue;const {props}=getImageProps({src:gameCardThumbnail(card.cardNo)||card.sourceImage,unoptimized:true,alt:'',width:320,height:436});if(thumbnails.has(props.src))continue;const image=new Image();image.decoding='async';image.onload=()=>{void image.decode().catch(()=>{})};image.onerror=()=>thumbnails.delete(props.src);image.src=props.src;thumbnails.set(props.src,image)}
 }
 export const cachedGameCollection=(owner:string)=>values.get(owner)?.value;
+export function invalidateGameCollection(owner:string){revisions.set(owner,(revisions.get(owner)||0)+1);values.delete(owner);pending.delete(owner)}
 export function loadGameCollection(owner:string,force=false){
  const cached=values.get(owner);if(!force&&cached&&Date.now()-cached.at<30000)return Promise.resolve(cached.value);
  const existing=pending.get(owner);if(existing)return existing;
  const revision=revisions.get(owner)||0;
- const task=fetch('/api/game-collection',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.error||'โหลดคลังการ์ดไม่สำเร็จ');if((revisions.get(owner)||0)!==revision)return values.get(owner)?.value||data as GameCollection;values.set(owner,{value:data,at:Date.now()});warmCollectionImages(data);return data as GameCollection}).finally(()=>pending.delete(owner));pending.set(owner,task);return task;
+ const task:Promise<GameCollection>=fetch('/api/game-collection',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.error||'โหลดคลังการ์ดไม่สำเร็จ');if((revisions.get(owner)||0)!==revision){const newer=pending.get(owner);if(newer&&newer!==task)return newer;return values.get(owner)?.value||data as GameCollection}values.set(owner,{value:data,at:Date.now()});warmCollectionImages(data);return data as GameCollection}).finally(()=>{if(pending.get(owner)===task)pending.delete(owner)});pending.set(owner,task);return task;
 }
 export async function mutateGameCollection(owner:string,body:Record<string,unknown>){
  const response=await fetch('/api/game-collection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),data=await response.json();

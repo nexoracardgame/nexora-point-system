@@ -10,6 +10,7 @@ modules['@/public/cards/card-skill-db.json']='module.exports='+fs.readFileSync('
 modules['@/public/cards/card-art.json']='module.exports='+fs.readFileSync('public/cards/card-art.json','utf8');
 modules['@/lib/game-card-art']=compile(fs.readFileSync('lib/game-card-art.ts','utf8'));
 modules['./game-card-art']='module.exports=require("@/lib/game-card-art");';
+for(const name of ['game-skill-rating','game-monster-rating'])modules['@/lib/'+name]=compile(fs.readFileSync('lib/'+name+'.ts','utf8'));
 modules['next-auth/react']='exports.useSession=()=>({status:"authenticated",data:{user:{id:"qa-owner",name:"QA"}}});';
 modules['next/image']='exports.__esModule=true;exports.default=p=>require("react").createElement("img",p);exports.getImageProps=p=>({props:p});';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';

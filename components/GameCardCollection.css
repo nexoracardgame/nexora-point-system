@@ -44,3 +44,5 @@ body:has(.game-card-collection) :is(.nexora-play-viewport-control,.nexora-settin
 .gcc-empty{overflow:auto;justify-content:safe center}.gcc-empty>*{flex-shrink:0}
 @media(max-width:760px){.game-card-collection{--gcc-header-height:max(112px,calc(var(--profile-back-width)/2 + 68px))}.game-card-collection .gcc-header{display:flex;align-items:flex-end;gap:8px;padding:0 12px 12px}.gcc-heading{flex:1}.gcc-heading h1{font-size:15px}.gcc-balances{gap:10px;font-size:11px}.gcc-balances small{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.game-card-collection,.gcc-inspect{animation:none}}html[data-game-motion-off=true] :is(.game-card-collection,.gcc-inspect){animation:none}
+.gcc-expiry{display:grid;gap:4px;padding:4px 0 8px;font-size:10px;line-height:1.5;color:#e5c580}.gcc-expiry small{font-size:9px;color:#9fb8c2;overflow-wrap:anywhere}
+.gcc-card-meta>.gcc-card-rating{display:flex;gap:2px;color:#e9c77e;min-height:12px;margin:4px 0}

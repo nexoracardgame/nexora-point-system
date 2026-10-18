@@ -6,7 +6,7 @@ export const deckFormats={'triad-all':'TRIAD · ALL IN ONE','triad-monster':'TRI
 export type DeckFormat=keyof typeof deckFormats;
 export type DeckGroup='main'|'monsters'|'hand'|'reserve';
 export type DeckCards=Record<DeckGroup,string[]>;
-export type OwnedGameCard={cardNo:string;quantity:number;favorite:boolean;acquiredAt:string};
+export type OwnedGameCard={cardNo:string;quantity:number;favorite:boolean;acquiredAt:string;permanentQuantity?:number;temporaryQuantity?:number;expiresAt?:string|null};
 export type SavedGameDeck={id:string;name:string;format:DeckFormat;cards:DeckCards;version:number;updatedAt:string};
 export type GameCollection={owned:OwnedGameCard[];decks:SavedGameDeck[];wallet:{nexPoint:number;coin:number}};
 export const emptyDeckCards=():DeckCards=>({main:[],monsters:[],hand:[],reserve:[]});

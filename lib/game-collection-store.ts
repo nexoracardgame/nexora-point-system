@@ -14,12 +14,19 @@ export function ensureGameCollection(){
   await tx.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS "GameSavedDeck" ("id" TEXT PRIMARY KEY,"userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,"name" TEXT NOT NULL,"format" TEXT NOT NULL,"cards" JSONB NOT NULL,"version" INTEGER NOT NULL DEFAULT 1,"createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),"updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())');
   await tx.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "GameSavedDeck_owner" ON "GameSavedDeck"("userId")');
   await tx.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS "GameCardGrant" ("id" TEXT PRIMARY KEY,"userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,"reference" TEXT NOT NULL,"source" TEXT NOT NULL,"payload" JSONB NOT NULL,"createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE("userId","reference"))');
+  await tx.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS "GameTimedCard" ("id" TEXT PRIMARY KEY,"userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,"cardNo" TEXT NOT NULL,"expiresAt" TIMESTAMPTZ NOT NULL,"favorite" BOOLEAN NOT NULL DEFAULT FALSE,"acquiredAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())');
+  await tx.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "GameTimedCard_active" ON "GameTimedCard"("userId","expiresAt")');
  }).catch(error=>{schema=undefined;throw error});
 }
 type OwnedRow=Omit<OwnedGameCard,'acquiredAt'>&{acquiredAt:Date};
 type DeckRow=Omit<SavedGameDeck,'updatedAt'>&{updatedAt:Date};
-const ownedRows=(db:Prisma.TransactionClient,owner:string)=>db.$queryRawUnsafe<OwnedRow[]>('SELECT "cardNo","quantity","favorite","acquiredAt" FROM "GameOwnedCard" WHERE "userId"=$1 ORDER BY "acquiredAt" DESC,"cardNo"',owner);
-const serializeOwned=(rows:OwnedRow[]):OwnedGameCard[]=>rows.map(row=>({...row,acquiredAt:row.acquiredAt.toISOString()}));
+async function ownedRows(db:Prisma.TransactionClient,owner:string){
+ const [permanent,timed]=await Promise.all([db.$queryRawUnsafe<OwnedRow[]>('SELECT "cardNo","quantity","favorite","acquiredAt" FROM "GameOwnedCard" WHERE "userId"=$1 ORDER BY "acquiredAt" DESC,"cardNo"',owner),db.$queryRawUnsafe<{cardNo:string;quantity:number;favorite:boolean;acquiredAt:Date;expiresAt:Date}[]>('SELECT "cardNo",COUNT(*)::int AS "quantity",BOOL_OR("favorite") AS "favorite",MIN("acquiredAt") AS "acquiredAt",MIN("expiresAt") AS "expiresAt" FROM "GameTimedCard" WHERE "userId"=$1 AND "expiresAt">CURRENT_TIMESTAMP GROUP BY "cardNo"',owner)]);
+ const combined=new Map(permanent.map(row=>[row.cardNo,{...row,permanentQuantity:row.quantity,temporaryQuantity:0,expiresAt:null as string|null}]));
+ for(const row of timed){const before=combined.get(row.cardNo);combined.set(row.cardNo,{cardNo:row.cardNo,quantity:(before?.quantity||0)+row.quantity,favorite:Boolean(before?.favorite||row.favorite),acquiredAt:before?.acquiredAt||row.acquiredAt,permanentQuantity:before?.permanentQuantity||0,temporaryQuantity:row.quantity,expiresAt:row.expiresAt.toISOString()})}
+ return [...combined.values()];
+}
+const serializeOwned=(rows:Awaited<ReturnType<typeof ownedRows>>):OwnedGameCard[]=>rows.map(row=>({...row,acquiredAt:row.acquiredAt.toISOString()}));
 const serializeDeck=(row:DeckRow):SavedGameDeck=>({...row,cards:parseDeckCards(row.cards),updatedAt:row.updatedAt.toISOString()});
 async function lockOwner(tx:Prisma.TransactionClient,owner:string){await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1,0))','game-collection:'+owner)}
 export async function readGameCollection(owner:string):Promise<GameCollection>{
@@ -59,8 +66,7 @@ export async function deleteGameDeck(owner:string,id:string,version:number){
 }
 export async function favoriteGameCard(owner:string,cardNo:string,favorite:boolean){
  await ensureGameCollection();
- const changed=await prisma.$executeRawUnsafe('UPDATE "GameOwnedCard" SET "favorite"=$1,"updatedAt"=NOW() WHERE "userId"=$2 AND "cardNo"=$3',favorite,owner,cardNo);
- if(!changed)throw new CollectionError('ยังไม่ได้เป็นเจ้าของการ์ดใบนี้',404);
+ await prisma.$transaction(async tx=>{const permanent=await tx.$executeRawUnsafe('UPDATE "GameOwnedCard" SET "favorite"=$1,"updatedAt"=NOW() WHERE "userId"=$2 AND "cardNo"=$3',favorite,owner,cardNo);const timed=await tx.$executeRawUnsafe('UPDATE "GameTimedCard" SET "favorite"=$1 WHERE "userId"=$2 AND "cardNo"=$3 AND "expiresAt">CURRENT_TIMESTAMP',favorite,owner,cardNo);if(!permanent&&!timed)throw new CollectionError('ยังไม่ได้เป็นเจ้าของการ์ดใบนี้',404)});
 }
 // Trusted reward/gacha services only. No player-facing grant endpoint exists.
 export async function grantPermanentGameCards(owner:string,reference:string,source:'reward'|'gacha'|'admin'|'migration',items:{cardNo:string;quantity:number}[]){
