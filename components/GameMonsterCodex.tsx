@@ -11,7 +11,7 @@ import './GameMonsterCodex.css';
 function Stars({count}:{count:number}){return <span className="gmc-stars" aria-label={`ระดับพลัง ${count} ดาว`}>{[1,2,3,4,5].map(value=><Star key={value} size={14} fill={value<=count?'currentColor':'none'} data-filled={value<=count}/>)}</span>}
 function MonsterArtwork({card}:{card:TriadCard}){
  const [ready,setReady]=useState(false);const artwork=describeMonster(card).characterArt||card.sourceImage;
- return <div className="gmc-character-art"><img className="gmc-character-preview" src={monsterThumbnail(card)} alt=""/><img className="gmc-character-full" src={artwork} alt={card.name} decoding="async" onLoad={()=>setReady(true)} onError={()=>setReady(false)} style={{opacity:ready?1:0}}/></div>;
+ return <div className="gmc-character-art" data-card-art={!describeMonster(card).characterArt}><div className="gmc-art-surface"><img className="gmc-character-preview" src={monsterThumbnail(card)} alt=""/><img className="gmc-character-full" src={artwork} alt={card.name} decoding="async" onLoad={()=>setReady(true)} onError={()=>setReady(false)} style={{opacity:ready?1:0}}/></div><span className="gmc-art-sparks" aria-hidden="true"/></div>;
 }
 export default function GameMonsterCodex(){
  const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[element,setElement]=useState('all'),[stars,setStars]=useState('all'),[sort,setSort]=useState('number'),[selected,setSelected]=useState<TriadCard|null>(null);

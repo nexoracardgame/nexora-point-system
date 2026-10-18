@@ -61,4 +61,25 @@ html[data-game-motion-off=true] .gmc-character{animation:none}
 @media(prefers-reduced-motion:reduce){.gmc-character-art{animation:none}.gmc-roster{scroll-behavior:auto}}
 html[data-game-motion-off=true] .gmc-character-art{animation:none}
 .gmc-results{align-items:center}.gmc-results select{background:#111a1d;color:#e5dfd0;border:1px solid #455456;border-radius:4px;min-height:36px;padding:4px 10px;font:inherit;margin-right:auto}
+@property --gmc-light-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+.gmc-character:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:#010508a8;clip-path:polygon(0 0,25% 0,76% 100%,45% 100%)}
+.gmc-character:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:#02060b60;clip-path:polygon(0 22%,0 0,10% 0,65% 100%,43% 100%)}
+.gmc-character-stage{z-index:0;overflow:hidden;padding:22px 30px}
+.gmc-character-art[data-card-art=true]{width:auto;height:100%;aspect-ratio:815/1110;max-width:100%;max-height:100%;border-radius:3.5%;filter:drop-shadow(0 12px 24px #0009) drop-shadow(0 0 10px #e6c37c44)}
+.gmc-art-surface{position:absolute;inset:0}
+.gmc-character-art[data-card-art=true] .gmc-art-surface{overflow:hidden;border-radius:3.5%;clip-path:inset(0 round 3.5%)}
+.gmc-character-art[data-card-art=true] img{object-fit:fill;border-radius:3.5%;clip-path:inset(0 round 3.5%)}
+.gmc-character-art[data-card-art=true]:after{content:"";position:absolute;inset:-2px;pointer-events:none;padding:2px;border-radius:3.5%;background:conic-gradient(from var(--gmc-light-angle),#edc87540, #ffffff 12%,var(--gmc-accent) 19%,#edc87530 30%,#edc87530 57%,#fff1c0 65%,var(--gmc-accent) 72%,#edc87530 85%);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;box-shadow:0 0 12px #edc87555;animation:gmc-edge-run 6s linear infinite}
+.gmc-art-surface:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(110deg,transparent 35%,#ffffff18 45%,transparent 57%);background-size:300% 100%;animation:gmc-foil-pass 8s ease-in-out infinite}
+.gmc-art-sparks{position:absolute;inset:-12%;pointer-events:none;opacity:.15;mix-blend-mode:screen;background:url('/battle-fx/spark_01.png') center/contain no-repeat;animation:gmc-sparks 7s ease-in-out infinite}
+.gmc-card-image{border-radius:3.5%;clip-path:inset(0 round 3.5%)}.gmc-card-image img{border-radius:3.5%}
+.gmc-roster>button{border-radius:5px}.gmc-roster img{border-radius:4px 4px 0 0}
+.gmc-character-info section{background:#02070bd9;border-left:2px solid #d0c39f50;box-shadow:0 8px 20px #0002}
+.gmc-character-info .gmc-rarity{background:linear-gradient(90deg,#d8b67c80,#d8b67c24);color:#f2e5c8}
+@keyframes gmc-edge-run{to{--gmc-light-angle:360deg}}
+@keyframes gmc-foil-pass{0%,15%{background-position:130% 0}75%,100%{background-position:-35% 0}}
+@keyframes gmc-sparks{0%,100%{opacity:.1;transform:translateY(7px)}50%{opacity:.28;transform:translateY(-7px)}}
+@media(max-width:760px){.gmc-character:before{clip-path:polygon(0 0,30% 0,100% 50%,100% 70%,0 12%)}.gmc-character-stage{padding:16px 28px}.gmc-character-art[data-card-art=true]{height:100%;max-width:90%}}
+@media(prefers-reduced-motion:reduce){.gmc-character-art:after,.gmc-art-surface:after,.gmc-art-sparks{animation:none!important}}
+html[data-game-motion-off=true] :is(.gmc-character-art,.gmc-art-surface):after,html[data-game-motion-off=true] .gmc-art-sparks{animation:none!important}
 .gmc-tier-badge{display:inline-block;font-size:11px;font-weight:700;line-height:1.6;margin-bottom:6px;color:#c99a78}.gmc-tier-badge[data-tier=diamond]{color:#9ae2f4}.gmc-tier-badge[data-tier=gold]{color:#edcc7e}.gmc-tier-badge[data-tier=silver]{color:#c3ccd7}.gmc-card[data-tier=diamond] .gmc-card-image{border-color:#6dc5d481}.gmc-card[data-tier=gold] .gmc-card-image{border-color:#d5b26381}.gmc-card-meta>.gmc-tier-badge{display:block}.gmc-card-meta>.gmc-stars{display:flex;justify-content:flex-start}.gmc-rarity .gmc-tier-badge{margin:0}
