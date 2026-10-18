@@ -2,11 +2,19 @@ function fitBounds(bounds, work) {
  const width=Math.min(bounds.width,work.width),height=Math.min(bounds.height,work.height);
  return {width,height,x:Math.max(work.x,Math.min(bounds.x,work.x+work.width-width)),y:Math.max(work.y,Math.min(bounds.y,work.y+work.height-height))};
 }
-function manageGameWindow(win,screen) {
+function readWindowState(file,screen){
+ try{const state=JSON.parse(require('node:fs').readFileSync(file,'utf8')),b=state.bounds;
+  if(!b||!['x','y','width','height'].every(key=>Number.isFinite(b[key]))||b.width<800||b.height<450||b.width>32768||b.height>32768)return null;
+  return {bounds:fitBounds(b,screen.getDisplayMatching(b).workArea),maximized:state.maximized===true};
+ }catch{return null}
+}
+function manageGameWindow(win,screen,storage={}) {
  const snapshot=()=>({bounds:win.isMaximized()?win.getNormalBounds():win.getBounds(),maximized:win.isMaximized()});
- let saved=snapshot(),transition=false,restoring=null;
+ let saved=storage.initial||snapshot(),transition=false,restoring=null;
+ const persist=()=>{if(storage.file)try{const fs=require('node:fs');fs.mkdirSync(require('node:path').dirname(storage.file),{recursive:true});fs.writeFileSync(storage.file+'.tmp',JSON.stringify(saved));fs.renameSync(storage.file+'.tmp',storage.file)}catch{}};
  const remember=()=>{if(!transition&&!win.isDestroyed()&&!win.isFullScreen()&&!win.isMinimized())saved=snapshot()};
  for(const event of ['move','resize','maximize','unmaximize'])win.on(event,remember);
+ win.on('close',()=>{remember();persist()});
  const restore=()=>{
   if(restoring)return restoring;
   transition=true;
@@ -50,4 +58,4 @@ function manageGameWindow(win,screen) {
   return true;
  }};
 }
-module.exports={fitBounds,manageGameWindow};
+module.exports={fitBounds,manageGameWindow,readWindowState};

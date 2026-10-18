@@ -1,6 +1,6 @@
 const path = require("node:path");
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session, screen } = require("electron");
-const {manageGameWindow}=require('./game-window-state.cjs');
+const {manageGameWindow,readWindowState}=require('./game-window-state.cjs');
 const { autoUpdater } = require("electron-updater");
 
 const DEFAULT_APP_URL = "https://nexora-point-system.vercel.app";
@@ -115,6 +115,8 @@ async function loadAppUrl() {
 
 function createWindow() {
   const windowIconPath = path.join(__dirname, "assets", GAME_ONLY ? "game-icon.ico" : "icon.ico");
+  const stateFile=GAME_ONLY?path.join(app.getPath('userData'),'game-window-state.json'):null;
+  const savedWindow=stateFile?readWindowState(stateFile,screen):null;
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -122,6 +124,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     ...(GAME_ONLY ? {minWidth:800,minHeight:450,frame:false,fullscreen:false} : {}),
+    ...(savedWindow?savedWindow.bounds:{}),
     title: APP_NAME,
     backgroundColor: "#050507",
     ...(windowIconPath ? { icon: windowIconPath } : {}),
@@ -135,11 +138,11 @@ function createWindow() {
     },
   });
 
-  if(GAME_ONLY)gameWindowState=manageGameWindow(mainWindow,screen);
+  if(GAME_ONLY)gameWindowState=manageGameWindow(mainWindow,screen,{file:stateFile,initial:savedWindow||undefined});
   mainWindow.once("ready-to-show", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.setTitle(APP_NAME);
-    if (GAME_ONLY) mainWindow.maximize();
+    if (GAME_ONLY&&savedWindow?.maximized) mainWindow.maximize();
     mainWindow.show();
   });
 
