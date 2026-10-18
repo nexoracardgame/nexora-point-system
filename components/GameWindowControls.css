@@ -3,7 +3,7 @@
 .nexora-window-controls button:hover,.nexora-window-controls button:focus-visible { background:#b48a323d; border-color:#d6b66b; outline:none; }
 .nexora-window-controls .nexora-window-close:hover { background:#a32232; border-color:#ea7682; color:#fff; }
 html[data-game-window-controls=desktop] button.nexora-settings-open { top:calc(env(safe-area-inset-top,0px) + 9px);right:calc(env(safe-area-inset-right,0px) + var(--game-window-controls-width,124px) + 12px);width:38px;height:38px;box-sizing:border-box; }
-html[data-game-window-mode=fullscreen] .nexora-window-controls > button:not(.nexora-window-close),html:fullscreen .nexora-window-controls > button:not(.nexora-window-close),html[data-game-window-mode=fullscreen] .nexora-window-drag,html:fullscreen .nexora-window-drag { display:none!important; }
+html[data-game-window-mode=fullscreen] .nexora-window-drag,html:fullscreen .nexora-window-drag { display:none!important; }
 .nexora-window-controls > [data-game-utilities-slot]:empty { display:none; }
 .nexora-window-controls > [data-game-audio-slot] { min-width:34px; min-height:30px; }
 .nexora-window-controls > [data-game-audio-slot],.nexora-window-controls > [data-game-utilities-slot] { display:flex; align-items:center; }
@@ -38,3 +38,11 @@ html[data-game-window-controls=desktop] body:has(.nexora-versus-plane) :is(.nexo
 .nexora-window-drag { position:fixed;left:0;right:136px;top:0;height:28px;z-index:1140;-webkit-app-region:drag;app-region:drag; }
 .nexora-window-controls,.nexora-settings-open { -webkit-app-region:no-drag;app-region:no-drag; }
 .nexora-exit-actions { display:flex;justify-content:flex-end;gap:12px;margin-top:24px; }.nexora-exit-actions button { width:auto;min-width:90px;padding:10px 18px;background:#e1c17c;color:#121416;border-radius:4px; }
+/* Shared chrome lives outside scene stacking contexts, including body portals. */
+button.nexora-settings-open{z-index:2147483645}
+.nexora-window-exit{z-index:2147483647}
+body:has(.nexora-settings-open) .nexora-login-utilities{display:none!important}
+body:has(.nexora-settings-open) .nexora-window-controls>[data-game-utilities-slot]{display:none}
+html[data-game-window-controls=desktop]{--game-chrome-width:calc(var(--game-window-controls-width,124px) + 58px)}
+html[data-game-window-controls=desktop] :is(.gg-header,.gcc-header,.gmc-header,.gpp-header,.nexora-waiting-header){padding-right:calc(var(--game-chrome-width) + 24px)!important}
+@media(max-width:900px),(max-height:520px){html[data-game-window-controls=desktop] :is(.gg-header,.gcc-header,.gmc-header,.gpp-header,.nexora-waiting-header){padding-top:58px!important;min-height:112px;padding-right:16px!important}}
