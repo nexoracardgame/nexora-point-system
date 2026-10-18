@@ -105,6 +105,14 @@ html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back):before{animation:non
 .gg-seal[data-busy=true] .gg-seal-card{animation:gg-charge 650ms ease-in-out infinite;opacity:1;cursor:default}
 .gg-seal[data-busy=true] .gg-seal-command{opacity:0}
 .gg-seal[data-busy=true] .gg-seal-cancel{visibility:hidden}
+.gg-pack-stage>.gg-pack[data-pack="0"]{--pack-aura:#c4a3ff}
+.gg-pack-stage>.gg-pack[data-pack="1"]{--pack-aura:#8ce6ff}
+.gg-pack-stage>.gg-pack[data-pack="2"]{--pack-aura:#ffe38b}
+.gg-pack-stage>.gg-pack,.gg-pack-stage>.gg-pack-front:not(:hover):not([aria-pressed=true]){opacity:1;filter:drop-shadow(0 0 9px var(--pack-aura)) drop-shadow(0 8px 12px #0006)}
+.gg-pack-stage>.gg-pack:before{content:"";position:absolute;inset:-2.5%;border:1.5px solid var(--pack-aura);border-radius:7% / 5%;box-shadow:0 0 9px var(--pack-aura),inset 0 0 7px var(--pack-aura);opacity:.8;pointer-events:none}
+.gg-pack-stage>.gg-pack[aria-pressed=true]:before{opacity:1}
+@media(hover:hover) and (pointer:fine){.gg-pack-stage>.gg-pack:hover:before{box-shadow:0 0 15px var(--pack-aura),inset 0 0 10px var(--pack-aura);opacity:1}}
+.gg-seal-stage[data-pack="0"]{--seal-light:#c4a3ff}.gg-seal-stage[data-pack="1"]{--seal-light:#8ce6ff}.gg-seal-stage[data-pack="2"]{--seal-light:#ffe38b}
 .gg-seal[data-busy=true] .gg-seal-flare{animation-duration:850ms}
 .gg-seal[data-busy=true] .gg-foil:before{animation-duration:700ms}
 html[data-game-motion-off=true] .gg-seal *{animation:none!important;transition:none!important}
