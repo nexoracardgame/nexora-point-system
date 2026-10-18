@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import "./BattleMobileOverlays.css";
+import GameLandscapeGuard from './GameLandscapeGuard';
 
 type CapacitorRuntime = {
   getPlatform?: () => string;
@@ -94,5 +95,5 @@ export default function NativeViewportBridge() {
     };
   }, []);
 
-  return null;
+  return <GameLandscapeGuard/>;
 }
