@@ -1,15 +1,15 @@
 import {triadCards,type TriadCard} from './triad-dominion';
 import {gameCardThumbnail} from './game-card-art';
+import {rateMonster} from './game-monster-rating';
+export {monsterTiers,monsterRatingPolicy,monsterStarBands} from './game-monster-rating';
 
 export const monsterElements={earth:'ดิน',water:'น้ำ',wood:'ไม้',fire:'ไฟ',gold:'ทอง',unknown:'ไม่ระบุ'};
-export type MonsterDetails={stars:number;rarity:string|null;lore:string|null;characterArt:string|null};
-// Editorial metadata is separate from combat rules and future gacha drop rates.
-export const monsterDetails:Record<string,Partial<MonsterDetails>>={};
+export type MonsterDetails=ReturnType<typeof rateMonster>&{lore:string|null;characterArt:string|null};
+// Only editorial fields may be overridden; ratings always come from the shared policy.
+export const monsterDetails:Record<string,Partial<Pick<MonsterDetails,'lore'|'characterArt'>>>={};
 export const gameMonsters=triadCards.filter(card=>card.kind==='monster');
 export function describeMonster(card:TriadCard):MonsterDetails{
- const power=Math.max(card.attack,card.support);
- const stars=power>=9500?5:power>=8000?4:power>=6500?3:power>=5000?2:1;
- return {stars,rarity:null,lore:null,characterArt:null,...monsterDetails[card.cardNo]};
+ return {lore:null,characterArt:null,...monsterDetails[card.cardNo],...rateMonster(card)};
 }
 export function monsterThumbnail(card:TriadCard){return gameCardThumbnail(card.cardNo)||card.sourceImage}
 export function warmMonsterImages(cards:readonly TriadCard[],full=false){
