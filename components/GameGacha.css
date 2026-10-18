@@ -78,3 +78,38 @@ html[data-game-motion-off=true] :is(.gg-foil,.gg-card-back):before{animation:non
 @media(hover:hover) and (pointer:fine){.gg-pack-stage>.gg-pack:hover{z-index:4;opacity:1;scale:1.06;filter:drop-shadow(0 0 20px var(--pack-aura))}.gg-pack-stage>.gg-pack:hover .gg-foil:after{opacity:1;animation-duration:1.6s}}
 @media(prefers-reduced-motion:reduce){.gg-pack-stage>.gg-pack:hover{scale:1}}
 .gg-pack-stage>.gg-pack-front:not(:hover):not([aria-pressed=true]){scale:1;rotate:none;filter:drop-shadow(0 8px 14px #0008)}
+.gg-confirm.gg-seal{width:100vw;max-width:none;height:100dvh;max-height:none;padding:0;border:0;border-radius:0;background:transparent;overflow:auto;color:#f5e6c8}
+.gg-seal::backdrop{background:#02060ccc;backdrop-filter:blur(10px)}
+.gg-seal-stage{position:relative;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:64px 20px 30px;isolation:isolate;--seal-light:#efd18c;animation:gg-seal-arrive 300ms ease-out both}
+.gg-seal-stage[data-pack="0"]{--seal-light:#9ceaf3}.gg-seal-stage[data-pack="2"]{--seal-light:#c7b3ff}
+.gg-seal-kicker{color:var(--seal-light);font-size:11px}.gg-seal-stage h2{font-size:26px;margin:0;line-height:1.4}
+.gg-seal-art{position:relative;display:grid;place-items:center;width:min(540px,90vw);height:min(54dvh,480px);min-height:200px;margin:12px 0;isolation:isolate}
+.gg-seal-art>img{position:absolute;pointer-events:none;object-fit:contain;mix-blend-mode:screen;z-index:-1}
+.gg-seal-sigil{width:min(100%,52dvh);aspect-ratio:1;opacity:.5;animation:gg-sigil-turn 28s linear infinite}
+.gg-seal-flare{width:100%;height:120%;opacity:.35;animation:gg-seal-breathe 3s ease-in-out infinite}
+.gg-seal-sparks{width:100%;height:100%;opacity:.65;animation:gg-seal-drift 5s ease-in-out infinite}
+.gg-seal .gg-seal-card{position:relative;display:block;flex:none;width:auto;height:100%;aspect-ratio:997/1398;max-width:70vw;padding:0;border:0;border-radius:6% / 4.3%;background:transparent;box-shadow:none;color:#fff;cursor:pointer;filter:drop-shadow(0 0 16px var(--seal-light));animation:gg-float 4s ease-in-out infinite;transition:filter 180ms,scale 180ms;touch-action:manipulation}
+.gg-seal-card .gg-foil{pointer-events:none}
+.gg-seal-command{position:absolute;bottom:9%;left:12%;right:12%;padding:9px 6px;border:1px solid #f0d69580;background:#03080ee8;color:#f9e7b9;font-size:16px;font-weight:700;border-radius:4px;pointer-events:none}
+.gg-seal .gg-seal-card:hover,.gg-seal .gg-seal-card:focus-visible{filter:drop-shadow(0 0 26px var(--seal-light));scale:1.035;outline:2px solid var(--seal-light);outline-offset:7px}
+.gg-seal .gg-seal-card:active{scale:.97}
+.gg-seal-price{display:flex;align-items:center;gap:8px;color:var(--seal-light);font-weight:700;font-size:21px}
+.gg-seal-stage .gg-seal-guarantee{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;font-size:12px;color:#bdcbd2;margin:0;line-height:1.5}
+.gg-seal .gg-seal-cancel{position:fixed;top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));display:grid;place-items:center;width:42px;height:42px;padding:0;border:1px solid #d7c18b80;border-radius:5px;background:#09111dd9;color:#f0d99f}
+@keyframes gg-seal-arrive{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes gg-sigil-turn{to{transform:rotate(360deg)}}
+@keyframes gg-seal-breathe{0%,100%{opacity:.25;transform:scale(.9)}50%{opacity:.5;transform:scale(1.04)}}
+@keyframes gg-seal-drift{0%,100%{transform:translateY(8px);opacity:.3}50%{transform:translateY(-8px);opacity:.7}}
+@media(max-height:520px) and (min-width:651px){.gg-seal-stage{padding:22px 60px;gap:6px}.gg-seal-art{height:52dvh;min-height:140px;margin:2px 0}.gg-seal-stage h2{font-size:19px}.gg-seal-price{font-size:17px}.gg-seal-command{font-size:12px;padding:5px}}
+@media(prefers-reduced-motion:reduce){.gg-seal *{animation:none!important;transition:none!important}}
+.gg-seal[data-busy=true] .gg-seal-card{animation:gg-charge 650ms ease-in-out infinite;opacity:1;cursor:default}
+.gg-seal[data-busy=true] .gg-seal-command{opacity:0}
+.gg-seal[data-busy=true] .gg-seal-cancel{visibility:hidden}
+.gg-seal[data-busy=true] .gg-seal-flare{animation-duration:850ms}
+.gg-seal[data-busy=true] .gg-foil:before{animation-duration:700ms}
+html[data-game-motion-off=true] .gg-seal *{animation:none!important;transition:none!important}
+.gg-seal-art>img{z-index:0}
+.gg-seal-art .gg-seal-sigil{width:min(145%,76dvh);max-width:none;opacity:.75;filter:sepia(.5) saturate(1.5)}
+.gg-seal .gg-seal-card{z-index:1}
+.gg-seal-art .gg-seal-sparks{z-index:2;opacity:.45}
+.gg-seal button.gg-seal-cancel{background:#09111dd9;color:#f0d99f}
