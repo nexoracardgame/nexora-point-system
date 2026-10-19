@@ -4202,8 +4202,8 @@ function CompactBattleBoard({
     <div data-battle-arena={arena.id} className={`triad-compact-board triad-arena-board ${revealAllCards ? "triad-spectator-board" : ""} relative h-full min-h-[clamp(330px,62dvh,600px)] max-w-full overflow-hidden rounded-[18px] border border-amber-100/14 bg-[#0a0908] shadow-[0_28px_90px_rgba(0,0,0,0.55)] [container-type:inline-size]`} style={{ "--arena-color": arena.color } as CSSProperties}>
       <CardHoverPreview card={previewCard} onClose={closeBoardPreview} passive={previewMode === "hover"} />
       <BattleArenaStatus fight={fightNo} turn={activeTurn} turns={3} title={pendingSkillChoice || waitingSkillChoice ? "เลือกเป้าหมายสกิล" : turnLocked ? "ปะทะ" : "เลือกการ์ด"} hint={activeTurn === 1 ? "มอนสเตอร์ปะทะ" : activeTurn === 2 ? "ATTACK" : "SUPPORT"} />
-      <BattleArenaScoreplate name={botName} score={matchScore.bot} avatar={<MiniProfileHover participant={botParticipant || undefined} name={botName} image={botImage} profile={profileForParticipant(botParticipant, rankProfiles || {})} label="คู่แข่ง" currentParticipantId={currentParticipantId} />} />
-      <BattleArenaScoreplate name={playerName} score={matchScore.player} player avatar={<MiniProfileHover participant={playerParticipant || undefined} name={playerName} image={playerImage} profile={profileForParticipant(playerParticipant, rankProfiles || {})} label="เรา" align="right" placement="top" currentParticipantId={currentParticipantId} />} />
+      <BattleArenaScoreplate name={botName} score={matchScore.bot} avatar={null} identity={{id:botParticipant?.id,name:botName,image:botImage}} rank={rankProfiles?.[botParticipant?.id||'']} currentUserId={currentParticipantId} />
+      <BattleArenaScoreplate name={playerName} score={matchScore.player} player avatar={null} identity={{id:playerParticipant?.id||currentParticipantId,name:playerName,image:playerImage}} rank={rankProfiles?.[playerParticipant?.id||currentParticipantId||'']} currentUserId={currentParticipantId} />
       {cinematicPlaying && currentResult ? (
         <BattleCinematic
           key={cinematicKey}

@@ -1,4 +1,5 @@
 import type { ReactNode, HTMLAttributes } from "react";
+import BattlePlayerProfile,{type BattlePlayerIdentity,type BattlePlayerRank} from './BattlePlayerProfile';
 
 export function BattleArenaSurface({ image, children, className = "", style, ...props }: HTMLAttributes<HTMLElement> & { image: string }) {
   return <main {...props} className={`nexora-arena-surface ${className}`} style={{...style,backgroundImage:`linear-gradient(#05070865,#05070865),url('${image}')`,backgroundPosition:"center",backgroundSize:"cover"}}>{children}</main>;
@@ -8,9 +9,10 @@ export function BattleArenaCardFrame({ children }: { children: ReactNode }) {
   return <span className="nexora-card-art-frame">{children}</span>;
 }
 
-export function BattleArenaScoreplate({ name, score, player, avatar }: { name: string; score: number; player?: boolean; avatar: ReactNode }) {
+export function BattleArenaScoreplate({ name, score, player, avatar,identity,rank,currentUserId }: { name: string; score: number; player?: boolean; avatar: ReactNode;identity?:BattlePlayerIdentity;rank?:BattlePlayerRank|null;currentUserId?:string }) {
   const info = <div className="min-w-0 max-w-[120px] sm:max-w-none"><div className="text-[9px] font-black uppercase">{player ? "เรา" : "คู่แข่ง"}</div><div className="truncate text-xs font-black text-white sm:text-base">{name}</div></div>;
   const points = <div className="nexora-arena-points grid shrink-0 place-items-center rounded-full font-black text-white">{score}</div>;
+  if(identity)return <div className={`nexora-arena-scoreplate ${player?'triad-player-scoreplate':'triad-opponent-scoreplate'}`}>{player&&points}<BattlePlayerProfile identity={identity} rank={rank} player={player} currentUserId={currentUserId}/>{!player&&points}</div>;
   return <div className={`nexora-arena-scoreplate ${player ? "triad-player-scoreplate" : "triad-opponent-scoreplate"}`} title={name}>{player ? <>{points}{info}{avatar}</> : <>{avatar}{info}{points}</>}</div>;
 }
 
