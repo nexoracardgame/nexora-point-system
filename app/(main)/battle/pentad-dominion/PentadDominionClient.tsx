@@ -10,6 +10,7 @@ import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
 import ElementClash from "./PentadElementClash";
 import { hasPentadElementClash } from "@/lib/pentad-element-presentation";
+import { isExpiredBattleAction } from "@/lib/battle-action-status";
 import BattleWaitingHeader from "@/components/BattleWaitingHeader";
 import BattleWaitingRoom from "@/components/BattleWaitingRoom";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
@@ -155,10 +156,17 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     if (action === "join") setEntering(true);
     const generation = loadGeneration.current;
     try {
+      if (["deck", "ready", "pick", "target"].includes(action) && extra.epoch !== undefined && Number(extra.epoch) !== current?.epoch) return false;
       const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, signal:AbortSignal.timeout(12000), body: JSON.stringify({ action, code: current?.code, epoch: current?.epoch, ...extra }) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return false;
       if (data.closed) { try{localStorage.removeItem("nexora:pentad:room");}catch{} router.replace("/game");return false; }
+      if (isExpiredBattleAction(data)) {
+        if (data.room && data.room.code === roomRef.current?.code) accept(data.room);
+        else if (current?.code === roomRef.current?.code) await load(current?.code);
+        return false;
+      }
+      if (response.status === 409 && current && roomRef.current?.code === current.code && roomRef.current.epoch !== Number(extra.epoch ?? current.epoch) && ["deck", "ready", "pick", "target"].includes(action)) return false;
       if (!response.ok) throw new Error(data.error || "คำสั่งไม่สำเร็จ");
       if (action === "leave") { loadGeneration.current++; try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/game"); }
       else if (data.room) accept(data.room);
@@ -208,7 +216,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     try { localStorage.setItem(deckKey(room, userId), JSON.stringify(deck)); } catch { /* Server draft synchronization remains available. */ }
     const timer = setTimeout(async () => {
       const snapshot = deckRef.current;
-      if (await act("deck", { deck: snapshot }, true) && deckRef.current === snapshot) dirtyDeck.current = false;
+      if (await act("deck", { deck: snapshot, epoch: room.epoch }, true) && deckRef.current === snapshot) dirtyDeck.current = false;
     }, 350);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,7 +233,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     if (!current || !side || current.phase !== "select" || current.picks[side] || pendingPickRef.current) return;
     const pending = { code: current.code, epoch: current.epoch, side, cardNo };
     pendingPickRef.current = pending; setPendingPick(pending); setError(""); playMenuCue();
-    const ok = await act("pick", { cardNo }, true);
+    const ok = await act("pick", { cardNo, epoch: pending.epoch }, true);
     if (!ok && pendingPickRef.current === pending) { pendingPickRef.current = null; setPendingPick(null); }
   };
   const available = (player: PentadSide) => {

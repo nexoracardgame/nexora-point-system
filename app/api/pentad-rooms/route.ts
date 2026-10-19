@@ -3,6 +3,7 @@ import { getApiActor } from "@/lib/admin-auth";
 import { getServerSupabaseClient } from "@/lib/supabase-server";
 import { createPentadRoom, listPentadRooms, mutatePentadRoom } from "@/lib/pentad-room-store";
 import {findActiveGameRoom} from '@/lib/active-game-room';
+import { isExpiredBattleAction } from '@/lib/battle-action-status';
 
 export const dynamic = "force-dynamic";
 function json(body: unknown, status = 200) {
@@ -49,5 +50,13 @@ export async function POST(request: Request) {
     if (!/^\d{6}$/.test(code)) return json({ error: "รหัสห้องไม่ถูกต้อง" }, 400);
     const room = await mutatePentadRoom(code, participant, body);
     notify(code); return json({ room });
-  } catch (error) { return errorJson(error, "คำสั่งไม่สำเร็จ"); }
+  } catch (error) {
+    if (isExpiredBattleAction(error)) {
+      try {
+        const room = await mutatePentadRoom(String(body.code || ""), participant);
+        return json({ room, ignored: true, reason: "stale_round" });
+      } catch (refreshError) { return errorJson(refreshError, "โหลดห้องไม่สำเร็จ"); }
+    }
+    return errorJson(error, "คำสั่งไม่สำเร็จ");
+  }
 }

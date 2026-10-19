@@ -1,5 +1,6 @@
 import { randomInt, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma";
+import { ExpiredBattleActionError } from "./battle-action-status";
 import { hasPentadElementClash, PENTAD_ELEMENT_SCENE_MS } from "./pentad-element-presentation";
 import type { BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
@@ -361,7 +362,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
   }
   const player = requireSeat();
   if (action === "target" && Number(body.epoch) === room.epoch - 1 && room.phase === "result") return;
-  if (Number(body.epoch) !== room.epoch) throw new Error("คำสั่งนี้เป็นของตาก่อนหน้า");
+  if (Number(body.epoch) !== room.epoch) throw new ExpiredBattleActionError();
   if (action === "deck" || action === "ready") {
     requirePhase("deck");
     if (room.ready[player]) throw new Error("ยืนยันเด็คแล้ว");
