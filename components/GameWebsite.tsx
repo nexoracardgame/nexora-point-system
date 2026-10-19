@@ -8,7 +8,7 @@ import {Download,Coins,UserRound,ArrowUpRight,ChevronDown,X,LogOut,ShieldCheck,S
 import {gameWorldSections} from '@/lib/game-world-sections';
 import './GameWebsite.css';
 import GameBattleTutorials from './GameBattleTutorials';
-import {loadLoginWallpaper} from '@/lib/login-wallpaper';
+import {HOME_WALLPAPER_POSTER,homeWallpaperSources} from '@/lib/home-wallpaper';
 
 export default function GameWebsite({children}:{children?:ReactNode}){
  const {data:session}=useSession();
@@ -31,12 +31,11 @@ export default function GameWebsite({children}:{children?:ReactNode}){
  useEffect(()=>{if(!worldOpen)return;const outside=(event:PointerEvent)=>{if(!worldButton.current?.contains(event.target as Node)&&!worldMenu.current?.contains(event.target as Node))setWorldOpen(false)};const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setWorldOpen(false);worldButton.current?.focus()}};const close=()=>setWorldOpen(false);document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);window.addEventListener('resize',close);window.addEventListener('scroll',close,true);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);window.removeEventListener('resize',close);window.removeEventListener('scroll',close,true)}},[worldOpen]);
  useEffect(()=>{
   if(hasPage)return;
-  const controller=new AbortController();let active=true,url='';
   setHeroReady(false);
-  void loadLoginWallpaper(controller.signal).then(value=>{if(!active){URL.revokeObjectURL(value);return}url=value;setHeroUrl(value)}).catch(()=>{});
-  return()=>{active=false;controller.abort();if(url)URL.revokeObjectURL(url);setHeroUrl('')};
+  setHeroUrl(homeWallpaperSources()[0]);
+  return()=>setHeroUrl('');
  },[hasPage]);
- useEffect(()=>{const sync=()=>{const video=heroVideo.current;if(!video)return;if(document.hidden)video.pause();else void video.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync)},[heroUrl]);
+ useEffect(()=>{const motion=matchMedia('(prefers-reduced-motion: reduce)');let inView=true;const sync=()=>{const video=heroVideo.current;if(!video)return;if(document.hidden||motion.matches||!inView)video.pause();else void video.play().catch(()=>{})};const observer=new IntersectionObserver(entries=>{inView=entries[0]?.isIntersecting??false;sync()});if(heroVideo.current)observer.observe(heroVideo.current);sync();document.addEventListener('visibilitychange',sync);motion.addEventListener('change',sync);return()=>{observer.disconnect();document.removeEventListener('visibilitychange',sync);motion.removeEventListener('change',sync);heroVideo.current?.pause()}},[heroUrl]);
  const login='/game/login?callbackUrl=%2Fgame';
  useEffect(()=>{
   setWallet(null);setWalletError(false);
@@ -67,8 +66,8 @@ export default function GameWebsite({children}:{children?:ReactNode}){
   </header>
   {worldOpen&&createPortal(<nav id="nx-world-menu" ref={worldMenu} className="nx-world-menu" aria-label="โลกของ NEXORA" style={worldPosition} onPointerEnter={cancelWorldClose} onPointerLeave={closeWorldSoon} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node)&&event.relatedTarget!==worldButton.current)setWorldOpen(false)}}>{gameWorldSections.map(item=><Link key={item.id} href={`/game/world/${item.id}`} onClick={()=>setWorldOpen(false)}>{item.title}</Link>)}</nav>,document.body)}
   {children||<><section className="nx-site-hero">
-   <img className="nx-site-scene" src="/game-assets/login/website-poster.webp" alt="" fetchPriority="high"/>
-   {heroUrl&&<video ref={heroVideo} className="nx-site-scene nx-site-hero-video" src={heroUrl} autoPlay muted loop playsInline aria-hidden="true" onLoadedData={()=>setHeroReady(true)} onError={()=>setHeroReady(false)} style={{opacity:heroReady?1:0}}/>}
+   <img className="nx-site-scene" src={HOME_WALLPAPER_POSTER} alt="" fetchPriority="high"/>
+   {heroUrl&&<video ref={heroVideo} className="nx-site-scene nx-site-hero-video" src={heroUrl} muted loop playsInline aria-hidden="true" preload="metadata" onLoadedData={()=>setHeroReady(true)} onError={()=>{setHeroReady(false);const sources=homeWallpaperSources();setHeroUrl(sources[sources.indexOf(heroUrl)+1]||'')}} style={{opacity:heroReady?1:0}}/>}
    <div className="nx-site-hero-copy"><span className="nx-site-eyebrow">THE NEXT MOVE IS YOURS</span><h1 className="nx-site-hero-brand"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" fetchPriority="high"/></h1><p>เลือกการ์ดของคุณ วางกลยุทธ์ของคุณ<br/>แล้วก้าวสู่สนามประลอง</p><div className="nx-site-actions"><a className="nx-site-primary" href="/downloads/game-windows/current"><Download size={22}/>ดาวน์โหลด Windows PC</a><Link className="nx-site-primary nx-topup-link" href="/game/topup"><Coins size={21}/>เติม COIN<ArrowUpRight size={17}/></Link></div><small>Windows 64-bit<span>มือถือ · พบกันในอนาคต</span></small></div>
    <a className="nx-site-explore" href="#news" onClick={scrollToSection('news')}>เข้าสู่โลก NEXORA <span>↓</span></a>
   </section>
