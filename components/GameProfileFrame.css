@@ -21,7 +21,7 @@
 .gpp-framed-name,.gpp-framed-rank { isolation:isolate; }
 .gpp-framed-name::after,.gpp-framed-rank::after { content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 36%,#fff4ce99 49%,transparent 62%);background-size:300% 100%;animation:profile-metal-sweep 7s ease-in-out infinite;mix-blend-mode:screen;mask:var(--profile-mask) center/100% 100% no-repeat; }
 .gpp-framed-name { --profile-mask:url('/images/lobby-play/profile-name-frame.png'); }
-.gpp-framed-name::after { display:none; }
+.gpp-framed-name::after,.gpp-framed-rank::after { display:none; }
 .gpp-framed-rank { --profile-mask:url('/images/lobby-play/profile-rank-label.png'); }
 .nli-pieces img { animation:none; }
 .nli-pieces .nli-piece-label,.nli-pieces .nli-piece-edit { animation:none; }

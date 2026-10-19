@@ -22,8 +22,8 @@
 .battle-player-mini{isolation:isolate;background:linear-gradient(130deg,#070d13f5,#111b24f7 65%,#080e15eb);backdrop-filter:blur(12px);box-shadow:0 0 15px #e6bf6030,0 8px 24px #000b}
 @property --bpp-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
 .battle-player-mini::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:2px;pointer-events:none;background:conic-gradient(from var(--bpp-angle),transparent 0deg 210deg,#b78d3944 240deg,#ffe8a4 275deg,#fff8de 285deg,transparent 310deg);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:bpp-aura 4s linear infinite}
-.bpi-copy::after{content:'';position:absolute;inset:0;pointer-events:none;background:conic-gradient(from var(--bpp-angle),transparent 0deg 230deg,#fff1bb 280deg,transparent 320deg);mask:url('/images/lobby-play/profile-name-frame.png') center/100% 100% no-repeat;mix-blend-mode:screen;animation:bpp-aura 5s linear infinite;opacity:.75}
-[data-player=true] .bpi-copy::after{transform:scaleX(-1)}
+/* Nameplate artwork includes opaque backing: a masked shine exposes its cut edges. */
+.bpi-copy::after{display:none}
 @keyframes bpp-aura{to{--bpp-angle:360deg}}
 .battle-player-mini header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid #d9b66c40}
 .battle-player-mini header>span{display:flex;align-items:center;gap:8px;color:#e7c887;font-size:12px}
