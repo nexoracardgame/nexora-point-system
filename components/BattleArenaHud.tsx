@@ -1,4 +1,5 @@
 import type { ReactNode, HTMLAttributes } from "react";
+import './BattleCardGeometry.css';
 import BattlePlayerProfile,{type BattlePlayerIdentity,type BattlePlayerRank} from './BattlePlayerProfile';
 
 export function BattleArenaSurface({ image, children, className = "", style, ...props }: HTMLAttributes<HTMLElement> & { image: string }) {

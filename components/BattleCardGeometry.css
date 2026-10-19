@@ -1,0 +1,12 @@
+/* Clip artwork only: combat auras and particles stay outside this surface. */
+.nexora-card-art-frame,
+[data-battle-card-face]{
+  --battle-card-radius:4% / 2.94%;
+  border-radius:var(--battle-card-radius)!important;
+  overflow:hidden;
+}
+.nexora-card-art-frame>img,
+[data-battle-card-face]>img{
+  border-radius:inherit!important;
+  object-fit:contain;
+}

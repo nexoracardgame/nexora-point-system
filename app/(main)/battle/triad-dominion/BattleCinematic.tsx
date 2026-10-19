@@ -205,14 +205,14 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
           const powerCard = power ? cardsByNo.get(power.cardNo) : undefined;
           const powerColor = { fire: "#ff8c68", water: "#71dfff", wood: "#79f2b0", earth: "#f4d475", gold: "#fff0ae", unknown: "#bce8ff" }[powerCard?.element || "unknown"];
           return <div key={side} data-fighter={step.side === side ? "source" : "target"} data-side={side} data-empowered={Boolean(power)} className={`${styles.fighter} ${side === "player" ? styles.player : styles.opponent} ${step.side === side ? styles.source : styles.target} ${power && !final ? styles.empowered : ""} ${receiving ? styles.receiving : ""} ${final && result.winner !== "draw" ? result.winner === side ? styles.winner : styles.defeated : ""}`} style={{ "--power-color": receiving ? color : powerColor } as CSSProperties}>
-            <div className={styles.card}>
+            <div className={styles.card} data-battle-card-face>
               {card ? <img src={card.sourceImage} alt={card.name} draggable={false} /> : <Swords size={40} />}
             </div>
             {(power || (receiving && step.effect !== "debuff" && step.effect !== "swap")) && !final ? <div className={styles.weaponAura} aria-hidden="true"><Swords size={36} strokeWidth={1.5} /></div> : null}
           </div>;
         })}
         {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`} style={{ "--skill-travel": `calc(${step.side === "player" ? "1" : "-1"} * (var(--card-width) * .84 + ${step.recipient !== "both" && step.recipient !== step.side ? "var(--transfer-distance)" : "0px"}))` } as CSSProperties}>
-          <img src={attacker.sourceImage} alt={attacker.name} draggable={false} />
+          <img data-battle-card-face src={attacker.sourceImage} alt={attacker.name} draggable={false} />
           <span>{step.blocked ? "สกิลถูกระงับ" : step.effect === "debuff" ? "ส่งผลลดพลัง" : "ส่งพลังสกิล"}</span>
         </div> : null}
         <span className={`${styles.name} ${styles.playerName}`}>{playerName}</span>

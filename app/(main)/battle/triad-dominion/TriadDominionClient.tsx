@@ -2257,7 +2257,7 @@ function RevealSpotlight({
           {showPlayer && playerCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${playerCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-red-200/70 shadow-[0_0_45px_rgba(248,113,113,0.55)]"}`}>
               {playerCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
-              <div className="relative aspect-[3/4] overflow-hidden rounded-[10px]">
+              <div data-battle-card-face className="relative aspect-[815/1110] overflow-hidden">
                 <Image src={playerCard.sourceImage} alt={playerCard.name} fill sizes="210px" className="object-cover" />
               </div>
             </div>
@@ -2284,7 +2284,7 @@ function RevealSpotlight({
           {showBot && botCard ? (
             <div className={`animate-[triad-card-pop_520ms_ease-out] rounded-[14px] border bg-black p-1 ${botCard.kind === "skill" ? "border-violet-200/80 shadow-[0_0_58px_rgba(168,85,247,0.75)]" : "border-cyan-200/70 shadow-[0_0_45px_rgba(34,211,238,0.55)]"}`}>
               {botCard.kind === "skill" ? <div className="absolute inset-x-0 -bottom-3 h-10 rounded-full bg-violet-400/50 blur-xl" /> : null}
-              <div className="relative aspect-[3/4] overflow-hidden rounded-[10px]">
+              <div data-battle-card-face className="relative aspect-[815/1110] overflow-hidden">
                 <Image src={botCard.sourceImage} alt={botCard.name} fill sizes="210px" className="object-cover" />
               </div>
             </div>
