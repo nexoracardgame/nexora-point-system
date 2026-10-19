@@ -1,5 +1,6 @@
 import { randomInt, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma";
+import { hasPentadElementClash, PENTAD_ELEMENT_SCENE_MS } from "./pentad-element-presentation";
 import type { BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
 import { triadCardByNo, triadCards, triadSkillRuleByNo, triadSkillElementConditionMatches } from "./triad-dominion";
@@ -231,7 +232,10 @@ function resolveRound(room: PentadRoom, now: number) {
   for (const previous of room.rounds) if (previous.winner !== "draw" && !previous.finalDuel) room.score[previous.winner]++;
   const scoreBefore = { ...room.score };
   if (result.winner !== "draw" && !room.finalDuel) room.score[result.winner]++;
-  const duration = (result.reason.startsWith("ธาตุ") ? 5500 : 12_000 + result.events.reduce((time, event) => time + Math.max(3500, Math.min(7000, event.summary.length * 35)), 0)) + (result.stages?.length || 0) * 3000;
+  const elementScene = hasPentadElementClash({ turn: room.turn, finalDuel: room.finalDuel, mains });
+  const duration = elementScene && result.reason.startsWith("ธาตุ")
+    ? PENTAD_ELEMENT_SCENE_MS + 2000
+    : 12_000 + result.events.reduce((time, event) => time + Math.max(3500, Math.min(7000, event.summary.length * 35)), 0) + (elementScene ? PENTAD_ELEMENT_SCENE_MS : (result.stages?.length || 0) * 3000);
   const round: PentadRound = { ...result, id: room.rounds.length + 1, fight: room.fight, turn: room.turn, mains, skills, opener: room.opener, endsAt: now + duration, finalDuel: room.finalDuel, scoreBefore, scoreAfter: { ...room.score } };
   room.rounds.push(round); room.phase = "result"; room.deadline = round.endsAt; room.epoch++;
   room.completedBy = [];
