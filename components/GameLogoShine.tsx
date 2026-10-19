@@ -25,6 +25,7 @@ export default function GameLogoShine() {
       clear();
       if (!enabled()) return;
       for (const image of document.querySelectorAll<HTMLImageElement>(`img[src="${logo}"]`)) {
+        if (image.closest('.nx-site-hero-brand')) continue;
         if (!image.complete || !image.naturalWidth || !image.getClientRects().length) continue;
         const light = document.createElement("div");
         light.className = "nexora-logo-reflection";

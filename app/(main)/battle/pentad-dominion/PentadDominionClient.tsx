@@ -14,6 +14,8 @@ import { isExpiredBattleAction } from "@/lib/battle-action-status";
 import BattleWaitingHeader from "@/components/BattleWaitingHeader";
 import BattleWaitingRoom from "@/components/BattleWaitingRoom";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
+import BattleFieldHistory from "@/components/BattleFieldHistory";
+import { readPentadHandoff, clearPentadHandoff } from '@/lib/pentad-room-handoff';
 import TargetSelectionModal from "@/components/TargetSelectionModal";
 import { pentadTargetView } from "@/lib/pentad-target-view";
 import { Bot, Check, ChevronRight, Clock3, Eye, Flag, History, Layers3, Loader2, LogOut, Plus, Search, SendHorizontal, Shuffle, Swords, X } from "lucide-react";
@@ -82,10 +84,10 @@ function cinematicResult(round: PentadRound): TriadTurnResult {
   };
 }
 
-export default function PentadDominionClient({ userId, initialRoomCode = "", initialSpectate = false }: { userId: string; initialRoomCode?: string; initialSpectate?: boolean }) {
+export default function PentadDominionClient({ userId, initialRoomCode = "", initialSpectate = false, initialRoom }: { userId: string; initialRoomCode?: string; initialSpectate?: boolean; initialRoom?: PentadRoom }) {
   const router = useRouter();
   useEffect(()=>{router.prefetch("/game");},[router]);
-  const [room, setRoom] = useState<PentadRoom | null>(null);
+  const [room, setRoom] = useState<PentadRoom | null>(initialRoom || null);
   const roomRef = useRef(room); roomRef.current = room;
   const [rooms, setRooms] = useState<Listing[]>([]);
   const [code, setCode] = useState("");
@@ -109,7 +111,6 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const [pendingPick, setPendingPick] = useState<{ code: string; epoch: number; side: PentadSide; cardNo: string } | null>(null);
   const pendingPickRef = useRef(pendingPick); pendingPickRef.current = pendingPick;
   const [entering, setEntering] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState("");
   const [introDone, setIntroDone] = useState("");
   const side: PentadSide | undefined = room?.seats.host?.id === userId ? "host" : room?.seats.challenger?.id === userId ? "challenger" : undefined;
@@ -153,6 +154,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     if (!background && busyRef.current) return false;
     if (!background) { busyRef.current = true; setBusy(true); setError(""); void primeBattleAudio(); playMenuCue(); }
     const current = roomRef.current;
+    if(action==='leave')clearPentadHandoff();
     if (["create", "join", "leave"].includes(action)) loadGeneration.current++;
     if (action === "join") setEntering(true);
     const generation = loadGeneration.current;
@@ -181,8 +183,9 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     try { saved = requested || localStorage.getItem("nexora:pentad:room"); } catch { saved = requested; }
     const restoring = saved && /^\d{6}$/.test(saved);
     if (!restoring) { router.replace("/game"); return; }
-    if (restoring) setEntering(true);
-    void act("join", { code: saved, spectate: initialSpectate || new URLSearchParams(window.location.search).get("spectate") === "1" });
+    const transferred = roomRef.current || readPentadHandoff(userId,String(saved));
+    if (transferred?.code === saved) { accept(transferred); setEntering(false); void load(saved); }
+    else { setEntering(true); void act("join", { code: saved, spectate: initialSpectate || new URLSearchParams(window.location.search).get("spectate") === "1" }); }
     const clock = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(clock);
     // Initial restoration runs once; mutable room state lives in roomRef.
@@ -276,7 +279,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={leaveRoom} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
     {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}
-    {!room ? <section className={styles.entering}>{entering && !error && <BattleConnectingScreen />}</section> : room.phase === "waiting" ? <BattleWaitingRoom seats={room.seats} spectators={room.spectators} userId={userId} leaderId={room.ownerId||room.seats.host?.id||''} modes={[{id:'all',title:'ALL CARDS',description:'เลือกจากการ์ดทั้งหมด'},{id:'random',title:'RANDOM POOL',description:'สุ่มพูลการ์ด'}]} mode={room.deckSource||'all'} canChange={(room.ownerId||room.seats.host?.id)===userId} busy={busy} onMode={deckSource=>void act('mode',{deckSource})} onWatch={()=>void act('watch')} onTake={seat=>void act('seat',{seat})} onBot={(seat,enabled)=>void act('bot',{seat,enabled})}/> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
+    {!room ? <section className={styles.entering}>{entering && !error && <BattleConnectingScreen />}</section> : room.phase === "waiting" ? <BattleWaitingRoom key={`${room.code}:${room.epoch}`} seats={room.seats} spectators={room.spectators} userId={userId} leaderId={room.ownerId||room.seats.host?.id||''} modes={[{id:'all',title:'ALL CARDS',description:'เลือกจากการ์ดทั้งหมด'},{id:'random',title:'RANDOM POOL',description:'สุ่มพูลการ์ด'}]} mode={room.deckSource||'all'} canChange={(room.ownerId||room.seats.host?.id)===userId} busy={busy} botId="pentad-bot" onMode={deckSource=>act('mode',{deckSource})} onWatch={()=>act('watch')} onTake={seat=>act('seat',{seat})} onBot={(seat,enabled)=>act('bot',{seat,enabled})}/> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
         {!side ? <h3>ผู้เล่นกำลังเตรียมเด็ค</h3> : <><div className={styles.tabs}>{(["monsters", "hand", "reserve"] as const).map(key => <button key={key} aria-pressed={group === key} onClick={() => setGroup(key)}>{key === "monsters" ? "มอนสเตอร์" : key === "hand" ? "สกิล" : "กองเสริมสกิล"}<b>{deck[key].length}/{key === "monsters" ? 5 : key === "hand" ? 15 : 10}</b></button>)}</div>
         <div className={styles.elementCounts}>{pentadElements.map(value => <span key={value}>{pentadElementNames[value]} {total.filter(no => triadCardByNo.get(no)?.element === value).length}/6</span>)}</div>
         <div className={styles.chosenCards}>{deck[group].map((no, index) => <Card key={`${no}:${index}`} no={no} badge={fixedDeck ? undefined : "−"} disabled={fixedDeck || room.ready[side] || busy} onClick={() => changeDeck({ ...deck, [group]: deck[group].filter((_, i) => i !== index) })} />)}</div>
@@ -310,8 +313,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
         if (!current || !currentChoice || current.code !== room.code || current.epoch !== room.epoch || currentChoice.cardNo !== pendingChoice.cardNo || currentChoice.side !== side || !currentChoice.options.includes(selectedTarget)) return false;
         return act("target", { target: selectedTarget, choiceIndex: current.choices.indexOf(currentChoice), cardNo: currentChoice.cardNo, sourceCardNo: currentChoice.sourceCardNo || "" });
       }} />}
-    {mounted && room && room.phase!=='waiting' && createPortal(<div className={styles.hudPlane}><button className={styles.historyToggle} title="ประวัติการต่อสู้" aria-label="ประวัติการต่อสู้" onClick={() => setHistoryOpen(!historyOpen)}><History size={20} /></button></div>, document.body)}
-    {mounted && room && historyOpen && createPortal(<aside className={styles.historyPanel}><header><h2>บันทึกสนาม</h2><button aria-label="ปิดประวัติ" onClick={() => setHistoryOpen(false)}><X /></button></header>{room.rounds.length ? [...room.rounds].reverse().map(round => <details key={round.id} open={round.id === room.rounds.at(-1)?.id}><summary>ไฟต์ {round.fight} · ตา {round.turn} · {round.winner === "draw" ? "เสมอ" : `${room.seats[round.winner]?.name} ชนะ`}</summary><p>{round.reason} · {round.totals.host.toLocaleString()} : {round.totals.challenger.toLocaleString()}</p>{(["host", "challenger"] as const).map(player => <p key={player}><strong>{room.seats[player]?.name}</strong> · No.{round.mains[player]}{round.skills[player] ? ` · สกิล No.${round.skills[player]} ${triadCardByNo.get(round.skills[player])?.name || ""}` : ""}</p>)}{round.stages?.map((stage, index) => <p key={index}><b>{stage.title}</b><br />{stage.detail}</p>)}{round.events.map((event, index) => <p key={index}><b>{room.seats[event.side === "player" ? "host" : "challenger"]?.name} · No.{event.cardNo}</b><br />{event.summary}</p>)}</details>) : <p>ยังไม่มีตาที่ตัดสินผล</p>}</aside>, document.body)}
+    {mounted && room && room.phase!=='waiting' && createPortal(<BattleFieldHistory key={`${room.code}:${room.epoch}`} room={room}/>, document.body)}
     {cine && currentRound && presentation && (hasPentadElementClash(currentRound) && introDone !== `${presentation.room.code}:${currentRound.id}` ? <ElementClash key={`${presentation.room.code}:${currentRound.id}`} round={currentRound} room={presentation.room} arenaImage={arena.image} onComplete={() => { if (currentRound.reason.startsWith("ธาตุ")) completeScene(); else setIntroDone(`${presentation.room.code}:${currentRound.id}`); }} /> : <BattleCinematic key={`${presentation.room.code}:${currentRound.id}`} result={cine} cardsByNo={triadCardByNo} playerCard={triadCardByNo.get(currentRound.skills.host || currentRound.mains.host)} opponentCard={triadCardByNo.get(currentRound.skills.challenger || currentRound.mains.challenger)} playerMainCard={triadCardByNo.get(currentRound.effective.host)} opponentMainCard={triadCardByNo.get(currentRound.effective.challenger)} playerName={presentation.room.seats.host?.name || "PLAYER"} opponentName={presentation.room.seats.challenger?.name || "PLAYER"} arena={arena} landscape onComplete={completeScene} />)}
   </BattleArenaSurface></PentadCardPreview>;
 }

@@ -1,7 +1,6 @@
 import type { TriadElement } from "@/lib/triad-dominion";
 import { BATTLE_CONTACT_MS } from "./BattleTiming";
 import { playGameUiSound } from "@/lib/game-ui-audio";
-
 import {gameVolume} from '@/lib/game-settings';
 
 const clips = {
@@ -16,6 +15,48 @@ export function battleAudioReady() { return audio?.state === "running"; }
 
 export function playMenuCue() {
   playGameUiSound();
+}
+
+export function playCardDeployment(element: TriadElement) {
+  try { if (localStorage.getItem("triad-battle-muted") === "1") return; } catch { /* Optional preference. */ }
+  const context = audio;
+  if (!context || context.state !== "running") {
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    void primeBattleAudio().then(ready => { if (ready && !cancelled) stop = playCardDeployment(element); });
+    return () => { cancelled = true; stop?.(); };
+  }
+  const now = context.currentTime;
+  const hit = now + .18;
+  const nodes: Array<AudioBufferSourceNode | OscillatorNode> = [];
+  const output = context.createGain();
+  output.gain.value = .65 * gameVolume('effects');
+  const compressor = context.createDynamicsCompressor();
+  output.connect(compressor).connect(context.destination);
+  const tone = context.createOscillator();
+  const envelope = context.createGain();
+  tone.frequency.setValueAtTime(150, hit);
+  tone.frequency.exponentialRampToValueAtTime(32, hit + .38);
+  envelope.gain.setValueAtTime(.0001, now);
+  envelope.gain.setValueAtTime(.28, hit);
+  envelope.gain.exponentialRampToValueAtTime(.0001, hit + .5);
+  tone.connect(envelope).connect(output);
+  tone.start(now); tone.stop(hit + .55); nodes.push(tone);
+  const clip = buffers.get(clips[element]) || buffers.get(clips.gold);
+  if (clip) {
+    const impact = context.createBufferSource(); impact.buffer = clip;
+    impact.playbackRate.value = .78;
+    const gain = context.createGain(); gain.gain.value = .48;
+    impact.connect(gain).connect(output); impact.start(hit); nodes.push(impact);
+    impact.addEventListener("ended", () => gain.disconnect(), { once: true });
+  }
+  tone.addEventListener("ended", () => { envelope.disconnect(); }, { once: true });
+  const timer = window.setTimeout(() => { nodes.forEach(node => node.disconnect()); output.disconnect(); compressor.disconnect(); }, 1800);
+  return () => {
+    window.clearTimeout(timer);
+    nodes.forEach(node => { try { node.stop(); } catch { /* Already ended. */ } node.disconnect(); });
+    envelope.disconnect(); output.disconnect(); compressor.disconnect();
+  };
 }
 
 export async function primeBattleAudio() {

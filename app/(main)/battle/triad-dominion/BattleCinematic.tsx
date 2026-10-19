@@ -140,8 +140,8 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   }, [index, steps.length, reduced, currentKind, currentSummaryLength]);
   const step = steps[Math.min(index, steps.length - 1)];
   const attacker = cardsByNo.get(step.cardNo) || (step.side === "player" ? playerCard : opponentCard);
-  const playerFighter = playerCard?.kind === "monster" ? playerCard : playerMainCard || playerCard;
-  const opponentFighter = opponentCard?.kind === "monster" ? opponentCard : opponentMainCard || opponentCard;
+  const playerFighter = playerCard?.kind === "monster" ? playerCard : playerMainCard?.kind === "monster" ? playerMainCard : undefined;
+  const opponentFighter = opponentCard?.kind === "monster" ? opponentCard : opponentMainCard?.kind === "monster" ? opponentMainCard : undefined;
   const replacementVisible = (side: Side) => !steps.some(item => item.cardNo === "265" && !item.blocked && item.recipient === side) || steps.slice(0,index).some(item => item.cardNo === "265" && !item.blocked && item.recipient === side);
   const activePlayer = replacementVisible("player") ? playerFighter : cardsByNo.get(result.originalPlayer?.top || "") || playerFighter;
   const activeOpponent = replacementVisible("opponent") ? opponentFighter : cardsByNo.get(result.originalOpponent?.top || "") || opponentFighter;
@@ -215,7 +215,8 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
             {(power || (receiving && step.effect !== "debuff" && step.effect !== "swap")) && !final ? <div className={styles.weaponAura} aria-hidden="true"><Swords size={36} strokeWidth={1.5} /></div> : null}
           </div>;
         })}
-        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`} style={{ "--skill-travel": `calc(${step.side === "player" ? "1" : "-1"} * (var(--card-width) * .84 + ${step.recipient !== "both" && step.recipient !== step.side ? "var(--transfer-distance)" : "0px"}))` } as CSSProperties}>
+        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`}>
+          <div className={styles.skillSeal} aria-hidden="true"><img src="/battle-fx/magic_01.png" alt="" /><i /><i /></div>
           <img data-battle-card-face src={attacker.sourceImage} alt={attacker.name} draggable={false} />
           <span>{step.blocked ? "สกิลถูกระงับ" : step.effect === "debuff" ? "ส่งผลลดพลัง" : "ส่งพลังสกิล"}</span>
         </div> : null}

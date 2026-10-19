@@ -1,7 +1,7 @@
 "use client";
 import HoldCardButton from "@/components/HoldCardButton";
-import {useCardGesture} from '@/lib/use-card-gesture';
 import GameLobbyNavigation from '@/components/GameLobbyNavigation';
+import {useCardGesture} from '@/lib/use-card-gesture';
 import GameLobbyProfile from '@/components/GameLobbyProfile';
 
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
@@ -20,8 +20,12 @@ import type { TargetOptionView } from "@/lib/target-selection-view";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import dynamic from 'next/dynamic';
+import { savePentadHandoff } from '@/lib/pentad-room-handoff';
+import type { PentadRoom } from '@/lib/pentad-room-store';
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+const PentadHandoffClient = dynamic(()=>import('../pentad-dominion/PentadDominionClient'),{ssr:false});
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import DuelistLeaderboard from "@/components/DuelistLeaderboard";
@@ -71,7 +75,7 @@ import BattleCinematic from "./BattleCinematic";
 import NexoraCommandScene from "./NexoraCommandScene";
 import "./NexoraCommand.css";
 import "./NexoraLobbyDrawer.css";
-import { playMenuCue, primeBattleAudio } from "./BattleAudio";
+import { playCardDeployment, playMenuCue, primeBattleAudio } from "./BattleAudio";
 import { battleArenaForSeed, type TriadArena } from "@/lib/triad-arena";
 import {
   resolveTriadTurn as resolveTriadTurnRules,
@@ -2091,6 +2095,21 @@ function BoardCardSlot({
   tone: "player" | "bot" | "neutral";
 }) {
   const activeGlow = active ? "shadow-[0_18px_48px_rgba(0,0,0,0.58)]" : "";
+  const [reducedDeployment, setReducedDeployment] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      try { setReducedDeployment(localStorage.getItem("triad-reduced-motion") === "1"); } catch { /* Optional preference. */ }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const deployedCardNo = card?.cardNo || "";
+  const deployedElement = card?.element || "unknown";
+  const previousCard = useRef(deployedCardNo);
+  useEffect(() => {
+    const changed = previousCard.current !== deployedCardNo;
+    previousCard.current = deployedCardNo;
+    if (changed && deployedCardNo && !hidden && tone === "player") return playCardDeployment(deployedElement);
+  }, [deployedCardNo, deployedElement, hidden, tone]);
 
   return (
     <div
@@ -2104,9 +2123,21 @@ function BoardCardSlot({
               : ""
       }`}
     >
-      <div className="relative overflow-hidden rounded-[6px] bg-transparent aspect-[815/1110]" data-board-card data-active={active || Boolean(aura)}>
+      <div className="triad-card-anchor relative overflow-visible rounded-[6px] bg-transparent aspect-[815/1110]" data-board-card data-card-no={card?.cardNo || ""} data-face-up={Boolean(card && !hidden)} data-deploy-motion={!reducedDeployment} data-active={active || Boolean(aura)} style={{ "--summon-color": ({ fire: "#ff765e", water: "#7be4ff", wood: "#86f2ab", earth: "#efca7a", gold: "#ffe3a4", unknown: "#d4b8ff" })[card?.element || "unknown"] } as CSSProperties}>
         {card && !hidden ? (
-          <BattleArenaCardFrame><Image src={card.sourceImage} alt={card.name} fill sizes="(max-width: 700px) 120px, 200px" className="object-contain" /></BattleArenaCardFrame>
+          <div key={card.cardNo} className={`triad-card-face ${tone === "player" ? "triad-card-deploy" : ""}`}>
+            <BattleArenaCardFrame><Image src={card.sourceImage} alt={card.name} fill loading="eager" sizes="(max-width: 700px) 120px, 200px" className="object-contain" /></BattleArenaCardFrame>
+            {tone === "player" ? (
+              <div className="triad-deploy-fx" aria-hidden="true">
+                <i /><i />
+                <img src="/battle-fx/magic_01.png" alt="" draggable={false} />
+                <img src="/battle-fx/spark_01.png" alt="" draggable={false} />
+                <div className="triad-deploy-rays">
+                  {[0, 1, 2, 3].map(direction => <img key={direction} src="/battle-fx/slash_01.png" alt="" style={{ "--ray-angle": `${direction * 90 + 45}deg` } as CSSProperties} />)}
+                </div>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <>
             <Image
@@ -2532,6 +2563,7 @@ function HandCard({
     const now = Date.now();
     if (now - playStampRef.current < 220) return;
     playStampRef.current = now;
+    onPreviewEnd();
     onClick();
   };
   const isPreviewOnlyInput = () =>
@@ -2567,6 +2599,7 @@ function HandCard({
       
       
       
+      {...gesture}
       aria-disabled={disabled || used}
       className={`group relative z-[2] min-w-0 touch-manipulation select-none overflow-hidden rounded-lg border bg-black/60 text-left shadow-[0_16px_34px_rgba(0,0,0,0.36)] transition [-webkit-touch-callout:none] [pointer-events:auto] ${
         used
@@ -2576,7 +2609,7 @@ function HandCard({
             : highlighted
               ? "border-cyan-200/80 shadow-[0_0_24px_rgba(34,211,238,0.45)] hover:-translate-y-2"
               : "border-white/14 hover:-translate-y-2 hover:border-amber-200/70"
-      }`} {...gesture}
+      }`}
     >
       <div className="relative aspect-[815/1110]">
         <BattleArenaCardFrame><Image src={card.sourceImage} alt={card.name} fill sizes="110px" draggable={false} className="select-none object-contain [-webkit-touch-callout:none]" /></BattleArenaCardFrame>
@@ -2587,7 +2620,7 @@ function HandCard({
           ใช้แล้ว
         </div>
       ) : null}
-      {highlighted ? <div className="absolute inset-0 animate-pulse rounded-[inherit] ring-4 ring-cyan-300/65" /> : null}
+      {highlighted ? <div className="pointer-events-none absolute inset-0 rounded-[inherit] ring-2 ring-cyan-200/65" /> : null}
       {placedLane ? (
         <div className="absolute right-1 top-1 rounded-md bg-amber-300 px-1.5 py-0.5 text-[8px] font-black uppercase text-black">
           {placedLane === "top" ? "หลัก" : placedLane === "left" ? "โจมตี" : "ช่วย"}
@@ -3575,7 +3608,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       <GameLobbyNavigation onRank={() => setPanel("rank")} onJoin={() => openPanel("join")} onHome={() => { setPanel(null); setPanelClosing(false); }} />
       <div className="nexora-lobby-promo-rail"><LobbyBanner />
       <section className="nexora-command-actions" aria-label="เลือกการเล่น">
-        <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => {if(panel==="create")closePanel();else openPanel("create");}} />
+        <LobbyActionButton artwork="play" title="PLAY" subtitle="สร้างสนามประลอง" onClick={() => {if(panel==='create')closePanel();else openPanel("create");}} />
       </section></div>
       <footer className="nexora-command-footer"><span>มอนสเตอร์ · สกิล · กลยุทธ์</span></footer>
       {(panel === "create" || panel === "join") && <div className="nexora-play-drawer-backdrop" data-closing={panelClosing} onClick={closePanel} aria-hidden="true" />}
@@ -4141,7 +4174,11 @@ function CompactBattleBoard({
 }) {
   const [previewCard, setPreviewCard] = useState<CardView | null>(null);
   const [previewMode, setPreviewMode] = useState<CardPreviewMode>("hover");
-  const playerTriangle = lockedFight?.player || player;
+  // A local placement must remain visible while the room snapshot catches up.
+  const playerTriangle = lockedFight ? {
+    ...lockedFight.player,
+    ...Object.fromEntries(Object.entries(player).filter(([, cardNo]) => Boolean(cardNo))),
+  } as TriadTriangle : player;
   const botTriangle = lockedFight?.bot || { top: "", left: "", right: "" };
   const activeLane = laneForTurn(activeTurn);
   const currentResult = lockedFight?.turns.find((turn) => turn.turn === activeTurn);
@@ -4225,7 +4262,7 @@ function CompactBattleBoard({
           }}
         />
       ) : null}
-      {!cinematicPlaying && !showResolvedBoard ? <RevealSpotlight
+      {!cinematicPlaying && !showResolvedBoard && botVisible(activeLane) ? <RevealSpotlight
         playerCard={playerTriangle[activeLane] ? cardsByNo.get(playerTriangle[activeLane]) : undefined}
         botCard={botTriangle[activeLane] ? cardsByNo.get(botTriangle[activeLane]) : undefined}
         showPlayer={playerVisible(activeLane)}
@@ -4450,6 +4487,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [roomPassword, setRoomPassword] = useState("");
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
   const [createFormat, setCreateFormat] = useState<"triad" | "pentad">("triad");
+  const [pentadHandoff,setPentadHandoff]=useState<PentadRoom|null>(null);
+  useEffect(()=>{void import('../pentad-dominion/PentadDominionClient');},[]);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [botChanging, setBotChanging] = useState(false);
   const botChangingRef = useRef(false);
@@ -5499,6 +5538,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       const response=await fetch("/api/pentad-rooms",{method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({action:"create",access,password,deckSource:deckMode === "all" ? "all" : "random",playWithBot:createRoomWithBot})});
       const data=await response.json();
       if (!response.ok || !data.room?.code) { setLobbyMessage(data.error || "สร้างห้องไม่สำเร็จ");return; }
+      savePentadHandoff(participant.id,data.room);
+      setPentadHandoff(data.room);
       router.push(`/game/pentad?room=${data.room.code}`);return;
     }
     const result = await postRoomAction({
@@ -7289,6 +7330,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     phase === "lobby" &&
     Boolean(activeRoomCode || activeRoomSnapshot || activeRoomCodeRef.current || activeRoomSnapshotRef.current);
 
+  if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff}/>;
+
   if (shouldShowReconnectSplash) {
     return <BattleConnectingScreen />;
   }
@@ -7425,7 +7468,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           </div>
         </div>
 
-        <BattleWaitingRoom seats={currentRoom.seats} spectators={currentRoom.spectators} userId={participant.id} leaderId={currentRoom.hostId} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'},{id:'monster',title:'MONSTER',description:'มอนสเตอร์ล้วน'},{id:'skill',title:'SKILL',description:'10 มอนสเตอร์ + 10 สกิล'}]} mode={currentDeckMode} canChange={isRoomController} busy={Boolean(roomModeSubmitting)||botChanging} onMode={mode=>void changeRoomDeckMode(mode as DeckMode)} onWatch={()=>void moveToSpectator()} onTake={side=>void takeFieldSlot(side)} onBot={(side,enabled)=>void toggleBotOpponent(side,enabled)} />
+        <BattleWaitingRoom key={currentRoom.code} seats={currentRoom.seats} spectators={currentRoom.spectators} userId={participant.id} leaderId={currentRoom.hostId} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'},{id:'monster',title:'MONSTER',description:'มอนสเตอร์ล้วน'},{id:'skill',title:'SKILL',description:'10 มอนสเตอร์ + 10 สกิล'}]} mode={currentDeckMode} canChange={isRoomController} busy={Boolean(roomModeSubmitting)||botChanging} onMode={mode=>changeRoomDeckMode(mode as DeckMode)} onWatch={()=>moveToSpectator()} onTake={side=>takeFieldSlot(side)} onBot={(side,enabled)=>toggleBotOpponent(side,enabled)} />
         <div className="nexora-command-room-chat"><BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} compact /></div>
       </main>
     );

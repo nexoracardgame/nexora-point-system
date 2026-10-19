@@ -1,5 +1,8 @@
 const fs=require('node:fs'),vm=require('node:vm');
 let source=fs.readFileSync('scripts/test-duelist-leaderboard.cjs','utf8');
+source=source.replace('const bundle=',"require('./game-wallpaper-test-modules.cjs')(modules);const bundle=");
+source=source.replace("${fs.readFileSync('components/DuelistLeaderboard.css','utf8')}","${fs.readFileSync('components/GameEntryBackground.css','utf8')}${fs.readFileSync('components/DuelistLeaderboard.css','utf8')}");
+source=source.replace('await page.screenshot(',`await page.waitForFunction(()=>{const v=document.querySelector('.nexora-ranking-background video');return v&&v.readyState>=2&&!v.paused&&v.currentTime>.1});assert.equal(await page.locator('.nexora-ranking-background>img').getAttribute('src'),require('../public/game-assets/video/entry-loop-3/manifest.json').poster);await page.screenshot(`);
 const component=require('typescript').transpileModule(fs.readFileSync('components/GameBackControl.tsx','utf8'),{compilerOptions:{module:1,jsx:4,target:7}}).outputText;
 const logo=require('typescript').transpileModule(fs.readFileSync('components/GamePageLogo.tsx','utf8'),{compilerOptions:{module:1,jsx:4,target:7}}).outputText;
 source=source.replace('const bundle=',`modules['./GamePageLogo']=${JSON.stringify(logo)};modules['./GamePageLogo.css']='';const bundle=`);

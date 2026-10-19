@@ -89,3 +89,6 @@
 .nexora-ranking { animation:nexora-rank-slide-in 550ms cubic-bezier(.16,1,.3,1) both; }
 @keyframes nexora-rank-slide-in { from { transform:translate3d(-100%,0,0); opacity:.3; } to { transform:translate3d(0,0,0); opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .nexora-ranking { animation:none; } }
+.nexora-ranking:has(>.nexora-ranking-background){isolation:isolate;background:#030506}
+.nexora-ranking>.nexora-ranking-background{z-index:-1}
+.nexora-ranking-background::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#04060999,transparent 45%,#04060977),linear-gradient(0deg,#020506b8,#02050630)}

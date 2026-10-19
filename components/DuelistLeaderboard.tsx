@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Crown, Search, Shield } from "lucide-react";
 import GameBackControl from './GameBackControl';
 import GamePageLogo from './GamePageLogo';
+import GameEntryBackground from './GameEntryBackground';
 import "./DuelistLeaderboard.css";
 
 type Profile = { userId: string; name: string; image: string; wins: number; losses: number; rankName: string; rankKey: string };
@@ -20,6 +21,7 @@ export default function DuelistLeaderboard({ players, userId, onClose }: { playe
   const own = ranked[ownIndex];
   const top = [3,1,0,2,4].map(index=>({player:ranked[index],position:index+1}));
   return <section className="nexora-ranking" role="dialog" aria-modal="true" aria-label="อันดับนักดวล">
+    <GameEntryBackground scene="entry" className="nexora-ranking-background"/>
     <GamePageLogo/>
     <header className="nexora-ranking-nav"><GameBackControl onBack={onClose}/></header>
     <div className="nexora-ranking-showcase"><div className="nexora-ranking-title"><h1>LEADERBOARD</h1><p>อันดับนักดวล NEXORA</p></div><div className="nexora-ranking-total"><Crown size={22}/><strong>PvP RANKING</strong><span>{ranked.length.toLocaleString()} นักดวล</span></div>

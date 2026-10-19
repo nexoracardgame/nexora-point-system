@@ -42,3 +42,8 @@ html:has(.nx-site-dialog[open]){overflow:hidden!important}
 .nx-world-page{min-height:calc(100svh - 88px);padding:85px 7%;background:linear-gradient(110deg,#060b0eee,#060b0ed9),url('/images/versus/arena.png') center/cover}.nx-world-page h1{font-size:40px;margin:0 0 32px}.nx-world-page-rule{height:1px;background:#efce8438;width:100%}@media(max-width:800px){.nx-world-page{min-height:calc(100svh - 112px);padding:55px 6%}.nx-world-page h1{font-size:30px}}
 .nx-site-hero > .nx-site-scene { object-position:65% 0%; }
 @media(max-width:800px) { .nx-site-hero > .nx-site-scene { object-position:62% 0%; } }
+.nx-site-hero .nx-site-hero-brand{position:relative}
+.nx-site-hero-brand::after{content:'';position:absolute;inset:0;pointer-events:none;mask:url('/images/triad/nexora-official-logo.webp') center/contain no-repeat;background:linear-gradient(110deg,transparent 30%,#fff1ce99 50%,transparent 70%);background-size:300% 100%;animation:nx-hero-logo-reflection 5s ease-out infinite}
+@keyframes nx-hero-logo-reflection{0%{background-position:100% 0;opacity:0}3.5%{opacity:.8}14%,100%{background-position:0 0;opacity:0}}
+@media(prefers-reduced-motion:reduce){.nx-site-hero-brand::after{animation:none;opacity:0}}
+html[data-game-motion-off=true] .nx-site-hero-brand::after{animation:none;opacity:0}

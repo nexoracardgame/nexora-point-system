@@ -28,6 +28,8 @@ const css=['components/GameWebsite.css','components/GameBattleTutorials.css'].ma
    await page.goto(`http://127.0.0.1:${server.address().port}`);
    await page.waitForFunction(w=>{const v=document.querySelector('video');return v?.videoWidth===w&&v.currentTime>.1},expected);
    const video=page.locator('video');assert.equal(await video.evaluate(v=>v.muted&&v.loop&&v.playsInline),true);
+   const shine=await page.locator('.nx-site-hero-brand').evaluate(node=>{const style=getComputedStyle(node,'::after');return {name:style.animationName,duration:style.animationDuration,repeat:style.animationIterationCount,mask:style.maskImage,pointer:style.pointerEvents}});
+   assert.equal(shine.name,'nx-hero-logo-reflection');assert.equal(shine.duration,'5s');assert.equal(shine.repeat,'infinite');assert.ok(shine.mask.includes('nexora-official-logo.webp'));assert.equal(shine.pointer,'none');
    const videoPath=new URL(await video.getAttribute('src'),page.url()).pathname;
    assert.ok(manifest.variants.some(variant=>variant.url===videoPath));
    assert.equal(await page.locator('.nx-site-hero>img').getAttribute('src'),manifest.poster);
@@ -37,6 +39,7 @@ const css=['components/GameWebsite.css','components/GameBattleTutorials.css'].ma
    await page.screenshot({path:`artifacts/website-home-loop/${width}.png`});
    await video.evaluate(v=>{v.currentTime=9.7});await page.waitForFunction(()=>document.querySelector('video').currentTime<2);
    await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>document.querySelector('video').paused);
+   assert.equal(await page.locator('.nx-site-hero-brand').evaluate(node=>getComputedStyle(node,'::after').animationName),'none');
    await page.emulateMedia({reducedMotion:'no-preference'});await page.waitForFunction(()=>!document.querySelector('video').paused);
    await page.evaluate(()=>scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
    if(await video.evaluate(v=>v.getBoundingClientRect().bottom<=0))await page.waitForFunction(()=>document.querySelector('video').paused);

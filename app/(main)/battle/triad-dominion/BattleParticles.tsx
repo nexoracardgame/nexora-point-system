@@ -36,7 +36,7 @@ export default function BattleParticles({ color, element, side, skill, skillReci
     // Local coordinates also work when the entire mobile arena is rotated.
     const target = canvas.parentElement?.querySelector<HTMLElement>('[data-fighter="target"]');
     const source = canvas.parentElement?.querySelector<HTMLElement>('[data-fighter="source"]');
-    const sourceX = source ? source.offsetLeft + source.offsetWidth / 2 : width * (side === "player" ? .23 : .77);
+    const sourceX = skill ? width / 2 : source ? source.offsetLeft + source.offsetWidth / 2 : width * (side === "player" ? .23 : .77);
     const recipient = skill && skillRecipient !== "both" ? canvas.parentElement?.querySelector<HTMLElement>(`[data-side="${skillRecipient || side}"]`) : target;
     const targetX = skill && skillRecipient === "both" ? width / 2 : recipient ? recipient.offsetLeft + recipient.offsetWidth / 2 : width * (side === "player" ? .77 : .23);
     const targetY = recipient ? recipient.offsetTop + recipient.offsetHeight / 2 : height * .39;

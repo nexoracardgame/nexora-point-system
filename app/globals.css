@@ -3592,6 +3592,41 @@ textarea {
 .nexora-battle-shell .triad-arena-board [data-triad-lane] > .group { width:100% !important; }
 .nexora-battle-shell .triad-arena-board [data-board-card] { aspect-ratio:815 / 1110; border:0; box-shadow:none; background:transparent; filter:drop-shadow(0 12px 10px #0009); }
 .nexora-battle-shell .triad-arena-board [data-board-card][data-active="true"] { filter:drop-shadow(0 0 10px var(--arena-color)) drop-shadow(0 12px 10px #0009); }
+.triad-card-face { position:absolute; inset:0; border-radius:6px; transform-origin:50% 75%; }
+.triad-card-deploy { animation:triad-deploy-land 720ms cubic-bezier(.18,.82,.24,1) both; }
+.triad-deploy-fx { position:absolute; inset:-45%; pointer-events:none; z-index:3; }
+.triad-deploy-fx i { position:absolute; inset:20%; border:2px solid var(--summon-color,#f5d887); border-radius:50%; opacity:0; animation:triad-deploy-ring 650ms ease-out 180ms both; box-shadow:0 0 14px var(--summon-color,#f5d887),inset 0 0 10px var(--summon-color,#f5d887); }
+.triad-deploy-fx i:nth-child(2) { animation-delay:240ms; border-width:1px; }
+.triad-deploy-fx img { position:absolute; width:100%; height:100%; object-fit:contain; mix-blend-mode:screen; opacity:0; animation:triad-deploy-sigil 820ms ease-out 100ms both; }
+.triad-deploy-fx > img:nth-of-type(2) { animation:triad-deploy-spark 620ms ease-out 180ms both; }
+.triad-deploy-rays { position:absolute; inset:0; }
+.triad-deploy-rays img { animation:triad-deploy-ray 540ms ease-out 180ms both; filter:drop-shadow(0 0 5px var(--summon-color)); }
+[data-deploy-motion="false"] .triad-card-deploy { animation:none; }
+[data-deploy-motion="false"] .triad-deploy-fx { display:none; }
+@keyframes triad-deploy-ray { 0% { opacity:.85; transform:rotate(var(--ray-angle)) translateY(0) scale(.35); } 100% { opacity:0; transform:rotate(var(--ray-angle)) translateY(-40%) scale(.8); } }
+@keyframes triad-deploy-land {
+  0% { transform:translateY(-42px) scale(1.18) rotate(-4deg); }
+  25% { transform:translateY(3px) scale(.96) rotate(0); }
+  37% { transform:translateY(-3px) scale(1.025); }
+  65%,100% { transform:translateY(0) scale(1); }
+}
+@keyframes triad-deploy-ring {
+  0% { opacity:.95; transform:scale(.35) rotateX(55deg); }
+  100% { opacity:0; transform:scale(2.4) rotateX(55deg); }
+}
+@keyframes triad-deploy-sigil {
+  0% { opacity:0; transform:scale(.55) rotate(-20deg); }
+  18% { opacity:.75; }
+  100% { opacity:0; transform:scale(1.4) rotate(25deg); }
+}
+@keyframes triad-deploy-spark {
+  0% { opacity:.9; transform:scale(.6); }
+  100% { opacity:0; transform:scale(2); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .triad-card-deploy { animation:none; }
+  .triad-deploy-fx { display:none; }
+}
 /* The source back has a black export margin outside its silver card edge. */
 .nexora-battle-shell .triad-arena-board .triad-card-back-art { transform:scale(1.078,1.048); object-fit:fill !important; }
 .nexora-battle-shell .triad-arena-board .triad-player-scoreplate { top:12px !important; bottom:auto !important; right:12px !important; }

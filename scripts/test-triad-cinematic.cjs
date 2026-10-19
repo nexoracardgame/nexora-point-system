@@ -58,12 +58,31 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       if (!asset.startsWith(path.resolve('public') + path.sep)) return route.abort();
       return route.fulfill({ body: fs.readFileSync(asset), contentType: asset.endsWith('.wav') ? 'audio/wav' : asset.endsWith('.webp') ? 'image/webp' : asset.endsWith('.png') ? 'image/png' : 'image/jpeg' });
     });
+    if(process.env.TRIAD_DEPLOY_AUDIO_ONLY){
+      await page.goto('https://cinematic.test/');
+      await page.getByRole('button',{name:'เปิดเสียงการต่อสู้'}).click();
+      await page.waitForFunction(()=>audioEvents.some(e=>e.kind==='createBufferSource'&&Math.abs(e.duration-.32)>.005));
+      await page.getByRole('button',{name:'ข้ามอนิเมชั่น'}).click();
+      const before=await page.evaluate(()=>audioEvents.length);
+      await page.evaluate(()=>{window.stopDeployment=require('./BattleAudio').playCardDeployment('fire')});
+      const deployment=await page.evaluate(n=>audioEvents.slice(n),before);
+      assert.equal(deployment.filter(e=>e.kind==='createOscillator').length,1,'Deployment has a low impact layer');
+      assert.equal(deployment.filter(e=>e.kind==='createBufferSource').length,1,'Deployment plays a decoded impact asset');
+      assert.ok(deployment.some(e=>e.kind==='createBufferSource'&&e.when-e.now>.16&&e.when-e.now<.2),'Deployment sound aligns with the 180ms landing frame');
+      await page.evaluate(()=>{stopDeployment();localStorage.setItem('triad-battle-muted','1')});
+      const mutedCount=await page.evaluate(()=>audioEvents.length);
+      await page.evaluate(()=>require('./BattleAudio').playCardDeployment('water'));
+      assert.equal(await page.evaluate(()=>audioEvents.length),mutedCount,'Muted deployment is silent');
+      assert.deepEqual(errors,[]);console.log('Deployment audio: decoded impact, bass layer, 180ms synchronization, cancellation and mute passed');return;
+    }
     if(process.env.TRIAD_CINEMATIC_FOCUSED){
       for(const [width,height] of [[1440,900],[844,390],[390,844],[320,568]]){
         await page.setViewportSize({width,height});await page.goto('https://cinematic.test/');
         await page.evaluate(()=>{forceLandscape=true;useSkill=true;result.turn=3;result.prioritySide='player';mount([{side:'player',cardNo:'018',summary:'เสริมพลังให้มอนสเตอร์หลักก่อนเข้าปะทะ',type:'stat'}],'focused')});
         await page.waitForSelector('[data-skill-transfer]');
         await page.waitForTimeout(700);await page.screenshot({path:`artifacts/triad-cinematic/focused-transfer-${width}.png`});
+        const overlaps=await page.evaluate(()=>{const skill=document.querySelector('[data-skill-transfer] > img').getBoundingClientRect();return [...document.querySelectorAll('.fighter .card')].some(el=>{const r=el.getBoundingClientRect();return r.left<skill.right&&r.right>skill.left&&r.top<skill.bottom&&r.bottom>skill.top})});
+        assert.equal(overlaps,false,`Skill art never overlaps either fighter at ${width}`);
         for(const selector of ['.heading','.hpRow','.caption','.card','[data-skill-transfer]']){
           const boxes=await page.locator(selector).evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}}));
           assert.ok(boxes.every(r=>r.x>=-1&&r.y>=-1&&r.right<=width+1&&r.bottom<=height+1),`${selector} fits ${width}: ${JSON.stringify(boxes)}`);
