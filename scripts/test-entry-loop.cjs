@@ -4,6 +4,7 @@ const { createHash } = require('node:crypto');
 const { chromium } = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const manifest = require('../public/game-assets/video/entry-loop-3/manifest.json');
 const release = require('../public/game-release.json');
+assert.deepEqual(fs.readdirSync('public/game-assets/video/entry-loop-3').sort(),['manifest.json',manifest.poster,...manifest.variants.map(item=>item.url)].map(item=>path.basename(item)).sort(),'Only current Final video assets may ship');
 for (const item of manifest.variants) {
   const bytes = fs.readFileSync('public' + item.url);
   assert.equal(bytes.length, item.bytes);
