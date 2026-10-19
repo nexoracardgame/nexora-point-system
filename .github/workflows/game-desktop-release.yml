@@ -2,8 +2,6 @@ name: Game Desktop Release
 on:
   push:
     tags: ['game-v*']
-    branches: [main]
-    paths: ['.github/workflows/game-desktop-release.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -46,6 +44,10 @@ jobs:
           node scripts/test-native-login-proof.cjs
           node scripts/test-game-resource-pack.cjs
           node scripts/test-game-release-bytes.cjs
+          node scripts/test-game-icons.cjs
+      - name: Verify embedded Windows icons
+        shell: pwsh
+        run: ./scripts/test-game-native-icons.ps1
       - name: Publish versioned binaries
         env:
           GH_TOKEN: ${{ github.token }}

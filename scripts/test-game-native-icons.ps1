@@ -4,10 +4,12 @@ $root = Split-Path -Parent $PSScriptRoot
 $output = Join-Path $root 'artifacts/game-icons'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $expected = [System.Drawing.Bitmap]::new((Join-Path $root 'public/game-assets/branding/icon-32.png'))
+$version = (& node -p "require('./desktop/game-config.cjs').extraMetadata.version").Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve game desktop version' }
 try {
     foreach ($entry in @(
         @{ Name='game'; Path='dist/game-desktop/win-unpacked/NEXORA CARD GAME.exe' },
-        @{ Name='installer'; Path='dist/game-desktop/NEXORA-CARD-GAME-Setup-1.0.10.exe' }
+        @{ Name='installer'; Path="dist/game-desktop/NEXORA-CARD-GAME-Setup-$version.exe" }
     )) {
         $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Join-Path $root $entry.Path))
         $bitmap = $icon.ToBitmap()
