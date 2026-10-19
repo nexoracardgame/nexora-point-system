@@ -115,7 +115,7 @@ export async function getDmRoomsForUser(
   const supabase = getServerSupabaseClient();
 
   if (!supabase) {
-    return [];
+    throw new Error("DM service unavailable");
   }
 
   const roomOrFilters = [`usera.eq.${myId}`, `userb.eq.${myId}`];
@@ -156,14 +156,14 @@ export async function getDmRoomsForUser(
           },
         },
       }),
-      getAuctionDealRoomSeedsForUser(myId).catch(() => []),
+      getAuctionDealRoomSeedsForUser(myId),
     ]),
   ]);
   const [deals, auctionDealSeeds] = dealData;
 
   if (directRoomsResult.error) {
     console.error("LOAD DM ROOM ERROR:", directRoomsResult.error);
-    return [];
+    throw new Error("Unable to load DM rooms");
   }
 
   const dedupedRooms = Array.from(
@@ -196,6 +196,7 @@ export async function getDmRoomsForUser(
         )
         .in("roomId", roomIds)
         .order("createdAt", { ascending: false })
+        .order("id", { ascending: false })
         .limit(Math.max(120, roomIds.length * 8)),
       supabase
         .from("dmMessage")
@@ -209,12 +210,12 @@ export async function getDmRoomsForUser(
 
   if (msgErr) {
     console.error("LOAD DM MESSAGE ERROR:", msgErr);
-    return [];
+    throw new Error("Unable to load DM messages");
   }
 
   if (unreadErr) {
     console.error("LOAD DM UNREAD ERROR:", unreadErr);
-    return [];
+    throw new Error("Unable to load DM unread counts");
   }
 
   const latestMessageByRoom = new Map<
@@ -234,6 +235,24 @@ export async function getDmRoomsForUser(
       continue;
     }
     latestMessageByRoom.set(roomId, message);
+  }
+
+  // Busy conversations must not push quieter rooms out of the global message window.
+  const missingRoomIds = roomIds.filter((id) => !latestMessageByRoom.has(id));
+  for (let offset = 0; offset < missingRoomIds.length; offset += 8) {
+    await Promise.all(missingRoomIds.slice(offset, offset + 8).map(async (roomId) => {
+      const result = await supabase.from("dmMessage")
+        .select("id,roomId,senderId,senderName,senderImage,content,imageUrl,createdAt,seenAt")
+        .eq("roomId", roomId)
+        .order("createdAt", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1);
+      if (result.error) throw new Error("Unable to load latest DM message");
+      const message = result.data?.[0];
+      if (message && isRoomActivityVisibleAfterClear(
+        String(message.createdAt || ""), directRoomClearAtByRoomId.get(roomId) || null
+      )) latestMessageByRoom.set(roomId, message);
+    }));
   }
 
   const unreadCountByRoom = new Map<string, number>();

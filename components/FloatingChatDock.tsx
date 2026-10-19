@@ -1,5 +1,6 @@
 "use client";
 
+import { reconcileRoomList } from "@/lib/chat-room-list-reconcile";
 import {
   ArrowLeft,
   Flame,
@@ -804,6 +805,8 @@ export default function FloatingChatDock({
     () => getRoomListStorageKey(currentUserId || sessionUserEmail),
     [currentUserId, sessionUserEmail]
   );
+  const roomListOwnerRef = useRef(roomListStorageKey);
+  roomListOwnerRef.current = status === "authenticated" ? roomListStorageKey : "";
   const badgeCount = Math.max(
     0,
     Number(unreadCount || 0),
@@ -876,6 +879,7 @@ export default function FloatingChatDock({
 
   useEffect(() => {
     roomsRef.current = rooms;
+    setLocalUnreadCount(rooms.reduce((total, room) => total + Math.max(0, Number(room.unread || 0)), 0));
   }, [rooms]);
 
   useEffect(() => {
@@ -1069,6 +1073,7 @@ export default function FloatingChatDock({
     }
 
     setRoomsLoading((current) => current || roomsRef.current.length === 0);
+    const baseline = roomsRef.current;
 
     const task = (async () => {
       const res = await fetch(`/api/dm/list?ts=${Date.now()}`, {
@@ -1078,7 +1083,8 @@ export default function FloatingChatDock({
         rooms?: DMRoomListItem[];
       } | null;
 
-      if (!res.ok) {
+      if (roomListOwnerRef.current !== roomListStorageKey) return [];
+      if (!res.ok || !Array.isArray(payload?.rooms)) {
         return roomsRef.current;
       }
 
@@ -1086,13 +1092,7 @@ export default function FloatingChatDock({
         .map((room) => normalizeRoom(room))
         .filter(Boolean) as FloatingRoom[];
 
-      roomsRef.current = nextRooms;
-      setRooms(nextRooms);
-      setLocalUnreadCount(
-        nextRooms.reduce((total, room) => total + Math.max(0, Number(room.unread || 0)), 0)
-      );
-
-      writeRoomListSnapshot(roomListStorageKey, nextRooms);
+      setRooms((current) => reconcileRoomList(current, nextRooms, baseline));
       return nextRooms;
     })();
 

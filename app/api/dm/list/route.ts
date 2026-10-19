@@ -14,11 +14,19 @@ export async function GET() {
   if (!myId) {
     return NextResponse.json(
       { rooms: [] },
-      { status: 200, headers: { "Cache-Control": "no-store" } }
+      { status: 401, headers: { "Cache-Control": "no-store" } }
     );
   }
 
-  const result = await getDmRoomsForUser(String(myId), myLineId);
+  let result;
+  try {
+    result = await getDmRoomsForUser(String(myId), myLineId);
+  } catch (error) {
+    console.error("DM list unavailable", error);
+    return NextResponse.json({ error: "DM_LIST_UNAVAILABLE" }, {
+      status: 503, headers: { "Cache-Control": "no-store" },
+    });
+  }
 
   return NextResponse.json(
     { rooms: result },
