@@ -12,6 +12,7 @@ import './BattleLoadingScreen.css';
 import {loadLobbyAssets,LOBBY_ASSET_VERSION} from '@/lib/lobby-assets';
 import {prepareGameProfile} from '@/lib/game-profile-client';
 import {prepareGameFriends} from '@/lib/game-friends-client';
+import GameEntryBackground from './GameEntryBackground';
 const preparedUsers=new Set<string>();
 function visitedGame(userId:string){try{return Boolean(userId&&sessionStorage.getItem('nexora:game-prepared:'+LOBBY_ASSET_VERSION+':'+userId))}catch{return false}}
 
@@ -64,7 +65,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     return()=>{cancelled=true;disposed=true;controller.abort();clearInterval(timer);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume)};
   },[retry,canPatch,userId,status,active]);
   if(pathname==='/game/profile'||pathname?.startsWith('/game/profile/')||pathname==='/game/login'||status==='unauthenticated'||(!blocking&&status==='authenticated'))return children;
-  if(!updating)return <div className="nexora-game-entry nexora-game-loading" role="status" aria-label="กำลังเตรียมเกม"><div className="nexora-game-loading-wallpaper" /><div className="nexora-game-loading-content"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div className="nexora-game-loading-track" role="progressbar" aria-label="กำลังโหลดเกม"><div /></div>{error&&<><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button></>}</div></div>;
+  if(!updating)return <div className="nexora-game-entry nexora-game-loading" role="status" aria-label="กำลังเตรียมเกม"><GameEntryBackground className="nexora-game-loading-wallpaper" /><div className="nexora-game-loading-content"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><div className="nexora-game-loading-track" role="progressbar" aria-label="กำลังโหลดเกม"><div /></div>{error&&<><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button></>}</div></div>;
   const percent=progress?Math.min(progress.completed===progress.count?100:99,Math.floor(progress.downloaded/progress.total*100)):0;
-  return <div className="nexora-game-patch" role="status"><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><h1>{error?'อัปเดตไม่สำเร็จ':'กำลังอัปเดตทรัพยากรเกม'}</h1><p>{error||progress?.file||'ตรวจสอบแพตช์'}</p><progress max={100} value={percent} aria-label="ดาวน์โหลดแพตช์" /><strong>{percent}%</strong>{progress&&<small>{(progress.downloaded/1048576).toFixed(1)} / {(progress.total/1048576).toFixed(1)} MB · {progress.completed}/{progress.count} ไฟล์{(progress.bytesPerSecond||0)>0&&<> · {((progress.bytesPerSecond||0)/1048576).toFixed(1)} MB/s</>}</small>}{error&&<button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button>}</div>;
+  return <div className="nexora-game-patch" role="status"><GameEntryBackground /><img src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" /><h1>{error?'อัปเดตไม่สำเร็จ':'กำลังอัปเดตทรัพยากรเกม'}</h1><p>{error||progress?.file||'ตรวจสอบแพตช์'}</p><progress max={100} value={percent} aria-label="ดาวน์โหลดแพตช์" /><strong>{percent}%</strong>{progress&&<small>{(progress.downloaded/1048576).toFixed(1)} / {(progress.total/1048576).toFixed(1)} MB · {progress.completed}/{progress.count} ไฟล์{(progress.bytesPerSecond||0)>0&&<> · {((progress.bytesPerSecond||0)/1048576).toFixed(1)} MB/s</>}</small>}{error&&<button onClick={()=>setRetry(n=>n+1)}>ลองอีกครั้ง</button>}</div>;
 }

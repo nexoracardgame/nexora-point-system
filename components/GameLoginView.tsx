@@ -4,7 +4,7 @@ import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Download,Settings,X,Volume2,VolumeX,UserRound,LockKeyhole,Eye,EyeOff} from 'lucide-react';
 import {playGameUiSound} from '@/lib/game-ui-audio';
-import {loadLoginWallpaper} from '@/lib/login-wallpaper';
+import GameEntryBackground from './GameEntryBackground';
 import {isInstalledGameRuntime} from '@/lib/game-desktop-runtime';
 import '@/app/login/GameLogin.css';
 import './GameEmailVerification.css';
@@ -15,21 +15,17 @@ const sections=[['news','NEWS','ข่าวสาร'],['event','EVENT','กิ
 
 export default function GameLoginView({busy,checking,error,onLogin,onCredentials}:Props){
  const [panel,setPanel]=useState(''),[flash,setFlash]=useState(''),[notice,setNotice]=useState(''),[muted,setMuted]=useState(false);
- const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[remember,setRemember]=useState(false),[showPassword,setShowPassword]=useState(false),[videoUrl,setVideoUrl]=useState('');
+ const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[remember,setRemember]=useState(false),[showPassword,setShowPassword]=useState(false);
  const [browserDownload,setBrowserDownload]=useState(false);
  const [email,setEmail]=useState(''),[verificationEmail,setVerificationEmail]=useState('');
- const [videoReady,setVideoReady]=useState(false),[videoFailed,setVideoFailed]=useState(false);
  const [utilitySlot,setUtilitySlot]=useState<Element|null>(null);
  useEffect(()=>{const locate=()=>setUtilitySlot(document.querySelector('[data-game-utilities-slot]'));locate();const observer=new MutationObserver(locate);observer.observe(document.body,{childList:true,subtree:true});return()=>observer.disconnect()},[]);
- const dialog=useRef<HTMLElement|null>(null),video=useRef<HTMLVideoElement|null>(null);
+ const dialog=useRef<HTMLElement|null>(null);
  useEffect(()=>{
   const installed=isInstalledGameRuntime(window);
   setBrowserDownload(!installed);document.documentElement.dataset.gameDesktop=String(installed);
-  let active=true,objectUrl='';const controller=new AbortController();try{const name=localStorage.getItem('nexora-game-username');if(name){setUsername(name);setRemember(true)}}catch{}
-  void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
-  return()=>{active=false;controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
+  try{const name=localStorage.getItem('nexora-game-username');if(name){setUsername(name);setRemember(true)}}catch{}
  },[]);
- useEffect(()=>{const sync=()=>{if(!video.current)return;let paused=false;try{paused=localStorage.getItem('triad-command-motion-off')==='1'}catch{}if(document.hidden||paused)video.current.pause();else void video.current.play().catch(()=>{})};sync();document.addEventListener('visibilitychange',sync);window.addEventListener('nexora:motion-preference',sync);return()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('nexora:motion-preference',sync)}},[videoUrl]);
  useEffect(()=>{
   if(!panel)return;
   const previous=document.activeElement as HTMLElement|null;
@@ -48,9 +44,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
  const social=<div className="nexora-login-social">{providers.map(([id,label])=><button type="button" data-provider={id} key={id} title={id==='line'||id==='google'?`เข้าสู่ระบบด้วย ${label}`:`${label} · ยังไม่เปิดให้บริการ`} aria-label={`เข้าสู่ระบบด้วย ${label}`} disabled={busy} data-flash={flash===id} onAnimationEnd={()=>setFlash('')} onClick={()=>{cue(id);if(id==='line'||id==='google')onLogin(id);else setNotice(`${label} ยังไม่เปิดให้บริการ กรุณาใช้ LINE หรือ Google`)}}><img src={`/images/game-login/plain-${id}.webp`} alt=""/><span>{label}</span></button>)}</div>;
  const utilities=<div className="nexora-login-utilities"><button type="button" title="ตั้งค่าเสียง" aria-label="ตั้งค่าเสียง" onClick={()=>open('settings')}><Settings size={21}/></button></div>;
  return <main className="nexora-game-login" aria-busy={busy}>
-  <img className="nexora-web-login-poster" src="/game-assets/login/website-poster.webp" alt="" fetchPriority="high"/>
-  {videoFailed&&<img className="nexora-game-login-scene" src="/images/triad/nexora-command-original.webp" alt=""/>}
-  {videoUrl&&!videoFailed&&<video ref={video} className="nexora-game-login-video" src={videoUrl} autoPlay loop muted playsInline aria-hidden="true" onLoadedData={()=>{const element=video.current;if(element?.requestVideoFrameCallback)element.requestVideoFrameCallback(()=>setVideoReady(true));else setVideoReady(true)}} onError={()=>setVideoFailed(true)} style={{opacity:videoReady?1:0,transition:'opacity 500ms ease'}}/>}
+  <GameEntryBackground className="nexora-game-login-video" />
   <nav className="nexora-login-rail" aria-label="ข้อมูลเกม">{sections.map(([id,label,thai])=><button type="button" key={id} title={thai} aria-label={thai} onClick={()=>open(id)}><img src={`/images/game-login/${id}.webp`} alt={label}/></button>)}</nav>
   {utilitySlot?createPortal(utilities,utilitySlot):utilities}
   <section className="nexora-game-login-content">

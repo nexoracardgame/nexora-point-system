@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "poster": "/game-assets/video/entry-loop-3/poster-5cbff2b1d0fa.webp",
+  "variants": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "url": "/game-assets/video/entry-loop-3/loop-4k-2ffb48992db7.mp4",
+      "bytes": 16090804,
+      "sha256": "2ffb48992db7be971c87a1c3dbe4abe3d5a2f83af5ce7112ddae621d73521036"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "url": "/game-assets/video/entry-loop-3/loop-1080p-3b04490c95af.mp4",
+      "bytes": 6003753,
+      "sha256": "3b04490c95af9dc3696ba5b6bbb119f286998d4dd8e29e77a1606f9c99b06f87"
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "url": "/game-assets/video/entry-loop-3/loop-720p-9af2ca5d2f37.mp4",
+      "bytes": 2677736,
+      "sha256": "9af2ca5d2f37a333471168b98d85d524f3b7d4106858f946466b893a2378b884"
+    }
+  ]
+}
