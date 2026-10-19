@@ -9,6 +9,7 @@ export type PentadParticipant = { id: string; name: string; image: string };
 export type PentadChoice = { side: PentadSide; cardNo: string; sourceCardNo?: string; kind?: "copy"; options: string[]; value: string; deadline: number };
 export type PentadRound = PentadResolution & { id: number; fight: number; turn: PentadTurn; mains: Record<PentadSide, string>; skills: Record<PentadSide, string>; opener: PentadSide; endsAt: number; finalDuel: boolean; scoreBefore?: Record<PentadSide,number>; scoreAfter?: Record<PentadSide,number> };
 export type PentadRoom = {
+  ownerId?:string;
   forfeit?: BattleForfeit;
   forfeitRankedAt?: number;
   code: string; version: number; epoch: number; createdAt: number; updatedAt: number;
@@ -41,7 +42,7 @@ async function ensureSchema() {
 }
 
 export function newPentadRoom(code: string, host: PentadParticipant, now = Date.now()): PentadRoom {
-  return { code, version: 0, epoch: 0, createdAt: now, updatedAt: now, seats: { host, challenger: null }, spectators: [], phase: "waiting", decks: pair(emptyPentadDeck), ready: pair(() => false), used: pair(() => []), spent: [], board: pair(() => []), picks: pair(() => ""), boost: pair(() => ""), choices: [], targets: pair(() => ""), score: pair(() => 0), fight: 1, turn: 1, opener: "host", deadline: 0, rounds: [], winner: "", finalDuel: false, notice: "", chat: [] };
+  return { code, ownerId:host.id, version: 0, epoch: 0, createdAt: now, updatedAt: now, seats: { host, challenger: null }, spectators: [], phase: "waiting", decks: pair(emptyPentadDeck), ready: pair(() => false), used: pair(() => []), spent: [], board: pair(() => []), picks: pair(() => ""), boost: pair(() => ""), choices: [], targets: pair(() => ""), score: pair(() => 0), fight: 1, turn: 1, opener: "host", deadline: 0, rounds: [], winner: "", finalDuel: false, notice: "", chat: [] };
 }
 export const pentadSeat = (room: PentadRoom, id: string) => sides.find(side => room.seats[side]?.id === id);
 export function pentadAvailable(room: PentadRoom, side: PentadSide, kind: "monster" | "skill") {
@@ -256,7 +257,7 @@ export function tickPentadRoom(room: PentadRoom, now = Date.now()) {
   if (room.phase === "deck") {
     if (room.deckSource === "random" && !room.pools) {
       room.pools=makePentadPools(random);room.decks=pair(emptyPentadDeck);room.ready=pair(()=>false);room.epoch++;room.deadline=now+PENTAD_DECK_MS;
-      if (room.seats.challenger?.id===PENTAD_BOT_ID) {room.decks.challenger=tournamentPentadDeck(room);room.ready.challenger=true;}
+      for(const side of sides)if(room.seats[side]?.id===PENTAD_BOT_ID){room.decks[side]=tournamentPentadDeck(room);room.ready[side]=true;}
       room.notice="อัปเดตเป็นพูลสุ่มกองละ 20 ใบ เลือกเด็คใหม่ได้แล้ว";
     }
     if (now >= room.deadline) for (const side of sides) { room.decks[side] = completePentadDeck(room.decks[side], random,room.pools); room.ready[side] = true; }
@@ -291,6 +292,8 @@ export function tickPentadRoom(room: PentadRoom, now = Date.now()) {
 }
 
 export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, body: Record<string, unknown>, now = Date.now()) {
+  room.ownerId??=room.seats.host?.id;
+  const controller=room.ownerId===actor.id;
   const action = String(body.action || "");
   const side = pentadSeat(room, actor.id);
   const requirePhase = (...phases: PentadRoom["phase"][]) => { if (!phases.includes(room.phase)) throw new Error("สถานะเกมเปลี่ยนแล้ว กรุณาลองอีกครั้ง"); };
@@ -327,21 +330,23 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
       room.seats[side] = null;
       if (side === "host" && room.phase === "waiting" && room.seats.challenger && room.seats.challenger.id !== PENTAD_BOT_ID) { room.seats.host = room.seats.challenger; room.seats.challenger = null; }
     }
-    room.spectators = room.spectators.filter(p => p.id !== actor.id); return;
+    room.spectators = room.spectators.filter(p => p.id !== actor.id);
+    if(room.ownerId===actor.id)room.ownerId=sides.map(side=>room.seats[side]).find(person=>person&&person.id!==PENTAD_BOT_ID)?.id||room.spectators[0]?.id;
+    return;
   }
-  if (action === "bot") { requirePhase("waiting"); if (requireSeat() !== "host" || (room.seats.challenger && room.seats.challenger.id !== PENTAD_BOT_ID)) throw new Error("เพิ่มบอทไม่ได้"); room.seats.challenger = room.seats.challenger ? null : { id: PENTAD_BOT_ID, name: "BOT Level.99", image: "/avatar.png" }; return; }
+  if (action === "bot") { requirePhase("waiting");const seat=body.seat==="host"?"host":"challenger";if(!controller||(room.seats[seat]&&room.seats[seat]!.id!==PENTAD_BOT_ID))throw Error("เพิ่มบอทไม่ได้");const enabled=typeof body.enabled==="boolean"?body.enabled:!room.seats[seat];room.seats[seat]=enabled?{id:PENTAD_BOT_ID,name:seat==="host"?"BOT Level.99 · A":"BOT Level.99 · B",image:"/avatar.png"}:null;return; }
   if (action === "start") {
-    requirePhase("waiting"); if (requireSeat() !== "host" || !room.seats.challenger) throw new Error("รอผู้ท้าชิงก่อน");
+    requirePhase("waiting"); if (!controller || !room.seats.host || !room.seats.challenger) throw new Error("รอผู้ท้าชิงก่อน");
     room.phase = "deck"; room.deadline = now + PENTAD_DECK_MS; room.epoch++;
     if (room.deckSource === "random") {
       room.pools = makePentadPools(random);
       room.decks = pair(emptyPentadDeck);
     }
-    if (room.seats.challenger.id === PENTAD_BOT_ID) { room.decks.challenger = tournamentPentadDeck(room); room.ready.challenger = true; }
+    for(const side of sides)if(room.seats[side]?.id===PENTAD_BOT_ID){room.decks[side]=tournamentPentadDeck(room);room.ready[side]=true;}
     return;
   }
-  if(action==='mode'){requirePhase('waiting');if(requireSeat()!=='host')throw Error('เฉพาะหัวห้อง');room.deckSource=body.deckSource==='random'?'random':'all';return;}
-  if(action==='watch'){requirePhase('waiting');if(!side)return;if(room.spectators.length>=10)throw Error('ผู้ชมเต็มแล้ว');room.seats[side]=null;room.spectators.push(actor);if(side==='host'&&room.seats.challenger){if(room.seats.challenger.id!==PENTAD_BOT_ID)room.seats.host=room.seats.challenger;room.seats.challenger=null;}return;}
+  if(action==='mode'){requirePhase('waiting');if(!controller)throw Error('เฉพาะหัวห้อง');room.deckSource=body.deckSource==='random'?'random':'all';return;}
+  if(action==='watch'){requirePhase('waiting');if(!side)return;if(room.spectators.length>=10)throw Error('ผู้ชมเต็มแล้ว');room.seats[side]=null;room.spectators.push(actor);return;}
   if(action==='seat'){requirePhase('waiting');if(side)return;const seat=body.seat==='host'?'host':'challenger';if(room.seats[seat])throw Error('ที่นั่งไม่ว่าง');room.seats[seat]=actor;room.spectators=room.spectators.filter(p=>p.id!==actor.id);return;}
   if (action === "refresh") return;
   if (action === "complete") {
@@ -459,7 +464,7 @@ export async function mutatePentadRoom(code: string, actor: PentadParticipant, b
       if (![room.forfeit.winner.id, room.forfeit.loser.id].includes(PENTAD_BOT_ID)) await recordForfeitRank(tx, `pentad:${room.code}:${room.createdAt}`, room.forfeit);
       room.forfeitRankedAt = now;
     }
-    if (body?.action === "leave" && !sides.some(side=>room.seats[side] && room.seats[side]!.id !== PENTAD_BOT_ID)) {
+    if (body?.action === "leave" && !room.spectators.length && !sides.some(side=>room.seats[side] && room.seats[side]!.id !== PENTAD_BOT_ID)) {
       await tx.$executeRawUnsafe(`DELETE FROM "PentadRoom" WHERE "code" = $1`,code);
       return null;
     }
@@ -472,7 +477,7 @@ export async function mutatePentadRoom(code: string, actor: PentadParticipant, b
 }
 export async function listPentadRooms() {
   await ensureSchema();
-  await prisma.$executeRawUnsafe(`DELETE FROM "PentadRoom" WHERE COALESCE("data"->'seats'->'host'->>'id','') IN ('','pentad-bot') AND COALESCE("data"->'seats'->'challenger'->>'id','') IN ('','pentad-bot')`);
+  await prisma.$executeRawUnsafe(`DELETE FROM "PentadRoom" WHERE COALESCE("data"->'seats'->'host'->>'id','') IN ('','pentad-bot') AND COALESCE("data"->'seats'->'challenger'->>'id','') IN ('','pentad-bot') AND jsonb_array_length(COALESCE("data"->'spectators','[]'::jsonb))=0`);
   const rows = await prisma.$queryRawUnsafe<{ data: PentadRoom }[]>(`SELECT "data" FROM "PentadRoom" WHERE "updatedAt" > NOW() - INTERVAL '2 hours' ORDER BY "updatedAt" DESC LIMIT 80`);
   return rows.filter(({data})=>data.access !== "private").map(({ data }) => ({ code: data.code, phase: data.phase, host: data.seats.host?.name || "PLAYER", challenger: data.seats.challenger?.name || "", spectators: data.spectators.length }));
 }

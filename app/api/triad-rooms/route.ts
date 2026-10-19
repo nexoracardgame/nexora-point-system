@@ -240,7 +240,7 @@ export async function POST(request: Request) {
   }
 
   if (action === "set-bot") {
-    const result = await setTriadRoomBotOpponent(cleanText(body.code), participant.id, Boolean(body.enabled));
+    const result = await setTriadRoomBotOpponent(cleanText(body.code), participant.id, Boolean(body.enabled),body.side==="host"?"host":"challenger");
     return roomActionJson(
       result,
       { status: result.ok ? 200 : 409 },

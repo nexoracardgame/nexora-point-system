@@ -52,7 +52,7 @@ export default function BattlePlayerProfile({identity,rank,player,currentUserId}
   const fit=()=>{node.style.fontSize='';let size=parseFloat(getComputedStyle(node).fontSize);while(size>8&&(node.scrollWidth>node.clientWidth+1||size>node.clientHeight)){size-=.5;node.style.fontSize=`${size}px`}};
   fit();const observer=new ResizeObserver(fit);observer.observe(node);return()=>observer.disconnect();
  },[identity.name]);
- const bot=!identity.id||identity.id==='triad-bot-level-99';
+ const bot=!identity.id||identity.id==='triad-bot-level-99'||identity.id==='pentad-bot';
  useEffect(()=>{
   setOpen(false);setDetails(identity.id?cachedGameProfile(identity.id)||null:null);
   if(bot)return;
