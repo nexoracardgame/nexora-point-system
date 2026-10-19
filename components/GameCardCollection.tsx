@@ -12,7 +12,7 @@ import {rateGameSkill} from '@/lib/game-skill-rating';
 import {rateMonster} from '@/lib/game-monster-rating';
 import GameBackControl from './GameBackControl';
 import GamePageLogo from './GamePageLogo';
-import GameGachaBackground from './GameGachaBackground';
+import GameEntryBackground from './GameEntryBackground';
 import GameCollectionDetails from './GameCollectionDetails';
 import './GameCardCollection.css';
 import './GameCollectionTheme.css';
@@ -80,7 +80,7 @@ export default function GameCardCollection(){
  const destroy=()=>{if(!draft?.id)return;const id=draft.id,version=draft.version;setConfirmation({title:'ลบเด็คนี้ถาวร? การ์ดในคลังจะไม่ถูกลบ',run:()=>{setBusy(true);void mutateGameCollection(owner,{action:'delete',id,version}).then(()=>{setData(cachedGameCollection(owner)||null);setDraft(null);setDirty(false);setDeckOpen(false);setNotice('ลบเด็คแล้ว')}).catch(reason=>setError(reason.message)).finally(()=>setBusy(false))}})};
  if(!open||status!=='authenticated')return null;
  return createPortal(<section ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="การ์ดของฉัน" className="game-card-collection" data-editor={Boolean(deckOpen||preview)} data-layout={layout}>
-  <GameGachaBackground/>
+  <GameEntryBackground scene="collection" className="gcc-background"/>
   <div className="gcc-canvas">
   <header className="gcc-header"><GameBackControl onBack={()=>{if(!busy)close()}}/><GamePageLogo/><span>MY COLLECTION</span></header>
   <div className="gcc-collection-title"><h1>การ์ดของฉัน</h1><span>MY COLLECTION</span></div>

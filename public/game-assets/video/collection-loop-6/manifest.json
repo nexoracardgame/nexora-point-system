@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "poster": "/game-assets/video/collection-loop-6/poster-eff3ab4a6fdd.webp",
+  "variants": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "url": "/game-assets/video/collection-loop-6/loop-4k-3cf3007004be.mp4",
+      "bytes": 33750005,
+      "sha256": "3cf3007004be489f9a60543a7a55cb5a49373f8f67d5cee431152b75ee7cb15d"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "url": "/game-assets/video/collection-loop-6/loop-1080p-458cc9e3d474.mp4",
+      "bytes": 12149100,
+      "sha256": "458cc9e3d47438af9d227a9b5505a9aaaf40cd5cfd668bfbeaec0354deccdf77"
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "url": "/game-assets/video/collection-loop-6/loop-720p-f4f2e41e7669.mp4",
+      "bytes": 5365068,
+      "sha256": "f4f2e41e7669d3f27646330b35c5b210ddaf30bb41bbbf0e051e04b7ecbf8444"
+    }
+  ]
+}

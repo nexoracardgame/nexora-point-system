@@ -2,6 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),a
 const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fixture=fs.readFileSync('scripts/test-game-settings-ui.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
+require('./game-wallpaper-test-modules.cjs')(modules);
 const compile=source=>ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
 for(const [id,file]of [['collection','components/GameCardCollection.tsx'],['./GameBackControl','components/GameBackControl.tsx'],['./GamePageLogo','components/GamePageLogo.tsx'],['@/lib/game-collection-client','lib/game-collection-client.ts'],['@/lib/game-collection','lib/game-collection.ts'],['@/lib/triad-dominion','lib/triad-dominion.ts'],['@/lib/use-card-gesture','lib/use-card-gesture.ts'],['./triad-deck-rules','lib/triad-deck-rules.ts'],['./pentad-dominion','lib/pentad-dominion.ts']])modules[id]=compile(fs.readFileSync(file,'utf8'));
 modules['./GameCollectionDetails']=compile(fs.readFileSync('components/GameCollectionDetails.tsx','utf8'));modules['./GameGachaBackground']=compile(fs.readFileSync('components/GameGachaBackground.tsx','utf8'));modules['@/lib/login-wallpaper']='exports.loadLoginWallpaper=async()=>"/wallpaper.mp4";';
@@ -16,10 +17,10 @@ modules['next-auth/react']='exports.useSession=()=>({status:"authenticated",data
 modules['next/image']='exports.__esModule=true;exports.default=p=>require("react").createElement("img",p);exports.getImageProps=p=>({props:p});';
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
 const script=`const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}require('react-dom/client').createRoot(document.getElementById('root')).render(require('react').createElement(require('collection').default));`;
-const css=['GameShell.css','GamePageLogo.css','GameCardCollection.css','GameCollectionTheme.css'].map(file=>fs.readFileSync('components/'+file,'utf8')).join('\n');
+const css=['GameShell.css','GamePageLogo.css','GameCardCollection.css','GameCollectionTheme.css','GameEntryBackground.css'].map(file=>fs.readFileSync('components/'+file,'utf8')).join('\n');
 const core=require('./game-collection-test-loader.cjs')(),{triadCards}=core('lib/triad-dominion.ts'),rules=core('lib/game-collection.ts');
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});fs.mkdirSync('artifacts/game-collection',{recursive:true});try{
- for(const [width,height]of [[1648,928],[1440,900],[1280,800],[1920,1080],[1366,768],[844,390],[667,375],[568,320]]){
+ for(const [width,height]of [[3840,2160],[1648,928],[1440,900],[1280,800],[1920,1080],[1366,768],[844,390],[667,375],[568,320]]){
   const page=await browser.newPage({viewport:{width,height}}),errors=[],posts=[];let fail=false;
   page.on('pageerror',error=>errors.push(error.message));
   const owned=triadCards.filter(card=>card.kind!=='unknown').slice(0,30).map(card=>({cardNo:card.cardNo,quantity:2,favorite:false,acquiredAt:new Date().toISOString()})),firstNo=owned[0].cardNo;
@@ -34,7 +35,7 @@ const core=require('./game-collection-test-loader.cjs')(),{triadCards}=core('lib
     if(body.action==='save'){const problems=rules.validateCollectionDeck(body.format,body.cards,snapshot.owned,true);if(problems.length)return route.fulfill({status:422,json:{error:problems.join('\n')}});const old=snapshot.decks.find(deck=>deck.id===body.id);if(old&&old.version!==body.version)return route.fulfill({status:409,json:{error:'Conflict'}});const deck={id:body.id||'deck-'+posts.length,name:body.name,format:body.format,cards:body.cards,version:(old?.version||0)+1,updatedAt:new Date().toISOString()};snapshot.decks=[deck,...snapshot.decks.filter(item=>item.id!==deck.id)];return route.fulfill({json:{deck}})}
     return route.fulfill({status:400,json:{error:'Invalid action'}});
    }
-   const file=path.join('public',url.pathname);return fs.existsSync(file)?route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.png')?'image/png':file.endsWith('.jpg')?'image/jpeg':'image/webp'}):route.abort();
+   const file=path.join('public',url.pathname);return fs.existsSync(file)?route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.mp4')?'video/mp4':file.endsWith('.png')?'image/png':file.endsWith('.jpg')?'image/jpeg':'image/webp'}):route.abort();
   });
   await page.goto('http://collection.test/');await page.waitForFunction(()=>Boolean(require('@/lib/game-collection-client').cachedGameCollection('qa-owner')));await page.locator('#open').click();
   const panel=page.getByRole('dialog',{name:'การ์ดของฉัน',exact:true});await panel.waitFor();assert.equal(await panel.locator('.gcc-card').count(),18);
@@ -49,7 +50,11 @@ const core=require('./game-collection-test-loader.cjs')(),{triadCards}=core('lib
   await panel.getByRole('combobox',{name:'ประเภทการ์ด'}).selectOption('monster');assert.equal(await panel.locator('.gcc-card').count(),18);
   await panel.getByRole('combobox',{name:'ประเภทการ์ด'}).selectOption('all');await openFilters();await panel.getByRole('checkbox',{name:'เฉพาะการ์ด 4–5 ดาว'}).check();assert.ok((await panel.locator('.gcc-card').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.stars)))).every(stars=>stars>=4));await panel.getByRole('checkbox',{name:'เฉพาะการ์ด 4–5 ดาว'}).uncheck();await page.keyboard.press('Escape');assert.equal(await panel.getByRole('dialog',{name:'ตัวกรองคลังการ์ด'}).count(),0);assert.equal(await panel.getByRole('button',{name:'ตัวกรองเพิ่มเติม'}).evaluate(node=>node===document.activeElement),true);
   await panel.getByRole('combobox',{name:'จำนวนการ์ดต่อหน้า'}).selectOption('36');assert.equal(await panel.locator('.gcc-card').count(),owned.length);
-  await panel.locator('.gg-background video[loop]').waitFor();await panel.getByRole('button',{name:/^ถาวร/}).click();assert.equal(await panel.locator('.gcc-card').count(),owned.length);await panel.getByRole('button',{name:/^รายวัน/}).click();assert.equal(await panel.locator('.gcc-card').count(),0);await panel.getByRole('button',{name:/^ทั้งหมด/}).click();
+  await panel.locator('.gcc-background video[loop]').waitFor();
+  await page.waitForFunction(()=>{const v=document.querySelector('.gcc-background video');return v&&v.readyState>=2&&!v.paused&&v.currentTime>.1;});
+  const back=await panel.getByRole('button',{name:'ย้อนกลับ',exact:true}).boundingBox();const viewport=page.viewportSize();assert.ok(Math.abs(back.width-Math.min(240,Math.max(84,viewport.width*.1)))<1,'Back width matches shared navigation');assert.ok(Math.abs(back.height-back.width/2)<1);assert.ok(Math.abs(back.x-8)<1&&Math.abs(back.y-6)<1,'Back position matches shared navigation');
+  assert.ok((await panel.locator('.gcc-background video').getAttribute('src')).includes('/collection-loop-6/'));
+  await panel.getByRole('button',{name:/^ถาวร/}).click();assert.equal(await panel.locator('.gcc-card').count(),owned.length);await panel.getByRole('button',{name:/^รายวัน/}).click();assert.equal(await panel.locator('.gcc-card').count(),0);await panel.getByRole('button',{name:/^ทั้งหมด/}).click();
   snapshot.owned[1]={...snapshot.owned[1],quantity:3,permanentQuantity:2,temporaryQuantity:1,expiresAt:new Date(Date.now()+86400000).toISOString()};await refresh();await page.waitForFunction(()=>require('@/lib/game-collection-client').cachedGameCollection('qa-owner').owned[1].temporaryQuantity===1);await panel.getByRole('button',{name:/^รายวัน/}).click();assert.equal(await panel.locator('.gcc-card').count(),1);await panel.getByRole('button',{name:/^ถาวร/}).click();assert.equal(await panel.locator('.gcc-card').count(),owned.length);await panel.getByRole('button',{name:/^ทั้งหมด/}).click();
   const canvas=await panel.locator('.gcc-canvas').evaluate(node=>({width:node.clientWidth,height:node.clientHeight,columns:getComputedStyle(node.querySelector('.gcc-workspace')).gridTemplateColumns.split(' ').length}));assert.ok(canvas.width>=1280&&canvas.height>=720);assert.equal(canvas.columns,2,'Landscape desktop rail and library on every device');
   await page.waitForTimeout(300);
