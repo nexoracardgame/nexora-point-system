@@ -14,7 +14,7 @@ export type PendingBattleChat = BattleChatMessage & { baseline: Set<string>; fai
 export function visibleBattleChat(messages: BattleChatMessage[], pending: PendingBattleChat[]) {
   const matched = new Set<string>();
   return [...messages, ...pending.filter(item => {
-    const echo = messages.find(message => !item.baseline.has(message.id) && !matched.has(message.id) && message.senderId === item.senderId && message.text === item.text);
+    const echo = messages.find(message => !item.baseline.has(message.id) && !matched.has(message.id) && message.senderId === item.senderId && message.text.trim().replace(/\s+/g, " ") === item.text);
     if (echo) { matched.add(echo.id); return false; }
     return true;
   })].slice(-40);

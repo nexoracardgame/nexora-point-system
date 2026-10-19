@@ -1,5 +1,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('typescript');
 const compile=file=>ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:1,target:9}}).outputText;
+const chatModule={exports:{}};new Function('require','module','exports',compile('lib/battle-chat-messages.ts'))(require,chatModule,chatModule.exports);
+assert.equal(chatModule.exports.visibleBattleChat([{id:'server',senderId:'a',senderName:'A',text:'hello  there'}],[{id:'pending',senderId:'a',senderName:'A',text:'hello there',baseline:new Set()}]).length,1,'Whitespace normalization cannot duplicate a Pentad echo');
 let actor={id:'member'},databaseError=false;const queries=[];
 const moduleUnderTest={exports:{}};
 new Function('require','module','exports',compile('app/api/battle-chat/route.ts'))(id=>({
