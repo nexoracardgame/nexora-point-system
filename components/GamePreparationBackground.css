@@ -1,0 +1,7 @@
+.nexora-preparation-background { position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; background:#05080a; }
+.nexora-preparation-background img,.nexora-preparation-background video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; }
+.nexora-preparation-background video { opacity:0; transition:opacity 400ms ease; }
+.nexora-preparation-background video[data-ready=true] { opacity:1; }
+.nexora-preparation-background::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#03080c9e,#03080c52 50%,#03080c9e),linear-gradient(0deg,#03080ca8,transparent 65%); }
+.nexora-deck-screen { isolation:isolate; }
+@media (prefers-reduced-motion:reduce) { .nexora-preparation-background video { transition:none; } }

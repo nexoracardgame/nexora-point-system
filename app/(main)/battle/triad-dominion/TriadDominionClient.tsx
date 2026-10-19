@@ -3565,7 +3565,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
       cancelAnimationFrame(pointerFrame.current);
       pointerFrame.current = requestAnimationFrame(() => { artRef.current?.style.setProperty("--command-x", `${x}px`); artRef.current?.style.setProperty("--command-y", `${y}px`); });
     }} onPointerLeave={() => { cancelAnimationFrame(pointerFrame.current); artRef.current?.style.setProperty("--command-x", "0px"); artRef.current?.style.setProperty("--command-y", "0px"); }}>
-      <NexoraCommandScene homeVideo /><div className="nexora-command-shade" />
+      <NexoraCommandScene key={panel === "create" ? "preparation" : "home"} homeVideo videoScene={panel === "create" ? "preparation" : "home"} /><div className="nexora-command-shade" />
       <header className="nexora-command-brand"><img className="nexora-official-logo" src="/images/triad/nexora-official-logo.webp" alt="NEXORA CARD GAME" />
         <GameLobbyProfile name={participant.name} image={participant.image || "/avatar.png"} rank={profile?.rankName || "BRONZE"} wins={profile?.wins || 0} />
       </header>

@@ -4,7 +4,8 @@ const http = require('node:http');
 const assert = require('node:assert/strict');
 const ts = require('typescript');
 const { chromium } = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const manifest = require('../public/game-assets/video/home-loop/manifest.json');
+const manifest = require('../public/game-assets/video/home-loop-2/manifest.json');
+const preparationManifest = require('../public/game-assets/video/home-loop/manifest.json');
 const modules = {};
 for (const [id, pkg, file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']]) {
   modules[id] = fs.readFileSync(path.join(path.dirname(require.resolve(pkg)), 'cjs', file), 'utf8');
@@ -12,13 +13,18 @@ for (const [id, pkg, file] of [['react','react','react.production.js'],['react/j
 modules['lucide-react'] = fs.readFileSync(require.resolve('lucide-react'), 'utf8');
 modules['./BattleAudio'] = 'exports.primeBattleAudio=async()=>{};';
 modules['./lobby-assets'] = 'exports.loadLobbyAssets=()=>Promise.resolve();';
-modules['../public/game-assets/video/home-loop/manifest.json'] = `module.exports=${JSON.stringify(manifest)};`;
+modules['../public/game-assets/video/home-loop-2/manifest.json'] = `module.exports=${JSON.stringify(manifest)};`;
+modules['../public/game-assets/video/home-loop/manifest.json'] = `module.exports=${JSON.stringify(preparationManifest)};`;
 for (const [id, file] of [['@/lib/home-wallpaper','lib/home-wallpaper.ts'],['scene','app/(main)/battle/triad-dominion/NexoraCommandScene.tsx']]) {
   modules[id] = ts.transpileModule(fs.readFileSync(file,'utf8'), {fileName:file, compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
 }
+for (const [id,file] of [['./GamePreparationBackground','components/GamePreparationBackground.tsx'],['waiting','components/BattleWaitingRoom.tsx'],['deck','components/DeckPreparation.tsx']]) {
+  modules[id] = ts.transpileModule(fs.readFileSync(file,'utf8'), {fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+}
+modules['./GamePreparationBackground.css'] = modules['./BattleWaitingRoom.css'] = '';
 const bundle = Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
-const css = fs.readFileSync('app/(main)/battle/triad-dominion/NexoraCommand.css','utf8');
-const html = `<html><style>body{margin:0;background:black}${css}</style><div id="root"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const root=require('react-dom/client').createRoot(document.getElementById('root'));window.renderScene=homeVideo=>root.render(require('react').createElement(require('scene').default,{homeVideo}));renderScene(true);</script></html>`;
+const css = ['app/(main)/battle/triad-dominion/NexoraCommand.css','components/BattleHud.css','components/BattleWaitingRoom.css','components/GamePreparationBackground.css'].map(file=>fs.readFileSync(file,'utf8')).join('\n')+fs.readFileSync('app/(main)/battle/pentad-dominion/PentadDominion.module.css','utf8').replace(/\.shell\b/g,'.test-pentad');
+const html = `<html><style>body{margin:0;background:black}${css}</style><div id="root"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const root=require('react-dom/client').createRoot(document.getElementById('root'));window.renderScene=(homeVideo,videoScene='home')=>root.render(require('react').createElement(require('scene').default,{homeVideo,videoScene,key:videoScene}));renderScene(true);</script></html>`;
 (async()=>{
  const server=http.createServer((req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
@@ -41,7 +47,7 @@ const html = `<html><style>body{margin:0;background:black}${css}</style><div id=
    await page.waitForFunction(w=>document.querySelector('video')?.videoWidth===w,expected);
    await page.waitForFunction(()=>document.querySelector('video')?.currentTime>.1);
    assert.equal(await page.locator('video').evaluate(v=>v.loop&&v.muted&&v.playsInline),true);
-   assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop/')));
+   assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop-2/')));
    await page.screenshot({path:`artifacts/home-loop/${name}.png`});
    await page.locator('video').evaluate(v=>{v.currentTime=9.7});
    await page.waitForFunction(()=>document.querySelector('video')?.currentTime<2);
@@ -50,8 +56,33 @@ const html = `<html><style>body{margin:0;background:black}${css}</style><div id=
    assert.equal(await page.locator('video').evaluate(v=>v.paused),true);
    await page.evaluate(()=>renderScene(false));
    await page.locator('video').waitFor({state:'detached'});
+   await page.evaluate(()=>{localStorage.removeItem('triad-command-motion-off');renderScene(true,'preparation');});
+   await page.waitForFunction(()=>document.querySelector('video')?.currentTime>.1);
+   assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop/')),'Create room uses Loop 1');
+   await page.evaluate(()=>renderScene(true));
+   await page.waitForFunction(()=>document.querySelector('video')?.currentTime>.1);
+   assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop-2/')),'Returning home restores Loop 2');
+   for(const mode of ['waiting','deck','pentad-waiting','pentad-deck']) {
+    await page.evaluate(mode=>{
+      localStorage.removeItem('triad-command-motion-off');
+      const React=require('react'),h=React.createElement;
+      const child=mode.endsWith('waiting')?h(require('waiting').default,{seats:{host:null,challenger:null},spectators:[],userId:'test',leaderId:'test',modes:[{id:'all',title:'ALL CARDS',description:''}],mode:'all',canChange:true,onMode:()=>{},onWatch:()=>{},onTake:()=>{window.actionWorked=true},onBot:()=>{}}):h(require('deck').DeckPreparationLayout,{tray:h('h2',null,'DECK'),catalog:h('button',{onClick:()=>{window.actionWorked=true}},'Select card')});
+      root.render(h('div',{className:'nexora-battle-shell',style:{width:'100vw',height:'100vh'}},h('main',{className:mode.startsWith('pentad')?'test-pentad':mode==='waiting'?'nexora-command triad-room-screen':'nexora-command-deck triad-deck-screen nexora-deck-screen'},child)));
+    },mode);
+    await page.waitForFunction(()=>document.querySelector('video')?.currentTime>.1);
+    assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop/')));
+    assert.equal(await page.locator('video').evaluate(v=>v.muted&&v.loop&&v.playsInline),true);
+    assert.equal(await page.locator('video').count(),1);
+    await page.screenshot({path:`artifacts/home-loop/${name}-${mode}.png`});
+    await page.locator(mode.endsWith('waiting')?'.nsw-seat-actions button':'.nexora-deck-catalog button').first().click();
+    assert.equal(await page.evaluate(()=>window.actionWorked),true);
+    await page.evaluate(()=>{window.actionWorked=false;localStorage.setItem('triad-command-motion-off','1');window.dispatchEvent(new Event('nexora:motion-preference'));});
+    await page.waitForFunction(()=>document.querySelector('video')?.paused);
+    await page.evaluate(()=>renderScene(false));
+    await page.locator('video').waitFor({state:'detached'});
+   }
    assert.deepEqual(errors,[]);await page.close();
   }
-  console.log('Home loop: desktop/4K/mobile resolution, playback, seamless repeat, mute, pause and home-only scope passed');
+  console.log('Home Loop 2 + waiting/deck Loop 1: desktop/4K/mobile resolution, playback, repeat, mute, pause, controls and scene cleanup passed');
  } finally {await browser.close();server.closeAllConnections();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

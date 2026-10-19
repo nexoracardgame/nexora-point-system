@@ -1,11 +1,12 @@
 "use client";
 import {Eye,Crown,Check,Bot,LogIn,UserMinus} from 'lucide-react';
 import './BattleWaitingRoom.css';
+import GamePreparationBackground from './GamePreparationBackground';
 type Person={id:string;name:string;image?:string};
 type Mode={id:string;title:string;description:string};
 export default function BattleWaitingRoom({seats,spectators,userId,leaderId,modes,mode,canChange,busy,onMode,onWatch,onTake,onBot,children}:{seats:{host:Person|null;challenger:Person|null};spectators:Person[];userId:string;leaderId:string;modes:Mode[];mode:string;canChange:boolean;busy?:boolean;onMode:(id:string)=>void;onWatch:()=>void;onTake:(side:'host'|'challenger')=>void;onBot?:(side:'host'|'challenger',enabled:boolean)=>void;children?:React.ReactNode}){
  const seated=seats.host?.id===userId||seats.challenger?.id===userId;
- return <section className="nexora-shared-waiting"><div className="nsw-seats">{(['host','challenger'] as const).map(side=>{
+ return <section className="nexora-shared-waiting"><GamePreparationBackground/><div className="nsw-seats">{(['host','challenger'] as const).map(side=>{
   const person=seats[side],bot=person?.id==='triad-bot-level-99'||person?.id==='pentad-bot';
   return <article key={side} className="nsw-seat" aria-label={side==='host'?'ฝั่ง A':'ฝั่ง B'}><small>{side==='host'?'ฝั่ง A':'ฝั่ง B'}</small><div className="nsw-person">
    {person?<><div className="nsw-avatar"><img src={person.image||'/avatar.png'} alt=""/>{person.id===leaderId&&<Crown/>}</div><strong>{person.name}</strong><span>{bot?'BOT · พร้อมลงสนาม':'พร้อมลงสนาม'}</span></>:<strong>รอผู้เล่น</strong>}

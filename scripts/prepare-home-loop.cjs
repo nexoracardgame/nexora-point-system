@@ -1,7 +1,8 @@
 const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto'),{execFileSync}=require('node:child_process');
-const [source,ffmpeg]=process.argv.slice(2);
+const [source,ffmpeg,folder='home-loop']=process.argv.slice(2);
 if(!source||!ffmpeg)throw Error('Usage: node scripts/prepare-home-loop.cjs <master.mp4> <ffmpeg.exe>');
-const root='public/game-assets/video/home-loop',urlRoot='/game-assets/video/home-loop';
+if(!/^[a-z0-9-]+$/.test(folder))throw Error('Invalid resource folder');
+const root='public/game-assets/video/'+folder,urlRoot='/game-assets/video/'+folder;
 fs.mkdirSync(root,{recursive:true});
 const variants=[];
 for(const [name,width,height,bitrate,maxrate,cq]of [['4k',3840,2160,'10M','14M','23'],['1080p',1920,1080,'3M','5M','24'],['720p',1280,720,'1500k','2200k','25']]){

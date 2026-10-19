@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Clock3, LogOut, Shuffle, Trash2 } from "lucide-react";
+import GamePreparationBackground from "./GamePreparationBackground";
 
 export const TRIAD_TITLE = "Triad Dominion (อำนาจสามผนึก) ฐาน 3 ใบ";
 export const PENTAD_TITLE = "Pentad Dominion (อำนาจห้าผนึก) ฐาน 5 ใบ";
@@ -15,5 +16,5 @@ export function DeckPreparationHeader({ title, time, onExit }: { title: string; 
 }
 
 export function DeckPreparationLayout({ tray, catalog, actions }: { tray: ReactNode; catalog: ReactNode; actions?: ReactNode }) {
-  return <section className="nexora-deck-layout"><aside className="nexora-deck-tray">{tray}</aside><div className="nexora-deck-catalog">{catalog}</div><footer className="nexora-deck-actions">{actions}</footer></section>;
+  return <><GamePreparationBackground /><section className="nexora-deck-layout"><aside className="nexora-deck-tray">{tray}</aside><div className="nexora-deck-catalog">{catalog}</div><footer className="nexora-deck-actions">{actions}</footer></section></>;
 }
