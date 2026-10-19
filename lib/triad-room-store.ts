@@ -2001,6 +2001,17 @@ function runSeatBots(room:StoredTriadRoom){
   for(const side of sides)changed=ensureBotDeckReady(room,side)||changed;
   if(!battleDecksReady(room))return changed;
   changed=finalizeDeckSelection(room)||changed;
+  // Resolve opening choices independently of the cinematic advance delay.
+  // Bound each tick so repeated draws cannot block the room worker.
+  if(room.game.openerTieBreak.status==="waiting"){
+    for(let round=0;round<8&&room.game.openerTieBreak.status==="waiting";round++){
+      let picked=false;
+      for(const side of sides)picked=botChooseOpeningTieBreak(room,side)||picked;
+      changed=picked||changed;
+      if(!picked||sides.length<2)break;
+    }
+    return changed;
+  }
   const resolved=room.game.turns.some(turn=>turn.turn===room.game.activeTurn);
   if(resolved){
     if(!room.game.botAdvanceAt){room.game.botAdvanceAt=Date.now()+20000;return true;}

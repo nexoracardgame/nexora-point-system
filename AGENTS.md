@@ -9,6 +9,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Every game screen is landscape-only on desktop, mobile and tablet. Do not introduce portrait-specific game layouts or stacked mobile-only navigation.
 - Reuse desktop scene composition with a fitted landscape canvas. If a browser refuses orientation locking, require rotation before allowing game interaction.
 - Keep My Collection controls minimal: search, primary filters, and pagination; put secondary options in one filter panel. Preserve live inventory and deck behavior.
+- Battlefield and deck-selection card/skill details in TRIAD and PENTAD must reuse `BattleCardInspector` and its shared stylesheet. Keep the panel inside the landscape viewport below window controls; use 80%-transparent backgrounds (20% opacity, not faded text) and scroll long descriptions internally. Do not fork per-mode inspector layouts.
 
 ## Blaze AI single-brain rule
 

@@ -9,14 +9,13 @@ import './BattleCardInspector.css';
 type InspectorCard = { cardNo: string; name: string; sourceImage: string; attack: number; support: number; kind: string; skillText: string };
 
 export default function BattleCardInspector({ card, element, interactive, onClose, onUseCard }: { card: InspectorCard; element: string; interactive: boolean; onClose?: () => void; onUseCard?: () => void }) {
-  const [bottom, setBottom] = useState(230);
+  const [bottom, setBottom] = useState(16);
   const panel=useRef<HTMLElement>(null);
-  useLayoutEffect(()=>{const element=panel.current;if(!element)return;let frame=0;const fit=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{const info=element.querySelector<HTMLElement>('.nexora-card-inspector-info');if(!info)return;let size=16;info.style.setProperty('--inspector-text-size',`${size}px`);while(size>10&&(info.scrollHeight>info.clientHeight+1||info.scrollWidth>info.clientWidth+1)){size-=.5;info.style.setProperty('--inspector-text-size',`${size}px`)}})};const observer=new ResizeObserver(fit);observer.observe(element);fit();return()=>{observer.disconnect();cancelAnimationFrame(frame)}},[card.cardNo,card.skillText]);
   useLayoutEffect(() => {
     const measure = () => {
       const tops = [...document.querySelectorAll(".nexora-arena-hand,.nexora-arena-hand-filters")]
         .map(node => node.getBoundingClientRect()).filter(rect => rect.width > 0 && rect.height > 0 && rect.top > window.innerHeight / 2).map(rect => rect.top);
-      setBottom(tops.length ? Math.max(175, window.innerHeight - Math.min(...tops) + 16) : 230);
+      setBottom(tops.length ? Math.min(window.innerHeight * .25, window.innerHeight - Math.min(...tops) + 16) : 16);
     };
     measure();
     const observer = new ResizeObserver(measure);

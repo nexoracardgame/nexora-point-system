@@ -9,6 +9,40 @@ const triad=mod.exports,pentad=load('lib/pentad-room-store.ts');
 const owner={id:'human-owner',name:'Owner',image:'/avatar.png',joinedAt:1},visitor={id:'visitor',name:'Visitor',image:'/avatar.png'};
 let now=Date.now();const realNow=Date.now;Date.now=()=>now;
 try{
+ const tieRoom={code:'bot-rps',hostId:owner.id,seats:{host:triad.triadBotParticipant(),challenger:triad.triadBotParticipant()},spectators:[owner],status:'playing',createdAt:now,updatedAt:now,game:{...triad.freshGame(),selectionPools:triad.buildSelectionPools('all','rps')}};
+ triad.runSeatBots(tieRoom);
+ const originalRandom=Math.random;
+ function resetTie(){
+  tieRoom.game.activeTurn=1;tieRoom.game.matchEndedAt=0;
+  tieRoom.game.turnStartedAt=Math.max(now,tieRoom.game.deckStartedAt+1);
+  tieRoom.game.turns=[{turn:1,winner:'draw'}];
+  tieRoom.game.botAdvanceAt=now+20000;
+  tieRoom.game.openerTieBreak={fightNo:tieRoom.game.fightNo,turn:1,status:'waiting',choices:{},round:1,winner:'',source:'manual'};
+ }
+ try{
+  resetTie();
+  const picks=[0,0,0.4,0.4,0,0.8];let calls=0;
+  Math.random=()=>picks[calls++]??0;
+  triad.runSeatBots(tieRoom);
+  assert.equal(tieRoom.game.openerTieBreak.status,'resolved');
+  assert.equal(tieRoom.game.openerTieBreak.winner,'host');
+  assert.equal(tieRoom.game.openerTieBreak.round,3);
+  assert.equal(tieRoom.game.activeTurn,2);
+  resetTie();Math.random=()=>0;
+  triad.runSeatBots(tieRoom);
+  assert.equal(tieRoom.game.openerTieBreak.status,'waiting');
+  assert.equal(tieRoom.game.openerTieBreak.round,9);
+  const next=[0.8,0];let i=0;Math.random=()=>next[i++]??0;
+  triad.runSeatBots(tieRoom);
+  assert.equal(tieRoom.game.openerTieBreak.status,'resolved');
+  assert.equal(tieRoom.game.openerTieBreak.winner,'challenger');
+  resetTie();tieRoom.seats.challenger=owner;Math.random=()=>0.4;
+  triad.runSeatBots(tieRoom);
+  assert.equal(tieRoom.game.openerTieBreak.choices.host,'paper');
+  assert.equal(tieRoom.game.openerTieBreak.choices.challenger,undefined);
+  assert.equal(tieRoom.game.openerTieBreak.status,'waiting');
+  console.log('TRIAD opening RPS: repeated draws, bounded retries, next-tick recovery and human choice preserved');
+ }finally{Math.random=originalRandom}
  for(const deckMode of ['all','monster','skill']){
   const room={code:'bot-'+deckMode,hostId:owner.id,seats:{host:triad.triadBotParticipant(),challenger:triad.triadBotParticipant()},spectators:[owner],status:'playing',createdAt:now,updatedAt:now,game:{...triad.freshGame(),deckMode,selectionPools:triad.buildSelectionPools(deckMode,'test')}};
   let resolved=0;
