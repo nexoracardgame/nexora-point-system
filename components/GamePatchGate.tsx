@@ -1,4 +1,5 @@
 "use client";
+import {isInstalledGameRuntime} from '@/lib/game-desktop-runtime';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
@@ -32,9 +33,10 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
     void profileReady.catch(()=>{});
     const ready=async()=>{await profileReady;if(!cancelled){preparedUsers.add(userId);try{sessionStorage.setItem('nexora:game-prepared:'+LOBBY_ASSET_VERSION+':'+userId,'1')}catch{}setBlocking(false)}};
     const desktop=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean;getVersion:()=>Promise<string>}}).nexoraDesktop;
-    const installed=Boolean(desktop?.isGameDesktop||window.matchMedia('(display-mode: standalone)').matches||(navigator as Navigator&{standalone?:boolean}).standalone);
+    const native=isInstalledGameRuntime(window);
+    const installed=Boolean(native||window.matchMedia('(display-mode: standalone)').matches||(navigator as Navigator&{standalone?:boolean}).standalone);
     if(!installed){setError('');void prepareGameResourceWorker().then(()=>Promise.all([loadLobbyAssets(),prepareCardAlbum()])).then(()=>ready()).catch(()=>{if(!cancelled)setError('โหลดทรัพยากรเกมไม่สำเร็จ')});return()=>{cancelled=true};}
-    if(desktop?.isGameDesktop)document.documentElement.dataset.gameDesktop='true';
+    if(native)document.documentElement.dataset.gameDesktop='true';
     let disposed=false,running=false;const controller=new AbortController();
     const check=async()=>{
       if(running||activeRef.current)return;running=true;
@@ -43,7 +45,7 @@ export default function GamePatchGate({children}:{children:React.ReactNode}){
         const response=await fetch('/game-release.json',{cache:'no-store',signal:controller.signal});if(!response.ok)throw Error('ตรวจสอบแพตช์ไม่สำเร็จ');
         const release=await response.json() as GameRelease;
         const current=await (await caches.open('nexora-game-release')).match('/game/release-pointer');const previous=current?await current.json():null;
-        const version=desktop?.isGameDesktop?await desktop.getVersion():release.minimumDesktopVersion;
+        const version=native&&desktop?.getVersion?await desktop.getVersion():release.minimumDesktopVersion;
         const numbers=(v:string)=>v.split('.').map(Number);const v=numbers(version),minimum=numbers(release.minimumDesktopVersion);
         if(v.some((n,i)=>n<minimum[i]&&v.slice(0,i).every((p,j)=>p===minimum[j])))throw Error('กรุณาอัปเดตตัวเกม Windows เป็นเวอร์ชันล่าสุด');
         if(!await hasPendingGameResources(release)){await Promise.all([loadLobbyAssets(),prepareCardAlbum()]);if(!disposed)await ready();return;}

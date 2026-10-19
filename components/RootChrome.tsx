@@ -10,6 +10,7 @@ import BattleMenuMusic from "@/components/BattleMenuMusic";
 import NexoraDialogProvider from "@/components/NexoraDialogProvider";
 import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
 import { isGameRoute } from "@/lib/game-routes";
+import { isInstalledGameRuntime } from '@/lib/game-desktop-runtime';
 
 const SiteRootChrome = dynamic(() => import("@/components/SiteRootChrome"));
 const GameWebsite = dynamic(() => import("@/components/GameWebsite"));
@@ -25,7 +26,7 @@ export default function RootChrome({
     pathname.startsWith("/blaze-embed") || pathname.startsWith("/market-embed");
   const isBattleRoute = isGameRoute(pathname);
   const [runtime,setRuntime]=useState<'checking'|'game'|'site'>('checking');
-  useEffect(()=>{const bridge=(window as typeof window&{nexoraDesktop?:{isGameDesktop?:boolean}}).nexoraDesktop;setRuntime(bridge?.isGameDesktop?'game':'site');if(bridge?.isGameDesktop&&!isGameRoute(pathname))window.location.replace('/game')},[pathname]);
+  useEffect(()=>{const game=isInstalledGameRuntime(window);setRuntime(game?'game':'site');if(game&&!isGameRoute(pathname))window.location.replace('/game')},[pathname]);
 
   if (isEmbedRoute) {
     return children;

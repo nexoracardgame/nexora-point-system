@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { useBattleArenaActive } from '@/lib/battle-ui-state';
 import {setGameWindowMode} from '@/lib/game-window-mode';
 import './GameWindowControls.css';
+import {isInstalledGameRuntime} from '@/lib/game-desktop-runtime';
 
 type WindowBridge={isGameDesktop?:boolean;windowControl?:(action:'minimize'|'resize'|'close')=>Promise<boolean>};
 export default function GameWindowControls(){
@@ -19,7 +20,7 @@ export default function GameWindowControls(){
   useEffect(()=>{if(!confirmClose)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();setConfirmClose(false)}if(e.key==='Tab'){e.stopImmediatePropagation();const buttons=document.querySelectorAll<HTMLButtonElement>('.nexora-window-exit button'),first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true)},[confirmClose]);
   useEffect(()=>{const sync=()=>setFullscreen(document.fullscreenElement!==null||document.documentElement.dataset.gameWindowMode==='fullscreen');sync();window.addEventListener('nexora:window-mode',sync);document.addEventListener('fullscreenchange',sync);return()=>{window.removeEventListener('nexora:window-mode',sync);document.removeEventListener('fullscreenchange',sync)}},[]);
   const {status}=useSession();const pathname=usePathname();const active=useBattleArenaActive();
-  useEffect(()=>{const bridge=(window as typeof window&{nexoraDesktop?:WindowBridge}).nexoraDesktop;if(bridge?.isGameDesktop&&bridge.windowControl)setDesktop(bridge)},[]);
+  useEffect(()=>{const bridge=(window as typeof window&{nexoraDesktop?:WindowBridge}).nexoraDesktop;if(isInstalledGameRuntime(window)&&bridge?.windowControl)setDesktop(bridge)},[]);
   const lobby=status==='authenticated'&&!active&&(pathname==='/game'||pathname==='/game/pentad');
   useEffect(()=>{document.documentElement.dataset.gameWindowControls=desktop?'desktop':'';return()=>{delete document.documentElement.dataset.gameWindowControls}},[desktop]);
   useEffect(()=>{const node=toolbar.current;if(!node)return;const sync=()=>document.documentElement.style.setProperty('--game-window-controls-width',`${node.getBoundingClientRect().width}px`);sync();const observer=new ResizeObserver(sync);observer.observe(node);return()=>{observer.disconnect();document.documentElement.style.removeProperty('--game-window-controls-width')}},[desktop]);

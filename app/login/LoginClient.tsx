@@ -1,4 +1,5 @@
 "use client";
+import {isInstalledGameRuntime} from '@/lib/game-desktop-runtime';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
@@ -172,7 +173,7 @@ export default function LoginClient({
 
       try {
         const desktop = (window as typeof window & {nexoraDesktop?: {isGameDesktop?:boolean;gameLogin?:(provider:string)=>Promise<boolean>}}).nexoraDesktop;
-        if (game && desktop?.isGameDesktop && desktop.gameLogin) {
+        if (game && isInstalledGameRuntime(window) && desktop?.gameLogin) {
           await desktop.gameLogin(provider);
           setPendingProvider(null);loginInFlightRef.current=false;
           return;

@@ -5,6 +5,7 @@ import {createPortal} from 'react-dom';
 import {Download,Settings,X,Volume2,VolumeX,UserRound,LockKeyhole,Eye,EyeOff} from 'lucide-react';
 import {playGameUiSound} from '@/lib/game-ui-audio';
 import {loadLoginWallpaper} from '@/lib/login-wallpaper';
+import {isInstalledGameRuntime} from '@/lib/game-desktop-runtime';
 import '@/app/login/GameLogin.css';
 import './GameEmailVerification.css';
 
@@ -22,8 +23,7 @@ export default function GameLoginView({busy,checking,error,onLogin,onCredentials
  useEffect(()=>{const locate=()=>setUtilitySlot(document.querySelector('[data-game-utilities-slot]'));locate();const observer=new MutationObserver(locate);observer.observe(document.body,{childList:true,subtree:true});return()=>observer.disconnect()},[]);
  const dialog=useRef<HTMLElement|null>(null),video=useRef<HTMLVideoElement|null>(null);
  useEffect(()=>{
-  const bridge=(window as typeof window&{nexoraDesktop?:{isDesktop?:boolean;isGameDesktop?:boolean}}).nexoraDesktop;
-  const installed=Boolean(bridge?.isDesktop||bridge?.isGameDesktop||navigator.userAgent.includes('Electron/'));
+  const installed=isInstalledGameRuntime(window);
   setBrowserDownload(!installed);document.documentElement.dataset.gameDesktop=String(installed);
   let active=true,objectUrl='';const controller=new AbortController();try{const name=localStorage.getItem('nexora-game-username');if(name){setUsername(name);setRemember(true)}}catch{}
   void loadLoginWallpaper(controller.signal).then(url=>{if(active){objectUrl=url;setVideoUrl(url)}else URL.revokeObjectURL(url)}).catch(()=>{if(active&&!controller.signal.aborted)setVideoFailed(true)});
