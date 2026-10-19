@@ -21,7 +21,7 @@ const css=['components/GameWebsite.css','components/GameBattleTutorials.css'].ma
  const browser=await chromium.launch({channel:'chrome',headless:true});
  try{
   fs.mkdirSync('artifacts/website-home-loop',{recursive:true});
-  for(const [width,height,mobile,expected]of [[1920,1080,false,1920],[3840,2160,false,3840],[844,390,true,1280],[390,844,true,1280]]){
+  for(const [width,height,mobile,expected]of [[1920,1080,false,1920],[3840,1296,false,3840],[3440,1440,false,3840],[3840,2160,false,3840],[844,390,true,1280],[390,844,true,1280]]){
    const page=await browser.newPage({viewport:{width,height},isMobile:mobile,hasTouch:mobile}),errors=[],requests=[];
    await page.addInitScript(()=>Object.defineProperty(navigator,'deviceMemory',{get:()=>8}));
    page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>requests.push(request.url()));
@@ -31,6 +31,7 @@ const css=['components/GameWebsite.css','components/GameBattleTutorials.css'].ma
    const videoPath=new URL(await video.getAttribute('src'),page.url()).pathname;
    assert.ok(manifest.variants.some(variant=>variant.url===videoPath));
    assert.equal(await page.locator('.nx-site-hero>img').getAttribute('src'),manifest.poster);
+   for(const scene of await page.locator('.nx-site-hero>.nx-site-scene').all())assert.equal(await scene.evaluate(element=>getComputedStyle(element).objectPosition.split(' ')[1]),'0%','Preserve the top of the character on every aspect ratio');
    assert.equal(requests.some(url=>url.includes('/videos/')||url.includes('lobby-action-sprite')),false,'No login video or game-only artwork download');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.screenshot({path:`artifacts/website-home-loop/${width}.png`});
