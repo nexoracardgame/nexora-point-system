@@ -1,10 +1,11 @@
 /* One landscape layout for both engines and deck-selection previews. */
-.nexora-card-inspector.nexora-card-inspector { inset:0!important;width:100%!important;height:100%!important;box-sizing:border-box!important;padding:72px 12px var(--inspector-bottom,16px)!important;display:flex!important;justify-content:flex-end!important;align-items:flex-start!important;background:transparent!important;pointer-events:none!important; }
+.nexora-card-inspector.nexora-card-inspector { inset:0!important;width:100%!important;height:100%!important;box-sizing:border-box!important;padding:var(--inspector-top,72px) 12px var(--inspector-bottom,16px)!important;display:flex!important;justify-content:flex-end!important;align-items:flex-start!important;background:transparent!important;pointer-events:none!important; }
+.nexora-card-inspector-panel,.nexora-card-inspector-panel * { box-sizing:border-box; }
 .nexora-card-inspector .nexora-card-inspector-panel {
   position:relative!important;display:grid!important;grid-template-columns:minmax(0,.8fr) minmax(0,1fr)!important;grid-template-rows:32px minmax(0,1fr) auto!important;
   width:min(560px,44%)!important;min-width:0!important;height:min(480px,100%)!important;max-height:100%!important;gap:12px!important;padding:14px!important;margin:0!important;
   clip-path:none!important;border:1px solid #e6c477!important;border-radius:6px!important;
-  background:linear-gradient(145deg,rgb(22 19 13 / 20%),rgb(6 10 16 / 20%) 50%,rgb(23 19 9 / 20%))!important;
+  background:rgb(0 0 0 / 80%)!important;
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 0 0 2px #c8a65022,inset 0 0 22px #caa44b18,0 8px 24px #0005!important;
   overflow:hidden!important;pointer-events:none!important;text-shadow:0 1px 3px #000,0 0 8px #000;animation:nexora-inspector-gold-in 220ms ease-out both!important;
 }
@@ -21,7 +22,7 @@
 .nexora-card-inspector .nexora-card-inspector-use { position:static!important;grid-column:1/-1;width:100%!important;min-height:32px!important;font-size:12px!important; }
 @keyframes nexora-inspector-gold-in { from { opacity:0;translate:12px 0; } to { opacity:1;translate:0 0; } }
 @media(max-width:1000px),(max-height:600px) {
-  .nexora-card-inspector.nexora-card-inspector { padding:72px 8px 12px!important; }
+  .nexora-card-inspector.nexora-card-inspector { padding:var(--inspector-top,72px) 8px 12px!important; }
   .nexora-card-inspector .nexora-card-inspector-panel { width:min(560px,64%)!important;gap:8px!important;padding:8px!important; }
   .nexora-card-inspector .nexora-card-inspector-info h2 { font-size:16px!important; }
   .nexora-card-inspector .nexora-card-inspector-info p { font-size:12px!important; }
