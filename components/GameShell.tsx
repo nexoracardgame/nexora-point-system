@@ -16,6 +16,7 @@ import GameSettings from './GameSettings';
 import GameRoomResume from './GameRoomResume';
 import GameProfileOverlay from './GameProfileOverlay';
 import GameDesktopUpdate from './GameDesktopUpdate';
+import GameLogoShine from './GameLogoShine';
 import { isInstalledGameRuntime } from '@/lib/game-desktop-runtime';
 
 const FloatingChatDock = dynamic(() => import("@/components/FloatingChatDock"), { ssr: false });
@@ -25,8 +26,8 @@ export default function GameShell({ children }: { children: React.ReactNode }) {
   const [desktop,setDesktop]=useState<boolean|null>(null);
   useEffect(()=>{setDesktop(isInstalledGameRuntime(window))},[]);
   if(desktop===null)return null;
-  if(!desktop)return pathname==='/game/login'?<div className="nexora-web-login">{children}</div>:<GameWebsite>{['/game/topup','/game/account','/game/verify-email'].includes(pathname)||pathname.startsWith('/game/world/')?children:null}</GameWebsite>;
-  return <InstalledGameShell>{children}</InstalledGameShell>;
+  if(!desktop)return <><GameLogoShine/>{pathname==='/game/login'?<div className="nexora-web-login">{children}</div>:<GameWebsite>{['/game/topup','/game/account','/game/verify-email'].includes(pathname)||pathname.startsWith('/game/world/')?children:null}</GameWebsite>}</>;
+  return <><GameLogoShine/><InstalledGameShell>{children}</InstalledGameShell></>;
 }
 
 function InstalledGameShell({ children }: { children: React.ReactNode }) {

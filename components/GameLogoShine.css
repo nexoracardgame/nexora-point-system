@@ -1,0 +1,3 @@
+.nexora-logo-reflection{position:fixed;z-index:2147483646;pointer-events:none;mask:url('/images/triad/nexora-official-logo.webp') center/100% 100% no-repeat;background:linear-gradient(110deg,transparent 30%,#fff1ce99 50%,transparent 70%);background-size:300% 100%;animation:nexora-logo-reflection 700ms ease-out both}
+@keyframes nexora-logo-reflection{from{background-position:100% 0;opacity:0}25%{opacity:.8}to{background-position:0 0;opacity:0}}
+@media(prefers-reduced-motion:reduce){.nexora-logo-reflection{display:none!important;animation:none}}
