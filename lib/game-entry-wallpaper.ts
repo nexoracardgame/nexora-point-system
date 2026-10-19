@@ -1,10 +1,11 @@
 import manifest from "../public/game-assets/video/entry-loop-3/manifest.json";
 import shopManifest from "../public/game-assets/video/shop-loop-5/manifest.json";
 import collectionManifest from "../public/game-assets/video/collection-loop-6/manifest.json";
+import monsterManifest from "../public/game-assets/video/monster-loop-8/manifest.json";
 
 export const ENTRY_WALLPAPER_POSTER = manifest.poster;
-export type EntryWallpaperScene = "entry" | "shop" | "collection";
-const sceneManifest = (scene: EntryWallpaperScene) => scene === "collection" ? collectionManifest : scene === "shop" ? shopManifest : manifest;
+export type EntryWallpaperScene = "entry" | "shop" | "collection" | "monster";
+const sceneManifest = (scene: EntryWallpaperScene) => scene === "monster" ? monsterManifest : scene === "collection" ? collectionManifest : scene === "shop" ? shopManifest : manifest;
 export function entryWallpaperPoster(scene: EntryWallpaperScene = "entry") {
   return sceneManifest(scene).poster;
 }

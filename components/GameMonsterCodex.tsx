@@ -6,7 +6,7 @@ import {gameMonsters,describeMonster,monsterElements,monsterThumbnail,warmMonste
 import type {TriadCard} from '@/lib/triad-dominion';
 import GameBackControl from './GameBackControl';
 import GamePageLogo from './GamePageLogo';
-import GameGachaBackground from './GameGachaBackground';
+import GameEntryBackground from './GameEntryBackground';
 import './GameMonsterCodex.css';
 
 function Stars({count}:{count:number}){return <span className="gmc-stars" aria-label={`ระดับพลัง ${count} ดาว`}>{[1,2,3,4,5].map(value=><Star key={value} size={14} fill={value<=count?'currentColor':'none'} data-filled={value<=count}/>)}</span>}
@@ -42,7 +42,7 @@ export default function GameMonsterCodex(){
  if(!open)return null;
  const details=selected?describeMonster(selected):null;
  return createPortal(<section className="game-monster-codex" role="dialog" aria-modal="true" aria-label="สารานุกรมมอนสเตอร์" tabIndex={-1} ref={root}>
-  <GameGachaBackground/>
+  <GameEntryBackground scene="monster" className="gg-background"/>
   <header className="gmc-header"><GameBackControl onBack={close}/><GamePageLogo/><div><h1>มอนสเตอร์</h1><span>NEXORA / MONSTER ARCHIVE</span></div><span className="gmc-count">{gameMonsters.length} ตัว</span></header>
   {!selected?<>
    <div className="gmc-toolbar"><label className="gmc-search"><Search size={18}/><input aria-label="ค้นหามอนสเตอร์" placeholder="ชื่อ / หมายเลข / สกิล" value={query} onChange={event=>setQuery(event.target.value)}/>{query&&<button type="button" aria-label="ล้างคำค้น" title="ล้างคำค้น" onClick={()=>setQuery('')}><X size={17}/></button>}</label><select aria-label="ธาตุมอนสเตอร์" value={element} onChange={event=>setElement(event.target.value)}><option value="all">ทุกธาตุ</option>{Object.entries(monsterElements).map(([id,label])=><option value={id} key={id}>{label}</option>)}</select><select aria-label="ระดับดาว" value={stars} onChange={event=>setStars(event.target.value)}><option value="all">ทุกระดับดาว</option>{[1,2,3,4,5].map(count=><option value={count} key={count}>{count} ดาว</option>)}</select><select aria-label="เรียงมอนสเตอร์" value={sort} onChange={event=>setSort(event.target.value)}><option value="number">หมายเลข</option><option value="attack">พลังโจมตี</option><option value="support">พลังสนับสนุน</option><option value="stars">ระดับดาว</option></select></div>

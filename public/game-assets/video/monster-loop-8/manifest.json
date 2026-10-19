@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "poster": "/game-assets/video/monster-loop-8/poster-8ea67c52d41b.webp",
+  "variants": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "url": "/game-assets/video/monster-loop-8/loop-4k-73b29aa7fb09.mp4",
+      "bytes": 33859873,
+      "sha256": "73b29aa7fb094dfa83449892eae1677b688c332f33f11a588f2021864a50bcf3"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "url": "/game-assets/video/monster-loop-8/loop-1080p-752e8117c1aa.mp4",
+      "bytes": 12106217,
+      "sha256": "752e8117c1aae3cf937e4d63b13200b1a2b1a2bc84fee86a639bf3871082db34"
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "url": "/game-assets/video/monster-loop-8/loop-720p-e56721fc5151.mp4",
+      "bytes": 5351450,
+      "sha256": "e56721fc51515e7643822e0282cd70aad4e33e8c5968123087a3645f7486cd6e"
+    }
+  ]
+}
