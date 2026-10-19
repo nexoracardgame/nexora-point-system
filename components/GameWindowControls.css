@@ -45,6 +45,8 @@ button.nexora-settings-open{z-index:2147483645}
 body:has(.nexora-settings-open) .nexora-login-utilities{display:none!important}
 body:has(.nexora-settings-open) .nexora-window-controls>[data-game-utilities-slot]{display:none}
 html[data-game-window-controls=desktop]{--game-chrome-width:calc(var(--game-window-controls-width,124px) + 58px)}
+/* Cinematic actions share the native chrome clearance, below its entire row. */
+body:has(.nexora-settings-open) [data-battle-cinematic] [data-battle-cinematic-actions]{top:calc(env(safe-area-inset-top,0px) + 60px);right:max(12px,env(safe-area-inset-right,0px));left:auto;gap:8px}
 html:not([data-game-window-controls=desktop]) body:has(.nexora-settings-open) :is(.nexora-arena-header,.nexora-deck-header,.gg-header,.gcc-header,.gmc-header,.gpp-header,.nexora-waiting-header){padding-right:calc(env(safe-area-inset-right,0px) + 70px)}
 html[data-game-window-controls=desktop] :is(.gg-header,.gcc-header,.gmc-header,.gpp-header,.nexora-waiting-header){padding-right:calc(var(--game-chrome-width) + 24px)!important}
 @media(max-width:900px),(max-height:520px){html[data-game-window-controls=desktop] :is(.gg-header,.gcc-header,.gmc-header,.gpp-header,.nexora-waiting-header){padding-top:58px!important;min-height:112px;padding-right:16px!important}}

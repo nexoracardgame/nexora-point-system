@@ -14,7 +14,11 @@ type Side = "player" | "opponent";
 type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; recipient?: Side | "both"; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
 
 export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard, opponentCard?: TriadCard, playerMainCard?: TriadCard, opponentMainCard?: TriadCard): Step[] {
-  const skills: Step[] = result.skillEvents.map((event) => {
+  const skills: Step[] = result.skillEvents.filter(event=>{
+    if(event.cardNo!=="270")return true;
+    const target=event.side==="player"?opponentMainCard||opponentCard:playerMainCard||playerCard;
+    return target?.kind==="monster"&&target.element==="fire"&&result.turn===3;
+  }).map((event) => {
     const rule = triadSkillRuleByNo.get(event.cardNo);
     const inactive = result.skillEligibilityTurn !== "combined" && rule?.allowedTurns?.includes(result.turn) === false;
     const deltas = rule?.effects?.map((effect) => effect.delta) || [];
@@ -184,7 +188,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   return createPortal(
     <div className={`${styles.overlay} ${landscape ? styles.landscape : ""} ${reduced ? styles.reduced : ""}`} data-battle-cinematic data-step={index} data-kind={step.kind} data-element={element} data-effect={step.blocked ? "blocked" : step.effect || step.kind} style={{ "--impact": color, "--motion-duration": `${BATTLE_MOTION_MS}ms`, "--contact-delay": `${BATTLE_CONTACT_MS}ms` } as CSSProperties}>
       {arena ? <div className={styles.environment}><img src={arena.image} alt="" draggable={false} /><div /></div> : null}
-      <div className={styles.toolbar}>
+      <div className={styles.toolbar} data-battle-cinematic-actions>
         <button type="button" onClick={toggleSound} title={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-label={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-pressed={!muted && soundReady}>{muted || !soundReady ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>
         <button type="button" onClick={finish} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
       </div>

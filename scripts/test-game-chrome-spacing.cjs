@@ -22,6 +22,9 @@ const css = ['BattleHud', 'GameSettings', 'GameWindowControls'].map(name => fs.r
           if (scene === 'arena') await page.screenshot({ path: `artifacts/game-chrome/${width}-${mode}.png` });
         }
         await page.close();
+        const cinematic=await browser.newPage({viewport:{width,height}});
+        await cinematic.setContent(`<style>${css}[data-battle-cinematic-actions]{position:fixed;top:8px;right:12px}button{width:40px;height:40px}</style><button class="nexora-settings-open">Settings</button><div class="nexora-window-controls"><button>Close</button></div><div data-battle-cinematic><div data-battle-cinematic-actions><button id="skip" onclick="window.skipped=true">Skip</button></div></div>`);
+        const skip=await cinematic.locator('#skip').boundingBox(),chrome=await cinematic.locator('.nexora-window-controls').boundingBox();assert.ok(skip.y>=chrome.y+chrome.height+6,'Skip is below native window chrome');await cinematic.locator('#skip').click();assert.equal(await cinematic.evaluate(()=>window.skipped),true);await cinematic.close();
       }
       console.log(`${width}x${height}: arena/deck exit clear of settings in native windowed/fullscreen and browser`);
     }

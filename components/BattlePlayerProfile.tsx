@@ -46,6 +46,12 @@ export default function BattlePlayerProfile({identity,rank,player,currentUserId}
  const [open,setOpen]=useState(false),[details,setDetails]=useState<GameProfileDetails|null>(null);
  const trigger=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
  const [position,setPosition]=useState<CSSProperties>({visibility:'hidden'});
+ const nameLabel=useRef<HTMLElement>(null);
+ useLayoutEffect(()=>{
+  const node=nameLabel.current;if(!node)return;
+  const fit=()=>{node.style.fontSize='';let size=parseFloat(getComputedStyle(node).fontSize);while(size>8&&(node.scrollWidth>node.clientWidth+1||size>node.clientHeight)){size-=.5;node.style.fontSize=`${size}px`}};
+  fit();const observer=new ResizeObserver(fit);observer.observe(node);return()=>observer.disconnect();
+ },[identity.name]);
  const bot=!identity.id||identity.id==='triad-bot-level-99';
  useEffect(()=>{
   setOpen(false);setDetails(identity.id?cachedGameProfile(identity.id)||null:null);
@@ -89,7 +95,7 @@ export default function BattlePlayerProfile({identity,rank,player,currentUserId}
  return <>
   <button ref={trigger} className="battle-player-identity" data-player={Boolean(player)} aria-label={`ดูโปรไฟล์ ${identity.name}`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(value=>!value)} onPointerEnter={()=>{if(!bot)void loadGameProfile(identity.id!).catch(()=>{})}}>
    <span className="bpi-avatar"><img src={image} alt=""/><img className="bpi-avatar-frame" src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span>
-   <span className="bpi-copy"><img className="bpi-name-frame" src="/images/lobby-play/profile-name-frame.png" alt=""/><strong title={identity.name}>{identity.name}</strong></span>
+   <span className="bpi-copy"><img className="bpi-name-frame" src="/images/lobby-play/profile-name-frame.png" alt=""/><strong ref={nameLabel} title={identity.name}>{identity.name}</strong></span>
    <span className="bpi-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{rankName||'—'}</span></span>
   </button>
   {open&&createPortal(<div ref={panel} role="dialog" aria-modal="false" className="battle-player-mini" style={position} aria-label={`โปรไฟล์ ${identity.name}`} onKeyDown={event=>event.stopPropagation()}>
