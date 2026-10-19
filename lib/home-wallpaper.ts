@@ -1,24 +1,20 @@
 import { loadLobbyAssets } from "./lobby-assets";
+import manifest from "../public/game-assets/video/home-loop/manifest.json";
+
+export const HOME_WALLPAPER_POSTER = manifest.poster;
+export function homeWallpaperSources() {
+  const device = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+  const compact = matchMedia("(pointer: coarse)").matches || device.connection?.saveData || (device.deviceMemory !== undefined && device.deviceMemory < 4);
+  const large = !compact && window.innerWidth * Math.min(window.devicePixelRatio || 1, 2) >= 2560 && (device.deviceMemory ?? 8) >= 8;
+  return manifest.variants.filter(variant => variant.width <= (compact ? 1280 : large ? 3840 : 1920)).map(variant => variant.url);
+}
 
 let wallpaper: Promise<string> | undefined;
 export function loadHomeWallpaper() {
   wallpaper ??= (async () => {
     // Interactive artwork must finish before large background downloads compete for bandwidth.
     await loadLobbyAssets().catch(() => {});
-    const base = "/videos/nexora-home-4k/";
-    const response = await fetch(base + "manifest.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("Wallpaper manifest unavailable");
-    const manifest = await response.json() as { width: number; height: number; bytes: number; sha256: string; parts: string[] };
-    if (manifest.width !== 3840 || manifest.height !== 2160) throw new Error("Wallpaper must be 4K");
-    const parts = await Promise.all(manifest.parts.map(async part => {
-      if (!/^part-\d+\.bin$/.test(part)) throw new Error("Invalid wallpaper part");
-      const response = await fetch(base + part + "?v=" + encodeURIComponent(manifest.sha256));
-      if (!response.ok) throw new Error("Wallpaper part unavailable");
-      return response.blob();
-    }));
-    const original = new Blob(parts, { type: "video/mp4" });
-    if (original.size !== manifest.bytes) throw new Error("Incomplete wallpaper");
-    return URL.createObjectURL(original);
+    return homeWallpaperSources()[0];
   })().catch(error => { wallpaper = undefined; throw error; });
   return wallpaper;
 }
