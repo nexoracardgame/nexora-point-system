@@ -6,6 +6,11 @@ const ts = require('typescript');
 const { chromium } = require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const manifest = require('../public/game-assets/video/home-loop-2/manifest.json');
 const preparationManifest = require('../public/game-assets/video/home-loop/manifest.json');
+const {createHash}=require('node:crypto');
+const release=require('../public/game-release.json');
+const homeFiles=[manifest.poster,...manifest.variants.map(item=>item.url)].map(url=>path.basename(url));
+assert.deepEqual(fs.readdirSync('public/game-assets/video/home-loop-2').sort(),['manifest.json',...homeFiles].sort(),'No obsolete Loop 2 files remain');
+for(const item of manifest.variants){const bytes=fs.readFileSync('public'+item.url);assert.equal(bytes.length,item.bytes);assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);assert.ok(release.resources.some(resource=>resource.url===item.url&&resource.sha256===item.sha256),'New Loop 2 must be in the verified patch');}
 const modules = {};
 for (const [id, pkg, file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']]) {
   modules[id] = fs.readFileSync(path.join(path.dirname(require.resolve(pkg)), 'cjs', file), 'utf8');
