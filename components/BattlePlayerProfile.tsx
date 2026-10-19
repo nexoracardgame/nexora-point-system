@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
 import {createPortal} from 'react-dom';
 import {Check,Clock3,Shield,UserPlus,Users,X} from 'lucide-react';
 import {cachedGameProfile,loadGameProfile,type GameProfileDetails} from '@/lib/game-profile-client';
@@ -44,18 +44,36 @@ function FriendAction({id}:{id:string}){
 
 export default function BattlePlayerProfile({identity,rank,player,currentUserId}:{identity:BattlePlayerIdentity;rank?:BattlePlayerRank|null;player?:boolean;currentUserId?:string}){
  const [open,setOpen]=useState(false),[details,setDetails]=useState<GameProfileDetails|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
- const trigger=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null);
+ const trigger=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
+ const [position,setPosition]=useState<CSSProperties>({visibility:'hidden'});
  const bot=!identity.id||identity.id==='triad-bot-level-99';
  useEffect(()=>{setOpen(false);setDetails(null);setError('')},[identity.id]);
  useEffect(()=>{
   if(!open)return;
-  const node=dialog.current;if(!node)return;
-  node.showModal();let active=true;
+  let active=true;
   if(!bot){setError('');setDetails(cachedGameProfile(identity.id!)||null);void loadGameProfile(identity.id!).then(value=>{if(active)setDetails(value)}).catch(()=>{if(active)setError('โหลดโปรไฟล์ไม่สำเร็จ')})}
-  const keyboard=(event:KeyboardEvent)=>{event.stopImmediatePropagation();if(event.key==='Escape'){event.preventDefault();setOpen(false)}};
+  const keyboard=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();setOpen(false);trigger.current?.focus()}};
+  const outside=(event:PointerEvent)=>{const target=event.target as Node;if(!panel.current?.contains(target)&&!trigger.current?.contains(target))setOpen(false)};
   window.addEventListener('keydown',keyboard,true);
-  return()=>{active=false;window.removeEventListener('keydown',keyboard,true);node.close();trigger.current?.focus()};
+  document.addEventListener('pointerdown',outside,true);
+  return()=>{active=false;window.removeEventListener('keydown',keyboard,true);document.removeEventListener('pointerdown',outside,true)};
  },[open,identity.id,bot,retry]);
+ useLayoutEffect(()=>{
+  if(!open)return;
+  let frame=0;
+  const place=()=>{
+   const anchor=trigger.current,node=panel.current;if(!anchor||!node)return;
+   const rect=anchor.getBoundingClientRect(),safe=8,gap=6,width=node.offsetWidth,height=node.offsetHeight;
+   let left=player?rect.right-width:rect.left,top=rect.bottom+gap;
+   if(top+height>window.innerHeight-safe&&rect.top-height-gap>=safe)top=rect.top-height-gap;
+   left=Math.max(safe,Math.min(left,window.innerWidth-width-safe));top=Math.max(safe,Math.min(top,window.innerHeight-height-safe));
+   setPosition({left,top,visibility:'visible'});
+  };
+  const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(place)};
+  place();const observer=new ResizeObserver(schedule);if(panel.current)observer.observe(panel.current);if(trigger.current)observer.observe(trigger.current);
+  window.addEventListener('resize',schedule);window.addEventListener('scroll',schedule,true);
+  return()=>{cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('resize',schedule);window.removeEventListener('scroll',schedule,true)};
+ },[open,player]);
  const stats=details?.stats||rank;
  const name=details?.user?.name||identity.name;
  const image=details?.appearance.avatar||details?.user?.image||identity.image||'/avatar.png';
@@ -63,18 +81,18 @@ export default function BattlePlayerProfile({identity,rank,player,currentUserId}
  const wins=stats?.wins,losses=stats?.losses;
  const rate=wins!==undefined&&losses!==undefined?(wins+losses?Math.round(wins/(wins+losses)*100):0):null;
  return <>
-  <button ref={trigger} className="battle-player-identity" data-player={Boolean(player)} aria-label={`ดูโปรไฟล์ ${identity.name}`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(true)} onPointerEnter={()=>{if(!bot)void loadGameProfile(identity.id!).catch(()=>{})}}>
+  <button ref={trigger} className="battle-player-identity" data-player={Boolean(player)} aria-label={`ดูโปรไฟล์ ${identity.name}`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(value=>!value)} onPointerEnter={()=>{if(!bot)void loadGameProfile(identity.id!).catch(()=>{})}}>
    <span className="bpi-avatar"><img src={identity.image||'/avatar.png'} alt=""/><img className="bpi-avatar-frame" src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span>
-   <span className="bpi-copy"><small>{player?'เรา':'คู่แข่ง'}</small><strong title={identity.name}>{identity.name}</strong><span><Shield size={11}/>{bot?'BOT':rank?.rankName||'ผู้เล่น'}</span></span>
-   <img className="bpi-name-frame" src="/images/lobby-play/profile-name-frame.png" alt=""/>
+   <span className="bpi-copy"><img className="bpi-name-frame" src="/images/lobby-play/profile-name-frame.png" alt=""/><strong title={identity.name}>{identity.name}</strong></span>
+   <span className="bpi-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{bot?'BOT':rank?.rankName||'ผู้เล่น'}</span></span>
   </button>
-  {open&&createPortal(<dialog ref={dialog} className="battle-player-mini" aria-label={`โปรไฟล์ ${identity.name}`} onCancel={event=>{event.preventDefault();setOpen(false)}} onClick={event=>{if(event.target===event.currentTarget){const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)setOpen(false)}}}>
-   <header><span><Shield size={16}/>โปรไฟล์ผู้เล่น</span><button autoFocus aria-label="ปิดโปรไฟล์" onClick={()=>setOpen(false)}><X size={19}/></button></header>
+  {open&&createPortal(<div ref={panel} role="dialog" aria-modal="false" className="battle-player-mini" style={position} aria-label={`โปรไฟล์ ${identity.name}`} onKeyDown={event=>event.stopPropagation()}>
+   <header><span><Shield size={16}/>โปรไฟล์ผู้เล่น</span><button aria-label="ปิดโปรไฟล์" onClick={()=>{setOpen(false);trigger.current?.focus()}}><X size={19}/></button></header>
    <div className="bpp-identity"><span className="bpp-avatar"><img src={image} alt=""/><img src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span><div><h2>{name}</h2><p><Shield size={15}/>{rankName||'กำลังโหลดแรงค์…'}</p></div></div>
    {bot?<p className="bpp-bot">คู่ฝึกซ้อม AI · ไม่จัดอันดับผู้เล่น</p>:<div className="bpp-stats"><div><small>ชนะ</small><strong>{wins?.toLocaleString()??'—'}</strong></div><div><small>แพ้</small><strong>{losses?.toLocaleString()??'—'}</strong></div><div><small>อัตราชนะ</small><strong>{rate===null?'—':rate+'%'}</strong></div></div>}
    {!bot&&details?.rank.nextWins!=null&&<p className="bpp-progress">อีก {Math.max(0,details.rank.nextWins-(wins||0)).toLocaleString()} ชัยชนะ สู่ {details.rank.nextName}</p>}
    {error&&<p className="bpp-error" role="alert">{error} <button onClick={()=>setRetry(value=>value+1)}>ลองใหม่</button></p>}
    {!bot&&identity.id!==currentUserId&&<FriendAction key={identity.id} id={identity.id!}/>}
-  </dialog>,document.body)}
+  </div>,document.body)}
  </>;
 }

@@ -31,8 +31,12 @@ const css=fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSyn
   await page.screenshot({path:`artifacts/battle-player-profile/frames-${width}.png`});
   await left.click();const dialog=page.getByRole('dialog');await dialog.waitFor();
   await page.getByRole('heading',{name:'LIVE PLAYER'}).waitFor();assert.match(await dialog.innerText(),/32[\s\S]*8[\s\S]*80%/);
-  assert.ok(await dialog.evaluate(n=>n.matches(':modal')));
+  assert.equal(await dialog.getAttribute('aria-modal'),'false');
+  assert.equal(await dialog.evaluate(n=>n.matches(':modal')),false);
+  assert.equal(await left.evaluate(n=>getComputedStyle(n.closest('.nexora-arena-scoreplate')).backgroundColor),'rgba(0, 0, 0, 0)');
+  assert.equal(await left.evaluate(n=>getComputedStyle(n.closest('.nexora-arena-scoreplate')).backdropFilter),'none');
   const r=await dialog.boundingBox();assert.ok(r.x>=0&&r.y>=0&&r.x+r.width<=width&&r.y+r.height<=height,'Mini profile fits landscape viewport');
+  assert.ok(Math.abs(r.x-a.x)<16,'Mini profile stays at the clicked frame, not screen center');
   await page.getByRole('button',{name:'เพิ่มเพื่อน',exact:true}).click();
   await page.getByText('ส่งคำขอแล้ว',{exact:true}).waitFor();assert.equal(posts,1);
   await page.screenshot({path:`artifacts/battle-player-profile/${width}.png`});
@@ -42,6 +46,9 @@ const css=fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSyn
   statusFail=true;await left.click();await page.getByRole('button',{name:'ลองใหม่',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'เพิ่มเพื่อน',exact:true}).count(),0);await page.keyboard.press('Escape');
   await right.click();await page.getByRole('heading',{name:'LIVE PLAYER'}).waitFor();assert.equal(await page.locator('.bpp-friend').count(),0);await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'ดูโปรไฟล์ BOT Level.99'}).click();await page.getByText('คู่ฝึกซ้อม AI · ไม่จัดอันดับผู้เล่น').waitFor();assert.equal(await page.locator('.bpp-friend').count(),0);assert.equal(await page.locator('.bpp-stats').count(),0);await page.keyboard.press('Escape');
-  assert.deepEqual(errors,[]);await context.close();console.log(`${width}x${height}: mirrored frames, live stats, click/close/focus, friend request/accept/existing/error, self and bot passed`);
+  await left.click();await dialog.waitFor();
+  await page.evaluate(()=>{const button=document.createElement('button');button.id='battle-action';button.style='position:fixed;right:10px;bottom:10px';button.textContent='Play';button.onclick=()=>window.battleAction=true;document.body.append(button)});
+  await page.locator('#battle-action').click();assert.equal(await page.evaluate(()=>window.battleAction),true,'Battle remains interactive while the mini profile is open');await dialog.waitFor({state:'detached'});
+  assert.deepEqual(errors,[]);await context.close();console.log(`${width}x${height}: frameless mirrored art, anchored nonmodal profile, unobstructed battle, live stats and friend states passed`);
  }
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
