@@ -22,6 +22,10 @@ for (const [id,file] of [['./GamePreparationBackground','components/GamePreparat
   modules[id] = ts.transpileModule(fs.readFileSync(file,'utf8'), {fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
 }
 modules['./GamePreparationBackground.css'] = modules['./BattleWaitingRoom.css'] = '';
+const lobbySource=fs.readFileSync('app/(main)/battle/triad-dominion/TriadDominionClient.tsx','utf8');
+const lobbyScene=lobbySource.match(/<NexoraCommandScene [^\n]+?<div className="nexora-command-shade" \/>/)?.[0];
+assert.ok(lobbyScene,'Use the actual lobby background JSX');
+modules.play=ts.transpileModule(`import React,{useState} from 'react';import NexoraCommandScene from 'scene';export default function Play(){const[panel,setPanel]=useState(null);return <div className="nexora-command-lobby">${lobbyScene}<button id="test-play" style={{position:'fixed',zIndex:100,left:0,top:0}} onClick={()=>setPanel(panel?null:'create')}>PLAY</button><span id="panel-state">{panel||'home'}</span></div>}`,{fileName:'play.tsx',compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 const bundle = Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(require,module,exports){${code}\n}`).join(',');
 const css = ['app/(main)/battle/triad-dominion/NexoraCommand.css','components/BattleHud.css','components/BattleWaitingRoom.css','components/GamePreparationBackground.css'].map(file=>fs.readFileSync(file,'utf8')).join('\n')+fs.readFileSync('app/(main)/battle/pentad-dominion/PentadDominion.module.css','utf8').replace(/\.shell\b/g,'.test-pentad');
 const html = `<html><style>body{margin:0;background:black}${css}</style><div id="root"></div><script>const modules={${bundle}},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](require,m,m.exports);return m.exports;}const root=require('react-dom/client').createRoot(document.getElementById('root'));window.renderScene=(homeVideo,videoScene='home')=>root.render(require('react').createElement(require('scene').default,{homeVideo,videoScene,key:videoScene}));renderScene(true);</script></html>`;
@@ -56,12 +60,17 @@ const html = `<html><style>body{margin:0;background:black}${css}</style><div id=
    assert.equal(await page.locator('video').evaluate(v=>v.paused),true);
    await page.evaluate(()=>renderScene(false));
    await page.locator('video').waitFor({state:'detached'});
-   await page.evaluate(()=>{localStorage.removeItem('triad-command-motion-off');renderScene(true,'preparation');});
+   await page.evaluate(()=>{localStorage.removeItem('triad-command-motion-off');root.render(require('react').createElement(require('play').default));});
    await page.waitForFunction(()=>document.querySelector('video')?.currentTime>.1);
-   assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop/')),'Create room uses Loop 1');
-   await page.evaluate(()=>renderScene(true));
-   await page.waitForFunction(()=>document.querySelector('video')?.currentTime>.1);
-   assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/game-assets/video/home-loop-2/')),'Returning home restores Loop 2');
+   const homeSource=await page.locator('video').getAttribute('src');
+   await page.locator('video').evaluate(v=>{v.dataset.identity='original';v.currentTime=3;});
+   await page.waitForFunction(()=>!document.querySelector('video').seeking);
+   for(const expectedPanel of ['create','home']){
+    await page.locator('#test-play').click();await page.waitForFunction(state=>document.querySelector('#panel-state').textContent===state,expectedPanel);
+    assert.equal(await page.locator('video').getAttribute('src'),homeSource,'PLAY retains the home clip');
+    assert.equal(await page.locator('video').getAttribute('data-identity'),'original','PLAY never remounts the video');
+    assert.ok(await page.locator('video').evaluate(v=>v.currentTime>=3),'PLAY never restarts playback');
+   }
    for(const mode of ['waiting','deck','pentad-waiting','pentad-deck']) {
     await page.evaluate(mode=>{
       localStorage.removeItem('triad-command-motion-off');
