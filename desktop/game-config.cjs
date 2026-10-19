@@ -2,10 +2,12 @@ const base = require('../package.json').build;
 const release=require('../public/game-release.json');
 module.exports = {
   ...base, appId:'com.nexora.cardgame', productName:'NEXORA CARD GAME',
-  files:['main.cjs','preload.cjs','game-*.cjs','assets/**','package.json'],
+  // Npm versions disagree on the root dependency tree; ship the isolated desktop install explicitly.
+  files:['main.cjs','preload.cjs','game-*.cjs','assets/**','package.json','!node_modules/**'],
+  extraFiles:[{from:'desktop/node_modules',to:'resources/app/node_modules',filter:['**/*','!**/.bin/**','!**/.package-lock.json']}],
   extraResources:[...(base.extraResources||[]),{from:'public/game-release.json',to:'game-resources/game-release.json'},...release.resources.map(resource=>({from:'public'+resource.url,to:'game-resources'+resource.url}))],
   directories:{...base.directories,output:'dist/game-desktop'},
-  extraMetadata:{name:'nexora-card-game',version:'1.0.11',gameOnly:true},
+  extraMetadata:{name:'nexora-card-game',version:'1.0.12',gameOnly:true},
   win:{...base.win,icon:'desktop/assets/game-icon.ico'},
   artifactName:'NEXORA-CARD-GAME-Setup-${version}.${ext}',
   protocols:[{name:'NEXORA Game Login',schemes:['nexoragame']}],
