@@ -21,3 +21,6 @@
 .nx-coin-price>span{color:#393c2c;font-size:11px}.nx-coin-package:hover .nx-coin-price,.nx-coin-package[data-selected=true] .nx-coin-price{background:#f3d99b}
 @media(max-width:800px){.nx-coin-package{padding:0 0 10px;min-height:0}.nx-coin-pack-value{aspect-ratio:1.4;padding:38px 8px 15px}.nx-coin-pack-top{padding:8px;font-size:10px;gap:6px}.nx-coin-total{padding:0;font-size:32px}.nx-coin-total>span{font-size:11px}.nx-coin-breakdown{padding:0 10px;font-size:10px;margin:12px 0;min-height:32px}.nx-coin-price{width:auto;margin: auto 8px 0;font-size:20px;min-height:44px}.nx-coin-check{width:18px;height:18px}}
 @media(max-width:360px){.nx-coin-total{font-size:28px}.nx-coin-price{font-size:18px}.nx-coin-pack-top{font-size:9px}}
+.nx-coin-package,.nx-coin-package:hover,.nx-coin-package[data-selected=true]{background:rgb(16 23 25 / 25%)}
+.nx-coin-pack-value,.nx-coin-pack-top{background:transparent}
+.nx-coin-total,.nx-coin-breakdown{text-shadow:0 1px 4px #000b}

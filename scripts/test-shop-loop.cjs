@@ -18,6 +18,9 @@ const server=http.createServer((req,res)=>{const url=new URL(req.url,'http://loc
    await page.evaluate(preview=>window.render(preview),preview);
    await page.waitForFunction(()=>{const v=document.querySelector('video');return v&&v.readyState>=2&&v.currentTime>.1&&!v.paused;});
    assert.equal(await page.locator('.nx-coin-package').count(),6);assert.equal(await page.locator('video').count(),1);
+   const surfaces=await page.locator('.nx-coin-package').evaluateAll(cards=>cards.map(card=>({background:getComputedStyle(card).backgroundColor,opacity:getComputedStyle(card).opacity,value:getComputedStyle(card.querySelector('.nx-coin-pack-value')).backgroundColor,top:getComputedStyle(card.querySelector('.nx-coin-pack-top')).backgroundImage,price:getComputedStyle(card.querySelector('.nx-coin-price')).backgroundColor})));
+   for(const surface of surfaces){assert.equal(surface.background,'rgba(16, 23, 25, 0.25)');assert.equal(surface.opacity,'1');assert.equal(surface.value,'rgba(0, 0, 0, 0)');assert.equal(surface.top,'none');assert.ok(['rgb(223, 191, 120)','rgb(243, 217, 155)'].includes(surface.price));}
+   await page.locator('.nx-coin-package').first().hover();assert.equal(await page.locator('.nx-coin-package').first().evaluate(n=>getComputedStyle(n).backgroundColor),'rgba(16, 23, 25, 0.25)');
    assert.equal(await page.locator('.nx-coin-scene>img').getAttribute('src'),manifest.poster);
    assert.ok(await page.locator('video').evaluate(v=>v.src.includes('/shop-loop-5/')&&v.loop&&v.muted));
    if(preview){
