@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {ArrowLeft,ArrowRight,Check,ShieldCheck,Sparkles,UserRound,X} from 'lucide-react';
 import {gameCoinPackages} from '@/lib/game-coin-packages';
 import './GameCoinShop.css';
+import GameEntryBackground from './GameEntryBackground';
 
 const number=(value:number)=>value.toLocaleString('th-TH');
 export default function GameCoinShop({preview=false}:{preview?:boolean}){
@@ -19,7 +20,7 @@ export default function GameCoinShop({preview=false}:{preview?:boolean}){
  const checkout=()=>{if(!pack)return;if(!session?.user){window.location.assign(login);return}notice.current?.showModal()};
  const openWebsite=(target:EventTarget|null)=>{const id=target instanceof Element?target.closest('.nx-coin-package')?.querySelector('input')?.value:null;window.open('https://nexora-point-system.vercel.app/game/topup'+(id?'?pack='+encodeURIComponent(id):''),'_blank','noopener,noreferrer')};
  return <div className="nx-coin-shop" data-preview={preview} onClickCapture={event=>{if(!preview)return;event.preventDefault();event.stopPropagation();openWebsite(event.target)}} onKeyDownCapture={event=>{if(preview&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.stopPropagation();openWebsite(event.target)}}}>
-  <div className="nx-coin-scene" aria-hidden="true"/>
+  {!preview&&<GameEntryBackground scene="shop" className="nx-coin-scene"/>}
   <div className="nx-coin-content">
    <Link href="/game" className="nx-coin-back"><ArrowLeft size={17}/>NEXORA</Link>
    <header className="nx-coin-heading"><div><span className="nx-site-eyebrow">NEXORA / TOP UP</span><h1>เติม <span>COIN</span></h1><p>เพิ่มพลังให้คอลเลกชันของคุณ</p></div><div className="nx-coin-account"><UserRound size={21}/><div>{session?.user?<><strong>{session.user.name}</strong><span>{session.user.id}</span></>:<Link href={login}>เข้าสู่ระบบบัญชี NEXORA<ArrowRight size={16}/></Link>}</div></div></header>

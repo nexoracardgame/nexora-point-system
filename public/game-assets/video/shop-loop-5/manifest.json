@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "poster": "/game-assets/video/shop-loop-5/poster-0950b0e1070a.webp",
+  "variants": [
+    {
+      "width": 3840,
+      "height": 2160,
+      "url": "/game-assets/video/shop-loop-5/loop-4k-6daa748d2efd.mp4",
+      "bytes": 33396033,
+      "sha256": "6daa748d2efd89df7f4b38a322dffebc7a68712cc0889de7e88d2ffbbfaf7a7c"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "url": "/game-assets/video/shop-loop-5/loop-1080p-4249ae2754fb.mp4",
+      "bytes": 11969640,
+      "sha256": "4249ae2754fbd379deadc4dcb0b20b529fc686df0c9e1487781bb052c2db99da"
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "url": "/game-assets/video/shop-loop-5/loop-720p-15fa15cda12b.mp4",
+      "bytes": 5267571,
+      "sha256": "15fa15cda12bcbacf88a53bdb445ca0214aa1dea593bc61e19b45ff67a2ea634"
+    }
+  ]
+}

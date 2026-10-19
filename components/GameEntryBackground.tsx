@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ENTRY_WALLPAPER_POSTER, entryWallpaperSources } from "@/lib/game-entry-wallpaper";
+import { entryWallpaperPoster, entryWallpaperSources, type EntryWallpaperScene } from "@/lib/game-entry-wallpaper";
 import "./GameEntryBackground.css";
 
-export default function GameEntryBackground({ className = "" }: { className?: string }) {
+export default function GameEntryBackground({ className = "", scene = "entry" }: { className?: string; scene?: EntryWallpaperScene }) {
+  const container = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [source, setSource] = useState("");
   const [ready, setReady] = useState(false);
@@ -16,17 +17,27 @@ export default function GameEntryBackground({ className = "" }: { className?: st
       try { enabled = localStorage.getItem("triad-command-motion-off") !== "1"; } catch { /* Optional preference. */ }
       setRunning(!document.hidden && !motion.matches && enabled);
     };
-    setSource(entryWallpaperSources()[0] || "");
+    let selected = "";
+    const selectSource = () => {
+      // Dialog children mount before showModal; a closed dialog has no measured width.
+      const fallbackWidth = Math.min(window.innerWidth, 1920 / Math.min(window.devicePixelRatio || 1, 2));
+      const next = entryWallpaperSources(scene, container.current?.clientWidth || fallbackWidth)[0] || "";
+      if (next !== selected) { selected = next; setReady(false); setSource(next); }
+    };
+    selectSource();
+    const observer = new ResizeObserver(selectSource);
+    if (container.current) observer.observe(container.current);
     sync();
     motion.addEventListener("change", sync);
     document.addEventListener("visibilitychange", sync);
     window.addEventListener("nexora:motion-preference", sync);
     return () => {
+      observer.disconnect();
       motion.removeEventListener("change", sync);
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("nexora:motion-preference", sync);
     };
-  }, []);
+  }, [scene]);
   useEffect(() => {
     const element = video.current;
     if (!element) return;
@@ -34,11 +45,11 @@ export default function GameEntryBackground({ className = "" }: { className?: st
     else element.pause();
     return () => element.pause();
   }, [source, running]);
-  return <div className={`nexora-entry-background ${className}`} aria-hidden="true">
-    <img src={ENTRY_WALLPAPER_POSTER} alt="" fetchPriority="high" />
-    {source && <video ref={video} src={source} muted loop playsInline preload="auto" data-ready={ready}
+  return <div ref={container} className={`nexora-entry-background ${className}`} data-wallpaper-scene={scene} aria-hidden="true">
+    <img src={entryWallpaperPoster(scene)} alt="" fetchPriority="high" />
+    {source && <video ref={video} src={source} autoPlay={running} muted loop playsInline preload="auto" data-ready={ready}
       onLoadedData={() => setReady(true)} onError={() => {
-        const sources = entryWallpaperSources();
+        const sources = entryWallpaperSources(scene, container.current?.clientWidth || window.innerWidth);
         setReady(false);
         setSource(sources[sources.indexOf(source) + 1] || "");
       }} />}

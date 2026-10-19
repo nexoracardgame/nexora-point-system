@@ -9,6 +9,7 @@ for(const name of ['triad-dominion','game-card-art','game-monster-rating','game-
 modules['@/lib/game-ui-audio']='exports.playGameUiSound=()=>{};';
 modules['./GameGachaBackground']=transpile(fs.readFileSync('components/GameGachaBackground.tsx','utf8'));
 modules['@/lib/login-wallpaper']='exports.loadLoginWallpaper=async()=>"data:video/mp4;base64,";';
+require('./game-wallpaper-test-modules.cjs')(modules);
 const homeManifest=require('../public/game-assets/video/home-loop-2/manifest.json');
 modules['@/lib/home-wallpaper']='exports.HOME_WALLPAPER_POSTER='+JSON.stringify(homeManifest.poster)+';exports.homeWallpaperSources=()=>'+JSON.stringify([homeManifest.variants.at(-1).url])+';';
 for(const name of ['GameBackControl','GamePageLogo','GameMonsterCodex'])modules['./'+name]=transpile(fs.readFileSync('components/'+name+'.tsx','utf8'));

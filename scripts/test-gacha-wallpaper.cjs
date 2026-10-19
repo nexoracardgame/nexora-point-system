@@ -2,10 +2,11 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fixture=fs.readFileSync('scripts/test-home-loop.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle ='))+'return modules;')(require);
+require('./game-wallpaper-test-modules.cjs')(modules);
 modules.background=ts.transpileModule(fs.readFileSync('components/GameGachaBackground.tsx','utf8'),{fileName:'background.tsx',compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}}).outputText;
 modules['@/lib/login-wallpaper']='exports.loadLoginWallpaper=async()=>{throw Error("Legacy video requested")};';
-const manifest=require('../public/game-assets/video/home-loop-2/manifest.json');
-const css=fs.readFileSync('components/GameGacha.css','utf8');
+const manifest=require('../public/game-assets/video/shop-loop-5/manifest.json');
+const css=fs.readFileSync('components/GameGacha.css','utf8')+fs.readFileSync('components/GameEntryBackground.css','utf8');
 const html=`<html><style>html,body,#root{margin:0;height:100%;background:black}${css}</style><div id="root"></div><script>const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}const React=require('react'),root=require('react-dom/client').createRoot(document.getElementById('root'));window.render=(shared=false)=>root.render(React.createElement('section',{className:'game-gacha'},React.createElement(require('background').default,{homeLoop:true}),shared&&React.createElement('aside',{className:'gg-rates'},React.createElement(require('background').default,{shared:true}))));render();</script></html>`;
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://local');if(url.pathname==='/'){res.setHeader('Content-Type','text/html');return res.end(html);}
@@ -28,11 +29,11 @@ const server=http.createServer((req,res)=>{
   assert.ok(await page.locator('video').evaluate((v,q)=>v.src.includes('loop-'+q+'-')&&v.loop&&v.muted&&v.playsInline,quality));
   await page.screenshot({path:`artifacts/gacha-wallpaper/${name}-playing.png`});
   await page.evaluate(()=>window.render(true));await page.waitForFunction(()=>document.querySelectorAll('video').length===2&&[...document.querySelectorAll('video')].every(v=>v.readyState>=2));
-  const urls=await page.locator('video').evaluateAll(vs=>vs.map(v=>v.src));assert.equal(urls[0],urls[1]);
+  const urls=await page.locator('video').evaluateAll(vs=>vs.map(v=>v.src));assert.ok(urls.every(url=>url.includes('/shop-loop-5/')));
   assert.ok(!requests.some(url=>url.includes('nexora-command-original')||url.includes('nexora-world-small')||url.includes('nexora-login-4k')));
   await page.evaluate(()=>{localStorage.setItem('triad-command-motion-off','1');window.dispatchEvent(new Event('nexora:motion-preference'));});await page.waitForFunction(()=>[...document.querySelectorAll('video')].every(v=>v.paused));
   assert.deepEqual(errors,[]);await context.close();
  }
- console.log('Gacha Loop 2: desktop/4K/mobile/tablet, cold-entry poster, no old-image requests, playing/muted/looping, shared rates and motion pause passed');
+ console.log('Gacha Loop 5: desktop/4K/mobile/tablet, cold-entry poster, no old-image requests, playing/muted/looping, shared rates and motion pause passed');
  }finally{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);server.closeAllConnections();server.close();process.exitCode=1;});

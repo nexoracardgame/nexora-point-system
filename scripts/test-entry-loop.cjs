@@ -14,6 +14,7 @@ for (const file of ['components/GameLoginView.tsx', 'components/BattleConnecting
   assert.ok(fs.readFileSync(file, 'utf8').includes('<GameEntryBackground'), file);
 }
 const modules = {};
+require('./game-wallpaper-test-modules.cjs')(modules);
 for (const [id, pkg, file] of [['react','react','react.production.js'],['react/jsx-runtime','react','react-jsx-runtime.production.js'],['react-dom','react-dom','react-dom.production.js'],['react-dom/client','react-dom','react-dom-client.production.js'],['scheduler','scheduler','scheduler.production.js']]) {
   modules[id] = fs.readFileSync(path.join(path.dirname(require.resolve(pkg)), 'cjs', file), 'utf8');
 }
