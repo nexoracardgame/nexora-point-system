@@ -425,6 +425,23 @@ function inferElementCondition(card: TriadCard): TriadSkillRule["elementConditio
 function makeSkillRule(card: TriadCard): TriadSkillRule | null {
   if (card.kind !== "skill") return null;
 
+  // The fire symbol qualifies the opposing main, not every opposing monster.
+  if (card.cardNo === "270") return {
+    cardNo: card.cardNo,
+    name: card.name,
+    shape: "stat",
+    effects: [],
+    target: "opponent-main",
+    duration: "turn",
+    allowedTurns: [3],
+    elementHint: card.element,
+    elementCondition: {mode: "include", elements: ["fire"]},
+    blockedMetric: "support",
+    blockedUseMetric: "support",
+    needsReview: false,
+    text: card.skillText,
+  };
+
   const effects = statEffects(card.skillText);
   const inferredShape = inferSkillShape(card.skillText, effects);
   const shape: TriadSkillShape =
