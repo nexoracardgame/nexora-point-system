@@ -48,7 +48,7 @@ export default function GameGacha(){
  };
  if(!open||!owner)return null;
  return createPortal(<section className="game-gacha" role="dialog" aria-modal="true" aria-label="เปิดสุ่มการ์ด" ref={root} tabIndex={-1} data-phase={phase} data-stars={receipt?.maxStars||1}>
-  <GameGachaBackground/>
+  <GameGachaBackground homeLoop/>
   <header className="gg-header"><GameBackControl onBack={back}/><GamePageLogo/><div><h1>เปิดสุ่มการ์ด</h1><span>NEXORA / ASTRAL ARCHIVE</span></div></header>
   {error&&<div className="gg-error" role="alert">{error}<button type="button" aria-label="ปิดข้อความ" title="ปิดข้อความ" onClick={()=>setError('')}><X size={17}/></button></div>}
   {phase==='result'&&receipt?<GameGachaResults key={receipt.id} receipt={receipt} onClose={()=>{setPhase('idle');setReceipt(null)}}/>:
