@@ -3,16 +3,19 @@
 import { useLayoutEffect, useRef, useState, type ReactNode,type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, SendHorizontal } from "lucide-react";
+import { useBattleChat } from "@/lib/use-battle-chat";
+import type { BattleChatRoom } from "@/lib/battle-chat-messages";
 
 export type ArenaChatMessage = { id: string; senderId: string; senderName: string; text: string };
-export default function BattleArenaChat({ messages, currentUserId, draft, onDraftChange, onSubmit, disabled = false }: {
-  messages: ArenaChatMessage[]; currentUserId: string; draft: string; onDraftChange: (text: string) => void; onSubmit: () => void; disabled?: boolean;
+export default function BattleArenaChat({ messages, currentUserId, currentUserName = "", room, draft, onDraftChange, onSubmit, disabled = false }: {
+  messages: ArenaChatMessage[]; currentUserId: string; currentUserName?: string; room?: BattleChatRoom; draft: string; onDraftChange: (text: string) => void; onSubmit: () => void | Promise<boolean | void>; disabled?: boolean;
 }) {
+  const chat = useBattleChat(messages, room, currentUserId, currentUserName);
   const log = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [messages.length]);
+  useLayoutEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [chat.messages.length]);
   return <section className="triad-battle-chat-hud" aria-label="แชตสนาม">
-    <div ref={log} className="triad-chat-hud-messages" role="log" aria-live="polite" aria-relevant="additions">{messages.slice(-40).map(message => <div key={message.id} className="triad-chat-hud-line"><span className={message.senderId === currentUserId ? "triad-chat-hud-own" : "triad-chat-hud-name"}>{message.senderName}: </span><span>{message.text}</span></div>)}</div>
-    <form onPointerDown={event=>event.stopPropagation()} onSubmit={event => { event.preventDefault(); onSubmit(); }}><MessageCircle size={16} aria-hidden="true" /><input aria-label="ข้อความแชตสนาม" placeholder="แชตสนาม..." value={draft} onChange={event => onDraftChange(event.target.value.slice(0,240))} maxLength={240} disabled={disabled} autoComplete="off" enterKeyHint="send" /><button type="submit" aria-label="ส่งข้อความ" title="ส่งข้อความ" disabled={disabled || !draft.trim()}><SendHorizontal size={16} /></button></form>
+    <div ref={log} className="triad-chat-hud-messages" role="log" aria-live="polite" aria-relevant="additions">{chat.messages.map(message => <div key={message.id} className="triad-chat-hud-line"><span className={message.senderId === currentUserId ? "triad-chat-hud-own" : "triad-chat-hud-name"}>{message.senderName}: </span><span>{message.text}</span>{"failed" in message && message.failed === true && <small role="status"> · ส่งไม่สำเร็จ</small>}</div>)}</div>
+    <form onPointerDown={event=>event.stopPropagation()} onSubmit={event => { event.preventDefault(); if (!disabled && draft.trim()) void chat.send(draft, onSubmit); }}><MessageCircle size={16} aria-hidden="true" /><input aria-label="ข้อความแชตสนาม" placeholder="แชตสนาม..." value={draft} onChange={event => onDraftChange(event.target.value.slice(0,240))} maxLength={240} disabled={disabled} autoComplete="off" enterKeyHint="send" /><button type="submit" aria-label="ส่งข้อความ" title="ส่งข้อความ" disabled={disabled || !draft.trim()}><SendHorizontal size={16} /></button></form>
   </section>;
 }
 

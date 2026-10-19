@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import DuelistLeaderboard from "@/components/DuelistLeaderboard";
 import { playDrawerSound } from "@/lib/play-drawer-audio";
 import { playGameUiSound } from "@/lib/game-ui-audio";
@@ -3111,14 +3112,15 @@ function BattleRoomChatPanel({
     if (!text || !room?.code) return;
     setDraft("");
     setSending(true);
-    void onSend(text).then((ok) => {
+    try {
+      const ok = await onSend(text);
       if (!ok) setDraft((current) => current || text);
-      setSending(false);
-    });
+      return ok;
+    } finally { setSending(false); }
   };
 
   if (compact) return (
-    <BattleArenaChat messages={messages} currentUserId={currentUserId} draft={draft} onDraftChange={setDraft} onSubmit={() => void submit()} disabled={!room?.code} />
+    <BattleArenaChat messages={messages} currentUserId={currentUserId} currentUserName={[room?.seats.host,room?.seats.challenger,...(room?.spectators || [])].find(person=>person?.id===currentUserId)?.name} room={room?.code ? {mode:"triad",code:room.code} : undefined} draft={draft} onDraftChange={setDraft} onSubmit={submit} disabled={!room?.code} />
   );
 
   return (
@@ -5852,6 +5854,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
     channel.on("broadcast", { event: TRIAD_ROOM_REALTIME_EVENT }, ({ payload }) => {
       const event = (payload || {}) as TriadRoomRealtimePayload;
+      if (event.action === "chat") {
+        if (event.code === activeRoomCodeRef.current) window.dispatchEvent(new CustomEvent(BATTLE_CHAT_CHANGED, { detail: { mode: "triad", code: event.code } }));
+        return;
+      }
       const room = normalizeApiRooms(event.room ? [event.room] : [])[0] || null;
       const code = safeText(event.code || room?.code);
       if (room?.status === "waiting" && startingRoomCodeRef.current === code) return;

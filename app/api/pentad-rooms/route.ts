@@ -14,12 +14,12 @@ function errorJson(error: unknown, fallback: string) {
   const databaseError = error && typeof error === "object" && ("code" in error || "clientVersion" in error);
   return json({ error: databaseError ? "เซิร์ฟเวอร์ยังไม่พร้อม กรุณาลองอีกครั้ง" : error instanceof Error ? error.message : fallback }, databaseError ? 503 : 409);
 }
-function notify(code: string) {
+function notify(code: string, action?: string) {
   after(async () => {
     const supabase = getServerSupabaseClient();
     if (!supabase) return;
     const channel = supabase.channel(`pentad:${code}`);
-    try { await channel.send({ type: "broadcast", event: "changed", payload: { code } }, { timeout: 500 }); }
+    try { await channel.send({ type: "broadcast", event: "changed", payload: { code, action } }, { timeout: 500 }); }
     catch { /* HTTP polling remains available if realtime is offline. */ }
     finally { void supabase.removeChannel(channel); }
   });
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const code = String(body.code || "");
     if (!/^\d{6}$/.test(code)) return json({ error: "รหัสห้องไม่ถูกต้อง" }, 400);
     const room = await mutatePentadRoom(code, participant, body);
-    notify(code); return json({ room });
+    notify(code, String(body.action || "")); return json({ room });
   } catch (error) {
     if (isExpiredBattleAction(error)) {
       try {

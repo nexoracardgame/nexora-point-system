@@ -24,6 +24,7 @@ import type { PentadRoom, PentadRound } from "@/lib/pentad-room-store";
 import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { useBattleArenaActivity, useBattleCombatActivity } from "@/lib/battle-ui-state";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
+import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, PENTAD_TITLE } from "@/components/DeckPreparation";
@@ -196,7 +197,10 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     };
     timer = setTimeout(poll, 1500);
     const supabase = getBrowserSupabaseClient();
-    const channel = room?.code && supabase ? supabase.channel(`pentad:${room.code}`).on("broadcast", { event: "changed" }, () => { void load(roomRef.current?.code); }).subscribe() : null;
+    const channel = room?.code && supabase ? supabase.channel(`pentad:${room.code}`).on("broadcast", { event: "changed" }, ({payload}) => {
+      if (payload?.action === "chat") window.dispatchEvent(new CustomEvent(BATTLE_CHAT_CHANGED, { detail: { mode: "pentad", code: room.code } }));
+      else void load(roomRef.current?.code);
+    }).subscribe() : null;
     const visible = () => { if (!document.hidden) void load(roomRef.current?.code); };
     document.addEventListener("visibilitychange", visible);
     return () => { stopped = true; clearTimeout(timer); document.removeEventListener("visibilitychange", visible); if (channel && supabase) void supabase.removeChannel(channel); };
@@ -291,7 +295,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       {room.notice && <p className={styles.notice}>{room.notice}</p>}
       {room.phase === "finished" && !room.forfeit && <BattleMatchResult key={`${room.code}:${room.createdAt}`} title={room.winner === "draw" ? "การแข่งขันสิ้นสุด" : `${room.seats[room.winner as PentadSide]?.name || "ผู้เล่น"} ชนะ`} draw={room.winner === "draw"} score={[room.score.host,room.score.challenger]} detail={room.notice} onExit={() => act("leave")} />}
     </section>}
-    {mounted && room && <BattleArenaChatFrame arenaSelector={`[data-pentad-phase="${room.phase}"] [data-pentad-chat-arena]`} cinematicActive={Boolean(presentation)} rotateBreakpoint={1000}><BattleArenaChat messages={room.chat.map(item => ({ id:item.id, senderId:item.id.slice(0,item.id.lastIndexOf(":")), senderName:item.name, text:item.text }))} currentUserId={userId} draft={message} onDraftChange={setMessage} onSubmit={() => { const text=message; if (!text.trim()) return; setMessage(""); void act("chat", {text}, true).then(ok => { if (!ok) setMessage(current => current || text); }); }} /></BattleArenaChatFrame>}
+    {mounted && room && <BattleArenaChatFrame arenaSelector={`[data-pentad-phase="${room.phase}"] [data-pentad-chat-arena]`} cinematicActive={Boolean(presentation)} rotateBreakpoint={1000}><BattleArenaChat messages={room.chat.map(item => ({ id:item.id, senderId:item.id.slice(0,item.id.lastIndexOf(":")), senderName:item.name, text:item.text, createdAt:item.at }))} currentUserId={userId} currentUserName={[room.seats.host,room.seats.challenger,...room.spectators].find(person=>person?.id===userId)?.name} room={{mode:"pentad",code:room.code}} draft={message} onDraftChange={setMessage} onSubmit={async () => { const text=message; if (!text.trim()) return false; setMessage(""); const ok=await act("chat", {text}, true); if (!ok) setMessage(current => current || text); return ok; }} /></BattleArenaChatFrame>}
     {mounted && !presentation && room?.phase === "target" && pendingChoice && targetView && <TargetSelectionModal key={choiceKey} contextKey={choiceKey}
       skillName={triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name || pendingChoice.cardNo}
       description={pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText || ""}
