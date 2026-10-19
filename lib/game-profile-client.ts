@@ -22,5 +22,18 @@ export function updateCachedGameAppearance(id:string,appearance:GameAppearance){
 export function loadGameProfile(id:string){
  const cached=cachedGameProfile(id);if(cached&&Date.now()-(updated.get(id)||0)<30000)return Promise.resolve(cached);
  const existing=pending.get(id);if(existing)return existing;
- const request=fetch('/api/game-profile/details?id='+encodeURIComponent(id),{cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('Profile unavailable');const data=await r.json() as GameProfileDetails;if(data.user?.id!==id)throw Error('Profile identity mismatch');if(!data.available||!data.stats)throw Error('Incomplete profile');values.set(id,data);updated.set(id,Date.now());try{sessionStorage.setItem('nexora:profile:'+id,JSON.stringify({at:Date.now(),value:data}))}catch{}return data}).finally(()=>pending.delete(id));pending.set(id,request);return request;
+ const request=(async()=>{
+  for(let attempt=0;attempt<3;attempt++){
+   try{
+    const response=await fetch('/api/game-profile/details?id='+encodeURIComponent(id),{cache:'no-store',signal:AbortSignal.timeout(8000)});
+    if(!response.ok){if(response.status>=500&&attempt<2){await new Promise(resolve=>setTimeout(resolve,300*(attempt+1)));continue}throw Error('Profile unavailable')}
+    const data=await response.json() as GameProfileDetails;
+    if(data.user?.id!==id)throw Error('Profile identity mismatch');
+    if(!data.available||!data.stats)throw Error('Incomplete profile');
+    values.set(id,data);updated.set(id,Date.now());try{sessionStorage.setItem('nexora:profile:'+id,JSON.stringify({at:Date.now(),value:data}))}catch{}
+    return data;
+   }catch(error){if(attempt<2&&error instanceof Error&&['TypeError','TimeoutError','AbortError'].includes(error.name)){await new Promise(resolve=>setTimeout(resolve,300*(attempt+1)));continue}if(cached?.available&&cached.user?.id===id&&cached.stats)return cached;throw error}
+  }
+  throw Error('Profile unavailable');
+ })().finally(()=>pending.delete(id));pending.set(id,request);return request;
 }

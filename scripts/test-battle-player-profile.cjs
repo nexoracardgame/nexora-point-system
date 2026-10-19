@@ -5,6 +5,7 @@ const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bund
 const transpile=file=>{const result=ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,reportDiagnostics:true,compilerOptions:{module:1,target:9,jsx:4,esModuleInterop:true}});assert.equal(result.diagnostics?.length||0,0,`${file}: no syntax errors`);return result.outputText};
 modules['./BattlePlayerProfile']=transpile('components/BattlePlayerProfile.tsx');
 modules['./BattlePlayerProfile.css']='';
+modules['./BattleCardGeometry.css']='';
 modules['@/lib/game-profile-client']=transpile('lib/game-profile-client.ts');
 modules['./game-profile-options']='exports.gameHeroes=[]';
 modules.hud=transpile('components/BattleArenaHud.tsx');
@@ -12,7 +13,7 @@ const bundle=`const modules=${JSON.stringify(modules)},cache={};function require
 const css=fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSync('components/BattlePlayerProfile.css','utf8');
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{
  fs.mkdirSync('artifacts/battle-player-profile',{recursive:true});
- for(const [width,height] of [[1920,1080],[1280,720],[844,390],[667,375],[568,320]]){
+ for(const [width,height] of [[3840,2160],[3440,1440],[2560,1440],[1920,1080],[1280,720],[844,390],[667,375],[568,320]]){
   const context=await browser.newContext({viewport:{width,height}}),page=await context.newPage(),errors=[];let relation='none',posts=0,statusFail=false;
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('http://battle-profile.test/**',async route=>{
@@ -21,17 +22,20 @@ const css=fs.readFileSync('components/BattleHud.css','utf8')+'\n'+fs.readFileSyn
    if(url.pathname.startsWith('/api/community/status/'))return route.fulfill({status:statusFail?503:200,json:statusFail?{error:'offline'}:{relation:{status:relation,requestId:relation==='incoming'?'request-1':null}}});
    if(url.pathname==='/api/community/friends'){posts++;const payload=route.request().postDataJSON();assert.ok(payload.targetUserId==='enemy'||payload.requestId==='request-1');await new Promise(r=>setTimeout(r,100));relation=payload.action==='respond'?'friends':'outgoing';return route.fulfill({json:{relation:{status:relation}}})}
    if(url.pathname.startsWith('/images/')||url.pathname==='/avatar.png')return route.fulfill({path:'public'+url.pathname});
-   return route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><style>body{margin:0;background:#172b34}*{box-sizing:border-box}${css}.arena{position:relative;height:100vh}.nexora-arena-scoreplate:nth-child(3){top:100px}</style><div id="root"></div><script>${bundle}</script>`});
+   return route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><style>body{margin:0;background:#172b34}*{box-sizing:border-box}${css}.arena{position:relative;height:100vh}.nexora-arena-scoreplate:nth-child(3){top:45vh}</style><div id="root"></div><script>${bundle}</script>`});
   });
   await page.goto('http://battle-profile.test/');
   const left=page.getByRole('button',{name:'ดูโปรไฟล์ OPPONENT LONG PLAYER NAME'}),right=page.getByRole('button',{name:'ดูโปรไฟล์ PLAYER',exact:true});
-  await left.waitFor();
+  await left.waitFor();await left.locator('.bpi-rank').filter({hasText:'Diamond'}).waitFor();
   assert.equal(await right.locator('.bpi-name-frame').evaluate(n=>getComputedStyle(n).transform),'matrix(-1, 0, 0, 1, 0, 0)');
   const a=await left.boundingBox(),b=await right.boundingBox();assert.ok(a.x+a.width<b.x,'Mirrored identities do not overlap');
+  if(width===3840)assert.ok(a.width>=600,'4K profile frame is enlarged');
   await page.screenshot({path:`artifacts/battle-player-profile/frames-${width}.png`});
   await left.click();const dialog=page.getByRole('dialog');await dialog.waitFor();
   await page.getByRole('heading',{name:'LIVE PLAYER'}).waitFor();assert.match(await dialog.innerText(),/32[\s\S]*8[\s\S]*80%/);
+  assert.ok(!(await dialog.innerText()).includes('กำลังโหลดแรงค์'));assert.ok(!(await dialog.innerText()).includes('โหลดโปรไฟล์ไม่สำเร็จ'));
   assert.equal(await dialog.getAttribute('aria-modal'),'false');
+  assert.equal(await dialog.evaluate(n=>getComputedStyle(n,'::before').animationName),'bpp-aura');
   assert.equal(await dialog.evaluate(n=>n.matches(':modal')),false);
   assert.equal(await left.evaluate(n=>getComputedStyle(n.closest('.nexora-arena-scoreplate')).backgroundColor),'rgba(0, 0, 0, 0)');
   assert.equal(await left.evaluate(n=>getComputedStyle(n.closest('.nexora-arena-scoreplate')).backdropFilter),'none');

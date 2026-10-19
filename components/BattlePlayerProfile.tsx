@@ -43,21 +43,27 @@ function FriendAction({id}:{id:string}){
 }
 
 export default function BattlePlayerProfile({identity,rank,player,currentUserId}:{identity:BattlePlayerIdentity;rank?:BattlePlayerRank|null;player?:boolean;currentUserId?:string}){
- const [open,setOpen]=useState(false),[details,setDetails]=useState<GameProfileDetails|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ const [open,setOpen]=useState(false),[details,setDetails]=useState<GameProfileDetails|null>(null);
  const trigger=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
  const [position,setPosition]=useState<CSSProperties>({visibility:'hidden'});
  const bot=!identity.id||identity.id==='triad-bot-level-99';
- useEffect(()=>{setOpen(false);setDetails(null);setError('')},[identity.id]);
+ useEffect(()=>{
+  setOpen(false);setDetails(identity.id?cachedGameProfile(identity.id)||null:null);
+  if(bot)return;
+  let active=true;
+  void loadGameProfile(identity.id!).then(value=>{if(active)setDetails(value)}).catch(()=>{});
+  return()=>{active=false};
+ },[identity.id,bot]);
  useEffect(()=>{
   if(!open)return;
   let active=true;
-  if(!bot){setError('');setDetails(cachedGameProfile(identity.id!)||null);void loadGameProfile(identity.id!).then(value=>{if(active)setDetails(value)}).catch(()=>{if(active)setError('โหลดโปรไฟล์ไม่สำเร็จ')})}
+  if(!bot){const cached=cachedGameProfile(identity.id!);if(cached)setDetails(cached);void loadGameProfile(identity.id!).then(value=>{if(active)setDetails(value)}).catch(()=>{})}
   const keyboard=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();setOpen(false);trigger.current?.focus()}};
   const outside=(event:PointerEvent)=>{const target=event.target as Node;if(!panel.current?.contains(target)&&!trigger.current?.contains(target))setOpen(false)};
   window.addEventListener('keydown',keyboard,true);
   document.addEventListener('pointerdown',outside,true);
   return()=>{active=false;window.removeEventListener('keydown',keyboard,true);document.removeEventListener('pointerdown',outside,true)};
- },[open,identity.id,bot,retry]);
+ },[open,identity.id,bot]);
  useLayoutEffect(()=>{
   if(!open)return;
   let frame=0;
@@ -82,16 +88,15 @@ export default function BattlePlayerProfile({identity,rank,player,currentUserId}
  const rate=wins!==undefined&&losses!==undefined?(wins+losses?Math.round(wins/(wins+losses)*100):0):null;
  return <>
   <button ref={trigger} className="battle-player-identity" data-player={Boolean(player)} aria-label={`ดูโปรไฟล์ ${identity.name}`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(value=>!value)} onPointerEnter={()=>{if(!bot)void loadGameProfile(identity.id!).catch(()=>{})}}>
-   <span className="bpi-avatar"><img src={identity.image||'/avatar.png'} alt=""/><img className="bpi-avatar-frame" src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span>
+   <span className="bpi-avatar"><img src={image} alt=""/><img className="bpi-avatar-frame" src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span>
    <span className="bpi-copy"><img className="bpi-name-frame" src="/images/lobby-play/profile-name-frame.png" alt=""/><strong title={identity.name}>{identity.name}</strong></span>
-   <span className="bpi-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{bot?'BOT':rank?.rankName||'ผู้เล่น'}</span></span>
+   <span className="bpi-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{rankName||'—'}</span></span>
   </button>
   {open&&createPortal(<div ref={panel} role="dialog" aria-modal="false" className="battle-player-mini" style={position} aria-label={`โปรไฟล์ ${identity.name}`} onKeyDown={event=>event.stopPropagation()}>
    <header><span><Shield size={16}/>โปรไฟล์ผู้เล่น</span><button aria-label="ปิดโปรไฟล์" onClick={()=>{setOpen(false);trigger.current?.focus()}}><X size={19}/></button></header>
-   <div className="bpp-identity"><span className="bpp-avatar"><img src={image} alt=""/><img src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span><div><h2>{name}</h2><p><Shield size={15}/>{rankName||'กำลังโหลดแรงค์…'}</p></div></div>
+   <div className="bpp-identity"><span className="bpp-avatar"><img src={image} alt=""/><img src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span><div><h2>{name}</h2><p><Shield size={15}/>{rankName||'—'}</p></div></div>
    {bot?<p className="bpp-bot">คู่ฝึกซ้อม AI · ไม่จัดอันดับผู้เล่น</p>:<div className="bpp-stats"><div><small>ชนะ</small><strong>{wins?.toLocaleString()??'—'}</strong></div><div><small>แพ้</small><strong>{losses?.toLocaleString()??'—'}</strong></div><div><small>อัตราชนะ</small><strong>{rate===null?'—':rate+'%'}</strong></div></div>}
    {!bot&&details?.rank.nextWins!=null&&<p className="bpp-progress">อีก {Math.max(0,details.rank.nextWins-(wins||0)).toLocaleString()} ชัยชนะ สู่ {details.rank.nextName}</p>}
-   {error&&<p className="bpp-error" role="alert">{error} <button onClick={()=>setRetry(value=>value+1)}>ลองใหม่</button></p>}
    {!bot&&identity.id!==currentUserId&&<FriendAction key={identity.id} id={identity.id!}/>}
   </div>,document.body)}
  </>;

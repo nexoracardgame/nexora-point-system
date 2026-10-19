@@ -947,6 +947,11 @@ async function addRankResult(participant: TriadRoomParticipant, result: "win" | 
   }
 }
 
+export async function readTriadRankStats(userId:string) {
+  const profile=await dbGetRankProfile(userId);
+  return {wins:profile?.wins??0,losses:profile?.losses??0};
+}
+
 export async function listTriadRankProfiles() {
   try {
     return await dbListRankProfiles();
