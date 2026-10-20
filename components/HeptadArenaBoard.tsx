@@ -30,7 +30,7 @@ function Slot({ no, turn, active, onChoose, onPreview, onPreviewEnd }: {
     style={{ '--slot-x': `${position.x}%`, '--slot-y': `${position.y}%` } as CSSProperties}
     aria-label={`ตา ${turn} · ${card?.name || (no === 'hidden' ? 'การ์ดคว่ำ' : HEPTAD_TURNS[turn - 1].kind === 'monster' ? 'มอนสเตอร์' : 'สกิล')}`}>
     {card ? <BattleArenaCardFrame><img src={card.sourceImage} alt={card.name} draggable={false} /></BattleArenaCardFrame>
-      : no === 'hidden' ? <BattleArenaCardFrame><img src="/cards/card-backs/card-backs.png" alt="การ์ดคว่ำ" draggable={false} /></BattleArenaCardFrame>
+      : no === 'hidden' ? <BattleArenaCardFrame><img className="nexora-card-back-art" src="/cards/card-backs/card-backs.png" alt="การ์ดคว่ำ" draggable={false} /></BattleArenaCardFrame>
         : <span className="heptad-slot-number">{turn}</span>}
   </button>;
 }

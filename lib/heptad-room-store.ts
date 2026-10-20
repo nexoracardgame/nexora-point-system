@@ -69,7 +69,8 @@ function resolve(room:HeptadRoom,now:number){
   const round:HeptadRound={...result,id:room.rounds.length+1,fight:room.fight,turn:room.turn,board,casts:structuredClone(room.casts),finalDuel:room.finalDuel};
   room.rounds.push(round);
   if(!room.finalDuel&&result.winner!=='draw')room.score[result.winner]++;
-  room.completedBy=[];room.phase='result';room.deadline=now+Math.max(12000,Math.min(60000,12000+result.events.length*6500+(result.elementClash?8000:0)));room.epoch++;
+  const supportScenes=room.turn>1&&!room.finalDuel?14000:0;
+  room.completedBy=[];room.phase='result';room.deadline=now+Math.max(12000,Math.min(90000,12000+result.events.length*6500+supportScenes+(result.elementClash?8000:0)));room.epoch++;
 }
 function prepareTargets(room:HeptadRoom,now:number){
   room.phase='target';room.choices=room.casts.map(cast=>({...cast,options:targetOptions(room,cast),value:''})).filter(choice=>choice.options.length);

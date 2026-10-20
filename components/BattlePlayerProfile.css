@@ -6,7 +6,7 @@
 .bpi-avatar>img:first-child{position:absolute;left:13%;top:15%;width:73%;height:65%;object-fit:cover;border-radius:50%}
 .bpi-avatar-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .bpi-copy{position:absolute;left:29%;top:0;width:71%;aspect-ratio:1532/465}
-.bpi-copy::before{content:'';position:absolute;inset:30% 15% 18% 10%;z-index:-1;background:linear-gradient(90deg,#03070940,#030709ee 15% 85%,#03070940);backdrop-filter:blur(8px);clip-path:polygon(8% 0,92% 0,100% 50%,92% 100%,8% 100%,0 50%)}
+.bpi-copy::before{display:none}
 .bpi-copy strong{position:absolute;left:14%;right:23%;top:42%;height:36%;display:flex;align-items:center;justify-content:center;z-index:2;overflow:hidden;white-space:nowrap;font-size:13px;line-height:1;color:#fff0ca;text-align:center;text-shadow:0 2px 3px #000}
 .bpi-name-frame{display:block;width:100%;height:100%;object-fit:contain;transition:filter .2s;clip-path:polygon(0 0,100% 0,100% 100%,16% 100%,16% 89%,0 89%)}
 .bpi-copy strong>span{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

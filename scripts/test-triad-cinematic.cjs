@@ -11,6 +11,8 @@ const reactDir = path.dirname(require.resolve('react'));
 const domDir = path.dirname(require.resolve('react-dom'));
 const schedulerDir = path.dirname(require.resolve('scheduler'));
 const modules = {
+  './game-settings': 'exports.gameVolume=()=>1;',
+  '@/lib/game-settings': 'exports.gameVolume=()=>1;',
   '@/lib/game-ui-audio': ts.transpileModule(fs.readFileSync('lib/game-ui-audio.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText,
   react: fs.readFileSync(path.join(reactDir, 'cjs/react.production.js'), 'utf8'),
   'react/jsx-runtime': fs.readFileSync(path.join(reactDir, 'cjs/react-jsx-runtime.production.js'), 'utf8'),
@@ -50,7 +52,7 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
   try {
     const page = await browser.newPage();
     const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', error => {errors.push(error.message);console.error(error.message)});
     await page.route('https://cinematic.test/**', route => {
       const url = new URL(route.request().url());
       if (url.pathname === '/') return route.fulfill({ body: html, contentType: 'text/html' });

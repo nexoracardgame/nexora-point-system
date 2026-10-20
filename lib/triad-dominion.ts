@@ -117,6 +117,7 @@ export type TriadTurnInput = {
 };
 
 export type TriadTurnResult = {
+  cinematicSupport?: Partial<Record<"player" | "opponent", string>>;
   pointsAwarded?: number;
   decisionReason?: string;
   pointScore?: { player: number; opponent: number };

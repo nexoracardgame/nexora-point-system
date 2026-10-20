@@ -9,7 +9,10 @@
 .heptad-slot { box-sizing:border-box;position:absolute;left:var(--slot-x);top:var(--slot-y);width:13%;aspect-ratio:815/1110;padding:0;border:1px solid #c7a86a66;border-radius:4%;background:#0006;color:#d9c18c;cursor:pointer;touch-action:manipulation; }
 .heptad-slot .nexora-card-art-frame { position:absolute;inset:0;display:block; }
 .heptad-slot img { width:100%;height:100%;display:block;object-fit:contain; }
-.heptad-slot[data-card-no]:not([data-card-no=""]) { border-color:transparent;background:transparent; }
+.heptad-slot[data-card-no]:not([data-card-no=""]),.heptad-slot[data-hidden=true] { border:0;background:transparent; }
+.heptad-slot:has(.nexora-card-art-frame):hover{filter:drop-shadow(0 0 8px #8ce9ce);z-index:2}
+.heptad-slot .nexora-card-art-frame{transition:filter 150ms ease}
+.heptad-slot:has(.nexora-card-art-frame):hover .nexora-card-art-frame{filter:brightness(1.12)}
 .heptad-slot[data-active=true] { box-shadow:0 0 0 1px #ffe4a4,0 0 12px #ecc36766; }
 .heptad-slot-number { display:grid;place-items:center;width:100%;height:100%;font-size:12px;font-weight:700; }
 .heptad-slot:focus-visible { outline:2px solid #fff1bd;outline-offset:3px; }

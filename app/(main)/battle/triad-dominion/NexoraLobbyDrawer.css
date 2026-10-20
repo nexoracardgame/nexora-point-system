@@ -252,7 +252,7 @@
 }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { clip-path:polygon(23% 9%,95% 9%,76% 91%,4% 91%); }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-primary { clip-path:polygon(23% 12%,80% 12%,93% 53%,80% 88%,6% 88%); }
-.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { clip-path:polygon(18% 0,100% 0,83% 100%,0 100%); }
+.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { min-height:0!important;min-width:0;box-sizing:border-box;clip-path:polygon(18% 0,100% 0,83% 100%,0 100%); }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer button::after { animation:none; transform:none; opacity:0; background:linear-gradient(120deg,#ffe29c55,transparent 45%,#ffd37b44); transition:opacity 180ms ease; }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer button:hover::after { opacity:.6; }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer button:active::after { opacity:1; background:#fff3c477; }

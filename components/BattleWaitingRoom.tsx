@@ -45,7 +45,7 @@ export default function BattleWaitingRoom({seats:confirmedSeats,spectators:confi
  return <>{code&&onExit&&onStart&&<BattleWaitingHeader code={code} onExit={exit} onStart={()=>void start()} botBusy={false} botDisabled={!canChange} startDisabled={starting||!canChange||!seats.host||!seats.challenger}/>}
  <section className="nexora-shared-waiting" aria-busy={Boolean(pending)||externalBusy}><GamePreparationBackground/><div className="nsw-seats">{(['host','challenger'] as const).map(side=>{
   const person=seats[side],bot=isBot(person);
-  return <article key={side} className="nsw-seat" aria-label={side==='host'?'ฝั่ง A':'ฝั่ง B'}><small>{side==='host'?'ฝั่ง A':'ฝั่ง B'}</small><div className="nsw-person">
+  return <article key={side} className="nsw-seat" aria-label={side==='host'?'ฝั่ง A':'ฝั่ง B'}><div className="nsw-person">
    {person?<><div className="nsw-framed-identity"><BattlePlayerProfile identity={person} player={side==='challenger'} currentUserId={userId} showRankBadge/>{person.id===leaderId&&<Crown className="nsw-leader" aria-label="หัวหน้าห้อง"/>}</div><span className="nsw-ready">{bot?'BOT · พร้อมลงสนาม':'พร้อมลงสนาม'}</span></>:<strong>รอผู้เล่น</strong>}
    <div className="nsw-seat-actions">
     {!person&&!seated&&<button onClick={()=>take(side)} disabled={starting}><LogIn size={16}/>ลงสนาม</button>}

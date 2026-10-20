@@ -11,7 +11,7 @@ import styles from "./BattleCinematic.module.css";
 import type { TriadArena } from "@/lib/triad-arena";
 
 type Side = "player" | "opponent";
-type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; recipient?: Side | "both"; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
+type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; recipient?: Side | "both"; supportTransfer?: boolean; secondaryTarget?: boolean; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
 
 export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard, opponentCard?: TriadCard, playerMainCard?: TriadCard, opponentMainCard?: TriadCard): Step[] {
   const skills: Step[] = result.skillEvents.filter(event=>{
@@ -25,23 +25,36 @@ export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard
     const positive = deltas.some(delta => delta > 0);
     const negative = deltas.some(delta => delta < 0);
     const other: Side = event.side === "player" ? "opponent" : "player";
-    const recipient = event.targetLabel?.includes("ฝ่ายตรงข้าม") ? other : event.targetLabel?.includes("ฝ่ายผู้ใช้") || event.targetLabel?.includes("ฝ่ายเรา") ? event.side : rule?.target === "all" ? "both" : rule?.target.startsWith("opponent") ? other : event.side;
+    const recipient = event.targetLabel?.includes("ตรงข้าม") ? other : /ผู้ใช้|ฝ่ายเรา/.test(event.targetLabel || "") ? event.side : rule?.target === "all" ? "both" : rule?.target.startsWith("opponent") ? other : event.side;
     return {
     side: event.side, cardNo: event.cardNo, kind: "skill", summary: event.summary,
     blocked: Boolean(inactive || event.blocked || event.type === "skill-cancel" || event.type === "block-stat-gain"),
     inactive,
     recipient,
+    secondaryTarget: Boolean(event.targetLabel?.includes("มอนสเตอร์รอง")),
     field: !inactive && ["all", "own-all", "opponent-all"].includes(rule?.target || ""),
     effect: ["226","227","255","229"].includes(event.cardNo) ? "debuff" : event.cardNo === "265" || event.type === "element-transform" ? "transform" : event.type === "swap-control" ? "swap" : positive && negative ? "shift" : negative ? "debuff" : positive ? "buff" : undefined,
   }; });
   const order: Side[] = result.prioritySide === "opponent" ? ["opponent", "player"] : ["player", "opponent"];
+  const sequenced: Step[] = [];
+  const transfers = order.flatMap((side): {after:number;step:Step}[] => {
+    const cardNo = result.cinematicSupport?.[side];
+    if (!cardNo) return [];
+    let after = -1;
+    skills.forEach((skill,index) => {
+      if (!skill.blocked && (skill.secondaryTarget || skill.field) && (skill.recipient === side || skill.recipient === "both")) after = index;
+    });
+    return [{after,step:{side,cardNo,kind:"skill",recipient:side,effect:"buff",supportTransfer:true,summary:`มอนสเตอร์รอง No.${cardNo} ถ่ายทอดพลัง${result.metric === "attack" ? " ATTACK" : result.metric === "support" ? " SUPPORT" : " ATK + SUP"} หลังผลที่เกี่ยวข้อง → มอนสเตอร์หลัก`}}];
+  });
+  sequenced.push(...transfers.filter(item=>item.after===-1).map(item=>item.step));
+  skills.forEach((skill,index)=>{sequenced.push(skill,...transfers.filter(item=>item.after===index).map(item=>item.step));});
   const strikes = order.flatMap((side): Step[] => {
     const laneCard = side === "player" ? playerCard : opponentCard;
     const mainCard = side === "player" ? playerMainCard : opponentMainCard;
-    const card = laneCard?.kind === "monster" ? laneCard : mainCard || laneCard;
+    const card = result.cinematicSupport?.[side] ? mainCard || laneCard : laneCard?.kind === "monster" ? laneCard : mainCard || laneCard;
     return [{ side, cardNo: card?.cardNo || "", kind: "strike", summary: "", value: Math.max(0, side === "player" ? result.playerTotal : result.opponentTotal) }];
   });
-  return [{ side: order[0], cardNo: "", kind: "intro", summary: "" }, ...skills, ...strikes, { side: result.winner === "opponent" ? "opponent" : "player", cardNo: "", kind: "result", summary: "" }];
+  return [{ side: order[0], cardNo: "", kind: "intro", summary: "" }, ...sequenced, ...strikes, { side: result.winner === "opponent" ? "opponent" : "player", cardNo: "", kind: "result", summary: "" }];
 }
 
 export function battleHpAtStep(result: TriadTurnResult, steps: Step[], index: number, hit: boolean) {
@@ -140,8 +153,8 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
   }, [index, steps.length, reduced, currentKind, currentSummaryLength]);
   const step = steps[Math.min(index, steps.length - 1)];
   const attacker = cardsByNo.get(step.cardNo) || (step.side === "player" ? playerCard : opponentCard);
-  const playerFighter = playerCard?.kind === "monster" ? playerCard : playerMainCard?.kind === "monster" ? playerMainCard : undefined;
-  const opponentFighter = opponentCard?.kind === "monster" ? opponentCard : opponentMainCard?.kind === "monster" ? opponentMainCard : undefined;
+  const playerFighter = result.cinematicSupport?.player ? playerMainCard : playerCard?.kind === "monster" ? playerCard : playerMainCard?.kind === "monster" ? playerMainCard : undefined;
+  const opponentFighter = result.cinematicSupport?.opponent ? opponentMainCard : opponentCard?.kind === "monster" ? opponentCard : opponentMainCard?.kind === "monster" ? opponentMainCard : undefined;
   const replacementVisible = (side: Side) => !steps.some(item => item.cardNo === "265" && !item.blocked && item.recipient === side) || steps.slice(0,index).some(item => item.cardNo === "265" && !item.blocked && item.recipient === side);
   const activePlayer = replacementVisible("player") ? playerFighter : cardsByNo.get(result.originalPlayer?.top || "") || playerFighter;
   const activeOpponent = replacementVisible("opponent") ? opponentFighter : cardsByNo.get(result.originalOpponent?.top || "") || opponentFighter;
@@ -206,6 +219,8 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
         {[{ side: "player" as const, card: activePlayer }, { side: "opponent" as const, card: activeOpponent }].map(({ side, card }) => {
           const power = empowered(side);
           const receiving = receivingSkill && (step.recipient === side || step.recipient === "both");
+          const secondary = receiving && step.secondaryTarget ? cardsByNo.get(result.cinematicSupport?.[side] || (side === "player" ? result.effectivePlayer : result.effectiveOpponent)[result.turn === 2 ? "right" : "left"] || "") : undefined;
+          if (secondary) card = secondary;
           const powerCard = power ? cardsByNo.get(power.cardNo) : undefined;
           const powerColor = { fire: "#ff8c68", water: "#71dfff", wood: "#79f2b0", earth: "#f4d475", gold: "#fff0ae", unknown: "#bce8ff" }[powerCard?.element || "unknown"];
           return <div key={side} data-fighter={step.side === side ? "source" : "target"} data-side={side} data-empowered={Boolean(power)} className={`${styles.fighter} ${side === "player" ? styles.player : styles.opponent} ${step.side === side ? styles.source : styles.target} ${power && !final ? styles.empowered : ""} ${receiving ? styles.receiving : ""} ${final && result.winner !== "draw" ? result.winner === side ? styles.winner : styles.defeated : ""}`} style={{ "--power-color": receiving ? color : powerColor } as CSSProperties}>
@@ -215,10 +230,10 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
             {(power || (receiving && step.effect !== "debuff" && step.effect !== "swap")) && !final ? <div className={styles.weaponAura} aria-hidden="true"><Swords size={36} strokeWidth={1.5} /></div> : null}
           </div>;
         })}
-        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`}>
+        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-support-transfer={Boolean(step.supportTransfer)} data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`}>
           <div className={styles.skillSeal} aria-hidden="true"><img src="/battle-fx/magic_01.png" alt="" /><i /><i /></div>
           <img data-battle-card-face src={attacker.sourceImage} alt={attacker.name} draggable={false} />
-          <span>{step.blocked ? "สกิลถูกระงับ" : step.effect === "debuff" ? "ส่งผลลดพลัง" : "ส่งพลังสกิล"}</span>
+          <span>{step.blocked ? "สกิลถูกระงับ" : step.supportTransfer ? "มอนสเตอร์รอง → มอนสเตอร์หลัก" : step.effect === "debuff" ? "ส่งผลลดพลัง" : "ส่งพลังสกิล"}</span>
         </div> : null}
         <span className={`${styles.name} ${styles.playerName}`}>{playerName}</span>
         <span className={`${styles.name} ${styles.opponentName}`}>{opponentName}</span>

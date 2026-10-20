@@ -26,8 +26,10 @@ import type { PentadRoom } from '@/lib/pentad-room-store';
 import type { HeptadRoom } from '@/lib/heptad-room-store';
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-const PentadHandoffClient = dynamic(()=>import('../pentad-dominion/PentadDominionClient'),{ssr:false});
-const HeptadHandoffClient = dynamic(()=>import('@/app/game/heptad/HeptadClient'),{ssr:false});
+const preparePentadClient = () => import('../pentad-dominion/PentadDominionClient');
+const prepareHeptadClient = () => import('@/app/game/heptad/HeptadClient');
+const PentadHandoffClient = dynamic(preparePentadClient,{ssr:false});
+const HeptadHandoffClient = dynamic(prepareHeptadClient,{ssr:false});
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import DuelistLeaderboard from "@/components/DuelistLeaderboard";
@@ -4495,7 +4497,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [creatingRoom, setCreatingRoom] = useState(false);
   const creatingRoomRef = useRef(false);
   const dismissedRoomCodesRef = useRef(new Set<string>());
-  useEffect(() => { router.prefetch("/game/pentad"); }, [router]);
+  useEffect(() => {
+    router.prefetch("/game/pentad");
+    router.prefetch("/game/heptad");
+    // Warm only the two room modules; do not decode full card collections here.
+    void preparePentadClient().catch(()=>{});
+    void prepareHeptadClient().catch(()=>{});
+    void import('@/lib/home-wallpaper').then(module=>module.loadHomeWallpaper('preparation')).catch(()=>{});
+  }, [router]);
+  const [creatingFormat,setCreatingFormat]=useState<"triad"|"pentad"|"heptad">("triad");
   const startingRoomCodeRef = useRef("");
   const roomResponseRevisionRef = useRef(0);
   const [createRoomMode, setCreateRoomMode] = useState<DeckMode>("all");
@@ -5531,6 +5541,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     }
 
     creatingRoomRef.current = true;
+    setCreatingFormat(createFormat);
     setCreatingRoom(true);
     setLobbyMessage("");
     try {
@@ -5563,6 +5574,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     setLobbyMessage("");
     if (roomDecksReadyForBattle(room)) markBattleStartedForRoom(room);
     setPhase(room.status === "playing" ? phaseForRoomWithBattleLock(room, "deck") || "deck" : "room");
+    } catch(error) {
+      setLobbyMessage(error instanceof Error?error.message:"สร้างห้องไม่สำเร็จ");
     } finally {
       creatingRoomRef.current = false;
       setCreatingRoom(false);
@@ -7315,6 +7328,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
 
   if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff}/>;
   if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} initialRoom={heptadHandoff} spectate={false}/>;
+  if (creatingRoom) return <BattleArenaSurface image={arena.image} className="nexora-room-create-preview">
+    <div role="status" className="nexora-room-create-status">{creatingFormat.toUpperCase()} · ยืนยันห้องกับเซิร์ฟเวอร์</div>
+    <BattleWaitingRoom seats={{host:participant,challenger:null}} spectators={[]} userId={participant.id} leaderId={participant.id} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'}]} mode="all" canChange={false} busy onMode={()=>{}} onWatch={()=>{}} onTake={()=>{}}/>
+  </BattleArenaSurface>;
 
   if (shouldShowReconnectSplash) {
     return <BattleConnectingScreen />;
@@ -7393,7 +7410,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
         <NexoraCommandLobby participant={participant} rankProfiles={rankProfiles} leaderboard={leaderboard} rooms={visibleRooms} roomAccess={roomAccess} setRoomAccess={setRoomAccess} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joiningRoomCode={joiningRoomCode} lobbyMessage={lobbyMessage}
           onCreate={(format) => {
             if(format==='heptad'){
-              if(creatingRoomRef.current)return;creatingRoomRef.current=true;setCreatingRoom(true);
+              if(creatingRoomRef.current)return;creatingRoomRef.current=true;setCreatingFormat('heptad');setCreatingRoom(true);setLobbyMessage('');
               void (async()=>{try{const response=await fetch('/api/heptad-rooms',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(12000),body:JSON.stringify({action:'create',access:roomAccess,password:roomPassword})}),data=await response.json();
                 if(!response.ok||!data.room)throw Error(data.error||'สร้างห้องไม่สำเร็จ');
                 try{sessionStorage.setItem('nexora:heptad:handoff',JSON.stringify({userId:participant.id,room:data.room,at:Date.now()}));}catch{}
