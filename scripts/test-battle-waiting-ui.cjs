@@ -11,7 +11,7 @@ const React=require('react'),Waiting=require('waiting').default,Chat=require('ch
 function App(){const [state,setState]=React.useState({seats:{host:{id:'a',name:'Player A'},challenger:null},spectators:[],mode:'all'});const [text,setText]=React.useState('');
 const update=(action,change)=>{window.started.push(action);return new Promise(resolve=>window.releases.push(()=>{setState(current=>change(current));window.completed.push(action);resolve(true)}));};
 const modes=Array.from({length:window.modeCount},(_,i)=>({id:['all','monster','skill','gold'][i],title:['ALL','MONSTER','SKILL','GOLD'][i],description:'มอนสเตอร์ · สกิลทุกระดับ'}));
-return React.createElement(Waiting,{...state,modes,userId:'a',leaderId:'a',canChange:true,code:'123456',onExit:()=>window.exited=true,onStart:()=>update('start',s=>s),onMode:mode=>update('mode:'+mode,s=>({...s,mode})),onWatch:()=>update('watch',s=>({...s,seats:{host:null,challenger:s.seats.challenger},spectators:[{id:'a',name:'Player A'}]})),onTake:side=>update('seat:'+side,s=>({...s,seats:{...s.seats,[side]:{id:'a',name:'Player A'}},spectators:[]})),onBot:(side,enabled)=>update('bot:'+side+':'+enabled,s=>({...s,seats:{...s.seats,[side]:enabled?{id:'pentad-bot',name:'BOT'}:null}})),chat:React.createElement(Chat,{messages:[],currentUserId:'a',draft:text,onDraftChange:setText,onSubmit:()=>true})});}
+return React.createElement(Waiting,{...state,modes,userId:'a',leaderId:'a',canChange:true,code:'123456',onExit:()=>window.exited=true,onStart:()=>update('start',s=>s),onMode:mode=>update('mode:'+mode,s=>({...s,mode})),onWatch:()=>update('watch',s=>({...s,seats:{host:null,challenger:s.seats.challenger},spectators:[{id:'a',name:'Player A'}]})),onTake:side=>update('seat:'+side,s=>({...s,seats:{...s.seats,[side]:{id:'a',name:'Player A'}},spectators:[]})),onBot:(side,enabled)=>update('bot:'+side+':'+enabled,s=>({...s,seats:{...s.seats,[side]:enabled?{id:'pentad-bot',name:'BOT'}:null}})),chat:React.createElement(Chat,{messages:Array.from({length:20},(_,i)=>({id:'message-'+i,senderId:'b',senderName:'Player B',text:'ข้อความ '+i})),currentUserId:'a',draft:text,onDraftChange:setText,onSubmit:()=>true})});}
 window.started=[];window.completed=[];window.releases=[];window.modeCount=Number(new URLSearchParams(location.search).get('count'));require('react-dom/client').createRoot(document.getElementById('root')).render(React.createElement(App));`;
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{
  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.message)});
@@ -20,19 +20,21 @@ window.started=[];window.completed=[];window.releases=[];window.modeCount=Number
   const dimensions=[];
   for(const count of [3,2,4]){
    await page.setViewportSize({width,height});await page.goto(`http://waiting.test/?count=${count}`);await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).waitFor({timeout:3000}).catch(async error=>{console.error(await page.locator('#root').innerHTML());throw error});
-   const geometry=await page.evaluate(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom}};return {header:rect('.nexora-waiting-header'),exit:rect('[data-room-actions]>button'),actions:rect('[data-room-actions]'),chat:rect('.nsw-chat'),spectators:rect('.nsw-spectators'),footer:rect('.nsw-footer'),settings:rect('.nsw-settings'),chrome:rect('.nexora-window-controls')};});
+   const geometry=await page.evaluate(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom}};return {header:rect('.nexora-waiting-header'),exit:rect('[data-room-actions]>button'),actions:rect('[data-room-actions]'),seats:rect('.nsw-seats'),chat:rect('.nsw-chat'),spectators:rect('.nsw-spectators'),footer:rect('.nsw-footer'),settings:rect('.nsw-settings'),chrome:rect('.nexora-window-controls')};});
    dimensions.push(geometry);
-   assert.ok(geometry.chat.right<=geometry.spectators.x+1,'Chat has its own footer column');
-   assert.ok(geometry.chat.bottom<=height&&geometry.settings.bottom<=geometry.footer.y+1,'Chat and spectators stay below settings');
+   assert.ok(Math.abs(geometry.chat.bottom-(geometry.seats.bottom-1))<1,'Chat sits on the border above mode settings');
+   assert.ok(Math.abs(geometry.chat.x-geometry.seats.x)<1&&geometry.chat.w<=440,'Chat stays left-aligned and compact');
+   assert.ok(geometry.chat.bottom<=geometry.settings.y&&geometry.settings.bottom<=geometry.footer.y+1,'Chat is above modes; spectators stay below modes');
+   assert.equal(await page.locator('.nsw-footer .nsw-chat').count(),0,'Chat never returns to the spectator footer');
    assert.ok(geometry.actions.right<=geometry.chrome.x,'Header actions clear native chrome');
    assert.ok(geometry.footer.bottom<=height+1,'Footer fits landscape viewport');
    const persons=await page.locator('.nsw-person').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return [...node.children].map(child=>child.getBoundingClientRect()).filter(r=>r.width&&r.height).map(child=>child.bottom)}).flat());
-   assert.ok(persons.every(bottom=>bottom<=geometry.settings.y+1),'Seat identities and controls do not overlap settings');
+   assert.ok(persons.every(bottom=>bottom<=geometry.chat.y+1),'Seat identities and controls do not overlap chat');
    assert.deepEqual(errors,[]);
    fs.mkdirSync('artifacts/battle-waiting',{recursive:true});await page.screenshot({path:`artifacts/battle-waiting/${count}-${width}.png`});
   }
   for(const item of dimensions.slice(1)){assert.equal(item.header.h,dimensions[0].header.h,'Same header height');assert.equal(item.exit.h,dimensions[0].exit.h,'Same button height');assert.equal(item.exit.w,dimensions[0].exit.w,'Same button width');}
-  console.log(`Waiting ${width}x${height}: three modes share header dimensions, isolated chat/footer and native-chrome clearance`);
+  console.log(`Waiting ${width}x${height}: all three modes anchor chat on the border above modes, without overlapping seats or spectators`);
  }
  await page.goto('http://waiting.test/?count=4');await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).click();
  await page.getByRole('button',{name:'เพิ่มบอทลงสนาม ฝั่ง A',exact:true}).click();

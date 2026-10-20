@@ -36,9 +36,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   for(const [width,height] of [[1920,1080],[844,390],[568,320]]){
    room=create('123456',actor);requests=[];maxActive=0;delay=500;
    await page.setViewportSize({width,height});await page.goto('http://clients.test/');await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).waitFor();
-   const dock=await page.locator('.nsw-chat').boundingBox(),spectators=await page.locator('.nsw-spectators').boundingBox();assert.ok(dock.x+dock.width<=spectators.x+1,'Shared waiting chat stays beside spectators');
+   const dock=await page.locator('.nsw-chat').boundingBox(),seats=await page.locator('.nsw-seats').boundingBox();assert.ok(Math.abs(dock.y+dock.height-(seats.y+seats.height-1))<1,'Shared waiting chat sits on the border above mode settings');
    const settings=await page.locator('.nsw-settings').boundingBox();
-   const seatBottoms=await page.locator('.nsw-person>*').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect()).filter(rect=>rect.width&&rect.height).map(rect=>rect.bottom));assert.ok(seatBottoms.every(bottom=>bottom<=settings.y+1),'Actual mode labels leave room for seat controls');
+   const seatBottoms=await page.locator('.nsw-person>*').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect()).filter(rect=>rect.width&&rect.height).map(rect=>rect.bottom));assert.ok(seatBottoms.every(bottom=>bottom<=dock.y+1)&&dock.y+dock.height<=settings.y,'Seat controls, border chat and mode settings do not overlap');
    await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).click();
    await page.getByRole('button',{name:'ลงสนาม',exact:true}).first().click();
    await page.getByRole('button',{name:'เพิ่มบอทลงสนาม ฝั่ง B',exact:true}).click();
