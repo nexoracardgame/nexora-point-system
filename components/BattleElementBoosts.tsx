@@ -4,7 +4,7 @@ import {createPortal} from 'react-dom';
 import {triadCardByNo} from '@/lib/triad-dominion';
 import './BattleElementBoosts.css';
 export function ElementBoostCard({no,used=false}:{no:string;used?:boolean}){
- const card=triadCardByNo.get(no);return card?<aside className="battle-element-boost" data-used={used}><strong>การ์ดเสริมธาตุ</strong><img src={card.sourceImage} alt={card.name}/><span>{used?'ใช้แล้ว':card.name}</span></aside>:null;
+ const card=triadCardByNo.get(no);return card?<aside key={no} className="battle-element-boost" data-used={used}><strong>{used?'การ์ดเสริมธาตุ':'ได้รับการ์ดเสริมธาตุ'}</strong><img src={card.sourceImage} alt={card.name}/><span>{used?'ใช้แล้ว':card.name}</span></aside>:null;
 }
 export default function BattleElementBoosts({boosts,used,mode}:{boosts:Partial<Record<'host'|'challenger',string>>;used:boolean|Partial<Record<'host'|'challenger',boolean>>;mode:'heptad'|'pentad'}){
  const [positions,setPositions]=useState<Record<string,{left:number;top:number;width:number}>>({});

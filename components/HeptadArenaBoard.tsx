@@ -16,6 +16,7 @@ type Props = {
   activeTurn: HeptadTurn;
   playerSide?: Side;
   onChooseSlot?: (turn: HeptadTurn) => void;
+  specials?:Record<Side,{turn:HeptadTurn;no:string;used:boolean}[]>;
 };
 
 function Slot({ no, turn, active, onChoose, onPreview, onPreviewEnd }: {
@@ -35,7 +36,7 @@ function Slot({ no, turn, active, onChoose, onPreview, onPreviewEnd }: {
   </button>;
 }
 
-export default function HeptadArenaBoard({ board, names, activeTurn, playerSide, onChooseSlot }: Props) {
+export default function HeptadArenaBoard({ board, names, activeTurn, playerSide, onChooseSlot,specials }: Props) {
   const [preview, setPreview] = useState('');
   const card = triadCardByNo.get(preview);
   const order: Side[] = playerSide === 'challenger' ? ['host', 'challenger'] : ['challenger', 'host'];
@@ -46,6 +47,7 @@ export default function HeptadArenaBoard({ board, names, activeTurn, playerSide,
         {HEPTAD_TURNS.map(({ turn }) => <Slot key={turn} turn={turn} no={board[side][turn] || ''} active={turn === activeTurn}
           onChoose={side === playerSide && turn === activeTurn && !board[side][turn] && onChooseSlot ? () => onChooseSlot(turn) : undefined}
           onPreview={() => setPreview(board[side][turn] || '')} onPreviewEnd={() => setPreview('')} />)}
+      {specials?.[side].map(item=><div key={`${item.turn}:${item.no}`} className="heptad-field-special" data-turn={item.turn} data-used={item.used} style={{left:`${HEPTAD_SLOT_POSITIONS[item.turn].x+13.8}%`,top:`${HEPTAD_SLOT_POSITIONS[item.turn].y}%`}}><strong>พิเศษ {item.turn}</strong><BattleArenaCardFrame><img src={item.no==='hidden'?'/cards/card-backs/card-backs.png':triadCardByNo.get(item.no)?.sourceImage} alt={item.no==='hidden'?'การ์ดเสริมพิเศษคว่ำหน้า':triadCardByNo.get(item.no)?.name||'การ์ดเสริมพิเศษ'} draggable={false}/></BattleArenaCardFrame><span>{item.used?'ใช้แล้ว':'ประกาศใช้'}</span></div>)}
       </div>
     </section>)}
     {card && <BattleCardInspector card={card} element={`ธาตุ${pentadElementNames[card.element]}`} interactive={false} onClose={() => setPreview('')} />}

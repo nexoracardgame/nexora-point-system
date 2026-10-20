@@ -6,15 +6,20 @@ const owner={id:'owner',name:'Owner',image:'/avatar.png'},rival={id:'rival',name
 function room(){return store.newHeptadRoom('123456',owner,1)}
 function action(r,actor,body,now=2){store.applyHeptadAction(r,actor,{epoch:r.epoch,...body},now)}
 {
- const r=room();r.phase='special';r.turn=2;r.decks.host[0].special=['218','219','220'];
+ const r=room();action(r,rival,{action:'join'});r.phase='special';r.turn=2;r.decks.host[0].special=['218','219','220'];r.decks.challenger[0].special=['221'];
  assert.throws(()=>action(r,owner,{action:'special',slot:-1}));
  assert.throws(()=>action(r,owner,{action:'special',slot:3}));
- action(r,owner,{action:'special',slot:0});
- assert.ok(['218','219','220'].includes(r.special.host));assert.equal(r.specialUsed.host,1);
+ assert.throws(()=>action(r,rival,{action:'special',cardNo:'221'}),'Second responder cannot act early');
+ action(r,owner,{action:'special',cardNo:'219'});
+ assert.equal(r.special.host,'219');assert.equal(r.specialUsed.host,1);
+ const concealed=store.publicHeptadRoom(r,rival.id);assert.equal(concealed.special.host,'confirmed');assert.ok(!concealed.used.host[0].includes('219'),'Facedown card identity is not leaked through used cards');
+ action(r,rival,{action:'special',cardNo:'221'});assert.deepEqual(r.specialOrder,['host','challenger']);
  assert.throws(()=>action(r,owner,{action:'special',slot:1}));
  const legacy=room();legacy.phase='special';legacy.turn=2;legacy.decks.host[0].special=['218'];
- action(legacy,owner,{action:'special',cardNo:'forged-card'});assert.equal(legacy.special.host,'218');
- console.log('Hidden special draw: server pool, slot validation, one choice and legacy request safety passed');
+ assert.throws(()=>action(legacy,owner,{action:'special',cardNo:'forged-card'}));action(legacy,owner,{action:'special',cardNo:'218'});assert.equal(legacy.special.host,'218');
+ const reverse=room();action(reverse,rival,{action:'join'});reverse.phase='special';reverse.turn=2;reverse.opener='challenger';reverse.decks.host[0].special=['218'];reverse.decks.challenger[0].special=['221'];
+ assert.throws(()=>action(reverse,owner,{action:'special',cardNo:'218'}));action(reverse,rival,{action:'special',cardNo:''});action(reverse,owner,{action:'special',cardNo:'218'});
+ console.log('Special selection: exact card, sequential priority both sides, hidden identity, decline and one-use safety passed');
 }
 for(const turn of [2,5]){
  const r=room();action(r,rival,{action:'join'});r.phase='select';r.turn=turn;

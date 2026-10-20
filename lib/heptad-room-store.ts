@@ -122,6 +122,9 @@ function beginSpecial(room:HeptadRoom,now:number){
   room.phase='special';room.deadline=now+30000;room.epoch++;
   for(const side of sides)if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!room.decks[side][room.fight-1].special.some(no=>!room.used[side][room.fight-1].includes(no)))room.special[side]='__decline__';
 }
+export function heptadSpecialResponder(room:HeptadRoom):PentadSide|undefined{
+  return [room.opener,otherPentadSide(room.opener)].find(side=>!room.special[side]);
+}
 export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
   if(room.phase==='deck'){
     if(now>=room.deadline)for(const side of sides){room.decks[side]=completeHeptadMatchDeck(room.decks[side],room.tier,random);room.ready[side]=true;}
@@ -157,11 +160,13 @@ export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
     if(pentadElementRelation(a.element,b.element).winner)reveal(room,now);else beginSpecial(room,now);
   }
   if(room.phase==='special'){
-    for(const side of sides)if(!room.special[side]){
+    for(const side of [room.opener,otherPentadSide(room.opener)])if(!room.special[side]){
       if(bot(room,side)){const cards=room.decks[side][room.fight-1].special.filter(no=>!room.used[side][room.fight-1].includes(no));
         const no=cards.length&&random()<.45?cards[randomInt(cards.length)]:'__decline__';room.special[side]=no;
         if(no!=='__decline__'){room.specialUsed[side]++;use(room,side,no);room.specialOrder.push(side);}
       }else if(now>=room.deadline)room.special[side]='__decline__';
+      else break;
+      room.deadline=now+30000;
     }
     if(sides.every(side=>room.special[side]))reveal(room,now);
   }
@@ -203,12 +208,12 @@ export function applyHeptadAction(room:HeptadRoom,actor:PentadParticipant,body:R
   }
   if(action==='special'){
     if(room.phase!=='special'||room.special[side])throw Error('ตอบรับการ์ดเสริมไปแล้ว');
-    if(body.slot===undefined&&!body.cardNo){room.special[side]='__decline__';return;}
+    if(heptadSpecialResponder(room)!==side)throw Error('รอฝ่ายที่มีสิทธิ์เลือกก่อน');
+    const no=String(body.cardNo||'');
+    if(!no){if(body.slot!==undefined)throw Error('กรุณาเลือกการ์ดเสริมพิเศษ');room.special[side]='__decline__';room.deadline=now+30000;return;}
     const pool=room.decks[side][room.fight-1].special.filter(no=>!room.used[side][room.fight-1].includes(no));
-    if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!pool.length||body.slot!==undefined&&(!Number.isInteger(body.slot)||Number(body.slot)<0||Number(body.slot)>=pool.length))throw Error('ใช้สิทธิ์เสริมไม่ได้');
-    // Resolve the hidden draw on the server, including requests from older clients.
-    const no=pool[randomInt(pool.length)];
-    room.special[side]=no;room.specialUsed[side]++;use(room,side,no);room.specialOrder.push(side);return;
+    if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!pool.includes(no))throw Error('ใช้สิทธิ์เสริมไม่ได้');
+    room.special[side]=no;room.specialUsed[side]++;use(room,side,no);room.specialOrder.push(side);room.deadline=now+30000;return;
   }
   if(action==='target'){
     const choice=room.choices.find(item=>!item.value);const value=String(body.target||'');
@@ -222,7 +227,11 @@ export function publicHeptadRoom(room:HeptadRoom,id:string):HeptadRoom{
   delete copy.temporaryMains;
   for(const seat of sides)if(seat!==side){
     copy.decks[seat]=[];copy.finalPool[seat]=[];
-    if(['select','special'].includes(room.phase)){if(!room.elementPresented)copy.picks[seat]=room.picks[seat]?'hidden':'';copy.special[seat]=room.special[seat]?'confirmed':'';}
+    if(['select','element','special'].includes(room.phase)){
+      if(room.phase!=='element'&&!room.elementPresented)copy.picks[seat]=room.picks[seat]?'hidden':'';
+      const special=room.special[seat];copy.special[seat]=special==='__decline__'?'__decline__':special?'confirmed':'';
+      if(special&&special!=='__decline__')copy.used[seat][room.fight-1]=copy.used[seat][room.fight-1].filter(no=>no!==special);
+    }
     if(room.phase==='target')copy.choices=copy.choices.map(choice=>choice.side===seat?{...choice,options:[],value:choice.value?'confirmed':''}:choice);
   }
   return copy;

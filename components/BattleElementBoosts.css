@@ -2,4 +2,8 @@
 .battle-element-boost img{display:block;width:100%;aspect-ratio:815/1110;object-fit:contain;border-radius:4%}
 .battle-element-boost strong,.battle-element-boost span{overflow-wrap:anywhere}
 .battle-element-boost[data-used=true]{filter:grayscale(1);opacity:.7;box-shadow:none}
+.battle-element-boost[data-used=false]{animation:element-boost-received .65s ease-out both}
+@keyframes element-boost-received{0%{opacity:0;transform:translateY(12px) scale(.85);filter:brightness(2)}100%{opacity:1;transform:none;filter:none}}
+@media(prefers-reduced-motion:reduce){.battle-element-boost[data-used=false]{animation:none}}
+html[data-game-motion-off=true] .battle-element-boost[data-used=false]{animation:none}
 @media(max-height:600px){.battle-element-boost{font-size:8px;padding:2px}}

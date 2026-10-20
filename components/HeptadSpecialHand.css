@@ -1,0 +1,13 @@
+.heptad-special-hand{position:absolute;right:12px;bottom:calc(var(--heptad-hand-height) + 12px);z-index:8;width:min(26%,420px);padding:10px;color:#fff;background:rgb(0 0 0 / 75%);border:1px solid #d6b56b88;border-radius:6px;font:700 12px/1.4 Arial,Tahoma,sans-serif;isolation:isolate}
+.heptad-special-hand header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px}.heptad-special-hand header span{font-size:10px;color:#ebcd8a}.heptad-special-hand p{margin:6px 0;color:#ffe4a3;overflow-wrap:anywhere}.heptad-special-hand[data-prompt=true]{border-color:#ffe4a3;box-shadow:0 0 16px #d6b56b44}
+.heptad-special-hand-fan{display:flex;justify-content:center;align-items:flex-end;padding:14px 5px 9px;min-width:0}
+.heptad-special-hand-card{position:relative;flex:0 0 24%;aspect-ratio:815/1110;min-width:0;padding:0;border:0;background:none;transform:rotate(var(--fan-angle));transform-origin:50% 100%;z-index:var(--fan-index);touch-action:manipulation}
+.heptad-special-hand-card+.heptad-special-hand-card{margin-left:-5%}.heptad-special-hand-card .nexora-card-art-frame{position:absolute;inset:0}.heptad-special-hand-card img{display:block;width:100%;height:100%;object-fit:contain}
+.heptad-special-hand-card:hover,.heptad-special-hand-card:focus-visible{transform:translateY(-8px);z-index:10;filter:drop-shadow(0 0 5px #f8d77e)}
+@property --special-hand-orbit{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes special-hand-orbit{to{--special-hand-orbit:360deg}}
+.heptad-special-hand[data-prompt=true]::after{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:conic-gradient(from var(--special-hand-orbit),transparent 0deg 55deg,#edca7b 80deg,#fff8df 90deg,#edca7b 100deg,transparent 135deg 235deg,#edca7b 265deg,transparent 300deg);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:special-hand-orbit 5s linear infinite}
+@media(prefers-reduced-motion:reduce){.heptad-special-hand::after{animation:none!important}}
+html[data-game-motion-off=true] .heptad-special-hand::after{animation:none!important}
+.heptad-scene .heptad-special-hand-card[aria-disabled=true]{opacity:1;cursor:help}.heptad-special-hand>.heptad-primary{width:100%;font-size:12px;min-height:30px;padding:4px}
+@media(max-height:600px){.heptad-special-hand{right:6px;bottom:calc(var(--heptad-hand-height) + 6px);width:28%;padding:6px;font-size:10px}.heptad-special-hand header span{font-size:9px}.heptad-special-hand p{font-size:9px;margin:3px 0}.heptad-special-hand-fan{padding:9px 3px 5px}.heptad-special-hand>.heptad-primary{font-size:9px;min-height:24px}}
