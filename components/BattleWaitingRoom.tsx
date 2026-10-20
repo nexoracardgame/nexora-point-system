@@ -19,7 +19,7 @@ export default function BattleWaitingRoom({seats:confirmedSeats,spectators:confi
  const watch=()=>{const self=[seats.host,seats.challenger].find(person=>person?.id===userId);if(!self)return;void execute({...snapshot,seats:{host:seats.host?.id===userId?null:seats.host,challenger:seats.challenger?.id===userId?null:seats.challenger},spectators:[...spectators,self]},onWatch)};
  const seated=seats.host?.id===userId||seats.challenger?.id===userId;
  return <section className="nexora-shared-waiting"><GamePreparationBackground/><div className="nsw-seats">{(['host','challenger'] as const).map(side=>{
-  const person=seats[side],bot=person?.id==='triad-bot-level-99'||person?.id==='pentad-bot';
+  const person=seats[side],bot=person?.id===botId||person?.id==='triad-bot-level-99'||person?.id==='pentad-bot';
   return <article key={side} className="nsw-seat" aria-label={side==='host'?'ฝั่ง A':'ฝั่ง B'}><small>{side==='host'?'ฝั่ง A':'ฝั่ง B'}</small><div className="nsw-person">
    {person?<><div className="nsw-avatar"><img src={person.image||'/avatar.png'} alt=""/>{person.id===leaderId&&<Crown/>}</div><strong>{person.name}</strong><span>{bot?'BOT · พร้อมลงสนาม':'พร้อมลงสนาม'}</span></>:<strong>รอผู้เล่น</strong>}
    <div className="nsw-seat-actions">

@@ -7,7 +7,7 @@
   "livePrefixes": ["api", "admin", "auth", "uploads", "downloads", "_next", ".well-known"],
   "liveFiles": ["game-release.json", "sw.js"],
   "sourceEntries": ["app/game", "app/(main)/battle"],
-  "sourceFilePrefixes": ["components/Game", "components/Battle", "components/Duelist", "lib/game-", "lib/triad-", "lib/pentad-", "lib/home-wallpaper", "lib/login-wallpaper"],
+  "sourceFilePrefixes": ["components/Game", "components/Battle", "components/Duelist", "components/Heptad", "lib/game-", "lib/triad-", "lib/pentad-", "lib/heptad-", "lib/home-wallpaper", "lib/login-wallpaper"],
   "resourceExtensions": ["png", "jpg", "jpeg", "webp", "avif", "gif", "svg", "ico", "mp3", "ogg", "wav", "m4a", "aac", "mp4", "webm", "bin", "json", "wasm", "glb", "gltf", "ktx2", "basis", "ttf", "otf", "woff", "woff2", "lottie"],
   "mimeTypes": {"png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","avif":"image/avif","gif":"image/gif","svg":"image/svg+xml","ico":"image/x-icon","mp3":"audio/mpeg","ogg":"audio/ogg","wav":"audio/wav","m4a":"audio/mp4","aac":"audio/aac","mp4":"video/mp4","webm":"video/webm","json":"application/json","wasm":"application/wasm","glb":"model/gltf-binary","gltf":"model/gltf+json","ktx2":"image/ktx2","ttf":"font/ttf","otf":"font/otf","woff":"font/woff","woff2":"font/woff2","lottie":"application/zip","js":"text/javascript","mjs":"text/javascript","css":"text/css","wgsl":"text/wgsl","vert":"text/plain","frag":"text/plain","txt":"text/plain"}
 }

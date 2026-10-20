@@ -1,0 +1,38 @@
+const fs=require('node:fs'),ts=require('typescript'),assert=require('node:assert/strict');
+const load=require('./game-collection-test-loader.cjs')();
+const rules=load('lib/heptad-rules.ts');
+const {triadCards}=load('lib/triad-dominion.ts');
+assert.equal(Object.values(rules.HEPTAD_RULES.deckSizes).reduce((a,b)=>a+b,0),35);
+assert.equal(rules.HEPTAD_RULES.fights*rules.HEPTAD_RULES.turnsPerFight,21);
+assert.deepEqual(rules.HEPTAD_TURNS.filter(turn=>turn.elementClash).map(turn=>turn.turn),[1,2,5]);
+for(const fight of [1,2,3])for(const turn of [1,2,3,4,5,6,7]){
+ assert.equal(rules.heptadCanCallSpecial(fight,turn,0),turn>=2&&turn<=6);
+ assert.equal(rules.heptadCanCallSpecial(fight,turn,fight),false);
+}
+const a=rules.emptyHeptadDeck(),b=rules.emptyHeptadDeck();a.monsters.push('001');assert.equal(b.monsters.length,0);
+assert.equal(rules.heptadCardRemaining(['001','001'],['001'],'001'),true);
+assert.equal(rules.heptadCardRemaining(['001','001'],['001','001'],'001'),false);
+assert.equal(rules.heptadCanStart(),false);
+const board={1:'001',2:'002',3:'218',4:'219',5:'003',6:'220',7:'221'};
+assert.deepEqual(rules.heptadTurnCards(board,4),{main:'001',branch:'002',skill:'219'});
+assert.deepEqual(rules.heptadTurnCards(board,7),{main:'001',branch:'003',skill:'221'});
+assert.equal(rules.heptadTurnCards(board,5).skill,'');
+assert.equal(rules.HEPTAD_RULES.skillDuration,'current-turn-only');
+assert.ok(rules.HEPTAD_SLOT_POSITIONS[6].x>rules.HEPTAD_SLOT_POSITIONS[7].x);
+const monsters=triadCards.filter(card=>card.kind==='monster');
+const skills=triadCards.filter(card=>card.kind==='skill');
+assert.ok(skills.length>=60);
+let skillIndex=0;
+const decks=Array.from({length:3},()=>({monsters:monsters.slice(0,10).map(card=>card.cardNo),monsterReserve:monsters.slice(10,15).map(card=>card.cardNo),skills:skills.slice(skillIndex,skillIndex+=10).map(card=>card.cardNo),special:skills.slice(skillIndex,skillIndex+=5).map(card=>card.cardNo),skillReserve:skills.slice(skillIndex,skillIndex+=5).map(card=>card.cardNo)}));
+assert.deepEqual(rules.validateHeptadMatchDeck(decks,'all'),[]);
+const main=triadCards.find(card=>card.cardNo===decks[0].monsters[0]);
+const secondary=triadCards.find(card=>card.cardNo===decks[0].monsters[1]);
+assert.equal(rules.heptadBasePower({1:main.cardNo,2:secondary.cardNo,3:skills[0].cardNo},3),main.attack+secondary.attack);
+assert.equal(rules.heptadBasePower({1:main.cardNo,5:secondary.cardNo,6:skills[0].cardNo},7),main.support+secondary.support);
+const duplicate=structuredClone(decks);duplicate[2].special[0]=decks[0].skillReserve[0];
+assert.ok(rules.validateHeptadMatchDeck(duplicate,'all').some(error=>error.includes('105')));
+const short=structuredClone(decks);short[1].skills.pop();assert.ok(rules.validateHeptadMatchDeck(short,'all').length);
+assert.deepEqual(rules.validateHeptadMatchDeck(short,'all',true),[]);
+assert.ok(rules.validateHeptadMatchDeck([{},{},{}],'all').length);
+assert.ok(fs.readFileSync('components/HeptadWaitingRoom.tsx','utf8').includes('<BattleWaitingRoom'));
+console.log('Heptad preparation: seven turns, draft pile counts, special quotas, card-instance consumption and disabled start passed');

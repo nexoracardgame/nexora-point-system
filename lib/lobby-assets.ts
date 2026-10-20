@@ -1,6 +1,7 @@
 export const LOBBY_ACTION_ART = "/images/triad/lobby-action-sprite.webp";
-export const LOBBY_ASSET_VERSION = 'local-resource-pack-2';
-export const LOBBY_READY_ART = [LOBBY_ACTION_ART,...['play-button','drawer','triad','pentad','public','private','create'].map(name=>`/images/lobby-play/${name}.webp`)];
+export const LOBBY_ASSET_VERSION = 'local-resource-pack-3';
+export const PLAY_DRAWER_ART = '/game-assets/ui/play-drawer-v2/drawer.webp';
+export const LOBBY_READY_ART = [LOBBY_ACTION_ART,'/images/lobby-play/play-button.webp',PLAY_DRAWER_ART];
 let ready: Promise<void> | undefined;
 const images=new Map<string,{image:HTMLImageElement;ready:Promise<void>}>();
 

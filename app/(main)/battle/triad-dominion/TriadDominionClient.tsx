@@ -3534,7 +3534,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
     window.addEventListener("nexora:navigate-back", back);
     return () => window.removeEventListener("nexora:navigate-back", back);
   }, [panel]);
-  const [format, setFormat] = useState<"triad" | "pentad">("triad");
+  const [format, setFormat] = useState<"triad" | "pentad" | "heptad">("triad");
   const [panelClosing, setPanelClosing] = useState(false);
   const panelTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const panelTrigger = useRef<HTMLElement | null>(null);
@@ -3547,6 +3547,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
     panelTimer.current = setTimeout(() => { setPanel(null); setPanelClosing(false); panelTrigger.current?.focus(); }, 240);
   };
   const openPanel = (next: "create" | "join") => {
+    if (next === 'join' && format === 'heptad') setFormat('triad');
     clearTimeout(panelTimer.current); panelTrigger.current = document.activeElement as HTMLElement;
     setPanelClosing(false); playDrawerSound(); setPanel(next);
   };
@@ -3582,6 +3583,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
     return () => {controller.abort();clearTimeout(timer);};
   }, [panel, format]);
   const createRoom = async () => {
+    if (format === 'heptad') return;
     onCreate(format);
   };
   const artRef = useRef<HTMLDivElement>(null);
@@ -3622,12 +3624,12 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
         <div className="nexora-command-sheet-head"><h2>{panel !== "join" ? <><b>PLAY</b><span>สนามประลอง</span></> : <><b>JOIN</b><span>เข้าร่วม / ชมการต่อสู้</span></>}</h2><button onClick={closePanel} title="ปิด" aria-label="ปิด"><X className="h-5 w-5" /></button></div>
         <div className="nexora-command-sheet-body">
           {panel !== "join" ? <>
-            <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : "PENTAD 5 ใบ"}</button>)}</div>
+            <div className="nexora-command-segment" role="group" aria-label="รูปแบบการต่อสู้">{(["triad", "pentad", "heptad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : value === "pentad" ? "PENTAD 5 ใบ" : "HEPTAD 7 ใบ"}<svg className="nexora-play-mode-edge" viewBox="0 0 1000 160" preserveAspectRatio="none" aria-hidden="true"><path pathLength="100" d="M30 8H855L975 80L855 152H100L25 108Z" /></svg></button>)}</div>
             <>
               <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
               <label>รหัสผ่านห้อง<input value={roomPassword} disabled={roomAccess !== "private"} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label>
             </>
-            <button className="nexora-command-primary" aria-label="สร้างสนามประลอง" onClick={() => void createRoom()} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้าง</button>
+            <button className="nexora-command-primary" aria-label="สร้างสนามประลอง" title={format === 'heptad' ? 'โหมด 7 ใบอยู่ระหว่างตรวจสอบกติกา' : undefined} onClick={() => void createRoom()} disabled={format === 'heptad' || roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้าง</button>
           </> : panel === "join" ? <>
             <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : "PENTAD 5 ใบ"}</button>)}</div>
             <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/game/pentad?room=${joinCode}`); else onEnter(joinCode); } }}>
