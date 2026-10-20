@@ -96,8 +96,7 @@ export default function BattlePlayerProfile({identity,rank,player,currentUserId,
   <button ref={trigger} className="battle-player-identity" data-player={Boolean(player)} aria-label={`ดูโปรไฟล์ ${identity.name}`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(value=>!value)} onPointerEnter={()=>{if(!bot)void loadGameProfile(identity.id!).catch(()=>{})}}>
    <span className="bpi-avatar"><img src={image} alt=""/><img className="bpi-avatar-frame" src="/images/lobby-play/profile-avatar-frame.png" alt=""/></span>
    <span className="bpi-copy"><img className="bpi-name-frame" src="/images/lobby-play/profile-name-frame.png" alt=""/><strong ref={nameLabel} title={identity.name}><span>{identity.name}</span></strong></span>
-   {showRankBadge&&<span className="bpi-badge" aria-hidden="true"><img src="/images/lobby-play/profile-rank-frame.png" alt=""/><Shield/></span>}
-   <span className="bpi-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{rankName||'—'}</span></span>
+   <span className="bpi-rank"><img src="/images/lobby-play/profile-rank-label.png" alt=""/><span>{showRankBadge&&<Shield className="bpi-inline-rank" aria-hidden="true"/>}{rankName||'—'}</span></span>
   </button>
   {open&&createPortal(<div ref={panel} role="dialog" aria-modal="false" className="battle-player-mini" style={position} aria-label={`โปรไฟล์ ${identity.name}`} onKeyDown={event=>event.stopPropagation()}>
    <header><span><Shield size={16}/>โปรไฟล์ผู้เล่น</span><button aria-label="ปิดโปรไฟล์" onClick={()=>{setOpen(false);trigger.current?.focus()}}><X size={19}/></button></header>

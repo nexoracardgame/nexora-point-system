@@ -4,4 +4,7 @@
 .nexora-preparation-background video[data-ready=true] { opacity:1; }
 .nexora-preparation-background::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#03080c9e,#03080c52 50%,#03080c9e),linear-gradient(0deg,#03080ca8,transparent 65%); }
 .nexora-deck-screen { isolation:isolate; }
+.nexora-shared-waiting{isolation:isolate}
+.nexora-shared-waiting>.nexora-preparation-background{z-index:0}
+.nexora-shared-waiting>:not(.nexora-preparation-background){position:relative;z-index:1}
 @media (prefers-reduced-motion:reduce) { .nexora-preparation-background video { transition:none; } }

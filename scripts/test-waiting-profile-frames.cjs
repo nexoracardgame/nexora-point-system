@@ -24,7 +24,8 @@ const app=`const modules=${JSON.stringify(modules)},cache={};function require(id
    await page.waitForFunction(()=>document.querySelector('.bpi-rank>span')?.textContent==='DIAMOND');
    await page.evaluate(()=>Promise.all([...document.images].map(image=>image.decode())));
    assert.equal(await page.locator('.battle-player-identity').count(),2);
-   assert.equal(await page.locator('.bpi-badge').count(),2);
+   assert.equal(await page.locator('.bpi-badge').count(),0);
+   assert.equal(await page.locator('.bpi-inline-rank').count(),2);
    assert.equal(await page.locator('.bpi-rank>span').nth(1).textContent(),'BOT');
    const bounds=await page.locator('.nsw-framed-identity').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}}));
    assert.equal(bounds[0].w,bounds[1].w,'Both sides share exact dimensions');
