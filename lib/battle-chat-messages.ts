@@ -1,5 +1,5 @@
 export type BattleChatMessage = { id: string; senderId: string; senderName: string; text: string; createdAt?: number };
-export type BattleChatRoom = { mode: "triad" | "pentad"; code: string };
+export type BattleChatRoom = { mode: "triad" | "pentad" | "heptad"; code: string };
 export const BATTLE_CHAT_CHANGED = "nexora:battle-chat-changed";
 
 export function mergeBattleChatMessages(...groups: BattleChatMessage[][]) {

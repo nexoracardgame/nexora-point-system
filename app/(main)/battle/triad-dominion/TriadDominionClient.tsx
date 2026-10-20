@@ -24,9 +24,11 @@ import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
 import { savePentadHandoff } from '@/lib/pentad-room-handoff';
 import type { PentadRoom } from '@/lib/pentad-room-store';
+import type { HeptadRoom } from '@/lib/heptad-room-store';
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 const PentadHandoffClient = dynamic(()=>import('../pentad-dominion/PentadDominionClient'),{ssr:false});
+const HeptadHandoffClient = dynamic(()=>import('@/app/game/heptad/HeptadClient'),{ssr:false});
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import DuelistLeaderboard from "@/components/DuelistLeaderboard";
@@ -3525,7 +3527,7 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   participant: RoomParticipant; rankProfiles: Record<string, TriadRankProfile>; leaderboard: TriadRankProfile[]; rooms: TriadRoom[];
   roomAccess: RoomAccess; setRoomAccess: (value: RoomAccess) => void; roomPassword: string; setRoomPassword: (value: string) => void;
   joinCode: string; setJoinCode: (value: string) => void; joiningRoomCode: string; lobbyMessage: string;
-  onCreate: (format: "triad" | "pentad") => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
+  onCreate: (format: "triad" | "pentad" | "heptad") => void; onEnter: (room: TriadRoom | string) => void; onNavigate: (path: string) => void;
 }) {
   const [panel, setPanel] = useState<"create" | "join" | "rank" | null>(null);
   useEffect(() => {
@@ -3547,7 +3549,6 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
     panelTimer.current = setTimeout(() => { setPanel(null); setPanelClosing(false); panelTrigger.current?.focus(); }, 240);
   };
   const openPanel = (next: "create" | "join") => {
-    if (next === 'join' && format === 'heptad') setFormat('triad');
     clearTimeout(panelTimer.current); panelTrigger.current = document.activeElement as HTMLElement;
     setPanelClosing(false); playDrawerSound(); setPanel(next);
   };
@@ -3572,18 +3573,17 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
   }, [panel]);
   const [pentadRooms, setPentadRooms] = useState<{ code: string; host: string; phase: string }[]>([]);
   useEffect(() => {
-    if (panel !== "join" || format !== "pentad") return;
+    if (panel !== "join" || format === "triad") return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
-      try { const response=await fetch("/api/pentad-rooms",{cache:"no-store",signal:controller.signal});const data=await response.json();if(!controller.signal.aborted && response.ok)setPentadRooms(data.rooms || []); } catch {}
+      try { const response=await fetch(`/api/${format}-rooms`,{cache:"no-store",signal:controller.signal});const data=await response.json();if(!controller.signal.aborted && response.ok)setPentadRooms(data.rooms || []); } catch {}
       if (!controller.signal.aborted) timer=setTimeout(refresh,1500);
     };
     void refresh();
     return () => {controller.abort();clearTimeout(timer);};
   }, [panel, format]);
   const createRoom = async () => {
-    if (format === 'heptad') return;
     onCreate(format);
   };
   const artRef = useRef<HTMLDivElement>(null);
@@ -3629,14 +3629,14 @@ function NexoraCommandLobby({ participant, rankProfiles, leaderboard, rooms, roo
               <div className="nexora-command-segment" role="group" aria-label="การเข้าถึงห้อง">{(["public", "private"] as RoomAccess[]).map(access => <button key={access} aria-pressed={roomAccess === access} onClick={() => setRoomAccess(access)}>{access === "public" ? "สาธารณะ" : "ส่วนตัว"}</button>)}</div>
               <label>รหัสผ่านห้อง<input value={roomPassword} disabled={roomAccess !== "private"} onChange={event => setRoomPassword(event.target.value)} placeholder="อย่างน้อย 4 ตัว" /></label>
             </>
-            <button className="nexora-command-primary" aria-label="สร้างสนามประลอง" title={format === 'heptad' ? 'โหมด 7 ใบอยู่ระหว่างตรวจสอบกติกา' : undefined} onClick={() => void createRoom()} disabled={format === 'heptad' || roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้าง</button>
+            <button className="nexora-command-primary" aria-label="สร้างสนามประลอง" onClick={() => void createRoom()} disabled={roomAccess === "private" && roomPassword.trim().length < 4}><Plus className="h-4 w-4" />สร้าง</button>
           </> : panel === "join" ? <>
-            <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : "PENTAD 5 ใบ"}</button>)}</div>
-            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format === "pentad") onNavigate(`/game/pentad?room=${joinCode}`); else onEnter(joinCode); } }}>
+            <div className="nexora-command-segment" role="group" aria-label="รูปแบบห้อง">{(["triad", "pentad", "heptad"] as const).map(value => <button key={value} aria-pressed={format === value} onClick={() => setFormat(value)}>{value === "triad" ? "TRIAD 3 ใบ" : value === 'pentad' ? "PENTAD 5 ใบ" : 'HEPTAD 7 ใบ'}</button>)}</div>
+            <form onSubmit={event => { event.preventDefault(); if (joinCode.length === 6 && joiningRoomCode !== joinCode) { if (format !== "triad") onNavigate(`/game/${format}?room=${joinCode}`); else onEnter(joinCode); } }}>
               <label>หมายเลขห้อง<input value={joinCode} onChange={event => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} maxLength={6} inputMode="numeric" placeholder="000000" /></label>
               <button className="nexora-command-primary" disabled={joinCode.length !== 6 || joiningRoomCode === joinCode}>{joiningRoomCode === joinCode && joinCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}เข้าห้อง</button>
             </form>
-            <div className="nexora-command-room-list">{format === "pentad" ? pentadRooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.host} · {room.phase === "waiting" ? "รอผู้ท้าชิง" : "กำลังต่อสู้"}</small></div><button onClick={() => onNavigate(`/game/pentad?room=${room.code}${room.phase === "waiting" ? "" : "&spectate=1"}`)}>{room.phase === "waiting" ? "เข้าห้อง" : "เข้าชม"}</button></article>) : rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : null}</div>
+            <div className="nexora-command-room-list">{format !== "triad" ? pentadRooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.host} · {room.phase === "waiting" ? "รอผู้ท้าชิง" : "กำลังต่อสู้"}</small></div><button onClick={() => onNavigate(`/game/${format}?room=${room.code}${room.phase === "waiting" ? "" : "&spectate=1"}`)}>{room.phase === "waiting" ? "เข้าห้อง" : "เข้าชม"}</button></article>) : rooms.length ? rooms.map(room => <article key={room.code} className="nexora-command-room-row"><div><strong>{room.code}</strong><small>{room.seats.host?.name || "NEXORA"} · {room.status === "playing" ? "กำลังต่อสู้" : "รอผู้ท้าชิง"}</small></div><button onClick={() => onEnter(room)} disabled={joiningRoomCode === room.code}>{room.access === "private" ? <Lock className="h-3 w-3" /> : null}{joiningRoomCode === room.code ? "กำลังเข้า" : room.status === "playing" ? "เข้าชม" : "เข้าห้อง"}</button></article>) : null}</div>
           </> : <RankLeaderboardPanel leaderboard={leaderboard} currentParticipantId={participant.id} />}
           {lobbyMessage ? <div role="status" className="nexora-command-alert">{lobbyMessage}</div> : null}
         </div>
@@ -4491,6 +4491,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
   const [createFormat, setCreateFormat] = useState<"triad" | "pentad">("triad");
   const [pentadHandoff,setPentadHandoff]=useState<PentadRoom|null>(null);
+  const [heptadHandoff,setHeptadHandoff]=useState<HeptadRoom|null>(null);
   useEffect(()=>{void import('../pentad-dominion/PentadDominionClient');},[]);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [botChanging, setBotChanging] = useState(false);
@@ -7326,6 +7327,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     Boolean(activeRoomCode || activeRoomSnapshot || activeRoomCodeRef.current || activeRoomSnapshotRef.current);
 
   if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff}/>;
+  if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} spectate={false}/>;
 
   if (shouldShowReconnectSplash) {
     return <BattleConnectingScreen />;
@@ -7402,7 +7404,17 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           />
         ) : null}
         <NexoraCommandLobby participant={participant} rankProfiles={rankProfiles} leaderboard={leaderboard} rooms={visibleRooms} roomAccess={roomAccess} setRoomAccess={setRoomAccess} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joiningRoomCode={joiningRoomCode} lobbyMessage={lobbyMessage}
-          onCreate={(format) => { setCreateFormat(format);setCreateRoomMode("all"); setCreateModeDialogOpen(true); }}
+          onCreate={(format) => {
+            if(format==='heptad'){
+              if(creatingRoomRef.current)return;creatingRoomRef.current=true;setCreatingRoom(true);
+              void (async()=>{try{const response=await fetch('/api/heptad-rooms',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(12000),body:JSON.stringify({action:'create',access:roomAccess,password:roomPassword})}),data=await response.json();
+                if(!response.ok||!data.room)throw Error(data.error||'สร้างห้องไม่สำเร็จ');
+                try{sessionStorage.setItem('nexora:heptad:handoff',JSON.stringify({userId:participant.id,room:data.room,at:Date.now()}));}catch{}
+                setHeptadHandoff(data.room);router.push(`/game/heptad?room=${data.room.code}`);
+              }catch(error){setLobbyMessage(error instanceof Error?error.message:'สร้างห้องไม่สำเร็จ');}finally{creatingRoomRef.current=false;setCreatingRoom(false);}})();return;
+            }
+            setCreateFormat(format);setCreateRoomMode("all");setCreateModeDialogOpen(true);
+          }}
           onEnter={(target) => {
             const room = typeof target === "string" ? rooms.find(room => room.code === target) : target;
             const code = typeof target === "string" ? target : target.code;

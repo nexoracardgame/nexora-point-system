@@ -12,7 +12,7 @@ for(const fight of [1,2,3])for(const turn of [1,2,3,4,5,6,7]){
 const a=rules.emptyHeptadDeck(),b=rules.emptyHeptadDeck();a.monsters.push('001');assert.equal(b.monsters.length,0);
 assert.equal(rules.heptadCardRemaining(['001','001'],['001'],'001'),true);
 assert.equal(rules.heptadCardRemaining(['001','001'],['001','001'],'001'),false);
-assert.equal(rules.heptadCanStart(),false);
+assert.equal(rules.heptadCanStart(),true);
 const board={1:'001',2:'002',3:'218',4:'219',5:'003',6:'220',7:'221'};
 assert.deepEqual(rules.heptadTurnCards(board,4),{main:'001',branch:'002',skill:'219'});
 assert.deepEqual(rules.heptadTurnCards(board,7),{main:'001',branch:'003',skill:'221'});
@@ -35,4 +35,4 @@ const short=structuredClone(decks);short[1].skills.pop();assert.ok(rules.validat
 assert.deepEqual(rules.validateHeptadMatchDeck(short,'all',true),[]);
 assert.ok(rules.validateHeptadMatchDeck([{},{},{}],'all').length);
 assert.ok(fs.readFileSync('components/HeptadWaitingRoom.tsx','utf8').includes('<BattleWaitingRoom'));
-console.log('Heptad preparation: seven turns, draft pile counts, special quotas, card-instance consumption and disabled start passed');
+console.log('Heptad preparation: seven turns, pile counts, special quotas, card-instance consumption and enabled start passed');

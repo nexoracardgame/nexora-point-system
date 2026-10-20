@@ -45,7 +45,7 @@ function InstalledGameShell({ children }: { children: React.ReactNode }) {
       <GameBackButton />
       <GameSettings />
       <GameRoomResume />
-      <GamePatchGate><div className={pathname === "/game/pentad" ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}</div></GamePatchGate>
+      <GamePatchGate><div className={pathname === "/game/pentad" || pathname === '/game/heptad' ? "nexora-pentad-shell" : "nexora-battle-shell"}>{children}</div></GamePatchGate>
       {pathname === "/game" && !active && <FloatingChatDock />}
       <GameProfileOverlay/>
     </div>

@@ -1,4 +1,4 @@
-import { triadCardByNo } from './triad-dominion';
+import { triadCardByNo, triadCards } from './triad-dominion';
 import { rateMonster } from './game-monster-rating';
 
 export type HeptadTurn = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -14,7 +14,7 @@ export type HeptadDeck = {
 
 // Confirmed rule contract. A live controller must enforce this server-side.
 export const HEPTAD_RULES = {
-  status: 'draft', fights: 3, turnsPerFight: 7, maximumScore: 21,
+  status: 'active', fights: 3, turnsPerFight: 7, maximumScore: 21,
   cardsPerFight: 35, cardsPerMatch: 105,
   maximumSkillCopiesPerMatch: 1,
   deckSizes: { monsters: 10, skills: 10, special: 5, skillReserve: 5, monsterReserve: 5 },
@@ -51,8 +51,29 @@ export function heptadCardRemaining(deck: readonly string[], used: readonly stri
   return deck.filter(card => card === no).length > used.filter(card => card === no).length;
 }
 export function heptadCanStart(): boolean {
-  // The room controller and full-match skill integration are not shipped yet.
-  return false;
+  return true;
+}
+
+export function completeHeptadMatchDeck(partial: HeptadDeck[], tier: HeptadTier, random: () => number = Math.random): HeptadDeck[] {
+  const errors=validateHeptadMatchDeck(partial,tier,true);
+  if(errors.length)throw Error(errors.join(' / '));
+  const decks=structuredClone(partial);
+  const selectedSkills=new Set(decks.flatMap(deck=>[...deck.skills,...deck.special,...deck.skillReserve]));
+  const shuffled=triadCards.map(card=>({card,order:random()})).sort((a,b)=>a.order-b.order).map(item=>item.card);
+  const skills=shuffled.filter(card=>card.kind==='skill'&&!selectedSkills.has(card.cardNo));
+  const monsters=shuffled.filter(card=>card.kind==='monster'&&(tier==='all'||rateMonster(card).tier===tier));
+  if(!monsters.length)throw Error('ไม่มีมอนสเตอร์ระดับนี้');
+  for(const deck of decks)for(const [key,limit] of Object.entries(HEPTAD_RULES.deckSizes)){
+    const group=key as keyof HeptadDeck;
+    const monster=group==='monsters'||group==='monsterReserve';
+    while(deck[group].length<limit){
+      const card=monster?monsters[Math.floor(random()*monsters.length)]:skills.shift();
+      if(!card)throw Error('การ์ดสกิลไม่พอสำหรับเด็ค 105 ใบ');
+      deck[group].push(card.cardNo);
+    }
+  }
+  const invalid=validateHeptadMatchDeck(decks,tier);if(invalid.length)throw Error(invalid.join(' / '));
+  return decks;
 }
 
 export const HEPTAD_SLOT_POSITIONS: Record<HeptadTurn, { x: number; y: number }> = {

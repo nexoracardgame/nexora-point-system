@@ -1,13 +1,13 @@
 # Seven-card Mode Preparation
 
-Status: draft, not a playable or published mode. No room API or lobby entry is enabled yet.
+Status: playable implementation. PLAY > HEPTAD opens the dedicated seven-card room API and client.
 
 ## Shared Structure
 
 - Waiting room: `HeptadWaitingRoom` delegates to `BattleWaitingRoom`, including seats, spectators, bot actions and optimistic pending state.
-- Reuse `BattleWaitingHeader`, `DeckPreparationLayout`, `DeckPreparationHeader`, `BattleCardInspector` and the existing landscape shell when wiring the real controller.
+- The controller reuses `BattleWaitingHeader`, `DeckPreparationLayout`, `DeckPreparationHeader`, `BattleCardInspector`, the shared cinematic scenes and the existing landscape shell.
 - Room membership, inventory, chat, authoritative outcomes and rank remain live server data. Never simulate these to make the unfinished mode appear playable.
-- Keep TRIAD/PENTAD endpoints and rules unchanged.
+- TRIAD/PENTAD keep their existing endpoints. Seven-card scoring opts into secondary-monster contributions in the shared skill engine; default scoring is unchanged.
 
 ## Confirmed Outline
 
@@ -25,4 +25,10 @@ Monster tier filtering supports bronze/silver/gold/all; skills are not restricte
 4. Skills do not carry from turn 3 to 4 or from turn 6 to 7. Retaining their artwork on the board is not permission to score them again. Each attack/support turn includes the corresponding secondary monster plus the main monster. No invented fight-long skill duration.
 5. `HEPTAD_SLOT_POSITIONS` is the single formation map: main apex, two secondary monsters, four bottom skills. Turn 6 goes to support-right, turn 7 to support-left. Both players use identical dimensions and a shared landscape composition.
 
-The 105-card validator and board layout are implemented. Do not enable start until room privacy, special-call negotiation, skill targeting, bots, score/rank, reconnect and full-match tests are integrated. The PLAY drawer includes the HEPTAD artwork/selection but creation remains disabled rather than sending the player into a different ruleset.
+## Runtime and Verification
+
+`lib/heptad-room-store.ts` owns authoritative state in a transactional PostgreSQL JSONB room row. `/api/heptad-rooms` authenticates membership and validates epochs, decks, choices and special quotas. Opponents' decks and unrevealed picks are redacted. Broadcast notifications use polling as a fallback. Result rank updates are recorded once and exclude bots. Room exits navigate immediately and send an idempotent background request.
+
+`app/game/heptad/HeptadClient.tsx` provides shared waiting controls, three-fight deck preparation, both bot seats, spectator access, target selection, cinematics, chat and event history. Both formations follow their profile side. The hand and chat have separate viewport space.
+
+Automated checks: `test-heptad-match.cjs` (32 complete bot matches, tier/deck validation, privacy, forfeits, skill targeting and no carryover), `test-heptad-api.cjs` (mocked persistence/auth, concurrent actions and exactly-once rank), `test-heptad-ui.cjs` (real client with mocked API at desktop and landscape phone sizes), `test-heptad-board.cjs` (14 slots across seven viewport sizes), and existing TRIAD/PENTAD regressions. These are not a substitute for physical-device or production two-account testing.

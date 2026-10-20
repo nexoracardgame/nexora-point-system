@@ -12,5 +12,5 @@ type Props = Omit<ComponentProps<typeof BattleWaitingRoom>, 'modes' | 'mode' | '
 // No separate seat, spectator or bot UI: all modes share the same controller.
 export default function HeptadWaitingRoom({ mode, onMode, ...props }: Props) {
   return <BattleWaitingRoom {...props} mode={mode} modes={HEPTAD_TIERS}
-    onMode={value => onMode(value as HeptadTier)} botId="heptad-bot" />;
+    onMode={value => onMode(value as HeptadTier)} botId="pentad-bot" />;
 }

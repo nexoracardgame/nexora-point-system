@@ -34,7 +34,7 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   assert.equal(await drawer.locator('.nexora-play-mode-edge').count(),3);
   await drawer.getByRole('button',{name:'HEPTAD 7 ใบ',exact:true}).click();
   assert.equal(await drawer.getByRole('button',{name:'HEPTAD 7 ใบ',exact:true}).getAttribute('aria-pressed'),'true');
-  assert.equal(await drawer.getByRole('button',{name:'สร้างสนามประลอง',exact:true}).isDisabled(),true,'Never create a TRIAD room under the HEPTAD label');
+  if(repeat===0){await drawer.getByRole('button',{name:'สร้างสนามประลอง',exact:true}).click();assert.equal(await page.evaluate(()=>window.createdFormat),'heptad','HEPTAD creation is routed to its own controller');}
   await drawer.getByRole('button',{name:'PENTAD 5 ใบ',exact:true}).click();
   if(repeat===0){await page.screenshot({path:`artifacts/play-drawer-ready/${width}.png`});await drawer.getByRole('button',{name:'PENTAD 5 ใบ',exact:true}).click();await drawer.getByRole('button',{name:'ส่วนตัว',exact:true}).click();await drawer.locator('input').fill('abcd');}
   else{assert.equal(await drawer.getByRole('button',{name:'PENTAD 5 ใบ',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await drawer.locator('input').inputValue(),'abcd');}

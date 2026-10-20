@@ -38,8 +38,9 @@ function Slot({ no, turn, active, onChoose, onPreview, onPreviewEnd }: {
 export default function HeptadArenaBoard({ board, names, activeTurn, playerSide, onChooseSlot }: Props) {
   const [preview, setPreview] = useState('');
   const card = triadCardByNo.get(preview);
+  const order: Side[] = playerSide === 'challenger' ? ['host', 'challenger'] : ['challenger', 'host'];
   return <section className="heptad-arena-board" aria-label="สนาม HEPTAD 7 ใบ">
-    {(['host', 'challenger'] as const).map(side => <section key={side} className="heptad-arena-side" data-side={side} data-player={side === playerSide} aria-label={names[side]}>
+    {order.map(side => <section key={side} className="heptad-arena-side" data-side={side} data-player={side === playerSide} aria-label={names[side]}>
       <header>{names[side]}</header>
       <div className="heptad-formation">
         {HEPTAD_TURNS.map(({ turn }) => <Slot key={turn} turn={turn} no={board[side][turn] || ''} active={turn === activeTurn}

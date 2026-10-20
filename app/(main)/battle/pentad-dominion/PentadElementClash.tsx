@@ -20,7 +20,7 @@ const elements: Record<TriadElement, { index: number; color: string; hue: string
   unknown: { index: 2, color: "#ffffff", hue: "0deg" },
 };
 
-export default function PentadElementClash({ round, room, arenaImage, onComplete }: { round: PentadRound; room: PentadRoom; arenaImage: string; onComplete: () => void }) {
+export default function PentadElementClash({ round, room, arenaImage, onComplete, comparisonLabel = 'ATK + SUP' }: { round: Pick<PentadRound,'id'|'mains'|'fight'|'turn'|'finalDuel'>; room: Pick<PentadRoom,'seats'>; arenaImage: string; onComplete: () => void; comparisonLabel?: string }) {
   const complete = useRef(onComplete); complete.current = onComplete;
   const [resolved, setResolved] = useState(false);
   const valid = hasPentadElementClash(round);
@@ -42,7 +42,7 @@ export default function PentadElementClash({ round, room, arenaImage, onComplete
   const winningElement = relation.winner === "host" ? left.element : right.element;
   const losingElement = relation.winner === "host" ? right.element : left.element;
   const title = !resolved ? "ธาตุปะทะ" : relation.winner ? `ธาตุ${pentadElementNames[winningElement]}ชนะ` : same ? "ธาตุเสมอ" : "ธาตุเสริมพลัง";
-  const detail = !resolved ? `ธาตุ${pentadElementNames[left.element]} ปะทะ ธาตุ${pentadElementNames[right.element]}` : relation.winner ? `ธาตุ${pentadElementNames[winningElement]}พิชิตธาตุ${pentadElementNames[losingElement]} · ได้ 1 คะแนน` : same ? "ไม่มีฝ่ายชนะด้วยธาตุ · ตัดสินต่อด้วย ATK + SUP" : `ธาตุ${pentadElementNames[relation.boosted === "host" ? left.element : right.element]}ได้รับพลังเสริม · ตัดสินต่อด้วย ATK + SUP`;
+  const detail = !resolved ? `ธาตุ${pentadElementNames[left.element]} ปะทะ ธาตุ${pentadElementNames[right.element]}` : relation.winner ? `ธาตุ${pentadElementNames[winningElement]}พิชิตธาตุ${pentadElementNames[losingElement]} · ได้ 1 คะแนน` : same ? `ไม่มีฝ่ายชนะด้วยธาตุ · ตัดสินต่อด้วย ${comparisonLabel}` : `ธาตุ${pentadElementNames[relation.boosted === "host" ? left.element : right.element]}ได้รับพลังเสริม · ตัดสินต่อด้วย ${comparisonLabel}`;
 
   return createPortal(<div className="nexora-versus-plane nexora-element-clash" data-resolved={resolved} role="status" aria-label={`ธาตุปะทะ ไฟต์ ${round.fight}`}>
     <img className="nec-arena" src={arenaImage} alt="" />

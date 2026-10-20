@@ -102,6 +102,8 @@ export type TriadTriangle = {
 };
 
 export type TriadTurnInput = {
+  includeOtherMonster?: boolean;
+  scoreAdjustments?: Partial<Record<"player" | "opponent", number>>;
   turn: TriadTurn;
   player: TriadTriangle;
   opponent: TriadTriangle;
@@ -566,10 +568,11 @@ function getCard(cardNo?: string) {
   return triadCardByNo.get(normalizeCardNo(cardNo));
 }
 
-function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: TriadMetric[] = []) {
+function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: TriadMetric[] = [], includeOtherMonster = false) {
   const blockedTopMetricSet = new Set(blockedTopMetrics);
   const top = getCard(triangle.top);
-  const laneCard = getCard(triangle[selectedLane(turn)]);
+  const scoreLane = includeOtherMonster && getCard(triangle[selectedLane(turn)])?.kind !== 'monster' ? (turn === 2 ? 'right' : 'left') : selectedLane(turn);
+  const laneCard = getCard(triangle[scoreLane]);
   const fieldMetricContributions = (metric: TriadMetric) =>
     (["top", "left", "right"] as TriadLane[])
       .map((lane) => {
@@ -601,7 +604,7 @@ function baseScore(triangle: TriadTriangle, turn: TriadTurn, blockedTopMetrics: 
     total: topValue + laneValue,
     contributions: [
       top ? { card: top, lane: "top" as TriadLane, value: topValue } : null,
-      laneCard?.kind === "monster" ? { card: laneCard, lane: selectedLane(turn), value: laneValue } : null,
+      laneCard?.kind === "monster" ? { card: laneCard, lane: scoreLane as TriadLane, value: laneValue } : null,
     ].filter((item): item is { card: TriadCard; lane: TriadLane; value: number } => Boolean(item)),
     fieldContributions: fieldMetricContributions(metric),
     breakdown: [
@@ -620,7 +623,7 @@ function parseBoardTargetSequence(value = "") {
   return value
     .split(">")
     .map((item) => item.trim())
-    .filter((item): item is "player-top" | "bot-top" => item === "player-top" || item === "bot-top");
+    .filter((item): item is "player-top" | "bot-top" | "player-secondary" | "bot-secondary" => ["player-top", "bot-top", "player-secondary", "bot-secondary"].includes(item));
 }
 
 function applyMetalSword(
@@ -738,20 +741,19 @@ function applyPowerSeal(
     return events;
   }
 
-  const scoreForTarget = (target: "player-top" | "bot-top") => {
-    if (target === "player-top") return side === "player" ? ownScore : opponentScore;
+  type SealTarget = ReturnType<typeof parseBoardTargetSequence>[number];
+  const scoreForTarget = (target: SealTarget) => {
+    if (target.startsWith("player-")) return side === "player" ? ownScore : opponentScore;
     return side === "player" ? opponentScore : ownScore;
   };
-  const sideForTarget = (target: "player-top" | "bot-top"): "player" | "opponent" =>
-    target === "player-top" ? "player" : "opponent";
-  const labelForTarget = (target: "player-top" | "bot-top") =>
-    target === (side === "player" ? "player-top" : "bot-top")
-      ? "มอนสเตอร์หลักฝ่ายผู้ใช้สกิล"
-      : "มอนสเตอร์หลักฝ่ายตรงข้าม";
+  const sideForTarget = (target: SealTarget): "player" | "opponent" =>
+    target.startsWith("player-") ? "player" : "opponent";
+  const labelForTarget = (target: SealTarget) =>
+    `${target.endsWith("secondary") ? "มอนสเตอร์รอง" : "มอนสเตอร์หลัก"}${sideForTarget(target) === side ? "ฝ่ายผู้ใช้สกิล" : "ฝ่ายตรงข้าม"}`;
 
-  const applyTargetDelta = (target: "player-top" | "bot-top", delta: number, order: 1 | 2) => {
+  const applyTargetDelta = (target: SealTarget, delta: number, order: 1 | 2) => {
     const targetScore = scoreForTarget(target);
-    const contribution = targetScore.contributions.find((item) => item.lane === "top");
+    const contribution = targetScore.contributions.find((item) => target.endsWith("secondary") ? item.lane !== "top" && item.card.kind === "monster" : item.lane === "top");
     const targetLabel = labelForTarget(target);
     const orderLabel = order === 1 ? "ตัวที่ 1" : "ตัวที่ 2";
     if (!contribution) {
@@ -770,7 +772,7 @@ function applyPowerSeal(
 
     const blocker = blockers.find((item) =>
       item.targetSide === sideForTarget(target) &&
-      statGainBlockerApplies(item, { metric: "attack", delta }, { lane: "top" })
+      statGainBlockerApplies(item, { metric: "attack", delta }, { lane: contribution.lane })
     );
     if (blocker) {
       events.push({
@@ -2735,13 +2737,22 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   const playerScore = baseScore(
     preScore.player,
     input.turn,
-    statUseBlocks.blockers.filter((blocker) => blocker.targetSide === "player").map((blocker) => blocker.metric)
+    statUseBlocks.blockers.filter((blocker) => blocker.targetSide === "player").map((blocker) => blocker.metric),
+    input.includeOtherMonster
   );
   const opponentScore = baseScore(
     preScore.opponent,
     input.turn,
-    statUseBlocks.blockers.filter((blocker) => blocker.targetSide === "opponent").map((blocker) => blocker.metric)
+    statUseBlocks.blockers.filter((blocker) => blocker.targetSide === "opponent").map((blocker) => blocker.metric),
+    input.includeOtherMonster
   );
+  playerScore.total += input.scoreAdjustments?.player || 0;
+  opponentScore.total += input.scoreAdjustments?.opponent || 0;
+  const selectedSkillTarget = (side: "player" | "opponent") => {
+    const triangle = side === "player" ? input.player : input.opponent;
+    const target = input.skillTargets?.[side]?.[getCard(triangle[selectedLane(input.turn)])?.cardNo || ""];
+    return input.includeOtherMonster && (target === "player-secondary" || target === "bot-secondary") ? target.replace("secondary", "top") : target;
+  };
   const applySide = (side: "player" | "opponent") =>
     side === "player"
       ? applySkill(
@@ -2754,7 +2765,7 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
           skippedSkillCardNos,
           cancelledOrLockedSkillCardNos,
           prioritySide === "player",
-          input.skillTargets?.player?.[getCard(input.player[selectedLane(input.turn)])?.cardNo || ""],
+          selectedSkillTarget("player"),
           undefined,
           boardState
         )
@@ -2768,17 +2779,17 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
           skippedSkillCardNos,
           cancelledOrLockedSkillCardNos,
           prioritySide === "opponent",
-          input.skillTargets?.opponent?.[getCard(input.opponent[selectedLane(input.turn)])?.cardNo || ""],
+          selectedSkillTarget("opponent"),
           undefined,
           boardState
         );
-  const applySideWithEnergyReversal = (side: "player" | "opponent") => {
+  const applySideWithEnergyReversalAtTarget = (side: "player" | "opponent") => {
     const base = applySide(side);
     const ownTriangle = side === "player" ? input.player : input.opponent;
     const opposingTriangle = side === "player" ? input.opponent : input.player;
     const ownScore = side === "player" ? playerScore : opponentScore;
     const opposingScore = side === "player" ? opponentScore : playerScore;
-    const selectedTarget = input.skillTargets?.[side]?.[getCard(ownTriangle[selectedLane(input.turn)])?.cardNo || ""];
+    const selectedTarget = selectedSkillTarget(side);
     const copied = applyEnergyReversal(
       side,
       ownTriangle,
@@ -2798,6 +2809,28 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
       unresolved: [...base.unresolved, ...copied.unresolved],
       events: [...base.events, ...copied.events],
     };
+  };
+  const applySideWithEnergyReversal = (side: "player" | "opponent") => {
+    const triangle = side === "player" ? input.player : input.opponent;
+    const target = input.skillTargets?.[side]?.[getCard(triangle[selectedLane(input.turn)])?.cardNo || ""];
+    if (!input.includeOtherMonster || (target !== "player-secondary" && target !== "bot-secondary")) return applySideWithEnergyReversalAtTarget(side);
+    const targetSide = target === "player-secondary" ? "player" : "opponent";
+    const lane: TriadLane = input.turn === 2 ? "right" : "left";
+    const score = targetSide === "player" ? playerScore : opponentScore;
+    const triangles = new Set([input[targetSide], boardState[targetSide]]);
+    const contributions = new Set([...score.contributions, ...score.fieldContributions]);
+    // Present only this cast's selected monster as top; preserve both monsters'
+    // accumulated values and restore their identities before the next cast.
+    const swap = () => {
+      for (const board of triangles) [board.top, board[lane]] = [board[lane] || "", board.top];
+      for (const item of contributions) if (item.lane === "top") item.lane = lane; else if (item.lane === lane) item.lane = "top";
+      for (const blocker of statGainBlockers) if (blocker.targetSide === targetSide) {
+        if (blocker.targetLane === "top") blocker.targetLane = lane;
+        else if (blocker.targetLane === lane) blocker.targetLane = "top";
+      }
+    };
+    swap();
+    try { return applySideWithEnergyReversalAtTarget(side); } finally { swap(); }
   };
   const orderedApplied =
     prioritySide === "player"

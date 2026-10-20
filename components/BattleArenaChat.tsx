@@ -19,7 +19,7 @@ export default function BattleArenaChat({ messages, currentUserId, currentUserNa
   </section>;
 }
 
-export function BattleArenaChatFrame({ children, arenaSelector, cinematicActive, rotateBreakpoint = 900 }: { children: ReactNode; arenaSelector: string; cinematicActive: boolean; rotateBreakpoint?: number }) {
+export function BattleArenaChatFrame({ children, arenaSelector, cinematicActive, rotateBreakpoint = 900, layoutKey }: { children: ReactNode; arenaSelector: string; cinematicActive: boolean; rotateBreakpoint?: number; layoutKey?: string }) {
   const [frame, setFrame] = useState<{ left: number; top: number; width: number; height: number; rotated: boolean; clearWidth?: number;handInset:number } | null>(null);
   useLayoutEffect(() => {
     const board = document.querySelector<HTMLElement>(arenaSelector);
@@ -38,6 +38,6 @@ export function BattleArenaChatFrame({ children, arenaSelector, cinematicActive,
     window.addEventListener("resize", measure);
     window.visualViewport?.addEventListener("resize", measure);
     return () => { observer.disconnect(); window.removeEventListener("resize", measure); window.visualViewport?.removeEventListener("resize", measure); };
-  }, [arenaSelector, cinematicActive, rotateBreakpoint]);
+  }, [arenaSelector, cinematicActive, rotateBreakpoint, layoutKey]);
   return frame ? createPortal(<div className="triad-battle-chat-hud-frame" style={{ left:frame.left,top:frame.top,width:frame.width,height:frame.height,transform:frame.rotated ? "rotate(90deg) translateY(-100%)" : "none", transformOrigin:"top left",'--chat-hand-inset':`${frame.handInset}px` } as CSSProperties} data-cinematic-chat={cinematicActive}><div style={{maxWidth:frame.clearWidth}}>{children}</div></div>, document.body) : null;
 }
