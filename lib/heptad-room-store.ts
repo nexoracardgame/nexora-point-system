@@ -6,21 +6,22 @@ import { triadCardByNo, triadSkillRuleByNo, triadSkillElementConditionMatches } 
 import { completeHeptadMatchDeck, emptyHeptadDeck, heptadCanCallSpecial, HEPTAD_TURNS, HEPTAD_TIERS, validateHeptadMatchDeck, type HeptadDeck, type HeptadTurn, type HeptadTier, type HeptadBoard, type HeptadFight } from './heptad-rules';
 import { resolveHeptadClash, type HeptadCast, type HeptadResult } from './heptad-resolution';
 import { recordForfeitRank } from './battle-forfeit-rank';
+import { PENTAD_ELEMENT_SCENE_MS } from './pentad-element-presentation';
 
 const sides=['host','challenger'] as const;
 const pair=<T>(value:()=>T):Record<PentadSide,T>=>({host:value(),challenger:value()});
 const random=()=>randomInt(0x1000000)/0x1000000;
-export type HeptadRound=HeptadResult&{id:number;fight:number;turn:HeptadTurn;board:Record<PentadSide,HeptadBoard>;casts:HeptadCast[];finalDuel:boolean};
+export type HeptadRound=HeptadResult&{id:number;fight:number;turn:HeptadTurn;board:Record<PentadSide,HeptadBoard>;casts:HeptadCast[];finalDuel:boolean;elementPresented?:boolean};
 type Choice=HeptadCast&{options:string[];value:string;copyChoice?:boolean};
 export type HeptadRoom={
   code:string;version:number;createdAt:number;updatedAt:number;lobby:PentadRoom;tier:HeptadTier;
-  phase:'waiting'|'deck'|'select'|'special'|'target'|'result'|'finished';epoch:number;deadline:number;
+  phase:'waiting'|'deck'|'select'|'element'|'special'|'target'|'result'|'finished';epoch:number;deadline:number;
   decks:Record<PentadSide,HeptadDeck[]>;ready:Record<PentadSide,boolean>;used:Record<PentadSide,string[][]>;
   board:Record<PentadSide,HeptadBoard>;picks:Record<PentadSide,string>;special:Record<PentadSide,string>;
   specialUsed:Record<PentadSide,number>;specialOrder:PentadSide[];choices:Choice[];casts:HeptadCast[];
   score:Record<PentadSide,number>;fight:HeptadFight;turn:HeptadTurn;opener:PentadSide;
   finalDuel:boolean;finalPool:Record<PentadSide,string[]>;rounds:HeptadRound[];
-  winner:PentadSide|'draw'|'';notice:string;rankedAt?:number;completedBy?:string[];temporaryMains?:Partial<Record<PentadSide,string>>;
+  winner:PentadSide|'draw'|'';notice:string;rankedAt?:number;completedBy?:string[];elementPresented?:boolean;elementCompletedBy?:string[];temporaryMains?:Partial<Record<PentadSide,string>>;
 };
 export function newHeptadRoom(code:string,actor:PentadParticipant,now=Date.now()):HeptadRoom{
   return {code,version:0,createdAt:now,updatedAt:now,lobby:newPentadRoom(code,actor,now),tier:'all',phase:'waiting',epoch:0,deadline:0,
@@ -37,6 +38,7 @@ export function heptadAvailable(room:HeptadRoom,side:PentadSide):string[]{
 }
 function finish(room:HeptadRoom,winner:HeptadRoom['winner'],notice:string){room.phase='finished';room.winner=winner;room.notice=notice;room.deadline=0;room.epoch++;room.lobby.phase='finished';}
 function selection(room:HeptadRoom,now:number){
+  room.elementPresented=false;room.elementCompletedBy=[];
   room.phase='select';room.picks=pair(()=>'');room.special=pair(()=>'');room.specialOrder=[];room.casts=[];room.choices=[];room.temporaryMains={};room.deadline=now+120000;room.epoch++;
   const empty=sides.filter(side=>!heptadAvailable(room,side).length);
   if(empty.length)finish(room,room.score.host===room.score.challenger?'draw':room.score.host>room.score.challenger?'host':'challenger','การ์ดที่ใช้ตัดสินหมดแล้ว นับคะแนนสะสม');
@@ -66,7 +68,7 @@ function resolve(room:HeptadRoom,now:number){
   const board=structuredClone(room.board);
   for(const side of sides)if(room.temporaryMains?.[side])board[side][1]=room.temporaryMains[side];
   const result=resolveHeptadClash({board,turn:room.turn,opener:room.opener,casts:room.casts,finalDuel:room.finalDuel,seed:`heptad:${room.code}:${room.fight}:${room.turn}:${room.rounds.length}`});
-  const round:HeptadRound={...result,id:room.rounds.length+1,fight:room.fight,turn:room.turn,board,casts:structuredClone(room.casts),finalDuel:room.finalDuel};
+  const round:HeptadRound={...result,id:room.rounds.length+1,fight:room.fight,turn:room.turn,board,casts:structuredClone(room.casts),finalDuel:room.finalDuel,elementPresented:room.elementPresented};
   room.rounds.push(round);
   if(!room.finalDuel&&result.winner!=='draw')room.score[result.winner]++;
   const supportScenes=room.turn>1&&!room.finalDuel?14000:0;
@@ -116,6 +118,10 @@ function reveal(room:HeptadRoom,now:number){
   if(!room.finalDuel&&HEPTAD_TURNS[room.turn-1].kind==='skill')for(const side of [room.opener,otherPentadSide(room.opener)])if(room.picks[side]!=='__pass__')room.casts.push({side,cardNo:room.picks[side],kind:'normal'});
   prepareTargets(room,now);
 }
+function beginSpecial(room:HeptadRoom,now:number){
+  room.phase='special';room.deadline=now+30000;room.epoch++;
+  for(const side of sides)if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!room.decks[side][room.fight-1].special.some(no=>!room.used[side][room.fight-1].includes(no)))room.special[side]='__decline__';
+}
 export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
   if(room.phase==='deck'){
     if(now>=room.deadline)for(const side of sides){room.decks[side]=completeHeptadMatchDeck(room.decks[side],room.tier,random);room.ready[side]=true;}
@@ -140,10 +146,15 @@ export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
       else if(now>=room.deadline)room.picks[side]='__pass__';
     }
     if(sides.every(side=>room.picks[side])){
-      if(!room.finalDuel&&room.turn>=2&&room.turn<=6){room.phase='special';room.deadline=now+30000;room.epoch++;
-        for(const side of sides)if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!room.decks[side][room.fight-1].special.some(no=>!room.used[side][room.fight-1].includes(no)))room.special[side]='__decline__';
-      }else reveal(room,now);
+      if(!room.finalDuel&&[2,5].includes(room.turn)&&sides.every(side=>{const card=triadCardByNo.get(room.picks[side]);return card?.kind==='monster'&&card.element!=='unknown';})){
+        room.phase='element';room.elementPresented=true;room.elementCompletedBy=[];room.deadline=now+PENTAD_ELEMENT_SCENE_MS+15000;room.epoch++;
+      }else if(!room.finalDuel&&room.turn>=2&&room.turn<=6)beginSpecial(room,now);
+      else reveal(room,now);
     }
+  }
+  if(room.phase==='element'&&(now>=room.deadline||sides.every(side=>bot(room,side)?now>=room.deadline-15000:(room.elementCompletedBy||[]).includes(room.lobby.seats[side]?.id||'')))){
+    const a=triadCardByNo.get(room.picks.host)!,b=triadCardByNo.get(room.picks.challenger)!;
+    if(pentadElementRelation(a.element,b.element).winner)reveal(room,now);else beginSpecial(room,now);
   }
   if(room.phase==='special'){
     for(const side of sides)if(!room.special[side]){
@@ -176,6 +187,10 @@ export function applyHeptadAction(room:HeptadRoom,actor:PentadParticipant,body:R
   if(action==='surrender'){if(['waiting','finished'].includes(room.phase))throw Error('ยอมแพ้ไม่ได้');finish(room,otherPentadSide(side),'ยอมแพ้');return;}
   if(action==='complete'){if(room.phase==='result'&&Number(body.roundId)===room.rounds.at(-1)?.id){room.completedBy=[...new Set([...(room.completedBy||[]),actor.id])];if(sides.every(player=>bot(room,player)||room.completedBy!.includes(room.lobby.seats[player]?.id||'')))room.deadline=Math.min(room.deadline,now+250);}return;}
   if(Number(body.epoch)!==room.epoch)throw Error('สถานะตาเปลี่ยนแล้ว');
+  if(action==='element-complete'){
+    if(room.phase!=='element')return;
+    room.elementCompletedBy=[...new Set([...(room.elementCompletedBy||[]),actor.id])];return;
+  }
   if(action==='ready'){
     if(room.phase!=='deck'||room.ready[side])throw Error('ยืนยันเด็คไม่ได้');
     const errors=validateHeptadMatchDeck(body.decks,room.tier);if(errors.length)throw Error(errors.join(' / '));
@@ -207,7 +222,7 @@ export function publicHeptadRoom(room:HeptadRoom,id:string):HeptadRoom{
   delete copy.temporaryMains;
   for(const seat of sides)if(seat!==side){
     copy.decks[seat]=[];copy.finalPool[seat]=[];
-    if(['select','special'].includes(room.phase)){copy.picks[seat]=room.picks[seat]?'hidden':'';copy.special[seat]=room.special[seat]?'confirmed':'';}
+    if(['select','special'].includes(room.phase)){if(!room.elementPresented)copy.picks[seat]=room.picks[seat]?'hidden':'';copy.special[seat]=room.special[seat]?'confirmed':'';}
     if(room.phase==='target')copy.choices=copy.choices.map(choice=>choice.side===seat?{...choice,options:[],value:choice.value?'confirmed':''}:choice);
   }
   return copy;

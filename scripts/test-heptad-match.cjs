@@ -16,6 +16,21 @@ function action(r,actor,body,now=2){store.applyHeptadAction(r,actor,{epoch:r.epo
  action(legacy,owner,{action:'special',cardNo:'forged-card'});assert.equal(legacy.special.host,'218');
  console.log('Hidden special draw: server pool, slot validation, one choice and legacy request safety passed');
 }
+for(const turn of [2,5]){
+ const r=room();action(r,rival,{action:'join'});r.phase='select';r.turn=turn;
+ const monster=triadCards.find(card=>card.kind==='monster'&&card.element!=='unknown');
+ r.picks={host:monster.cardNo,challenger:monster.cardNo};r.decks.host[0].special=['218'];r.decks.challenger[0].special=['219'];
+ store.tickHeptadRoom(r,3);assert.equal(r.phase,'element');
+ assert.equal(store.publicHeptadRoom(r,rival.id).picks.host,monster.cardNo,'VS reveals both monsters');
+ assert.throws(()=>action(r,owner,{action:'special',slot:0},4),'No draw before VS completes');
+ action(r,owner,{action:'element-complete'},5);store.tickHeptadRoom(r,6);assert.equal(r.phase,'element','Wait for both players');
+ action(r,rival,{action:'element-complete'},7);store.tickHeptadRoom(r,8);assert.equal(r.phase,'special');
+ action(r,owner,{action:'special',cardNo:''},9);action(r,rival,{action:'special',cardNo:''},10);store.tickHeptadRoom(r,11);
+ assert.equal(r.rounds.at(-1).elementPresented,true,'Result must not replay VS');
+ const timeout=room();action(timeout,rival,{action:'join'});timeout.phase='select';timeout.turn=turn;timeout.picks={host:monster.cardNo,challenger:monster.cardNo};
+ store.tickHeptadRoom(timeout,3);store.tickHeptadRoom(timeout,timeout.deadline+1);assert.notEqual(timeout.phase,'element','Disconnected player cannot stall forever');
+ console.log(`Turn ${turn}: VS before draw, both-player acknowledgement, no replay and timeout passed`);
+}
 for(const tier of ['all','bronze','silver','gold']){
  for(let n=0;n<8;n++){
   const r=room();action(r,owner,{action:'watch'});action(r,owner,{action:'mode',tier});
