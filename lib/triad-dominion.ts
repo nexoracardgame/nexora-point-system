@@ -2861,6 +2861,10 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     effectiveOpponent: boardState.opponent,
     originalPlayer: { ...input.player },
     originalOpponent: { ...input.opponent },
+    cinematicSupport: {
+      player: playerScore.contributions.find(item=>item.lane!=="top"&&item.card.kind==="monster")?.card.cardNo,
+      opponent: opponentScore.contributions.find(item=>item.lane!=="top"&&item.card.kind==="monster")?.card.cardNo,
+    },
     playerBreakdown: playerScore.breakdown,
     opponentBreakdown: opponentScore.breakdown,
     unresolvedSkills: orderedApplied.flatMap((item) => item.unresolved),

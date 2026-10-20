@@ -56,7 +56,7 @@
 .strike .burst { display:none; }
 .blocked .burst { color:#9bd9ff; }
 .wave { position:absolute; inset:25px 4%; border:2px solid var(--impact); border-radius:50%; animation:wave var(--motion-duration) ease-out both; }
-.number { position:absolute; left:50%; top:384px; z-index:5; text-align:center; font-size:48px; line-height:1; font-weight:900; color:#fff; text-shadow:0 2px 4px #000,0 0 20px var(--impact); animation:number 2000ms ease-out var(--contact-delay) both; }
+.number { position:absolute; left:50%; top:auto!important;bottom:16px; z-index:5; text-align:center; font-size:48px; line-height:1; font-weight:900; color:#fff; text-shadow:0 2px 4px #000,0 0 20px var(--impact); animation:number 2000ms ease-out var(--contact-delay) both; }
 .number span { display:block; margin-bottom:6px; font-size:12px; color:var(--impact); }
 .guard { position:absolute; top:400px; left:15%; right:15%; text-align:center; color:#9bd9ff; font-size:16px; font-weight:700; }
 .caption { width:min(850px,90%); min-height:48px; max-height:80px; overflow:auto; text-align:center; font-size:15px; line-height:1.6; overflow-wrap:anywhere; color:#d0d5dc; }

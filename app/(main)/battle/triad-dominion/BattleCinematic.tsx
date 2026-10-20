@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { FastForward, Shield, Sparkles, Swords, Volume2, VolumeX, Trophy, ArrowDown, ArrowUp, RefreshCw } from "lucide-react";
 import { createPortal } from "react-dom";
 import BattleParticles from "./BattleParticles";
+import BattleDepthFX from "@/components/BattleDepthFX";
 import { battleAudioReady, playBattleSequence, primeBattleAudio } from "./BattleAudio";
 import { BATTLE_CONTACT_MS, BATTLE_MOTION_MS, battleStepDuration } from "./BattleTiming";
 import { triadSkillRuleByNo, type TriadCard, type TriadTurnResult } from "@/lib/triad-dominion";
@@ -215,6 +216,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
         <HpMeter side="opponent" name={opponentName} initial={Math.max(0, result.opponentTotal)} value={hp.opponent} reduced={reduced} />
       </div>
       <div ref={arenaRef} className={`${styles.arena} ${step.kind === "strike" ? styles.strike : step.kind === "skill" ? styles.cast : ""} ${step.side === "opponent" ? styles.fromOpponent : styles.fromPlayer} ${step.blocked ? styles.blocked : ""} ${step.field ? styles.field : ""} ${final ? styles.final : ""}`}>
+        {!final&&!intro&&!step.blocked&&<BattleDepthFX key={`depth-${index}`} color={color} skill={step.kind==='skill'} reduced={reduced}/>}
         {!final && !intro ? <BattleParticles key={index} color={color} element={element} side={step.side} skill={step.kind === "skill"} skillRecipient={step.recipient} field={Boolean(step.field)} blocked={Boolean(step.blocked)} reduced={reduced} effect={step.effect} /> : null}
         {[{ side: "player" as const, card: activePlayer }, { side: "opponent" as const, card: activeOpponent }].map(({ side, card }) => {
           const power = empowered(side);

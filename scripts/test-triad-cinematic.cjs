@@ -11,6 +11,7 @@ const reactDir = path.dirname(require.resolve('react'));
 const domDir = path.dirname(require.resolve('react-dom'));
 const schedulerDir = path.dirname(require.resolve('scheduler'));
 const modules = {
+  '@/components/BattleDepthFX': 'exports.__esModule=true;exports.default=()=>null;',
   './game-settings': 'exports.gameVolume=()=>1;',
   '@/lib/game-settings': 'exports.gameVolume=()=>1;',
   '@/lib/game-ui-audio': ts.transpileModule(fs.readFileSync('lib/game-ui-audio.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText,
@@ -149,12 +150,12 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
     await page.waitForSelector('.wave');
     assert.equal(await page.locator('[data-battle-cinematic]').getAttribute('data-effect'), 'debuff');
     await page.screenshot({ path: 'artifacts/triad-cinematic/field-skill.png' });
-    await page.locator('input[type=checkbox]').check();
+    await page.evaluate(()=>{localStorage.setItem('triad-command-motion-off','1');mount([], 'reduced')});
     await page.waitForFunction(() => finished === 2);
     await page.reload();
     await page.waitForSelector('.reduced');
     await page.waitForFunction(() => finished === 1);
-    await page.locator('input[type=checkbox]').uncheck();
+    await page.evaluate(()=>localStorage.removeItem('triad-command-motion-off'));
     // Each element must draw an actual, distinct impact rather than a color-only variant.
     for (const element of ['fire','water','wood','earth','gold']) {
       await page.evaluate(e => { player.element=e; opponent.element=e; mount([], 'element-'+e); }, element);
