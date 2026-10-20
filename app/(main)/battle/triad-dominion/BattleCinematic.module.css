@@ -143,7 +143,13 @@
 .skillSeal img { width:100%; height:100%; object-fit:contain; opacity:.65; mix-blend-mode:screen; animation:sealOrbit var(--motion-duration) ease-out both; }
 .skillSeal i { position:absolute; inset:8%; border:1px solid var(--impact); border-radius:50%; animation:castShockwave var(--motion-duration) ease-out both; }
 .skillSeal i:last-child { inset:15%; animation-delay:100ms; }
-.skillPlayer,.skillOpponent { right:auto; }
+.skillPlayer { left:37%;right:auto; }
+.skillOpponent { left:63%;right:auto; }
+.skillTransfer > strong{display:block;margin-bottom:6px;text-align:center;font-size:12px;line-height:1.3;color:#fff;overflow-wrap:anywhere;text-shadow:0 1px 4px #000;background:#000b;border-radius:4px;padding:4px}
+.landscape .arena.cast{--edge:3%}
+.landscape .skillTransfer{top:0;width:calc(var(--card-width) * .9)}
+.landscape .skillTransfer>strong{font-size:8px;padding:2px;margin-bottom:2px;line-height:1.1}
+.landscape .skillTransfer span{font-size:8px;margin-top:2px;line-height:1.1}
 .skillBlocked { animation-name:skillReject; }
 .cast .trail,.cast .burst { display:none; }
 .reduced .skillTransfer { opacity:1; transform:translateX(-50%); }

@@ -4501,6 +4501,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     router.prefetch("/game/heptad");
     // Room clients are already imported; never wait for a lazy boundary on entry.
     void import('@/lib/home-wallpaper').then(module=>module.loadHomeWallpaper('preparation')).catch(()=>{});
+    void import('@/lib/preparation-video').then(module=>module.warmPreparationVideo()).catch(()=>{});
   }, [router]);
   const [creatingFormat,setCreatingFormat]=useState<"triad"|"pentad"|"heptad">("triad");
   const startingRoomCodeRef = useRef("");

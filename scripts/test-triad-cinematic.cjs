@@ -188,6 +188,8 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       await page.waitForSelector('[data-skill-transfer]');
       assert.equal(await page.locator('[data-side="player"] .card img').getAttribute('alt'),'Fire Warrior','Monster never swaps into skill art');
       assert.equal(await page.locator('[data-skill-transfer]').getAttribute('data-recipient'),'player');
+      assert.equal(await page.locator('[data-skill-transfer]').getAttribute('data-caster'),'player');
+      assert.ok(await page.locator('[data-skill-transfer]').evaluate(node=>{const card=node.getBoundingClientRect(),arena=document.querySelector('.arena').getBoundingClientRect();return card.x+card.width/2<arena.x+arena.width/2;}),'Player buff stays in the left lane');
       await page.waitForTimeout(700);
       await page.screenshot({path:`artifacts/triad-cinematic/skill-transfer-turn-${turn}.png`});
       await page.evaluate(()=>{window.stableArena=document.querySelector('.arena');window.stableMonster=document.querySelector('[data-side="player"] .card img');window.blankFrames=0;window.tracking=true;function track(){if(!tracking)return;if(!document.querySelector('[data-battle-cinematic]'))blankFrames++;requestAnimationFrame(track)}track();window.poll=setInterval(()=>mount([{side:'player',cardNo:'018',summary:'เพิ่มพลังให้มอนสเตอร์หลักก่อนเข้าปะทะ',type:'stat'}],'imbue-'+result.turn),180)});

@@ -238,10 +238,11 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
             {result.elementalBoost?.[side]&&<div className={styles.elementBoost}><ElementBoostCard no={result.elementalBoost[side]!} used={final}/></div>}
           </div>;
         })}
-        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-support-transfer={Boolean(step.supportTransfer)} data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`}>
+        {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-caster={step.side} data-support-transfer={Boolean(step.supportTransfer)} data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`}>
+          <strong>{step.side==='player'?playerName:opponentName} · {step.supportTransfer?'ส่งพลังมอนสเตอร์รอง':'ผู้ใช้สกิล'}</strong>
           <div className={styles.skillSeal} aria-hidden="true"><img src="/battle-fx/magic_01.png" alt="" /><i /><i /></div>
           <img data-battle-card-face src={attacker.sourceImage} alt={attacker.name} draggable={false} />
-          <span>{step.blocked ? "สกิลถูกระงับ" : step.supportTransfer ? "มอนสเตอร์รอง → มอนสเตอร์หลัก" : step.effect === "debuff" ? "ส่งผลลดพลัง" : "ส่งพลังสกิล"}</span>
+          <span>{step.blocked ? "สกิลถูกระงับ" : step.supportTransfer ? "มอนสเตอร์รอง → มอนสเตอร์หลัก" : `เป้าหมาย: ${step.recipient==='both'?'ทั้งสองฝ่าย':step.recipient==='player'?playerName:step.recipient==='opponent'?opponentName:actorName}`}</span>
         </div> : null}
         <span className={`${styles.name} ${styles.playerName}`}>{playerName}</span>
         <span className={`${styles.name} ${styles.opponentName}`}>{opponentName}</span>

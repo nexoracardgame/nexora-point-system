@@ -10,7 +10,7 @@ export function homeWallpaperSources(scene: WallpaperScene = "home") {
   const compact = matchMedia("(pointer: coarse)").matches || device.connection?.saveData || (device.deviceMemory !== undefined && device.deviceMemory < 4);
   const large = !compact && window.innerWidth * Math.min(window.devicePixelRatio || 1, 2) >= 2560 && (device.deviceMemory ?? 8) >= 8;
   const selected = scene === "preparation" ? preparationManifest : manifest;
-  return selected.variants.filter(variant => variant.width <= (compact ? 1280 : large ? 3840 : 1920)).map(variant => variant.url);
+  return selected.variants.filter(variant => variant.width <= (compact ? 1280 : scene==='preparation' ? 1920 : large ? 3840 : 1920)).map(variant => variant.url);
 }
 
 const wallpapers: Partial<Record<WallpaperScene, Promise<string>>> = {};
