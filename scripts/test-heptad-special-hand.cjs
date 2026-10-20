@@ -14,9 +14,14 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   const boxes=()=>page.locator('.heptad-slot').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}}));const before=await boxes();
   assert.equal(await page.locator('.heptad-special-hand-card').count(),5);assert.ok(await page.locator('.heptad-special-hand-card img').evaluateAll(nodes=>nodes.every(node=>!node.src.includes('card-backs'))));
   await page.evaluate(()=>setPrompt(true));await page.getByRole('button',{name:'ไม่ใช้การ์ดเสริมพิเศษ',exact:true}).waitFor();assert.deepEqual(await boxes(),before,'Prompt never shifts or scales battlefield');
+  assert.equal(await page.locator('.heptad-special-decision-arrow').count(),1);
+  assert.equal(await page.locator('.heptad-special-hand').evaluate(node=>getComputedStyle(node,'::after').animationName),'special-hand-orbit');
+  assert.ok(await page.locator('.heptad-special-hand-card').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node,'::after').animationName==='special-hand-orbit')));
   const tray=await page.locator('.heptad-special-hand').boundingBox();assert.ok(tray.x>=0&&tray.y>=48&&tray.x+tray.width<=width&&tray.y+tray.height<=height);
   for(const b of before)assert.ok(b.x+b.w<=tray.x||b.x>=tray.x+tray.width||b.y+b.h<=tray.y||b.y>=tray.y+tray.height,'Tray clears all 14 cards');
   await page.locator('.heptad-special-hand-card').last().dblclick();assert.equal(await page.evaluate(()=>chosen),1);assert.equal(await page.locator('.heptad-special-hand-card').count(),4);assert.equal(await page.locator('.heptad-field-special img').getAttribute('src'),'/cards/card-backs/card-backs.png');
+  assert.equal(await page.locator('.heptad-special-decision-arrow').count(),0,'Decision arrow ends immediately after choosing');
+  assert.equal(await page.locator('.heptad-special-hand').evaluate(node=>getComputedStyle(node,'::after').animationName),'none');
   assert.deepEqual(await boxes(),before,'Placing special card never moves battlefield');assert.deepEqual(errors,[]);
   fs.mkdirSync('artifacts/heptad-special-hand',{recursive:true});await page.screenshot({path:`artifacts/heptad-special-hand/${width}.png`});await page.close();console.log(`${width}x${height}: face-up persistent fan, no battlefield movement/overlap, double-click, 5→4 cards and facedown placement passed`);
  }
