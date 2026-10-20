@@ -20,7 +20,7 @@ const app=`const modules=${JSON.stringify(modules)},cache={};function require(id
     if((url.pathname.startsWith('/images/lobby-play/')||url.pathname==='/avatar.png')&&fs.existsSync(file))return route.fulfill({path:file});
     return route.abort();
    });
-   await page.goto('http://waiting.test/');await page.addScriptTag({content:app});
+   await page.goto('http://waiting.test/');await page.addScriptTag({content:app.replace("require('react-dom/client').createRoot(document.getElementById('root')).render", "(window.waitingRoot=require('react-dom/client').createRoot(document.getElementById('root'))).render")+`;window.renderPreparation=preparing=>window.waitingRoot.render(R.createElement(Waiting,{...props,seats:{host:props.seats.host,challenger:null},preparing,canChange:!preparing}));`});
    await page.waitForFunction(()=>document.querySelector('.bpi-rank>span')?.textContent==='DIAMOND');
    await page.evaluate(()=>Promise.all([...document.images].map(image=>image.decode())));
    assert.equal(await page.locator('.battle-player-identity').count(),2);
@@ -37,7 +37,14 @@ const app=`const modules=${JSON.stringify(modules)},cache={};function require(id
    const after=await page.locator('.nsw-framed-identity').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}}));assert.deepEqual(after,bounds,'Chat never shifts framed profiles');
    fs.mkdirSync('artifacts/waiting-profiles',{recursive:true});await page.screenshot({path:`artifacts/waiting-profiles/${width}x${height}.png`});
    await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.bpi-avatar').first().evaluate(node=>getComputedStyle(node,'::after').animationName),'none');
-   assert.deepEqual(errors,[]);await page.close();console.log(`${width}x${height}: two framed profiles, live rank, fitted names, chat isolation, assets and reduced motion passed`);
+   await page.evaluate(()=>window.renderPreparation(true));
+   const botButton=page.getByRole('button',{name:'เพิ่มบอทลงสนาม ฝั่ง B',exact:true});
+   await botButton.waitFor({state:'visible'});assert.equal(await botButton.isDisabled(),true);
+   const preparingBounds=await botButton.boundingBox();
+   await page.evaluate(()=>window.renderPreparation(false));
+   await page.waitForFunction(()=>!document.querySelector('button[aria-label="เพิ่มบอทลงสนาม ฝั่ง B"]').disabled);
+   assert.deepEqual(await botButton.boundingBox(),preparingBounds,'Bot button never moves when server confirms room');
+   assert.deepEqual(errors,[]);await page.close();console.log(`${width}x${height}: profiles, chat isolation and stable first-frame bot control passed`);
   }
  }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

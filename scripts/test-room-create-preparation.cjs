@@ -5,7 +5,8 @@ for(const name of ['Pentad','Heptad'])assert.ok(client.includes(`import ${name}H
 assert.ok(client.includes("module.loadHomeWallpaper('preparation')"));
 const preview=client.slice(client.indexOf('if (creatingRoom) return'),client.indexOf('if (shouldShowReconnectSplash)'));
 assert.ok(preview.includes('<BattleWaitingRoom'),'Create feedback uses the shared waiting room');
-assert.ok(preview.includes('canChange={false} busy'),'No optimistic room mutations before server confirmation');
+assert.ok(preview.includes('canChange={false} preparing busy'),'No optimistic room mutations before server confirmation');
+assert.ok(preview.includes('onBot={()=>{}}'),'Bot control is rendered in the first room preview');
 assert.ok(preview.includes('code="—"'),'Pending header reserves actual room-header geometry');
 assert.ok(preview.includes('chat={<BattleArenaChat'),'Pending chat reserves the same space as confirmed chat');
 assert.ok(client.includes('setCreatingFormat(createFormat)'));
