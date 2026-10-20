@@ -1,0 +1,17 @@
+@font-face{font-family:NexoraResult;src:url('/fonts/orbitron/Orbitron.ttf') format('truetype');font-display:swap}
+.battle-skip-summary{position:fixed;right:12px;left:auto;top:180px;transform:none;z-index:2147483600;width:280px;max-width:30%;box-sizing:border-box;padding:14px;text-align:left;color:#fff;background:rgb(0 0 0 / 85%);border:1px solid #d9b85e;border-radius:4px;box-shadow:0 0 22px #e3bb3c30;pointer-events:none;font:700 13px/1.4 Arial,Tahoma,sans-serif;animation:bss-life 3s both;overflow:hidden;letter-spacing:0}
+.battle-skip-summary header{display:flex;align-items:center;gap:6px;color:#ffe19a}
+.battle-skip-summary header strong{font-size:13px}
+.battle-skip-summary header>span{margin-left:auto;font:700 8px NexoraResult,Arial,sans-serif;color:#83e8e1}
+.battle-skip-summary h2{font-size:20px;line-height:1.25;color:#ffe4a3;margin:10px 0;overflow-wrap:anywhere;animation:bss-glitch .32s steps(2,end) both}
+.bss-scores{display:grid;gap:5px}
+.bss-scores>div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #ffffff20}
+.bss-scores span{overflow-wrap:anywhere}.bss-scores b{font:700 18px NexoraResult,Arial,sans-serif;color:#ddd;font-variant-numeric:tabular-nums}.bss-scores [data-winner=true] b{color:#8ff5d1}
+.battle-skip-summary footer{display:flex;gap:5px;align-items:flex-start;margin-top:9px;color:#b6e7ef;font-size:11px}.battle-skip-summary small{display:block;margin-top:5px;color:#ddd;font-size:11px}.battle-skip-summary small b{color:#ffe4a3}
+.bss-timer{position:absolute;bottom:0;left:0;height:2px;width:100%;background:#f2cf78;transform-origin:left;animation:bss-time 3s linear both}
+@keyframes bss-life{0%{opacity:0;translate:12px 0}8%,85%{opacity:1;translate:0 0}100%{opacity:0;translate:8px 0}}
+@keyframes bss-glitch{0%,70%{text-shadow:2px 0 #68ffff,-2px 0 #ff648c;translate:2px 0}30%,85%{text-shadow:-2px 0 #68ffff,2px 0 #ff648c;translate:-2px 0}100%{text-shadow:none;translate:0 0}}
+@keyframes bss-time{to{transform:scaleX(0)}}
+@media(max-height:600px){.battle-skip-summary{right:6px;width:224px;max-width:30%;padding:8px;font-size:10px}.battle-skip-summary h2{font-size:14px;margin:5px 0}.battle-skip-summary header strong{font-size:10px}.battle-skip-summary header>span{display:none}.bss-scores b{font-size:13px}.bss-scores>div{padding:3px 0}.battle-skip-summary footer,.battle-skip-summary small{font-size:9px;margin-top:4px}}
+@media(prefers-reduced-motion:reduce){.battle-skip-summary,.battle-skip-summary h2,.bss-timer{animation:none}}
+html[data-game-motion-off=true] .battle-skip-summary,html[data-game-motion-off=true] .battle-skip-summary h2,html[data-game-motion-off=true] .bss-timer{animation:none}

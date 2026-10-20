@@ -209,7 +209,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
       {arena ? <div className={styles.environment}><img src={arena.image} alt="" draggable={false} /><div /></div> : null}
       <div className={styles.toolbar} data-battle-cinematic-actions>
         <button type="button" onClick={toggleSound} title={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-label={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-pressed={!muted && soundReady}>{muted || !soundReady ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>
-        <button type="button" onClick={()=>{window.dispatchEvent(new CustomEvent('nexora:round-skipped',{detail:{winner:result.winner,player:playerName,opponent:opponentName,a:result.playerTotal,b:result.opponentTotal}}));finish()}} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
+        <button type="button" onClick={()=>{window.dispatchEvent(new CustomEvent('nexora:round-skipped',{detail:{winner:result.winner,player:playerName,opponent:opponentName,a:result.playerTotal,b:result.opponentTotal,reason:result.decisionReason,metric:result.metric}}));finish()}} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
       </div>
       <div className={styles.heading} aria-live="polite">
         <span>{arena ? `${arena.name} · ` : ""}{final ? "ผลการปะทะ" : intro ? "เตรียมปะทะ" : `${index} / ${steps.length - 2}`}</span>
