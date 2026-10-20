@@ -14,6 +14,9 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   assert.equal(await panel.locator('h2').textContent(),'BOT Level.99 · B');assert.ok((await panel.textContent()).includes('6,300'));
   const rect=await panel.boundingBox();assert.ok(rect.x>width/2&&rect.y>=105&&rect.y+rect.height<=height-60);
   assert.ok(await panel.evaluate(node=>node.scrollWidth<=node.clientWidth+1),'No overflowing text');
+  assert.equal(await panel.evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0)');
+  assert.equal(await panel.evaluate(node=>getComputedStyle(node).borderTopWidth),'0px');
+  assert.equal(await panel.locator('h2').evaluate(node=>getComputedStyle(node).color),'rgb(8, 11, 14)');
   await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await panel.evaluate(node=>getComputedStyle(node).animationName),'none');
   fs.mkdirSync('artifacts/skip-summary',{recursive:true});await page.screenshot({path:`artifacts/skip-summary/${width}.png`});
   await panel.waitFor({state:'detached',timeout:4000});assert.deepEqual(errors,[]);await page.close();console.log(`${width}x${height}: clear winner, separate power rows, right placement, reduced motion and 3s cleanup passed`);

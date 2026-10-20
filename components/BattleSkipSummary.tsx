@@ -11,9 +11,10 @@ export default function BattleSkipSummary(){
  useLayoutEffect(()=>{
   if(!value||!panel.current)return;sequence.current++;
   const fit=()=>{const node=panel.current;if(!node)return;const width=node.offsetWidth,height=node.offsetHeight,pad=12,x=window.innerWidth-width-pad;
-   const blockers=[...document.querySelectorAll<HTMLElement>('.nexora-card-art-frame,.nexora-arena-scoreplate,.nexora-arena-header,.nexora-arena-hand')].filter(item=>!item.closest('.nexora-versus-plane')).map(item=>item.getBoundingClientRect()).filter(rect=>rect.width&&rect.height);
+   const blockers=[...document.querySelectorAll<HTMLElement>('.nexora-card-art-frame,.nexora-arena-scoreplate,.nexora-arena-header,.nexora-arena-hand,.heptad-special-hand,.triad-arena-card,[data-game-window-controls]')].filter(item=>!item.closest('.nexora-versus-plane')).map(item=>item.getBoundingClientRect()).filter(rect=>rect.width&&rect.height);
    let best=pad,score=Infinity;
-   for(let y=pad;y<=window.innerHeight-height-pad;y+=8){const overlap=blockers.reduce((sum,r)=>sum+Math.max(0,Math.min(x+width,r.right)-Math.max(x,r.left))*Math.max(0,Math.min(y+height,r.bottom)-Math.max(y,r.top)),0);if(overlap<score){score=overlap;best=y;}if(!overlap)break;}
+   const preferred=Math.max(pad,(window.innerHeight-height)/2);
+   for(let y=pad;y<=window.innerHeight-height-pad;y+=8){const overlap=blockers.reduce((sum,r)=>sum+Math.max(0,Math.min(x+width+8,r.right)-Math.max(x-8,r.left))*Math.max(0,Math.min(y+height+8,r.bottom)-Math.max(y-8,r.top)),0);const rank=overlap*1000+Math.abs(y-preferred);if(rank<score){score=rank;best=y;}}
    node.style.top=`${best}px`;};
   fit();const frame=requestAnimationFrame(fit);window.addEventListener('resize',fit);return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',fit);};
  },[value]);
