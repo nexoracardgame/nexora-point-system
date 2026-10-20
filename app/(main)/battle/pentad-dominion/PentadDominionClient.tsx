@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
+import { sendBattleRoomExit } from '@/lib/battle-room-exit';
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
@@ -94,6 +95,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const loadGeneration = useRef(0);
+  const exitedRoom = useRef(false);
   const [error, setError] = useState("");
   const [joinPassword,setJoinPassword]=useState("");
   const [now, setNow] = useState(Date.now());
@@ -121,6 +123,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   useBattleLoadingStage(`${room?.code || ""}:${room?.phase === "deck" ? "deck" : room?.phase === "waiting" ? "waiting" : room ? "battle" : "lobby"}`);
   const arena = useMemo(() => battleArenaForSeed(`pentad:${room?.code || "lobby"}:${room?.createdAt || 0}`), [room?.code, room?.createdAt]);
   const accept = (next: PentadRoom) => {
+    if (exitedRoom.current) return;
     const previous = roomRef.current;
     if (previous && previous.code === next.code && previous.version > next.version) return;
     const pending = pendingPickRef.current;
@@ -140,6 +143,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     try { localStorage.setItem("nexora:pentad:room", next.code); } catch { /* The room is already held in memory. */ }
   };
   const load = async (selectedCode?: string) => {
+    if (exitedRoom.current) return;
     const generation = loadGeneration.current;
     try {
       const response = await fetch(`/api/pentad-rooms${selectedCode ? `?room=${selectedCode}` : ""}`, { cache: "no-store", signal:AbortSignal.timeout(12000) });
@@ -267,7 +271,15 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     leavingRoomRef.current = true;
     try {
     if (side && room && !["waiting", "finished"].includes(room.phase) && !await confirmBattleLeave()) return;
-    busyRef.current = false; setBusy(false); await act("leave", {}, true);
+    const current = roomRef.current;
+    exitedRoom.current = true;
+    loadGeneration.current++;
+    clearPentadHandoff();
+    try { localStorage.removeItem('nexora:pentad:room'); } catch { /* Optional cache. */ }
+    roomRef.current = null; setRoom(null); setPresentation(null); setEntering(false);
+    busyRef.current = false; setBusy(false);
+    router.replace('/game');
+    if (current) void sendBattleRoomExit('/api/pentad-rooms', { code: current.code, epoch: current.epoch });
     } finally { leavingRoomRef.current = false; }
   };
 

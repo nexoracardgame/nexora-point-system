@@ -5,6 +5,7 @@ import {useCardGesture} from '@/lib/use-card-gesture';
 import GameLobbyProfile from '@/components/GameLobbyProfile';
 
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
+import { sendBattleRoomExit } from '@/lib/battle-room-exit';
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
@@ -5750,12 +5751,8 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (leavingRoomRef.current) return;
     leavingRoomRef.current = true;
     try {
-    let alreadyLeft = false;
     if (currentRoom?.status === "playing" && isFieldPlayer && !currentRoom.game.matchEndedAt) {
       if (!await confirmBattleLeave()) return;
-      const result = await postRoomAction({ action: "leave", code: currentRoom.code }).catch(() => null);
-      if (!result?.ok) { setBattleLog(current => ["ออกจากห้องไม่สำเร็จ กรุณาลองอีกครั้ง", ...current]); return; }
-      alreadyLeft = true;
     }
     joiningRoomCodeRef.current = "";
     setJoiningRoomCode("");
@@ -5768,14 +5765,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     writeCachedTriadRoom(participant.id, null);
     setPhase("lobby");
     if (code) {
-      if (!alreadyLeft) await postRoomAction({ action: "leave", code }).catch(() => null);
-      if (activeRoomCodeRef.current && activeRoomCodeRef.current !== code) return;
-      activeRoomCodeRef.current = "";
-      activeRoomSnapshotRef.current = null;
-      setActiveRoomCode("");
-      setActiveRoomSnapshot(null);
-      writeCachedTriadRoom(participant.id, null);
-      setPhase("lobby");
+      setRooms(current => current.filter(room => room.code !== code));
+      void sendBattleRoomExit(ROOM_API_PATH, { code, participant }).then(ok => {
+        if (!ok) setLobbyMessage('ออกจากสนามแล้ว แต่ยังยืนยันกับเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบการเชื่อมต่อ');
+      });
     }
     } finally { leavingRoomRef.current = false; }
   };
