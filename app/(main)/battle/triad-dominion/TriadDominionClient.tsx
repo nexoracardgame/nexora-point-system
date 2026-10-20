@@ -20,16 +20,14 @@ import type { TargetOptionView } from "@/lib/target-selection-view";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import dynamic from 'next/dynamic';
+import PentadHandoffClient from '../pentad-dominion/PentadDominionClient';
+import HeptadHandoffClient from '@/app/game/heptad/HeptadClient';
 import { savePentadHandoff } from '@/lib/pentad-room-handoff';
 import type { PentadRoom } from '@/lib/pentad-room-store';
 import type { HeptadRoom } from '@/lib/heptad-room-store';
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-const preparePentadClient = () => import('../pentad-dominion/PentadDominionClient');
-const prepareHeptadClient = () => import('@/app/game/heptad/HeptadClient');
-const PentadHandoffClient = dynamic(preparePentadClient,{ssr:false});
-const HeptadHandoffClient = dynamic(prepareHeptadClient,{ssr:false});
+import {HEPTAD_TIERS as waitingTierModes} from '@/lib/heptad-rules';
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import DuelistLeaderboard from "@/components/DuelistLeaderboard";
@@ -4500,9 +4498,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   useEffect(() => {
     router.prefetch("/game/pentad");
     router.prefetch("/game/heptad");
-    // Warm only the two room modules; do not decode full card collections here.
-    void preparePentadClient().catch(()=>{});
-    void prepareHeptadClient().catch(()=>{});
+    // Room clients are already imported; never wait for a lazy boundary on entry.
     void import('@/lib/home-wallpaper').then(module=>module.loadHomeWallpaper('preparation')).catch(()=>{});
   }, [router]);
   const [creatingFormat,setCreatingFormat]=useState<"triad"|"pentad"|"heptad">("triad");
@@ -7336,8 +7332,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff} onExitToLobby={exitHandoffToLobby}/>;
   if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} initialRoom={heptadHandoff} spectate={false} onExitToLobby={exitHandoffToLobby}/>;
   if (creatingRoom) return <BattleArenaSurface image={arena.image} className="nexora-room-create-preview">
-    <div role="status" className="nexora-room-create-status">{creatingFormat.toUpperCase()} · ยืนยันห้องกับเซิร์ฟเวอร์</div>
-    <BattleWaitingRoom seats={{host:participant,challenger:null}} spectators={[]} userId={participant.id} leaderId={participant.id} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'}]} mode="all" canChange={false} busy onMode={()=>{}} onWatch={()=>{}} onTake={()=>{}}/>
+    <BattleWaitingRoom code="—" onExit={()=>{}} onStart={()=>{}} seats={{host:participant,challenger:null}} spectators={[]} userId={participant.id} leaderId={participant.id} modes={creatingFormat==='heptad'?waitingTierModes:creatingFormat==='pentad'?[{id:'all',title:'ALL CARDS',description:'เลือกจากการ์ดทั้งหมด'},{id:'random',title:'RANDOM POOL',description:'สุ่มพูลการ์ด'}]:[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'},{id:'monster',title:'MONSTER',description:'มอนสเตอร์ล้วน'},{id:'skill',title:'SKILL',description:'10 มอนสเตอร์ + 10 สกิล'}]} mode={creatingFormat==='triad'?createRoomMode:'all'} canChange={false} busy onMode={()=>{}} onWatch={()=>{}} onTake={()=>{}} chat={<BattleArenaChat messages={[]} currentUserId={participant.id} currentUserName={participant.name} draft="" onDraftChange={()=>{}} onSubmit={()=>{}} disabled/>}/>
   </BattleArenaSurface>;
 
   if (shouldShowReconnectSplash) {

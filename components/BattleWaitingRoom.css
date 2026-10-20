@@ -47,6 +47,7 @@
 .nsw-framed-identity .bpi-badge{--waiting-profile-mask:url('/images/lobby-play/profile-rank-frame.png');clip-path:polygon(18% 0,100% 0,100% 100%,0 100%,0 18%)}
 .nsw-framed-identity :is(.bpi-avatar,.bpi-copy,.bpi-rank,.bpi-badge)::after{content:'';display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 40%,#fff1bd99 49%,#ffffffb3 50%,transparent 60%);background-size:300% 100%;mask:var(--waiting-profile-mask) center/100% 100% no-repeat;animation:nsw-profile-shine 6s ease-in-out infinite;z-index:1}
 .nsw-framed-identity [data-player=true] :is(.bpi-avatar,.bpi-copy,.bpi-rank)::after{transform:scaleX(-1)}
+.nsw-framed-identity .bpi-avatar::after{clip-path:polygon(0 0,100% 0,100% 59%,94% 59%,94% 100%,0 100%)}
 .nsw-framed-identity .bpi-rank::after,.nsw-framed-identity .bpi-badge::after{animation-delay:.2s}
 @keyframes nsw-profile-shine{0%,65%{background-position:100% 0;opacity:0}70%{opacity:.7}90%,100%{background-position:0 0;opacity:0}}
 @media(min-width:2400px) and (min-height:1000px){.nsw-framed-identity{width:min(100%,620px,calc(max(24px,100cqh - 64px)*3))}.nsw-framed-identity .bpi-copy strong{font-size:28px}.nsw-framed-identity .bpi-rank>span{font-size:19px}}
@@ -55,7 +56,8 @@
 @media(max-height:360px){.nsw-framed-identity{width:min(100%,190px,calc(max(24px,100cqh - 40px)*3))}.nsw-framed-identity .bpi-copy strong{font-size:10px}.nsw-person:has(.nsw-framed-identity){gap:2px}.nsw-person:has(.nsw-framed-identity) .nsw-seat-actions{min-height:20px}}
 @media(prefers-reduced-motion:reduce){.nsw-framed-identity :is(.bpi-avatar,.bpi-copy,.bpi-rank,.bpi-badge)::after{animation:none;display:none}}
 html[data-game-motion-off=true] .nsw-framed-identity :is(.bpi-avatar,.bpi-copy,.bpi-rank,.bpi-badge)::after{animation:none;display:none}
-.nexora-room-create-preview{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;color:#fff;background:#070d12}
+.nexora-room-create-preview{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;overflow:hidden;color:#fff;background:#070d12;font-family:Arial,Tahoma,sans-serif;isolation:isolate}
+.nexora-room-create-preview *{box-sizing:border-box;letter-spacing:0}
 .nexora-room-create-status{height:78px;flex:none;display:flex;align-items:center;justify-content:center;color:#ffe4ac;font:700 14px/1.4 Arial,Tahoma,sans-serif}
 .nexora-room-create-preview .nexora-shared-waiting{width:100%}
 @media(max-height:600px){.nexora-room-create-status{height:48px;font-size:11px}}
