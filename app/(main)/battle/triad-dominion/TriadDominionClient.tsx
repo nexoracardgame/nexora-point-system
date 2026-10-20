@@ -6,6 +6,7 @@ import GameLobbyProfile from '@/components/GameLobbyProfile';
 
 import { confirmBattleSurrender, confirmBattleLeave } from "@/lib/battle-surrender-dialog";
 import { sendBattleRoomExit } from '@/lib/battle-room-exit';
+import {commitBattleExit} from '@/lib/battle-lobby-navigation';
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
@@ -5753,16 +5754,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     if (currentRoom?.status === "playing" && isFieldPlayer && !currentRoom.game.matchEndedAt) {
       if (!await confirmBattleLeave()) return;
     }
+    const code = currentRoom?.code || "";
+    commitBattleExit(()=>{
     joiningRoomCodeRef.current = "";
     setJoiningRoomCode("");
-    const code = currentRoom?.code || "";
     if (code) dismissedRoomCodesRef.current.add(code);
     activeRoomCodeRef.current = "";
     activeRoomSnapshotRef.current = null;
     setActiveRoomCode("");
     setActiveRoomSnapshot(null);
-    writeCachedTriadRoom(participant.id, null);
     setPhase("lobby");
+    setCinematicActive(false);
+    });
+    writeCachedTriadRoom(participant.id, null);
     if (code) {
       setRooms(current => current.filter(room => room.code !== code));
       void sendBattleRoomExit(ROOM_API_PATH, { code, participant }).then(ok => {

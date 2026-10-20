@@ -278,11 +278,11 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     const current = roomRef.current;
     exitedRoom.current = true;
     loadGeneration.current++;
-    clearPentadHandoff();
-    try { localStorage.removeItem('nexora:pentad:room'); } catch { /* Optional cache. */ }
     roomRef.current = null; setRoom(null); setPresentation(null); setEntering(false);
     busyRef.current = false; setBusy(false);
     returnToBattleLobby(router,onExitToLobby);
+    clearPentadHandoff();
+    try { localStorage.removeItem('nexora:pentad:room'); } catch { /* Optional cache. */ }
     if (current) void sendBattleRoomExit('/api/pentad-rooms', { code: current.code, epoch: current.epoch });
     } finally { leavingRoomRef.current = false; }
   };

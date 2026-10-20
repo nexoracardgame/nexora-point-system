@@ -106,9 +106,9 @@ export default function HeptadClient({userId,initialCode,spectate,initialRoom,on
   const changeDeck=(value:HeptadDeck[])=>{if(!room||!side||room.ready[side])return;const errors=validateHeptadMatchDeck(value,room.tier,true);if(errors.length){setError(errors[0]);return;}setDraft(value);try{localStorage.setItem(`heptad:draft:${room.code}:${room.createdAt}:${userId}`,JSON.stringify(value));}catch{}};
   const leave=async()=>{if(leaving.current)return;leaving.current=true;
     try{const current=ref.current;if(side&&current&&!['waiting','finished'].includes(current.phase)&&!await confirmBattleLeave())return;
-      exited.current=true;generation.current++;setPresentation(null);setRoom(null);ref.current=null;
-      try{localStorage.removeItem(`nexora:heptad:room:${userId}`);sessionStorage.removeItem('nexora:heptad:handoff');}catch{}
+      exited.current=true;generation.current++;setPresentation(null);setElementScene(null);setRoom(null);ref.current=null;
       returnToBattleLobby(router,onExitToLobby);
+      try{localStorage.removeItem(`nexora:heptad:room:${userId}`);sessionStorage.removeItem('nexora:heptad:handoff');}catch{}
       if(current)void sendBattleRoomExit('/api/heptad-rooms',{code:current.code});
     }finally{leaving.current=false;}
   };
