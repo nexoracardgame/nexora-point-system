@@ -28,7 +28,11 @@ const script=`const modules=${JSON.stringify(modules)},cache={};function require
   const boxes=await page.locator('.heptad-slot').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,turn:Number(node.dataset.turn)}}));
   assert.equal(boxes.length,14);
   for(let i=0;i<boxes.length;i++){const a=boxes[i];assert.ok(a.x>=0&&a.y>=80&&a.x+a.w<=width&&a.y+a.h<=height-67,'Card inside allocated field');assert.ok(Math.abs(a.w/a.h-815/1110)<.01);assert.ok(Math.abs(a.w-boxes[0].w)<1,'Equal card size both sides');for(let j=0;j<i;j++){const b=boxes[j];assert.ok(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y,'No overlapping cards');}}
-  const left=boxes.slice(0,7);assert.ok(left[0].y<left[1].y&&left[1].y<left[2].y);assert.ok(left[5].x>left[6].x,'Support turn 6 right, 7 left');
+  const upper=boxes.slice(0,7),lower=boxes.slice(7);
+  assert.ok(upper[0].y>upper[1].y&&upper[1].y>upper[2].y,'Opponent formation faces centre');
+  assert.ok(lower[0].y<lower[1].y&&lower[1].y<lower[2].y,'Player formation faces centre');
+  assert.ok(lower[2].x>lower[3].x&&lower[5].x<lower[6].x,'Player slots swap 3/4 and 6/7');
+  assert.ok(upper[2].x<upper[3].x&&upper[5].x>upper[6].x,'Opponent uses mirrored corrected slots');
   assert.deepEqual(errors,[]);fs.mkdirSync('artifacts/heptad-board',{recursive:true});await page.screenshot({path:`artifacts/heptad-board/${width}.png`});
   console.log(`HEPTAD ${width}x${height}: 14 equal cards, 1-2-4 formation, correct turn order and no overlaps`);
  }

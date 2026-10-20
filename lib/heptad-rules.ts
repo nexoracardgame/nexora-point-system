@@ -79,11 +79,11 @@ export function completeHeptadMatchDeck(partial: HeptadDeck[], tier: HeptadTier,
 export const HEPTAD_SLOT_POSITIONS: Record<HeptadTurn, { x: number; y: number }> = {
   1: { x: 43.5, y: 0 },
   2: { x: 23, y: 35 },
-  3: { x: 12.5, y: 70 },
-  4: { x: 33.5, y: 70 },
+  3: { x: 33.5, y: 70 },
+  4: { x: 12.5, y: 70 },
   5: { x: 63, y: 35 },
-  6: { x: 74.5, y: 70 },
-  7: { x: 53.5, y: 70 },
+  6: { x: 53.5, y: 70 },
+  7: { x: 74.5, y: 70 },
 };
 
 export type HeptadBoard = Partial<Record<HeptadTurn, string>>;

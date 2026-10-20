@@ -1,7 +1,8 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const css=['components/BattleHud.css','components/HeptadArenaBoard.css','app/game/heptad/HeptadClient.css'].map(file=>fs.readFileSync(file,'utf8')).join('\n');
-const positions=[[43.5,0],[23,35],[12.5,70],[33.5,70],[63,35],[74.5,70],[53.5,70]];
+const load=require('./game-collection-test-loader.cjs')();
+const positions=Object.values(load('lib/heptad-rules.ts').HEPTAD_SLOT_POSITIONS).map(({x,y})=>[x,y]);
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{
  for(const [width,height] of [[3840,2160],[1920,1080],[1366,768],[1024,768],[844,390],[667,375]]){
   const page=await browser.newPage({viewport:{width,height}});
