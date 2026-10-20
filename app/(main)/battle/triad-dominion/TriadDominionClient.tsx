@@ -9,7 +9,6 @@ import { sendBattleRoomExit } from '@/lib/battle-room-exit';
 import BattleForfeitVictory from "@/components/BattleForfeitVictory";
 import BattleMatchResult from "@/components/BattleMatchResult";
 import BattleVersusIntro from "@/components/BattleVersusIntro";
-import BattleWaitingHeader from "@/components/BattleWaitingHeader";
 import BattleWaitingRoom from "@/components/BattleWaitingRoom";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import { normalizeBattleForfeit, type BattleForfeit } from "@/lib/battle-forfeit";
@@ -4494,8 +4493,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [heptadHandoff,setHeptadHandoff]=useState<HeptadRoom|null>(null);
   useEffect(()=>{void import('../pentad-dominion/PentadDominionClient');},[]);
   const [creatingRoom, setCreatingRoom] = useState(false);
-  const [botChanging, setBotChanging] = useState(false);
-  const botChangingRef = useRef(false);
   const creatingRoomRef = useRef(false);
   const dismissedRoomCodesRef = useRef(new Set<string>());
   useEffect(() => { router.prefetch("/game/pentad"); }, [router]);
@@ -4565,7 +4562,6 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   const [pendingTurnReadyKey, setPendingTurnReadyKey] = useState("");
   const [turnReadySubmittingKey, setTurnReadySubmittingKey] = useState("");
   const [deckReadySubmitting, setDeckReadySubmitting] = useState(false);
-  const [roomModeSubmitting, setRoomModeSubmitting] = useState<DeckMode | null>(null);
   const openingTieBreakPendingChoiceRef = useRef<TriadRpsChoice | null>(null);
   const openingTieBreakPendingKeyRef = useRef("");
   const roomPlayerSideRef = useRef<RoomPlayerSide | null>(null);
@@ -5662,22 +5658,19 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const moveToSpectator = async () => {
-    if (!currentRoom || isSpectator || currentRoom.status === "playing") return;
+    if (!currentRoom || currentRoom.status === "playing") return;
     const result = await postRoomAction({ action: "spectate", code: currentRoom.code });
     if (!result.ok) setLobbyMessage("ย้ายไปนั่งชมไม่ได้");
   };
 
   const takeFieldSlot = async (slot: "host" | "challenger") => {
-    if (!currentRoom || currentRoom.status === "playing" || currentRoom.seats[slot]) return;
+    if (!currentRoom || currentRoom.status === "playing") return;
     const result = await postRoomAction({ action: "take-slot", code: currentRoom.code, slot });
     if (!result.ok) setLobbyMessage("ลงช่องนี้ไม่ได้");
   };
 
   const toggleBotOpponent = async (side:'host'|'challenger'='challenger',enabled=!isBotParticipant(currentRoom?.seats[side])) => {
-    if (!currentRoom || !isRoomController || botChangingRef.current) return;
-    botChangingRef.current = true;
-    setBotChanging(true);
-    try {
+    if (!currentRoom || !isRoomController) return;
     const result = await postRoomAction({
       action: "set-bot",
       code: currentRoom.code,
@@ -5688,22 +5681,16 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       return;
     }
     setLobbyMessage(enabled?`เพิ่มบอทฝั่ง ${side==='host'?'A':'B'} แล้ว`:`เอาบอทฝั่ง ${side==='host'?'A':'B'} ออกแล้ว`);
-    } finally {
-      botChangingRef.current = false;
-      setBotChanging(false);
-    }
   };
 
   const changeRoomDeckMode = async (deckMode: DeckMode) => {
-    if (!currentRoom || !isRoomController || currentRoom.status !== "waiting" || currentDeckMode === deckMode) return;
-    setRoomModeSubmitting(deckMode);
+    if (!currentRoom || !isRoomController || currentRoom.status !== "waiting") return;
     setLobbyMessage("");
     const result = await postRoomAction({
       action: "set-mode",
       code: currentRoom.code,
       deckMode,
     });
-    setRoomModeSubmitting(null);
     if (!result.ok) {
       setLobbyMessage("เปลี่ยนโหมดห้องไม่สำเร็จ");
       return;
@@ -5717,7 +5704,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
   };
 
   const startRoomGame = async () => {
-    if (!currentRoom || !isRoomController || !currentRoom.seats.host || !currentRoom.seats.challenger) return;
+    if (!currentRoom || !isRoomController) return;
     if (startingRoomCodeRef.current) return;
     const code = currentRoom.code;
     const startedAsFieldPlayer = Boolean(
@@ -7461,22 +7448,10 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
       );
     }
 
-    const canStart = isRoomController && !botChanging && Boolean(currentRoom.seats.host && currentRoom.seats.challenger);
-    const currentIsSpectator = currentRoom.spectators.some((viewer) => viewer.id === participant.id);
-
     return (
       <main className="nexora-command nexora-command-room triad-room-screen">
         <NexoraCommandScene /><div className="nexora-command-shade" />
-<BattleWaitingHeader code={currentRoom.code} onExit={()=>void leaveRoom()} onStart={()=>void startRoomGame()} botBusy={botChanging} botDisabled={!isRoomController} startDisabled={!canStart} />
-
-        <div className="triad-room-notice px-4 pb-2 sm:px-6 xl:px-8">
-          <div className="rounded-2xl border border-cyan-200/14 bg-cyan-300/8 px-4 py-3 text-sm font-semibold leading-6 text-cyan-50/78">
-            เมื่อเริ่มเกม ทั้งสองฝั่งจะเข้าสู่ช่วงเลือกเด็คพร้อมกัน ผู้ชมจะเห็นตัวนับถอยหลัง 5 นาทีและชื่อของฝั่งที่กำลังจัดเด็คอย่างชัดเจน
-          </div>
-        </div>
-
-        <BattleWaitingRoom key={currentRoom.code} seats={currentRoom.seats} spectators={currentRoom.spectators} userId={participant.id} leaderId={currentRoom.hostId} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'},{id:'monster',title:'MONSTER',description:'มอนสเตอร์ล้วน'},{id:'skill',title:'SKILL',description:'10 มอนสเตอร์ + 10 สกิล'}]} mode={currentDeckMode} canChange={isRoomController} busy={Boolean(roomModeSubmitting)||botChanging} onMode={mode=>changeRoomDeckMode(mode as DeckMode)} onWatch={()=>moveToSpectator()} onTake={side=>takeFieldSlot(side)} onBot={(side,enabled)=>toggleBotOpponent(side,enabled)} />
-        <div className="nexora-command-room-chat"><BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} compact /></div>
+        <BattleWaitingRoom key={currentRoom.code} code={currentRoom.code} onExit={()=>void leaveRoom()} onStart={()=>startRoomGame()} chat={<BattleRoomChatPanel room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} compact />} seats={currentRoom.seats} spectators={currentRoom.spectators} userId={participant.id} leaderId={currentRoom.hostId} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'},{id:'monster',title:'MONSTER',description:'มอนสเตอร์ล้วน'},{id:'skill',title:'SKILL',description:'10 มอนสเตอร์ + 10 สกิล'}]} mode={currentDeckMode} canChange={isRoomController} onMode={mode=>changeRoomDeckMode(mode as DeckMode)} onWatch={()=>moveToSpectator()} onTake={side=>takeFieldSlot(side)} onBot={(side,enabled)=>toggleBotOpponent(side,enabled)} />
       </main>
     );
   }

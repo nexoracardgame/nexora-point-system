@@ -218,4 +218,5 @@ html:has(.nexora-pentad-shell),body:has(.nexora-pentad-shell) { overflow:hidden;
 @media (max-width:700px) and (orientation:landscape), (max-width:900px) and (orientation:portrait) {
   .triad-battle-chat-hud { width:min(220px,20cqw); }
 }
-.triad-battle-chat-hud-frame .triad-battle-chat-hud { bottom:max(var(--chat-hand-inset,12px),env(safe-area-inset-bottom))!important; }
+.triad-battle-chat-hud-frame .triad-battle-chat-hud { bottom:max(var(--chat-hand-inset,12px),env(safe-area-inset-bottom))!important;left:var(--chat-clear-left,0px)!important; }
+:is(.nexora-arena-header,.nexora-deck-header,.nexora-arena-scoreplate){font-family:var(--font-geist-sans),Arial,Tahoma,sans-serif}

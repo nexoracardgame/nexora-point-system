@@ -12,7 +12,6 @@ import BattleVersusIntro from "@/components/BattleVersusIntro";
 import ElementClash from "./PentadElementClash";
 import { hasPentadElementClash } from "@/lib/pentad-element-presentation";
 import { isExpiredBattleAction } from "@/lib/battle-action-status";
-import BattleWaitingHeader from "@/components/BattleWaitingHeader";
 import BattleWaitingRoom from "@/components/BattleWaitingRoom";
 import BattleConnectingScreen from "@/components/BattleConnectingScreen";
 import BattleFieldHistory from "@/components/BattleFieldHistory";
@@ -94,6 +93,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const pendingActions = useRef(new Set<string>());
   const loadGeneration = useRef(0);
   const exitedRoom = useRef(false);
   const [error, setError] = useState("");
@@ -155,8 +155,8 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     } catch (err) { if (generation === loadGeneration.current) setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); }
   };
   const act = async (action: string, extra: Record<string, unknown> = {}, background = false) => {
-    if (!background && busyRef.current) return false;
-    if (!background) { busyRef.current = true; setBusy(true); setError(""); void primeBattleAudio(); playMenuCue(); }
+    if (!background && pendingActions.current.has(action)) return false;
+    if (!background) { pendingActions.current.add(action); busyRef.current = true; setBusy(true); setError(""); void primeBattleAudio(); playMenuCue(); }
     const current = roomRef.current;
     if(action==='leave')clearPentadHandoff();
     if (["create", "join", "leave"].includes(action)) loadGeneration.current++;
@@ -179,7 +179,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       else if (data.room) accept(data.room);
       return true;
     } catch (err) { if (generation === loadGeneration.current) { setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); if (current) void load(current.code); } return false; }
-    finally { if (action === "join") setEntering(false); if (!background) { busyRef.current = false; setBusy(false); } }
+    finally { if (action === "join") setEntering(false); if (!background) { pendingActions.current.delete(action); busyRef.current = pendingActions.current.size > 0; setBusy(busyRef.current); } }
   };
   useLayoutEffect(() => {
     setMounted(true); let saved: string | null = null;
@@ -283,15 +283,15 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     } finally { leavingRoomRef.current = false; }
   };
 
+  const chat=room?<BattleArenaChat messages={room.chat.map(item=>({id:item.id,senderId:item.id.slice(0,item.id.lastIndexOf(":")),senderName:item.name,text:item.text,createdAt:item.at}))} currentUserId={userId} currentUserName={[room.seats.host,room.seats.challenger,...room.spectators].find(person=>person?.id===userId)?.name} room={{mode:"pentad",code:room.code}} draft={message} onDraftChange={setMessage} onSubmit={async()=>{const text=message;if(!text.trim())return false;setMessage("");const ok=await act("chat",{text},true);if(!ok)setMessage(current=>current||text);return ok;}}/>:null;
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><BattleArenaSurface image={room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image} className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
     <BattleVersusIntro sessionKey={room ? `pentad:${room.code}:${room.createdAt}:${room.deadline && room.phase === "deck" ? room.deadline : "match"}` : ""} enabled={Boolean(room && room.ready.host && room.ready.challenger && room.phase === "select" && room.fight === 1 && room.turn === 1)} left={room?.seats.host || {name:"PLAYER"}} right={room?.seats.challenger || {name:"PLAYER"}} background={arena.image} />
     <BattleForfeitVictory result={room?.forfeit} userId={userId} onExit={() => { void leaveRoom(); }} />
-    {room?.phase === "waiting" && <BattleWaitingHeader code={room.code} onExit={()=>void leaveRoom()} onStart={()=>void act("start")} botBusy={busy} botDisabled={(room.ownerId||room.seats.host?.id)!==userId} startDisabled={busy || (room.ownerId||room.seats.host?.id)!==userId || !room.seats.host || !room.seats.challenger} />}
     {room && room.phase !== "deck" && room.phase !== "waiting" && <BattleArenaHeader title={PENTAD_TITLE} code={room.code} time={countdown(room.deadline-now)} onExit={leaveRoom} onSurrender={side && room.phase !== "finished" ? async ()=>{if(await confirmBattleSurrender())void act("surrender");} : undefined} />}
     {room?.phase === "deck" && <DeckPreparationHeader title={PENTAD_TITLE} time={countdown(room.deadline-now)} onExit={leaveRoom} />}
     {error && <div className={styles.error} role="alert">{error}<button onClick={() => setError("")} aria-label="ปิดข้อความ"><X size={16} /></button></div>}
     {!room && error.includes("รหัสผ่าน") && <form className={styles.passwordPanel} onSubmit={event=>{event.preventDefault();void act("join",{code:initialRoomCode || new URLSearchParams(window.location.search).get("room"),password:joinPassword,spectate:initialSpectate});}}><label>รหัสผ่านห้อง<input type="password" value={joinPassword} onChange={event=>setJoinPassword(event.target.value)} maxLength={128} /></label><button className={styles.primary} disabled={busy}>เข้าห้อง</button></form>}
-    {!room ? <section className={styles.entering}>{entering && !error && <BattleConnectingScreen />}</section> : room.phase === "waiting" ? <BattleWaitingRoom key={`${room.code}:${room.epoch}`} seats={room.seats} spectators={room.spectators} userId={userId} leaderId={room.ownerId||room.seats.host?.id||''} modes={[{id:'all',title:'ALL CARDS',description:'เลือกจากการ์ดทั้งหมด'},{id:'random',title:'RANDOM POOL',description:'สุ่มพูลการ์ด'}]} mode={room.deckSource||'all'} canChange={(room.ownerId||room.seats.host?.id)===userId} busy={busy} botId="pentad-bot" onMode={deckSource=>act('mode',{deckSource})} onWatch={()=>act('watch')} onTake={seat=>act('seat',{seat})} onBot={(seat,enabled)=>act('bot',{seat,enabled})}/> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
+    {!room ? <section className={styles.entering}>{entering && !error && <BattleConnectingScreen />}</section> : room.phase === "waiting" ? <BattleWaitingRoom key={room.code} code={room.code} onExit={()=>void leaveRoom()} onStart={()=>act('start',{},true)} chat={chat} seats={room.seats} spectators={room.spectators} userId={userId} leaderId={room.ownerId||room.seats.host?.id||''} modes={[{id:'all',title:'ALL CARDS',description:'เลือกจากการ์ดทั้งหมด'},{id:'random',title:'RANDOM POOL',description:'สุ่มพูลการ์ด'}]} mode={room.deckSource||'all'} canChange={(room.ownerId||room.seats.host?.id)===userId} botId="pentad-bot" onMode={deckSource=>act('mode',{deckSource},true)} onWatch={()=>act('watch',{},true)} onTake={seat=>act('seat',{seat},true)} onBot={(seat,enabled)=>act('bot',{seat,enabled},true)}/> : room.phase === "deck" ? <DeckPreparationLayout tray={<><h2>เตรียมเด็ค <b>{total.length}/30</b></h2>
         {!side ? <h3>ผู้เล่นกำลังเตรียมเด็ค</h3> : <><div className={styles.tabs}>{(["monsters", "hand", "reserve"] as const).map(key => <button key={key} aria-pressed={group === key} onClick={() => setGroup(key)}>{key === "monsters" ? "มอนสเตอร์" : key === "hand" ? "สกิล" : "กองเสริมสกิล"}<b>{deck[key].length}/{key === "monsters" ? 5 : key === "hand" ? 15 : 10}</b></button>)}</div>
         <div className={styles.elementCounts}>{pentadElements.map(value => <span key={value}>{pentadElementNames[value]} {total.filter(no => triadCardByNo.get(no)?.element === value).length}/6</span>)}</div>
         <div className={styles.chosenCards}>{deck[group].map((no, index) => <Card key={`${no}:${index}`} no={no} badge={fixedDeck ? undefined : "−"} disabled={fixedDeck || room.ready[side] || busy} onClick={() => changeDeck({ ...deck, [group]: deck[group].filter((_, i) => i !== index) })} />)}</div>
@@ -310,7 +310,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       {room.notice && <p className={styles.notice}>{room.notice}</p>}
       {room.phase === "finished" && !room.forfeit && <BattleMatchResult key={`${room.code}:${room.createdAt}`} title={room.winner === "draw" ? "การแข่งขันสิ้นสุด" : `${room.seats[room.winner as PentadSide]?.name || "ผู้เล่น"} ชนะ`} draw={room.winner === "draw"} score={[room.score.host,room.score.challenger]} detail={room.notice} onExit={() => act("leave")} />}
     </section>}
-    {mounted && room && <BattleArenaChatFrame arenaSelector={`[data-pentad-phase="${room.phase}"] [data-pentad-chat-arena]`} cinematicActive={Boolean(presentation)} rotateBreakpoint={1000}><BattleArenaChat messages={room.chat.map(item => ({ id:item.id, senderId:item.id.slice(0,item.id.lastIndexOf(":")), senderName:item.name, text:item.text, createdAt:item.at }))} currentUserId={userId} currentUserName={[room.seats.host,room.seats.challenger,...room.spectators].find(person=>person?.id===userId)?.name} room={{mode:"pentad",code:room.code}} draft={message} onDraftChange={setMessage} onSubmit={async () => { const text=message; if (!text.trim()) return false; setMessage(""); const ok=await act("chat", {text}, true); if (!ok) setMessage(current => current || text); return ok; }} /></BattleArenaChatFrame>}
+    {mounted && room && room.phase!=='waiting' && <BattleArenaChatFrame arenaSelector={`[data-pentad-phase="${room.phase}"] [data-pentad-chat-arena]`} cinematicActive={Boolean(presentation)} rotateBreakpoint={1000}>{chat}</BattleArenaChatFrame>}
     {mounted && !presentation && room?.phase === "target" && pendingChoice && targetView && <TargetSelectionModal key={choiceKey} contextKey={choiceKey}
       skillName={triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name || pendingChoice.cardNo}
       description={pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText || ""}

@@ -1,6 +1,6 @@
 .heptad-scene { position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;overflow:hidden;color:#fff;font-family:Arial,sans-serif;isolation:isolate; }
 .heptad-scene * { box-sizing:border-box;letter-spacing:0; }
-.heptad-scene button { cursor:pointer;font:inherit; }
+.heptad-scene button { cursor:pointer; }
 .heptad-scene button[aria-disabled=true],.heptad-scene button:disabled { opacity:.45;cursor:default; }
 .heptad-scene .heptad-hand-card { position:relative;display:block;flex:none;width:76px;aspect-ratio:815/1110;min-height:0;padding:0;border:0;border-radius:4%;background:transparent; }
 .heptad-hand-card .nexora-card-art-frame { position:absolute;inset:0;display:block; }
@@ -18,10 +18,8 @@
 .heptad-search input { min-width:0;width:100%;background:transparent;border:0;color:#fff; }
 .heptad-ready { display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:12px;color:#a4e9da; }
 .heptad-field { position:absolute;inset:170px 12px 146px;min-height:0; }
-body:has(.heptad-scene) .triad-battle-chat-hud-frame:not([data-cinematic-chat=true]) .triad-battle-chat-hud { left:50%!important;bottom:calc(var(--chat-hand-inset,146px) + 12px)!important;transform:translateX(-50%);width:clamp(120px,18cqw,260px)!important;min-width:0!important; }
-body:has(.heptad-scene) .triad-battle-chat-hud-frame:not([data-cinematic-chat=true]) .triad-chat-hud-messages { max-height:64px; }
 .heptad-scene .nexora-arena-status { position:absolute;top:76px;left:50%;transform:translateX(-50%);z-index:3; }
-.heptad-scene .nexora-arena-scoreplate { top:74px!important;bottom:auto!important;max-width:35%; }
+.heptad-scene .nexora-arena-scoreplate { top:74px!important;bottom:auto!important; }
 .heptad-scene .nexora-arena-hand { position:absolute;bottom:0;left:0;right:0;max-height:136px!important; }
 .heptad-error { position:absolute;top:66px;left:20%;right:20%;z-index:2147483600;display:flex;justify-content:space-between;padding:10px 16px;background:#381719ed;border:1px solid #eb9b9b;border-radius:4px; }
 .heptad-error button { background:none;border:0;color:inherit; }
@@ -32,4 +30,4 @@ body:has(.heptad-scene) .triad-battle-chat-hud-frame:not([data-cinematic-chat=tr
 .heptad-history-toggle { position:absolute;right:16px;top:150px;z-index:4;background:#000d;border:1px solid #d5b46b;border-radius:4px;color:#e9cf90;padding:6px 10px; }
 .heptad-history { position:absolute;top:184px;right:16px;bottom:148px;z-index:12;width:min(460px,65%);overflow:auto;padding:14px;background:#000e;border:1px solid #d5b46b;border-radius:5px; }
 .heptad-history header { display:flex;justify-content:space-between;align-items:center; }.heptad-history header button { background:none;border:0;color:inherit; }.heptad-history details { border-bottom:1px solid #d5b46b33;padding:10px 0; }.heptad-history p { font-size:13px;line-height:1.5; }
-@media(max-height:600px) { .heptad-field { inset:128px 6px 96px; }.heptad-scene .nexora-arena-scoreplate { top:58px!important;max-width:32%; }.heptad-scene .nexora-arena-status { top:60px;font-size:10px; }.heptad-scene .nexora-arena-hand { max-height:90px!important; }.heptad-scene .heptad-hand-card { width:46px; }.heptad-catalog .heptad-hand-card,.heptad-chosen .heptad-hand-card { width:100%; }.heptad-catalog { grid-template-columns:repeat(auto-fill,minmax(60px,1fr)); }.heptad-history-toggle { top:112px;right:8px;font-size:10px; }.heptad-history { top:140px;bottom:96px; }.heptad-tabs button { font-size:11px;padding:4px; }.heptad-special { max-height:76%;padding:10px; }.heptad-round-summary { padding:4px 8px;font-size:11px; } }
+@media(max-height:600px) { .heptad-field { inset:128px 6px 96px; }.heptad-scene .nexora-arena-scoreplate { top:58px!important; }.heptad-scene .nexora-arena-status { top:60px;font-size:10px; }.heptad-scene .nexora-arena-hand { max-height:90px!important; }.heptad-scene .heptad-hand-card { width:46px; }.heptad-catalog .heptad-hand-card,.heptad-chosen .heptad-hand-card { width:100%; }.heptad-catalog { grid-template-columns:repeat(auto-fill,minmax(60px,1fr)); }.heptad-history-toggle { top:112px;right:8px;font-size:10px; }.heptad-history { top:140px;bottom:96px; }.heptad-tabs button { font-size:11px;padding:4px; }.heptad-special { max-height:76%;padding:10px; }.heptad-round-summary { padding:4px 8px;font-size:11px; } }
