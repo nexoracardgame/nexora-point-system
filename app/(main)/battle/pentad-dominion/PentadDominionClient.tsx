@@ -28,6 +28,7 @@ import { useBattleArenaActivity, useBattleCombatActivity } from "@/lib/battle-ui
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
 import BattleElementBoosts from '@/components/BattleElementBoosts';
+import {returnToBattleLobby} from '@/lib/battle-lobby-navigation';
 import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, PENTAD_TITLE } from "@/components/DeckPreparation";
@@ -87,7 +88,7 @@ function cinematicResult(round: PentadRound): TriadTurnResult {
   };
 }
 
-export default function PentadDominionClient({ userId, initialRoomCode = "", initialSpectate = false, initialRoom }: { userId: string; initialRoomCode?: string; initialSpectate?: boolean; initialRoom?: PentadRoom }) {
+export default function PentadDominionClient({ userId, initialRoomCode = "", initialSpectate = false, initialRoom,onExitToLobby }: { userId: string; initialRoomCode?: string; initialSpectate?: boolean; initialRoom?: PentadRoom;onExitToLobby?:()=>void }) {
   const router = useRouter();
   useEffect(()=>{router.prefetch("/game");},[router]);
   const [room, setRoom] = useState<PentadRoom | null>(initialRoom || null);
@@ -152,7 +153,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       const response = await fetch(`/api/pentad-rooms${selectedCode ? `?room=${selectedCode}` : ""}`, { cache: "no-store", signal:AbortSignal.timeout(12000) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return;
-      if (data.closed) { loadGeneration.current++;try{localStorage.removeItem("nexora:pentad:room");}catch{}router.replace("/game");return; }
+      if (data.closed) { loadGeneration.current++;clearPentadHandoff();try{localStorage.removeItem("nexora:pentad:room");}catch{}returnToBattleLobby(router,onExitToLobby);return; }
       if (!response.ok) throw new Error(data.error || "โหลดห้องไม่สำเร็จ");
       if (data.room) accept(data.room); else setRooms(data.rooms || []);
     } catch (err) { if (generation === loadGeneration.current) setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); }
@@ -170,7 +171,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       const response = await fetch("/api/pentad-rooms", { method: "POST", headers: { "Content-Type": "application/json" }, signal:AbortSignal.timeout(12000), body: JSON.stringify({ action, code: current?.code, epoch: current?.epoch, ...extra }) });
       const data = await response.json();
       if (generation !== loadGeneration.current) return false;
-      if (data.closed) { try{localStorage.removeItem("nexora:pentad:room");}catch{} router.replace("/game");return false; }
+      if (data.closed) { clearPentadHandoff();try{localStorage.removeItem("nexora:pentad:room");}catch{} returnToBattleLobby(router,onExitToLobby);return false; }
       if (isExpiredBattleAction(data)) {
         if (data.room && data.room.code === roomRef.current?.code) accept(data.room);
         else if (current?.code === roomRef.current?.code) await load(current?.code);
@@ -178,7 +179,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
       }
       if (response.status === 409 && current && roomRef.current?.code === current.code && roomRef.current.epoch !== Number(extra.epoch ?? current.epoch) && ["deck", "ready", "pick", "target"].includes(action)) return false;
       if (!response.ok) throw new Error(data.error || "คำสั่งไม่สำเร็จ");
-      if (action === "leave") { loadGeneration.current++; try { localStorage.removeItem("nexora:pentad:room"); } catch {} router.replace("/game"); }
+      if (action === "leave") { loadGeneration.current++; try { localStorage.removeItem("nexora:pentad:room"); } catch {} returnToBattleLobby(router,onExitToLobby); }
       else if (data.room) accept(data.room);
       return true;
     } catch (err) { if (generation === loadGeneration.current) { setError(err instanceof Error ? err.message : "เชื่อมต่อไม่สำเร็จ"); if (current) void load(current.code); } return false; }
@@ -281,7 +282,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     try { localStorage.removeItem('nexora:pentad:room'); } catch { /* Optional cache. */ }
     roomRef.current = null; setRoom(null); setPresentation(null); setEntering(false);
     busyRef.current = false; setBusy(false);
-    router.replace('/game');
+    returnToBattleLobby(router,onExitToLobby);
     if (current) void sendBattleRoomExit('/api/pentad-rooms', { code: current.code, epoch: current.epoch });
     } finally { leavingRoomRef.current = false; }
   };

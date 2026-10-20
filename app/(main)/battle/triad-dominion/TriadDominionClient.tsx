@@ -7326,8 +7326,15 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     phase === "lobby" &&
     Boolean(activeRoomCode || activeRoomSnapshot || activeRoomCodeRef.current || activeRoomSnapshotRef.current);
 
-  if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff}/>;
-  if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} initialRoom={heptadHandoff} spectate={false}/>;
+  const exitHandoffToLobby=()=>{
+    setPentadHandoff(null);setHeptadHandoff(null);
+    setCreateModeDialogOpen(false);setCreatingRoom(false);creatingRoomRef.current=false;
+    activeRoomCodeRef.current='';activeRoomSnapshotRef.current=null;
+    setActiveRoomCode('');setActiveRoomSnapshot(null);setPhase('lobby');
+    try{sessionStorage.removeItem('nexora:heptad:handoff');sessionStorage.removeItem('nexora:pentad:handoff');}catch{}
+  };
+  if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff} onExitToLobby={exitHandoffToLobby}/>;
+  if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} initialRoom={heptadHandoff} spectate={false} onExitToLobby={exitHandoffToLobby}/>;
   if (creatingRoom) return <BattleArenaSurface image={arena.image} className="nexora-room-create-preview">
     <div role="status" className="nexora-room-create-status">{creatingFormat.toUpperCase()} · ยืนยันห้องกับเซิร์ฟเวอร์</div>
     <BattleWaitingRoom seats={{host:participant,challenger:null}} spectators={[]} userId={participant.id} leaderId={participant.id} modes={[{id:'all',title:'ALL IN ONE',description:'มอนสเตอร์ + สกิล'}]} mode="all" canChange={false} busy onMode={()=>{}} onWatch={()=>{}} onTake={()=>{}}/>

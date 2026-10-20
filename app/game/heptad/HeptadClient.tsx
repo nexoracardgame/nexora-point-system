@@ -12,6 +12,7 @@ import { battleArenaForSeed } from '@/lib/triad-arena';
 import { useBattleArenaActivity, useBattleCombatActivity } from '@/lib/battle-ui-state';
 import { useCardGesture } from '@/lib/use-card-gesture';
 import { sendBattleRoomExit } from '@/lib/battle-room-exit';
+import {returnToBattleLobby} from '@/lib/battle-lobby-navigation';
 import { confirmBattleLeave, confirmBattleSurrender } from '@/lib/battle-surrender-dialog';
 import { getBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { BATTLE_CHAT_CHANGED } from '@/lib/battle-chat-messages';
@@ -40,7 +41,7 @@ function Card({no,onChoose,onPreview,onPreviewEnd,disabled=false}:{no:string;onC
   const card=triadCardByNo.get(no);const gesture=useCardGesture({onChoose,disabled,onPreview:()=>onPreview(no),onPreviewEnd});
   return card?<button {...gesture} type="button" className="heptad-hand-card" aria-label={card.name} aria-disabled={disabled}><BattleArenaCardFrame><img src={card.sourceImage} alt={card.name} draggable={false}/></BattleArenaCardFrame></button>:null;
 }
-export default function HeptadClient({userId,initialCode,spectate,initialRoom}:{userId:string;initialCode:string;spectate:boolean;initialRoom?:HeptadRoom}){
+export default function HeptadClient({userId,initialCode,spectate,initialRoom,onExitToLobby}:{userId:string;initialCode:string;spectate:boolean;initialRoom?:HeptadRoom;onExitToLobby?:()=>void}){
   const router=useRouter(),[room,setRoom]=useState<HeptadRoom|null>(initialRoom||null),ref=useRef(room);ref.current=room;
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),busyRef=useRef(false),pendingActions=useRef(new Set<string>()),generation=useRef(0),exited=useRef(false),leaving=useRef(false);
   const [now,setNow]=useState(Date.now()),[draft,setDraft]=useState<HeptadDeck[]>(blank),[fight,setFight]=useState(0),[group,setGroup]=useState<keyof HeptadDeck>('monsters'),[query,setQuery]=useState(''),[preview,setPreview]=useState(''),[filter,setFilter]=useState<ArenaCardFilter>('all');
@@ -93,7 +94,9 @@ export default function HeptadClient({userId,initialCode,spectate,initialRoom}:{
   const changeDeck=(value:HeptadDeck[])=>{if(!room||!side||room.ready[side])return;const errors=validateHeptadMatchDeck(value,room.tier,true);if(errors.length){setError(errors[0]);return;}setDraft(value);try{localStorage.setItem(`heptad:draft:${room.code}:${room.createdAt}:${userId}`,JSON.stringify(value));}catch{}};
   const leave=async()=>{if(leaving.current)return;leaving.current=true;
     try{const current=ref.current;if(side&&current&&!['waiting','finished'].includes(current.phase)&&!await confirmBattleLeave())return;
-      exited.current=true;generation.current++;setPresentation(null);setRoom(null);ref.current=null;try{localStorage.removeItem(`nexora:heptad:room:${userId}`);}catch{}router.replace('/game');
+      exited.current=true;generation.current++;setPresentation(null);setRoom(null);ref.current=null;
+      try{localStorage.removeItem(`nexora:heptad:room:${userId}`);sessionStorage.removeItem('nexora:heptad:handoff');}catch{}
+      returnToBattleLobby(router,onExitToLobby);
       if(current)void sendBattleRoomExit('/api/heptad-rooms',{code:current.code});
     }finally{leaving.current=false;}
   };
