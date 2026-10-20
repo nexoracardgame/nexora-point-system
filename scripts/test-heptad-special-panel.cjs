@@ -9,9 +9,9 @@ const css=['components/BattleHud.css','app/game/heptad/HeptadClient.css'].map(fi
   assert.ok(panel.x>=field.x+field.width,'Panel never covers battlefield');
   assert.ok(panel.y>=0&&panel.x+panel.width<=width&&panel.y+panel.height<=height,'Panel fits landscape viewport');
   const button=await page.locator('.heptad-primary').boundingBox();assert.ok(button.y+button.height<=panel.y+panel.height,'Pass action stays visible');
-  assert.equal(await page.locator('.heptad-special').evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0.8)');
+  assert.equal(await page.locator('.heptad-special').evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0.75)');
   assert.equal(await page.locator('.heptad-special').evaluate(node=>getComputedStyle(node,'::after').animationDuration),'5s');
   fs.mkdirSync('artifacts/heptad-special',{recursive:true});await page.screenshot({path:`artifacts/heptad-special/${width}x${height}.png`});
-  await page.close();console.log(`${width}x${height}: right panel clears field, 80% black, gold orbit and visible controls passed`);
+  await page.close();console.log(`${width}x${height}: right panel clears field, 75% black, gold orbit and visible controls passed`);
  }
 }finally{await browser.close()}})().catch(error=>{console.error(error);process.exitCode=1});

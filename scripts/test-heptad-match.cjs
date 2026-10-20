@@ -5,6 +5,17 @@ const {triadCards,triadCardByNo}=load('lib/triad-dominion.ts');
 const owner={id:'owner',name:'Owner',image:'/avatar.png'},rival={id:'rival',name:'Rival',image:'/avatar.png'};
 function room(){return store.newHeptadRoom('123456',owner,1)}
 function action(r,actor,body,now=2){store.applyHeptadAction(r,actor,{epoch:r.epoch,...body},now)}
+{
+ const r=room();r.phase='special';r.turn=2;r.decks.host[0].special=['218','219','220'];
+ assert.throws(()=>action(r,owner,{action:'special',slot:-1}));
+ assert.throws(()=>action(r,owner,{action:'special',slot:3}));
+ action(r,owner,{action:'special',slot:0});
+ assert.ok(['218','219','220'].includes(r.special.host));assert.equal(r.specialUsed.host,1);
+ assert.throws(()=>action(r,owner,{action:'special',slot:1}));
+ const legacy=room();legacy.phase='special';legacy.turn=2;legacy.decks.host[0].special=['218'];
+ action(legacy,owner,{action:'special',cardNo:'forged-card'});assert.equal(legacy.special.host,'218');
+ console.log('Hidden special draw: server pool, slot validation, one choice and legacy request safety passed');
+}
 for(const tier of ['all','bronze','silver','gold']){
  for(let n=0;n<8;n++){
   const r=room();action(r,owner,{action:'watch'});action(r,owner,{action:'mode',tier});

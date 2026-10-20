@@ -45,6 +45,10 @@
 @media(prefers-reduced-motion:reduce){.heptad-special::after{animation:none}}
 html[data-game-motion-off=true] .heptad-special::after{animation:none}
 .heptad-special-cards { display:flex;gap:8px;margin:10px 0;overflow:auto; }
+.heptad-scene .heptad-special{top:max(var(--special-safe-top,180px),180px);bottom:auto;max-height:calc(100% - max(var(--special-safe-top,180px),180px) - var(--heptad-hand-height) - 12px);background:rgb(0 0 0 / 75%);overflow:auto}
+.heptad-special .heptad-special-cards{flex:0 1 auto;overflow:auto;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-height:600px){.heptad-scene .heptad-special{top:max(var(--special-safe-top,128px),128px);max-height:calc(100% - max(var(--special-safe-top,128px),128px) - var(--heptad-hand-height) - 10px)}}
+@media(max-height:600px){.heptad-scene[data-heptad-phase=special]{--special-panel-width:min(42%,480px)}.heptad-special .heptad-special-cards{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}.heptad-special>p{font-size:10px;line-height:1.2}}
 .heptad-round-summary { position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;max-width:70%;padding:10px 16px;background:#000c;border:1px solid #dfbf77;border-radius:4px; }
 .heptad-history-toggle { position:absolute;right:16px;top:150px;z-index:4;background:#000d;border:1px solid #d5b46b;border-radius:4px;color:#e9cf90;padding:6px 10px; }
 .heptad-history { position:absolute;top:184px;right:16px;bottom:148px;z-index:12;width:min(460px,65%);overflow:auto;padding:14px;background:#000e;border:1px solid #d5b46b;border-radius:5px; }

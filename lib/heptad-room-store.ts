@@ -188,8 +188,11 @@ export function applyHeptadAction(room:HeptadRoom,actor:PentadParticipant,body:R
   }
   if(action==='special'){
     if(room.phase!=='special'||room.special[side])throw Error('ตอบรับการ์ดเสริมไปแล้ว');
-    const no=String(body.cardNo||'');if(!no){room.special[side]='__decline__';return;}
-    if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!room.decks[side][room.fight-1].special.includes(no)||room.used[side][room.fight-1].includes(no))throw Error('ใช้สิทธิ์เสริมไม่ได้');
+    if(body.slot===undefined&&!body.cardNo){room.special[side]='__decline__';return;}
+    const pool=room.decks[side][room.fight-1].special.filter(no=>!room.used[side][room.fight-1].includes(no));
+    if(!heptadCanCallSpecial(room.fight,room.turn,room.specialUsed[side])||!pool.length||body.slot!==undefined&&(!Number.isInteger(body.slot)||Number(body.slot)<0||Number(body.slot)>=pool.length))throw Error('ใช้สิทธิ์เสริมไม่ได้');
+    // Resolve the hidden draw on the server, including requests from older clients.
+    const no=pool[randomInt(pool.length)];
     room.special[side]=no;room.specialUsed[side]++;use(room,side,no);room.specialOrder.push(side);return;
   }
   if(action==='target'){
