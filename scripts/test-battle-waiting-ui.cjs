@@ -22,6 +22,10 @@ window.started=[];window.completed=[];window.releases=[];window.modeCount=Number
    await page.setViewportSize({width,height});await page.goto(`http://waiting.test/?count=${count}`);await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).waitFor({timeout:3000}).catch(async error=>{console.error(await page.locator('#root').innerHTML());throw error});
    const geometry=await page.evaluate(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom}};return {header:rect('.nexora-waiting-header'),exit:rect('[data-room-actions]>button'),actions:rect('[data-room-actions]'),seats:rect('.nsw-seats'),chat:rect('.nsw-chat'),spectators:rect('.nsw-spectators'),footer:rect('.nsw-footer'),settings:rect('.nsw-settings'),chrome:rect('.nexora-window-controls')};});
    dimensions.push(geometry);
+   const log=await page.locator('.nsw-chat .triad-chat-hud-messages').evaluate(el=>({rows:getComputedStyle(el).getPropertyValue('--waiting-chat-rows').trim(),height:el.clientHeight}));
+   const rows=width>=3000&&height>=1600?20:height>=1000?15:height>=600?10:5;
+   assert.equal(Number(log.rows),rows,'Responsive history row budget');
+   if(height>=600)assert.ok(log.height>=rows*20-1,'Large displays show the full history row budget');
    assert.ok(Math.abs(geometry.chat.bottom-(geometry.seats.bottom-1))<1,'Chat sits on the border above mode settings');
    assert.ok(Math.abs(geometry.chat.x-geometry.seats.x)<1&&geometry.chat.w<=440,'Chat stays left-aligned and compact');
    assert.ok(geometry.chat.bottom<=geometry.settings.y&&geometry.settings.bottom<=geometry.footer.y+1,'Chat is above modes; spectators stay below modes');

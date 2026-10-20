@@ -7314,7 +7314,7 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     Boolean(activeRoomCode || activeRoomSnapshot || activeRoomCodeRef.current || activeRoomSnapshotRef.current);
 
   if (pentadHandoff) return <PentadHandoffClient userId={participant.id} initialRoomCode={pentadHandoff.code} initialRoom={pentadHandoff}/>;
-  if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} spectate={false}/>;
+  if (heptadHandoff) return <HeptadHandoffClient userId={participant.id} initialCode={heptadHandoff.code} initialRoom={heptadHandoff} spectate={false}/>;
 
   if (shouldShowReconnectSplash) {
     return <BattleConnectingScreen />;

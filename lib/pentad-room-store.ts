@@ -1,4 +1,4 @@
-import { randomInt, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomInt, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma";
 import { ExpiredBattleActionError } from "./battle-action-status";
 import { hasPentadElementClash, PENTAD_ELEMENT_SCENE_MS } from "./pentad-element-presentation";
@@ -322,8 +322,7 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
   if (action === "chat") {
     const text = String(body.text || "").trim().slice(0, 240);
     if (!text) return;
-    if (room.chat.some(item => item.id.startsWith(`${actor.id}:`) && now - item.at < 600)) throw new Error("ส่งข้อความเร็วเกินไป");
-    room.chat.push({ id: `${actor.id}:${now}`, name: actor.name, text, at: now }); room.chat = room.chat.slice(-80); return;
+    room.chat.push({ id: `${actor.id}:${now}-${randomUUID()}`, name: actor.name, text, at: now }); room.chat = room.chat.slice(-80); return;
   }
   if (action === "leave") {
     if (side) {

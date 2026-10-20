@@ -39,8 +39,8 @@ function Card({no,onChoose,onPreview,onPreviewEnd,disabled=false}:{no:string;onC
   const card=triadCardByNo.get(no);const gesture=useCardGesture({onChoose,disabled,onPreview:()=>onPreview(no),onPreviewEnd});
   return card?<button {...gesture} type="button" className="heptad-hand-card" aria-label={card.name} aria-disabled={disabled}><BattleArenaCardFrame><img src={card.sourceImage} alt={card.name} draggable={false}/></BattleArenaCardFrame></button>:null;
 }
-export default function HeptadClient({userId,initialCode,spectate}:{userId:string;initialCode:string;spectate:boolean}){
-  const router=useRouter(),[room,setRoom]=useState<HeptadRoom|null>(null),ref=useRef(room);ref.current=room;
+export default function HeptadClient({userId,initialCode,spectate,initialRoom}:{userId:string;initialCode:string;spectate:boolean;initialRoom?:HeptadRoom}){
+  const router=useRouter(),[room,setRoom]=useState<HeptadRoom|null>(initialRoom||null),ref=useRef(room);ref.current=room;
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),busyRef=useRef(false),pendingActions=useRef(new Set<string>()),generation=useRef(0),exited=useRef(false),leaving=useRef(false);
   const [now,setNow]=useState(Date.now()),[draft,setDraft]=useState<HeptadDeck[]>(blank),[fight,setFight]=useState(0),[group,setGroup]=useState<keyof HeptadDeck>('monsters'),[query,setQuery]=useState(''),[preview,setPreview]=useState(''),[filter,setFilter]=useState<ArenaCardFilter>('all');
   const [password,setPassword]=useState(''),[message,setMessage]=useState(''),[target,setTarget]=useState(''),[presentation,setPresentation]=useState<{round:HeptadRound;seats:HeptadRoom['lobby']['seats']}|null>(null),[elementDone,setElementDone]=useState(0),[history,setHistory]=useState(false),[pendingPick,setPendingPick]=useState<{epoch:number;cardNo:string}|null>(null);
@@ -75,8 +75,9 @@ export default function HeptadClient({userId,initialCode,spectate}:{userId:strin
   };
   useLayoutEffect(()=>{
     if(mounted.current)return;mounted.current=true;router.prefetch('/game');
-    let transferred:HeptadRoom|null=null;try{const saved=JSON.parse(sessionStorage.getItem('nexora:heptad:handoff')||'null');sessionStorage.removeItem('nexora:heptad:handoff');if(saved?.userId===userId&&saved.room?.code===initialCode&&Date.now()-saved.at<15000)transferred=saved.room;}catch{}
-    if(transferred){accept(transferred);void load(transferred.code);}else if(/^\d{6}$/.test(initialCode))void act('join',{spectate});else router.replace('/game');
+    const code=initialCode||new URLSearchParams(location.search).get('room')||'';
+    let transferred:HeptadRoom|null=ref.current;try{const saved=JSON.parse(sessionStorage.getItem('nexora:heptad:handoff')||'null');if(saved?.userId===userId&&saved.room?.code===code&&Date.now()-saved.at>=0&&Date.now()-saved.at<60000)transferred=saved.room;}catch{}
+    if(transferred){accept(transferred);void load(transferred.code);}else if(/^\d{6}$/.test(code))void act('join',{code,spectate});else setError('ไม่พบหมายเลขห้อง กรุณาเข้าห้องจากหน้า PLAY');
   },[]);
   useEffect(()=>{const clock=setInterval(()=>setNow(Date.now()),200);return()=>clearInterval(clock);},[]);
   useEffect(()=>{

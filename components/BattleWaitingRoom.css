@@ -11,7 +11,7 @@
 .nsw-chat-row{display:flex;align-items:flex-end;align-self:end;grid-column:1/-1;grid-row:2;min-width:0;padding-top:4px}
 .nsw-chat{position:relative;min-width:0;width:clamp(180px,28%,440px);max-width:100%;color:#fff}
 .nsw-chat .triad-battle-chat-hud{position:relative!important;inset:auto!important;width:100%!important;min-width:0!important;max-width:100%!important;transform:none!important;margin:0!important;box-sizing:border-box}
-.nsw-chat .triad-chat-hud-messages{max-height:52px;overflow:auto}
+.nsw-chat .triad-chat-hud-messages{--waiting-chat-rows:5;line-height:20px;max-height:min(calc(var(--waiting-chat-rows)*20px),max(24px,calc(100dvh - 310px)));overflow:auto;overflow-wrap:anywhere;scrollbar-width:thin}
 .nsw-chat .triad-battle-chat-hud input{min-width:0;width:100%;border:0;background:transparent;color:inherit;font:400 14px/1.4 Arial,Tahoma,sans-serif}
 .nsw-chat .triad-battle-chat-hud form{display:flex;align-items:center;gap:8px}
 .nsw-chat .triad-battle-chat-hud form>svg,.nsw-chat .triad-battle-chat-hud form>button{flex:none}
@@ -22,3 +22,7 @@
 @media(max-height:600px){.nexora-shared-waiting .nsw-settings{margin-inline:4%}.nexora-shared-waiting .nsw-person>strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
 @media(max-height:600px){.nsw-person{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:auto auto auto;align-content:center;justify-content:normal;column-gap:8px;row-gap:2px;width:min(100%,240px);align-self:center}.nsw-avatar{grid-column:1;grid-row:1/3;width:36px;height:36px}.nsw-avatar svg{width:16px;height:16px;padding:2px}.nsw-person>strong{grid-column:2;grid-row:1;text-align:left;font-size:13px;line-height:1.2}.nsw-person>span{grid-column:2;grid-row:2;font-size:9px;line-height:1.2}.nsw-seat-actions{grid-column:1/-1;grid-row:3}.nsw-person:not(:has(>.nsw-avatar))>strong{grid-column:1/-1;text-align:center}.nsw-modes button small{line-height:1.3}.nsw-person>strong,.nsw-person>span{min-width:0}}
 @media(max-height:360px){.nsw-person{grid-template-columns:32px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:5px;width:100%}.nsw-avatar{width:32px;height:32px}.nsw-person>.nsw-seat-actions{grid-column:3;grid-row:1/3}.nsw-person:not(:has(>.nsw-avatar))>strong{grid-column:1/3;grid-row:1/3}.nexora-shared-waiting .nsw-seat-actions button{font-size:9px;padding-inline:5px}}
+@media(min-height:600px){.nsw-chat .triad-chat-hud-messages{--waiting-chat-rows:10}}
+@media(min-height:1000px){.nsw-chat .triad-chat-hud-messages{--waiting-chat-rows:15}}
+@media(min-width:3000px) and (min-height:1600px){.nsw-chat .triad-chat-hud-messages{--waiting-chat-rows:20}}
+@media(max-height:600px){.nsw-chat .triad-chat-hud-messages{max-height:min(calc(var(--waiting-chat-rows)*20px),max(24px,calc(100dvh - 310px)))}}
