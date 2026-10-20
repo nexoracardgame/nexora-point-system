@@ -1,0 +1,10 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('typescript');const m={exports:{}};
+new Function('require','module','exports',ts.transpileModule(fs.readFileSync('app/(main)/battle/triad-dominion/BattleCinematic.tsx','utf8'),{compilerOptions:{module:1,target:9,jsx:4}}).outputText)(id=>id==='@/lib/triad-dominion'?{triadSkillRuleByNo:new Map()}: {},m,m.exports);
+const r={powerBefore:{player:8000,opponent:9000},playerTotal:12000,opponentTotal:6000};
+const steps=[{kind:'intro'},{kind:'skill',powerAfter:{player:12000,opponent:9000}},{kind:'skill',powerAfter:{player:12000,opponent:6000}},{kind:'strike',side:'player',value:12000}];
+assert.deepEqual(m.exports.battleHpAtStep(r,steps,0,false),r.powerBefore,'Intro must not reveal final totals');
+assert.deepEqual(m.exports.battleHpAtStep(r,steps,1,false),r.powerBefore,'Power stays unchanged before skill impact');
+assert.deepEqual(m.exports.battleHpAtStep(r,steps,1,true),{player:12000,opponent:9000});
+assert.deepEqual(m.exports.battleHpAtStep(r,steps,2,true),{player:12000,opponent:6000});
+assert.deepEqual(m.exports.battleHpAtStep(r,steps,3,true),{player:12000,opponent:-6000});
+console.log('No final totals before skills; authoritative buff/debuff snapshots and strike impact reveal passed');

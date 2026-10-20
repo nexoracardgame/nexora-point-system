@@ -5,6 +5,7 @@ import { FastForward, Shield, Sparkles, Swords, Volume2, VolumeX, Trophy, ArrowD
 import { createPortal } from "react-dom";
 import BattleParticles from "./BattleParticles";
 import BattleDepthFX from "@/components/BattleDepthFX";
+import {ElementBoostCard} from '@/components/BattleElementBoosts';
 import { battleAudioReady, playBattleSequence, primeBattleAudio } from "./BattleAudio";
 import { BATTLE_CONTACT_MS, BATTLE_MOTION_MS, battleStepDuration } from "./BattleTiming";
 import { triadSkillRuleByNo, type TriadCard, type TriadTurnResult } from "@/lib/triad-dominion";
@@ -12,7 +13,7 @@ import styles from "./BattleCinematic.module.css";
 import type { TriadArena } from "@/lib/triad-arena";
 
 type Side = "player" | "opponent";
-type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; recipient?: Side | "both"; supportTransfer?: boolean; secondaryTarget?: boolean; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
+type Step = { side: Side; cardNo: string; kind: "intro" | "skill" | "strike" | "result"; summary: string; powerAfter?:{player:number;opponent:number}; blocked?: boolean; inactive?: boolean; field?: boolean; value?: number; recipient?: Side | "both"; supportTransfer?: boolean; secondaryTarget?: boolean; effect?: "buff" | "debuff" | "shift" | "transform" | "swap" };
 
 export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard, opponentCard?: TriadCard, playerMainCard?: TriadCard, opponentMainCard?: TriadCard): Step[] {
   const skills: Step[] = result.skillEvents.filter(event=>{
@@ -29,6 +30,7 @@ export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard
     const recipient = event.targetLabel?.includes("ตรงข้าม") ? other : /ผู้ใช้|ฝ่ายเรา/.test(event.targetLabel || "") ? event.side : rule?.target === "all" ? "both" : rule?.target.startsWith("opponent") ? other : event.side;
     return {
     side: event.side, cardNo: event.cardNo, kind: "skill", summary: event.summary,
+    powerAfter:event.powerAfter,
     blocked: Boolean(inactive || event.blocked || event.type === "skill-cancel" || event.type === "block-stat-gain"),
     inactive,
     recipient,
@@ -59,10 +61,12 @@ export function buildBattleSteps(result: TriadTurnResult, playerCard?: TriadCard
 }
 
 export function battleHpAtStep(result: TriadTurnResult, steps: Step[], index: number, hit: boolean) {
-  const hp = { player: Math.max(0, result.playerTotal), opponent: Math.max(0, result.opponentTotal) };
+  const hp = {...(result.powerBefore||{player:Math.max(0,result.playerTotal),opponent:Math.max(0,result.opponentTotal)})};
   for (let i = 0; i <= index && i < steps.length; i++) {
     const step = steps[i];
+    if(step.kind==='skill'&&step.powerAfter&&(i<index||hit))Object.assign(hp,step.powerAfter);
     if (step.kind !== "strike" || (i === index && !hit)) continue;
+    if(!steps.slice(0,i).some(s=>s.kind==='strike')){hp.player=Math.max(0,result.playerTotal);hp.opponent=Math.max(0,result.opponentTotal);}
     hp[step.side === "player" ? "opponent" : "player"] -= step.value || 0;
   }
   return hp;
@@ -95,7 +99,7 @@ function HpMeter({ side, name, initial, value, reduced }: { side: Side; name: st
   }, [value, reduced]);
   const percent = initial > 0 ? Math.max(0, Math.min(100, value / initial * 100)) : 0;
   return <div className={`${styles.hpMeter} ${side === "player" ? styles.playerHp : styles.opponentHp}`} data-hp-side={side} data-hp-value={value}>
-    <div className={styles.hpTitle}><span>{name}</span><small>พลังโจมตี {initial.toLocaleString()}</small></div>
+    <div className={styles.hpTitle}><span>{name}</span><small>พลังเริ่มต้น {initial.toLocaleString()}</small></div>
     <div className={styles.hpTrack} role="progressbar" aria-label={`HP ${name}`} aria-valuemin={0} aria-valuemax={Math.max(1, initial)} aria-valuenow={Math.max(0, value)} aria-valuetext={`${value.toLocaleString()} / ${initial.toLocaleString()}`}>
       <div className={styles.hpTrail} style={{ width: `${percent}%` }} />
       <div className={styles.hpFill} style={{ width: `${percent}%` }} />
@@ -173,7 +177,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
     arenaRef.current?.getAnimations({ subtree: true }).forEach(animation => { animation.currentTime = 0; });
   }, [index, mounted]);
   useEffect(() => {
-    if (step.kind !== "strike") return;
+    if (step.kind !== "strike"&&step.kind!=="skill") return;
     const timer = window.setTimeout(() => setImpactedIndex(index), reduced ? 250 : BATTLE_CONTACT_MS);
     return () => window.clearTimeout(timer);
   }, [index, step.kind, reduced]);
@@ -204,7 +208,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
       {arena ? <div className={styles.environment}><img src={arena.image} alt="" draggable={false} /><div /></div> : null}
       <div className={styles.toolbar} data-battle-cinematic-actions>
         <button type="button" onClick={toggleSound} title={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-label={muted || !soundReady ? "เปิดเสียงการต่อสู้" : "ปิดเสียงการต่อสู้"} aria-pressed={!muted && soundReady}>{muted || !soundReady ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>
-        <button type="button" onClick={finish} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
+        <button type="button" onClick={()=>{window.dispatchEvent(new CustomEvent('nexora:round-skipped',{detail:{winner:result.winner,player:playerName,opponent:opponentName,a:result.playerTotal,b:result.opponentTotal}}));finish()}} title="ข้ามอนิเมชั่น" aria-label="ข้ามอนิเมชั่น"><FastForward size={19} /></button>
       </div>
       <div className={styles.heading} aria-live="polite">
         <span>{arena ? `${arena.name} · ` : ""}{final ? "ผลการปะทะ" : intro ? "เตรียมปะทะ" : `${index} / ${steps.length - 2}`}</span>
@@ -212,8 +216,8 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
         {!final && !intro && attacker ? <small>No.{attacker.cardNo} · {attacker.name}</small> : <small>{result.metric === "total" ? "ATK + SUP" : result.metric === "attack" ? "ATK" : "SUP"}</small>}
       </div>
       <div className={styles.hpRow}>
-        <HpMeter side="player" name={playerName} initial={Math.max(0, result.playerTotal)} value={hp.player} reduced={reduced} />
-        <HpMeter side="opponent" name={opponentName} initial={Math.max(0, result.opponentTotal)} value={hp.opponent} reduced={reduced} />
+        <HpMeter side="player" name={playerName} initial={Math.max(0, result.powerBefore?.player??result.playerTotal)} value={hp.player} reduced={reduced} />
+        <HpMeter side="opponent" name={opponentName} initial={Math.max(0, result.powerBefore?.opponent??result.opponentTotal)} value={hp.opponent} reduced={reduced} />
       </div>
       <div ref={arenaRef} className={`${styles.arena} ${step.kind === "strike" ? styles.strike : step.kind === "skill" ? styles.cast : ""} ${step.side === "opponent" ? styles.fromOpponent : styles.fromPlayer} ${step.blocked ? styles.blocked : ""} ${step.field ? styles.field : ""} ${final ? styles.final : ""}`}>
         {!final&&!intro&&!step.blocked&&<BattleDepthFX key={`depth-${index}`} color={color} skill={step.kind==='skill'} reduced={reduced}/>}
@@ -230,6 +234,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
               {card ? <img src={card.sourceImage} alt={card.name} draggable={false} /> : <Swords size={40} />}
             </div>
             {(power || (receiving && step.effect !== "debuff" && step.effect !== "swap")) && !final ? <div className={styles.weaponAura} aria-hidden="true"><Swords size={36} strokeWidth={1.5} /></div> : null}
+            {result.elementalBoost?.[side]&&<div className={styles.elementBoost}><ElementBoostCard no={result.elementalBoost[side]!} used={final}/></div>}
           </div>;
         })}
         {step.kind === "skill" && attacker ? <div key={index} data-skill-transfer data-support-transfer={Boolean(step.supportTransfer)} data-recipient={step.recipient} className={`${styles.skillTransfer} ${step.side === "player" ? styles.skillPlayer : styles.skillOpponent} ${step.blocked ? styles.skillBlocked : ""}`}>
@@ -261,7 +266,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
           <div className={styles.scores}><strong>{result.playerTotal.toLocaleString()}</strong><span>VS</span><strong>{result.opponentTotal.toLocaleString()}</strong></div>
         </> : null}
       </div>
-      <div className={styles.caption}>{step.summary || (final ? `${result.decisionReason || (result.metric === "total" ? "ATK + SUP" : result.metric === "attack" ? "ATK" : "SUP")} · ${result.playerTotal.toLocaleString()} : ${result.opponentTotal.toLocaleString()}${result.pointScore ? ` · คะแนนสะสม ${result.pointScore.player} : ${result.pointScore.opponent}` : ""}` : intro ? `${playerName} ${Math.max(0, result.playerTotal).toLocaleString()} · ${opponentName} ${Math.max(0, result.opponentTotal).toLocaleString()}` : step.kind === "strike" ? `${actorName} โจมตี ${step.value?.toLocaleString()} → ${step.side === "player" ? opponentName : playerName} HP ${(step.side === "player" ? hp.opponent : hp.player).toLocaleString()}` : "เปิดใช้ผลสกิล")}</div>
+      <div className={styles.caption}>{step.summary || (final ? `${result.decisionReason || (result.metric === "total" ? "ATK + SUP" : result.metric === "attack" ? "ATK" : "SUP")} · ${result.playerTotal.toLocaleString()} : ${result.opponentTotal.toLocaleString()}${result.pointScore ? ` · คะแนนสะสม ${result.pointScore.player} : ${result.pointScore.opponent}` : ""}` : intro ? `${playerName} ปะทะ ${opponentName} · รอผลการใช้การ์ดตามลำดับ` : step.kind === "strike" ? `${actorName} โจมตี ${step.value?.toLocaleString()} → ${step.side === "player" ? opponentName : playerName} HP ${(step.side === "player" ? hp.opponent : hp.player).toLocaleString()}` : "เปิดใช้ผลสกิล")}</div>
       <div className={styles.progress}>{steps.map((_, i) => <i key={i} className={i <= index ? styles.passed : ""} />)}</div>
     </div>,
     document.body

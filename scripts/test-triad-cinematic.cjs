@@ -11,6 +11,7 @@ const reactDir = path.dirname(require.resolve('react'));
 const domDir = path.dirname(require.resolve('react-dom'));
 const schedulerDir = path.dirname(require.resolve('scheduler'));
 const modules = {
+  '@/components/BattleElementBoosts': 'exports.ElementBoostCard=()=>null;',
   '@/components/BattleDepthFX': 'exports.__esModule=true;exports.default=()=>null;',
   './game-settings': 'exports.gameVolume=()=>1;',
   '@/lib/game-settings': 'exports.gameVolume=()=>1;',

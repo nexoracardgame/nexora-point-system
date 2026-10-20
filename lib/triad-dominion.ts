@@ -117,6 +117,8 @@ export type TriadTurnInput = {
 };
 
 export type TriadTurnResult = {
+  powerBefore?: {player:number;opponent:number};
+  elementalBoost?: Partial<Record<"player"|"opponent",string>>;
   cinematicSupport?: Partial<Record<"player" | "opponent", string>>;
   pointsAwarded?: number;
   decisionReason?: string;
@@ -139,6 +141,7 @@ export type TriadTurnResult = {
 };
 
 export type TriadSkillEvent = {
+  powerAfter?: {player:number;opponent:number};
   cardNo: string;
   name: string;
   side: "player" | "opponent";
@@ -2833,10 +2836,19 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
     swap();
     try { return applySideWithEnergyReversalAtTarget(side); } finally { swap(); }
   };
+  const powerBefore={player:baseScore(input.player,input.turn,[],input.includeOtherMonster).total+(input.scoreAdjustments?.player||0),opponent:baseScore(input.opponent,input.turn,[],input.includeOtherMonster).total+(input.scoreAdjustments?.opponent||0)};
+  const preEvent=preScore.events.at(-1)||statUseBlocks.events.at(-1);
+  if(preEvent)preEvent.powerAfter={player:playerScore.total,opponent:opponentScore.total};
+  const applyWithSnapshot=(side:"player"|"opponent")=>{
+    const applied=applySideWithEnergyReversal(side);
+    const last=applied.events.at(-1);
+    if(last)last.powerAfter={player:playerScore.total,opponent:opponentScore.total};
+    return applied;
+  };
   const orderedApplied =
     prioritySide === "player"
-      ? [applySideWithEnergyReversal("player"), applySideWithEnergyReversal("opponent")]
-      : [applySideWithEnergyReversal("opponent"), applySideWithEnergyReversal("player")];
+      ? [applyWithSnapshot("player"), applyWithSnapshot("opponent")]
+      : [applyWithSnapshot("opponent"), applyWithSnapshot("player")];
   for (const blocker of statGainBlockers) {
     if (!blocker.rule.blockedUseMetric && !["255", "226", "227"].includes(blocker.rule.cardNo)) continue;
     const score = blocker.targetSide === "player" ? playerScore : opponentScore;
@@ -2849,9 +2861,12 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   }
   const playerTotal = playerScore.total;
   const opponentTotal = opponentScore.total;
+  const finalEvent=orderedApplied.flatMap(item=>item.events).at(-1)||preEvent;
+  if(finalEvent)finalEvent.powerAfter={player:playerTotal,opponent:opponentTotal};
 
   return {
     turn: input.turn,
+    powerBefore,
     prioritySide,
     metric: playerScore.metric,
     playerTotal,

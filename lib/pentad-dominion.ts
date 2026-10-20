@@ -94,6 +94,7 @@ export function completePentadDeck(partial: PentadDeck, random: () => number = M
 }
 
 export type PentadResolution = {
+  powerBefore?: TriadTurnResult['powerBefore'];
   winner: PentadSide | "draw";
   reason: string;
   attack: Record<PentadSide, number>;
@@ -155,10 +156,12 @@ export function resolvePentadTurn(input: {
   const totals = metric === "total" ? { host: attack.host + support.host, challenger: attack.challenger + support.challenger } : metric === "attack" ? attack : support;
   const winner = input.turn === 1 ? comparePentadPower(attack, support, input.finalDuel) : totals.host === totals.challenger ? "draw" : totals.host > totals.challenger ? "host" : "challenger";
   const metricEvents = [
-    ...(atk?.skillEvents || []).filter(event => metric !== "total" || triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(2) !== false),
-    ...(sup?.skillEvents || []).filter(event => metric !== "total" || triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(3) !== false),
+    ...(atk?.skillEvents || []).filter(event => metric !== "total" || triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(2) !== false).map(event=>({...event,powerAfter:event.powerAfter&&{player:event.powerAfter.player+(metric==='total'?basic.support.host:0),opponent:event.powerAfter.opponent+(metric==='total'?basic.support.challenger:0)}})),
+    ...(sup?.skillEvents || []).filter(event => metric !== "total" || triadSkillRuleByNo.get(event.cardNo)?.allowedTurns.includes(3) !== false).map(event=>({...event,powerAfter:event.powerAfter&&{player:event.powerAfter.player+(metric==='total'?attack.host:0),opponent:event.powerAfter.opponent+(metric==='total'?attack.challenger:0)}})),
   ];
   const events = metricEvents.filter((event, index, all) => all.findIndex(other => other.side === event.side && other.cardNo === event.cardNo && other.summary === event.summary) === index);
+  if(events.length)events[events.length-1].powerAfter={player:totals.host,opponent:totals.challenger};
+  const powerBefore={player:metric==='total'?host.attack+host.support:host[metric],opponent:metric==='total'?challenger.attack+challenger.support:challenger[metric]};
   const effective = atk || sup;
   const stages: NonNullable<PentadResolution["stages"]> = [];
   if (input.turn === 1 && !input.finalDuel) {
@@ -176,5 +179,5 @@ export function resolvePentadTurn(input: {
     if (winner === "draw") stages.push({ title: "เสมอทุกค่า", detail: "ทิ้งมอนสเตอร์ทั้งสองฝ่าย เลือกตัวใหม่ ไม่มีเป่ายิงฉุบ" });
   }
   const reason = metric === "total" ? totals.host !== totals.challenger || input.finalDuel ? "พลังรวม ATK + SUP" : attack.host !== attack.challenger ? "ATK + SUP เท่ากัน ตัดสินด้วย ATK" : support.host !== support.challenger ? "ATK เท่ากัน ตัดสินด้วย SUP" : "ATK และ SUP เท่ากัน ต้องเลือกมอนสเตอร์ใหม่" : metric === "attack" ? "พลัง ATTACK" : "พลัง SUPPORT";
-  return { winner, stages, reason, attack, support, totals, events, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
+  return { winner, stages, reason, attack, support, totals, events, powerBefore, effective: { host: effective?.effectivePlayer.top || host.cardNo, challenger: effective?.effectiveOpponent.top || challenger.cardNo } };
 }

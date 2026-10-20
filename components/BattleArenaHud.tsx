@@ -1,5 +1,7 @@
 import type { ReactNode, HTMLAttributes } from "react";
 import './BattleCardGeometry.css';
+import BattleSkipSummary from './BattleSkipSummary';
+import './BattleElementBoosts.css';
 import {PREPARATION_WALLPAPER_POSTER} from '@/lib/home-wallpaper';
 import BattlePlayerProfile,{type BattlePlayerIdentity,type BattlePlayerRank} from './BattlePlayerProfile';
 
@@ -7,7 +9,7 @@ export function BattleArenaSurface({ image, children, className = "", style, ...
   const phase=(props as Record<string,unknown>)['data-heptad-phase']||(props as Record<string,unknown>)['data-pentad-phase'];
   const preparation=phase==='waiting'||phase==='entering'||className.includes('nexora-room-create-preview');
   const background=preparation?PREPARATION_WALLPAPER_POSTER:image;
-  return <main {...props} className={`nexora-arena-surface ${className}`} style={{...style,backgroundImage:`linear-gradient(#05070865,#05070865),url('${background}')`,backgroundPosition:"center",backgroundSize:"cover"}}>{children}</main>;
+  return <main {...props} className={`nexora-arena-surface ${className}`} style={{...style,backgroundImage:`linear-gradient(#05070865,#05070865),url('${background}')`,backgroundPosition:"center",backgroundSize:"cover"}}>{children}<BattleSkipSummary/></main>;
 }
 
 export function BattleArenaCardFrame({ children }: { children: ReactNode }) {

@@ -4,6 +4,7 @@ import { heptadTurnCards, type HeptadBoard, type HeptadTurn } from './heptad-rul
 
 export type HeptadCast = { side: PentadSide; cardNo: string; target?: string; copied?: string; kind?: 'normal' | 'special' | 'boost' };
 export type HeptadResult = {
+  powerBefore?: TriadTurnResult['powerBefore'];
   winner: PentadSide | 'draw'; totals: Record<PentadSide, number>;
   attack: Record<PentadSide, number>; support: Record<PentadSide, number>;
   reason: string; events: TriadTurnResult['skillEvents'];
@@ -56,11 +57,13 @@ export function resolveHeptadClash(input: {
         effective.host=result.effectivePlayer.top;effective.challenger=result.effectiveOpponent.top;
       }
       adjustments={player:totals.host-basic('host',stat),opponent:totals.challenger-basic('challenger',stat)};
-      events.push(...result.skillEvents);
+      const offset=metric==='combined'?(stat==='attack'?{host:basic('host','support'),challenger:basic('challenger','support')}:attack):{host:0,challenger:0};
+      events.push(...result.skillEvents.map(event=>({...event,powerAfter:event.powerAfter&&{player:event.powerAfter.player+offset.host,opponent:event.powerAfter.opponent+offset.challenger}})));
     }
     if(stat==='attack')Object.assign(attack,totals);else Object.assign(support,totals);
   }
   const totals=metric==='combined'?{host:attack.host+support.host,challenger:attack.challenger+support.challenger}:metric==='attack'?{...attack}:{...support};
   const winner=totals.host!==totals.challenger?(totals.host>totals.challenger?'host':'challenger'):elementClash?comparePentadPower(attack,support):'draw';
+  if(events.length)events[events.length-1].powerAfter={player:totals.host,opponent:totals.challenger};
   return {winner,totals,attack,support,effective,elementClash,reason:input.finalDuel?'ตัดสินด้วย ATK + SUP':metric==='combined'?'พลังรวม ATK + SUP':metric==='attack'?'ATTACK หลัก + รอง + สกิลตานี้':'SUPPORT หลัก + รอง + สกิลตานี้',events:events.filter((event,i,all)=>all.findIndex(other=>other.side===event.side&&other.cardNo===event.cardNo&&other.summary===event.summary)===i)};
 }

@@ -27,6 +27,7 @@ import { getBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { useBattleArenaActivity, useBattleCombatActivity } from "@/lib/battle-ui-state";
 import BattleArenaChat, { BattleArenaChatFrame } from "@/components/BattleArenaChat";
 import { BATTLE_CHAT_CHANGED } from "@/lib/battle-chat-messages";
+import BattleElementBoosts from '@/components/BattleElementBoosts';
 import { useBattleLoadingStage } from "@/components/BattleLoadingScreen";
 import { BattleArenaHeader, BattleArenaHand, BattleArenaFormation, BattleArenaStatus, type ArenaCardFilter } from "@/components/BattleArenaControls";
 import { DeckPreparationHeader, DeckPreparationLayout, DeckPreparationTools, PENTAD_TITLE } from "@/components/DeckPreparation";
@@ -74,6 +75,8 @@ function cinematicResult(round: PentadRound): TriadTurnResult {
     ...(combined ? { skillEligibilityTurn: "combined" as const } : {}),
     prioritySide: round.opener === "host" ? "player" : "opponent", metric: combined ? "total" : round.turn < 4 ? "attack" : "support",
     playerTotal: round.totals.host, opponentTotal: round.totals.challenger,
+    powerBefore:round.powerBefore,
+    elementalBoost:round.turn===1&&!round.finalDuel?{player:round.skills.host,opponent:round.skills.challenger}:undefined,
     pointsAwarded: round.finalDuel || round.winner === "draw" ? 0 : 1,
     decisionReason: round.reason,
     pointScore: round.scoreAfter ? { player: round.scoreAfter.host, opponent: round.scoreAfter.challenger } : undefined,
@@ -285,6 +288,7 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
 
   const chat=room?<BattleArenaChat messages={room.chat.map(item=>({id:item.id,senderId:item.id.slice(0,item.id.lastIndexOf(":")),senderName:item.name,text:item.text,createdAt:item.at}))} currentUserId={userId} currentUserName={[room.seats.host,room.seats.challenger,...room.spectators].find(person=>person?.id===userId)?.name} room={{mode:"pentad",code:room.code}} draft={message} onDraftChange={setMessage} onSubmit={async()=>{const text=message;if(!text.trim())return false;setMessage("");const ok=await act("chat",{text},true);if(!ok)setMessage(current=>current||text);return ok;}}/>:null;
   return <PentadCardPreview contextKey={`${room?.code || "lobby"}:${room?.epoch || 0}:${room?.phase || "lobby"}`}><BattleArenaSurface image={room?.phase === "waiting" || room?.phase === "deck" || !room ? "/images/triad/nexora-command-original.webp" : arena.image} className={styles.shell} style={panelStyle} data-pentad-phase={room?.phase || "lobby"}>
+    {room&&!presentation&&!['waiting','deck'].includes(room.phase)&&<BattleElementBoosts mode="pentad" boosts={room.turn===1?room.boost:room.rounds.find(r=>r.fight===room.fight&&r.turn===1&&!r.finalDuel)?.skills||{}} used={room.turn>1||room.phase==='result'||room.phase==='finished'}/>}
     <BattleVersusIntro sessionKey={room ? `pentad:${room.code}:${room.createdAt}:${room.deadline && room.phase === "deck" ? room.deadline : "match"}` : ""} enabled={Boolean(room && room.ready.host && room.ready.challenger && room.phase === "select" && room.fight === 1 && room.turn === 1)} left={room?.seats.host || {name:"PLAYER"}} right={room?.seats.challenger || {name:"PLAYER"}} background={arena.image} />
     <BattleForfeitVictory result={room?.forfeit} userId={userId} onExit={() => { void leaveRoom(); }} />
     {room && room.phase !== "deck" && room.phase !== "waiting" && <BattleArenaHeader title={PENTAD_TITLE} code={room.code} time={countdown(room.deadline-now)} onExit={leaveRoom} onSurrender={side && room.phase !== "finished" ? async ()=>{if(await confirmBattleSurrender())void act("surrender");} : undefined} />}

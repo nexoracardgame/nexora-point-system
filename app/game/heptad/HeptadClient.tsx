@@ -15,6 +15,7 @@ import { sendBattleRoomExit } from '@/lib/battle-room-exit';
 import { confirmBattleLeave, confirmBattleSurrender } from '@/lib/battle-surrender-dialog';
 import { getBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { BATTLE_CHAT_CHANGED } from '@/lib/battle-chat-messages';
+import BattleElementBoosts from '@/components/BattleElementBoosts';
 import HeptadWaitingRoom from '@/components/HeptadWaitingRoom';
 import HeptadArenaBoard from '@/components/HeptadArenaBoard';
 import { BattleArenaHeader, BattleArenaStatus, BattleArenaHand, type ArenaCardFilter } from '@/components/BattleArenaControls';
@@ -119,7 +120,15 @@ export default function HeptadClient({userId,initialCode,spectate,initialRoom}:{
     const branch=presentation.round.turn<=4?2:5;
     cinematic.cinematicSupport={player:presentation.round.board.host[branch],opponent:presentation.round.board.challenger[branch]};
   }
+  if(cinematic&&presentation){
+    const r=presentation.round;
+    const before=(side:PentadSide)=>[r.board[side][1],r.turn>1?r.board[side][r.turn<=4?2:5]:''].reduce((sum,no)=>{const card=triadCardByNo.get(no||'');return sum+(card?(r.turn===1?card.attack+card.support:r.turn<=4?card.attack:card.support):0)},0);
+    cinematic.powerBefore={player:before('host'),opponent:before('challenger')};
+    cinematic.elementalBoost={player:r.casts.find(c=>c.kind==='boost'&&c.side==='host')?.cardNo,opponent:r.casts.find(c=>c.kind==='boost'&&c.side==='challenger')?.cardNo};
+  }
+  const boosts=room?Object.fromEntries((['host','challenger'] as const).map(side=>[side,room.casts.find(c=>c.kind==='boost'&&c.side===side)?.cardNo||[...room.rounds].reverse().find(r=>r.fight===room.fight&&r.casts.some(c=>c.kind==='boost'&&c.side===side))?.casts.find(c=>c.kind==='boost'&&c.side===side)?.cardNo||''])):{};
   return <BattleArenaSurface className="heptad-scene" image={arena.image} data-heptad-phase={room?.phase||'entering'}>
+    {room&&!presentation&&!['waiting','deck'].includes(room.phase)&&<BattleElementBoosts mode="heptad" boosts={boosts} used={Object.fromEntries((['host','challenger'] as const).map(side=>[side,!room.casts.some(c=>c.kind==='boost'&&c.side===side)||room.phase==='result'||room.phase==='finished']))}/>}
     {room?.phase!=='waiting'&&(room?.phase==='deck'?<DeckPreparationHeader title={TITLE} time={time(room.deadline-now)} onExit={()=>void leave()}/>:<BattleArenaHeader title={TITLE} code={room?.code} time={room?time(room.deadline-now):''} onExit={()=>void leave()} onSurrender={side&&room?.phase!=='finished'?async()=>{if(await confirmBattleSurrender())void act('surrender');}:undefined}/>)}
     {error&&<div className="heptad-error" role="alert">{error}<button onClick={()=>setError('')} aria-label="ปิดข้อความ"><X size={16}/></button></div>}
     {!room&&error.includes('รหัสผ่าน')&&<form className="heptad-password" onSubmit={event=>{event.preventDefault();void act('join',{password,spectate});}}><label>รหัสผ่านห้อง<input type="password" value={password} onChange={event=>setPassword(event.target.value)}/></label><button disabled={busy}>เข้าห้อง</button></form>}
