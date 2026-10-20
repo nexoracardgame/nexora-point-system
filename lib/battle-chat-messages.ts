@@ -11,11 +11,29 @@ export function mergeBattleChatMessages(...groups: BattleChatMessage[][]) {
 }
 
 export type PendingBattleChat = BattleChatMessage & { baseline: Set<string>; failed?: boolean };
+export type BattleChatDelivery = { key: string; pending: PendingBattleChat[]; aliases: Record<string, { id: string; createdAt?: number }> };
+
+// Keep each optimistic row's identity after acknowledgement, including repeated text.
+export function reconcileBattleChat(messages: BattleChatMessage[], delivery: BattleChatDelivery): BattleChatDelivery {
+  const aliases = { ...delivery.aliases };
+  let changed = false;
+  const pending = delivery.pending.filter(item => {
+    if (item.failed) return true;
+    const echo = messages.find(message => !aliases[message.id] && !item.baseline.has(message.id) && message.senderId === item.senderId && message.text.trim().replace(/\s+/g, " ") === item.text);
+    if (!echo) return true;
+    aliases[echo.id] = { id: item.id, createdAt: item.createdAt };
+    changed = true;
+    return false;
+  });
+  const retained = new Set(messages.map(message => message.id));
+  for (const id of Object.keys(aliases)) if (!retained.has(id)) { delete aliases[id]; changed = true; }
+  return changed ? { ...delivery, pending, aliases } : delivery;
+}
+
+export function deliveredBattleChat(messages: BattleChatMessage[], delivery: BattleChatDelivery) {
+  return [...messages.map(message => delivery.aliases[message.id] ? { ...message, ...delivery.aliases[message.id] } : message), ...delivery.pending]
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).slice(-80);
+}
 export function visibleBattleChat(messages: BattleChatMessage[], pending: PendingBattleChat[]) {
-  const matched = new Set<string>();
-  return [...messages, ...pending.filter(item => {
-    const echo = messages.find(message => !item.baseline.has(message.id) && !matched.has(message.id) && message.senderId === item.senderId && message.text.trim().replace(/\s+/g, " ") === item.text);
-    if (echo) { matched.add(echo.id); return false; }
-    return true;
-  })].slice(-40);
+  return deliveredBattleChat(messages, reconcileBattleChat(messages, { key: "", pending, aliases: {} }));
 }

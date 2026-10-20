@@ -5,6 +5,7 @@ import {BattleCommandQueue} from '@/lib/battle-command-queue';
 import BattleWaitingHeader from './BattleWaitingHeader';
 import './BattleWaitingRoom.css';
 import GamePreparationBackground from './GamePreparationBackground';
+import BattlePlayerProfile from './BattlePlayerProfile';
 
 type Person={id:string;name:string;image?:string};
 type Mode={id:string;title:string;description:string};
@@ -45,7 +46,7 @@ export default function BattleWaitingRoom({seats:confirmedSeats,spectators:confi
  <section className="nexora-shared-waiting" aria-busy={Boolean(pending)||externalBusy}><GamePreparationBackground/><div className="nsw-seats">{(['host','challenger'] as const).map(side=>{
   const person=seats[side],bot=isBot(person);
   return <article key={side} className="nsw-seat" aria-label={side==='host'?'ฝั่ง A':'ฝั่ง B'}><small>{side==='host'?'ฝั่ง A':'ฝั่ง B'}</small><div className="nsw-person">
-   {person?<><div className="nsw-avatar"><img src={person.image||'/avatar.png'} alt=""/>{person.id===leaderId&&<Crown/>}</div><strong title={person.name}>{person.name}</strong><span>{bot?'BOT · พร้อมลงสนาม':'พร้อมลงสนาม'}</span></>:<strong>รอผู้เล่น</strong>}
+   {person?<><div className="nsw-framed-identity"><BattlePlayerProfile identity={person} player={side==='challenger'} currentUserId={userId} showRankBadge/>{person.id===leaderId&&<Crown className="nsw-leader" aria-label="หัวหน้าห้อง"/>}</div><span className="nsw-ready">{bot?'BOT · พร้อมลงสนาม':'พร้อมลงสนาม'}</span></>:<strong>รอผู้เล่น</strong>}
    <div className="nsw-seat-actions">
     {!person&&!seated&&<button onClick={()=>take(side)} disabled={starting}><LogIn size={16}/>ลงสนาม</button>}
     {onBot&&canChange&&(!person||bot)&&<button onClick={()=>void execute(state=>({...state,seats:{...state.seats,[side]:!bot?{id:botId,name:`BOT Level.99 · ${side==='host'?'A':'B'}`,image:'/avatar.png'}:null}}),()=>callbacks.current.onBot?.(side,!bot))} disabled={starting} aria-label={`${bot?'เอาบอทออก':'เพิ่มบอทลงสนาม'} ${side==='host'?'ฝั่ง A':'ฝั่ง B'}`}>{bot?<UserMinus size={16}/>:<Bot size={16}/>} {bot?'เอาบอทออก':'เพิ่มบอทลงสนาม'}</button>}

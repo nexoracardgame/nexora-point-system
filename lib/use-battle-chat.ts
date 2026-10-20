@@ -1,25 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BATTLE_CHAT_CHANGED, mergeBattleChatMessages, visibleBattleChat, type BattleChatMessage, type BattleChatRoom, type PendingBattleChat } from "./battle-chat-messages";
+import { BATTLE_CHAT_CHANGED, mergeBattleChatMessages, reconcileBattleChat, deliveredBattleChat, type BattleChatDelivery, type BattleChatMessage, type BattleChatRoom, type PendingBattleChat } from "./battle-chat-messages";
 
 export function useBattleChat(messages: BattleChatMessage[], room: BattleChatRoom | undefined, userId: string, name: string) {
   const key = room ? `${room.mode}:${room.code}` : "";
   const [received, setReceived] = useState<{ key: string; messages: BattleChatMessage[] }>({ key: "", messages: [] });
-  const [pending, setPending] = useState<{ key: string; messages: PendingBattleChat[] }>({ key: "", messages: [] });
+  const [delivery, setDelivery] = useState<BattleChatDelivery>({ key: "", pending: [], aliases: {} });
   const liveKey = useRef(key); liveKey.current = key;
   const confirmed = mergeBattleChatMessages(messages, received.key === key ? received.messages : []);
   const confirmationKey = confirmed.map(message => message.id).join("|");
   useEffect(() => {
-    setPending(current => {
-      if (current.key !== key || !current.messages.length) return current;
-      const visible = new Set(visibleBattleChat(confirmed, current.messages).map(message => message.id));
-      const remaining = current.messages.filter(message => visible.has(message.id));
-      return remaining.length === current.messages.length ? current : { key, messages: remaining };
+    // A slower room-action response must not erase chat seen in a newer snapshot.
+    setReceived(current => {
+      const merged = mergeBattleChatMessages(current.key === key ? current.messages : [], confirmed);
+      if (current.key === key && merged.length === current.messages.length && merged.every((message, index) => message.id === current.messages[index].id)) return current;
+      return { key, messages: merged };
     });
-    // IDs acknowledge pending messages once; later history truncation cannot resurrect them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, confirmationKey]);
+  const currentDelivery = delivery.key === key ? delivery : { key, pending: [], aliases: {} };
+  const reconciled = reconcileBattleChat(confirmed, currentDelivery);
+  useEffect(() => {
+    setDelivery(current => current.key === key ? reconcileBattleChat(confirmed, current) : current);
+    // IDs acknowledge pending messages once; later history truncation cannot resurrect them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, confirmationKey, delivery]);
   useEffect(() => {
     if (!room?.code) return;
     let active = true, running = false, queued = false;
@@ -50,12 +56,12 @@ export function useBattleChat(messages: BattleChatMessage[], room: BattleChatRoo
   const send = async (text: string, submit: () => void | Promise<boolean | void>) => {
     const id = `pending-${crypto.randomUUID()}`;
     const item: PendingBattleChat = { id, senderId: userId, senderName: name || "คุณ", text: text.trim().replace(/\s+/g, " ").slice(0, 240), createdAt: Date.now(), baseline: new Set(confirmed.map(message => message.id)) };
-    setPending(current => ({ key, messages: [...(current.key === key ? current.messages : []), item].slice(-40) }));
+    setDelivery(current => ({ key, aliases: current.key === key ? current.aliases : {}, pending: [...(current.key === key ? current.pending : []), item].slice(-80) }));
     let ok = false;
     try { ok = (await submit()) !== false; } catch { /* Keep a visible failure instead of losing the message. */ }
     if (liveKey.current !== key) return;
-    if (!ok) setPending(current => current.key !== key ? current : { key, messages: current.messages.map(message => message.id === id ? { ...message, failed: true } : message) });
+    if (!ok) setDelivery(current => current.key !== key ? current : { ...current, pending: current.pending.map(message => message.id === id ? { ...message, failed: true } : message) });
     if (room) window.dispatchEvent(new CustomEvent(BATTLE_CHAT_CHANGED, { detail: room }));
   };
-  return { messages: visibleBattleChat(confirmed, pending.key === key ? pending.messages : []), send };
+  return { messages: deliveredBattleChat(confirmed, reconciled), send };
 }

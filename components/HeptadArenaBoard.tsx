@@ -40,7 +40,7 @@ export default function HeptadArenaBoard({ board, names, activeTurn, playerSide,
   const card = triadCardByNo.get(preview);
   const order: Side[] = playerSide === 'challenger' ? ['host', 'challenger'] : ['challenger', 'host'];
   return <section className="heptad-arena-board" aria-label="สนาม HEPTAD 7 ใบ">
-    {order.map(side => <section key={side} className="heptad-arena-side" data-side={side} data-player={side === playerSide} aria-label={names[side]}>
+    {order.map((side,index) => <section key={side} className="heptad-arena-side" data-side={side} data-upper={index===0} data-player={side === playerSide} aria-label={names[side]}>
       <header>{names[side]}</header>
       <div className="heptad-formation">
         {HEPTAD_TURNS.map(({ turn }) => <Slot key={turn} turn={turn} no={board[side][turn] || ''} active={turn === activeTurn}

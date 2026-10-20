@@ -4,7 +4,7 @@ import sharp from "sharp";
 
 const rootDir = process.cwd();
 const game = process.argv.includes('--game');
-const sourceIcon = path.join(rootDir, "public", game ? "game-icons/icon-512.png" : "icon-512.png");
+const sourceIcon = path.join(rootDir, "public", game ? "game-assets/branding/icon-512.png" : "icon-512.png");
 const assetsDir = path.join(rootDir, "desktop", "assets");
 const iconPath = path.join(assetsDir, game ? "game-icon.ico" : "icon.ico");
 const iconSizes = [16, 24, 32, 48, 64, 128, 256];

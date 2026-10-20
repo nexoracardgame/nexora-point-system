@@ -231,8 +231,8 @@
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"] button:first-child { left:10.2%; top:37.5%; width:31.3%; height:11.1%; }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"] button:nth-child(2) { left:10.2%; top:49.6%; width:34.3%; height:11.1%; }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="รูปแบบการต่อสู้"] button:nth-child(3) { left:10.2%; top:61.0%; width:35.0%; height:11.1%; }
-.nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button:first-child { left:8.9%; top:72.8%; width:20.15%; height:8.5%; }
-.nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button:nth-child(2) { left:26.25%; top:72.8%; width:20.22%; height:8.5%; }
+.nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button:first-child { left:9.65%; top:73.7%; width:16.6%; height:5.85%; }
+.nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button:nth-child(2) { left:26.5%; top:73.8%; width:16.6%; height:5.85%; }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-primary { left:40.1%; top:66.8%; width:40.5%; height:20%; }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-primary > svg { display:none; }
 .nexora-command-lobby .nexora-create-drawer label { position:absolute; left:10.6%; top:82.0%; width:28.1%; height:8%; margin:0; padding:0; font-size:0; background:#000; clip-path:polygon(1% 0,85% 0,99% 100%,15% 100%); }
@@ -252,11 +252,20 @@
 }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { clip-path:polygon(23% 9%,95% 9%,76% 91%,4% 91%); }
 .nexora-command-lobby .nexora-create-drawer .nexora-command-primary { clip-path:polygon(23% 12%,80% 12%,93% 53%,80% 88%,6% 88%); }
-.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { clip-path:polygon(22% 10%,94% 10%,77% 89%,5% 89%); }
+.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed] { clip-path:polygon(18% 0,100% 0,83% 100%,0 100%); }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer button::after { animation:none; transform:none; opacity:0; background:linear-gradient(120deg,#ffe29c55,transparent 45%,#ffd37b44); transition:opacity 180ms ease; }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer button:hover::after { opacity:.6; }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer button:active::after { opacity:1; background:#fff3c477; }
 .nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment button[aria-pressed=true]::before { display:block; content:''; position:absolute; inset:5px; z-index:1; pointer-events:none; background:linear-gradient(0deg,#ffbd3277,transparent 55%); border-bottom:4px solid #ffe49a; box-shadow:inset 0 -12px 20px #ffc34d88; }
+/* Keep all access-button lighting inside the silver artwork, not a rectangular underline. */
+.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button::after,
+.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed=true]::before {
+  inset:0; width:100%; height:100%; clip-path:inherit; border:0; border-radius:0;
+  box-shadow:none; pointer-events:none;
+}
+.nexora-command-lobby .nexora-play-drawer.nexora-create-drawer .nexora-command-segment[aria-label="การเข้าถึงห้อง"] button[aria-pressed=true]::before {
+  background:linear-gradient(0deg,#ffc34d99 0%,#ffd36b55 35%,#ffe8a61a 75%,transparent 100%);
+}
 .nexora-play-mode-edge { position:absolute;inset:0;width:100%;height:100%;pointer-events:none;fill:none;overflow:visible; }
 .nexora-play-mode-edge path { stroke:#ffe6a0;stroke-width:3;vector-effect:non-scaling-stroke;stroke-dasharray:10 40;filter:drop-shadow(0 0 3px #ffd478);animation:nexora-play-edge-run 5s linear infinite; }
 .nexora-create-drawer .nexora-command-primary:disabled { opacity:.55; }

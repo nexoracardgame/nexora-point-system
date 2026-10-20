@@ -20,7 +20,9 @@
 .heptad-field { position:absolute;inset:170px 12px 146px;min-height:0; }
 .heptad-scene .nexora-arena-status { position:absolute;top:76px;left:50%;transform:translateX(-50%);z-index:3; }
 .heptad-scene .nexora-arena-scoreplate { top:74px!important;bottom:auto!important; }
-.heptad-scene .nexora-arena-hand { position:absolute;bottom:0;left:0;right:0;max-height:136px!important; }
+.heptad-scene .nexora-arena-hand { position:absolute;bottom:0;left:0;right:0;height:136px;max-height:136px!important;display:flex;flex-direction:column;overflow:hidden; }
+.heptad-scene .nexora-arena-hand-heading{flex:none}
+.heptad-scene .nexora-arena-hand-cards{flex:1;min-height:0;height:auto;overflow-x:auto;overflow-y:hidden;box-sizing:border-box;padding:4px 4px 10px}
 .heptad-error { position:absolute;top:66px;left:20%;right:20%;z-index:2147483600;display:flex;justify-content:space-between;padding:10px 16px;background:#381719ed;border:1px solid #eb9b9b;border-radius:4px; }
 .heptad-error button { background:none;border:0;color:inherit; }
 .heptad-password,.heptad-special { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;width:min(560px,80%);max-height:70%;overflow:auto;padding:16px;background:#000e;border:1px solid #d6b56b;border-radius:6px;box-shadow:0 12px 40px #0008; }

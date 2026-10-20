@@ -26,3 +26,32 @@
 @media(min-height:1000px){.nsw-chat .triad-chat-hud-messages{--waiting-chat-rows:15}}
 @media(min-width:3000px) and (min-height:1600px){.nsw-chat .triad-chat-hud-messages{--waiting-chat-rows:20}}
 @media(max-height:600px){.nsw-chat .triad-chat-hud-messages{max-height:min(calc(var(--waiting-chat-rows)*20px),max(24px,calc(100dvh - 310px)))}}
+/* Reserve the log's space before the first message so seat profiles never reflow. */
+.nsw-chat .triad-chat-hud-messages{display:block;height:min(calc(var(--waiting-chat-rows)*20px),max(24px,calc(100dvh - 310px)));min-height:0;box-sizing:border-box;contain:layout paint;overflow-anchor:none}
+.nsw-seat{min-height:0}
+.nsw-person:has(.nsw-framed-identity){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;align-self:stretch;min-height:0;container-type:size}
+.nsw-person:has(.nsw-framed-identity) .nsw-seat-actions:empty{display:flex;visibility:hidden}
+.nsw-framed-identity{position:relative;width:min(100%,420px,calc(max(24px,100cqh - 64px)*3));flex:none;aspect-ratio:3}
+.nsw-framed-identity .battle-player-identity{display:block;width:100%;height:100%;min-height:0;max-width:100%;flex:none;margin:0;padding:0;border:0;border-radius:0;background:none}
+.nsw-framed-identity .bpi-copy strong{font:800 20px/1 Arial,Tahoma,sans-serif;letter-spacing:0}
+.nsw-framed-identity .bpi-rank>span{display:flex;align-items:center;justify-content:center;font:700 13px/1 Arial,Tahoma,sans-serif;letter-spacing:0}
+.nsw-framed-identity .bpi-badge{position:absolute;left:29%;top:65%;width:11%;aspect-ratio:1;display:grid;place-items:center;color:#ffe3a0;pointer-events:none}
+.nsw-framed-identity .bpi-badge>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.nsw-framed-identity .bpi-badge>svg{position:relative;width:40%;height:40%;filter:drop-shadow(0 1px 2px #000)}
+.nsw-framed-identity [data-player=true] .bpi-badge{left:auto;right:29%}
+.nsw-leader{position:absolute;right:0;top:0;width:20px;height:20px;padding:3px;box-sizing:content-box;color:#17120b;background:#f0c867;border-radius:50%;pointer-events:none}
+.nsw-framed-identity:has([data-player=true]) .nsw-leader{right:auto;left:0}
+.nsw-framed-identity .bpi-avatar{--waiting-profile-mask:url('/images/lobby-play/profile-avatar-frame.png')}
+.nsw-framed-identity .bpi-copy{--waiting-profile-mask:url('/images/lobby-play/profile-name-frame.png')}
+.nsw-framed-identity .bpi-rank{--waiting-profile-mask:url('/images/lobby-play/profile-rank-label.png')}
+.nsw-framed-identity .bpi-badge{--waiting-profile-mask:url('/images/lobby-play/profile-rank-frame.png')}
+.nsw-framed-identity :is(.bpi-avatar,.bpi-copy,.bpi-rank,.bpi-badge)::after{content:'';display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 40%,#fff1bd99 49%,#ffffffb3 50%,transparent 60%);background-size:300% 100%;mask:var(--waiting-profile-mask) center/100% 100% no-repeat;animation:nsw-profile-shine 6s ease-in-out infinite;z-index:1}
+.nsw-framed-identity [data-player=true] :is(.bpi-avatar,.bpi-copy,.bpi-rank)::after{transform:scaleX(-1)}
+.nsw-framed-identity .bpi-rank::after,.nsw-framed-identity .bpi-badge::after{animation-delay:.2s}
+@keyframes nsw-profile-shine{0%,65%{background-position:100% 0;opacity:0}70%{opacity:.7}90%,100%{background-position:0 0;opacity:0}}
+@media(min-width:2400px) and (min-height:1000px){.nsw-framed-identity{width:min(100%,620px,calc(max(24px,100cqh - 64px)*3))}.nsw-framed-identity .bpi-copy strong{font-size:28px}.nsw-framed-identity .bpi-rank>span{font-size:19px}}
+@media(max-height:600px){.nsw-framed-identity{width:min(100%,250px,calc(max(24px,100cqh - 44px)*3))}.nsw-framed-identity .bpi-copy strong{font-size:12px}.nsw-framed-identity .bpi-rank>span{font-size:9px}.nsw-person:has(.nsw-framed-identity){gap:3px}.nsw-leader{width:13px;height:13px;padding:2px}}
+@media(max-height:450px){.nexora-shared-waiting:has(.nsw-framed-identity) .triad-chat-hud-messages{height:24px;max-height:24px}}
+@media(max-height:360px){.nsw-framed-identity{width:min(100%,190px,calc(max(24px,100cqh - 40px)*3))}.nsw-framed-identity .bpi-copy strong{font-size:10px}.nsw-person:has(.nsw-framed-identity){gap:2px}.nsw-person:has(.nsw-framed-identity) .nsw-seat-actions{min-height:20px}}
+@media(prefers-reduced-motion:reduce){.nsw-framed-identity :is(.bpi-avatar,.bpi-copy,.bpi-rank,.bpi-badge)::after{animation:none;display:none}}
+html[data-game-motion-off=true] .nsw-framed-identity :is(.bpi-avatar,.bpi-copy,.bpi-rank,.bpi-badge)::after{animation:none;display:none}
