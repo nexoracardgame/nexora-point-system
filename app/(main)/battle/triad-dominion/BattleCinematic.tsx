@@ -97,14 +97,15 @@ function HpMeter({ side, name, initial, value, reduced }: { side: Side; name: st
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
   }, [value, reduced]);
-  const percent = initial > 0 ? Math.max(0, Math.min(100, value / initial * 100)) : 0;
+  const capacity=Math.max(1,initial*2,value);
+  const percent = Math.max(0, Math.min(100, value / capacity * 100));
   return <div className={`${styles.hpMeter} ${side === "player" ? styles.playerHp : styles.opponentHp}`} data-hp-side={side} data-hp-value={value}>
     <div className={styles.hpTitle}><span>{name}</span><small>พลังเริ่มต้น {initial.toLocaleString()}</small></div>
-    <div className={styles.hpTrack} role="progressbar" aria-label={`HP ${name}`} aria-valuemin={0} aria-valuemax={Math.max(1, initial)} aria-valuenow={Math.max(0, value)} aria-valuetext={`${value.toLocaleString()} / ${initial.toLocaleString()}`}>
+    <div className={styles.hpTrack} role="progressbar" aria-label={`HP ${name}`} aria-valuemin={0} aria-valuemax={capacity} aria-valuenow={Math.max(0, value)} aria-valuetext={`พลัง ${value.toLocaleString()} · เริ่มต้น ${initial.toLocaleString()}`}>
       <div className={styles.hpTrail} style={{ width: `${percent}%` }} />
       <div className={styles.hpFill} style={{ width: `${percent}%` }} />
     </div>
-    <div className={`${styles.hpValue} ${value < 0 ? styles.overkill : ""}`}><span>HP {display.toLocaleString()}</span><small>/ {initial.toLocaleString()}</small></div>
+    <div className={`${styles.hpValue} ${value < 0 ? styles.overkill : ""}`}><span>HP {display.toLocaleString()}</span><small>เริ่ม {initial.toLocaleString()}</small></div>
   </div>;
 }
 
