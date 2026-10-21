@@ -16,6 +16,11 @@
 .battle-skip-summary header,.battle-skip-summary h2,.battle-skip-summary header>span,.battle-skip-summary footer,.battle-skip-summary small,.battle-skip-summary small b,.bss-scores b,.bss-scores [data-winner=true] b{color:#080b0e}
 .battle-skip-summary header strong{font-size:18px}.battle-skip-summary h2{font-size:28px;margin:8px 0;font-weight:900}.bss-scores b{font-size:25px}.bss-scores>div{border:0;padding:4px 0}.battle-skip-summary footer,.battle-skip-summary small{font-size:14px}
 .bss-timer{display:none}
+.battle-skip-summary header>span{display:none}
+.battle-skip-summary h2{line-height:1.4;margin:10px 0 14px}
+.bss-scores>div{column-gap:16px;padding:6px 0}
+.battle-skip-summary footer{line-height:1.5}
+.battle-skip-summary footer span{overflow-wrap:anywhere}
 .battle-skip-summary::after{content:'';position:absolute;left:4%;right:4%;top:50%;height:2px;background:#fff;box-shadow:0 0 8px #fff,0 0 20px #5de9ff;pointer-events:none;animation:bss-flash .45s ease-out both}
 @keyframes bss-flash{0%{opacity:0;transform:scaleX(.1)}25%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(.8)}}
 @keyframes bss-glitch{0%,70%{text-shadow:2px 0 #68ffff,-2px 0 #ff648c,0 0 5px #fff;translate:2px 0}30%,85%{text-shadow:-2px 0 #68ffff,2px 0 #ff648c,0 0 5px #fff;translate:-2px 0}100%{text-shadow:1px 0 #fff,-1px 0 #fff,0 1px #fff,0 -1px #fff;translate:0 0}}

@@ -68,9 +68,11 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
         await page.evaluate(()=>{forceLandscape=true;mount([],'intro-only')});
         await page.locator('.introStats').first().waitFor();
         await page.waitForTimeout(1250);
+        const overlap=await page.locator('.introStats').evaluateAll(nodes=>nodes.some(node=>{const [a,b]=[...node.querySelectorAll('b')].map(n=>n.getBoundingClientRect());return a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom;}));assert.equal(overlap,false,'ATK and SUP numbers never collide');
         assert.equal(await page.locator('.introStats').count(),2);assert.equal(await page.locator('.introVs').textContent(),'VS');
         for(const selector of ['.introStats','.introVs','.card'])assert.ok(await page.locator(selector).evaluateAll(nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.left>=-1&&r.top>=-1&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})),`${selector} fits ${width}x${height}`);
-        await page.waitForTimeout(800);assert.equal(await page.locator('[data-kind=intro]').count(),1,'Intro remains for three seconds');
+        assert.equal(await page.locator('[data-kind=intro]').count(),1,'Intro remains visible after entry');
+        await page.screenshot({path:`artifacts/triad-cinematic/intro-full-${width}.png`});
         await page.locator('[data-kind=strike]').waitFor();
         console.log(`${width}x${height}: main-card VS, real ATK/SUP, 3s intro and next phase passed`);
       }
