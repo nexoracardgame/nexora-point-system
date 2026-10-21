@@ -1,4 +1,5 @@
 import { resolveTriadTurn, triadCardByNo, triadSkillRuleByNo, triadSkillElementConditionMatches, type TriadTriangle, type TriadTurn } from "./triad-dominion";
+import {battleBotOutcome} from './battle-bot-evaluation';
 
 export function botSkillTargets(no: string, own: TriadTriangle, enemy: TriadTriangle): string[] {
   const rule = triadSkillRuleByNo.get(no);
@@ -24,18 +25,20 @@ export function bestTriadBotPlay(turn: TriadTurn, enemy: TriadTriangle, own: Tri
     const field = { ...own, [lane]: no };
     for (const target of botSkillTargets(no, field, enemy)) {
       const result = resolveTriadTurn({ turn, player: enemy, opponent: field, prioritySide: priority, skillTargets: { opponent: { [no]: target } }, randomMonsterSeed: `bot:${no}:${enemy.top}:${own.top}` });
-      const margin = result.opponentTotal-result.playerTotal;
       let future = 0;
       if (turn < 3) {
         const nextLane = turn === 1 ? "left" : "right";
         const nextTurn = (turn + 1) as TriadTurn;
         const followups = candidates.filter(other => other !== no && other !== own.top && other !== own.left && triadCardByNo.get(other)?.kind === (turn === 1 ? "monster" : triadCardByNo.get(no)?.kind));
         future = Math.max(0,...followups.slice(0,20).map(other => {
-          const follow = resolveTriadTurn({turn:nextTurn,player:enemy,opponent:{...field,[nextLane]:other},prioritySide:priority});
-          return follow.winner === "opponent" ? 20_000 : follow.winner === "draw" ? 5_000 : 0;
+          const nextField={...field,[nextLane]:other};
+          return Math.max(...botSkillTargets(other,nextField,enemy).map(nextTarget=>{
+            const follow=resolveTriadTurn({turn:nextTurn,player:enemy,opponent:nextField,prioritySide:priority,skillTargets:{opponent:{[other]:nextTarget}}});
+            return follow.winner==='opponent'?20_000:follow.winner==='draw'?5_000:0;
+          }));
         }));
       }
-      const score = (result.winner === "opponent" ? 1_000_000 : result.winner === "draw" ? 0 : -1_000_000) + Math.max(-100_000,Math.min(100_000,margin)) + future;
+      const score = battleBotOutcome(result.winner,'opponent',result.opponentTotal,result.playerTotal) + future;
       if (score > best.score) best = { cardNo:no, target, score };
     }
   }

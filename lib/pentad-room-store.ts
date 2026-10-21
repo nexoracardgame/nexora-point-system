@@ -4,6 +4,7 @@ import { ExpiredBattleActionError } from "./battle-action-status";
 import { hasPentadElementClash, PENTAD_ELEMENT_SCENE_MS } from "./pentad-element-presentation";
 import type { BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
+import {battleBotOutcome,battleBotRisk} from './battle-bot-evaluation';
 import { triadCardByNo, triadCards, triadSkillRuleByNo, triadSkillElementConditionMatches } from "./triad-dominion";
 import { completePentadDeck, makePentadPools, emptyPentadDeck, otherPentadSide, pentadElementRelation, resolvePentadTurn, validatePentadDeck, PENTAD_DECK_MS, PENTAD_TARGET_MS, PENTAD_TURN_MS, type PentadDeck, type PentadResolution, type PentadSide, type PentadTurn } from "./pentad-dominion";
 
@@ -117,7 +118,7 @@ function tickChoices(room: PentadRoom, now: number) {
 
 function pentadBotValue(room: PentadRoom, side: PentadSide, skills: Record<PentadSide,string>, targets: Record<PentadSide,string>, copiedSkills = room.copiedSkills) {
   const result = resolvePentadTurn({fight:room.fight,turn:room.turn,mains:{host:room.board.host[0],challenger:room.board.challenger[0]},skills,opener:room.opener,targets,copiedSkills,spent:[...room.spent,...room.used.host,...room.used.challenger]});
-  return (result.winner === side ? 1_000_000 : result.winner === "draw" ? 0 : -1_000_000) + Math.max(-100_000,Math.min(100_000,result.totals[side]-result.totals[otherPentadSide(side)]));
+  return battleBotOutcome(result.winner,side,result.totals[side],result.totals[otherPentadSide(side)]);
 }
 
 function bestPentadTarget(room: PentadRoom, choice: PentadChoice) {
@@ -169,7 +170,7 @@ function choosePentadBotCard(room: PentadRoom, side: PentadSide, available: stri
     }
     const rule=triadSkillRuleByNo.get(no);
     const future=rule?.allowedTurns.some(turn=>turn===(room.turn<3?2:3))?rule.effects.reduce((n,e)=>n+Math.abs(e.delta),0):0;
-    return {no,value:worst*.7+total/Math.max(1,responses.length)*.3-future*.02};
+    return {no,value:battleBotRisk([worst,total/Math.max(1,responses.length)])-future*.02};
   }).sort((a,b)=>b.value-a.value)[0]?.no || "";
 }
 

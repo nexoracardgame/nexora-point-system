@@ -102,6 +102,8 @@ export type TriadTriangle = {
 };
 
 export type TriadTurnInput = {
+  contributionValues?:Partial<Record<'player'|'opponent',Partial<Record<TriadLane,number>>>>;
+  statProtections?:{targetSide:'player'|'opponent';targetLane?:TriadLane;direction:'gain'|'loss';cardNo:string}[];
   includeOtherMonster?: boolean;
   scoreAdjustments?: Partial<Record<"player" | "opponent", number>>;
   turn: TriadTurn;
@@ -117,6 +119,8 @@ export type TriadTurnInput = {
 };
 
 export type TriadTurnResult = {
+  contributionValues?:Partial<Record<'player'|'opponent',Partial<Record<TriadLane,number>>>>;
+  statProtections?:TriadTurnInput['statProtections'];
   powerBefore?: {player:number;opponent:number};
   elementalBoost?: Partial<Record<"player"|"opponent",string>>;
   cinematicSupport?: Partial<Record<"player" | "opponent", string>>;
@@ -2298,6 +2302,29 @@ function applySkill(
     return { unresolved, events };
   }
 
+  if (['228','235','237','252','275','285'].includes(rule.cardNo)) {
+    const target=selectedTarget||(side==='player'?'player-top':'bot-top');
+    const targetSide=target.startsWith('player-')?'player':'opponent';
+    const score=targetSide===side?ownScore:opponentScore;
+    const contribution=score.contributions.find(item=>target.endsWith('secondary')?item.lane!=='top'&&item.card.kind==='monster':item.lane==='top');
+    const ownOnly=rule.cardNo!=='235'&&rule.cardNo!=='285';
+    if(!contribution||ownOnly&&targetSide!==side||!triadSkillElementConditionMatches(rule,contribution.card)){
+      events.push({cardNo:rule.cardNo,name:rule.name,side,type:rule.shape,text:rule.text,summary:'เป้าหมายไม่ตรงเงื่อนไขบนการ์ด',blocked:true});return {unresolved,events};
+    }
+    const base=score.metric==='total'?contribution.card.attack+contribution.card.support:contribution.card[score.metric];
+    if(rule.cardNo==='285'){
+      const swapped=score.metric==='attack'?contribution.card.support:score.metric==='support'?contribution.card.attack:base;
+      score.total+=swapped-base;contribution.value+=swapped-base;
+      events.push({cardNo:rule.cardNo,name:rule.name,side,type:'stat',text:rule.text,summary:'สลับ ATTACK และ SUPPORT ของมอนสเตอร์เป้าหมายจนจบตา',targetLabel:`มอนสเตอร์${targetSide===side?'ฝ่ายผู้ใช้สกิล':'ฝ่ายตรงข้าม'}`});
+    }else{
+      const direction=rule.cardNo==='235'?'gain':'loss';
+      const delta=contribution.value-base;
+      if(direction==='gain'?delta>0:delta<0){score.total-=delta;contribution.value=base;}
+      blockers.push({sourceSide:side,targetSide,targetLane:contribution.lane,rule,direction});
+      events.push({cardNo:rule.cardNo,name:rule.name,side,type:'stat',text:rule.text,summary:`ยกเลิกผล${direction==='gain'?'เพิ่ม':'ลด'}พลังทั้งหมดของมอนสเตอร์เป้าหมายในตานี้`,targetLabel:`มอนสเตอร์${targetSide===side?'ฝ่ายผู้ใช้สกิล':'ฝ่ายตรงข้าม'}`});
+    }
+    return {unresolved,events};
+  }
   if (rule.needsReview && rule.shape !== "stat") {
     unresolved.push(rule);
     ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: รอยืนยันกติกาสกิลพิเศษ`);
@@ -2516,6 +2543,7 @@ function getLaneSkillRule(triangle: TriadTriangle, turn: TriadTurn, skippedSkill
 }
 
 type StatGainBlocker = {
+  direction?:'gain'|'loss';
   sourceSide: "player" | "opponent";
   targetSide: "player" | "opponent";
   targetLane?: TriadLane;
@@ -2550,6 +2578,7 @@ function statGainBlockerTarget(rule: TriadSkillRule, side: "player" | "opponent"
 function statGainBlockerApplies(blocker: StatGainBlocker, effect: TriadSkillEffect, contribution: { lane: TriadLane }) {
   if (blocker.metric && blocker.metric !== effect.metric) return false;
   if (blocker.targetLane && blocker.targetLane !== contribution.lane) return false;
+  if(blocker.direction)return blocker.direction==='gain'?effect.delta>0:effect.delta<0;
   if (blocker.rule.cardNo === "244" || blocker.rule.cardNo === "234") return effect.delta !== 0;
   return effect.delta > 0;
 }
@@ -2752,6 +2781,8 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
   );
   playerScore.total += input.scoreAdjustments?.player || 0;
   opponentScore.total += input.scoreAdjustments?.opponent || 0;
+  for(const side of ['player','opponent'] as const){const score=side==='player'?playerScore:opponentScore;for(const contribution of score.contributions){const value=input.contributionValues?.[side]?.[contribution.lane];if(value!==undefined)contribution.value=value;}}
+  for(const protection of input.statProtections||[]){const rule=triadSkillRuleByNo.get(protection.cardNo);if(rule)statGainBlockers.push({...protection,rule,sourceSide:protection.targetSide});}
   const selectedSkillTarget = (side: "player" | "opponent") => {
     const triangle = side === "player" ? input.player : input.opponent;
     const target = input.skillTargets?.[side]?.[getCard(triangle[selectedLane(input.turn)])?.cardNo || ""];
@@ -2866,6 +2897,8 @@ export function resolveTriadTurn(input: TriadTurnInput): TriadTurnResult {
 
   return {
     turn: input.turn,
+    contributionValues:{player:Object.fromEntries(playerScore.contributions.map(item=>[item.lane,item.value])),opponent:Object.fromEntries(opponentScore.contributions.map(item=>[item.lane,item.value]))},
+    statProtections:statGainBlockers.filter(item=>item.direction).map(item=>({targetSide:item.targetSide,targetLane:item.targetLane,direction:item.direction!,cardNo:item.rule.cardNo})),
     powerBefore,
     prioritySide,
     metric: playerScore.metric,

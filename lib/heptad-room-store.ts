@@ -2,7 +2,8 @@ import { randomInt, randomBytes, scryptSync } from 'node:crypto';
 import { prisma } from './prisma';
 import { newPentadRoom, applyPentadAction, publicPentadRoom, pentadSeat, PENTAD_BOT_ID, type PentadRoom, type PentadParticipant } from './pentad-room-store';
 import { pentadElementRelation, otherPentadSide, type PentadSide } from './pentad-dominion';
-import { triadCardByNo, triadSkillRuleByNo, triadSkillElementConditionMatches } from './triad-dominion';
+import { triadCards,triadCardByNo, triadSkillRuleByNo, triadSkillElementConditionMatches } from './triad-dominion';
+import {battleBotOutcome,battleBotRisk} from './battle-bot-evaluation';
 import { completeHeptadMatchDeck, emptyHeptadDeck, heptadCanCallSpecial, HEPTAD_TURNS, HEPTAD_TIERS, validateHeptadMatchDeck, type HeptadDeck, type HeptadTurn, type HeptadTier, type HeptadBoard, type HeptadFight } from './heptad-rules';
 import { resolveHeptadClash, type HeptadCast, type HeptadResult } from './heptad-resolution';
 import { recordForfeitRank } from './battle-forfeit-rank';
@@ -97,7 +98,11 @@ function settleTarget(room:HeptadRoom,choice:Choice,value:string){
 }
 function tickTargets(room:HeptadRoom,now:number){
   for(const choice of room.choices){if(choice.value)continue;
-    if(bot(room,choice.side))settleTarget(room,choice,choice.options[randomInt(choice.options.length)]);
+    if(bot(room,choice.side)){
+      let best=choice.options[0],value=-Infinity;
+      for(const option of choice.options){const trial=structuredClone(room);const cloned=trial.choices[room.choices.indexOf(choice)];settleTarget(trial,cloned,option);const score=heptadBotValue(trial,choice.side,trial.casts);if(score>value){value=score;best=option;}}
+      settleTarget(room,choice,best);
+    }
     else if(now>=room.deadline)settleTarget(room,choice,'__expired__');
     else return;
   }
@@ -117,6 +122,46 @@ function reveal(room:HeptadRoom,now:number){
   }
   if(!room.finalDuel&&HEPTAD_TURNS[room.turn-1].kind==='skill')for(const side of [room.opener,otherPentadSide(room.opener)])if(room.picks[side]!=='__pass__')room.casts.push({side,cardNo:room.picks[side],kind:'normal'});
   prepareTargets(room,now);
+}
+function heptadBotValue(room:HeptadRoom,side:PentadSide,casts:HeptadCast[]){
+ const result=resolveHeptadClash({board:room.board,turn:room.turn,opener:room.opener,casts,finalDuel:room.finalDuel,seed:`bot:${room.code}:${room.fight}:${room.turn}`});
+ return battleBotOutcome(result.winner,side,result.totals[side],result.totals[otherPentadSide(side)]);
+}
+function bestHeptadCast(room:HeptadRoom,side:PentadSide,no:string,kind:HeptadCast['kind'],base:HeptadCast[]=[]){
+ const cast:HeptadCast={side,cardNo:no,kind};let best=-Infinity,target='';
+ const options=targetOptions(room,cast);
+ for(const option of options.length?options:['']){
+  const trial=structuredClone(room);trial.casts=[...base,{...cast}];
+  if(option){const choice:Choice={...cast,options,value:''};trial.choices=[choice];settleTarget(trial,choice,option);
+   // Copy effects can introduce a second target decision; search that too.
+   const follow=trial.choices.find(item=>!item.value);
+   if(follow){for(const next of follow.options){const copied=structuredClone(trial);settleTarget(copied,copied.choices.find(item=>!item.value)!,next);const score=heptadBotValue(copied,side,copied.casts);if(score>best){best=score;target=option;}}continue;}
+  }
+  const score=heptadBotValue(trial,side,trial.casts);if(score>best){best=score;target=option;}
+ }
+ return {score:best,target};
+}
+export function chooseHeptadBotCard(room:HeptadRoom,side:PentadSide,available=heptadAvailable(room,side)){
+ const enemy=otherPentadSide(side),kind=HEPTAD_TURNS[room.turn-1].kind;
+ // Opposing unrevealed hands and picks never enter the search.
+ const seen=new Set([...room.used[enemy].flat(),...Object.values(room.board[enemy])]);
+ const pool=triadCards.filter(card=>card.kind===kind&&!seen.has(card.cardNo));
+ const ranked=pool.sort((a,b)=>kind==='monster'?(room.turn<=4?b.attack-a.attack:b.support-a.support):Number(triadSkillRuleByNo.get(b.cardNo)?.effects.reduce((n,e)=>n+Math.abs(e.delta),0)||0)-Number(triadSkillRuleByNo.get(a.cardNo)?.effects.reduce((n,e)=>n+Math.abs(e.delta),0)||0));
+ const responses=[...new Set([ranked[0]?.cardNo,ranked[Math.floor(ranked.length/3)]?.cardNo,ranked[Math.floor(ranked.length*2/3)]?.cardNo,ranked.at(-1)?.cardNo].filter((no):no is string=>Boolean(no)))];
+ let best=available[0]||'__pass__',value=-Infinity;
+ for(const no of [...new Set(available)]){
+  const scores=responses.map(response=>{const trial=structuredClone(room);trial.decks[enemy]=Array.from({length:3},emptyHeptadDeck);trial.board[side][room.turn]=no;trial.board[enemy][room.turn]=response;
+   if(kind==='monster')return heptadBotValue(trial,side,[]);
+   const enemyCast:HeptadCast={side:enemy,cardNo:response,kind:'normal'};
+   const enemyTarget=bestHeptadCast(trial,enemy,response,'normal');enemyCast.target=enemyTarget.target;
+   return bestHeptadCast(trial,side,no,'normal',[enemyCast]).score;
+  });
+  const card=triadCardByNo.get(no),rule=triadSkillRuleByNo.get(no);
+  const future=card?.kind==='monster'?(room.turn===1?card.attack+card.support:room.turn<5?card.support:0):rule?.effects.reduce((n,e)=>n+Math.abs(e.delta),0)||0;
+  const score=battleBotRisk(scores)-future*.03;
+  if(score>value){value=score;best=no;}
+ }
+ return best;
 }
 function beginSpecial(room:HeptadRoom,now:number){
   room.phase='special';room.deadline=now+30000;room.epoch++;
@@ -145,7 +190,7 @@ export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
   }
   if(room.phase==='select'){
     for(const side of sides)if(!room.picks[side]&&(HEPTAD_TURNS[room.turn-1].kind==='monster'||side===room.opener||room.picks[room.opener])){
-      if(bot(room,side)){const available=heptadAvailable(room,side);room.picks[side]=available[randomInt(available.length)]||'__pass__';}
+      if(bot(room,side))room.picks[side]=chooseHeptadBotCard(room,side);
       else if(now>=room.deadline)room.picks[side]='__pass__';
     }
     if(sides.every(side=>room.picks[side])){
@@ -162,7 +207,13 @@ export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
   if(room.phase==='special'){
     for(const side of [room.opener,otherPentadSide(room.opener)])if(!room.special[side]){
       if(bot(room,side)){const cards=room.decks[side][room.fight-1].special.filter(no=>!room.used[side][room.fight-1].includes(no));
-        const no=cards.length&&random()<.45?cards[randomInt(cards.length)]:'__decline__';room.special[side]=no;
+        const trial=structuredClone(room);for(const player of sides)trial.board[player][room.turn]=room.picks[player]==='__pass__'||player!==side&&HEPTAD_TURNS[room.turn-1].kind==='skill'?'':room.picks[player];
+        trial.decks[otherPentadSide(side)]=Array.from({length:3},emptyHeptadDeck);
+        const base:HeptadCast[]=room.specialOrder.filter(player=>player===side).map(player=>({side:player,cardNo:room.special[player],kind:'special'}));
+        if(HEPTAD_TURNS[room.turn-1].kind==='skill')base.push({side,cardNo:room.picks[side],kind:'normal'});
+        let no='__decline__',value=heptadBotValue(trial,side,base)+500;
+        for(const card of cards){const candidate=bestHeptadCast(trial,side,card,'special',base);if(candidate.score>value){value=candidate.score;no=card;}}
+        room.special[side]=no;
         if(no!=='__decline__'){room.specialUsed[side]++;use(room,side,no);room.specialOrder.push(side);}
       }else if(now>=room.deadline)room.special[side]='__decline__';
       else break;

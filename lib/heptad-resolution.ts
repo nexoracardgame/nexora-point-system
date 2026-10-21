@@ -36,6 +36,8 @@ export function resolveHeptadClash(input: {
     const skillLane = engineTurn === 2 ? 'left' : 'right';
     const monsterLane = engineTurn === 2 ? 'right' : 'left';
     let adjustments = { player:0,opponent:0 };
+    let contributionValues:TriadTurnResult['contributionValues'];
+    let statProtections:TriadTurnResult['statProtections'];
     let totals = {host:basic('host',stat),challenger:basic('challenger',stat)};
     // Special cards precede the regular pair; the caller's sequence is preserved.
     const batches: HeptadCast[][] = [];
@@ -46,13 +48,14 @@ export function resolveHeptadClash(input: {
       const own = batch.find(cast=>cast.side==='host'), enemy=batch.find(cast=>cast.side==='challenger');
       const triangle = (side:PentadSide,skill=''):TriadTriangle => ({top:effective[side],left:'',right:'',[monsterLane]:cards[side].branch,[skillLane]:skill});
       const target=(cast:HeptadCast|undefined)=>cast?.target||'';
-      const result=resolveTriadTurn({turn:engineTurn,includeOtherMonster:true,scoreAdjustments:adjustments,
+      const result=resolveTriadTurn({turn:engineTurn,includeOtherMonster:true,scoreAdjustments:adjustments,contributionValues,statProtections,
         combinedStatConditions:metric==='combined',player:triangle('host',own?.cardNo),opponent:triangle('challenger',enemy?.cardNo),
         prioritySide:(batch.length===1?batch[0].side:input.opener)==='host'?'player':'opponent',
         skillTargets:{player:own?{[own.cardNo]:target(own)}:{},opponent:enemy?{[enemy.cardNo]:target(enemy)}:{}},
         copiedSkillCardNos:{player:own?.copied,opponent:enemy?.copied},randomMonsterSeed:input.seed,
       });
       totals={host:result.playerTotal,challenger:result.opponentTotal};
+      contributionValues=result.contributionValues;statProtections=result.statProtections;
       if (result.skillEvents.some(event=>event.cardNo==='265'&&!event.blocked)) {
         effective.host=result.effectivePlayer.top;effective.challenger=result.effectiveOpponent.top;
       }
