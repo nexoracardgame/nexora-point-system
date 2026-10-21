@@ -62,6 +62,20 @@ window.steps=()=>C.buildBattleSteps(window.result,window.player,window.opponent)
       if (!asset.startsWith(path.resolve('public') + path.sep)) return route.abort();
       return route.fulfill({ body: fs.readFileSync(asset), contentType: asset.endsWith('.wav') ? 'audio/wav' : asset.endsWith('.webp') ? 'image/webp' : asset.endsWith('.png') ? 'image/png' : 'image/jpeg' });
     });
+    if(process.env.TRIAD_INTRO_ONLY){
+      for(const [width,height] of [[3840,2160],[1920,1080],[844,390],[568,320],[390,844],[320,568]]){
+        await page.setViewportSize({width,height});await page.goto('https://cinematic.test/');
+        await page.evaluate(()=>{forceLandscape=true;mount([],'intro-only')});
+        await page.locator('.introStats').first().waitFor();
+        await page.waitForTimeout(1250);
+        assert.equal(await page.locator('.introStats').count(),2);assert.equal(await page.locator('.introVs').textContent(),'VS');
+        for(const selector of ['.introStats','.introVs','.card'])assert.ok(await page.locator(selector).evaluateAll(nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.left>=-1&&r.top>=-1&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})),`${selector} fits ${width}x${height}`);
+        await page.waitForTimeout(800);assert.equal(await page.locator('[data-kind=intro]').count(),1,'Intro remains for three seconds');
+        await page.locator('[data-kind=strike]').waitFor();
+        console.log(`${width}x${height}: main-card VS, real ATK/SUP, 3s intro and next phase passed`);
+      }
+      assert.deepEqual(errors,[]);return;
+    }
     if(process.env.TRIAD_DEPLOY_AUDIO_ONLY){
       await page.goto('https://cinematic.test/');
       await page.getByRole('button',{name:'เปิดเสียงการต่อสู้'}).click();

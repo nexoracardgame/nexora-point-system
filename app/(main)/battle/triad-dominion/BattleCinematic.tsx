@@ -224,6 +224,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
         {!final&&!intro&&!step.blocked&&<BattleDepthFX key={`depth-${index}`} color={color} skill={step.kind==='skill'} reduced={reduced}/>}
         {!final && !intro ? <BattleParticles key={index} color={color} element={element} side={step.side} skill={step.kind === "skill"} skillRecipient={step.recipient} field={Boolean(step.field)} blocked={Boolean(step.blocked)} reduced={reduced} effect={step.effect} /> : null}
         {[{ side: "player" as const, card: activePlayer }, { side: "opponent" as const, card: activeOpponent }].map(({ side, card }) => {
+          if(intro)card=(side==='player'?playerMainCard:opponentMainCard)||card;
           const power = empowered(side);
           const receiving = receivingSkill && (step.recipient === side || step.recipient === "both");
           const secondary = receiving && step.secondaryTarget ? cardsByNo.get(result.cinematicSupport?.[side] || (side === "player" ? result.effectivePlayer : result.effectiveOpponent)[result.turn === 2 ? "right" : "left"] || "") : undefined;
@@ -233,6 +234,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
           return <div key={side} data-fighter={step.side === side ? "source" : "target"} data-side={side} data-empowered={Boolean(power)} className={`${styles.fighter} ${side === "player" ? styles.player : styles.opponent} ${step.side === side ? styles.source : styles.target} ${power && !final ? styles.empowered : ""} ${receiving ? styles.receiving : ""} ${final && result.winner !== "draw" ? result.winner === side ? styles.winner : styles.defeated : ""}`} style={{ "--power-color": receiving ? color : powerColor } as CSSProperties}>
             <div className={styles.card} data-battle-card-face>
               {card ? <img src={card.sourceImage} alt={card.name} draggable={false} /> : <Swords size={40} />}
+              {intro&&card?.kind==='monster'&&<div className={styles.introStats} aria-label={`ATTACK ${card.attack} SUPPORT ${card.support}`}><div><span>ATTACK</span><b>{card.attack.toLocaleString()}</b></div><div><span>SUPPORT</span><b>{card.support.toLocaleString()}</b></div></div>}
             </div>
             {(power || (receiving && step.effect !== "debuff" && step.effect !== "swap")) && !final ? <div className={styles.weaponAura} aria-hidden="true"><Swords size={36} strokeWidth={1.5} /></div> : null}
             {result.elementalBoost?.[side]&&<div className={styles.elementBoost}><ElementBoostCard no={result.elementalBoost[side]!} used={final}/></div>}
@@ -244,6 +246,7 @@ export default function BattleCinematic({ result, playerCard, opponentCard, play
           <img data-battle-card-face src={attacker.sourceImage} alt={attacker.name} draggable={false} />
           <span>{step.blocked ? "สกิลถูกระงับ" : step.supportTransfer ? "มอนสเตอร์รอง → มอนสเตอร์หลัก" : `เป้าหมาย: ${step.recipient==='both'?'ทั้งสองฝ่าย':step.recipient==='player'?playerName:step.recipient==='opponent'?opponentName:actorName}`}</span>
         </div> : null}
+        {intro&&<div className={styles.introVs} aria-label="VS">VS</div>}
         <span className={`${styles.name} ${styles.playerName}`}>{playerName}</span>
         <span className={`${styles.name} ${styles.opponentName}`}>{opponentName}</span>
         {!final && step.kind === "strike" ? <>

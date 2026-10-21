@@ -1,4 +1,21 @@
 .overlay { position:fixed; inset:0; z-index:2147483050; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; background:rgba(4,8,11,.95); color:#fff; pointer-events:auto; isolation:isolate; }
+@font-face{font-family:NexoraClash;src:url('/fonts/orbitron/Orbitron.ttf') format('truetype');font-display:swap}
+.overlay[data-kind=intro] .hpRow{visibility:hidden}
+.overlay[data-kind=intro] .arena{--edge:10%;--card-width:240px}
+.overlay[data-kind=intro] .card{position:relative;overflow:visible}
+.introStats{position:absolute;left:0;right:0;bottom:10%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px;z-index:4;pointer-events:none}
+.introStats>div{display:flex;flex-direction:column;align-items:center;color:#fff6d4;text-shadow:0 2px 3px #000,0 0 10px #ffbd3c,0 0 22px #ffd77e;animation:introPower .65s ease-out both}
+.introStats>div:last-child{color:#c8ffff;text-shadow:0 2px 3px #000,0 0 10px #13c8ed,0 0 22px #80efff;animation-delay:.12s}
+.introStats span{font:700 12px/1.3 NexoraClash,Arial,sans-serif;background:#000b;padding:3px}
+.introStats b{font:900 34px/1.25 NexoraClash,Arial,sans-serif;-webkit-text-stroke:1px #141414;paint-order:stroke fill}
+.introVs{position:absolute;left:50%;top:35%;transform:translate(-50%,-50%);font:900 46px/1 NexoraClash,Arial,sans-serif;color:#fff2b8;text-shadow:0 0 16px #ffb72e,3px 0 #67e8ff,-3px 0 #ff7184}
+@keyframes introPower{0%{opacity:0;transform:translateY(20px) scale(.6)}35%{opacity:1;transform:translateY(-4px) scale(1.15);filter:brightness(2)}45%{translate:2px 0}55%{translate:-2px 0}100%{opacity:1;transform:none;translate:0 0;filter:none}}
+@media(max-height:600px){.overlay[data-kind=intro] .arena{--card-width:96px;--edge:12%}.introStats{gap:3px}.introStats span{font-size:7px;padding:1px}.introStats b{font-size:17px}.introVs{font-size:28px}}
+@media(prefers-reduced-motion:reduce){.introStats>div{animation:none!important}}
+.reduced .introStats>div{animation:none}
+@media(max-height:360px){.overlay[data-kind=intro] .arena{--card-width:72px}.introStats b{font-size:14px}.introStats span{font-size:6px}}
+@media(max-width:900px) and (orientation:portrait){.overlay.landscape[data-kind=intro] .arena{--card-width:86px}.introStats b{font-size:16px}.introStats span{font-size:7px}.introVs{font-size:28px}}
+@media(max-width:360px) and (orientation:portrait){.overlay.landscape[data-kind=intro] .arena{--card-width:64px}.introStats b{font-size:12px}.introStats span{font-size:6px}}
 .overlay { animation:cinematicReveal 700ms ease-out both; }
 @keyframes cinematicReveal { from { opacity:0; } to { opacity:1; } }
 .overlay[data-kind="intro"] .player { animation:arrivePlayer 1200ms cubic-bezier(.16,1,.3,1) both; }
