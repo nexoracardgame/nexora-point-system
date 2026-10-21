@@ -732,7 +732,7 @@ function applyPowerSeal(
   const [drainTarget, boostTarget] = targets;
   const uniqueTargets = new Set(targets);
 
-  if (!drainTarget || !boostTarget || uniqueTargets.size < 2) {
+  if (targets.length !== 2 || !drainTarget || !boostTarget || uniqueTargets.size !== 2) {
     events.push({
       cardNo: rule.cardNo,
       name: rule.name,
