@@ -1,8 +1,8 @@
-version: 1.0.14
+version: 1.0.15
 files:
-  - url: https://github.com/nexoracardgame/nexora-point-system/releases/download/game-v1.0.14/NEXORA-CARD-GAME-Setup-1.0.14.exe
-    sha512: Qn7QL/ys38s27M56fMwu3nC4rMKSLEVGsN2fIkUURdJW9mEr1NyGyU4iF2zLESHYa57ncc1sFTo0jKXWKlC4tA==
-    size: 850678023
-path: https://github.com/nexoracardgame/nexora-point-system/releases/download/game-v1.0.14/NEXORA-CARD-GAME-Setup-1.0.14.exe
-sha512: Qn7QL/ys38s27M56fMwu3nC4rMKSLEVGsN2fIkUURdJW9mEr1NyGyU4iF2zLESHYa57ncc1sFTo0jKXWKlC4tA==
-releaseDate: '2026-10-27T02:25:02.493Z'
+  - url: https://github.com/nexoracardgame/nexora-point-system/releases/download/game-v1.0.15/NEXORA-CARD-GAME-Setup-1.0.15.exe
+    sha512: 7f6ksMgXjii55+NFE29OiZqmkPx6jyLeQj3Xp6wq0OpuI36pbro7Qm4/6RwDvgVejVvzcv99z5mOA2RFlYX0Yw==
+    size: 850678921
+path: https://github.com/nexoracardgame/nexora-point-system/releases/download/game-v1.0.15/NEXORA-CARD-GAME-Setup-1.0.15.exe
+sha512: 7f6ksMgXjii55+NFE29OiZqmkPx6jyLeQj3Xp6wq0OpuI36pbro7Qm4/6RwDvgVejVvzcv99z5mOA2RFlYX0Yw==
+releaseDate: '2026-10-27T03:36:39.254Z'
