@@ -5,7 +5,7 @@ async function startGameLogin({onToken,timeoutMs=180000}){
   res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Type','text/html; charset=utf-8');
   const url=new URL(req.url,'http://127.0.0.1');const token=url.searchParams.get('token');
   if(used||req.method!=='GET'||url.pathname!=='/nexora-auth/'+state||!token||token.length>8192){res.statusCode=400;res.end('Invalid login callback');return}
-  used=true;clearTimeout(timer);server.close();res.end('<meta charset="utf-8"><title>NEXORA</title><p>เข้าสู่ระบบแล้ว กลับไปที่เกมได้เลย</p>');void Promise.resolve(onToken(token,verifier)).catch(()=>{});
+  used=true;clearTimeout(timer);server.close();res.statusCode=204;res.end();void Promise.resolve().then(()=>onToken(token,verifier)).catch(()=>{});
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve)});
  timer=setTimeout(()=>server.close(),timeoutMs);timer.unref();

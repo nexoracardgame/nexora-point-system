@@ -7,7 +7,7 @@ module.exports = {
   extraFiles:[{from:'desktop/node_modules',to:'resources/app/node_modules',filter:['**/*','!**/.bin/**','!**/.package-lock.json']}],
   extraResources:[...(base.extraResources||[]),{from:'public/game-release.json',to:'game-resources/game-release.json'},...release.resources.map(resource=>({from:'public'+resource.url,to:'game-resources'+resource.url}))],
   directories:{...base.directories,output:'dist/game-desktop'},
-  extraMetadata:{name:'nexora-card-game',version:'1.0.13',gameOnly:true},
+  extraMetadata:{name:'nexora-card-game',version:'1.0.14',gameOnly:true},
   win:{...base.win,icon:'desktop/assets/game-icon.ico'},
   artifactName:'NEXORA-CARD-GAME-Setup-${version}.${ext}',
   protocols:[{name:'NEXORA Game Login',schemes:['nexoragame']}],
