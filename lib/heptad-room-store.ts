@@ -4,7 +4,7 @@ import { newPentadRoom, applyPentadAction, publicPentadRoom, pentadSeat, PENTAD_
 import { pentadElementRelation, otherPentadSide, type PentadSide } from './pentad-dominion';
 import { triadCards,triadCardByNo, triadSkillRuleByNo, triadSkillElementConditionMatches } from './triad-dominion';
 import {battleBotOutcome,battleBotRisk} from './battle-bot-evaluation';
-import { completeHeptadMatchDeck, emptyHeptadDeck, heptadCanCallSpecial, HEPTAD_TURNS, HEPTAD_TIERS, validateHeptadMatchDeck, type HeptadDeck, type HeptadTurn, type HeptadTier, type HeptadBoard, type HeptadFight } from './heptad-rules';
+import { completeHeptadMatchDeck, emptyHeptadDeck, heptadCanCallSpecial, normalizeHeptadTier, HEPTAD_TURNS, HEPTAD_TIERS, validateHeptadMatchDeck, type HeptadDeck, type HeptadTurn, type HeptadTier, type HeptadBoard, type HeptadFight } from './heptad-rules';
 import { resolveHeptadClash, type HeptadCast, type HeptadResult } from './heptad-resolution';
 import { recordForfeitRank } from './battle-forfeit-rank';
 import { PENTAD_ELEMENT_SCENE_MS } from './pentad-element-presentation';
@@ -172,6 +172,7 @@ export function heptadSpecialResponder(room:HeptadRoom):PentadSide|undefined{
   return [room.opener,otherPentadSide(room.opener)].find(side=>!room.special[side]);
 }
 export function tickHeptadRoom(room:HeptadRoom,now=Date.now()){
+  room.tier=normalizeHeptadTier(room.tier);
   if(room.phase==='deck'){
     if(now>=room.deadline)for(const side of sides){room.decks[side]=completeHeptadMatchDeck(room.decks[side],room.tier,random);room.ready[side]=true;}
     if(sides.every(side=>room.ready[side]))selection(room,now);
@@ -234,7 +235,7 @@ export function applyHeptadAction(room:HeptadRoom,actor:PentadParticipant,body:R
   }
   if(!member(room,actor.id))throw Error('กรุณาเข้าร่วมห้องก่อน');
   if(action==='refresh')return;
-  if(action==='mode'){if(room.phase!=='waiting'||!controller)throw Error('เปลี่ยนโหมดไม่ได้');if(!HEPTAD_TIERS.some(tier=>tier.id===body.tier))throw Error('ระดับไม่ถูกต้อง');room.tier=body.tier as HeptadTier;return;}
+  if(action==='mode'){if(room.phase!=='waiting'||!controller)throw Error('เปลี่ยนโหมดไม่ได้');const tier=normalizeHeptadTier(body.tier as HeptadTier);if(!HEPTAD_TIERS.some(item=>item.id===tier))throw Error('ระดับไม่ถูกต้อง');room.tier=tier;return;}
   if(action==='start'){
     if(room.phase!=='waiting'||!controller||!room.lobby.seats.host||!room.lobby.seats.challenger)throw Error('รอผู้เล่นครบสองฝ่าย');
     room.phase='deck';room.deadline=now+600000;room.epoch++;room.lobby.phase='deck';
@@ -280,6 +281,7 @@ export function applyHeptadAction(room:HeptadRoom,actor:PentadParticipant,body:R
 
 export function publicHeptadRoom(room:HeptadRoom,id:string):HeptadRoom{
   const copy=structuredClone(room),side=heptadSeat(room,id);copy.lobby=publicPentadRoom(room.lobby,id);
+  copy.tier=normalizeHeptadTier(copy.tier);
   delete copy.temporaryMains;
   for(const seat of sides)if(seat!==side){
     copy.decks[seat]=[];copy.finalPool[seat]=[];

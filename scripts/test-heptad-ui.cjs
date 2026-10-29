@@ -2,6 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require('C:/Users/USER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fixture=fs.readFileSync('scripts/test-game-monsters.cjs','utf8');
 const modules=new Function('require',fixture.slice(0,fixture.indexOf('const bundle='))+'return modules;')(require);
+for(const name of ['three.module.js','three.core.js'])modules[name==='three.module.js'?'three':'./three.core.js']=ts.transpileModule(fs.readFileSync(path.join(path.dirname(require.resolve('three')),name),'utf8'),{compilerOptions:{module:1,target:9,allowJs:true},fileName:name}).outputText;
 const css=new Map(),loaded=new Set();
 const overrides={
  'next/navigation':`const router={prefetch:()=>{},replace:path=>{window.navigationTarget=path}};exports.useRouter=()=>router;`,
@@ -37,7 +38,7 @@ function add(id,file){
 add('client','app/game/heptad/HeptadClient.tsx');
 add('viewport','components/NativeViewportBridge.tsx');
 for(const file of ['app/globals.css','components/BattleHud.css','components/BattlePlayerProfile.css','components/GameWindowControls.css'])css.set(file,fs.readFileSync(file,'utf8'));
-const bundle=`const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};if(!modules[id])throw Error('Missing module '+id);new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}const React=require('react');require('react-dom/client').createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,React.createElement(require('viewport').default),React.createElement(require('client').default,{userId:'a',initialCode:'123456',spectate:false})));`;
+const bundle=`window.process={env:{NODE_ENV:'production'}};const modules=${JSON.stringify(modules)},cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};if(!modules[id])throw Error('Missing module '+id);new Function('require','module','exports',modules[id])(require,m,m.exports);return m.exports}const React=require('react');require('react-dom/client').createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,React.createElement(require('viewport').default),React.createElement(require('client').default,{userId:'a',initialCode:'123456',spectate:false})));`;
 const html=`<meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;font-family:Arial}button,input,select{font:inherit}button{color:inherit}${[...css.values()].join('\n')}</style><div class="nexora-pentad-shell" id="root"></div><script>${bundle}</script>`;
 const load=require('./game-collection-test-loader.cjs')({'./prisma':{prisma:{}}}),store=load('lib/heptad-room-store.ts'),rules=load('lib/heptad-rules.ts');
 const actor={id:'a',name:'ผู้เล่นทดสอบ',image:'/avatar.png'},rival={id:'b',name:'คู่ต่อสู้',image:'/avatar.png'};
@@ -59,12 +60,18 @@ function fresh(){room=store.newHeptadRoom('123456',actor);return room;}
  });
  for(const [width,height] of [[1920,1080],[844,390],[667,375]]){
   fresh();await page.setViewportSize({width,height});await page.goto('http://heptad.test/');await page.locator('[data-heptad-phase="waiting"]').waitFor();
+  assert.equal(await page.locator('.nsw-modes button').count(),3);
+  await page.getByRole('button',{name:/SILVER \+ GOLD/}).click();
+  await page.waitForFunction(()=>document.querySelector('.nsw-modes button[aria-pressed="true"]')?.textContent.includes('SILVER + GOLD'));
+  assert.equal(room.tier,'silver-gold');
   await page.getByRole('button',{name:'เพิ่มบอทลงสนาม ฝั่ง B',exact:true}).click();await page.getByRole('button',{name:'เอาบอทออก ฝั่ง B',exact:true}).waitFor();
   await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).click();await page.getByRole('button',{name:'เพิ่มบอทลงสนาม ฝั่ง A',exact:true}).waitFor();
   await page.getByRole('button',{name:'ลงสนาม',exact:true}).first().click();await page.getByRole('button',{name:'ไปนั่งชม',exact:true}).waitFor();
   const start=page.locator('[data-room-actions] button').filter({hasText:'เริ่ม'});assert.equal(await start.count(),1);await start.click();
   await page.locator('[data-heptad-phase="deck"]').waitFor();await page.getByRole('button',{name:'เติมเด็ค',exact:true}).click();await page.getByRole('button',{name:'ยืนยันเด็ค 105 ใบ',exact:true}).click();
   await page.locator('[data-heptad-phase="select"],[data-heptad-phase="result"]').waitFor();
+  assert.equal(new Set(room.decks.host.flatMap(d=>[...d.monsters,...d.monsterReserve])).size,45);
+  assert.deepEqual(rules.validateHeptadMatchDeck(room.decks.host,'silver-gold'),[]);
   const field=await page.locator('.heptad-field').boundingBox();assert.ok(field.x>=0&&field.y>=0&&field.width>0&&field.height>0&&field.x+field.width<=width+1&&field.y+field.height<=height+1,'Field fits '+width);
   assert.equal(await page.locator('.heptad-slot').count(),14);assert.deepEqual(errors,[]);
   const chat=await page.locator('.triad-battle-chat-hud').boundingBox(),hand=await page.locator('.nexora-arena-hand').boundingBox();

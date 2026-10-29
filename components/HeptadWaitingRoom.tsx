@@ -2,7 +2,7 @@
 
 import type { ComponentProps } from 'react';
 import BattleWaitingRoom from './BattleWaitingRoom';
-import { HEPTAD_TIERS, type HeptadTier } from '@/lib/heptad-rules';
+import { HEPTAD_TIERS, normalizeHeptadTier, type HeptadTier } from '@/lib/heptad-rules';
 
 type Props = Omit<ComponentProps<typeof BattleWaitingRoom>, 'modes' | 'mode' | 'onMode' | 'botId'> & {
   mode: HeptadTier;
@@ -11,6 +11,6 @@ type Props = Omit<ComponentProps<typeof BattleWaitingRoom>, 'modes' | 'mode' | '
 
 // No separate seat, spectator or bot UI: all modes share the same controller.
 export default function HeptadWaitingRoom({ mode, onMode, ...props }: Props) {
-  return <BattleWaitingRoom {...props} mode={mode} modes={HEPTAD_TIERS}
+  return <BattleWaitingRoom {...props} mode={normalizeHeptadTier(mode)} modes={HEPTAD_TIERS}
     onMode={value => onMode(value as HeptadTier)} botId="pentad-bot" />;
 }

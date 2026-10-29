@@ -36,7 +36,7 @@ for(const turn of [2,5]){
  store.tickHeptadRoom(timeout,3);store.tickHeptadRoom(timeout,timeout.deadline+1);assert.notEqual(timeout.phase,'element','Disconnected player cannot stall forever');
  console.log(`Turn ${turn}: VS before draw, both-player acknowledgement, no replay and timeout passed`);
 }
-for(const tier of ['all','bronze','silver','gold']){
+for(const tier of ['all','bronze','silver-gold']){
  for(let n=0;n<8;n++){
   const r=room();action(r,owner,{action:'watch'});action(r,owner,{action:'mode',tier});
   action(r,owner,{action:'bot',seat:'host',enabled:true});action(r,owner,{action:'bot',seat:'challenger',enabled:true});
