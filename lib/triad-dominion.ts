@@ -2351,6 +2351,15 @@ function applySkill(
       ? opponentScore
       : ownScore;
 
+  if (rule.cardNo === "269") {
+    const target = targetScore.contributions.find(item => item.lane === "top");
+    const attack = targetScore.metric === "attack" ? target?.value : target?.card.attack;
+    if (attack === undefined || attack < 7000) {
+      events.push({cardNo:rule.cardNo,name:rule.name,side,type:rule.shape,text:rule.text,summary:"เป้าหมายต้องมี ATTACK ตั้งแต่ 7,000 ขึ้นไป สกิลจึงจะลด ATTACK 3,000",blocked:true});
+      return {unresolved,events};
+    }
+  }
+
   for (const effect of rule.effects) {
     if (targetScore.metric !== "total" && effect.metric === targetScore.metric) {
       const eligibleContributions = targetScore.contributions.filter((item) => (rule.target !== "any-one" || item.lane === "top") && triadSkillElementConditionMatches(rule, item.card));

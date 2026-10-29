@@ -13,7 +13,7 @@
 .bpi-inline-rank{display:inline-block;width:1em;height:1em;flex:none;margin-right:5px;vertical-align:middle;color:#ffe3a0}
 .bpi-rank{position:absolute;left:42%;top:65%;width:42%;aspect-ratio:835/230}
 .bpi-rank>img{width:100%;height:100%;object-fit:contain}
-.bpi-rank>span{position:absolute;left:13%;right:13%;top:15%;bottom:35%;font-size:10px;line-height:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#fff0ca}
+.bpi-rank>span{position:absolute;left:13%;right:13%;top:15%;bottom:20%;display:flex;align-items:center;justify-content:center;gap:4px;font-size:10px;line-height:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#fff0ca}
 [data-player=true] .bpi-avatar{left:auto;right:0}
 [data-player=true] .bpi-copy{left:auto;right:29%}
 [data-player=true] .bpi-copy strong{left:23%;right:14%}
