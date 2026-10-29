@@ -5,11 +5,12 @@ import { hasPentadElementClash, PENTAD_ELEMENT_SCENE_MS } from "./pentad-element
 import type { BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
 import {battleBotOutcome,battleBotRisk} from './battle-bot-evaluation';
+import { legalTargetPreview } from './battle-target-preview';
 import { triadCardByNo, triadCards, triadSkillRuleByNo, triadSkillElementConditionMatches } from "./triad-dominion";
 import { completePentadDeck, makePentadPools, emptyPentadDeck, otherPentadSide, pentadElementRelation, resolvePentadTurn, validatePentadDeck, PENTAD_DECK_MS, PENTAD_TARGET_MS, PENTAD_TURN_MS, type PentadDeck, type PentadResolution, type PentadSide, type PentadTurn } from "./pentad-dominion";
 
 export type PentadParticipant = { id: string; name: string; image: string };
-export type PentadChoice = { side: PentadSide; cardNo: string; sourceCardNo?: string; kind?: "copy"; options: string[]; value: string; deadline: number };
+export type PentadChoice = { side: PentadSide; cardNo: string; sourceCardNo?: string; kind?: "copy"; options: string[]; value: string; preview?:string; deadline: number };
 export type PentadRound = PentadResolution & { id: number; fight: number; turn: PentadTurn; mains: Record<PentadSide, string>; skills: Record<PentadSide, string>; opener: PentadSide; endsAt: number; finalDuel: boolean; scoreBefore?: Record<PentadSide,number>; scoreAfter?: Record<PentadSide,number> };
 export type PentadRoom = {
   ownerId?:string;
@@ -393,6 +394,10 @@ export function applyPentadAction(room: PentadRoom, actor: PentadParticipant, bo
     if (!choice || choice.side !== player) throw new Error("ยังไม่ถึงลำดับเลือกเป้าหมาย");
     if (body.choiceIndex !== undefined && (requested !== choice || choice.cardNo !== body.cardNo || (choice.sourceCardNo || "") !== (body.sourceCardNo || ""))) throw new Error("คำขอเลือกเป้าหมายเปลี่ยนแล้ว");
     const value = String(body.target || "");
+    if(body.preview===true){
+      if(!legalTargetPreview(choice.options,value))throw new Error('เป้าหมายไม่เข้าเงื่อนไข');
+      choice.preview=value;return;
+    }
     if (!choice.options.includes(value)) throw new Error("เป้าหมายไม่เข้าเงื่อนไข");
     choice.value = value; settleChoice(room, choice, room.choices.indexOf(choice)); return;
   }
@@ -414,7 +419,6 @@ export function publicPentadRoom(room: PentadRoom, id: string) {
     if (room.phase !== "result" && room.phase !== "finished") {
       copy.targets[seat] = "";
       if (copy.copiedSkills) copy.copiedSkills[seat] = "";
-      copy.choices = copy.choices.map(choice => choice.side === seat ? { ...choice, options: [], value: choice.value ? 'confirmed' : '' } : choice);
     }
   }
   return copy;

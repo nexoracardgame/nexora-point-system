@@ -7,7 +7,7 @@ import { targetSelectionView, toggleTargetSelection, type TargetOptionView } fro
 import "./TargetSelectionModal.css";
 import "./BattleMobileOverlays.css";
 
-type Props = { contextKey: string; skillName: string; description: string; options: TargetOptionView[]; selected: string[]; min?: number; max?: number; sequences?: string[][]; timeLeft?: number; busy?: boolean; readOnly?: boolean; waitingText?: string; selectionHint?: string; onSelect: (ids: string[]) => void; onConfirm: () => unknown };
+type Props = { contextKey: string; skillName: string; description: string; options: TargetOptionView[]; selected: string[]; min?: number; max?: number; sequences?: string[][]; timeLeft?: number; busy?: boolean; readOnly?: boolean; waitingText?: string; selectionHint?: string; previewRequest?:{url:string;body:Record<string,unknown>;field?:string}; onSelect: (ids: string[]) => void; onConfirm: () => unknown };
 const assets = "/images/target-ui/";
 
 export default function TargetSelectionModal(props: Props) {
@@ -17,6 +17,14 @@ export default function TargetSelectionModal(props: Props) {
   const [closing, setClosing] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   latest.current = props;
+  const previewQueue=useRef(Promise.resolve());
+  const select=(ids:string[])=>{
+    if(latest.current.readOnly)return;
+    onSelect(ids);
+    const request=latest.current.previewRequest;if(!request)return;
+    const body={...request.body,preview:true,[request.field||'target']:ids.join('>')};
+    previewQueue.current=previewQueue.current.catch(()=>{}).then(async()=>{await fetch(request.url,{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify(body)});}).catch(()=>{});
+  };
   const view = targetSelectionView(options, selected, min, max, sequences);
   const expired = timeLeft !== undefined && timeLeft <= 0;
   useEffect(() => { setMounted(true); const previous = document.activeElement; const overflow = document.body.style.overflow; document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = overflow; if (previous instanceof HTMLElement) previous.focus(); }; }, []);
@@ -26,6 +34,7 @@ export default function TargetSelectionModal(props: Props) {
   const selectedKey = selected.join("|");
   useEffect(() => {
     const current = latest.current;
+    if(current.readOnly)return;
     const legal = new Set(current.options.filter(option => !option.disabled).map(option => option.id));
     const valid = [...new Set(current.selected.filter(id => legal.has(id)))];
     if (valid.join("|") !== current.selected.join("|")) current.onSelect(valid);
@@ -42,7 +51,7 @@ export default function TargetSelectionModal(props: Props) {
   };
   if (!mounted) return null;
   if (hidden) return createPortal(<button type="button" className="nexora-target-reopen" onClick={() => setHidden(false)}><Sparkles size={18} />เลือกเป้าหมายสกิล</button>, document.body);
-  return createPortal(<div className="nexora-target-overlay" data-target-mode={view.mode} data-closing={closing} role="dialog" aria-modal="true" aria-labelledby="nexora-target-title" onPointerDown={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()} onKeyDown={event => {
+  return createPortal(<div className="nexora-target-overlay" data-readonly={readOnly} data-target-mode={view.mode} data-closing={closing} role="dialog" aria-modal="true" aria-labelledby="nexora-target-title" onPointerDown={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()} onKeyDown={event => {
     if (event.key === "Escape" && !sending && !busy) hide();
     if (event.key !== "Tab") return;
     const buttons = [...(panel.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || [])];
@@ -57,7 +66,7 @@ export default function TargetSelectionModal(props: Props) {
       <div className="nexora-target-skill"><strong>{skillName}</strong><p>{description}</p>{selectionHint && <p className="nexora-target-hint">{selectionHint}</p>}{timeLeft !== undefined && <span className="nexora-target-timer" data-urgent={timeLeft <= 10}><Clock3 size={16} />{Math.floor(Math.max(0,timeLeft) / 60)}:{String(Math.max(0,timeLeft) % 60).padStart(2,"0")}</span>}</div>
       <div className="nexora-target-groups">{view.groups.map(group => <section className="nexora-target-side" data-faction={group.faction} key={group.faction}><h3><img src={assets + (group.faction === "ally" ? "gold_emblem.png" : "red_emblem.png")} alt="" aria-hidden="true" />{group.faction === "ally" ? "ฝั่งเรา" : "ฝั่งศัตรู"}</h3><div className="nexora-target-options">{group.options.map(option => {
         const index = selected.indexOf(option.id);
-        return <button key={option.id} type="button" className="nexora-target-option" data-target-id={option.id} disabled={sending || busy || readOnly || expired} aria-pressed={index >= 0} onClick={() => onSelect(toggleTargetSelection(selected, option.id, max))}>
+        return <button key={option.id} type="button" className="nexora-target-option" data-target-id={option.id} disabled={sending || busy || readOnly || expired} aria-pressed={index >= 0} onClick={() => select(toggleTargetSelection(selected, option.id, max))}>
           <div className="nexora-target-art"><img className="nexora-target-frame" src={assets + (group.faction === "ally" ? "ally_card.png" : "enemy_card.png")} alt="" aria-hidden="true" />{option.action ? <span className="nexora-target-action-art"><Sparkles size={42} /></span> : <img className="nexora-target-card" src={option.card?.sourceImage || "/cards/card-backs/card-backs.png"} alt={option.card?.name || "มอนสเตอร์ที่ยังไม่เปิดเผย"} draggable={false} />}{index >= 0 && <span className="nexora-target-check">{max > 1 ? index + 1 : <Check size={20} />}</span>}</div>
           <strong>{option.card?.name || option.label}</strong>{option.card && <span className="nexora-target-stats"><span>ATK {option.card.attack.toLocaleString()}</span><span>SUP {option.card.support.toLocaleString()}</span></span>}{option.note && <small>{option.note}</small>}
         </button>;

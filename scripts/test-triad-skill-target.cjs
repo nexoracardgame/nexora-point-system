@@ -16,12 +16,19 @@ const ctx = vm.createContext({
   publicRoom: room => structuredClone(room), ensureSkillChoices: () => {}, runBotBrain: () => {}, healTriadRoomState: () => {},
   resolveIfBothLocked: room => { if (room.game.skillChoices.every(c => c.selectedTarget || c.skipped)) room.game.turns = [{ turn: 2 }]; },
   legalManualSkillTargetSlots: () => ['host'],
+  legalTargetPreview: require('./game-collection-test-loader.cjs')()('lib/battle-target-preview.ts').legalTargetPreview,
 });
 vm.runInContext(ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, ctx);
 const reset = () => { stored = { code: 'test', game: { deckStartedAt: 100, fightNo: 1, activeTurn: 2, turns: [], skillChoices: [{ fightNo: 1, turn: 2, side: 'host', lane: 'left', cardNo: '235', deadlineAt: 31000, selectedTarget: '', skipped: false }] } }; };
 const expected = { deckStartedAt: 100, fightNo: 1, turn: 2, cardNo: '235', deadlineAt: 31000 };
 const call = (target = 'player-top', identity = expected) => ctx.chooseTriadRoomSkillTarget('test', 'host', target, identity);
 (async () => {
+  reset();
+  assert.equal((await call('player-top',{...expected,preview:true})).ok,true);
+  assert.equal(stored.game.skillChoices[0].previewTarget,'player-top');
+  assert.equal(stored.game.skillChoices[0].selectedTarget,'','Preview does not confirm');
+  assert.equal(stored.game.turns.length,0);
+  assert.equal((await call('bot-top',{...expected,preview:true})).ok,false);
   reset();
   const simultaneous = await Promise.all([call(), call('bot-top')]);
   assert.equal(simultaneous[0].ok, true);

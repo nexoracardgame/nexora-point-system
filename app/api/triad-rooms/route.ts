@@ -303,6 +303,7 @@ export async function POST(request: Request) {
       turn: typeof body.turn === "number" ? body.turn : undefined,
       cardNo: typeof body.cardNo === "string" ? cleanText(body.cardNo) : undefined,
       deadlineAt: typeof body.deadlineAt === "number" ? body.deadlineAt : undefined,
+      preview: body.preview === true,
     });
     return roomActionJson(
       result,

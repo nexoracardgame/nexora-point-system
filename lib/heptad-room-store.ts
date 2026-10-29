@@ -8,12 +8,13 @@ import { completeHeptadMatchDeck, emptyHeptadDeck, heptadCanCallSpecial, HEPTAD_
 import { resolveHeptadClash, type HeptadCast, type HeptadResult } from './heptad-resolution';
 import { recordForfeitRank } from './battle-forfeit-rank';
 import { PENTAD_ELEMENT_SCENE_MS } from './pentad-element-presentation';
+import { legalTargetPreview } from './battle-target-preview';
 
 const sides=['host','challenger'] as const;
 const pair=<T>(value:()=>T):Record<PentadSide,T>=>({host:value(),challenger:value()});
 const random=()=>randomInt(0x1000000)/0x1000000;
 export type HeptadRound=HeptadResult&{id:number;fight:number;turn:HeptadTurn;board:Record<PentadSide,HeptadBoard>;casts:HeptadCast[];finalDuel:boolean;elementPresented?:boolean};
-type Choice=HeptadCast&{options:string[];value:string;copyChoice?:boolean};
+type Choice=HeptadCast&{options:string[];value:string;preview?:string;copyChoice?:boolean};
 export type HeptadRoom={
   code:string;version:number;createdAt:number;updatedAt:number;lobby:PentadRoom;tier:HeptadTier;
   phase:'waiting'|'deck'|'select'|'element'|'special'|'target'|'result'|'finished';epoch:number;deadline:number;
@@ -268,6 +269,10 @@ export function applyHeptadAction(room:HeptadRoom,actor:PentadParticipant,body:R
   }
   if(action==='target'){
     const choice=room.choices.find(item=>!item.value);const value=String(body.target||'');
+    if(body.preview===true){
+      if(room.phase!=='target'||choice?.side!==side||body.cardNo!==choice.cardNo||Number(body.choiceIndex)!==room.choices.indexOf(choice)||!legalTargetPreview(choice.options,value))throw Error('เป้าหมายไม่ถูกต้อง');
+      choice.preview=value;return;
+    }
     if(room.phase!=='target'||choice?.side!==side||!choice.options.includes(value))throw Error('เป้าหมายไม่ถูกต้อง');settleTarget(room,choice,value);return;
   }
   throw Error('ไม่พบคำสั่ง');
@@ -283,7 +288,6 @@ export function publicHeptadRoom(room:HeptadRoom,id:string):HeptadRoom{
       const special=room.special[seat];copy.special[seat]=special==='__decline__'?'__decline__':special?'confirmed':'';
       if(special&&special!=='__decline__')copy.used[seat][room.fight-1]=copy.used[seat][room.fight-1].filter(no=>no!==special);
     }
-    if(room.phase==='target')copy.choices=copy.choices.map(choice=>choice.side===seat?{...choice,options:[],value:choice.value?'confirmed':''}:choice);
   }
   return copy;
 }

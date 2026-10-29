@@ -299,6 +299,7 @@ type RoomSkillChoice = {
   startedAt: number;
   deadlineAt: number;
   selectedTarget: string;
+  previewTarget?:string;
   skipped: boolean;
   blessingChoice?: BlessingChoice;
   blessingDrawCardNo?: string;
@@ -1148,6 +1149,7 @@ function normalizeRoomGame(value: unknown): RoomGame {
             startedAt: Number(rawChoice.startedAt || Date.now()),
             deadlineAt: Number(rawChoice.deadlineAt || Date.now()),
             selectedTarget: safeText(rawChoice.selectedTarget),
+            previewTarget: safeText(rawChoice.previewTarget),
             skipped: Boolean(rawChoice.skipped),
           };
         })
@@ -3951,10 +3953,11 @@ function MatchFinalOverlay({
 }
 
 function SkillTargetOverlay({
-  card, side, playerTop, botTop, targetPlayerTop, targetBotTop, selectedTarget, timeLeft, turn = 1, onSelect, onConfirm, copyField,
+  card, side, playerTop, botTop, targetPlayerTop, targetBotTop, selectedTarget, timeLeft, turn = 1, onSelect, onConfirm, copyField, readOnly=false, previewRequest,
 }: {
   card?: CardView; turn?: TriadTurn; side: Side; playerTop?: CardView; botTop?: CardView; targetPlayerTop?: CardView; targetBotTop?: CardView; copyField?: TriadTriangle;
   selectedTarget: PendingSkillChoice["selectedTarget"]; timeLeft: number; onSelect: (target: SkillTargetSelection) => void; onConfirm: () => void | Promise<void>;
+  readOnly?:boolean;previewRequest?:{url:string;body:Record<string,unknown>;field?:string};
 }) {
   const [copyTargetStep, setCopyTargetStep] = useState(false);
   if (!card) return null;
@@ -3962,7 +3965,8 @@ function SkillTargetOverlay({
   const sourceOptions = card.cardNo === "245" ? getPlayableSkillTargetIds(card, side, playerTop, botTop, turn, copyField) : [];
   const copyId = rawCopyId || (sourceOptions.length === 1 ? sourceOptions[0] : "");
   const copiedCard = card.cardNo === "245" ? triadCardByNo.get(copyId?.slice(5)) : undefined;
-  const targetCard = copyTargetStep && copiedCard ? copiedCard : card;
+  const showCopyTarget=copyTargetStep||(readOnly&&copiedTargets.length>0);
+  const targetCard = showCopyTarget && copiedCard ? copiedCard : card;
   const ownId = side === "player" ? "player-top" : "bot-top";
   const eligible = getPlayableSkillTargetIds(targetCard, side, targetPlayerTop || playerTop, targetBotTop || botTop, turn, copyField);
   const options: TargetOptionView[] = targetCard.cardNo === "254" ? eligible.map(id => ({ id, faction: id === "reroll-opponent" ? "enemy" : "ally", action: true, label: id === "draw-skill" ? "สุ่มสกิลเข้ามือ" : id === "reroll-own" ? "สุ่มมอนสเตอร์เรา" : "สุ่มมอนสเตอร์อีกฝ่าย" })) : targetCard.cardNo === "245" ? eligible.map(id => ({ id, faction: "enemy", label: "สกิลบนสนามฝ่ายตรงข้าม", card: triadCardByNo.get(id.slice(5)) })) : eligible.filter(id => Boolean(id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop)).map(id => ({
@@ -3971,9 +3975,10 @@ function SkillTargetOverlay({
     card: id === "player-top" ? targetPlayerTop || playerTop : targetBotTop || botTop,
   }));
   const two = isTwoStepTargetSkill(targetCard);
-  const selection = copyTargetStep ? copiedTargets.join(">") : card.cardNo === "245" ? copyId : selectedTarget;
-  const selected = selection ? parseSkillTargetSelection(selection) : !two && options.length === 1 ? [options[0].id] : [];
+  const selection = showCopyTarget ? copiedTargets.join(">") : card.cardNo === "245" ? copyId : selectedTarget;
+  const selected = selection ? parseSkillTargetSelection(selection) : !readOnly && !two && options.length === 1 ? [options[0].id] : [];
   return <TargetSelectionModal contextKey={`${card.cardNo}:${side}:${turn}:${copyTargetStep ? copyId : "source"}`} skillName={copyTargetStep ? `${card.name} → ${targetCard.name}` : card.name} description={targetCard.skillText} options={options} selected={selected} min={two ? 2 : 1} max={two ? 2 : 1} timeLeft={timeLeft}
+    readOnly={readOnly} previewRequest={previewRequest}
     selectionHint={two ? "เลือกตามลำดับ: ตัวที่ 1 ลด ATK 2,000 · ตัวที่ 2 เพิ่ม ATK 2,000" : undefined}
     onSelect={ids => onSelect((copyTargetStep ? [copyId, ...ids] : ids).join(">") as SkillTargetSelection)} onConfirm={() => {
       if (copiedCard && !copyTargetStep && /เลือก|choose|target/i.test(copiedCard.skillText)) {
@@ -4895,6 +4900,13 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
           ? `โหมดนี้ใช้การ์ดมอนสเตอร์ทั้งหมด ${DECK_SIZE} ใบ`
           : "โหมดนี้ต้องมีมอนสเตอร์อย่างน้อย 3 ใบ ที่เหลือเลือกการ์ดใดก็ได้";
   const queuedRoomSkillChoice = currentRoom ? currentQueuedSkillChoice(currentRoom) : null;
+  const targetPreviewQueue=useRef(Promise.resolve());
+  const publishSkillPreview=(selectedTarget:string)=>{
+    if(!currentRoom||!queuedRoomSkillChoice||queuedRoomSkillChoice.side!==roomPlayerSide)return;
+    const choice=queuedRoomSkillChoice;
+    const body={action:'choose-skill-target',code:currentRoom.code,selectedTarget,preview:true,deckStartedAt:currentRoom.game.deckStartedAt,fightNo:choice.fightNo,turn:choice.turn,cardNo:choice.cardNo,deadlineAt:choice.deadlineAt};
+    targetPreviewQueue.current=targetPreviewQueue.current.catch(()=>{}).then(async()=>{await fetch('/api/triad-rooms',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify(body)});}).catch(()=>{});
+  };
   const ownPendingRoomSkillChoice =
     queuedRoomSkillChoice && queuedRoomSkillChoice.side === roomPlayerSide ? queuedRoomSkillChoice : null;
   const ownPendingRoomBlessingChoice = currentRoom && roomPlayerSide
@@ -7511,6 +7523,14 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     <BattleArenaSurface image={arena.image} className={`triad-dominion-game ${isSpectator ? "triad-spectator-mode" : ""} ${spectatorDeckSelectionWaiting ? "triad-spectator-deck-waiting" : ""} relative h-full min-h-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[20px] border border-white/8 bg-[#06080d] text-white shadow-[0_26px_90px_rgba(0,0,0,0.42)] sm:rounded-[24px]`}>
       <BattleVersusIntro sessionKey={battleSessionKey} enabled={(currentRoom ? bothDecksReady : phase === "battle") && !matchDone && (currentRoom?.game.fightNo || fightNo) === 1 && (currentRoom?.game.activeTurn || activeTurn) === 1} left={currentRoom?.seats.host || participant} right={currentRoom?.seats.challenger || {name:"BOT Level.99",image:"/avatar.png"}} ranks={{left:profileForParticipant(currentRoom?.seats.host || participant,rankProfiles)?.rankName,right:profileForParticipant(currentRoom?.seats.challenger,rankProfiles)?.rankName}} />
       <BattleForfeitVictory result={currentRoom?.game.forfeit} userId={participant.id} onExit={() => { void leaveRoom(); }} />
+      {currentRoom&&waitingPendingRoomSkillChoice&&!cinematicActive&&<SkillTargetOverlay
+        key={`watch:${currentRoom.code}:${waitingPendingRoomSkillChoice.deadlineAt}`}
+        readOnly card={cardsByNo.get(waitingPendingRoomSkillChoice.cardNo)} side="player" turn={currentRoom.game.activeTurn}
+        playerTop={cardsByNo.get(currentRoom.game.triangles[waitingPendingRoomSkillChoice.side].top)}
+        botTop={cardsByNo.get(currentRoom.game.triangles[waitingPendingRoomSkillChoice.side==='host'?'challenger':'host'].top)}
+        copyField={currentRoom.game.triangles[waitingPendingRoomSkillChoice.side==='host'?'challenger':'host']}
+        selectedTarget={(waitingPendingRoomSkillChoice.previewTarget||'') as SkillTargetSelection}
+        timeLeft={Math.max(0,Math.ceil((waitingPendingRoomSkillChoice.deadlineAt-Date.now())/1000))} onSelect={()=>{}} onConfirm={()=>{}}/>}
       {currentRoom ? <BattleRoomChatHud key={currentRoom.code} room={currentRoom} currentUserId={participant.id} rankProfiles={rankProfiles} onSend={sendRoomChat} cinematicActive={cinematicActive} /> : null}
       {false && currentRoom && isFieldPlayer && !matchDone ? (
         <button
@@ -7685,9 +7705,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
                   skillSecondName={displaySkillSecondName}
                   nextSkillOpenerName={displayNextSkillOpenerName}
                   nextSkillSecondName={displayNextSkillSecondName}
-                  onSelectSkillTarget={(target) =>
-                    setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
-                  }
+                  onSelectSkillTarget={(target) => {
+                    setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current));publishSkillPreview(target);
+                  }}
                   onConfirmSkillTarget={confirmSkillTarget}
                   onDrawRandomCard={() => {
                     void drawRandomCard();
@@ -7759,9 +7779,9 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
               skillSecondName={displaySkillSecondName}
               nextSkillOpenerName={displayNextSkillOpenerName}
               nextSkillSecondName={displayNextSkillSecondName}
-              onSelectSkillTarget={(target) =>
-                setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current))
-              }
+              onSelectSkillTarget={(target) => {
+                setPendingSkillChoice((current) => (current ? { ...current, selectedTarget: target } : current));publishSkillPreview(target);
+              }}
               onConfirmSkillTarget={confirmSkillTarget}
               onDrawRandomCard={() => {
                 void drawRandomCard();

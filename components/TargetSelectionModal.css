@@ -80,3 +80,9 @@
 .nexora-target-overlay.nexora-target-overlay { z-index:2147483620; pointer-events:auto; }
 .nexora-target-option { pointer-events:auto; touch-action:manipulation; }
 .nexora-target-option > strong,.nexora-target-option > small,.nexora-target-stats { pointer-events:none; }
+.nexora-target-overlay[data-readonly=true] .nexora-target-option:disabled{opacity:1;cursor:default}
+.nexora-target-option[aria-pressed=true]{--target-accent:#ffdf80}
+@property --target-orbit{syntax:'<angle>';initial-value:0deg;inherits:false}
+.nexora-target-option[aria-pressed=true] .nexora-target-art::after{--target-accent:#ffdf80;padding:3px;border:0;background:conic-gradient(from var(--target-orbit),#b8822433 0deg 210deg,#ffd25b 250deg,#fff9d8 280deg,#ffd25b 300deg,#b8822433 340deg);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:nexora-target-orbit 1.5s linear infinite;transform:none;opacity:1}
+@keyframes nexora-target-orbit{to{--target-orbit:360deg}}
+@media(prefers-reduced-motion:reduce){.nexora-target-option[aria-pressed=true] .nexora-target-art::after{animation:none}}

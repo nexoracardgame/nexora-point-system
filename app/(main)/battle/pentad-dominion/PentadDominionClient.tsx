@@ -319,7 +319,8 @@ export default function PentadDominionClient({ userId, initialRoomCode = "", ini
     {mounted && !presentation && room?.phase === "target" && pendingChoice && targetView && <TargetSelectionModal key={choiceKey} contextKey={choiceKey}
       skillName={triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.name || pendingChoice.cardNo}
       description={pendingChoice.kind === "copy" ? "เลือกสกิลฝ่ายตรงข้ามที่จะคัดลอก" : triadCardByNo.get(pendingChoice.sourceCardNo || pendingChoice.cardNo)?.skillText || ""}
-      options={targetView.options} selected={selectedTarget ? selectedTarget.split(">") : []} min={targetView.count} max={targetView.count} sequences={targetView.sequences}
+      options={targetView.options} selected={(side===pendingChoice.side?selectedTarget:pendingChoice.preview||'').split('>').filter(Boolean)} min={targetView.count} max={targetView.count} sequences={targetView.sequences}
+      previewRequest={{url:'/api/pentad-rooms',body:{action:'target',code:room.code,epoch:room.epoch,choiceIndex:room.choices.indexOf(pendingChoice),cardNo:pendingChoice.cardNo,sourceCardNo:pendingChoice.sourceCardNo||''}}}
       timeLeft={Math.max(0, Math.ceil((pendingChoice.deadline - now) / 1000))} busy={busy} readOnly={side !== pendingChoice.side}
       waitingText={`รอ ${room.seats[pendingChoice.side]?.name || "ผู้เล่น"} เลือกเป้าหมาย`}
       selectionHint={targetView.count === 2 ? "เลือกตามลำดับ: ตัวที่ 1 ลด ATK 2,000 · ตัวที่ 2 เพิ่ม ATK 2,000" : undefined}

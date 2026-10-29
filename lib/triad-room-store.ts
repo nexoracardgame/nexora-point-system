@@ -3,6 +3,7 @@ import {validateTriadDeckMode,countTriadDeck as deckCardCounts} from './triad-de
 import { normalizeBattleForfeit, type BattleForfeit } from "./battle-forfeit";
 import { recordForfeitRank } from "./battle-forfeit-rank";
 import { bestTriadBotPlay } from "./battle-bot-search";
+import { legalTargetPreview } from './battle-target-preview';
 import {
   getTriadCardRpsChoice,
   resolveTriadTurn,
@@ -45,6 +46,7 @@ export type TriadRoomSkillChoice = {
   startedAt: number;
   deadlineAt: number;
   selectedTarget: string;
+  previewTarget?: string;
   skipped: boolean;
   blessingChoice?: TriadBlessingChoice;
   blessingDrawCardNo?: string;
@@ -437,6 +439,7 @@ function normalizeSkillChoices(value: unknown): TriadRoomSkillChoice[] {
         startedAt: Number(raw.startedAt || Date.now()),
         deadlineAt: Number(raw.deadlineAt || Date.now() + SKILL_CHOICE_TIMEOUT_MS),
         selectedTarget: cleanText(raw.selectedTarget),
+        previewTarget: cleanText(raw.previewTarget),
         skipped: Boolean(raw.skipped),
         blessingChoice:
           raw.blessingChoice === "draw-skill" || raw.blessingChoice === "reroll-own" || raw.blessingChoice === "reroll-opponent"
@@ -2827,7 +2830,7 @@ export async function lockTriadRoomCard(code: string, participantId: string, car
   };
 }
 
-export async function chooseTriadRoomSkillTarget(code: string, participantId: string, selectedTarget: string, expected: { deckStartedAt?: number; fightNo?: number; turn?: number; cardNo?: string; deadlineAt?: number } = {}) {
+export async function chooseTriadRoomSkillTarget(code: string, participantId: string, selectedTarget: string, expected: { deckStartedAt?: number; fightNo?: number; turn?: number; cardNo?: string; deadlineAt?: number; preview?:boolean } = {}) {
   return withRoomMutationLock(code, async () => {
   const room = await getStoredRoom(code);
   if (!room) return { ok: false as const, reason: "not_found" as const };
@@ -2860,6 +2863,18 @@ export async function chooseTriadRoomSkillTarget(code: string, participantId: st
     return { ok: false as const, reason: "choice_expired" as const, room: publicRoom(room) };
   }
   const cleanTarget = cleanText(selectedTarget);
+  if(expected.preview){
+    const optionsFor=(no:string):string[]=>{
+      if(no==='254')return ['draw-skill','reroll-own','reroll-opponent'];
+      const tokens=legalManualSkillTargetSlots(room,side,no).map(slot=>slot===side?'player-top':'bot-top');
+      return no==='232'?tokens.flatMap(first=>tokens.filter(second=>second!==first).map(second=>`${first}>${second}`)):tokens;
+    };
+    const options=choice.cardNo==='245'?reversalCopyOptions(room,side).flatMap(copy=>{const targets=optionsFor(copy.slice(5));return targets.length?targets.map(target=>`${copy}>${target}`):[copy];}):optionsFor(choice.cardNo);
+    if(!legalTargetPreview(options,cleanTarget))return {ok:false as const,reason:'invalid_target' as const,room:publicRoom(room)};
+    choice.previewTarget=cleanTarget;
+    await upsertStoredRoom(room);
+    return {ok:true as const,room:publicRoom(room)};
+  }
   if (choice.cardNo === "245") {
     const [copy, ...targets] = cleanTarget.split(">");
     if (!reversalCopyOptions(room, side).includes(copy)) return { ok: false as const, reason: "invalid_target" as const, room: publicRoom(room) };
