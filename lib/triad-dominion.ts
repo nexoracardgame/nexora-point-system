@@ -407,6 +407,9 @@ function hasExplicitElementCondition(text: string) {
 }
 
 function inferElementCondition(card: TriadCard): TriadSkillRule["elementCondition"] {
+  // Flavor text (such as "blue magnetic force") is not a target restriction.
+  if (card.cardNo === "240") return { mode: "exclude", elements: ["gold"] };
+  if (card.cardNo === "274") return { mode: "exclude", elements: ["fire"] };
   if (ELEMENT_CRYSTAL_CARD_NOS.has(card.cardNo) && card.element !== "unknown") {
     return { mode: "include", elements: [card.element] };
   }
@@ -2150,10 +2153,10 @@ function applySkill(
     return { unresolved, events };
   }
 
-  if (rule.cardNo === "249") {
+  if (rule.cardNo === "249" || rule.cardNo === "274") {
     const mistEvents = applyAllFieldStatRule(rule, side, ownScore, opponentScore, blockers);
     events.push(...mistEvents);
-    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: applied all-field non-water SUPPORT change`);
+    ownScore.breakdown.push(`No.${rule.cardNo} ${rule.name}: applied all-field SUPPORT change (${elementConditionLabel(rule)})`);
     return { unresolved, events };
   }
 
