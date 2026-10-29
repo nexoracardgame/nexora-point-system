@@ -1,4 +1,5 @@
 "use client";
+import GameInvitations from './GameInvitations';
 
 import {
   createContext,
@@ -247,6 +248,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   return (
     <OnlinePresenceContext.Provider value={value}>
       {children}
+      <GameInvitations/>
     </OnlinePresenceContext.Provider>
   );
 }

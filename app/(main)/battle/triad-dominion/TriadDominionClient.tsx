@@ -5207,6 +5207,12 @@ export default function TriadDominionClient({ cards, reviewSkills, summary, curr
     return stableRoom;
   };
 
+  useEffect(()=>{
+    const joined=(event:Event)=>{const room=normalizeApiRooms([(event as CustomEvent).detail])[0];if(room&&participantInRoom(room,participant.id)){setPentadHandoff(null);setHeptadHandoff(null);forceApplyServerRoom(room);}};
+    window.addEventListener('nexora:invitation-joined',joined);
+    return()=>window.removeEventListener('nexora:invitation-joined',joined);
+  });
+
   const resetLocalDeckSelectionState = (room: TriadRoom) => {
     if (deckSyncTimerRef.current) window.clearTimeout(deckSyncTimerRef.current);
     deckSyncTimerRef.current = null;

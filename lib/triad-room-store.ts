@@ -3200,8 +3200,10 @@ export async function joinTriadRoom(input: {
   if (!room) return { ok: false as const, reason: "not_found" as const };
   if (room.game.forfeit?.loser.id === input.participant.id) return { ok: false as const, reason: "not_playing" as const };
   if (room.access === "private" && room.password !== cleanText(input.password) && room.hostId !== input.participant.id) {
+    if(participantInStoredRoom(room,input.participant.id))return {ok:true as const,room:publicRoom(room),joinedAs:sideForParticipant(room,input.participant.id)?'player':'spectator'};
     return { ok: false as const, reason: "wrong_password" as const, room: publicRoom(room) };
   }
+  if(participantInStoredRoom(room,input.participant.id))return {ok:true as const,room:publicRoom(room),joinedAs:sideForParticipant(room,input.participant.id)?'player':'spectator'};
 
   const cleanRoom = removeParticipant(room, input.participant.id);
   const mustSpectate = Boolean(

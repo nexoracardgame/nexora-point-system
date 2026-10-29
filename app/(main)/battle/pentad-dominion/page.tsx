@@ -8,5 +8,5 @@ export default async function PentadDominionPage({ searchParams }: { searchParam
   const session = await getServerSession(authOptions);
   const params = new URLSearchParams(); if (query.room) params.set("room",query.room); if (query.spectate) params.set("spectate",query.spectate);
   if (!session?.user?.id) redirect(`/game/login?callbackUrl=${encodeURIComponent(`/game/pentad${params.size ? `?${params}` : ""}`)}`);
-  return <PentadDominionClient userId={String(session.user.id)} initialRoomCode={query.room || ""} initialSpectate={query.spectate === "1"} />;
+  return <PentadDominionClient key={query.room||'lobby'} userId={String(session.user.id)} initialRoomCode={query.room || ""} initialSpectate={query.spectate === "1"} />;
 }

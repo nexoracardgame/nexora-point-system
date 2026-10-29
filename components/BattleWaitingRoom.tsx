@@ -12,7 +12,7 @@ type Mode={id:string;title:string;description:string};
 type WaitingState={seats:{host:Person|null;challenger:Person|null};spectators:Person[];mode:string};
 type Side='host'|'challenger';
 type Result=void|Promise<unknown>;
-export default function BattleWaitingRoom({seats:confirmedSeats,spectators:confirmedSpectators,userId,leaderId,modes,mode:confirmedMode,canChange,preparing=false,busy:externalBusy,onMode,onWatch,onTake,onBot,children,chat,code,onExit,onStart,botId='triad-bot-level-99'}:{seats:WaitingState['seats'];spectators:Person[];userId:string;leaderId:string;modes:Mode[];mode:string;canChange:boolean;preparing?:boolean;busy?:boolean;onMode:(id:string)=>Result;onWatch:()=>Result;onTake:(side:Side)=>Result;onBot?:(side:Side,enabled:boolean)=>Result;children?:React.ReactNode;chat?:React.ReactNode;code?:string;onExit?:()=>void;onStart?:()=>Result;botId?:string}){
+export default function BattleWaitingRoom({seats:confirmedSeats,spectators:confirmedSpectators,userId,leaderId,modes,mode:confirmedMode,canChange,preparing=false,busy:externalBusy,onMode,onWatch,onTake,onBot,children,chat,code,onExit,onStart,botId='triad-bot-level-99',gameMode=botId==='pentad-bot'?'pentad':'triad'}:{seats:WaitingState['seats'];spectators:Person[];userId:string;leaderId:string;modes:Mode[];mode:string;canChange:boolean;preparing?:boolean;busy?:boolean;onMode:(id:string)=>Result;onWatch:()=>Result;onTake:(side:Side)=>Result;onBot?:(side:Side,enabled:boolean)=>Result;children?:React.ReactNode;chat?:React.ReactNode;code?:string;onExit?:()=>void;onStart?:()=>Result;botId?:string;gameMode?:'triad'|'pentad'|'heptad'}){
  const [pending,setPending]=useState<WaitingState|null>(null),[starting,setStarting]=useState(false);
  const pendingRef=useRef(pending),confirmed=useRef<WaitingState>({seats:confirmedSeats,spectators:confirmedSpectators,mode:confirmedMode});
  confirmed.current={seats:confirmedSeats,spectators:confirmedSpectators,mode:confirmedMode};
@@ -42,7 +42,7 @@ export default function BattleWaitingRoom({seats:confirmedSeats,spectators:confi
  const exit=()=>{revision.current++;queue.current.cancelPending();callbacks.current.onExit?.();};
  const seated=seats.host?.id===userId||seats.challenger?.id===userId;
  const isBot=(person:Person|null)=>person?.id===botId||person?.id==='triad-bot-level-99'||person?.id==='pentad-bot';
- return <>{code&&onExit&&onStart&&<BattleWaitingHeader code={code} onExit={exit} onStart={()=>void start()} botBusy={false} botDisabled={!canChange} startDisabled={starting||!canChange||!seats.host||!seats.challenger}/>}
+ return <>{code&&onExit&&onStart&&<BattleWaitingHeader code={code} onInvite={preparing?undefined:()=>window.dispatchEvent(new CustomEvent('nexora:invite-friends',{detail:{mode:gameMode,code}}))} onExit={exit} onStart={()=>void start()} botBusy={false} botDisabled={!canChange} startDisabled={starting||!canChange||!seats.host||!seats.challenger}/>}
  <section className="nexora-shared-waiting" aria-busy={Boolean(pending)||externalBusy}><GamePreparationBackground/><div className="nsw-seats">{(['host','challenger'] as const).map(side=>{
   const person=seats[side],bot=isBot(person);
   return <article key={side} className="nsw-seat" aria-label={side==='host'?'ฝั่ง A':'ฝั่ง B'}><div className="nsw-person">
