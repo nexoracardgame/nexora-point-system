@@ -19,6 +19,7 @@ const ALLOWED_ACTIONS = new Set([
   "oauth-login",
   "proxy-diagnostics",
   "roles",
+  "guild-emojis",
   "server-status",
   "sync-roster-message",
   "prepare-roster-emojis",
@@ -86,6 +87,7 @@ const MC_DISCORD_INVITE_URL = "https://discord.gg/n5SDytjHVw";
 const PRIMARY_CFX_STATUS_URL = "https://frontend.cfx-services.net/api/servers/single/vq3dge5";
 const PRIMARY_FIVEM_ENDPOINTS = ["play.aroundtown-rp.com:30120", "play.aroundtown-rp.com"];
 const SECONDARY_FIVEM_ENDPOINTS = ["play.mhnk.online:30120", "play.mhnk.online"];
+const WAVEVY_FIVEM_ENDPOINTS = ["play.wavevycity.com:30120", "play.wavevycity.com"];
 
 function jsonResponse(body: unknown, status = 200) {
   return Response.json(body, {
@@ -144,11 +146,12 @@ function resolveDiscordPath(action: string, body: Record<string, unknown>) {
 
   if (action === "bot") return { ok: true, method: "GET", path: "/users/@me" };
   if (action === "guild-list") return { ok: true, method: "GET", path: "/users/@me/guilds" };
-  if ((action === "guild" || action === "roles") && !guildId) {
+  if ((action === "guild" || action === "roles" || action === "guild-emojis") && !guildId) {
     return { ok: false, message: "Missing guildId" };
   }
   if (action === "guild") return { ok: true, method: "GET", path: `/guilds/${guildId}` };
   if (action === "roles") return { ok: true, method: "GET", path: `/guilds/${guildId}/roles` };
+  if (action === "guild-emojis") return { ok: true, method: "GET", path: `/guilds/${guildId}/emojis` };
   if (action === "assign-role") {
     if (!guildId || !userId || !roleId) {
       return { ok: false, message: "Missing guildId, userId, or roleId" };
@@ -379,7 +382,8 @@ async function fetchJsonWithTimeout(url: string, timeoutMs = 3500) {
 }
 
 async function getFiveMStatus(body: Record<string, unknown>) {
-  const kind = cleanText(body.kind, 20) === "secondary" ? "secondary" : "primary";
+  const requestedKind = cleanText(body.kind, 20);
+  const kind = requestedKind === "wavevy" ? "wavevy" : requestedKind === "secondary" ? "secondary" : "primary";
   const errors: string[] = [];
 
   if (kind === "primary") {
@@ -398,7 +402,7 @@ async function getFiveMStatus(body: Record<string, unknown>) {
     }
   }
 
-  const endpoints = kind === "secondary" ? SECONDARY_FIVEM_ENDPOINTS : PRIMARY_FIVEM_ENDPOINTS;
+  const endpoints = kind === "wavevy" ? WAVEVY_FIVEM_ENDPOINTS : kind === "secondary" ? SECONDARY_FIVEM_ENDPOINTS : PRIMARY_FIVEM_ENDPOINTS;
   for (const endpoint of endpoints) {
     try {
       const dynamic = await fetchJsonWithTimeout(`http://${endpoint}/dynamic.json?t=${Date.now()}`, 2500);

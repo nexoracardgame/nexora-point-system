@@ -10,6 +10,7 @@ const required = [
   'app/api/mc-discord/event-map.ts',
   'app/api/mc-discord/map-assets.json',
   'public/mc-avatars/male-15.webp',
+  'public/mc-servers/wavevy-city.webp',
   'public/mc-map/vendor/leaflet.js',
   'public/mc-map/vendor/leaflet.css',
   'public/mc-roster-background-20260930.webp',
