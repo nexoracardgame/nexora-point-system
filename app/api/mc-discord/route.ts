@@ -19,7 +19,6 @@ const ALLOWED_ACTIONS = new Set([
   "oauth-login",
   "proxy-diagnostics",
   "roles",
-  "guild-emojis",
   "server-status",
   "sync-roster-message",
   "prepare-roster-emojis",
@@ -34,6 +33,7 @@ const ROSTER_EMOJI_SOURCES = [
   { id: "1506940284205010964", name: "mc_roster_title", animated: true },
   { id: "1200056999052857354", name: "mc_roster_updated", animated: true },
   { id: "1495409128745734144", name: "mc_roster_page", animated: true },
+  { id: "wv-blue-heart-spin", name: "2750blueheartspin", animated: true, imageUrl: "https://cdn3.emoji.gg/emojis/2750-blue-heart-spin.gif" },
 ];
 
 async function rosterEmojiApi(path: string, botToken: string, payload?: Record<string, unknown>) {
@@ -62,13 +62,14 @@ async function getRosterApplicationEmojis(botToken: string, createMissing = fals
     if (!emoji && createMissing) {
       // Only copy the configured user-selected public assets, never a caller-supplied URL.
       const extension = source.animated ? "gif" : "png";
-      const image = await fetch(`https://cdn.discordapp.com/emojis/${source.id}.${extension}?size=128&quality=lossless`, { redirect: "error" });
+      const image = await fetch(source.imageUrl || `https://cdn.discordapp.com/emojis/${source.id}.${extension}?size=128&quality=lossless`, { redirect: "error" });
       const mime = image.headers.get("content-type")?.split(";")[0];
       if (!image.ok || mime !== `image/${extension}`) throw new Error(`Could not load roster emoji ${source.name}`);
       const bytes = Buffer.from(await image.arrayBuffer());
       if (!bytes.length || bytes.length > 256 * 1024) throw new Error(`Roster emoji ${source.name} exceeds Discord's upload limit`);
       emoji = await rosterEmojiApi(path, botToken, { name: source.name, image: `data:${mime};base64,${bytes.toString("base64")}` });
     }
+    if (!emoji && source.id === 'wv-blue-heart-spin' && !createMissing) continue;
     if (!emoji || !cleanSnowflake(emoji.id) || emoji.available === false || Boolean(emoji.animated) !== source.animated) {
       throw new Error(`Prepare application emoji ${source.name} before syncing the roster`);
     }
@@ -146,12 +147,11 @@ function resolveDiscordPath(action: string, body: Record<string, unknown>) {
 
   if (action === "bot") return { ok: true, method: "GET", path: "/users/@me" };
   if (action === "guild-list") return { ok: true, method: "GET", path: "/users/@me/guilds" };
-  if ((action === "guild" || action === "roles" || action === "guild-emojis") && !guildId) {
+  if ((action === "guild" || action === "roles") && !guildId) {
     return { ok: false, message: "Missing guildId" };
   }
   if (action === "guild") return { ok: true, method: "GET", path: `/guilds/${guildId}` };
   if (action === "roles") return { ok: true, method: "GET", path: `/guilds/${guildId}/roles` };
-  if (action === "guild-emojis") return { ok: true, method: "GET", path: `/guilds/${guildId}/emojis` };
   if (action === "assign-role") {
     if (!guildId || !userId || !roleId) {
       return { ok: false, message: "Missing guildId, userId, or roleId" };
