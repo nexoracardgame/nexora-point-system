@@ -51,6 +51,11 @@ function signed(body, timestamp = String(Math.floor(Date.now() / 1000))) {
   assert.equal(JSON.parse(calls[1].body).content, 'พัก AI แล้วครับ');
   assert.equal(JSON.parse(calls[1].body).allowed_mentions.parse.length, 0);
   assert.equal(calls[1].method, 'PATCH');
+  const messengerCustomer = 'M' + 'b'.repeat(32);
+  const messengerResponse = await (await output.POST(signed({ ...interaction, data: { component_type: 2, custom_id: 'noc:resume:' + messengerCustomer } }))).json();
+  assert.equal(messengerResponse.type, 5, 'Messenger controls share the verified Discord endpoint');
+  await callbacks.shift()();
+  assert.equal(JSON.parse(calls.at(-2).body).discordControl.customId, 'noc:resume:' + messengerCustomer);
   const off = await (await output.POST(signed({ ...interaction, data: { component_type: 2, custom_id: 'noc:off:' + customer } }))).json();
   assert.equal(off.type, 4);
   assert.equal(off.data.flags, 64);
@@ -58,7 +63,7 @@ function signed(body, timestamp = String(Math.floor(Date.now() / 1000))) {
   assert.equal(callbacks.length, 0, 'Permanent-off requires confirmation before mutation');
   await output.POST(signed({ ...interaction, data: { component_type: 2, custom_id: 'noc:confirmoff:' + customer } }));
   await callbacks.shift()();
-  assert.equal(JSON.parse(calls[2].body).discordControl.customId, 'noc:off:' + customer);
+  assert.equal(JSON.parse(calls.at(-2).body).discordControl.customId, 'noc:off:' + customer);
   upstreamFail = true;
   await output.POST(signed(interaction));
   await callbacks.shift()();

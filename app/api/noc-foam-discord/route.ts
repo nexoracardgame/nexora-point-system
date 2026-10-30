@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const controlSecret = process.env.NOC_DISCORD_CONTROL_SECRET || (webhookSecret ? createHmac("sha256", webhookSecret).update("noc-foam-discord-control-v1").digest("hex") : "");
   if (!appId || data.application_id !== appId || !controlSecret || !webhookSecret) return privateReply("ยังไม่ได้ตั้งค่าการควบคุม NOC AI ให้ครบครับ");
   const customId = String(data.data?.custom_id || "");
-  const match = customId.match(/^noc:(idle|pause2|pause6|resume|off|confirmoff):([UCR][a-f0-9]{32})$/i);
+  const match = customId.match(/^noc:(idle|pause2|pause6|resume|off|confirmoff):([UCRM][a-f0-9]{32})$/i);
   const userId = String(data.member?.user?.id || "");
   if (data.type !== 3 || data.data?.component_type !== 2 || !match || !/^\d{17,20}$/.test(userId) ||
       !/^\d{17,20}$/.test(String(data.id || "")) || !/^[A-Za-z0-9._-]+$/.test(String(data.token || ""))) return privateReply("คำสั่งไม่ถูกต้องครับ");
