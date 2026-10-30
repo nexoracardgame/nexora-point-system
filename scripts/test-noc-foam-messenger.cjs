@@ -20,6 +20,11 @@ const sign=body=>{const raw=JSON.stringify(body);return new Request('https://exa
   assert.ok(!/[^\x00-\x7f]/.test(forwarded.body));assert.equal(JSON.parse(forwarded.body).entry.length,1);
   assert.equal(JSON.parse(forwarded.body).entry[0].messaging[0].message.text,event.entry[0].messaging[0].message.text);
   const count=calls.length;assert.equal((await output.POST(sign({object:'page',entry:[{id:'other-page'}]}))).status,200);assert.equal(calls.length,count);
+  env.NOC_META_PAGE_IDS='123456789,282598955251288';
+  const multi={object:'page',entry:[event.entry[0],{id:'282598955251288',messaging:[]},{id:'821716087685022',messaging:[]}]};
+  assert.equal((await output.POST(sign(multi))).status,200);
+  assert.deepEqual(JSON.parse(JSON.parse(calls.at(-1).body).messengerEnvelope.body).entry.map(e=>e.id),['123456789','282598955251288'],'Only the two approved foam Pages enter the brain; the game Page is excluded');
+  env.NOC_META_PAGE_IDS='123456789,invalid';assert.equal((await output.POST(sign(event))).status,503);delete env.NOC_META_PAGE_IDS;
   upstream=false;assert.equal((await output.POST(sign(event))).status,503,'Failed processing must not claim successful delivery');
   const configuredRequest=sign(event);delete env.NOC_META_APP_SECRET;assert.equal((await output.POST(configuredRequest)).status,503);
   console.log('PASS Messenger ingress: challenge, raw-body signature, page isolation, signed ASCII bridge, fail-closed config and upstream failure. No live requests.');

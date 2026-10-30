@@ -23,9 +23,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const appSecret = process.env.NOC_META_APP_SECRET;
-  const pageId = process.env.NOC_META_PAGE_ID;
+  const pageIds = (process.env.NOC_META_PAGE_IDS || process.env.NOC_META_PAGE_ID || "").split(/[\s,]+/).filter(Boolean);
   const bridgeSecret = process.env.NOC_FOAM_WEBHOOK_SECRET;
-  if (!appSecret || !bridgeSecret || !pageId || !/^\d{5,30}$/.test(pageId)) return json({ error: "Messenger is not configured" }, 503);
+  if (!appSecret || !bridgeSecret || !pageIds.length || pageIds.length > 10 || !pageIds.every(id => /^\d{5,30}$/.test(id))) return json({ error: "Messenger is not configured" }, 503);
   if (Number(request.headers.get("content-length")) > 1048576) return json({ error: "Payload too large" }, 413);
   const raw = Buffer.from(await request.arrayBuffer());
   if (raw.length > 1048576) return json({ error: "Payload too large" }, 413);
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   let body;
   try { body = JSON.parse(raw.toString("utf8")); } catch { return json({ error: "Invalid JSON" }, 400); }
   if (!body || body.object !== "page" || !Array.isArray(body.entry)) return json({ error: "Invalid page event" }, 400);
-  const entries = body.entry.filter((entry: { id?: unknown }) => String(entry?.id || "") === pageId);
+  const entries = body.entry.filter((entry: { id?: unknown }) => pageIds.includes(String(entry?.id || "")));
   if (!entries.length) return json({ ok: true, ignored: true });
   // Bind the authenticated, page-filtered bytes to a short-lived internal envelope.
   const payload = JSON.stringify({ object: "page", entry: entries }).replace(/[\u007f-\uffff]/g, c => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
