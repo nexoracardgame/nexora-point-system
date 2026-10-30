@@ -29,10 +29,31 @@ export function validateNocPageToken(data: TokenData | null | undefined, pageId:
 
 export function inspectNocMetaToken(token: string, appSecret: string): Promise<{ status: number; body: { data?: TokenData; error?: { code?: unknown; error_subcode?: unknown } } }> {
   // Meta requires input_token in this GET query. Keep it out of Next fetch tracing and all application logs.
+  return readNocMeta(`/${NOC_META_API_VERSION}/debug_token?input_token=${encodeURIComponent(token)}`, appSecret);
+}
+
+type SubscriptionBody = { data?: { object?: unknown; active?: unknown; callback_url?: unknown; fields?: unknown }[]; error?: { code?: unknown; error_subcode?: unknown } };
+export function inspectNocMetaWebhooks(appSecret: string): Promise<{ status: number; body: SubscriptionBody }> {
+  return readNocMeta(`/${NOC_META_API_VERSION}/${NOC_META_APP_ID}/subscriptions`, appSecret);
+}
+
+export function summarizeNocMetaWebhooks(body: SubscriptionBody) {
+  if (!Array.isArray(body.data)) return { ok: false, reason: "META_FORMAT" };
+  const callback = "https://nexora-point-system.vercel.app/api/noc-foam-messenger";
+  const subscriptions = body.data.filter(entry => entry && entry.object === "page").map(entry => {
+    const fields = Array.isArray(entry.fields) ? entry.fields : [];
+    const names = fields.map(field => typeof field === "string" ? field : field?.name);
+    return { active: entry.active === true, callbackMatches: entry.callback_url === callback,
+      messages: names.includes("messages"), messageEchoes: names.includes("message_echoes") };
+  });
+  return { ok: true, appId: NOC_META_APP_ID, expectedCallback: callback, pageSubscriptions: subscriptions };
+}
+
+function readNocMeta<T>(path: string, appSecret: string): Promise<{ status: number; body: T }> {
   return new Promise((resolve, reject) => {
     const req = httpsRequest({
       hostname: "graph.facebook.com", port: 443, method: "GET", signal: AbortSignal.timeout(12000),
-      path: `/${NOC_META_API_VERSION}/debug_token?input_token=${encodeURIComponent(token)}`,
+      path,
       headers: { Authorization: `Bearer ${NOC_META_APP_ID}|${appSecret}`, Accept: "application/json" },
     }, response => {
       const chunks: Buffer[] = [];

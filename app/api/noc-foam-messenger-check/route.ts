@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { inspectNocMetaToken, validateNocPageToken, NOC_META_FOAM_PAGES } from "@/lib/noc-messenger-token-check";
+import { inspectNocMetaToken, inspectNocMetaWebhooks, summarizeNocMetaWebhooks, validateNocPageToken, NOC_META_FOAM_PAGES } from "@/lib/noc-messenger-token-check";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +25,14 @@ export async function POST(request: Request) {
   if (!appSecret || !/^[a-f0-9]{32}$/i.test(appSecret)) return json({ ok: false, reason: "SERVICE_CONFIG" }, 503);
   let body;
   try { body = JSON.parse(raw.toString("utf8")); } catch { return json({ ok: false }, 400); }
+  if (body?.operation === "webhook-status") {
+    try {
+      const result = await inspectNocMetaWebhooks(appSecret);
+      if (result.status !== 200 || result.body?.error) return json({ ok: false, reason: "META_REJECTED", metaStatus: result.status,
+        metaCode: Number.isInteger(result.body?.error?.code) ? Number(result.body?.error?.code) : 0 });
+      return json(summarizeNocMetaWebhooks(result.body));
+    } catch { return json({ ok: false, reason: "META_UNAVAILABLE" }, 502); }
+  }
   const pageId = String(body?.pageId || ""), token = String(body?.pageToken || "");
   const allowed = (process.env.NOC_META_PAGE_IDS || process.env.NOC_META_PAGE_ID || "").split(/[\s,]+/);
   if (!NOC_META_FOAM_PAGES.includes(pageId) || !allowed.includes(pageId)) return json({ ok: false, reason: "PAGE_NOT_ALLOWED" }, 400);

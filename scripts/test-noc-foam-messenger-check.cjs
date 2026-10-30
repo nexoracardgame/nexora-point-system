@@ -2,14 +2,14 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const transpile=file=>ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const library={},output={},calls=[],logs=[];
 const app='2146587072887497',page='408021709324004',token='test-page-token-'.repeat(8),appSecret='a'.repeat(32);
-let mode='';
+let mode='',subscriptionData=[];
 const valid={is_valid:true,app_id:app,type:'PAGE',profile_id:page,expires_at:0,scopes:['pages_messaging','pages_manage_metadata','pages_read_engagement'],granular_scopes:[{scope:'pages_messaging',target_ids:[page]}]};
 function mockRequest(options,callback){
   calls.push(options);const req=new EventEmitter();req.setTimeout=()=>req;req.destroy=e=>{queueMicrotask(()=>req.emit('error',e));return req;};
   req.end=()=>queueMicrotask(()=>{
     if(mode==='network'){req.emit('error',Error(token+appSecret));return;}
     const response=new EventEmitter();response.statusCode=mode==='denied'?400:mode==='redirect'?302:200;callback(response);
-    const payload=mode==='denied'?{error:{code:100,error_subcode:0,message:token+appSecret}}:{data:valid};
+    const payload=mode==='denied'?{error:{code:100,error_subcode:0,message:token+appSecret}}:{data:options.path.endsWith('/subscriptions')?subscriptionData:valid};
     response.emit('data',Buffer.from(mode==='invalid-json'?token:mode==='oversized'?'x'.repeat(70000):JSON.stringify(payload)));response.emit('end');
   });return req;
 }
@@ -40,7 +40,19 @@ function signed(body={pageId:page,pageToken:token},timestamp=String(Date.now()),
     mode=kind;const result=await (await output.POST(signed())).json();assert.equal(result.ok,false);assert.ok(!JSON.stringify(result).includes(token)&&!JSON.stringify(result).includes(appSecret));
     if(kind==='denied'){assert.equal(result.metaStatus,400);assert.equal(result.metaCode,100);}
   }
-  const before=calls.length;delete env.NOC_META_APP_SECRET;assert.equal((await output.POST(signed())).status,503);assert.equal(calls.length,before);
+  mode='';subscriptionData=[{object:'page',active:true,callback_url:'https://nexora-point-system.vercel.app/api/noc-foam-messenger',fields:[{name:'messages'},{name:'message_echoes'}]},{object:'instagram',callback_url:'https://private.test/?token='+token}];
+  const webhooks=await (await output.POST(signed({operation:'webhook-status'}))).json();
+  assert.equal(webhooks.ok,true);assert.equal(webhooks.pageSubscriptions.length,1);
+  assert.deepEqual(webhooks.pageSubscriptions[0],{active:true,callbackMatches:true,messages:true,messageEchoes:true});
+  assert.equal(calls.at(-1).path,'/v26.0/'+app+'/subscriptions');assert.equal(calls.at(-1).method,'GET');
+  assert.ok(!JSON.stringify(webhooks).includes(token));
+  subscriptionData=[{object:'page',active:false,callback_url:'https://private.test/?secret='+token,fields:[]}];
+  const wrong=await (await output.POST(signed({operation:'webhook-status'}))).json();
+  assert.equal(wrong.pageSubscriptions[0].callbackMatches,false);assert.equal(wrong.pageSubscriptions[0].messages,false);
+  assert.ok(!JSON.stringify(wrong).includes('private.test'));
+  subscriptionData=[];assert.equal((await (await output.POST(signed({operation:'webhook-status'}))).json()).pageSubscriptions.length,0);
+  mode='denied';const denied=await (await output.POST(signed({operation:'webhook-status'}))).json();assert.equal(denied.metaCode,100);assert.ok(!JSON.stringify(denied).includes(appSecret));
+  mode='';const before=calls.length;delete env.NOC_META_APP_SECRET;assert.equal((await output.POST(signed())).status,503);assert.equal(calls.length,before);
   assert.deepEqual(logs,[],'No application logs may contain provider responses, tokens or URL query strings');
   console.log('PASS Messenger token check: signed/fresh/domain-bound calls, fixed two-Page allowlist, app/type/profile/scope/expiry checks, no Page read dependency, bounded core HTTPS, sanitized errors, no credentials returned/logged, no customer sends.');
 })().catch(error=>{console.error(error.message);process.exitCode=1;});
