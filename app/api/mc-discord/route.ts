@@ -418,7 +418,7 @@ async function getFiveMStatus(body: Record<string, unknown>) {
     }
   }
 
-  const endpoints = kind === "wavevy" ? WAVEVY_FIVEM_ENDPOINTS : kind === "secondary" ? SECONDARY_FIVEM_ENDPOINTS : PRIMARY_FIVEM_ENDPOINTS;
+  const endpoints = kind === "wavevy" ? WAVEVY_FIVEM_ENDPOINTS : PRIMARY_FIVEM_ENDPOINTS;
   for (const endpoint of endpoints) {
     try {
       const dynamic = await fetchJsonWithTimeout(`http://${endpoint}/dynamic.json?t=${Date.now()}`, 2500);
