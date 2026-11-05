@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 const POPUP_URL = "https://nexora-point-system.vercel.app/api/mc-discord/login";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwyDfe498KkEUhD_W8ddE_yEJScbESaR9hxtHwGx121sTv4vpgY61uMMWu_6_-7iSsCmg/exec";
-const STATE_PATTERN = /^login_[a-f0-9]{32}$/;
+const STATE_PATTERN = /^(?:login_)?[a-f0-9]{32}$/;
 const COOKIE_PATH = "/api/mc-discord/login";
 const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 
@@ -41,9 +41,15 @@ function cookie(state: string, value: string, maxAge: number) {
 
 function html(script: string, message: string, extraHeaders: Record<string, string> = {}, callbackURL = "") {
   const nonce = randomBytes(16).toString("base64");
-  return new Response(`<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>THE MC CLUB Discord Login</title>
+  return new Response(`<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>THE MC CLUB Discord Verify</title>
     <style nonce="${nonce}">:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#08060b;color:#fff;font:16px Arial,sans-serif}main{width:min(460px,calc(100% - 40px));padding:32px 24px;text-align:center;border:1px solid #9769c0;border-radius:8px;background:#000b;box-shadow:0 0 24px #8f4cbd33}h1{font-size:24px;color:#ecdcff;text-shadow:1px 0 #a970d8}p{line-height:1.6}button{padding:12px 24px;color:#fff;background:#251333;border:1px solid #a970d8;border-radius:6px;cursor:pointer}</style></head>
-    <body><main><h1>DISCORD LOGIN</h1><p id="status" role="status">${message}</p><button id="close">กลับหน้าหลัก</button></main>${callbackURL ? `<iframe title="Discord callback" hidden src="${callbackURL.replace(/&/g, "&amp;")}"></iframe>` : ""}
+    <style nonce="${nonce}">
+    body{background:#030205}main{position:relative;background:linear-gradient(145deg,#1b1122aa,#09070cf5 60%);box-shadow:0 0 56px #a970ee16;border-color:#9f78d16b;overflow:hidden}
+    main:before{content:'';position:absolute;inset:0;border-top:1px solid #d9baff;pointer-events:none;animation:verify-signal 5s steps(1) infinite}
+    h1{letter-spacing:0}button:focus-visible{outline:2px solid #e3cbff;outline-offset:4px}
+    @keyframes verify-signal{0%,93%,100%{transform:none;clip-path:inset(0)}94%{transform:translateX(2px);clip-path:inset(24% 0 74%);background:#c594ff12}97%{transform:translateX(-2px);clip-path:inset(66% 0 32%)}}
+    @media(prefers-reduced-motion:reduce){main:before{animation:none}}
+    </style><body><main><h1>DISCORD VERIFY</h1><p id="status" role="status">${message}</p><button id="close">กลับหน้าหลัก</button></main>${callbackURL ? `<iframe title="Discord callback" hidden src="${callbackURL.replace(/&/g, "&amp;")}"></iframe>` : ""}
     <script nonce="${nonce}">function closePopup(){try{if(window.opener)window.opener.focus();}catch(error){}window.close();}document.getElementById('close').onclick=closePopup;${script}</script></body></html>`, {
     headers: { ...headers, "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; frame-src https://script.google.com https://*.googleusercontent.com; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`, ...extraHeaders },
   });
@@ -59,7 +65,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     if (!STATE_PATTERN.test(body.state || "") || !/^[a-f0-9]{32}$/.test(body.pollToken || "")) throw new Error("Invalid binding");
     const auth = new URL(String(body.authorizationUrl || ""));
-    if (auth.origin !== "https://discord.com" || auth.pathname !== "/oauth2/authorize" || auth.searchParams.get("redirect_uri") !== POPUP_URL || auth.searchParams.get("scope") !== "identify" || auth.searchParams.get("state") !== body.state || auth.searchParams.get("client_id") !== (process.env.DISCORD_CLIENT_ID?.trim() || "1544896499241062541")) throw new Error("Invalid authorization URL");
+    const scope = String(body.state).startsWith('login_') ? 'identify' : 'identify guilds.join';
+    if (auth.origin !== "https://discord.com" || auth.pathname !== "/oauth2/authorize" || auth.searchParams.get("redirect_uri") !== POPUP_URL || auth.searchParams.get("scope") !== scope || auth.searchParams.get("state") !== body.state || auth.searchParams.get("client_id") !== (process.env.DISCORD_CLIENT_ID?.trim() || "1544896499241062541")) throw new Error("Invalid authorization URL");
     const binding = { state: body.state, pollToken: body.pollToken, expiresAt: Date.now() + 300000 };
     return Response.json({ ok: true, url: auth.href }, { headers: { ...headers, "Set-Cookie": cookie(binding.state, seal(binding, secret), 300) } });
   } catch { return Response.json({ ok: false }, { status: 400, headers }); }
@@ -95,7 +102,7 @@ export async function GET(request: Request) {
     window.addEventListener('message',event=>{
       if(!event.source||event.source.top!==window||!/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(event.origin)||!event.data||event.data.state!==binding.state)return;
       if(event.data.type==='request')event.source.postMessage({type:'binding',state:binding.state,token:binding.token},event.origin);
-      if(event.data.type==='complete'){document.getElementById('status').textContent='ยืนยันเรียบร้อยแล้ว กำลังกลับหน้าหลัก...';closePopup();setTimeout(closePopup,250);}
+      if(event.data.type==='complete'){document.getElementById('status').textContent='ยืนยันเรียบร้อยแล้ว กำลังกลับหน้าหลัก...';if(!binding.state.startsWith('login_')&&event.data.joinOk===false){location.replace('https://discord.gg/n5SDytjHVw');return;}closePopup();setTimeout(closePopup,80);}
       if(event.data.type==='failed')document.getElementById('status').textContent='ยืนยันไม่สำเร็จ กรุณากลับหน้าหลักแล้วเริ่มล็อกอินใหม่';
     });`, "กำลังยืนยันตัวตน...", clearCookie, callbackURL.href);
 }

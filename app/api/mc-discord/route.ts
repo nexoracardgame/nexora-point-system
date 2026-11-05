@@ -88,6 +88,7 @@ const MC_DISCORD_INVITE_URL = "https://discord.gg/n5SDytjHVw";
 const PRIMARY_CFX_STATUS_URL = "https://frontend.cfx-services.net/api/servers/single/vq3dge5";
 const PRIMARY_FIVEM_ENDPOINTS = ["play.aroundtown-rp.com:30120", "play.aroundtown-rp.com"];
 const SECONDARY_FIVEM_ENDPOINTS = ["play.mhnk.online:30120", "play.mhnk.online"];
+const SECONDARY_CFX_STATUS_URL = "https://frontend.cfx-services.net/api/servers/single/9dbm8a";
 const WAVEVY_FIVEM_ENDPOINTS = ["play.wavevycity.com:30120", "play.wavevycity.com"];
 
 function jsonResponse(body: unknown, status = 200) {
@@ -234,7 +235,7 @@ async function completeDiscordOAuth(body: Record<string, unknown>, proxySecret: 
 
   if (!clientSecret) return { ok: false, message: "Discord client secret is not configured on Vercel" };
   if (!loginOnly && !botToken) return { ok: false, message: "Discord bot token is not configured on Vercel" };
-  const hostedLoginCallback = loginOnly && redirectUri === "https://nexora-point-system.vercel.app/api/mc-discord/login";
+  const hostedLoginCallback = redirectUri === "https://nexora-point-system.vercel.app/api/mc-discord/login";
   if (!code || (!hostedLoginCallback && !/^https:\/\/script\.google\.com\/macros\/s\/[^/?#]+\/exec$/i.test(redirectUri))) {
     return { ok: false, message: "Invalid Discord OAuth callback" };
   }
@@ -385,6 +386,21 @@ async function getFiveMStatus(body: Record<string, unknown>) {
   const requestedKind = cleanText(body.kind, 20);
   const kind = requestedKind === "wavevy" ? "wavevy" : requestedKind === "secondary" ? "secondary" : "primary";
   const errors: string[] = [];
+
+  if (kind === 'secondary') {
+    try {
+      const cfx = await fetchJsonWithTimeout(`${SECONDARY_CFX_STATUS_URL}?t=${Date.now()}`, 4000);
+      if (cfx.status === 404) return buildFiveMStatus(false, null, '9dbm8a', 'cfx-frontend');
+      const data = cfx.json && cfx.json.Data && typeof cfx.json.Data === 'object'
+        ? cfx.json.Data as Record<string, unknown> : null;
+      if (cfx.ok && data && /mahanakorn|mahanakhon|diwa/i.test(String(data.hostname || ''))) {
+        return buildFiveMStatus(true, data, '9dbm8a', 'cfx-frontend');
+      }
+      return buildFiveMUnknown('9dbm8a', `MHNK CFX unavailable [HTTP ${cfx.status}]`);
+    } catch {
+      return buildFiveMUnknown('9dbm8a', 'MHNK CFX temporarily unavailable');
+    }
+  }
 
   if (kind === "primary") {
     try {
