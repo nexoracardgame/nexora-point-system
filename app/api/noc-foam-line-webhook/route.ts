@@ -60,25 +60,43 @@ export async function POST(request: Request) {
       redirect: "follow",
     });
     const text = await upstream.text().catch(() => "");
+    let upstreamPayload: { ok?: unknown; error?: unknown } | null = null;
+    try {
+      upstreamPayload = JSON.parse(text) as { ok?: unknown; error?: unknown };
+    } catch {
+      // Apps Script should return JSON. Do not acknowledge a login/error page
+      // that happens to use HTTP 200 as a successfully processed event.
+    }
+    const applicationFailed = upstreamPayload?.ok === false;
+    const responseFailed = !upstream.ok || !upstreamPayload || applicationFailed;
     console.info("NOC FOAM LINE WEBHOOK UPSTREAM:", {
-      ok: upstream.ok,
+      ok: !responseFailed,
       status: upstream.status,
-      body: text.slice(0, 300),
+      applicationFailed,
+      error: typeof upstreamPayload?.error === "string"
+        ? upstreamPayload.error.slice(0, 180)
+        : undefined,
     });
-    if (!upstream.ok) {
+    if (responseFailed) {
       console.error("NOC FOAM LINE WEBHOOK UPSTREAM ERROR:", {
         status: upstream.status,
-        body: text.slice(0, 500),
+        applicationFailed,
+        error: typeof upstreamPayload?.error === "string"
+          ? upstreamPayload.error.slice(0, 180)
+          : "Apps Script returned a non-JSON or unsuccessful response",
       });
     }
     if (parsedBody.debug) {
       return new NextResponse(text || "{}", {
-        status: upstream.ok ? 200 : 502,
+        status: responseFailed ? 502 : 200,
         headers: {
           "Content-Type": "application/json; charset=utf-8",
           "Cache-Control": "no-store, max-age=0",
         },
       });
+    }
+    if (responseFailed) {
+      return noStoreJson({ ok: false, forwarded: false }, { status: 502 });
     }
   } catch (error) {
     console.error("NOC FOAM LINE WEBHOOK PROXY ERROR:", error);
@@ -88,6 +106,7 @@ export async function POST(request: Request) {
         error: error instanceof Error ? error.message : String(error),
       }, { status: 500 });
     }
+    return noStoreJson({ ok: false, forwarded: false }, { status: 502 });
   }
 
   return noStoreJson({
